@@ -29,6 +29,8 @@
 
 #include "mongo/db/local_catalog/ddl/direct_connection_ddl_hook.h"
 
+#include "mongo/db/auth/authorization_session_for_test.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/unittest/assert.h"
@@ -42,15 +44,91 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
 const NamespaceString kAnotherNss = NamespaceString::createNamespaceString_forTest("test2.bar");
 
+void makeAuthorizedForDirectOps(Client* client) {
+    auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(client);
+    auto authzSession =
+        std::make_unique<AuthorizationSessionForTest>(std::move(localSessionState), client);
+    authzSession->assumePrivilegesForBuiltinRole(RoleName{"root", "admin"});
+    AuthorizationSession::set(client, std::move(authzSession));
+}
+
+void makeUnauthorizedForDirectOps(Client* client) {
+    auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(client);
+    auto authzSession =
+        std::make_unique<AuthorizationSessionForTest>(std::move(localSessionState), client);
+    authzSession->assumePrivilegesForBuiltinRole(RoleName{"clusterAdmin", "admin"});
+    AuthorizationSession::set(client, std::move(authzSession));
+}
+
+class DirectConnectionDDLHookTestReplicaSet : public ServiceContextMongoDTest {
+public:
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+
+        operationContext = cc().makeOperationContext();
+
+        const auto& client = operationContext.get()->getClient();
+        authzManager = AuthorizationManager::get(client->getService());
+        AuthorizationManager::get(getServiceContext()->getService())->setAuthEnabled(true);
+    }
+
+protected:
+    AuthorizationManager* authzManager;
+    ServiceContext::UniqueOperationContext operationContext;
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagPreventDirectShardDDLsDuringPromotion", true};
+};
+
+TEST_F(DirectConnectionDDLHookTestReplicaSet, BasicRegisterUnauthorizedShardingDisabled) {
+    makeUnauthorizedForDirectOps(operationContext.get()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext.get(), kNss);
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext.get()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
 class DirectConnectionDDLHookTest : public ShardServerTestFixture {
 public:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        const auto& client = operationContext()->getClient();
+        authzManager = AuthorizationManager::get(client->getService());
+        AuthorizationManager::get(getServiceContext()->getService())->setAuthEnabled(true);
+    }
+
     auto makeClient(std::string desc = "DirectConnectionDDLHookTest",
                     std::shared_ptr<transport::Session> session = nullptr) {
         return getServiceContext()->getService()->makeClient(desc, session);
     }
+
+protected:
+    AuthorizationManager* authzManager;
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagPreventDirectShardDDLsDuringPromotion", true};
 };
 
-TEST_F(DirectConnectionDDLHookTest, BasicRegisterOp) {
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOps) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), kNss);
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpUnauthorized) {
+    makeUnauthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    ASSERT_THROWS_CODE(
+        hook.onBeginDDL(operationContext(), kNss), DBException, ErrorCodes::Unauthorized);
+}
+
+TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpNoAuth) {
+    AuthorizationManager::get(getServiceContext()->getService())->setAuthEnabled(false);
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
@@ -58,16 +136,23 @@ TEST_F(DirectConnectionDDLHookTest, BasicRegisterOp) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, RegisterOpSessionsCollection) {
+    makeUnauthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), NamespaceString::kLogicalSessionsNamespace);
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
 TEST_F(DirectConnectionDDLHookTest, RegisterMultiple) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
+
     auto secondClient = makeClient();
     auto secondOpCtx = secondClient->makeOperationContext();
+    makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
+
     hook.onBeginDDL(secondOpCtx.get(), kAnotherNss);
 
     ASSERT_EQ(hook.getOngoingOperations().size(), 2);
@@ -77,6 +162,8 @@ TEST_F(DirectConnectionDDLHookTest, RegisterMultiple) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, RegisterReEntrant) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
     hook.onBeginDDL(operationContext(), kNss);
@@ -95,6 +182,8 @@ TEST_F(DirectConnectionDDLHookTest, RegisterReEntrant) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, BasicDeRegisterOp) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
     hook.onEndDDL(operationContext(), kNss);
@@ -111,10 +200,15 @@ TEST_F(DirectConnectionDDLHookTest, DeRegisterEmpty) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, DeRegisterWrongOpId) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
+
     auto secondClient = makeClient();
     auto secondOpCtx = secondClient->makeOperationContext();
+    makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
+
     hook.onEndDDL(secondOpCtx.get(), kAnotherNss);
     ASSERT_FALSE(hook.getOngoingOperations().empty());
     hook.onEndDDL(operationContext(), kNss);
@@ -127,6 +221,8 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureNoOngoing) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureOneOp) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
     auto future = hook.getWaitForDrainedFuture(operationContext());
@@ -137,10 +233,15 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureOneOp) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureMultipleOps) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
+
     auto secondClient = makeClient();
     auto secondOpCtx = secondClient->makeOperationContext();
+    makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
+
     hook.onBeginDDL(secondOpCtx.get(), kAnotherNss);
 
     auto future = hook.getWaitForDrainedFuture(operationContext());
@@ -152,6 +253,8 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureMultipleOps) {
 }
 
 TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureReEntrant) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), kNss);
     hook.onBeginDDL(operationContext(), kNss);
@@ -164,6 +267,23 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureReEntrant) {
 
     hook.onEndDDL(operationContext(), kNss);
     ASSERT_TRUE(future.isReady());
+}
+
+TEST_F(DirectConnectionDDLHookTest, WaitForDrainedAllowedOpUnregistered) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), kNss);
+
+    auto future = hook.getWaitForDrainedFuture(operationContext());
+
+    auto secondClient = makeClient();
+    auto secondOpCtx = secondClient->makeOperationContext();
+    makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
+
+    hook.onBeginDDL(secondOpCtx.get(), kAnotherNss);
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
 
 }  // namespace

@@ -29,6 +29,9 @@
 
 #include "mongo/db/local_catalog/ddl/direct_connection_ddl_hook.h"
 
+#include "mongo/db/local_catalog/shard_role_api/direct_connection_util.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+
 namespace mongo {
 
 void DirectConnectionDDLHook::create(ServiceContext* serviceContext) {
@@ -55,10 +58,23 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx, const Namespac
         ongoingOpIt->second++;
         return;
     }
-    // TODO (SERVER-109208): add in check for whether this operation is allowed.
 
-    // Register the operation for later draining if needed.
-    _ongoingOps.emplace(opId, 1);
+    // Checks if the operation is allowed to proceed and throws ErrorCodes::Unauthorized if not.
+    // Skip these checks if the feature flag is disabled.
+    if (feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        direct_connection_util::checkDirectShardDDLAllowed(opCtx, nss);
+    }
+
+    // Register the operation for later draining if needed. We skip registering the operation if
+    // draining has started to ensure draining is possible once direct connections are disallowed -
+    // this is needed because our method of checking direct operations doesn't tell us if something
+    // is a direct operation only if it is an authorized direct operation or not. Thus authorized
+    // direct DDLs and sharded DDLs will still pass through here after we block direct DDLs.
+    if (!_drainingPromise.has_value()) {
+        _ongoingOps.emplace(opId, 1);
+    }
 }
 
 void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx, const NamespaceString& nss) {
@@ -83,6 +99,13 @@ void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx, const NamespaceS
 
 SharedSemiFuture<void> DirectConnectionDDLHook::getWaitForDrainedFuture(OperationContext* opCtx) {
     stdx::lock_guard lk(_mutex);
+    tassert(10920801,
+            "Cannot drain direct DDL operations when "
+            "featureFlagPreventDirectShardDDLsDuringPromotion is disabled",
+            feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
     // If there are no ongoing ops, then return immediately a ready future.
     if (_ongoingOps.empty()) {
         return SemiFuture<void>::makeReady().share();

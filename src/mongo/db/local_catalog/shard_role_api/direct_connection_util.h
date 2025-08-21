@@ -36,6 +36,15 @@ namespace direct_connection_util {
 
 /*
  * Checks if the operation is coming from a direct connection and whether the user has the correct
+ * permissions to execute a DDL operation directly against the shard.
+ *
+ * Throws ErrorCodes::Unauthorized if the command is a direct connection and the user does not have
+ * sufficient permissions.
+ */
+void checkDirectShardDDLAllowed(OperationContext* opCtx, const NamespaceString& nss);
+
+/*
+ * Checks if the operation is coming from a direct connection and whether the user has the correct
  * permissions to execute an operation directly against the shard.
  *
  * Throws ErrorCodes::Unauthorized if the command is a direct connection and the user does not have
