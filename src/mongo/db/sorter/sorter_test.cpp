@@ -750,8 +750,9 @@ TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
 }
 
 TEST_F(BoundedSorterTest, SpillSorted) {
+    unittest::TempDir tempDir = makeTempDir();
     auto options =
-        SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
+        SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
     sorter = makeAsc(options);
 
     auto output = sort({
@@ -771,7 +772,8 @@ TEST_F(BoundedSorterTest, SpillSorted) {
 }
 
 TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
-    auto options = SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    unittest::TempDir tempDir = makeTempDir();
+    auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16);
     sorter = makeAsc(options);
 
     auto output = sort({
@@ -792,8 +794,9 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
 }
 
 TEST_F(BoundedSorterTest, SpillAlmostSorted) {
+    unittest::TempDir tempDir = makeTempDir();
     auto options =
-        SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
+        SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
     sorter = makeAsc(options);
 
     auto output = sort({
@@ -815,7 +818,8 @@ TEST_F(BoundedSorterTest, SpillAlmostSorted) {
 }
 
 TEST_F(BoundedSorterTest, SpillWrongInput) {
-    auto options = SortOptions().TempDir("unused_temp_dir").MaxMemoryUsageBytes(16);
+    unittest::TempDir tempDir = makeTempDir();
+    auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16);
 
     std::vector<Doc> input = {
         {3},
@@ -853,8 +857,9 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
 }
 
 TEST_F(BoundedSorterTest, LimitNoSpill) {
+    unittest::TempDir tempDir = makeTempDir();
     auto options = SortOptions()
-                       .TempDir("unused_temp_dir")
+                       .TempDir(tempDir.path())
                        .MaxMemoryUsageBytes(40)
                        .Tracker(&sorterTracker)
                        .Limit(2);
@@ -884,8 +889,9 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
 }
 
 TEST_F(BoundedSorterTest, LimitSpill) {
+    unittest::TempDir tempDir = makeTempDir();
     auto options = SortOptions()
-                       .TempDir("unused_temp_dir")
+                       .TempDir(tempDir.path())
                        .MaxMemoryUsageBytes(40)
                        .Tracker(&sorterTracker)
                        .Limit(3);
@@ -917,8 +923,9 @@ TEST_F(BoundedSorterTest, LimitSpill) {
 
 TEST_F(BoundedSorterTest, ForceSpill) {
     SorterFileStats fileStats(&sorterTracker);
+    unittest::TempDir tempDir = makeTempDir();
     auto options = SortOptions()
-                       .TempDir("unused_temp_dir")
+                       .TempDir(tempDir.path())
                        .MaxMemoryUsageBytes(100 * 1024 * 1024)
                        .Tracker(&sorterTracker)
                        .FileStats(&fileStats);
@@ -1217,8 +1224,9 @@ TEST_F(BoundedSorterTest, CompoundLimit) {
 }
 
 TEST_F(BoundedSorterTest, CompoundSpill) {
+    unittest::TempDir tempDir = makeTempDir();
     auto options =
-        SortOptions().TempDir("unused_temp_dir").Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
+        SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
     sorter = makeAsc(options);
 
     // When each partition is small enough, we don't spill.
