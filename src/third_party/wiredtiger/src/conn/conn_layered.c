@@ -274,7 +274,8 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
     if (cval.len > 0 && cval.val == 0)
         checkpoint_timestamp = WT_TS_NONE;
     else
-        WT_ERR(__wt_txn_parse_timestamp(session, "checkpoint", &checkpoint_timestamp, &cval));
+        WT_ERR(
+          __wt_txn_parse_timestamp(session, "checkpoint timestamp", &checkpoint_timestamp, &cval));
 
     /* Save the metadata key-value pair. */
     metadata_key = WT_DISAGG_METADATA_URI;

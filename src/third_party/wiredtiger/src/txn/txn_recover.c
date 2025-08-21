@@ -130,7 +130,7 @@ __txn_backup_post_recovery(WT_RECOVERY *r)
             clear = false;
     }
     if (clear) {
-        F_CLR(conn, WT_CONN_INCR_BACKUP);
+        F_CLR_ATOMIC_32(conn, WT_CONN_INCR_BACKUP);
         F_CLR(&conn->log_mgr, WT_LOG_INCR_BACKUP);
         conn->incr_granularity = 0;
     }
@@ -1062,7 +1062,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[], bool disagg)
      * some sort.
      */
     if (ret == ENOENT) {
-        F_SET(conn, WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION);
         ret = WT_ERROR;
     }
 
@@ -1225,7 +1225,7 @@ done:
           " milliseconds",
           conn->recovery_timeline.rts_ms);
     } else if (disagg)
-        __wt_verbose_warning(session, WT_VERB_RTS, "%s", "skipped recovery RTS due to disagg");
+        __wt_verbose_info(session, WT_VERB_RTS, "%s", "skipped recovery RTS due to disagg");
 
     /*
      * Sometimes eviction is triggered after doing a checkpoint. However, we don't want eviction to

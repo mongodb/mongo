@@ -1914,7 +1914,7 @@ __wti_log_release(WT_SESSION_IMPL *session, WTI_LOGSLOT *slot, bool *freep)
      * field and using its condition. Don't signal on close because the checkpoint server is
      * shutdown before logging.
      */
-    if (WT_CKPT_LOGSIZE(conn) && !F_ISSET(conn, WT_CONN_CLOSING)) {
+    if (WT_CKPT_LOGSIZE(conn) && !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING)) {
         log->log_written += (wt_off_t)release_bytes;
         __wt_checkpoint_signal(session, log->log_written);
     }
@@ -2036,7 +2036,7 @@ __log_salvage_message(
 
     __wt_verbose_notice(session, WT_VERB_LOG, "log file %s corrupted%s at position %" PRIuMAX "%s.",
       log_name, extra_msg, (uintmax_t)offset, log != NULL ? ", truncated" : "");
-    F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+    F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
     return (WT_ERROR);
 }
 

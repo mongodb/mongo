@@ -85,6 +85,7 @@ class test_bug_031(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor[key] = value
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        cursor.close()
 
         # Checkpoint.
         self.session.checkpoint()
@@ -97,7 +98,9 @@ class test_bug_031(wttest.WiredTigerTestCase):
         # - A record with a start ts 10 and stop ts 20 in the HS.
 
         # RTS.
-        self.conn.rollback_to_stable()
+        self.reopen_conn()
+
+        cursor = self.session.open_cursor(uri)
 
         # Since the stable timestamp is 10, RTS marks all the updates performed at a time greater
         # time than 10 as aborted. The update chain in memory is:

@@ -363,7 +363,7 @@ err:
 static int
 __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *delta)
 {
-    WT_CELL_UNPACK_DELTA_LEAF unpack;
+    WT_CELL_UNPACK_DELTA_LEAF_KV unpack;
     WT_CURSOR_BTREE cbt;
     WT_DECL_RET;
     WT_ITEM key, value;
@@ -382,10 +382,10 @@ __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *de
     __wt_btcur_init(session, &cbt);
     __wt_btcur_open(&cbt);
 
-    WT_CELL_FOREACH_DELTA_LEAF(session, header, unpack)
+    WT_CELL_FOREACH_DELTA_LEAF(session, header, &unpack)
     {
-        key.data = unpack.key;
-        key.size = unpack.key_size;
+        key.data = unpack.delta_key.data;
+        key.size = unpack.delta_key.size;
         upd = standard_value = tombstone = NULL;
         size = 0;
 
@@ -413,60 +413,45 @@ __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *de
             size += tmp_size;
             upd = tombstone;
         } else {
-            value.data = unpack.value;
-            value.size = unpack.value_size;
+            value.data = unpack.delta_value_data.data;
+            value.size = unpack.delta_value_data.size;
             WT_ERR(__wt_upd_alloc(session, &value, WT_UPDATE_STANDARD, &standard_value, &tmp_size));
-            standard_value->txnid = unpack.tw.start_txn;
-            standard_value->upd_start_ts = unpack.tw.start_ts;
-            standard_value->upd_durable_ts = unpack.tw.durable_start_ts;
-            if (WT_TIME_WINDOW_HAS_START_PREPARE(&unpack.tw)) {
-                standard_value->prepared_id = unpack.tw.start_prepared_id;
-                standard_value->prepare_ts = unpack.tw.start_prepare_ts;
+            standard_value->txnid = unpack.delta_value.tw.start_txn;
+            if (WT_TIME_WINDOW_HAS_START_PREPARE(&unpack.delta_value.tw)) {
+                standard_value->prepared_id = unpack.delta_value.tw.start_prepared_id;
+                standard_value->prepare_ts = unpack.delta_value.tw.start_prepare_ts;
                 standard_value->prepare_state = WT_PREPARE_INPROGRESS;
+                standard_value->upd_start_ts = unpack.delta_value.tw.start_prepare_ts;
 
                 F_SET(standard_value, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
-            } else
+            } else {
+                standard_value->upd_start_ts = unpack.delta_value.tw.start_ts;
+                standard_value->upd_durable_ts = unpack.delta_value.tw.durable_start_ts;
                 F_SET(standard_value, WT_UPDATE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
+            }
             size += tmp_size;
 
-            if (WT_TIME_WINDOW_HAS_STOP(&unpack.tw)) {
+            if (WT_TIME_WINDOW_HAS_STOP(&unpack.delta_value.tw)) {
                 WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &tmp_size));
-                tombstone->txnid = unpack.tw.stop_txn;
-                tombstone->upd_start_ts = unpack.tw.stop_ts;
-                tombstone->upd_durable_ts = unpack.tw.durable_stop_ts;
+                tombstone->txnid = unpack.delta_value.tw.stop_txn;
 
-                if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&unpack.tw)) {
-                    tombstone->prepared_id = unpack.tw.stop_prepared_id;
-                    tombstone->prepare_ts = unpack.tw.stop_prepare_ts;
+                if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&unpack.delta_value.tw)) {
+                    tombstone->prepared_id = unpack.delta_value.tw.stop_prepared_id;
+                    tombstone->prepare_ts = unpack.delta_value.tw.stop_prepare_ts;
                     tombstone->prepare_state = WT_PREPARE_INPROGRESS;
+                    tombstone->upd_start_ts = unpack.delta_value.tw.stop_prepare_ts;
                     F_SET(
                       tombstone, WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS);
-
-                    if (WT_TIME_WINDOW_HAS_START_PREPARE(&unpack.tw)) {
-                        standard_value->prepared_id = unpack.tw.start_prepared_id;
-                        standard_value->prepare_ts = unpack.tw.start_prepare_ts;
-                        standard_value->prepare_state = WT_PREPARE_INPROGRESS;
-                        F_SET(standard_value,
-                          WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS);
-                    }
-                } else
+                } else {
+                    tombstone->upd_start_ts = unpack.delta_value.tw.stop_ts;
+                    tombstone->upd_durable_ts = unpack.delta_value.tw.durable_stop_ts;
                     F_SET(tombstone, WT_UPDATE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
+                }
                 size += tmp_size;
                 tombstone->next = standard_value;
                 upd = tombstone;
-            } else {
-                if (WT_TIME_WINDOW_HAS_START_PREPARE(&unpack.tw)) {
-                    WT_ASSERT(session,
-                      unpack.tw.start_prepared_id != WT_PREPARED_ID_NONE &&
-                        unpack.tw.start_prepare_ts != WT_TS_NONE);
-                    standard_value->prepared_id = unpack.tw.start_prepared_id;
-                    standard_value->prepare_ts = unpack.tw.start_prepare_ts;
-                    standard_value->prepare_state = WT_PREPARE_INPROGRESS;
-                    F_SET(standard_value,
-                      WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS);
-                }
+            } else
                 upd = standard_value;
-            }
         }
 
         WT_ERR(__wt_row_modify(&cbt, &key, NULL, &upd, WT_UPDATE_INVALID, true, true));

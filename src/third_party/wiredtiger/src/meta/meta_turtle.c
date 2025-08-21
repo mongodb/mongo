@@ -681,7 +681,7 @@ err:
     if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 ||
       strcmp(key, WT_METADATA_LIVE_RESTORE) == 0 || F_ISSET(S2C(session), WT_CONN_SALVAGE))
         return (ret);
-    F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+    F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
     WT_RET_PANIC(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error %d at %s",
       WT_METADATA_TURTLE, ret, msg);
 }
@@ -717,7 +717,7 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
     /*
      * If a compatibility setting has been explicitly set, save it out to the turtle file.
      */
-    if (F_ISSET(conn, WT_CONN_COMPATIBILITY))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_COMPATIBILITY))
         WT_ERR(__wt_fprintf(session, fs,
           "%s\n"
           "major=%" PRIu16 ",minor=%" PRIu16 "\n",
@@ -757,6 +757,6 @@ err:
      */
     if (ret == 0)
         return (ret);
-    F_SET(conn, WT_CONN_DATA_CORRUPTION);
+    F_SET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION);
     WT_RET_PANIC(session, ret, "%s: fatal turtle file update error", WT_METADATA_TURTLE);
 }

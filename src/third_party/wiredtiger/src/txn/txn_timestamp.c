@@ -9,6 +9,49 @@
 #include "wt_internal.h"
 
 /*
+ * __txn_parse_hex_raw --
+ *     Decodes and sets a hex value. Don't do any checking.
+ */
+WT_INLINE static int
+__txn_parse_hex_raw(
+  WT_SESSION_IMPL *session, const char *name, uint64_t *valuep, WT_CONFIG_ITEM *cval)
+{
+    static const int8_t hextable[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1, -1, -1, -1, -1,
+      -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 10, 11, 12, 13, 14, 15, -1};
+    uint64_t value;
+    size_t len;
+    int hex_val;
+    const char *hex_itr;
+
+    *valuep = 0;
+
+    if (cval->len == 0)
+        return (0);
+
+    /* Protect against unexpectedly long hex strings. */
+    if (cval->len > 2 * sizeof(uint64_t))
+        WT_RET_MSG(
+          session, EINVAL, "%s timestamp too long '%.*s'", name, (int)cval->len, cval->str);
+
+    for (value = 0, hex_itr = cval->str, len = cval->len; len > 0; --len) {
+        if ((size_t)*hex_itr < WT_ELEMENTS(hextable))
+            hex_val = hextable[(size_t)*hex_itr++];
+        else
+            hex_val = -1;
+        if (hex_val < 0)
+            WT_RET_MSG(
+              session, EINVAL, "Failed to parse %s '%.*s'", name, (int)cval->len, cval->str);
+        value = (value << 4) | (uint64_t)hex_val;
+    }
+    *valuep = value;
+
+    return (0);
+}
+
+/*
  * __wt_txn_parse_timestamp_raw --
  *     Decodes and sets a timestamp. Don't do any checking.
  */
@@ -16,39 +59,7 @@ int
 __wt_txn_parse_timestamp_raw(
   WT_SESSION_IMPL *session, const char *name, wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval)
 {
-    static const int8_t hextable[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1, -1, -1, -1, -1,
-      -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 10, 11, 12, 13, 14, 15, -1};
-    wt_timestamp_t ts;
-    size_t len;
-    int hex_val;
-    const char *hex_itr;
-
-    *timestamp = 0;
-
-    if (cval->len == 0)
-        return (0);
-
-    /* Protect against unexpectedly long hex strings. */
-    if (cval->len > 2 * sizeof(wt_timestamp_t))
-        WT_RET_MSG(
-          session, EINVAL, "%s timestamp too long '%.*s'", name, (int)cval->len, cval->str);
-
-    for (ts = 0, hex_itr = cval->str, len = cval->len; len > 0; --len) {
-        if ((size_t)*hex_itr < WT_ELEMENTS(hextable))
-            hex_val = hextable[(size_t)*hex_itr++];
-        else
-            hex_val = -1;
-        if (hex_val < 0)
-            WT_RET_MSG(session, EINVAL, "Failed to parse %s timestamp '%.*s'", name, (int)cval->len,
-              cval->str);
-        ts = (ts << 4) | (uint64_t)hex_val;
-    }
-    *timestamp = ts;
-
-    return (0);
+    return (__txn_parse_hex_raw(session, name, timestamp, cval));
 }
 
 /*
@@ -61,7 +72,22 @@ __wt_txn_parse_timestamp(
 {
     WT_RET(__wt_txn_parse_timestamp_raw(session, name, timestamp, cval));
     if (cval->len != 0 && *timestamp == WT_TS_NONE)
-        WT_RET_MSG(session, EINVAL, "illegal %s timestamp '%.*s': zero not permitted", name,
+        WT_RET_MSG(session, EINVAL, "illegal %s '%.*s': zero not permitted", name, (int)cval->len,
+          cval->str);
+
+    return (0);
+}
+
+/*
+ * __wt_txn_parse_prepared_id --
+ *     Decodes and sets a prepared id checking it is non-zero.
+ */
+int
+__wt_txn_parse_prepared_id(WT_SESSION_IMPL *session, uint64_t *prepared_id, WT_CONFIG_ITEM *cval)
+{
+    WT_RET(__txn_parse_hex_raw(session, "prepare id", prepared_id, cval));
+    if (cval->len != 0 && *prepared_id == WT_PREPARED_ID_NONE)
+        WT_RET_MSG(session, EINVAL, "illegal prepared id '%.*s': zero not permitted",
           (int)cval->len, cval->str);
 
     return (0);
@@ -362,9 +388,9 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * Parsing will initialize the timestamp to zero even if it is not configured.
      */
-    WT_RET(__wt_txn_parse_timestamp(session, "durable", &durable_ts, &durable_cval));
-    WT_RET(__wt_txn_parse_timestamp(session, "oldest", &oldest_ts, &oldest_cval));
-    WT_RET(__wt_txn_parse_timestamp(session, "stable", &stable_ts, &stable_cval));
+    WT_RET(__wt_txn_parse_timestamp(session, "durable timestamp", &durable_ts, &durable_cval));
+    WT_RET(__wt_txn_parse_timestamp(session, "oldest timestamp", &oldest_ts, &oldest_cval));
+    WT_RET(__wt_txn_parse_timestamp(session, "stable timestamp", &stable_ts, &stable_cval));
 
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
     force = cval.val != 0;
@@ -983,10 +1009,6 @@ __txn_set_rollback_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
     if (!F_ISSET(txn, WT_TXN_PREPARE))
         WT_RET_MSG(session, EINVAL, "rollback timestamp is set for an non-prepared transaction");
 
-    if (!F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED))
-        WT_RET_MSG(
-          session, EINVAL, "rollback timestamp is set when the preserve_prepared config is off");
-
     if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
         WT_RET_MSG(session, EINVAL, "rollback timestamp is already set");
 
@@ -1010,6 +1032,26 @@ __txn_set_rollback_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
     }
     txn->rollback_timestamp = rollback_ts;
     F_SET(txn, WT_TXN_HAS_TS_ROLLBACK);
+
+    return (0);
+}
+
+/*
+ * __txn_set_prepared_id --
+ *     Validate and set the prepared_id.
+ */
+static int
+__txn_set_prepared_id(WT_SESSION_IMPL *session, uint64_t prepared_id)
+{
+    WT_TXN *txn;
+
+    txn = session->txn;
+
+    if (F_ISSET(txn, WT_TXN_HAS_PREPARED_ID))
+        WT_RET_MSG(session, EINVAL, "prepared id is already set");
+
+    txn->prepared_id = prepared_id;
+    F_SET(txn, WT_TXN_HAS_PREPARED_ID);
 
     return (0);
 }
@@ -1056,19 +1098,20 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[], bool commit)
         while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0) {
             WT_ASSERT(session, ckey.str != NULL);
             if (WT_CONFIG_LIT_MATCH("commit_timestamp", ckey)) {
-                WT_RET(__wt_txn_parse_timestamp(session, "commit", &commit_ts, &cval));
+                WT_RET(__wt_txn_parse_timestamp(session, "commit timestamp", &commit_ts, &cval));
                 set_ts = true;
             } else if (WT_CONFIG_LIT_MATCH("durable_timestamp", ckey)) {
-                WT_RET(__wt_txn_parse_timestamp(session, "durable", &durable_ts, &cval));
+                WT_RET(__wt_txn_parse_timestamp(session, "durable timestamp", &durable_ts, &cval));
                 set_ts = true;
             } else if (WT_CONFIG_LIT_MATCH("prepare_timestamp", ckey)) {
-                WT_RET(__wt_txn_parse_timestamp(session, "prepare", &prepare_ts, &cval));
+                WT_RET(__wt_txn_parse_timestamp(session, "prepare timestamp", &prepare_ts, &cval));
                 set_ts = true;
             } else if (WT_CONFIG_LIT_MATCH("read_timestamp", ckey)) {
-                WT_RET(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
+                WT_RET(__wt_txn_parse_timestamp(session, "read timestamp", &read_ts, &cval));
                 set_ts = true;
             } else if (WT_CONFIG_LIT_MATCH("rollback_timestamp", ckey)) {
-                WT_RET(__wt_txn_parse_timestamp(session, "rollback", &rollback_ts, &cval));
+                WT_RET(
+                  __wt_txn_parse_timestamp(session, "rollback timestamp", &rollback_ts, &cval));
                 set_ts = true;
             }
         }
@@ -1171,6 +1214,62 @@ __wt_txn_set_timestamp_uint(WT_SESSION_IMPL *session, WT_TS_TXN_TYPE which, wt_t
     if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING) &&
       F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) && !F_ISSET(conn, WT_CONN_RECOVERING))
         WT_RET(__wti_txn_ts_log(session));
+
+    return (0);
+}
+
+/*
+ * __wt_txn_set_prepared_id --
+ *     Parse a request to set a prepared_id in a transaction.
+ */
+int
+__wt_txn_set_prepared_id(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_CONFIG cparser;
+    WT_CONFIG_ITEM ckey, cval;
+    WT_DECL_RET;
+    uint64_t prepared_id;
+
+    WT_RET(__wt_txn_context_check(session, true));
+
+    prepared_id = WT_PREPARED_ID_NONE;
+
+    /*
+     * If the API received no configuration string, or we just have the base configuration, there
+     * are no strings to parse. Additionally, take a shortcut in parsing that works because we're
+     * only given a base configuration and a user configuration.
+     */
+    if (cfg != NULL && cfg[0] != NULL && cfg[1] != NULL) {
+        WT_ASSERT(session, cfg[2] == NULL);
+        __wt_config_init(session, &cparser, cfg[1]);
+        while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0) {
+            WT_ASSERT(session, ckey.str != NULL);
+            if (WT_CONFIG_LIT_MATCH("prepared_id", ckey))
+                WT_RET(__wt_txn_parse_prepared_id(session, &prepared_id, &cval));
+        }
+        WT_RET_NOTFOUND_OK(ret);
+    }
+
+    if (prepared_id != WT_PREPARED_ID_NONE)
+        WT_RET(__txn_set_prepared_id(session, prepared_id));
+
+    return (0);
+}
+
+/*
+ * __wt_txn_set_prepared_id_uint --
+ *     Directly set the prepared id in a transaction, bypassing parsing logic. Prefer this to
+ *     __wt_txn_set_prepared_id when string parsing is a performance bottleneck.
+ */
+int
+__wt_txn_set_prepared_id_uint(WT_SESSION_IMPL *session, uint64_t prepared_id)
+{
+    WT_RET(__wt_txn_context_check(session, true));
+
+    if (prepared_id == WT_PREPARED_ID_NONE)
+        WT_RET_MSG(session, EINVAL, "illegal prepared id: zero not permitted");
+
+    WT_RET(__txn_set_prepared_id(session, prepared_id));
 
     return (0);
 }

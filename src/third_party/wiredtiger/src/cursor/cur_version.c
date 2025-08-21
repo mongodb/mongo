@@ -967,7 +967,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
 
     /* Open the history store cursor for btrees that may have data in the history store.*/
     file_btree = CUR2BT(version_cursor->file_cursor);
-    if (F_ISSET(conn, WT_CONN_HS_OPEN) && !F_ISSET(file_btree, WT_BTREE_IN_MEMORY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_HS_OPEN) && !F_ISSET(file_btree, WT_BTREE_IN_MEMORY)) {
         WT_ERR(__wt_curhs_open(session, file_btree->id, cursor, &version_cursor->hs_cursor));
         F_SET(version_cursor->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
     }
@@ -1002,7 +1002,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
       __wt_config_gets_def(session, cfg, "debug.dump_version.start_timestamp", 0, &cval), true);
     if (ret == 0)
         WT_ERR(__wt_txn_parse_timestamp(
-          session, "start_timestamp", &version_cursor->start_timestamp, &cval));
+          session, "start timestamp", &version_cursor->start_timestamp, &cval));
     else
         ret = 0;
 

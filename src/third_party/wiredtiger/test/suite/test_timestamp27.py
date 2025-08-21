@@ -50,9 +50,7 @@ class test_timestamp27_preserve_prepared_off(wttest.WiredTigerTestCase):
     def test_prepared(self):
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50))
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-        self.session.timestamp_transaction('rollback_timestamp=' + self.timestamp_str(100)),
-            '/rollback timestamp is set when the preserve_prepared config is off/')
+        self.session.timestamp_transaction('rollback_timestamp=' + self.timestamp_str(100))
 
 class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
     conn_config = "precise_checkpoint=true,preserve_prepared=true"

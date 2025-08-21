@@ -1040,7 +1040,7 @@ __wti_live_restore_fs_restore_file(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
          * closing state in the meantime.
          */
         WT_ERR(WT_SESSION_CHECK_PANIC(wt_session));
-        if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING))
             break;
     }
 err:

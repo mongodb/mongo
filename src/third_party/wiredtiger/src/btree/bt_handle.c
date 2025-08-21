@@ -226,7 +226,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
      * entries, it can't be a metadata file, nor can it be the history store file.
      */
     WT_ASSERT(session,
-      !F_ISSET(S2C(session), WT_CONN_HS_OPEN) || !btree->hs_entries ||
+      !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN) || !btree->hs_entries ||
         (!WT_IS_METADATA(btree->dhandle) && !WT_IS_HS(btree->dhandle)));
 
     /* Clear the saved checkpoint information. */
@@ -519,7 +519,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     WT_RET_NOTFOUND_OK(ret);
     if (ret == 0 && cval.len != 0)
         WT_RET(__wt_txn_parse_timestamp_raw(
-          session, "flush_timestamp", &btree->flush_most_recent_ts, &cval));
+          session, "flush timestamp", &btree->flush_most_recent_ts, &cval));
 
     /* Checksums */
     WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
@@ -748,7 +748,7 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
      * Flag any failed read or verification: if we're in startup, it may be fatal.
      */
     if (ret != 0)
-        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
     F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
     if (ret != 0)
         __wt_err(session, ret, "unable to read root page from %s", session->dhandle->name);
@@ -1088,7 +1088,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     btree->maxmempage = (uint64_t)cval.val;
 
 #define WT_MIN_PAGES 10
-    if (!F_ISSET(conn, WT_CONN_CACHE_POOL) && (cache_size = conn->cache_size) > 0)
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL) && (cache_size = conn->cache_size) > 0)
         btree->maxmempage = (uint64_t)WT_MIN(btree->maxmempage,
           ((conn->evict->eviction_dirty_trigger * cache_size) / 100) / WT_MIN_PAGES);
 

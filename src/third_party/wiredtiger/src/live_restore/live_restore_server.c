@@ -196,7 +196,7 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
     uint64_t time_diff_ms;
 
-    if (!F_ISSET(S2C(session), WT_CONN_READY)) {
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY)) {
         /*
          * Wait until the connection has finished opening to begin migration. Otherwise we could
          * start up, see an empty queue, and immediately call the live restore clean up logic. This

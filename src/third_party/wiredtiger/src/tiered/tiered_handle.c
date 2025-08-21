@@ -589,7 +589,7 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
      * See if there are earlier objects that are not yet flushed, as we could have crashed in the
      * middle of flushing and restarted.
      */
-    if (F_ISSET(S2C(session), WT_CONN_TIERED_FIRST_FLUSH))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_TIERED_FIRST_FLUSH))
         WT_ERR(__tiered_restart_work(session, tiered));
 
     /* Create the object: entry in the metadata. */

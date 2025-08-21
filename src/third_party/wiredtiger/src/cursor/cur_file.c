@@ -901,7 +901,7 @@ __curfile_setup_checkpoint(WT_CURSOR_BTREE *cbt, const char *cfg[], WT_DATA_HAND
             ckpt_snapshot->stable_ts = WT_TXN_NONE;
         else if (cval.val != 0) {
             WT_ERR(__wt_txn_parse_timestamp(
-              session, "checkpoint_read", &ckpt_snapshot->stable_ts, &cval));
+              session, "checkpoint read timestamp", &ckpt_snapshot->stable_ts, &cval));
             /*
              * Fail if the read timestamp is less than checkpoint's oldest timestamp. Since this is
              * a debug setting it's not super critical to make it a usable interface, and for

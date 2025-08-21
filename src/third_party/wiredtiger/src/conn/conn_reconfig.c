@@ -57,7 +57,7 @@ __wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     if (cval.len == 0) {
         new_compat.major = WIREDTIGER_VERSION_MAJOR;
         new_compat.minor = WIREDTIGER_VERSION_MINOR;
-        F_CLR(conn, WT_CONN_COMPATIBILITY);
+        F_CLR_ATOMIC_32(conn, WT_CONN_COMPATIBILITY);
     } else {
         WT_RET(__conn_compat_parse(session, &cval, &new_compat.major, &new_compat.minor));
 
@@ -75,13 +75,13 @@ __wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
             if (txn_active)
                 WT_RET_MSG(session, ENOTSUP, "system must be quiescent for upgrade or downgrade");
         }
-        F_SET(conn, WT_CONN_COMPATIBILITY);
+        F_SET_ATOMIC_32(conn, WT_CONN_COMPATIBILITY);
     }
     /*
      * If we're a reconfigure and the user did not set any compatibility or did not change the
      * setting, we're done.
      */
-    if (reconfig && (!F_ISSET(conn, WT_CONN_COMPATIBILITY) || unchg))
+    if (reconfig && (!F_ISSET_ATOMIC_32(conn, WT_CONN_COMPATIBILITY) || unchg))
         goto done;
 
     /*
@@ -222,9 +222,9 @@ __wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool recon
 
     WT_RET(__wt_config_gets(session, cfg, "operation_tracking.enabled", &cval));
     if (cval.val == 0) {
-        if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
             WT_RET(__wti_conn_optrack_teardown(session, reconfig));
-            F_CLR(conn, WT_CONN_OPTRACK);
+            F_CLR_ATOMIC_32(conn, WT_CONN_OPTRACK);
         }
         return (0);
     }
@@ -232,7 +232,7 @@ __wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool recon
         /* Operation tracking isn't supported in read-only mode */
         WT_RET_MSG(
           session, EINVAL, "Operation tracking is incompatible with read only configuration");
-    if (F_ISSET(conn, WT_CONN_OPTRACK))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK))
         /* Already enabled, nothing else to do */
         return (0);
 
@@ -258,7 +258,7 @@ __wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool recon
     WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE, &conn->dummy_session.optrack_buf));
 
     /* Set operation tracking on */
-    F_SET(conn, WT_CONN_OPTRACK);
+    F_SET_ATOMIC_32(conn, WT_CONN_OPTRACK);
 
 err:
     __wt_scr_free(session, &buf);
@@ -281,7 +281,7 @@ __wti_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
         /* Looks like we are shutting down */
         __wt_free(session, conn->optrack_path);
 
-    if (!F_ISSET(conn, WT_CONN_OPTRACK))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK))
         return (0);
 
     __wt_spin_destroy(session, &conn->optrack_map_spinlock);
@@ -393,7 +393,7 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 
     /* Serialize reconfiguration. */
     __wt_spin_lock(session, &conn->reconfig_lock);
-    F_SET(conn, WT_CONN_RECONFIGURING);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING);
 
     /*
      * The configuration argument has been checked for validity, update the previous connection
@@ -482,7 +482,7 @@ done:
     conn->cfg = p;
 
 err:
-    F_CLR(conn, WT_CONN_RECONFIGURING);
+    F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING);
     __wt_spin_unlock(session, &conn->reconfig_lock);
 
     return (ret);

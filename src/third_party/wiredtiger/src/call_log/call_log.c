@@ -456,7 +456,7 @@ __wt_call_log_timestamp_transaction(WT_SESSION_IMPL *session, const char *config
  */
 int
 __wt_call_log_timestamp_transaction_uint(
-  WT_SESSION_IMPL *session, WT_TS_TXN_TYPE which, uint64_t ts, int ret_val)
+  WT_SESSION_IMPL *session, WT_TS_TXN_TYPE which, wt_timestamp_t ts, int ret_val)
 {
     WT_CONNECTION_IMPL *conn;
     char ts_buf[128];
@@ -499,6 +499,68 @@ __wt_call_log_timestamp_transaction_uint(
     WT_RET(__call_log_print_input(session, 2, ts_type_buf, ts_buf));
 
     /* timestamp_transaction_uint has no output arguments. */
+    WT_RET(__call_log_print_output(session, 0));
+    WT_RET(__wt_call_log_print_return(conn, session, ret_val, ""));
+
+    return (0);
+}
+
+/*
+ * __wt_call_log_prepared_id_transaction --
+ *     Print the call log entry for the prepared_id_transaction API call.
+ */
+int
+__wt_call_log_prepared_id_transaction(WT_SESSION_IMPL *session, const char *config, int ret_val)
+{
+    WT_CONNECTION_IMPL *conn;
+    char config_buf[128];
+
+    conn = S2C(session);
+
+    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+        return (0);
+
+    WT_RET(__call_log_print_start(session, "session", "prepared_id_transaction"));
+    WT_RET(__wt_fprintf(session, conn->call_log_fst, "    \"session_id\": \"%p\",\n", session));
+
+    /*
+     * The prepared id transaction entry includes the prepared id configuration string which is
+     * copied from the original API call.
+     */
+    WT_RET(__wt_snprintf(config_buf, sizeof(config_buf), "\"config\": \"%s\"", config));
+    WT_RET(__call_log_print_input(session, 1, config_buf));
+
+    /* prepared_id_transaction has no output arguments. */
+    WT_RET(__call_log_print_output(session, 0));
+    WT_RET(__wt_call_log_print_return(conn, session, ret_val, ""));
+
+    return (0);
+}
+
+/*
+ * __wt_call_log_prepared_id_transaction_uint --
+ *     Print the call log entry for the prepared_id_transaction_uint API call.
+ */
+int
+__wt_call_log_prepared_id_transaction_uint(
+  WT_SESSION_IMPL *session, uint64_t prepared_id, int ret_val)
+{
+    WT_CONNECTION_IMPL *conn;
+    char buf[128];
+
+    conn = S2C(session);
+
+    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+        return (0);
+
+    WT_RET(__call_log_print_start(session, "session", "prepared_id_transaction_uint"));
+    WT_RET(__wt_fprintf(session, conn->call_log_fst, "    \"session_id\": \"%p\",\n", session));
+
+    /* The prepared id transaction uint entry includes the prepared id being set. */
+    WT_RET(__wt_snprintf(buf, sizeof(buf), "\"prepared_id\": %" PRIu64, prepared_id));
+    WT_RET(__call_log_print_input(session, 1, buf));
+
+    /* prepared_id_transaction_uint has no output arguments. */
     WT_RET(__call_log_print_output(session, 0));
     WT_RET(__wt_call_log_print_return(conn, session, ret_val, ""));
 

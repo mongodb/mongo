@@ -157,6 +157,7 @@ WT_CONF_API_DECLARE(WT_SESSION, drop, 1, 5);
 WT_CONF_API_DECLARE(WT_SESSION, log_flush, 1, 1);
 WT_CONF_API_DECLARE(WT_SESSION, open_cursor, 4, 34);
 WT_CONF_API_DECLARE(WT_SESSION, prepare_transaction, 1, 2);
+WT_CONF_API_DECLARE(WT_SESSION, prepared_id_transaction, 1, 1);
 WT_CONF_API_DECLARE(WT_SESSION, query_timestamp, 1, 1);
 WT_CONF_API_DECLARE(WT_SESSION, reconfigure, 3, 9);
 WT_CONF_API_DECLARE(WT_SESSION, rollback_transaction, 1, 2);
@@ -177,7 +178,7 @@ WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_all, 25, 191);
 WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_basecfg, 25, 185);
 WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_usercfg, 25, 184);
 
-#define WT_CONF_API_ELEMENTS 54
+#define WT_CONF_API_ELEMENTS 56
 
 /*
  * Per-API configuration structure declarations: END

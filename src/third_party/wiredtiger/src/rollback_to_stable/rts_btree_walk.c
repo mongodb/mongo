@@ -248,7 +248,8 @@ __rts_btree(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollback_t
      * Ignore rollback to stable failures on files that don't exist or files where corruption is
      * detected.
      */
-    if (ret == ENOENT || (ret == WT_ERROR && F_ISSET(S2C(session), WT_CONN_DATA_CORRUPTION))) {
+    if (ret == ENOENT ||
+      (ret == WT_ERROR && F_ISSET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_SKIP_DAMAGE
           "%s: skipped performing rollback to stable because the file %s",

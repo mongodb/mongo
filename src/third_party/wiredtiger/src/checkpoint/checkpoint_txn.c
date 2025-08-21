@@ -177,7 +177,7 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     WT_ERR(__wt_metadata_cursor_release(session, &cursor));
 
     /* Clear the flag on success. */
-    F_CLR(conn, WT_CONN_TIERED_FIRST_FLUSH);
+    F_CLR_ATOMIC_32(conn, WT_CONN_TIERED_FIRST_FLUSH);
     return (0);
 
 err:
@@ -811,7 +811,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_ERR(__wt_config_gets(session, cfg, "flush_tier.force", &cval));
     flush_force = cval.val;
 
-    if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_PRECISE_CHECKPOINT)) {
         /* Precise checkpoint doesn't support non-timestamped checkpoint. */
         if (!use_timestamp)
             return (EINVAL);
@@ -2394,7 +2394,8 @@ __wt_checkpoint_tree_reconcile_update(WT_SESSION_IMPL *session, WT_TIME_AGGREGAT
      * specific scenarios, we should always reflect the state of the stable content.
      */
     if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE) ||
-      F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT | WT_CONN_RECOVERING))
+      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING_CHECKPOINT) ||
+      F_ISSET(S2C(session), WT_CONN_RECOVERING))
         btree->rec_max_timestamp = WT_MAX(ta->newest_start_durable_ts, ta->newest_stop_durable_ts);
 }
 
@@ -2614,7 +2615,7 @@ err:
     /* For a successful checkpoint, post process the ckptlist, to keep a cached copy around. */
     if (WT_SESSION_IS_CHECKPOINT(session))
         WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_POSTPROCESS);
-    if (ret != 0 || WT_IS_METADATA(session->dhandle) || F_ISSET(conn, WT_CONN_CLOSING))
+    if (ret != 0 || WT_IS_METADATA(session->dhandle) || F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING))
         __wt_ckptlist_saved_free(session);
     else {
         ret = __checkpoint_save_ckptlist(session, btree->ckpt);

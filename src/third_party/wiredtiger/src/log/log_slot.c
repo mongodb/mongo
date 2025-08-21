@@ -425,7 +425,7 @@ __wti_log_slot_switch(
          * If the connection is closing, the logging system has finished running, all threads except
          * for the connection closing thread (i.e. the default session) can early exit.
          */
-        if (F_ISSET(S2C(session), WT_CONN_CLOSING) && !WT_SESSION_IS_DEFAULT(session))
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) && !WT_SESSION_IS_DEFAULT(session))
             break;
     } while (F_ISSET(myslot, WTI_MYSLOT_CLOSE) || (retry && ret == EBUSY));
     return (ret);

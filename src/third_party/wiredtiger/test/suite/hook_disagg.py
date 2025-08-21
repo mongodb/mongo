@@ -305,6 +305,7 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
             ("test_cursor_big",      "Cursor caching verified with stats"),
             ("test_cursor_bound",    "Can't use cursor bounds with a disagg table"),
             ("test_salvage",         "Salvage tests directly name files ending in '.wt'"),
+            ("test_truncate",        "Truncate on disagg tables not yet implemented"),
             ("tiered",               "Tiered tests do not apply to disagg"),
         ]
 

@@ -507,7 +507,7 @@ __wti_tiered_storage_create(WT_SESSION_IMPL *session)
      * right now because it would entail opening and getting the dhandle for every table and that
      * work is already done in the flush_tier. So do it there and keep that code together.
      */
-    F_SET(conn, WT_CONN_TIERED_FIRST_FLUSH);
+    F_SET_ATOMIC_32(conn, WT_CONN_TIERED_FIRST_FLUSH);
     /* Start the thread. */
     WT_ERR(__wt_thread_create(session, &conn->tiered_tid, __tiered_server, session));
     conn->tiered_tid_set = true;

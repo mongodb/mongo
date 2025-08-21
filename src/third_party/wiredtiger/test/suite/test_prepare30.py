@@ -51,4 +51,4 @@ class test_prepare30(wttest.WiredTigerTestCase):
         if self.expected_error:
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
                 self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(ts)),
-                        '/prepared_id need to be set with preserve_prepared flag on/')
+                        '/prepared_id need to be set if the preserve_prepared config is enabled/')

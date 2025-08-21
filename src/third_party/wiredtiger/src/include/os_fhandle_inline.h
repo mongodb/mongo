@@ -120,7 +120,7 @@ __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void
 
     /* Flag any failed read: if we're in startup, it may be fatal. */
     if (ret != 0)
-        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
 
     time_stop = __wt_clock(session);
     __wt_stat_msecs_hist_incr_fsread(session, WT_CLOCKDIFF_MS(time_stop, time_start));

@@ -119,7 +119,7 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session, const char *fname, const char *ch
  * configured.
  */
 #ifdef WT_STANDALONE_BUILD
-    if (!F_ISSET(S2C(session), WT_CONN_COMPATIBILITY))
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_COMPATIBILITY))
         /* Check the major/minor version numbers. */
         WT_ERR(__ckpt_version_chk(session, fname, config));
 #else
@@ -652,7 +652,7 @@ __meta_blk_mods_load(
      * checkpoint's modified blocks from the block manager.
      */
     F_SET(ckpt, WT_CKPT_ADD);
-    if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP)) {
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_INCR_BACKUP)) {
         F_SET(ckpt, WT_CKPT_BLOCK_MODS_LIST);
         WT_RET(__ckpt_valid_blk_mods(session, ckpt, rename));
     }

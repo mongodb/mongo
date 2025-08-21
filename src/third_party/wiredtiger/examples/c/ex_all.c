@@ -838,6 +838,9 @@ transaction_ops(WT_SESSION *session_arg)
         error_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, "key");
         cursor->set_value(cursor, "value");
+        /*! [transaction prepared_id] */
+        error_check(session->prepared_id_transaction(session, "prepared_id=a"));
+        /*! [transaction prepared_id] */
         error_check(session->prepare_transaction(session, "prepare_timestamp=2a"));
         error_check(
           session->commit_transaction(session, "commit_timestamp=2b,durable_timestamp=2b"));
@@ -917,7 +920,13 @@ transaction_ops(WT_SESSION *session_arg)
 
         error_check(session->begin_transaction(session, NULL));
         /*! [transaction timestamp_uint] */
+        error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_PREPARE, 40));
+        /*! [transaction prepared_id_uint] */
+        error_check(session->prepared_id_transaction_uint(session, 10));
+        error_check(session->prepare_transaction(session, NULL));
+        /*! [transaction prepared_id_uint] */
         error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, 42));
+        error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_DURABLE, 45));
         /*! [transaction timestamp_uint] */
         error_check(session->commit_transaction(session, NULL));
     }

@@ -1621,7 +1621,7 @@ struct __wt_session {
      * @configstart{WT_SESSION.begin_transaction, see dist/api_data.py}
      * @config{claim_prepared_id, allow a session to claim a prepared transaction that was restored
      * upon restart by specifying the transaction's prepared ID. Returns WT_NOTFOUND if the prepared
-     * id doesn't exist., an integer greater than or equal to \c 0; default \c 0.}
+     * id doesn't exist., a string; default empty.}
      * @config{ignore_prepare, whether to ignore updates by other prepared transactions when doing
      * of read operations of this transaction.  When \c true\, forces the transaction to be
      * read-only.  Use \c force to ignore prepared updates and permit writes (see @ref
@@ -1730,10 +1730,10 @@ struct __wt_session {
      * transaction.  The value must not be older than any active read timestamps\, and must be newer
      * than the current stable timestamp.  See @ref timestamp_prepare., a string; default empty.}
      * @config{prepared_id, set the optional prepared ID for the prepared updates of the current
-     * transaction.  Multiple transactions can share a prepared transaction ID\, as long as they are
-     * all guaranteed to share a decision whether to commit or abort and share the same prepare\,
-     * commit and durable timestamps.  Default value 0 ignores this configuration option., an
-     * integer greater than or equal to \c 0; default \c 0.}
+     * transaction.  Multiple transactions can share a prepared ID\, as long as they are all
+     * guaranteed to share a decision whether to commit or abort and share the same prepare\, commit
+     * and durable timestamps.  It is ignored if the preserve prepared config is not enabled., a
+     * string; default empty.}
      * @configend
      * @errors
      */
@@ -1831,8 +1831,8 @@ struct __wt_session {
      * @config{rollback_timestamp, set the rollback timestamp for the current transaction.  This is
      * valid only for prepared transactions under the preserve_prepared config.  For prepared
      * transactions\, a rollback timestamp is required\, must not be older than the prepare
-     * timestamp\, and can be set only once.  See @ref timestamp_txn_api and @ref
-     * timestamp_prepare., a string; default empty.}
+     * timestamp\, and can be set only once.  It is ignored if the preserve prepared config is not
+     * enabled.  See @ref timestamp_txn_api and @ref timestamp_prepare., a string; default empty.}
      * @configend
      * @errors
      */
@@ -1857,6 +1857,44 @@ struct __wt_session {
      */
     int __F(timestamp_transaction_uint)(WT_SESSION *session, WT_TS_TXN_TYPE which,
             uint64_t ts);
+
+    /*!
+     * Set a prepared_id on a transaction.
+     *
+     * The WT_SESSION.prepared_id_transaction method can only be used at snapshot isolation.
+     *
+     * @snippet ex_all.c transaction prepared_id
+     *
+     * @requires_transaction
+     *
+     * @param session the session handle
+     * @configstart{WT_SESSION.prepared_id_transaction, see dist/api_data.py}
+     * @config{prepared_id, set the optional prepared ID for the prepared updates of the current
+     * transaction.  Multiple transactions can share a prepared ID\, as long as they are all
+     * guaranteed to share a decision whether to commit or abort and share the same prepare\, commit
+     * and durable timestamps.  It is ignored if the preserve prepared config is not enabled., a
+     * string; default empty.}
+     * @configend
+     * @errors
+     */
+    int __F(prepared_id_transaction)(WT_SESSION *session, const char *config);
+
+    /*!
+     * Set a prepared id on a transaction numerically.  Prefer this method over
+     * WT_SESSION::prepared_id_transaction if the hexadecimal string parsing done in that method
+     * becomes a bottleneck.
+     *
+     * The WT_SESSION.prepared_id_transaction_uint method can only be used at snapshot isolation.
+     *
+     * @snippet ex_all.c transaction prepared_id_uint
+     *
+     * @requires_transaction
+     *
+     * @param session the session handle
+     * @param prepared_id the prepared_id.
+     * @errors
+     */
+    int __F(prepared_id_transaction_uint)(WT_SESSION *session, uint64_t prepared_id);
     /*! @} */
 
     /*!

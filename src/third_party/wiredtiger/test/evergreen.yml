@@ -850,11 +850,24 @@ functions:
         fi
         py=${python_binary|python3}
         echo "Using $threads_command for 'unit test parallel'"
-        if [ ${check_coverage|false} = true ]; then
+        if [[ $TESTUTIL_TSAN -eq 1 ]]; then
+            export TSAN_OPTIONS="$TSAN_OPTIONS:log_path=$(git rev-parse --show-toplevel)/tsan_logs:exitcode=0"
             ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1 || echo "Ignoring failed test as we are checking test coverage"
         else
             ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1
         fi
+
+  "tsan warning metric":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_PATH}
+        # Track warnings only after time 2025-08-06 06:07:50.655735+00:00
+        python3 test/evergreen/tsan_warnings_analysis.py --timestamp 1754460496
 
   "code coverage analysis":
     command: shell.exec
@@ -2197,6 +2210,22 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 -R cursor13 schema03 timestamp22
+
+  - name: unit-test-tsan
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test parallel"
+        vars:
+          # Run the set of tests that are not in the fail list.
+          unit_test_parallel_ignore: test/suite/tsan.fail
+          unit_test_parallel_args: -v 2 --timeout 300
+      - func: "upload artifact"
+        vars:
+          upload_source_dir: "wiredtiger"
+          upload_filename: unit-test-tsan.tgz
 
   - name: unit-test-hook-disagg-leader
     tags: ["python"]
@@ -4402,19 +4431,17 @@ tasks:
           test-name: modularity_metrics
           collection: CodeModularityMetrics
 
-  - name: tsan-warning-metrics
+  - name: generate-tsan-metric
+    tags: ["pull_request_code_statistics"]
+    depends_on:
+      - name: "unit-test-tsan"
     commands:
       - func: "get project"
-      - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            python3 ../test/evergreen/tsan_warnings_analysis.py
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: unit-test-tsan
+          destination: wiredtiger/unit-test-tsan
+      - func: "tsan warning metric"
 
     ###############################
     # Performance Tests for btree #
@@ -5770,11 +5797,13 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
       export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    num_jobs: 2
   tasks:
+    - name: compile
     - name: examples-c-test
-    - name: tsan-warning-metrics
-      batchtime: 10080 # 7 days
+    - name: unit-test-tsan
+      distros: ubuntu2004-large
+    - name: generate-tsan-metric
 
 # FIXME-WT-13256
 # This variant runs all possible tasks under TSan but instructs TSan to not report any issues it
@@ -6611,9 +6640,13 @@ buildvariants:
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
       export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    num_jobs: 2
   tasks:
+    - name: compile
     - name: examples-c-test
+    - name: unit-test-tsan
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: generate-tsan-metric
 
 - name: amazon2023-armv9-msan
   display_name: "(ARMV9) Amazon Linux 2023 MSAN"

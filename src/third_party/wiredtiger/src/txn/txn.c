@@ -709,7 +709,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, WT_CONF *conf)
 
     WT_ERR(__wt_conf_gets_def(session, conf, read_timestamp, 0, &cval));
     if (cval.len != 0) {
-        WT_ERR(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
+        WT_ERR(__wt_txn_parse_timestamp(session, "read timestamp", &read_ts, &cval));
         WT_ERR(__wti_txn_set_read_timestamp(session, read_ts));
     }
 
@@ -1135,20 +1135,12 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
           txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]),
           __wt_timestamp_to_string(txn->commit_timestamp, ts_string[1]),
           __wt_timestamp_to_string(txn->durable_timestamp, ts_string[2]));
-    else {
-        /* Rollback timestamp should only be set when preserve prepared is enabled. */
-        WT_ASSERT(session,
-          !F_ISSET(S2C(session), WT_CONN_READY) ||
-            (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
-              F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)) ||
-            (!F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
-              !F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)));
+    else
         __wt_verbose_debug2(session, WT_VERB_TRANSACTION,
           "rollback resolving prepared transaction with txnid: %" PRIu64
           " and prepared timestamp: %s and rollback timestamp: %s",
           txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]),
           __wt_timestamp_to_string(txn->rollback_timestamp, ts_string[1]));
-    }
 
     /*
      * Aborted updates can exist in the update chain of our transaction due to reserved update. All
@@ -1906,7 +1898,6 @@ err:
 int
 __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 {
-    WT_CONFIG_ITEM cval;
     WT_TXN *txn;
     WT_TXN_OP *op;
     WT_UPDATE *tmp, *upd;
@@ -1928,15 +1919,12 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Set the prepare timestamp. */
     WT_RET(__wt_txn_set_timestamp(session, cfg, false));
+    /* Set the prepared id. */
+    WT_RET(__wt_txn_set_prepared_id(session, cfg));
 
-    /* Set the prepared id */
-    WT_RET(__wt_config_gets(session, cfg, "prepared_id", &cval));
-
-    if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
-      (uint64_t)cval.val == WT_PREPARED_ID_NONE) {
-        WT_RET_MSG(session, EINVAL, "prepared_id need to be set with preserve_prepared flag on");
-    }
-    session->txn->prepared_id = (uint64_t)cval.val;
+    if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) && !F_ISSET(txn, WT_TXN_HAS_PREPARED_ID))
+        WT_RET_MSG(session, EINVAL,
+          "prepared_id need to be set if the preserve_prepared config is enabled.");
 
     if (!F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
         WT_RET_MSG(session, EINVAL, "prepare timestamp is not set");
@@ -2116,7 +2104,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[], bool api_call)
 
         /* If this is a rollback during shutdown, prepared transaction work should not be a undone
          */
-        if (F_ISSET(S2C(session), WT_CONN_CLOSING) && prepare)
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) && prepare)
             continue;
 
         switch (op->type) {
@@ -2527,7 +2515,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
      * before shutting down all the subsystems. We have shut down all user sessions, but send in
      * true for waiting for internal races.
      */
-    F_SET(conn, WT_CONN_CLOSING_CHECKPOINT);
+    F_SET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT);
     WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
     ckpt_cfg = "use_timestamp=false";
     if (cval.val != 0) {
@@ -2535,7 +2523,8 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
         if (conn->txn_global.has_stable_timestamp)
             use_timestamp = true;
     }
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY | WT_CONN_PANIC)) {
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY) &&
+      !F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC)) {
         /*
          * Perform rollback to stable to ensure that the stable version is written to disk on a
          * clean shutdown.
@@ -2568,7 +2557,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
                   " milliseconds",
                   conn->shutdown_timeline.rts_ms);
         } else if (conn_is_disagg)
-            __wt_verbose_warning(session, WT_VERB_RTS, "%s", "skipped shutdown RTS due to disagg");
+            __wt_verbose_info(session, WT_VERB_RTS, "%s", "skipped shutdown RTS due to disagg");
 
         s = NULL;
         /*

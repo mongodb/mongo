@@ -249,7 +249,7 @@ __wt_session_compact_check_interrupted(WT_SESSION_IMPL *session)
          * Otherwise, it is expected to potentially interrupt background compaction and should not
          * be exposed as a warning.
          */
-        if (!background_compaction || !F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_MINIMAL))
+        if (!background_compaction || !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING | WT_CONN_MINIMAL))
             __wt_verbose_warning(session, WT_VERB_COMPACT, "%s", interrupt_msg);
         else
             __wt_verbose(session, WT_VERB_COMPACT, "%s", interrupt_msg);

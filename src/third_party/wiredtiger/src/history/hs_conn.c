@@ -94,7 +94,7 @@ __hs_config(WT_SESSION_IMPL *session, uint32_t hs_id, const char **cfg)
      * Now that we have the history store's handle, we may set the flag because we know the file is
      * open.
      */
-    F_SET(conn, WT_CONN_HS_OPEN);
+    F_SET_ATOMIC_32(conn, WT_CONN_HS_OPEN);
 
 err:
     if (tmp_setup_session != NULL)
@@ -171,5 +171,5 @@ err:
 void
 __wt_hs_close(WT_SESSION_IMPL *session)
 {
-    F_CLR(S2C(session), WT_CONN_HS_OPEN);
+    F_CLR_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN);
 }

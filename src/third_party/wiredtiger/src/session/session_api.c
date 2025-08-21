@@ -393,7 +393,7 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * Close the file where we tracked long operations. Do this before releasing resources, as we do
      * scratch buffer management when we flush optrack buffers to disk.
      */
-    if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
         if (session->optrackbuf_ptr > 0) {
             __wt_optrack_flush_buffer(session);
             WT_TRET(__wt_close(session, &session->optrack_fh));
@@ -821,8 +821,8 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
      * - The session is an internal session
      * - The connection is minimally ready and the URI is "statistics:"
      */
-    if (!F_ISSET(S2C(session), WT_CONN_READY) && !F_ISSET(session, WT_SESSION_INTERNAL) &&
-      (!F_ISSET(S2C(session), WT_CONN_MINIMAL) || strcmp(uri, "statistics:") != 0))
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY) && !F_ISSET(session, WT_SESSION_INTERNAL) &&
+      (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_MINIMAL) || strcmp(uri, "statistics:") != 0))
         WT_ERR_MSG(
           session, EINVAL, "cannot open a non-statistics cursor before connection is opened");
 
@@ -2065,7 +2065,7 @@ __session_timestamp_transaction_uint(WT_SESSION *wt_session, WT_TS_TXN_TYPE whic
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL_PREPARE_ALLOWED_NOCONF(session, timestamp_transaction_uint);
 
-    ret = __wt_txn_set_timestamp_uint(session, which, (wt_timestamp_t)ts);
+    ret = __wt_txn_set_timestamp_uint(session, which, ts);
 err:
 #ifdef HAVE_CALL_LOG
     WT_TRET(__wt_call_log_timestamp_transaction_uint(session, which, ts, ret));
@@ -2075,7 +2075,7 @@ err:
 
 /*
  * __session_timestamp_transaction_uint_notsup --
- *     WT_SESSION->timestamp_transaction_uint_ method; not supported version.
+ *     WT_SESSION->timestamp_transaction_uint method; not supported version.
  */
 static int
 __session_timestamp_transaction_uint_notsup(
@@ -2089,6 +2089,92 @@ __session_timestamp_transaction_uint_notsup(
 
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL_NOCONF(session, timestamp_transaction_uint);
+    ret = __wti_session_notsup(session);
+err:
+    API_END_RET(session, ret);
+}
+
+/*
+ * __session_prepared_id_transaction --
+ *     WT_SESSION->prepared_id_transaction method. Also see __session_prepared_id_transaction_uint
+ *     if config parsing is a performance issue.
+ */
+static int
+__session_prepared_id_transaction(WT_SESSION *wt_session, const char *config)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)wt_session;
+#ifdef HAVE_DIAGNOSTIC
+    SESSION_API_CALL_PREPARE_ALLOWED(session, prepared_id_transaction, config, cfg);
+#else
+    SESSION_API_CALL_PREPARE_ALLOWED(session, prepared_id_transaction, NULL, cfg);
+    cfg[1] = config;
+#endif
+
+    ret = __wt_txn_set_prepared_id(session, cfg);
+err:
+#ifdef HAVE_CALL_LOG
+    WT_TRET(__wt_call_log_prepared_id_transaction(session, config, ret));
+#endif
+    API_END_RET(session, ret);
+}
+
+/*
+ * __session_prepared_id_transaction_notsup --
+ *     WT_SESSION->prepared_id_transaction method; not supported version.
+ */
+static int
+__session_prepared_id_transaction_notsup(WT_SESSION *wt_session, const char *config)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(config);
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_NOCONF(session, prepared_id_transaction);
+    ret = __wti_session_notsup(session);
+err:
+    API_END_RET(session, ret);
+}
+
+/*
+ * __session_prepared_id_transaction_uint --
+ *     WT_SESSION->prepared_id_transaction_uint method.
+ */
+static int
+__session_prepared_id_transaction_uint(WT_SESSION *wt_session, uint64_t prepared_id)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_PREPARE_ALLOWED_NOCONF(session, prepared_id_uint);
+
+    ret = __wt_txn_set_prepared_id_uint(session, prepared_id);
+err:
+#ifdef HAVE_CALL_LOG
+    WT_TRET(__wt_call_log_prepared_id_transaction_uint(session, prepared_id, ret));
+#endif
+    API_END_RET(session, ret);
+}
+
+/*
+ * __session_prepared_id_transaction_uint_notsup --
+ *     WT_SESSION->prepared_id_transaction_uint method; not supported version.
+ */
+static int
+__session_prepared_id_transaction_uint_notsup(WT_SESSION *wt_session, uint64_t prepared_id)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(prepared_id);
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_NOCONF(session, prepared_id_uint);
     ret = __wti_session_notsup(session);
 err:
     API_END_RET(session, ret);
@@ -2347,7 +2433,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_reset, __session_salvage, __session_truncate, __session_verify,
         __session_begin_transaction, __session_commit_transaction, __session_prepare_transaction,
         __session_rollback_transaction, __session_query_timestamp, __session_timestamp_transaction,
-        __session_timestamp_transaction_uint, __session_checkpoint, __session_reset_snapshot,
+        __session_timestamp_transaction_uint, __session_prepared_id_transaction,
+        __session_prepared_id_transaction_uint, __session_checkpoint, __session_reset_snapshot,
         __session_transaction_pinned_range, __session_get_last_error, __wt_session_breakpoint},
       stds_min = {NULL, NULL, __session_close, __session_reconfigure_notsup, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
@@ -2357,7 +2444,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_begin_transaction_notsup, __session_commit_transaction_notsup,
         __session_prepare_transaction_readonly, __session_rollback_transaction_notsup,
         __session_query_timestamp_notsup, __session_timestamp_transaction_notsup,
-        __session_timestamp_transaction_uint_notsup, __session_checkpoint_readonly,
+        __session_timestamp_transaction_uint_notsup, __session_prepared_id_transaction_notsup,
+        __session_prepared_id_transaction_uint_notsup, __session_checkpoint_readonly,
         __session_reset_snapshot_notsup, __session_transaction_pinned_range_notsup,
         __session_get_last_error, __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
@@ -2368,7 +2456,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_begin_transaction, __session_commit_transaction,
         __session_prepare_transaction_readonly, __session_rollback_transaction,
         __session_query_timestamp, __session_timestamp_transaction,
-        __session_timestamp_transaction_uint, __session_checkpoint_readonly,
+        __session_timestamp_transaction_uint, __session_prepared_id_transaction,
+        __session_prepared_id_transaction_uint, __session_checkpoint_readonly,
         __session_reset_snapshot, __session_transaction_pinned_range, __session_get_last_error,
         __wt_session_breakpoint};
     WT_DECL_RET;
@@ -2388,7 +2477,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * Make sure we don't try to open a new session after the application closes the connection.
      * This is particularly intended to catch cases where server threads open sessions.
      */
-    WT_ASSERT(session, !F_ISSET(conn, WT_CONN_CLOSING));
+    WT_ASSERT(session, !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING));
 
     /* Find the first inactive session slot. */
     for (session_ret = WT_CONN_SESSIONS_GET(conn), i = 0; i < conn->session_array.size;
@@ -2409,7 +2498,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __wt_atomic_store32(&conn->session_array.cnt, i + 1);
 
     /* Find the set of methods appropriate to this session. */
-    if (F_ISSET(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
         session_ret->iface = stds_min;
     else
         session_ret->iface = F_ISSET(conn, WT_CONN_READONLY) ? stds_readonly : stds;
@@ -2491,7 +2580,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
       session, session_ret->stat_dsrc_bucket == session_ret->id % WT_STAT_DSRC_COUNTER_SLOTS);
 
     /* Allocate the buffer for operation tracking */
-    if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
         WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE, &session_ret->optrack_buf));
         session_ret->optrackbuf_ptr = 0;
     }

@@ -101,7 +101,7 @@ class test_bug_030(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(50))
 
         self.session.checkpoint()
-        self.conn.rollback_to_stable()
+        self.reopen_conn()
 
         # Another delete, committed this time
         self.session.begin_transaction()

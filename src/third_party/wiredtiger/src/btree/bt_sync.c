@@ -63,7 +63,8 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     /* RTS, recovery or shutdown should not leave anything dirty behind. */
     if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
         return (false);
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT))
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
+      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING_CHECKPOINT))
         return (false);
 
     /*
@@ -378,7 +379,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * Do not mark the tree dirty if there is no change to stable timestamp compared to the last
          * checkpoint.
          */
-        if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT) &&
+        if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING) &&
+          !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT) &&
           (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
             (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
               btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))

@@ -1884,10 +1884,10 @@ methods = {
         whether to sync log records when the transaction commits, inherited from ::wiredtiger_open
         \c transaction_sync''',
         type='boolean'),
-    Config('claim_prepared_id', '0', r'''
+    Config('claim_prepared_id', '', r'''
         allow a session to claim a prepared transaction that was restored upon restart by
         specifying the transaction's prepared ID. Returns WT_NOTFOUND if the prepared id doesn't
-        exist.''', type='int', min=0)
+        exist.''')
 ], compilable=True),
 
 'WT_SESSION.commit_transaction' : Method([
@@ -1923,11 +1923,11 @@ methods = {
         set the prepare timestamp for the updates of the current transaction. The value must
         not be older than any active read timestamps, and must be newer than the current stable
         timestamp. See @ref timestamp_prepare'''),
-    Config('prepared_id', '0', r'''
+    Config('prepared_id', '', r'''
         set the optional prepared ID for the prepared updates of the current transaction. Multiple
-        transactions can share a prepared transaction ID, as long as they are all guaranteed to
-        share a decision whether to commit or abort and share the same prepare, commit and durable
-        timestamps. Default value 0 ignores this configuration option''', type='int', min=0)
+        transactions can share a prepared ID, as long as they are all guaranteed to share a decision
+        whether to commit or abort and share the same prepare, commit and durable timestamps. It is
+        ignored if the preserve prepared config is not enabled.''')
 ]),
 
 'WT_SESSION.timestamp_transaction_uint' : Method([]),
@@ -1959,7 +1959,17 @@ methods = {
         set the rollback timestamp for the current transaction. This is valid only for prepared
         transactions under the preserve_prepared config. For prepared transactions, a rollback
         timestamp is required, must not be older than the prepare timestamp, and can be set only
-        once. See @ref timestamp_txn_api and @ref timestamp_prepare'''),
+        once. It is ignored if the preserve prepared config is not enabled. See
+        @ref timestamp_txn_api and @ref timestamp_prepare''')
+]),
+
+'WT_SESSION.prepared_id_transaction_uint' : Method([]),
+'WT_SESSION.prepared_id_transaction' : Method([
+    Config('prepared_id', '', r'''
+        set the optional prepared ID for the prepared updates of the current transaction. Multiple
+        transactions can share a prepared ID, as long as they are all guaranteed to share a decision
+        whether to commit or abort and share the same prepare, commit and durable timestamps. It is
+        ignored if the preserve prepared config is not enabled.''')
 ]),
 
 'WT_SESSION.rollback_transaction' : Method([

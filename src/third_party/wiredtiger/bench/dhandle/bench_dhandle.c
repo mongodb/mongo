@@ -608,7 +608,7 @@ queuer(void *void_args)
         if (queue_len > 0)
             printf("Work queue length at %d, adding %d items for range %d, %d\n", queue_len,
               items_to_add, shared->low, shared->high);
-        table_numbers = realloc(table_numbers, sizeof(int) * (size_t)table_count);
+        table_numbers = drealloc(table_numbers, sizeof(int) * (size_t)table_count);
         for (i = 0; i < table_count; ++i)
             table_numbers[i] = i;
         shuffle(table_numbers, table_count, &rnd);
