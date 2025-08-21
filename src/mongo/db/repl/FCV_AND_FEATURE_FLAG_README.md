@@ -302,7 +302,27 @@ The dry-run check is exposed in two complementary ways:
 
 If a setFCV command fails during dry-run mode, a `CannotUpgrade` or `CannotDowngrade` error will be thrown and the transition won't start, preventing the user from leaving the FCV in a transitional state.
 
-The compatibility checks are done respectively in functions `_userCollectionsUassertsForDowngrade` and `_userCollectionsUassertsForUpgrade`, so every added check should be placed in one of those functions.
+### Guidelines for adding new compatibility checks
+
+The upgrade/downgrade compatibility checks are done in the functions `_userCollectionsUassertsForUpgrade` and `_userCollectionsUassertsForDowngrade`, respectively. These functions are read-only (i.e. must not modify any user data or system state), so that their only purpose is to check for unmet preconditions and fail with a `CannotUpgrade` or `CannotDowngrade` error if the user needs to manually clean up data or settings before proceeding. Thus, every added check should be placed in one of these functions and must adhere to the following principles:
+
+- **Fast and non-disruptive**: Checks must complete quickly (under 10 seconds in typical scenarios) and have no noticeable impact on performance. This ensures users can perform a dry-run validation on a live system without disruption.
+  - In particular, avoid scanning large datasets like user data or chunks. It may be acceptable, however, to inspect collection/index metadata through the in-memory collection catalog.
+- **Report downstream impact**: When adding a new feasibility check, remember to fill the appropriate project/ticket metadata to notify any impact to other teams and document any manual upgrade/downgrade instructions.
+
+### Skipping the automatic dry-run
+
+For advanced use cases, you can bypass the automatic dry-run validation by including the `skipDryRun: true` parameter.
+
+```
+db.runCommand({
+  setFeatureCompatibilityVersion: '9.0',
+  confirm: true,
+  skipDryRun: true
+})
+```
+
+**Warning**: When this parameter is used and incompatible user data exists, the setFCV command will not fail before the actual FCV transition. Instead, it will begin the process of transitioning and then fail, leaving the FCV in a transitional "upgrading" or "downgrading" state.
 
 ## SetFCV Command Errors
 
@@ -410,7 +430,7 @@ in the helper functions:
 - `_userCollectionsUassertsForUpgrade`: for any checks on user data or settings that will uassert
   with the `CannotUpgrade` code if users need to manually clean up user data or settings. It must
   not modify any user data or system state. It only checks preconditions for upgrades and fails
-  if they are unmet.
+  if they are unmet (see [guidelines for adding new compatibility checks](#guidelines-for-adding-new-compatibility-checks)).
 - `_userCollectionsWorkForUpgrade`: for any user collections uasserts (with the `CannotUpgrade` error code),
   creations, or deletions that need to happen during the upgrade. This happens after the global lock.
   It is required that the code in this helper function is idempotent and could be
@@ -446,7 +466,7 @@ placed in the helper functions:
 - `_userCollectionsUassertsForDowngrade`: for any checks on user data or settings that will uassert
   with the `CannotDowngrade` code if users need to manually clean up user data or settings. It must
   not modify any user data or system state. It only checks preconditions for downgrades and fails
-  if they are unmet.
+  if they are unmet (see [guidelines for adding new compatibility checks](#guidelines-for-adding-new-compatibility-checks)).
 
 `_runDowngrade:` \_runDowngrade performs all the metadata-changing actions of an FCV downgrade. Any
 new feature specific downgrade code should be placed in the `_runDowngrade` helper functions:
