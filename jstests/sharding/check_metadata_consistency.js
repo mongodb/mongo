@@ -756,7 +756,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     jsTest.log("Executing testUnexpectedAdminDatabaseInGlobalCatalog");
 
     // Register the 'admin' database in the global catalog.
-    assert.commandWorked(st.configRS.getPrimary().getDB("config").databases.insertOne({
+    assert.commandWorked(configDB.databases.insertOne({
         _id: "admin",
         primary: "config",
         version: {uuid: UUID(), lastMod: NumberInt(1), timestamp: Timestamp(1, 0)}
@@ -766,8 +766,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assertNoInconsistencies();
 
     // Clean up the inconsistency for following test cases.
-    assert.commandWorked(
-        st.configRS.getPrimary().getDB("config").databases.deleteOne({_id: "admin"}));
+    assert.commandWorked(configDB.databases.deleteOne({_id: "admin"}));
 })();
 
 (function testDefaultCollationMismatch1() {
