@@ -1079,6 +1079,40 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 }
 
+void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       const UUID& collUUID,
+                                       StringData ident,
+                                       int64_t key,
+                                       std::span<const char> value) {
+    // TODO (SERVER-109427): Generate an oplog entry.
+}
+
+void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       const UUID& collUUID,
+                                       StringData ident,
+                                       std::span<const char> key,
+                                       std::span<const char> value) {
+    // TODO (SERVER-109427): Generate an oplog entry.
+}
+
+void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       const UUID& collUUID,
+                                       StringData ident,
+                                       int64_t key) {
+    // TODO (SERVER-109427): Generate an oplog entry.
+}
+
+void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       const UUID& collUUID,
+                                       StringData ident,
+                                       std::span<const char> key) {
+    // TODO (SERVER-109427): Generate an oplog entry.
+}
+
 void OpObserverImpl::onInternalOpMessage(
     OperationContext* opCtx,
     const NamespaceString& nss,

@@ -264,6 +264,52 @@ public:
             o->onDelete(opCtx, coll, stmtId, doc, documentKey, args, &opStateAccumulator);
     }
 
+    void onContainerInsert(OperationContext* opCtx,
+                           const NamespaceString& ns,
+                           const UUID& collUUID,
+                           StringData ident,
+                           int64_t key,
+                           std::span<const char> value) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerInsert(opCtx, ns, collUUID, ident, key, value);
+        }
+    }
+
+    void onContainerInsert(OperationContext* opCtx,
+                           const NamespaceString& ns,
+                           const UUID& collUUID,
+                           StringData ident,
+                           std::span<const char> key,
+                           std::span<const char> value) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerInsert(opCtx, ns, collUUID, ident, key, value);
+        }
+    }
+
+    void onContainerDelete(OperationContext* opCtx,
+                           const NamespaceString& ns,
+                           const UUID& collUUID,
+                           StringData ident,
+                           int64_t key) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerDelete(opCtx, ns, collUUID, ident, key);
+        }
+    }
+
+    void onContainerDelete(OperationContext* opCtx,
+                           const NamespaceString& ns,
+                           const UUID& collUUID,
+                           StringData ident,
+                           std::span<const char> key) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerDelete(opCtx, ns, collUUID, ident, key);
+        }
+    }
+
     void onInternalOpMessage(OperationContext* const opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID>& uuid,

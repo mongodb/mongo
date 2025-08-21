@@ -276,6 +276,32 @@ public:
                           const OplogDeleteEntryArgs& args,
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
+    virtual void onContainerInsert(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const UUID& collUUID,
+                                   StringData ident,
+                                   int64_t key,
+                                   std::span<const char> value) = 0;
+
+    virtual void onContainerInsert(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const UUID& collUUID,
+                                   StringData ident,
+                                   std::span<const char> key,
+                                   std::span<const char> value) = 0;
+
+    virtual void onContainerDelete(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const UUID& collUUID,
+                                   StringData ident,
+                                   int64_t key) = 0;
+
+    virtual void onContainerDelete(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const UUID& collUUID,
+                                   StringData ident,
+                                   std::span<const char> key) = 0;
+
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.
      *
