@@ -56,10 +56,10 @@ void assertVersionCompatibility(const ::MongoExtensionAPIVersionVector* hostVers
     bool foundCompatibleMinor = false;
 
     for (uint64_t i = 0; i < hostVersions->len; ++i) {
-        const auto& hostVersion = hostVersions[i].versions;
-        if (hostVersion->major == extensionVersion.major) {
+        const auto& hostVersion = hostVersions->versions[i];
+        if (hostVersion.major == extensionVersion.major) {
             foundCompatibleMajor = true;
-            if (hostVersion->minor >= extensionVersion.minor) {
+            if (hostVersion.minor >= extensionVersion.minor) {
                 foundCompatibleMinor = true;
                 break;
             }
