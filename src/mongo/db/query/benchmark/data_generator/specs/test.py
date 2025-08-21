@@ -37,8 +37,17 @@ from datagen.util import Specification
 
 
 @dataclasses.dataclass
+class TestGrandchild:
+    g: Specification(int)
+
+@dataclasses.dataclass
+class TestChild:
+    c: Specification(TestGrandchild)
+
+@dataclasses.dataclass
 class Test:
     i: Specification(int)
+    child: Specification(TestChild)
 
     @staticmethod
     def compute_il(fkr: faker.proxy.Faker) -> float:

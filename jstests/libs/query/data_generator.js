@@ -41,7 +41,7 @@ export class DataGenerator {
         this.seed = seed;
     }
 
-    execute({spec = null, size = null, indices = null} = {}) {
+    execute({spec = null, size = null, indices = null, analyze = false} = {}) {
         let args = [
             getPython3Binary(),
             DataGenerator.PROGRAM_PATH,
@@ -65,6 +65,10 @@ export class DataGenerator {
 
         if (this.seed !== null) {
             args.push('--seed', this.seed);
+        }
+
+        if (this.analyze) {
+            args.push('--analyze');
         }
 
         args.push(this.module, spec);

@@ -12,10 +12,13 @@ try {
     const collName = 'Test';
     const size = 10;
 
-    dg.execute({spec: collName, size: size, indices: 'test_index'});
+    dg.execute({spec: collName, size: size, indices: 'test_index', analyze: true});
 
     assert.eq(db[collName].find({i: {$exists: true}}).count(), size);
     assert.eq(db[collName].getIndexes().length, 2);  // _id and i_idx test index
+
+    // Confirm that 'analyze' has run on all nested fields.
+    assert.eq(db["system.statistics.Test"].find().count(), 4);
 } finally {
     dg.cleanup();
 }

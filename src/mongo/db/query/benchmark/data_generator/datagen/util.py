@@ -37,6 +37,7 @@ import datagen.faker
 import datagen.random
 import datagen.statistics
 import faker
+from datagen.database_instance import DatabaseInstance
 
 ####################################################################################################
 #
@@ -186,3 +187,18 @@ class Specification:
             and (not isinstance(getattr(self, attr), tuple) or getattr(self, attr))
         )
         return f"{self.type.__name__}({', '.join(specs)})"
+
+    async def analyze(self, database_instance: DatabaseInstance, collection_name: str, field_name: str) -> None:
+        """
+        Runs 'analyze' on all fields in the Specification.
+
+        If any field is a sub-Specification, run 'analyze' on the subfields too.
+        """
+
+        await database_instance.analyze_field(collection_name, field_name)
+
+        if dataclasses.is_dataclass(self.type):
+            for subfield in dataclasses.fields(self.type):
+                if isinstance(subfield.type, Specification):
+                    subfield_path = field_name + "." + subfield.name
+                    await subfield.type.analyze(database_instance, collection_name, subfield_path)

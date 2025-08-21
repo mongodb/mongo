@@ -30,6 +30,7 @@
 import pathlib
 import shlex
 import typing
+from dataclasses import fields
 
 import datagen.database_instance
 
@@ -179,6 +180,10 @@ async def main():
     )
     parser.add_argument("--drop", action="store_true", help="Drop the collection before inserting.")
     parser.add_argument("--dump", nargs="?", const="", help="Dump the collection after inserting.")
+    parser.add_argument("--analyze", action="store_true", help="""
+                        Run the 'analyze' command against each field of the collection.
+                        Analyze is not preserved across restarts, or when dumping or restoring.
+                        """)
     parser.add_argument("--indices", action="append", help="An index set to load.")
     parser.add_argument("--restore-args", type=str, help="Parameters to pass to mongorestore.")
     parser.add_argument(
@@ -268,6 +273,10 @@ async def main():
             database_instance.dump(dump_additional_args)
             dump_commands(args.out)
 
+        # 6. Run 'analyze' on each field
+        if args.analyze is not None:
+            for field in fields(spec):
+                await field.type.analyze(database_instance, collection_name, field.name)
 
 if __name__ == "__main__":
     import asyncio

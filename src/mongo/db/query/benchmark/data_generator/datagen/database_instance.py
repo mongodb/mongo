@@ -125,6 +125,13 @@ class DatabaseInstance:
             check=True,
         )
 
+    async def analyze_field(self, collection_name: str, field: str, number_buckets: int = 1000) -> None:
+        """
+        Run 'analyze' on a given field.
+        Analyze is currently not persisted across restarts, or when dumping or restoring.
+        """
+        await self.database.command({"analyze": collection_name, "key": field, "numberBuckets": number_buckets})
+
     async def set_parameter(self, name: str, value: any) -> None:
         """Set MongoDB Parameter."""
         await self.client.admin.command({"setParameter": 1, name: value})
