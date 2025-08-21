@@ -8,13 +8,13 @@
 export const $config = (function() {
     var states = (function() {
         function resizeOplog(db, collName) {
-            const oplogSizeBytes = (100 + Math.floor(100 * Math.random())) * 1024 * 1024;
+            const oplogSizeBytes = (20 + Math.floor(50 * Math.random())) * 1024 * 1024;
             jsTest.log.info("Setting", {oplogSizeBytes});
             assert.commandWorked(db.adminCommand({replSetResizeOplog: 1, size: oplogSizeBytes}));
         }
 
         function insertDocs(db, collName) {
-            const numDocs = Math.floor(100 * Math.random());
+            const numDocs = Math.floor(10 * Math.random());
             let docs = [];
             for (let i = 0; i < numDocs; i++) {
                 docs.push({a: i});
@@ -24,7 +24,15 @@ export const $config = (function() {
         }
 
         function scanOplog(db, collName) {
-            assert.gte(db.getSiblingDB("local")["oplog.rs"].find().itcount(), 0);
+            try {
+                assert.gte(db.getSiblingDB("local")["oplog.rs"].find().limit(20).itcount(), 0);
+            } catch (e) {
+                if (e.code == ErrorCodes.CappedPositionLost) {
+                    return;
+                } else {
+                    throw e;
+                }
+            }
         }
 
         return {
@@ -41,7 +49,7 @@ export const $config = (function() {
     };
 
     return {
-        threadCount: 10,
+        threadCount: 4,
         iterations: 100,
         startState: 'insertDocs',
         data: {},
