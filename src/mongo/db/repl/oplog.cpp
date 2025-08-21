@@ -345,16 +345,17 @@ void createIndexForApplyOps(OperationContext* opCtx,
             return IndexBuildInfo(indexSpec, *storageEngine, indexCollection->ns().dbName());
         }
 
-        auto identField = indexMetadata->getField("ident");
+        auto indexIdentField = indexMetadata->getField("indexIdent");
         uassert(ErrorCodes::BadValue,
-                "Failed to create index because metadata o2 was present but missing ident: " +
+                "Failed to create index because metadata o2 was present but missing indexIdent: " +
                     indexMetadata->toString(),
-                !identField.eoo());
+                !indexIdentField.eoo());
         uassert(ErrorCodes::BadValue,
-                "Failed to create index because ident field in metadata o2 was invalid: " +
+                "Failed to create index because indexIdent field in metadata o2 was invalid: " +
                     indexMetadata->toString(),
-                identField.type() == BSONType::string && !identField.valueStringData().empty());
-        IndexBuildInfo indexBuildInfo(indexSpec, identField.String());
+                indexIdentField.type() == BSONType::string &&
+                    !indexIdentField.valueStringData().empty());
+        IndexBuildInfo indexBuildInfo(indexSpec, indexIdentField.String());
         indexBuildInfo.setInternalIdents(*storageEngine);
         return indexBuildInfo;
     }();

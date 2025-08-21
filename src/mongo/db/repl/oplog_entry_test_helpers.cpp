@@ -155,7 +155,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     boost::optional<BSONObj> o2;
     if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
         indexInfo = BSON("createIndexes" << nss.coll() << "spec" << spec.obj());
-        o2 = BSON("ident" << ident::generateNewIndexIdent(nss.dbName(), false, false));
+        o2 = BSON("indexIdent" << ident::generateNewIndexIdent(nss.dbName(), false, false));
     } else {
         BSONObjBuilder builder;
         builder.append("createIndexes", nss.coll());

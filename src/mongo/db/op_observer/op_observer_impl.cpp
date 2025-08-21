@@ -348,7 +348,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(builder.obj());
     if (replicateLocalCatalogIdentifiers) {
-        oplogEntry.setObject2(BSON("ident" << indexBuildInfo.indexIdent));
+        oplogEntry.setObject2(BSON("indexIdent" << indexBuildInfo.indexIdent));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
