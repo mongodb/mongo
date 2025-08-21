@@ -29,6 +29,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
@@ -105,14 +106,10 @@ public:
      * Constructs a SortedDataInterface. The rsKeyFormat is the RecordId key format of the related
      * RecordStore.
      */
-    SortedDataInterface(StringData ident,
-                        key_string::Version keyStringVersion,
+    SortedDataInterface(key_string::Version keyStringVersion,
                         Ordering ordering,
                         KeyFormat rsKeyFormat)
-        : _ident(std::make_shared<Ident>(std::string{ident})),
-          _keyStringVersion(keyStringVersion),
-          _ordering(ordering),
-          _rsKeyFormat(rsKeyFormat) {}
+        : _keyStringVersion(keyStringVersion), _ordering(ordering), _rsKeyFormat(rsKeyFormat) {}
 
     virtual ~SortedDataInterface() {}
 
@@ -247,6 +244,16 @@ public:
      */
     virtual int64_t numEntries(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
 
+    /**
+     * Returns the underlying container.
+     */
+    virtual StringKeyedContainer& getContainer() = 0;
+
+    /**
+     * Returns the underlying container.
+     */
+    virtual const StringKeyedContainer& getContainer() const = 0;
+
     /*
      * Return the KeyString version for 'this' index.
      */
@@ -269,11 +276,11 @@ public:
     }
 
     std::shared_ptr<Ident> getSharedIdent() const {
-        return _ident;
+        return getContainer().ident();
     }
 
     void setIdent(std::shared_ptr<Ident> newIdent) {
-        _ident = std::move(newIdent);
+        getContainer().setIdent(std::move(newIdent));
     }
 
     /**
@@ -479,8 +486,6 @@ public:
     virtual Status initAsEmpty() = 0;
 
 protected:
-    std::shared_ptr<Ident> _ident;
-
     const key_string::Version _keyStringVersion;
     const Ordering _ordering;
     const KeyFormat _rsKeyFormat;

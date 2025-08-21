@@ -343,10 +343,8 @@ public:
 class DevNullSortedDataInterface : public SortedDataInterface {
 public:
     DevNullSortedDataInterface(StringData identName)
-        : SortedDataInterface(identName,
-                              key_string::Version::kLatestVersion,
-                              Ordering::make(BSONObj()),
-                              KeyFormat::Long) {}
+        : SortedDataInterface(
+              key_string::Version::kLatestVersion, Ordering::make(BSONObj()), KeyFormat::Long) {}
 
     ~DevNullSortedDataInterface() override {}
 
@@ -428,6 +426,17 @@ public:
     Status truncate(OperationContext* opCtx, RecoveryUnit& ru) override {
         return Status::OK();
     }
+
+    StringKeyedContainer& getContainer() override {
+        return _container;
+    }
+
+    const StringKeyedContainer& getContainer() const override {
+        return _container;
+    }
+
+private:
+    DevNullStringKeyedContainer _container;
 };
 
 DevNullKVEngine::DevNullKVEngine() : _engineDbPath(storageGlobalParams.dbpath) {

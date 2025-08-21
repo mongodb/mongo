@@ -740,6 +740,7 @@ mongo_cc_library(
         "//src/mongo/db:profile_settings",
         "//src/mongo/db/query/algebra",
         "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/db/storage:container",
         "//src/mongo/db/storage/key_string",
     ],
 )

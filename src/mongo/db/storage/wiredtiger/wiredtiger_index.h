@@ -40,6 +40,7 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_container.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/validate/validate_results.h"
@@ -196,14 +197,20 @@ public:
 
     Status truncate(OperationContext* opCtx, RecoveryUnit& ru) override;
 
-    const std::string& uri() const {
-        return _uri;
+    StringKeyedContainer& getContainer() override;
+
+    const StringKeyedContainer& getContainer() const override;
+
+    WiredTigerStringKeyedContainer& getWiredTigerContainer();
+
+    StringData uri() const {
+        return _container.uri();
     }
 
     // WiredTigerIndex additions
 
     uint64_t tableId() const {
-        return _tableId;
+        return _container.tableId();
     }
 
     std::string indexName() const {
@@ -305,13 +312,13 @@ protected:
                                   StringData ident,
                                   const IndexConfig& config);
 
+    WiredTigerStringKeyedContainer _container;
+
     /*
      * The data format version is effectively const after the WiredTigerIndex instance is
      * constructed.
      */
     int _dataFormatVersion;
-    const std::string _uri;
-    uint64_t _tableId;
     const UUID _collectionUUID;
     const std::string _indexName;
     const bool _isLogged;
