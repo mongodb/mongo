@@ -1109,6 +1109,20 @@ boost::optional<TimeseriesOptions> CommonMongodProcessInterface::_getTimeseriesO
     return mongo::timeseries::getTimeseriesOptions(opCtx, ns, true /*convertToBucketsNamespace*/);
 }
 
+namespace {
+// TODO SERVER-106716 Remove this
+template <typename SpillTableWriteOperation>
+void withWriteUnitOfWorkIfNeeded(OperationContext* opCtx, SpillTableWriteOperation operation) {
+    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        operation();
+    } else {
+        WriteUnitOfWork wuow(opCtx);
+        operation();
+        wuow.commit();
+    }
+}
+}  // namespace
+
 void CommonMongodProcessInterface::writeRecordsToSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     SpillTable& spillTable,
@@ -1121,13 +1135,15 @@ void CommonMongodProcessInterface::writeRecordsToSpillTable(
         expCtx->getNamespaceString(),
         [&] {
             Lock::GlobalLock lk = acquireLockForSpillTable(expCtx->getOperationContext());
-            WriteUnitOfWork wuow(expCtx->getOperationContext());
-            auto writeResult = spillTable.insertRecords(expCtx->getOperationContext(), records);
-            uassert(ErrorCodes::OutOfDiskSpace,
-                    str::stream() << "Failed to write to disk because " << writeResult.reason(),
-                    writeResult.isOK());
-            wuow.commit();
-        });
+            withWriteUnitOfWorkIfNeeded(expCtx->getOperationContext(), [&]() {
+                auto writeResult = spillTable.insertRecords(expCtx->getOperationContext(), records);
+                uassert(ErrorCodes::OutOfDiskSpace,
+                        str::stream() << "Failed to write to disk because " << writeResult.reason(),
+                        writeResult.isOK());
+            });
+        }
+
+    );
 }
 
 std::unique_ptr<SpillTable> CommonMongodProcessInterface::createSpillTable(
@@ -1179,9 +1195,9 @@ void CommonMongodProcessInterface::deleteRecordFromSpillTable(
                        [&] {
                            Lock::GlobalLock lk =
                                acquireLockForSpillTable(expCtx->getOperationContext());
-                           WriteUnitOfWork wuow(expCtx->getOperationContext());
-                           spillTable.deleteRecord(expCtx->getOperationContext(), rID);
-                           wuow.commit();
+                           withWriteUnitOfWorkIfNeeded(expCtx->getOperationContext(), [&]() {
+                               spillTable.deleteRecord(expCtx->getOperationContext(), rID);
+                           });
                        });
 }
 
@@ -1194,10 +1210,10 @@ void CommonMongodProcessInterface::truncateSpillTable(
                        [&] {
                            Lock::GlobalLock lk =
                                acquireLockForSpillTable(expCtx->getOperationContext());
-                           WriteUnitOfWork wuow(expCtx->getOperationContext());
-                           auto status = spillTable.truncate(expCtx->getOperationContext());
-                           tassert(5643000, "Unable to clear record store", status.isOK());
-                           wuow.commit();
+                           withWriteUnitOfWorkIfNeeded(expCtx->getOperationContext(), [&]() {
+                               auto status = spillTable.truncate(expCtx->getOperationContext());
+                               tassert(5643000, "Unable to clear record store", status.isOK());
+                           });
                        });
 }
 

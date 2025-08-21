@@ -34,7 +34,7 @@
 namespace mongo {
 
 /**
- * Test fixtures that sets up SpillingTestMongoProcessInterface.
+ * Test fixtures that sets up a process interface to allow spilling.
  */
 class SpillingTestFixture : public ServiceContextMongoDTest {
 public:

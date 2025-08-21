@@ -30,7 +30,7 @@
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
+#include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 
 namespace mongo {
 
@@ -40,7 +40,7 @@ SpillingTestFixture::SpillingTestFixture()
       _expCtx(new ExpressionContextForTest(_opCtx.get(),
                                            NamespaceString::createNamespaceString_forTest(
                                                "SpillingTestFixture.SpillingTestFixture"))) {
-    _expCtx->setMongoProcessInterface(std::make_shared<SpillingTestMongoProcessInterface>());
+    _expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
 }
 
 }  // namespace mongo

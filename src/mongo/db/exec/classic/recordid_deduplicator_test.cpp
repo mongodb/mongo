@@ -33,6 +33,9 @@
 
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -40,22 +43,21 @@ using namespace mongo;
 
 namespace {
 
+void assertInsertNew(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
+    ASSERT_FALSE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
+    ASSERT_TRUE(recordIdDeduplicator.insert(recordId)) << "RecordId " << recordId;
+    ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
+}
+
+void assertInsertExisting(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
+    ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
+    ASSERT_FALSE(recordIdDeduplicator.insert(recordId)) << "RecordId " << recordId;
+    ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
+}
+
 class RecordIdDeduplicatorTest : public SpillingTestFixture {
 public:
     SpillingStats spillingStats;
-
-protected:
-    void assertInsertNew(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
-        ASSERT_FALSE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
-        ASSERT_TRUE(recordIdDeduplicator.insert(recordId)) << "RecordId " << recordId;
-        ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
-    }
-
-    void assertInsertExisting(RecordIdDeduplicator& recordIdDeduplicator, RecordId recordId) {
-        ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
-        ASSERT_FALSE(recordIdDeduplicator.insert(recordId)) << "RecordId " << recordId;
-        ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
-    }
 };
 
 //
@@ -244,5 +246,67 @@ TEST_F(RecordIdDeduplicatorTest, freeMemoryRemovesOnlyInMemoryElements) {
     assertInsertNew(recordIdDeduplicator, newRecordId);
 }
 
+/**
+ * A suite that also initializes a catalog to test interaction between RecordIdDeduplicator spilling
+ * and having acquired collections.
+ */
+class RecordIdDeduplicatorCatalogTest : public CatalogTestFixture {
+public:
+    RecordIdDeduplicatorCatalogTest() : CatalogTestFixture(Options{}) {}
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        _expCtx = new ExpressionContextForTest(operationContext(), kNss);
+        _expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
+    }
+
+    void tearDown() override {
+        _expCtx.reset();
+    }
+
+protected:
+    static const NamespaceString kNss;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+};
+
+const NamespaceString RecordIdDeduplicatorCatalogTest::kNss =
+    NamespaceString::createNamespaceString_forTest("test.test");
+
+TEST_F(RecordIdDeduplicatorCatalogTest, canSpillWithAcquiredCollection) {
+    _expCtx->setAllowDiskUse(true);
+    RecordIdDeduplicator recordIdDeduplicator{_expCtx.get(), 40, 6, 1'000'000};
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+        auto db = autoColl.ensureDbExists(operationContext());
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(db->createCollection(operationContext(), kNss));
+        wuow.commit();
+    }
+
+    auto acquisition = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(kNss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    RecordId stringRecordId(std::span("ABCDEFGHIJABCDEFGHIJABCDEFGHIJKLMN", 34));
+    RecordId longRecordId(12345678);
+    RecordId nullRecordId;
+
+    assertInsertNew(recordIdDeduplicator, nullRecordId);
+    assertInsertNew(recordIdDeduplicator, longRecordId);
+    assertInsertNew(recordIdDeduplicator, stringRecordId);
+
+    SpillingStats stats;
+    recordIdDeduplicator.spill(stats);
+
+    assertInsertExisting(recordIdDeduplicator, nullRecordId);
+    assertInsertExisting(recordIdDeduplicator, longRecordId);
+    assertInsertExisting(recordIdDeduplicator, stringRecordId);
+}
 
 }  // namespace

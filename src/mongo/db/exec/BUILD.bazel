@@ -226,6 +226,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/classic:query_shard_server_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline/spilling:spilling_test_utils",
         "//src/mongo/db/query:query_test_service_context",

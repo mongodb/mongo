@@ -41,9 +41,9 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
-#include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
@@ -87,10 +87,10 @@ public:
  * A MongoProcessInterface use for testing that supports making pipelines with an initial
  * DocumentSourceMock source.
  */
-class MockMongoInterface final : public SpillingTestMongoProcessInterface {
+class MockMongoInterface final : public StandaloneProcessInterface {
 public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> results)
-        : _results(std::move(results)) {}
+        : StandaloneProcessInterface(nullptr), _results(std::move(results)) {}
 
     std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* ownedPipeline,
