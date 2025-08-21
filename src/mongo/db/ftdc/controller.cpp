@@ -193,17 +193,16 @@ Status FTDCController::setDirectory(const boost::filesystem::path& path) {
     return Status::OK();
 }
 
-
 void FTDCController::addPeriodicMetadataCollector(
     std::unique_ptr<FTDCCollectorInterface> collector) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     invariant(_state == State::kNotStarted);
 
     _periodicMetadataCollectors.add(std::move(collector));
 }
 
 void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     invariant(_state == State::kNotStarted);
 
     if (feature_flags::gFeatureFlagGaplessFTDC.isEnabled()) {
@@ -216,7 +215,7 @@ void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface
 }
 
 void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     invariant(_state == State::kNotStarted);
 
     _rotateCollectors.add(std::move(collector));
@@ -242,7 +241,7 @@ void FTDCController::start(Service* service) {
     _thread = stdx::thread([this, service] { doLoop(service); });
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -253,7 +252,7 @@ void FTDCController::stop() {
     LOGV2(20626, "Shutting down full-time diagnostic data capture");
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard lock(_mutex);
 
         bool started = (_state == State::kStarted);
 
@@ -273,7 +272,10 @@ void FTDCController::stop() {
 
     _thread.join();
 
-    _state = State::kDone;
+    {
+        stdx::lock_guard lock(_mutex);
+        _state = State::kDone;
+    }
 
     if (_mgr) {
         auto s = _mgr->close();
