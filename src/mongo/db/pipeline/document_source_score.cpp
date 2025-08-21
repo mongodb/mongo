@@ -231,7 +231,6 @@ boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
                 BSON("$minMaxScaler" << BSON("input" << BSON("$meta" << "score"))),
                 sortPattern,
                 expCtx.get())}},
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         SbeCompatibility::notCompatible);
 }
 

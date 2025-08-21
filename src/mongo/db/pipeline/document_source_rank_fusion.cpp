@@ -161,7 +161,6 @@ boost::intrusive_ptr<DocumentSource> setWindowFields(const auto& expCtx,
             rankFieldName,
             window_function::Expression::parse(
                 BSON("$rank" << BSONObj()), dummySortPattern, expCtx.get())}},
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
         SbeCompatibility::notCompatible);
 }
 

@@ -346,16 +346,9 @@ TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage)
     ASSERT_EQ(std::string(pipeline.back()->getSourceName()), "$_internalSetWindowFields"_sd);
 }
 
-PlanSummaryStats collectPipelineStats(
-    const std::list<boost::intrusive_ptr<DocumentSource>>& pipelineStages) {
+PlanSummaryStats collectPipelineStats(const exec::agg::Pipeline& execPipeline) {
     PlanSummaryStats stats;
-    PlanSummaryStatsVisitor visitor{stats};
-    for (const auto& stage : pipelineStages) {
-        const auto* stageStats = exec::agg::buildStage(stage)->getSpecificStats();
-        if (stageStats != nullptr) {
-            stageStats->acceptVisitor(&visitor);
-        }
-    }
+    execPipeline.accumulatePlanSummaryStats(stats);
     return stats;
 }
 
@@ -404,7 +397,7 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest,
         if (allowDiskUse) {
             exhaustPipeline();
 
-            auto planSummaryStats = collectPipelineStats(pipelineStages);
+            auto planSummaryStats = collectPipelineStats(*execPipeline);
             const auto& spillingStats =
                 planSummaryStats
                     .spillingStatsPerStage[PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS];
@@ -469,7 +462,7 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest, CanForceSpill) {
     ASSERT_EQ(nextDocIndex, docs.size());
 
     SpillingStats spillingStats =
-        collectPipelineStats(pipelineStages)
+        collectPipelineStats(*execPipeline)
             .spillingStatsPerStage[PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS];
     ASSERT_EQ(spillingStats.getSpills(), 1);
     ASSERT_EQ(spillingStats.getSpilledRecords(), 80);

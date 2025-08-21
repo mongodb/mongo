@@ -42,10 +42,8 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
@@ -92,7 +90,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
 
 }  // namespace document_source_set_window_fields
 
-class DocumentSourceInternalSetWindowFields final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalSetWindowFields final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSetWindowFields"_sd;
 
@@ -108,18 +106,11 @@ public:
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
         boost::optional<SortPattern> sortBy,
         std::vector<WindowFunctionStatement> outputFields,
-        int64_t maxMemoryBytes,
         SbeCompatibility sbeCompatibility)
         : DocumentSource(kStageName, expCtx),
-          exec::agg::Stage(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _memoryTracker{OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
-              *expCtx, expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryBytes)},
-          // TODO SERVER-98563 I think we can remove the sortBy here in favor of {$meta: "sortKey"}
-          // also.
-          _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy),
           _sbeCompatibility(sbeCompatibility) {};
 
     GetModPathsReturn getModifiedPaths() const final {
@@ -190,23 +181,6 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    DocumentSource::GetNextResult doGetNext() override;
-
-    void doDispose() override;
-
-    void setSource(Stage* source) final {
-        pSource = source;
-        _iterator.setSource(source);
-    }
-
-    bool usedDisk() const final {
-        return _iterator.usedDisk();
-    };
-
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
-    }
-
     SbeCompatibility sbeCompatibility() const {
         return _sbeCompatibility;
     }
@@ -223,31 +197,13 @@ public:
         return _outputFields;
     }
 
-    void doForceSpill() override {
-        _iterator.spillToDisk();
-    }
 
 private:
-    void initialize();
-
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
 
-    // Memory tracker is not updated directly by this class, but it is passed down to
-    // PartitionIterator and WindowFunctionExec's that update their memory consumption.
-    MemoryUsageTracker _memoryTracker;
-
-    PartitionIterator _iterator;
-    // std::map is necessary to guarantee iteration order - see SERVER-88080 for details.
-    std::map<std::string, std::unique_ptr<WindowFunctionExec>> _executableOutputs;
-    bool _init = false;
-    bool _eof = false;
-    // Used by the failpoint to determine when to spill to disk.
-    int32_t _numDocsProcessed = 0;
     SbeCompatibility _sbeCompatibility = SbeCompatibility::noRequirements;
-
-    DocumentSourceSetWindowFieldsStats _stats;
 };
 
 }  // namespace mongo

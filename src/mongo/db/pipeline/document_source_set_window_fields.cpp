@@ -53,7 +53,6 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -82,8 +81,6 @@ using SortPatternPart = mongo::SortPattern::SortPatternPart;
 namespace mongo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(overrideMemoryLimitForSpill);
-
 /**
  * Does a sort pattern contain a path that has been modified?
  */
@@ -302,13 +299,11 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     // $_internalSetWindowFields
-    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx,
-        simplePartitionByExpr,
-        std::move(sortBy),
-        std::move(outputFields),
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
-        sbeCompatibility));
+    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(expCtx,
+                                                                           simplePartitionByExpr,
+                                                                           std::move(sortBy),
+                                                                           std::move(outputFields),
+                                                                           sbeCompatibility));
 
     // $unset
     if (complexPartitionBy) {
@@ -326,7 +321,6 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
     if (_partitionBy) {
         _partitionBy = _partitionBy->get()->optimize();
     }
-    _iterator.optimizePartition();
 
     if (_outputFields.size() > 0) {
         // Calculate the new expression SBE compatibility after optimization without overwriting
@@ -366,35 +360,6 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
     MutableDocument out;
     out[getSourceName()] = Value(spec.freeze());
 
-    if (opts.isSerializingForExplain() &&
-        *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        MutableDocument md;
-
-        for (auto&& [fieldName, function] : _executableOutputs) {
-            md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteral(
-                static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes(fieldName)));
-        }
-
-        out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
-        // TODO SERVER-88298 Remove maxTotalMemoryUsageBytes when we enable feature flag as
-        // peakTrackedMemBytes reports the same value.
-        out["maxTotalMemoryUsageBytes"] =
-            opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
-        out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
-        out["spills"] =
-            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
-        out["spilledDataStorageSize"] = opts.serializeLiteral(
-            static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
-        out["spilledBytes"] =
-            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
-        out["spilledRecords"] =
-            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
-        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            out["peakTrackedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_stats.peakTrackedMemBytes));
-        }
-    }
-
     return Value(out.freezeToValue());
 }
 
@@ -429,20 +394,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx,
-        partitionBy,
-        sortBy,
-        outputFields,
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes),
-        sbeCompatibility);
-}
-
-void DocumentSourceInternalSetWindowFields::initialize() {
-    for (auto& wfs : _outputFields) {
-        _executableOutputs[wfs.fieldName] =
-            WindowFunctionExec::create(pExpCtx.get(), &_iterator, wfs, _sortBy, &_memoryTracker);
-    }
-    _init = true;
+        expCtx, partitionBy, sortBy, outputFields, sbeCompatibility);
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::doOptimizeAt(
@@ -528,101 +480,6 @@ DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::doOptim
     if (itr == container->begin())
         return itr;
     return std::prev(itr);
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext() {
-    if (!_init) {
-        initialize();
-    }
-
-    if (_eof) {
-        // On EOF, update SetWindowFieldStats so explain has $_internalSetWindowFields-level
-        // statistics.
-        _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    auto curDoc = _iterator.current();
-    if (!curDoc) {
-        if (_iterator.isPaused()) {
-            return DocumentSource::GetNextResult::makePauseExecution();
-        }
-        // The only way we hit this case is if there are no documents, since otherwise _eof will be
-        // set.
-        _eof = true;
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    // Populate the output document with the result from each window function.
-    auto projSpec = std::make_unique<projection_executor::InclusionNode>(
-        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
-    for (auto&& outputField : _outputFields) {
-        try {
-            // If we hit a uassert while evaluating expressions on user data, delete the temporary
-            // table before aborting the operation.
-            auto& fieldName = outputField.fieldName;
-            projSpec->addExpressionForPath(
-                FieldPath(fieldName),
-                ExpressionConstant::create(pExpCtx.get(),
-                                           _executableOutputs[fieldName]->getNext(*curDoc)));
-        } catch (const DBException&) {
-            _iterator.finalize();
-            throw;
-        }
-
-        bool inMemoryLimit = _memoryTracker.withinMemoryLimit();
-        overrideMemoryLimitForSpill.execute([&](const BSONObj& data) {
-            _numDocsProcessed++;
-            inMemoryLimit = _numDocsProcessed <= data["maxDocsBeforeSpill"].numberInt();
-        });
-
-        if (!inMemoryLimit && _memoryTracker.allowDiskUse()) {
-            // Attempt to spill where possible.
-            _iterator.spillToDisk();
-            _stats.spillingStats = _iterator.getSpillingStats();
-        }
-        if (!_memoryTracker.withinMemoryLimit()) {
-            _iterator.finalize();
-            uasserted(5414201,
-                      str::stream()
-                          << "Exceeded memory limit in DocumentSourceSetWindowFields, used "
-                          << _memoryTracker.inUseTrackedMemoryBytes()
-                          << " bytes but max allowed is "
-                          << _memoryTracker.maxAllowedMemoryUsageBytes());
-        }
-    }
-
-    // Advance the iterator and handle partition/EOF edge cases.
-    switch (_iterator.advance()) {
-        case PartitionIterator::AdvanceResult::kAdvanced:
-            break;
-        case PartitionIterator::AdvanceResult::kNewPartition:
-            // We've advanced to a new partition, reset the state of every function.
-            for (auto&& [fieldName, function] : _executableOutputs) {
-                function->reset();
-            }
-            break;
-        case PartitionIterator::AdvanceResult::kEOF:
-            _eof = true;
-            _iterator.finalize();
-            _stats.spillingStats = _iterator.getSpillingStats();
-            break;
-    }
-
-    // Avoid using the factory 'create' on the executor since we don't want to re-parse.
-    auto projExec = std::make_unique<projection_executor::AddFieldsProjectionExecutor>(
-        pExpCtx, std::move(projSpec));
-
-    return projExec->applyProjection(*curDoc);
-}
-
-void DocumentSourceInternalSetWindowFields::doDispose() {
-    // Before we clear the memory tracker, update SetWindowFieldStats so explain has
-    // $_internalSetWindowFields-level statistics.
-    _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
-
-    _iterator.finalize();
-    _stats.spillingStats = _iterator.getSpillingStats();
 }
 
 }  // namespace mongo
