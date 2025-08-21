@@ -112,8 +112,10 @@ void FlatBSONStore<Element, Value>::Data::setValue(const BSONElement& elem) {
 }
 
 template <class Element, class Value>
-FlatBSONStore<Element, Value>::Entry::Entry(tracking::Context& trackingContext)
-    : _element(trackingContext) {}
+FlatBSONStore<Element, Value>::Entry::Entry(tracking::Context& trackingContext,
+                                            uint32_t offsetEnd,
+                                            uint32_t offsetParent)
+    : _offsetEnd(offsetEnd), _offsetParent(offsetParent), _element(trackingContext) {}
 
 template <class Element, class Value>
 FlatBSONStore<Element, Value>::Iterator::Iterator(
@@ -293,11 +295,8 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
                                            std::string fieldName) {
     // Remember our iterator position so we can restore it after inserting a new element.
     auto index = std::distance(_entries.begin(), _pos);
-    auto inserted = _entries.emplace(pos._pos, _trackingContext);
+    auto inserted = _entries.emplace(pos._pos, _trackingContext, 1, 0);
     _pos = _entries.begin() + index;
-
-    // Setup our newly created entry.
-    inserted->_offsetEnd = 1;  // no subelements
     inserted->_element.setFieldName(std::move(fieldName));
     inserted->_offsetParent = std::distance(_pos, inserted);
 
@@ -361,9 +360,7 @@ typename FlatBSONStore<Element, Value>::ConstIterator FlatBSONStore<Element, Val
 template <class Element, class Value>
 FlatBSONStore<Element, Value>::FlatBSONStore(tracking::Context& trackingContext)
     : entries(tracking::make_vector<Entry>(trackingContext)), _trackingContext(trackingContext) {
-    auto& entry = entries.emplace_back(trackingContext);
-    entry._offsetEnd = 1;
-    entry._offsetParent = 0;
+    auto& entry = entries.emplace_back(trackingContext, 1, 0);
     entry._element.initializeRoot();
 }
 

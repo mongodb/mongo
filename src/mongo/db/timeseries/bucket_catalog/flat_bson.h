@@ -123,7 +123,7 @@ public:
      */
     struct Entry {
     public:
-        explicit Entry(tracking::Context& trackingContext);
+        Entry(tracking::Context& trackingContext, uint32_t offsetEnd, uint32_t offsetParent);
 
         // Iterator offset to the entry after the last subelement
         uint32_t _offsetEnd;
