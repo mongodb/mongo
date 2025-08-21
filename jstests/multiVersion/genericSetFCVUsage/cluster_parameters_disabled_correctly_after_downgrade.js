@@ -7,8 +7,6 @@
 // disabled when lowering the FCV, causing an incompatibility.
 // @tags: [
 //   all_feature_flags_incompatible,
-//   # TODO(SERVER-108443) Reenable this test
-//   multiversion_incompatible,
 // ]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
