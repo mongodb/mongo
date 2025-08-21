@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -471,5 +472,32 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
         makeCardinalityEstimate(collCard));
 
     return samplingEstimator;
+}
+
+IndexBounds getIndexBounds(const QueryConfiguration& queryConfig,
+                           std::vector<std::pair<stats::SBEValue, stats::SBEValue>>& intervals) {
+    ASSERT_EQUALS(queryConfig.queryFields.size(), intervals.size());
+    IndexBounds bounds;
+
+    for (size_t fieldIdx = 0; fieldIdx < queryConfig.queryFields.size(); fieldIdx++) {
+        OrderedIntervalList oil(queryConfig.queryFields[fieldIdx].fieldName);
+
+        switch (queryConfig.queryTypes[fieldIdx]) {
+            case kPoint: {
+                auto point = stats::sbeValueToBSON(intervals[fieldIdx].first, "");
+                oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(point));
+                break;
+            }
+            case kRange: {
+                auto range = stats::sbeValuesToInterval(
+                    intervals[fieldIdx].first, "", intervals[fieldIdx].second, "");
+                oil.intervals.emplace_back(IndexBoundsBuilder::makeRangeInterval(
+                    range, BoundInclusion::kIncludeBothStartAndEndKeys));
+                break;
+            }
+        }
+        bounds.fields.push_back(oil);
+    }
+    return bounds;
 }
 }  // namespace mongo::ce

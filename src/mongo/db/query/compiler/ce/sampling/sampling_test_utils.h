@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -265,4 +266,9 @@ void printResult(DataConfiguration dataConfig,
                      samplingAlgoAndChunks,
                  ErrorCalculationSummary error);
 
+/**
+ * Helper function to create index bounds from generated query intervals.
+ */
+IndexBounds getIndexBounds(const QueryConfiguration& queryConfig,
+                           std::vector<std::pair<stats::SBEValue, stats::SBEValue>>& intervals);
 }  // namespace mongo::ce
