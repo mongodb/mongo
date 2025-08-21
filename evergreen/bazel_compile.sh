@@ -95,10 +95,12 @@ if [ "${skip_debug_link}" = "true" ]; then
     export version_id="${version_id}"
     if [ "${task_name}" = "archive_dist_test" ]; then
         task_compile_flags="${task_compile_flags} --simple_build_id=True --linkopt='-Wl,-S' --separate_debug=False"
-        ARCH=$(uname -m)
-        # Remote linking is currently only supported on arm
-        if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
-            task_compile_flags="${task_compile_flags} --remote_download_outputs=toplevel --config=remote_link"
+        if [ "${remote_link}" = "true" ]; then
+            ARCH=$(uname -m)
+            # Remote linking is currently only supported on arm
+            if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
+                task_compile_flags="${task_compile_flags} --remote_download_outputs=toplevel --config=remote_link"
+            fi
         fi
     fi
     if [ "${task_name}" = "archive_dist_test_debug" ]; then
