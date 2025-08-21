@@ -82,6 +82,13 @@ MONGO_COMPILER_NOINLINE void logShardedViewFound(
                 "new_pipe"_attr = new_pipeline.serializeToBson());
 }
 
+template <size_t N>
+MONGO_COMPILER_NOINLINE void logPipeline(int32_t id,
+                                         const char (&msg)[N],
+                                         const mongo::Pipeline& pipe) {
+    LOGV2_DEBUG(id, 5, msg, "pipeline"_attr = pipe.serializeToBson());
+}
+
 std::unique_ptr<mongo::Pipeline> buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ResolvedNamespace resolvedNs,
@@ -157,17 +164,11 @@ GetNextResult UnionWithStage::doGetNext() {
             _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
                 pExpCtx->getQuerySettings());
 
-            LOGV2_DEBUG(104243,
-                        5,
-                        "$unionWith before pipeline prep: ",
-                        "pipeline"_attr = _sharedState->_pipeline->serializeToBson());
+            logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
             _sharedState->_pipeline =
                 pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
                     _sharedState->_pipeline.release());
-            LOGV2_DEBUG(104244,
-                        5,
-                        "$unionWith POST pipeline prep: ",
-                        "pipeline"_attr = _sharedState->_pipeline->serializeToBson());
+            logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
 
             _sharedState->_executionState =
                 UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;
