@@ -1475,22 +1475,18 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
     try {
         const auto catalog = CollectionCatalog::latest(opCtx);
         const auto& nss = acquiredCollection->prerequisites.nss;
-        // This establish consistent collection is safe to use because it will happen after the
-        // collection writer has fully committed the changes. The resulted Collection object will be
-        // fetched from the in-memory catalog and not from the durable catalog and no temporary
-        // objects will be stored in the snapshot.
-        auto collection = catalog->establishConsistentCollection(
-            opCtx, acquiredCollection->prerequisites.nss, boost::none /*readTimestamp*/);
-        checkCollectionUUIDMismatch(
-            opCtx, nss, collection.get(), acquiredCollection->prerequisites.uuid);
-        if (!acquiredCollection->collectionPtr && collection.get()) {
+        auto collection =
+            catalog->lookupCollectionByNamespace(opCtx, acquiredCollection->prerequisites.nss);
+        checkCollectionUUIDMismatch(opCtx, nss, collection, acquiredCollection->prerequisites.uuid);
+        if (!acquiredCollection->collectionPtr && collection) {
             // If the uuid wasn't originally set on the prerequisites, because the collection didn't
             // exist, set it now so that on restore from yield we can check we are restoring the
             // same instance of the ns.
             acquiredCollection->prerequisites.uuid = collection->uuid();
         }
 
-        acquiredCollection->collectionPtr = CollectionPtr(collection);
+        // TODO(SERVER-108988): Remove call to CollectionPtr::CollectionPtr_UNSAFE
+        acquiredCollection->collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(7653800,
                     1,
