@@ -85,30 +85,26 @@ public:
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
 
-            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-            return router.route(
+            const auto cri = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            const auto primaryShardId = cri.getDbPrimaryShardId();
+
+            auto shard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+            auto versionedCmdObj = makeVersionedCmdObj(
+                cri, CommandHelpers::filterCommandRequestForPassthrough(request().toBSON()));
+            auto swResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,
-                Request::kCommandName,
-                [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
-                    auto cmdObj =
-                        CommandHelpers::filterCommandRequestForPassthrough(request().toBSON());
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                DatabaseName::kAdmin,
+                versionedCmdObj,
+                Shard::RetryPolicy::kIdempotent);
 
-                    const auto swResponse =
-                        executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                            opCtx,
-                            DatabaseName::kAdmin,
-                            dbInfo,
-                            cmdObj,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            Shard::RetryPolicy::kIdempotent);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
 
-                    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(swResponse));
-
-                    auto remoteResponse = uassertStatusOK(swResponse.swResponse).data;
-                    auto response = ConfigureQueryAnalyzerResponse::parse(
-                        IDLParserContext("clusterConfigureQueryAnalyzer"), remoteResponse);
-                    return response;
-                });
+            auto response = ConfigureQueryAnalyzerResponse::parse(
+                IDLParserContext("clusterConfigureQueryAnalyzer"), swResponse.getValue().response);
+            return response;
         }
 
     private:

@@ -901,14 +901,12 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetryOnStaleConfig) {
     ASSERT_EQ(tries, 2);
 }
 
-TEST_F(RouterRoleTest,
-       MultiCollectionRouterDoesNotRetryOnStaleConfigNonTargetedNamespaceWhenShardIsNotStale) {
+TEST_F(RouterRoleTest, MultiCollectionRouterDoesNotRetryOnStaleConfigNonTargetedNamespace) {
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};
     auto nss2 = NamespaceString::createNamespaceString_forTest("test.foo2");
 
-    // The MultiCollectionRouter should not retry on StaleConfig error with non-targeted
-    // namespace when the router is stale.
+    // The MultiCollectionRouter should not retry on StaleConfig error with non-targeted namespace.
     int tries = 0;
     sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss, nss2});
     auto future = launchAsync([&] {
@@ -925,7 +923,7 @@ TEST_F(RouterRoleTest,
                 uasserted(StaleConfigInfo(
                               NamespaceString::createNamespaceString_forTest("test.foo_not_exist"),
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
-                              ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 1})),
+                              boost::none,
                               ShardId{"0"}),
                           "StaleConfig error");
             });
@@ -1331,11 +1329,12 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};
 
-    auto bucketNss = _nss.makeTimeseriesBucketsNamespace();
+    auto timeseriesNss = NamespaceString::createNamespaceString_forTest("test.timeseries");
+    auto bucketNss = timeseriesNss.makeTimeseriesBucketsNamespace();
 
     // The CollectionRouter should retry because bucket collection maps to targeted timeseries view.
     int tries = 0;
-    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    sharding::router::CollectionRouter router(getServiceContext(), timeseriesNss);
     auto future = launchAsync([&] {
         router.route(operationContext(),
                      "test timeseries routing",

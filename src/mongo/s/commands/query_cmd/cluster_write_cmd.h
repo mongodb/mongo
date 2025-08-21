@@ -36,7 +36,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/update_metrics.h"
 #include "mongo/db/commands/query_cmd/write_commands_common.h"
-#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
@@ -116,7 +115,6 @@ public:
                                const NamespaceString& nss,
                                const BSONObj& command,
                                BatchItemRef targetingBatchItem,
-                               const CollectionRoutingInfoTargeter& targeter,
                                std::vector<AsyncRequestsSender::Response>* results);
 
     /**
