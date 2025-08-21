@@ -580,6 +580,21 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "container",
+    srcs = [
+        "container_base.cpp",
+    ],
+    hdrs = [
+        "container.h",
+        "container_base.h",
+    ],
+    deps = [
+        ":recovery_unit_base",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "record_store_test_harness",
     srcs = [
         "record_store_test_harness.cpp",

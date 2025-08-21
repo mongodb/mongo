@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/container_base.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -58,6 +59,32 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+class DevNullIntegerKeyedContainer : public IntegerKeyedContainerBase {
+public:
+    DevNullIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
+
+    Status insert(RecoveryUnit& ru, int64_t key, std::span<const char> value) final {
+        return Status::OK();
+    }
+
+    Status remove(RecoveryUnit& ru, int64_t key) final {
+        return Status::OK();
+    }
+};
+
+class DevNullStringKeyedContainer : public StringKeyedContainerBase {
+public:
+    DevNullStringKeyedContainer() : StringKeyedContainerBase(nullptr) {}
+
+    Status insert(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) final {
+        return Status::OK();
+    }
+
+    Status remove(RecoveryUnit& ru, std::span<const char> key) final {
+        return Status::OK();
+    }
+};
 
 class EmptyRecordCursor final : public SeekableRecordCursor {
 public:
