@@ -93,6 +93,16 @@ public:
     void assertIsPrimaryShardForDb(OperationContext* opCtx) const override {}
 
     /**
+     * Sets this node's cached database metadata without critical section checks.
+     */
+    void setDbMetadata(OperationContext* opCtx, const DatabaseType& dbMetadata);
+
+    /**
+     * Resets this node's cached database metadata without critical section checks.
+     */
+    void clearDbMetadata();
+
+    /**
      * Configures the mock to simulate a failure in db version check due to unknown metadata.
      */
     void expectFailureDbVersionCheckWithUnknownMetadata(const DatabaseVersion& receivedVersion);

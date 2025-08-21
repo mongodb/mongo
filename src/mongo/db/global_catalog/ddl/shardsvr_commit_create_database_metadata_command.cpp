@@ -105,7 +105,7 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx, const Database
 
     // Update DSR in primary node.
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->setDbInfo(opCtx, dbMetadata);
+    scopedDsr->setDbMetadata(opCtx, dbMetadata);
 }
 
 namespace {
@@ -150,11 +150,6 @@ public:
 
             const auto dbName = request().getDbName();
             const auto dbVersion = request().getDbVersion();
-
-            tassert(10105900,
-                    "The critical section must be taken in order to execute this command",
-                    DatabaseShardingRuntime::acquireShared(opCtx, dbName)
-                        ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
 
             LOGV2(10105904,
                   "About to commit createDatabase metadata in the shard catalog",

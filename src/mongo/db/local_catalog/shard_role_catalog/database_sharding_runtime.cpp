@@ -106,7 +106,8 @@ boost::optional<DatabaseVersion> getOperationReceivedVersion(OperationContext* o
 
 }  // namespace
 
-DatabaseShardingRuntime::DatabaseShardingRuntime(const DatabaseName& dbName) : _dbName(dbName) {}
+DatabaseShardingRuntime::DatabaseShardingRuntime(const DatabaseName& dbName)
+    : _dbName(dbName), _dbMetadataAccessor(dbName) {}
 
 DatabaseShardingRuntime::~DatabaseShardingRuntime() = default;
 
@@ -171,9 +172,9 @@ void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx,
 
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none),
             str::stream() << "No cached info for the database " << _dbName.toStringForErrorMsg(),
-            _dbInfo);
+            _dbMetadataAccessor.getDbVersion());
 
-    const auto wantedVersion = _dbInfo->getVersion();
+    const auto wantedVersion = *(_dbMetadataAccessor.getDbVersion());
 
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, wantedVersion),
             str::stream() << "Version mismatch for the database " << _dbName.toStringForErrorMsg(),
@@ -196,22 +197,35 @@ void DatabaseShardingRuntime::assertIsPrimaryShardForDb(OperationContext* opCtx)
     auto expectedDbVersion = OperationShardingState::get(opCtx).getDbVersion(_dbName);
 
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Received request without the version for the database "
-                          << _dbName.toStringForErrorMsg(),
+            fmt::format("Received request without the version for the database {}",
+                        _dbName.toStringForErrorMsg()),
             expectedDbVersion);
 
     checkDbVersionOrThrow(opCtx, *expectedDbVersion);
 
-    const auto primaryShardId = _dbInfo->getPrimary();
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "This is not the primary shard for the database "
-                          << _dbName.toStringForErrorMsg() << ". Expected: " << primaryShardId
-                          << " Actual: " << thisShardId,
-            primaryShardId == thisShardId);
+
+    tassert(10371100,
+            fmt::format("Did not find a primary shard in the database metadata after validating "
+                        "the database version: expected: {} for database: {} and dbVersion: {}.",
+                        thisShardId.toString(),
+                        _dbName.toStringForErrorMsg(),
+                        _dbMetadataAccessor.getDbVersion()->toString()),
+            _dbMetadataAccessor.getDbPrimaryShard());
+
+    const auto primaryShardId = *(_dbMetadataAccessor.getDbPrimaryShard());
+
+    uassert(
+        ErrorCodes::IllegalOperation,
+        fmt::format("This is not the primary shard for the database {}. Expected: {} Actual: {}",
+                    _dbName.toStringForErrorMsg(),
+                    primaryShardId.toString(),
+                    thisShardId.toString()),
+        primaryShardId == thisShardId);
 }
 
-void DatabaseShardingRuntime::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
+void DatabaseShardingRuntime::setDbMetadata(OperationContext* opCtx,
+                                            const DatabaseType& dbMetadata) {
     // During the recovery phase, when the ShardingRecoveryService is reading from disk and
     // populating the DatabaseShardingState, the ShardingState is not yet initialized. Therefore,
     // the following sanity check cannot be performed, as it requires knowing which ShardId this
@@ -221,56 +235,57 @@ void DatabaseShardingRuntime::setDbInfo(OperationContext* opCtx, const DatabaseT
         tassert(
             10003604,
             fmt::format(
-                "Expected to be setting this node's cached database info with its corresponding "
-                "database version. Found primary shard in the database info: {}, expected: {} for "
-                "database: {} and dbVersion: {}.",
-                dbInfo.getPrimary().toString(),
+                "Expected to be setting this node's cached database metadata with its "
+                "corresponding database version. Found primary shard in the database metadata: {}, "
+                "expected: {} for database: {} and dbVersion: {}.",
+                dbMetadata.getPrimary().toString(),
                 thisShardId.toString(),
-                _dbName.toStringForErrorMsg(),
-                dbInfo.getVersion().toString()),
-            dbInfo.getPrimary() == thisShardId);
+                dbMetadata.getDbName().toStringForErrorMsg(),
+                dbMetadata.getVersion().toString()),
+            dbMetadata.getPrimary() == thisShardId);
     }
 
-    LOGV2(10003605,
-          "Setting this node's cached database info",
-          logAttrs(_dbName),
-          "dbVersion"_attr = dbInfo.getVersion());
-
-    _dbInfo.emplace(dbInfo);
+    _dbMetadataAccessor.setDbMetadata(dbMetadata.getPrimary(), dbMetadata.getVersion());
 }
 
-void DatabaseShardingRuntime::clearDbInfo() {
-    LOGV2(10003602, "Clearing this node's cached database info", logAttrs(_dbName));
-
-    _dbInfo = boost::none;
+void DatabaseShardingRuntime::clearDbMetadata() {
+    _dbMetadataAccessor.clearDbMetadata();
 }
 
 void DatabaseShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
-    _critSec.enterCriticalSectionCatchUpPhase(reason);
+    _criticalSection.enterCriticalSectionCatchUpPhase(reason);
 
     _cancelDbMetadataRefresh_DEPRECATED();
 }
 
 void DatabaseShardingRuntime::enterCriticalSectionCommitPhase(const BSONObj& reason) {
-    _critSec.enterCriticalSectionCommitPhase(reason);
+    _criticalSection.enterCriticalSectionCommitPhase(reason);
+
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
 }
 
 void DatabaseShardingRuntime::exitCriticalSection(const BSONObj& reason) {
-    _critSec.exitCriticalSection(reason);
+    _criticalSection.exitCriticalSection(reason);
+
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
 void DatabaseShardingRuntime::exitCriticalSectionNoChecks() {
-    _critSec.exitCriticalSectionNoChecks();
+    _criticalSection.exitCriticalSectionNoChecks();
+
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
 void DatabaseShardingRuntime::setMovePrimaryInProgress(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_X));
-    _movePrimaryInProgress = true;
+
+    _dbMetadataAccessor.setMovePrimaryInProgress();
 }
 
 void DatabaseShardingRuntime::unsetMovePrimaryInProgress(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
-    _movePrimaryInProgress = false;
+
+    _dbMetadataAccessor.unsetMovePrimaryInProgress();
 }
 
 
@@ -280,12 +295,7 @@ void DatabaseShardingRuntime::setDbInfo_DEPRECATED(OperationContext* opCtx,
                                                    const DatabaseType& dbInfo) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
-    LOGV2(7286900,
-          "Setting this node's cached database info",
-          logAttrs(_dbName),
-          "dbVersion"_attr = dbInfo.getVersion());
-
-    _dbInfo.emplace(dbInfo);
+    _dbMetadataAccessor.setDbMetadata_UNSAFE(dbInfo.getPrimary(), dbInfo.getVersion());
 }
 
 void DatabaseShardingRuntime::clearDbInfo_DEPRECATED(OperationContext* opCtx,
@@ -296,9 +306,7 @@ void DatabaseShardingRuntime::clearDbInfo_DEPRECATED(OperationContext* opCtx,
         _cancelDbMetadataRefresh_DEPRECATED();
     }
 
-    LOGV2(7286901, "Clearing this node's cached database info", logAttrs(_dbName));
-
-    _dbInfo = boost::none;
+    _dbMetadataAccessor.clearDbMetadata();
 }
 
 void DatabaseShardingRuntime::setDbMetadataRefreshFuture_DEPRECATED(

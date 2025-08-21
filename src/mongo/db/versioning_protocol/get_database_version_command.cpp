@@ -98,19 +98,19 @@ public:
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            const auto dbMetadata = [&] {
+            auto [dbPrimaryShard, dbVersion] = [&] {
                 const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, _targetDb());
-                return scopedDsr->getCurrentMetadataIfKnown();
+                return std::make_pair(scopedDsr->getDbPrimaryShard(), scopedDsr->getDbVersion());
             }();
 
-            if (!dbMetadata) {
+            if (!dbVersion) {
                 result->getBodyBuilder().append("dbVersion", BSONObj());
                 return;
             }
 
-            result->getBodyBuilder().append("dbVersion", dbMetadata->getVersion().toBSON());
+            result->getBodyBuilder().append("dbVersion", dbVersion->toBSON());
 
-            if (ShardingState::get(opCtx)->shardId() == dbMetadata->getPrimary()) {
+            if (dbPrimaryShard && ShardingState::get(opCtx)->shardId() == *dbPrimaryShard) {
                 result->getBodyBuilder().append("isPrimaryShardForDb", true);
             }
         }

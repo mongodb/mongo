@@ -66,6 +66,8 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 
+#include <algorithm>
+#include <array>
 #include <memory>
 #include <set>
 #include <utility>
@@ -132,7 +134,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     const NamespaceString& nss,
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
-    bool clearDbInfo) {
+    bool clearDbMetadata) {
     LOGV2_DEBUG(5656600,
                 3,
                 "Acquiring recoverable critical section blocking writes",
@@ -212,7 +214,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // - Otherwise this call will fail and the CS won't be taken (neither persisted nor
         // in-mem)
         CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
-        newDoc.setClearDbInfo(clearDbInfo);
+        newDoc.setClearDbInfo(clearDbMetadata);
 
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(
@@ -515,21 +517,23 @@ void ShardingRecoveryService::onReplicationRollback(
     // TODO (SERVER-91926): Move these recovery services to onConsistentDataAvailable interface once
     // it offers a way to know which nss were impacted by the rollback event.
 
-    if (rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
-        rollbackNamespaces.end()) {
-        _recoverRecoverableCriticalSections(opCtx);
-    }
-
-    if (rollbackNamespaces.find(NamespaceString::kConfigShardCatalogDatabasesNamespace) !=
-        rollbackNamespaces.end()) {
+    static const std::array kShardingRecoveryTriggerNamespaces{
+        NamespaceString::kConfigShardCatalogDatabasesNamespace,
+        NamespaceString::kCollectionCriticalSectionsNamespace,
+    };
+    if (std::ranges::any_of(kShardingRecoveryTriggerNamespaces, [&](const NamespaceString& nss) {
+            return rollbackNamespaces.contains(nss);
+        })) {
+        _resetInMemoryStates(opCtx);
         _recoverDatabaseShardingState(opCtx);
+        _recoverRecoverableCriticalSections(opCtx);
     }
 
     // If writes to config.cache.* have been rolled back, interrupt the SSCCL to ensure secondary
     // waits for replication do not use incorrect opTimes.
-    if (std::any_of(rollbackNamespaces.begin(),
-                    rollbackNamespaces.end(),
-                    [](const NamespaceString& nss) { return nss.isConfigDotCacheDotChunks(); })) {
+    if (std::ranges::any_of(rollbackNamespaces, [](const NamespaceString& nss) {
+            return nss.isConfigDotCacheDotChunks();
+        })) {
         FilteringMetadataCache::get(opCtx)->onReplicationRollback();
     }
 }
@@ -542,8 +546,9 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
         return;
     }
 
-    _recoverRecoverableCriticalSections(opCtx);
+    _resetInMemoryStates(opCtx);
     _recoverDatabaseShardingState(opCtx);
+    _recoverRecoverableCriticalSections(opCtx);
 }
 
 void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationContext* opCtx) {
@@ -551,20 +556,6 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
 
     Lock::DBLockSkipOptions dbLockOptions{.explicitIntent =
                                               rss::consensus::IntentRegistry::Intent::Read};
-
-    // Release all in-memory critical sections
-    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-        Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX, Date_t::max(), dbLockOptions};
-        Lock::CollectionLock collLock{opCtx, nss, MODE_IX};
-        auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
-        scopedCsr->exitCriticalSectionNoChecks();
-    }
-    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
-        Lock::DBLock dbLock{opCtx, dbName, MODE_IX, Date_t::max(), dbLockOptions};
-        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDsr->exitCriticalSectionNoChecks();
-    }
 
     // Map the critical sections that are on disk to memory
     PersistentTaskStore<CollectionCriticalSectionDocument> store(
@@ -607,24 +598,70 @@ void ShardingRecoveryService::_recoverDatabaseShardingState(OperationContext* op
 
     LOGV2_DEBUG(9813601, 2, "Recovering DatabaseShardingState from the shard catalog");
 
-    Lock::GlobalWrite globalLock{opCtx};
-
-    const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
-    for (const auto& dbName : allDatabases) {
-        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDsr->clearDbInfo();
-    }
+    Lock::DBLockSkipOptions dbLockOptions{.explicitIntent =
+                                              rss::consensus::IntentRegistry::Intent::Read};
 
     PersistentTaskStore<DatabaseType> store(NamespaceString::kConfigShardCatalogDatabasesNamespace);
-    store.forEach(opCtx, BSONObj{}, [&opCtx](const DatabaseType& dbMetadata) {
-        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
-            opCtx, dbMetadata.getDbName());
-        scopedDsr->setDbInfo(opCtx, dbMetadata);
+    store.forEach(opCtx, BSONObj{}, [&opCtx, &dbLockOptions](const DatabaseType& dbMetadata) {
+        const auto dbName = dbMetadata.getDbName();
+        Lock::DBLock dbLock{opCtx, dbName, MODE_X, Date_t::max(), dbLockOptions};
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+
+        auto reason = BSON(
+            "shardingRecoveryService"
+            << "setDbMetadata"
+            << "dbName"
+            << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest()));
+
+        scopedDsr->enterCriticalSectionCatchUpPhase(reason);
+        scopedDsr->enterCriticalSectionCommitPhase(reason);
+
+        scopedDsr->setDbMetadata(opCtx, dbMetadata);
+
+        scopedDsr->exitCriticalSection(reason);
 
         return true;
     });
 
     LOGV2_DEBUG(9813602, 2, "Recovered the DatabaseShardingState from the shard catalog");
+}
+
+void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
+    LOGV2_DEBUG(10371108, 2, "Resetting all in-memory sharding states");
+
+    Lock::DBLockSkipOptions dbLockOptions{.explicitIntent =
+                                              rss::consensus::IntentRegistry::Intent::Read};
+
+    // Release all in-memory critical sections
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX, Date_t::max(), dbLockOptions};
+        Lock::CollectionLock collLock{opCtx, nss, MODE_IX};
+        auto scopedCsr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+        scopedCsr->exitCriticalSectionNoChecks();
+    }
+
+    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
+        Lock::DBLock dbLock{opCtx, dbName, MODE_X, Date_t::max(), dbLockOptions};
+
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+        scopedDsr->exitCriticalSectionNoChecks();
+
+        auto reason = BSON(
+            "shardingRecoveryService"
+            << "clearDbMetadata"
+            << "dbName"
+            << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest()));
+
+        scopedDsr->enterCriticalSectionCatchUpPhase(reason);
+        scopedDsr->enterCriticalSectionCommitPhase(reason);
+
+        scopedDsr->clearDbMetadata();
+
+        scopedDsr->exitCriticalSection(reason);
+    }
+
+    LOGV2_DEBUG(10371109, 2, "Reset all in-memory sharding states");
 }
 
 }  // namespace mongo

@@ -104,7 +104,7 @@ public:
      * otherwise since it is the responsibility of the caller to ensure that only one thread is
      * taking the critical section.
      *
-     * NOTE: If the `clearDbInfo` flag is set, at the time of releasing the database critical
+     * NOTE: If the `clearDbMetadata` flag is set, at the time of releasing the database critical
      * section it will also clear the filtering database information. This flag is only used by
      * secondary nodes.
      */
@@ -112,7 +112,7 @@ public:
                                                       const NamespaceString& nss,
                                                       const BSONObj& reason,
                                                       const WriteConcernOptions& writeConcern,
-                                                      bool clearDbInfo = true);
+                                                      bool clearDbMetadata = true);
 
     /**
      * Advances the recoverable critical section from the catch-up phase (i.e. blocking writes) to
@@ -164,8 +164,16 @@ public:
 
 private:
     /**
+     * This method is called to reset the states before recover (mirror the state on disk to
+     * memory). It must be called before the recover functions.
+     */
+    void _resetInMemoryStates(OperationContext* opCtx);
+
+    /**
      * This method is called when we have to mirror the state on disk of the recoverable critical
      * section to memory (on startup or on rollback).
+     *
+     * NOTE: It must be called after `_recoverDatabaseShardingState`.
      */
     void _recoverRecoverableCriticalSections(OperationContext* opCtx);
 

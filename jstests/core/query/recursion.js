@@ -9,6 +9,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
+//   requires_scripting,
 // ]
 
 db.recursion.drop();

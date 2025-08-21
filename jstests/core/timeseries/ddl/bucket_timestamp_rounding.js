@@ -18,7 +18,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
-    if (TestData.runningWithBalancer) {
+    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         assert.commandWorked(coll.createIndex({'t': 1}));
     }
 
@@ -48,7 +48,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
-    if (TestData.runningWithBalancer) {
+    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         assert.commandWorked(coll.createIndex({'t': 1}));
     }
 
@@ -78,7 +78,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: 't', granularity: 'hours'}}));
-    if (TestData.runningWithBalancer) {
+    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         assert.commandWorked(coll.createIndex({'t': 1}));
     }
 
@@ -109,7 +109,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
-    if (TestData.runningWithBalancer) {
+    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         assert.commandWorked(coll.createIndex({'t': 1}));
     }
 
@@ -158,7 +158,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
-    if (TestData.runningWithBalancer) {
+    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         assert.commandWorked(coll.createIndex({'t': 1}));
     }
 

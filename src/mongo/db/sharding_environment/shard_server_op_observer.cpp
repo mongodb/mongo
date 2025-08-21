@@ -577,8 +577,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [deletedNss = collCSDoc.getNss(),
              reason = collCSDoc.getReason().getOwned(),
-             clearDbInfo = collCSDoc.getClearDbInfo()](OperationContext* opCtx,
-                                                       boost::optional<Timestamp>) {
+             clearDbMetadata = collCSDoc.getClearDbInfo()](OperationContext* opCtx,
+                                                           boost::optional<Timestamp>) {
                 if (deletedNss.isDbOnly()) {
                     // Primaries take locks when writing to certain internal namespaces. It must
                     // be ensured that those locks are also taken on secondaries, when
@@ -602,7 +602,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
                     // Secondaries that are in oplog application must clear the database metadata
                     // before releasing the in-memory critical section.
-                    if (!opCtx->isEnforcingConstraints() && clearDbInfo) {
+                    if (!opCtx->isEnforcingConstraints() && clearDbMetadata) {
                         scopedDsr->clearDbInfo_DEPRECATED(opCtx);
                     }
 
@@ -830,6 +830,11 @@ void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
 
 void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
                                                      const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
     auto entry = CreateDatabaseMetadataOplogEntry::parse(
         IDLParserContext("OplogCreateDatabaseMetadataOplogEntryContext"), op.getObject());
 
@@ -837,18 +842,23 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
     auto dbName = dbMetadata.getDbName();
 
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->setDbInfo(opCtx, dbMetadata);
+    scopedDsr->setDbMetadata(opCtx, dbMetadata);
 }
 
 void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
                                                    const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
     auto entry = DropDatabaseMetadataOplogEntry::parse(
         IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"), op.getObject());
 
     auto dbName = entry.getDbName();
 
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbInfo();
+    scopedDsr->clearDbMetadata();
 }
 
 }  // namespace mongo

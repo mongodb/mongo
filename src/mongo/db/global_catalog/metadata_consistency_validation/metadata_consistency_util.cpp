@@ -664,12 +664,12 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     const ShardId& primaryShard) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
-    const auto dbMetadata = [&]() {
+    const auto dbVersion = [&]() {
         const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
-        return scopedDsr->getCurrentMetadataIfKnown();
+        return scopedDsr->getDbVersion();
     }();
 
-    if (!dbMetadata) {
+    if (!dbVersion) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalogCache,
             MissingDatabaseMetadataInShardCatalogCacheDetails{
@@ -677,7 +677,7 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
         return inconsistencies;
     }
 
-    const auto dbVersionInCache = dbMetadata->getVersion();
+    const auto dbVersionInCache = *dbVersion;
 
     if (dbVersionInGlobalCatalog != dbVersionInCache ||
         dbVersionInShardCatalog != dbVersionInCache) {

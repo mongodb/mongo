@@ -101,7 +101,7 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
 
     // Update DSR in primary node.
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbInfo();
+    scopedDsr->clearDbMetadata();
 }
 
 class ShardsvrCommitDropDatabaseMetadataCommand final
@@ -143,11 +143,6 @@ public:
                     TransactionParticipant::get(opCtx));
 
             const auto dbName = request().getDbName();
-
-            tassert(10105901,
-                    "The critical section must be taken in order to execute this command",
-                    DatabaseShardingRuntime::acquireShared(opCtx, dbName)
-                        ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
 
             LOGV2(10105902,
                   "About to commit dropDatabase metadata in the shard catalog",

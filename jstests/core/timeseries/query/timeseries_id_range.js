@@ -54,7 +54,7 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(
             db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
-        if (TestData.runningWithBalancer) {
+        if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
             assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
         }
     }

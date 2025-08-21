@@ -6,6 +6,7 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
+//   requires_scripting,
 // ]
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

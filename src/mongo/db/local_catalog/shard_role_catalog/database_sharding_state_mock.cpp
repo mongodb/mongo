@@ -74,7 +74,7 @@ void DatabaseShardingStateMock::expectFailureDbVersionCheckWithMismatchingVersio
 
 void DatabaseShardingStateMock::expectFailureDbVersionCheckWithCriticalSection(
     const DatabaseVersion& receivedVersion, const BSONObj& csReason) {
-    _critSec.enterCriticalSectionCatchUpPhase(csReason);
+    _criticalSection.enterCriticalSectionCatchUpPhase(csReason);
     _staleInfo =
         StaleDbRoutingVersion(_dbName,
                               receivedVersion,
@@ -84,7 +84,20 @@ void DatabaseShardingStateMock::expectFailureDbVersionCheckWithCriticalSection(
 
 void DatabaseShardingStateMock::clearExpectedFailureDbVersionCheck() {
     _staleInfo = boost::none;
-    _critSec.exitCriticalSectionNoChecks();
+    _criticalSection.exitCriticalSectionNoChecks();
+}
+
+void DatabaseShardingStateMock::setDbMetadata(OperationContext* opCtx,
+                                              const DatabaseType& dbMetadata) {
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    _dbMetadataAccessor.setDbMetadata(dbMetadata.getPrimary(), dbMetadata.getVersion());
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+}
+
+void DatabaseShardingStateMock::clearDbMetadata() {
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    _dbMetadataAccessor.clearDbMetadata();
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
 }  // namespace mongo

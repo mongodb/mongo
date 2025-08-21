@@ -111,6 +111,10 @@ selector:
     - featureFlagSearchHybridScoringFull
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
+    # TODO (SERVER-91002): server side javascript execution is deprecated, and the cloneAuthoritativeMetadata
+    # DDL (which is part of the FCV upgrade) is not compatible with it. Once the incompatibility is
+    # taken care off, we can re-enable these tests. See SERVER-97624 for more information.
+    - requires_scripting
     # Exclude tests that require a specific fcv.
     # Once SERVER-81054 is complete this is no longer needed.
     - requires_fcv_71

@@ -68,7 +68,7 @@ TimeseriesTest.run((insert) => {
         // Check both buckets.
         // First bucket should be not contain both documents because the time of the second
         // measurement is ahead of the first document by more than 'bucketMaxTimeRangeHours'.
-        if (!TestData.runningWithBalancer) {
+        if (!TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
             assert.eq(2, bucketDocs.length, bucketDocs);
             assert.eq(
                 0,

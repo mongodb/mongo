@@ -128,7 +128,22 @@ void removeDatabaseMetadataFromShard(OperationContext* opCtx,
  *
  * TODO (SERVER-98118): Remove this method once v9.0 become last-lts.
  */
-void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
+void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& critSecReason) {
+    auto recoveryService = ShardingRecoveryService::get(opCtx);
+    recoveryService->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx,
+        NamespaceString(dbName),
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        false /* clearDbMetadata */);
+    recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx,
+        NamespaceString(dbName),
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto dbMetadata =
         catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
@@ -145,6 +160,14 @@ void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseN
             thisShardId == dbMetadata.getPrimary());
 
     commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
+
+    recoveryService->releaseRecoverableCriticalSection(
+        opCtx,
+        NamespaceString(dbName),
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        ShardingRecoveryService::NoCustomAction(),
+        false /* throwIfReasonDiffers */);
 }
 
 /**
@@ -408,7 +431,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                 if (_doc.getAuthoritativeMetadataAccessLevel() ==
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    cloneAuthoritativeDatabaseMetadata(opCtx, _dbName);
+                    cloneAuthoritativeDatabaseMetadata(opCtx, _dbName, _critSecReason);
                 }
 
                 // Drop all collections under this DB
@@ -509,7 +532,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 {
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
-                    const bool clearDbInfo = _doc.getAuthoritativeMetadataAccessLevel() ==
+                    const bool clearDbMetadata = _doc.getAuthoritativeMetadataAccessLevel() ==
                         AuthoritativeMetadataAccessLevelEnum::kNone;
                     auto recoveryService = ShardingRecoveryService::get(opCtx);
                     recoveryService->acquireRecoverableCriticalSectionBlockWrites(
@@ -517,7 +540,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         dbNss,
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        clearDbInfo);
+                        clearDbMetadata);
                     recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
                         opCtx,
                         dbNss,
@@ -641,11 +664,11 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 dropDatabaseCoordinatorPauseAfterConfigCommit.pauseWhileSet();
             }
 
-            const bool clearDbInfo = _doc.getAuthoritativeMetadataAccessLevel() ==
+            const bool clearDbMetadata = _doc.getAuthoritativeMetadataAccessLevel() ==
                 AuthoritativeMetadataAccessLevelEnum::kNone;
 
             std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
-            if (clearDbInfo) {
+            if (clearDbMetadata) {
                 actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
             } else {
                 actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();

@@ -31,6 +31,7 @@
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
@@ -103,6 +104,19 @@ void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
 
 void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     OperationContext* opCtx, const DatabaseName& dbName) {
+    auto csReason = BSON("cloneAuthoritativeMetadata" << DatabaseNameUtil::serialize(
+                             dbName, SerializationContext::stateCommandRequest()));
+
+    if (!_firstExecution) {
+        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+            opCtx,
+            NamespaceString(dbName),
+            csReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction(),
+            false /*throwIfReasonDiffers*/);
+    }
+
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto dbMetadata =
         catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
@@ -134,11 +148,45 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     DDLLockManager::ScopedDatabaseDDLLock dbLock(
         opCtx, dbName, "cloneAuthoritativeMetadata"_sd, MODE_IX);
 
+    ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx,
+        NamespaceString(dbName),
+        csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        false /*clearDbMetadata*/);
+
+    ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx,
+        NamespaceString(dbName),
+        csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+
     commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
+
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx,
+        NamespaceString(dbName),
+        csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        ShardingRecoveryService::NoCustomAction(),
+        true /*throwIfReasonDiffers*/);
 }
 
 void CloneAuthoritativeMetadataCoordinator::_removeDbFromCloningList(OperationContext* opCtx,
                                                                      const DatabaseName& dbName) {
+    {
+        auto csReason = BSON("cloneAuthoritativeMetadata" << DatabaseNameUtil::serialize(
+                                 dbName, SerializationContext::stateCommandRequest()));
+
+        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+            opCtx,
+            NamespaceString(dbName),
+            csReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            ShardingRecoveryService::NoCustomAction(),
+            false /*throwIfReasonDiffers*/);
+    }
+
     auto dbs = *_doc.getDbsToClone();
     dbs.erase(std::remove(dbs.begin(), dbs.end(), dbName), dbs.end());
     _doc.setDbsToClone(std::move(dbs));

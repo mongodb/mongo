@@ -145,20 +145,19 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, OnDbVersionMismatch) {
     auto checkOnDbVersionMismatch = [&](const auto& newDb, bool expectRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
-        auto getActiveDbMetadata = [&] {
-            const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kDbName);
-            return scopedDsr->getCurrentMetadataIfKnown();
-        };
 
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
         ASSERT_OK(
             FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(opCtx, kDbName, newDbVersion));
 
-        auto activeDbMetadata = getActiveDbMetadata();
-        ASSERT_TRUE(activeDbMetadata);
+        auto dbVersion = [&] {
+            const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kDbName);
+            return scopedDsr->getDbVersion();
+        }();
+
+        ASSERT_TRUE(dbVersion);
         if (expectRefresh) {
-            ASSERT_EQUALS(newDbVersion.getTimestamp(),
-                          activeDbMetadata->getVersion().getTimestamp());
+            ASSERT_EQUALS(newDbVersion.getTimestamp(), dbVersion->getTimestamp());
         }
     };
 
@@ -181,13 +180,14 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
         ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
             opCtx, kDbName));
 
-        auto activeDbMetadata = [&] {
+        auto dbVersion = [&] {
             const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kDbName);
-            return scopedDsr->getCurrentMetadataIfKnown();
+            return scopedDsr->getDbVersion();
         }();
-        ASSERT_TRUE(activeDbMetadata);
+
+        ASSERT_TRUE(dbVersion);
         if (expectRefresh) {
-            ASSERT_EQ(newDbVersion.getTimestamp(), activeDbMetadata->getVersion().getTimestamp());
+            ASSERT_EQUALS(newDbVersion.getTimestamp(), dbVersion->getTimestamp());
         }
     };
 

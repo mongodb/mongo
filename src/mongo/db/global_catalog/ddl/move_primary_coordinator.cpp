@@ -773,6 +773,19 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
 }
 
 void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx) const {
+    auto recoveryService = ShardingRecoveryService::get(opCtx);
+    recoveryService->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx,
+        NamespaceString(_dbName),
+        _csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        false /* clearDbMetadata */);
+    recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx,
+        NamespaceString(_dbName),
+        _csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto dbMetadata =
         catalogClient->getDatabase(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
@@ -789,6 +802,14 @@ void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext
             thisShardId == dbMetadata.getPrimary());
 
     commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
+
+    recoveryService->releaseRecoverableCriticalSection(
+        opCtx,
+        NamespaceString(_dbName),
+        _csReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        ShardingRecoveryService::NoCustomAction(),
+        false /* throwIfReasonDiffers */);
 }
 
 void MovePrimaryCoordinator::blockWritesLegacy(OperationContext* opCtx) const {
@@ -811,14 +832,14 @@ void MovePrimaryCoordinator::unblockWritesLegacy(OperationContext* opCtx) const 
 }
 
 void MovePrimaryCoordinator::blockWrites(OperationContext* opCtx) const {
-    const bool clearDbInfo =
+    const bool clearDbMetadata =
         _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
         opCtx,
         NamespaceString(_dbName),
         _csReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        clearDbInfo);
+        clearDbMetadata);
 }
 
 void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
@@ -832,11 +853,11 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
     // In case of step-down, this operation could be re-executed and trigger the invariant in case
     // the new primary runs a DDL that acquires the critical section in the old primary shard
-    const bool clearDbInfo =
+    const bool clearDbMetadata =
         _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
-    if (clearDbInfo) {
+    if (clearDbMetadata) {
         actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
     } else {
         actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();

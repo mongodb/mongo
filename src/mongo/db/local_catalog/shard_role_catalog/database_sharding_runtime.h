@@ -33,6 +33,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
+#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_metadata_accessor.h"
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -126,25 +127,26 @@ public:
     void assertIsPrimaryShardForDb(OperationContext* opCtx) const override;
 
     bool isMovePrimaryInProgress() const override {
-        return _movePrimaryInProgress;
+        return _dbMetadataAccessor.isMovePrimaryInProgress();
     }
 
-    /**
-     * Returns this node's cached database metadata if set, otherwise it returns `boost::none`.
-     */
-    boost::optional<DatabaseType> getCurrentMetadataIfKnown() const {
-        return _dbInfo;
+    boost::optional<DatabaseVersion> getDbVersion() const {
+        return _dbMetadataAccessor.getDbVersion();
+    }
+
+    boost::optional<ShardId> getDbPrimaryShard() const {
+        return _dbMetadataAccessor.getDbPrimaryShard();
     }
 
     /**
      * Sets this node's cached database info.
      */
-    void setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
+    void setDbMetadata(OperationContext* opCtx, const DatabaseType& dbMetadata);
 
     /**
      * Resets this node's cached database info.
      */
-    void clearDbInfo();
+    void clearDbMetadata();
 
     /**
      * Methods to control the databases's critical section. Must be called with the database X lock
@@ -156,11 +158,11 @@ public:
     void exitCriticalSectionNoChecks();
 
     auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
-        return _critSec.getSignal(op);
+        return _criticalSection.getSignal(op);
     }
 
     auto getCriticalSectionReason() const {
-        return _critSec.getReason();
+        return _criticalSection.getReason();
     }
 
     /**
@@ -225,17 +227,11 @@ public:
 protected:
     const DatabaseName _dbName;
 
-    // This node's cached database info.
-    boost::optional<DatabaseType> _dbInfo;
-
-    // Modifying the state below requires holding the DBLock.
+    // Tracks the database metadata and its lifecycle for this database.
+    DatabaseShardingMetadataAccessor _dbMetadataAccessor;
 
     // Tracks the critical section state for this database.
-    ShardingMigrationCriticalSection _critSec;
-
-    // Is `true` when this database is serving as a source shard for a movePrimary, `false`
-    // otherwise.
-    bool _movePrimaryInProgress{false};
+    ShardingMigrationCriticalSection _criticalSection;
 
 private:
     // DEPRECATED methods and attributes

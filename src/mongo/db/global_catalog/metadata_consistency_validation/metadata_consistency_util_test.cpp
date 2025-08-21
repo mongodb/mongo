@@ -41,7 +41,7 @@
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
-#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_runtime.h"
+#include "mongo/db/local_catalog/shard_role_catalog/database_sharding_state_mock.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -623,8 +623,8 @@ TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) 
 
     // Introduce an inconsistency in the shard catalog cache.
     {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDsr->clearDbInfo();
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->clearDbMetadata();
     }
 
     // Validate that we can find the inconsistency.
@@ -652,9 +652,9 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCac
 
     // Introduce an inconsistency in the shard catalog cache.
     {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDsr->setDbInfo(operationContext(),
-                             DatabaseType{_dbName, kMyShardName, {_dbUuid, Timestamp(2, 0)}});
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(),
+                                 DatabaseType{_dbName, kMyShardName, {_dbUuid, Timestamp(2, 0)}});
     }
 
     // Validate that we can find the inconsistency.
@@ -677,8 +677,8 @@ TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
 
     // Introduce an inconsistency in the shard catalog while mocking it in the cache.
     {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDsr->setDbInfo(operationContext(), dbInGlobalCatalog);
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
     }
 
     // Validate that we can find the inconsistency.
@@ -700,8 +700,8 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWi
 
     // Mock database metadata in the shard catalog cache.
     {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDsr->setDbInfo(operationContext(), dbInGlobalCatalog);
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
     }
 
     // Introduce an inconsistency in the shard catalog
@@ -731,8 +731,8 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
 
     // Mock database metadata in the shard catalog cache.
     {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDsr->setDbInfo(operationContext(), dbInGlobalCatalog);
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
     }
 
     // Introduce an inconsistency in the shard catalog
@@ -759,8 +759,8 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
 
     // Mock database metadata in the shard catalog cache.
     {
-        auto scopedDss = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(), dbInGlobalCatalog);
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
     }
 
     // Introduce an inconsistency in the shard catalog
