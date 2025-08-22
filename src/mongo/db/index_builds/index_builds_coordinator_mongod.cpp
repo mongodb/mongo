@@ -62,6 +62,7 @@
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -297,6 +298,13 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     auto writeBlockState = GlobalUserWriteBlockState::get(opCtx);
 
     invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive(), buildUUID.toString());
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+        invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven);
+    }
 
     const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 

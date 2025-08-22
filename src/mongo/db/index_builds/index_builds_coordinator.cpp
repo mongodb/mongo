@@ -1995,12 +1995,20 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, build.collUUID);
         invariant(nss);
 
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+            .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
+                                  feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                                      VersionContext::getDecoration(opCtx), fcvSnapshot))
+                                     ? IndexBuildMethodEnum::kPrimaryDriven
+                                     : IndexBuildMethodEnum::kHybrid)};
         LOGV2(20660,
               "Index build: restarting",
               "buildUUID"_attr = buildUUID,
               "collectionUUID"_attr = build.collUUID,
-              logAttrs(nss.value()));
-        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
+              logAttrs(nss.value()),
+              "method"_attr = IndexBuildMethod_serializer(indexBuildOptions.indexBuildMethod));
+
         // Indicate that the initialization should not generate oplog entries or timestamps for the
         // first catalog write, and that the original durable catalog entries should be dropped and
         // replaced.
