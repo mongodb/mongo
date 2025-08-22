@@ -12,6 +12,7 @@
 /perf.data
 /perf.data.old
 /massif.out.*
+/merged_decls.json
 /modules_dump.yaml
 venv
 

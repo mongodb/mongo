@@ -490,7 +490,7 @@ access_control:
 admission:
   meta:
     slack: server-workload-scheduling
-    jira: server-workload-scheduling
+    jira: Workload Scheduling
   files:
     - src/mongo/db/admission/
     - src/mongo/db/flow_control_ticketholder*
@@ -499,7 +499,7 @@ admission:
 workload_simulation:
   meta:
     slack: server-workload-scheduling
-    jira: server-workload-scheduling
+    jira: Workload Scheduling
   files:
     - src/mongo/tools/workload_simulation/
 
@@ -975,7 +975,7 @@ tracking_allocators: # authoritative: @10gen/server-tracking-allocators
   files:
     - src/mongo/util/tracking
 
-atlas-streams:
+atlas_streams:
   meta:
     slack: streams-engine
     jira: Atlas Streams
@@ -1000,7 +1000,7 @@ installer:
 replication:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
   files:
     - src/mongo/db/repl/ # excluding ./dbcheck*
     - src/mongo/db/command_can_run_here*
@@ -1018,7 +1018,7 @@ replication:
 replication.hello:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
   files:
     - src/mongo/db/repl/hello/
     - src/mongo/db/repl/replication_info.cpp
@@ -1026,7 +1026,7 @@ replication.hello:
 replication.initial_sync:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
   files:
     - src/mongo/db/modules/enterprise/src/fcbis/
     - src/mongo/db/repl/initial_sync/
@@ -1034,7 +1034,7 @@ replication.initial_sync:
 replication.oplog:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
   files:
     - src/mongo/db/op_observer/op_observer*
     - src/mongo/db/op_observer/operation_logger*
@@ -1051,7 +1051,7 @@ replication.oplog:
 replication.server_rw_concerns:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
   files:
     - src/mongo/db/commands/read_write_concern_defaults_server_status.cpp
     - src/mongo/db/*read_concern*
@@ -1065,7 +1065,7 @@ replication.server_rw_concerns:
 replication.rs_aware_service:
   meta:
     slack: server-replication
-    jira: Server Replication
+    jira: Replication
   files:
     - src/mongo/db/repl/*primary_only_service*
     - src/mongo/db/repl/*replica_set_aware_service*
