@@ -135,10 +135,13 @@
  *     #define MONGO_COMPILER_API_CALLING_CONVENTION
  *     #endif
  *     #else // ... fall through to the definitions below.
+ * NOTE: Used and retain attributes were added to prevent these symbols from getting discarded by
+ * the compiler and linker when using LTO. See:
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-used-function-attribute
  */
 #define MONGO_COMPILER_API_EXPORT                 \
     MONGO_COMPILER_IF_MSVC(__declspec(dllexport)) \
-    MONGO_COMPILER_IF_GNUC(__attribute__((__visibility__("default"))))
+    MONGO_COMPILER_IF_GNUC(__attribute__((__visibility__("default"), used, retain)))
 
 /**
  *   Instructs the compiler to label the given type, variable or function as imported
