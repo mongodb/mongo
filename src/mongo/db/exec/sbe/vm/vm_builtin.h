@@ -136,6 +136,7 @@ enum class Builtin : uint16_t {
     coerceToString,
     concat,
     concatArrays,
+    zipArrays,
     trim,
     ltrim,
     rtrim,

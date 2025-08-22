@@ -36,6 +36,11 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
+
+// We need to ensure that 'size_t' is wide enough to store a 32-bit index.
+// This is assumed by both builtinZipArrays and builtinExtractSubArray.
+static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityType arity) {
     auto [tag, val] = value::makeNewArray();
     value::ValueGuard guard{tag, val};
@@ -107,7 +112,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arity
     auto [tagField, valField] = moveOwnedFromStack(1);
     value::ValueGuard guardField{tagField, valField};
 
-    // Create a new array is it does not exist yet.
+    // Create a new array if it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
         ownAgg = true;
         std::tie(tagAgg, valAgg) = value::makeNewArray();
@@ -219,6 +224,94 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
     return {true, resTag, resVal};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinZipArrays(ArityType arity) {
+    ArityType localVariables = 0;
+    tassert(5156501, "Invalid parameter count for builtin ZipArrays", arity >= 2);
+
+    const auto [_, inputSizeTag, inputSizeVal] = getFromStack(localVariables++);
+    const auto [__, useLongestLengthTag, useLongestLengthVal] = getFromStack(localVariables++);
+
+    if (useLongestLengthTag != value::TypeTags::Boolean ||
+        inputSizeTag != value::TypeTags::NumberInt32) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    const bool useLongestLength = value::bitcastTo<bool>(useLongestLengthVal);
+    const size_t inputSize = value::bitcastTo<int32_t>(inputSizeVal);
+
+    // Check that the count of input arrays doesn't exceed the parameters received.
+    tassert(5156502,
+            "Invalid parameter 'input size' for builtin ZipArrays",
+            inputSize <= arity - localVariables);
+
+    const size_t defaultSize = arity - localVariables - inputSize;
+
+    // Assert whether defaults has the same size as the input (also checked by an upper layer).
+    tassert(5156503,
+            "Invalid default array count for builtin ZipArrays",
+            defaultSize == 0 || defaultSize == inputSize);
+
+    // Keeps enumerators to every input array.
+    absl::InlinedVector<value::ArrayEnumerator, 8> inputs;
+    inputs.reserve(inputSize);
+
+    size_t outputLength = 0;
+    for (size_t i = 0; i < inputSize; ++i) {
+        auto [_, tag, val] = getFromStack(localVariables + i);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        inputs.emplace_back(tag, val);
+
+        const size_t arraySize = value::getArraySize(tag, val);
+        if (i == 0) {
+            outputLength = arraySize;
+        } else {
+            outputLength = useLongestLength ? std::max(arraySize, outputLength)
+                                            : std::min(arraySize, outputLength);
+        }
+    }
+
+    // The final output array, e.g. [[1, 2, 3], [2, 3, 4]].
+    auto [resTag, resVal] = value::makeNewArray();
+    value::ValueGuard resGuard{resTag, resVal};
+
+    auto* resView = value::getArrayView(resVal);
+    resView->reserve(outputLength);
+
+    for (size_t row = 0; row < outputLength; row++) {
+        // Used to construct each array in the output, e.g. [1, 2, 3].
+        auto [intermediateResTag, intermediateResVal] = value::makeNewArray();
+        value::ValueGuard intermediateResGuard{intermediateResTag, intermediateResVal};
+
+        auto* intermediateResView = value::getArrayView(intermediateResVal);
+        intermediateResView->reserve(inputSize);
+
+        for (size_t col = 0; col < inputSize; col++) {
+            value::ArrayEnumerator& input = inputs[col];
+            if (!input.atEnd()) {
+                // Add the value from the appropriate input array.
+                auto [inputTag, inputVal] = input.getViewOfValue();
+                intermediateResView->push_back(value::copyValue(inputTag, inputVal));
+                input.advance();
+            } else if (col < defaultSize) {
+                // Add the specified default value.
+                auto [_, defaultTag, defaultVal] = getFromStack(localVariables + inputSize + col);
+                intermediateResView->push_back(value::copyValue(defaultTag, defaultVal));
+            } else {
+                // Add a null default value.
+                intermediateResView->push_back(value::TypeTags::Null, 0);
+            }
+        }
+        intermediateResGuard.reset();
+        resView->push_back(intermediateResTag, intermediateResVal);
+    }
+
+    resGuard.reset();
+    return {true, resTag, resVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArraysCapped(
     ArityType arity) {
     auto [newElemTag, newElemVal] = moveOwnedFromStack(1);
@@ -323,9 +416,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(Ari
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(ArityType arity) {
-    // We need to ensure that 'size_t' is wide enough to store 32-bit index.
-    static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
-
     auto [arrayOwned, arrayTag, arrayValue] = getFromStack(0);
     auto [limitOwned, limitTag, limitValue] = getFromStack(1);
 

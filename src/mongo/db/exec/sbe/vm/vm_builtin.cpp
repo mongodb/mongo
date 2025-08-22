@@ -175,6 +175,8 @@ std::string builtinToString(Builtin b) {
             return "concat";
         case Builtin::concatArrays:
             return "concatArrays";
+        case Builtin::zipArrays:
+            return "zipArrays";
         case Builtin::aggConcatArraysCapped:
             return "aggConcatArraysCapped";
         case Builtin::concatArraysCapped:
@@ -798,6 +800,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinConcat(arity);
         case Builtin::concatArrays:
             return builtinConcatArrays(arity);
+        case Builtin::zipArrays:
+            return builtinZipArrays(arity);
         case Builtin::aggConcatArraysCapped:
             return builtinAggConcatArraysCapped(arity);
         case Builtin::concatArraysCapped:
