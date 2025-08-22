@@ -82,6 +82,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/idl/**/idl_compatibility_errors.py @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/idl/**/test_compatibility.py @10gen/query-optimization @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/monitor_build_status/OWNERS.yml
+/buildscripts/monitor_build_status/ @10gen/devprod-correctness @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/resmoke_proxy/OWNERS.yml
 /buildscripts/resmoke_proxy/ @10gen/devprod-correctness @svc-auto-approve-bot
 
