@@ -103,6 +103,13 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         !opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
         auto validIntent = _validIntent(intent);
         if (_lastInterruption == InterruptionType::Shutdown) {
+            if (!validIntent) {
+                // Mark opCtx as killed before uasserting.
+                auto serviceCtx = opCtx->getServiceContext();
+                auto client = opCtx->getClient();
+                ClientLock lock(client);
+                serviceCtx->killOperation(lock, opCtx, ErrorCodes::InterruptedAtShutdown);
+            }
             uassert(ErrorCodes::InterruptedAtShutdown,
                     "Cannot register intent due to Shutdown.",
                     validIntent);
