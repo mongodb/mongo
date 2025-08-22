@@ -1401,6 +1401,12 @@ tasks:
     tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
+        # The hardcoded timeout is to overrule history-based timeout at the beginning of the suite
+        # introduction. This should be removed once the suite has run for long enough that the
+        # historical timeout is more accurate.
+        vars:
+          exec_timeout_secs: 4800 # 80min
+          timeout_secs: 4800 # 80min
 
   - <<: *gen_task_template
     name: retryable_writes_downgrade_gen
