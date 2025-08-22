@@ -215,14 +215,10 @@ PlanState HashLookupUnwindStage::getNext() {
                 _lookupStageOutputAccessor.reset(
                     false /* owned */, innerMatch->first, innerMatch->second);
                 return trackPlanState(PlanState::ADVANCED);
-            } else {
-                _outerKeyOpen = false;
             }
-        } else {
-            _outerKeyOpen = false;
         }
+        _outerKeyOpen = false;
     }  // while true
-    return trackPlanState(PlanState::IS_EOF);
 }  // HashLookupUnwindStage::getNext
 
 void HashLookupUnwindStage::close() {
