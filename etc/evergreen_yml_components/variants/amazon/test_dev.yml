@@ -357,7 +357,8 @@ buildvariants:
         --modules=none
       has_packages: false
       repo_edition: org
-      large_distro_name: amazon2023-arm64-latest-small-m8g
+      large_distro_name: amazon2023-arm64-latest-large-m8g
+      core_analyzer_distro_name: amazon2023-arm64-latest-large-m8g
       compile_variant: amazon2023-arm64
     tasks:
       - name: compile_test_and_package_serial_TG
@@ -394,6 +395,7 @@ buildvariants:
       multiversion_architecture: aarch64
       repo_edition: enterprise
       compile_variant: enterprise-amazon2023-arm64-grav4
+      core_analyzer_distro_name: amazon2023-arm64-latest-large-m8g
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
