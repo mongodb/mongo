@@ -113,12 +113,12 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
     auto identsVec = getAllKVEngineIdents(opCtx.get());
-    auto idents = std::set<std::string>(identsVec.begin(), identsVec.end());
+    auto idents = std::set<std::string, std::less<>>(identsVec.begin(), identsVec.end());
 
     // There are two idents. `_mdb_catalog` and the ident for `db.coll1`.
     ASSERT_EQUALS(static_cast<const unsigned long>(2), idents.size());
     ASSERT_TRUE(idents.find(collInfo.ident) != idents.end());
-    ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
+    ASSERT_TRUE(idents.find(ident::kMbdCatalog) != idents.end());
 
     // Drop the `db.coll1` table, while leaving the MDBCatalog entry.
     ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),

@@ -203,5 +203,114 @@ TEST_F(IdentGenerationTest, InternalIdentsAreGeneratedAndClassifiedCorrectly) {
     ASSERT_TRUE(ident::isInternalIdent(internalIdentWithStem, specificIdentStem))
         << "ident: " << internalIdentWithStem;
 }
+
+TEST_F(IdentGenerationTest, ValidIndexIdents) {
+    // Default format. one vs two - hits different codepaths
+    ASSERT_TRUE(ident::isValidIdent("index-0"));
+    ASSERT_TRUE(ident::isValidIdent("index-0-1"));
+    ASSERT_TRUE(ident::isValidIdent("index-0-1-2"));
+
+    // directoryForIndexes
+    ASSERT_TRUE(ident::isValidIdent("index/0"));
+    ASSERT_TRUE(ident::isValidIdent("index/0-1"));
+    ASSERT_TRUE(ident::isValidIdent("index/0-1-2"));
+
+    // directoryPerDB
+    ASSERT_TRUE(ident::isValidIdent("db.name/index-0"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/index-0-1"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/index-0-1-2"));
+
+    // directoryPerDB where dbName is "index"
+    ASSERT_TRUE(ident::isValidIdent("index/index-0"));
+    ASSERT_TRUE(ident::isValidIdent("index/index-0-1"));
+    ASSERT_TRUE(ident::isValidIdent("index/index-0-1-2"));
+
+    // directoryPerDB where dbName is "collection"
+    ASSERT_TRUE(ident::isValidIdent("collection/index-0"));
+    ASSERT_TRUE(ident::isValidIdent("collection/index-0-1"));
+
+    // directoryPerDB where dbName is "internal"
+    ASSERT_TRUE(ident::isValidIdent("internal/index-0"));
+    ASSERT_TRUE(ident::isValidIdent("internal/index-0-1"));
+
+    // directoryForIndexes plus directoryPerDB
+    ASSERT_TRUE(ident::isValidIdent("db.name/index/0"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/index/0-1"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/index/0-1-2"));
+
+    // directoryForIndexes plus directoryPerDB where dbName is "index"
+    ASSERT_TRUE(ident::isValidIdent("index/index/0"));
+    ASSERT_TRUE(ident::isValidIdent("index/index/0-1"));
+    ASSERT_TRUE(ident::isValidIdent("index/index/0-1-2"));
+
+    // dbName with some escaped characters
+    ASSERT_TRUE(ident::isValidIdent(".00.01.02/index/0"));
+}
+
+TEST_F(IdentGenerationTest, ValidCollectionIdents) {
+    // Default format. one vs two - hits different codepaths
+    ASSERT_TRUE(ident::isValidIdent("collection-0"));
+    ASSERT_TRUE(ident::isValidIdent("collection-0-1"));
+    ASSERT_TRUE(ident::isValidIdent("collection-0-1-2"));
+
+    // directoryForIndexes
+    ASSERT_TRUE(ident::isValidIdent("collection/0"));
+    ASSERT_TRUE(ident::isValidIdent("collection/0-1"));
+    ASSERT_TRUE(ident::isValidIdent("collection/0-1-2"));
+
+    // directoryPerDB
+    ASSERT_TRUE(ident::isValidIdent("db.name/collection-0"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/collection-0-1"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/collection-0-1-2"));
+
+    // directoryPerDB where dbName is "index"
+    ASSERT_TRUE(ident::isValidIdent("index/collection-0"));
+    ASSERT_TRUE(ident::isValidIdent("index/collection-0-1"));
+    ASSERT_TRUE(ident::isValidIdent("index/collection-0-1-2"));
+
+    // directoryForIndexes plus directoryPerDB
+    ASSERT_TRUE(ident::isValidIdent("db.name/collection/0"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/collection/0-1"));
+    ASSERT_TRUE(ident::isValidIdent("db.name/collection/0-1-2"));
+
+    // directoryForIndexes plus directoryPerDB where dbName is "index"
+    ASSERT_TRUE(ident::isValidIdent("index/collection/0"));
+    ASSERT_TRUE(ident::isValidIdent("index/collection/0-1"));
+    ASSERT_TRUE(ident::isValidIdent("index/collection/0-1-2"));
+
+    // The special hardcoded collection idents
+    ASSERT_TRUE(ident::isValidIdent(ident::kMbdCatalog));
+    ASSERT_TRUE(ident::isValidIdent(ident::kSizeStorer));
+}
+
+TEST_F(IdentGenerationTest, InvalidIdents) {
+    // empty ident
+    ASSERT_FALSE(ident::isValidIdent(""));
+    // no separators
+    ASSERT_FALSE(ident::isValidIdent("index"));
+    // no tag after separator
+    ASSERT_FALSE(ident::isValidIdent("index-"));
+    ASSERT_FALSE(ident::isValidIdent("index/"));
+    // invalid stem
+    ASSERT_FALSE(ident::isValidIdent("foo-0"));
+    ASSERT_FALSE(ident::isValidIdent("foo/0"));
+    // invalid stem after dbname
+    ASSERT_FALSE(ident::isValidIdent("db/foo-0"));
+    ASSERT_FALSE(ident::isValidIdent("db/foo/0"));
+    // too many path components
+    ASSERT_FALSE(ident::isValidIdent("db/index/a/b"));
+    // invalid path components
+    ASSERT_FALSE(ident::isValidIdent("./index/a"));
+    ASSERT_FALSE(ident::isValidIdent("../index/a"));
+    ASSERT_FALSE(ident::isValidIdent("/index/a"));
+    ASSERT_FALSE(ident::isValidIdent("db/./a"));
+    ASSERT_FALSE(ident::isValidIdent("db/../a"));
+    ASSERT_FALSE(ident::isValidIdent("db/index/."));
+    ASSERT_FALSE(ident::isValidIdent("db/index/.."));
+    ASSERT_FALSE(ident::isValidIdent("db/index/\\a"));
+    ASSERT_FALSE(ident::isValidIdent("db/index/:a"));
+    // dbname containing characters that should have been escaped
+    ASSERT_FALSE(ident::isValidIdent("db[name]/index/a"));
+}
 }  // namespace
 }  // namespace mongo

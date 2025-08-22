@@ -222,7 +222,8 @@ inline std::ostream& operator<<(std::ostream& s, const UUID& uuid) {
     return (s << uuid.toString());
 }
 
-inline StringBuilder& operator<<(StringBuilder& s, const UUID& uuid) {
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& s, const UUID& uuid) {
     return (s << uuid.toString());
 }
 

@@ -468,6 +468,13 @@ TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {
             opCtx.get(), spec, BSON("indexIdent" << ""), _nss, OplogApplication::Mode::kSecondary),
         AssertionException,
         ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(createIndexForApplyOps(opCtx.get(),
+                                              spec,
+                                              BSON("ident" << "malformed-ident"),
+                                              _nss,
+                                              OplogApplication::Mode::kSecondary),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 }  // namespace

@@ -28,26 +28,8 @@
  */
 
 
-#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
-#define LOGV2_FOR_ROLLBACK(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                             \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationRollback}, MESSAGE, ##__VA_ARGS__)
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/algorithm/string/join.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/none.hpp>
-#include <boost/none_t.hpp>
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-#include <wiredtiger.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
@@ -62,6 +44,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv_backup_block.h"
@@ -78,7 +61,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -88,7 +70,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -99,7 +80,6 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/system_tick_source.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -111,14 +91,26 @@
 #include <cstddef>
 #include <exception>
 #include <iomanip>
-#include <limits>
 #include <memory>
 #include <mutex>
 #include <sstream>
 #include <utility>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+#include <wiredtiger.h>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_ROLLBACK(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                             \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationRollback}, MESSAGE, ##__VA_ARGS__)
 
 namespace mongo {
 
@@ -545,7 +537,7 @@ std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(WiredTigerSessi
             continue;
 
         StringData ident = key.substr(idx + 1);
-        if (ident == "sizeStorer")
+        if (ident == ident::kSizeStorer)
             continue;
 
         all.push_back(std::string{ident});
@@ -688,7 +680,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         minSnapshotHistoryWindowInSeconds.store(0);
     }
 
-    _sizeStorerUri = WiredTigerUtil::buildTableUri("sizeStorer");
+    _sizeStorerUri = WiredTigerUtil::buildTableUri(ident::kSizeStorer);
     WiredTigerSession session(_connection.get());
     if (repair && _wtHasUri(session, _sizeStorerUri)) {
         LOGV2(22316, "Repairing size cache");

@@ -71,9 +71,8 @@ public:
 
     std::unique_ptr<RecordStore> newRecordStore(
         const std::string& ns, const RecordStore::Options& recordStoreOptions) override {
-        auto ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        return newRecordStore(nss, ident, recordStoreOptions, UUID::gen());
+        return newRecordStore(nss, _identForNs(ns), recordStoreOptions, UUID::gen());
     }
 
     std::unique_ptr<RecordStore> newRecordStore(const NamespaceString& nss,
@@ -103,6 +102,12 @@ public:
     }
 
 private:
+    std::string _identForNs(StringData ns) {
+        auto ident = fmt::format("collection-{}", ns);
+        std::replace(ident.begin(), ident.end(), '.', '_');
+        return ident;
+    }
+
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
     std::unique_ptr<WiredTigerKVEngine> _engine;

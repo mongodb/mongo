@@ -944,7 +944,7 @@ private:
 };
 
 TEST_F(WiredTigerKVEngineDirectoryTest, TopLevelIdentsDontRemoveDirectories) {
-    std::string ident = "ident-without-directory";
+    std::string ident = "collection-ident-without-directory";
     StatusWith<boost::filesystem::path> path = createIdent("name.space", ident);
     ASSERT_OK(path);
     ASSERT_TRUE(boost::filesystem::exists(path.getValue().parent_path()));
@@ -955,19 +955,19 @@ TEST_F(WiredTigerKVEngineDirectoryTest, TopLevelIdentsDontRemoveDirectories) {
 }
 
 TEST_F(WiredTigerKVEngineDirectoryTest, RemovingLastIdentPromptsDirectoryRemoval) {
-    std::string apple = "fruit/apple";
+    std::string apple = "fruit/collection-apple";
     StatusWith<boost::filesystem::path> applePath = createIdent("fruit.apple", apple);
     ASSERT_OK(applePath);
     boost::filesystem::path fruitDir = applePath.getValue().parent_path();
 
     // Same directory.
-    std::string orange = "fruit/orange";
+    std::string orange = "fruit/collection-orange";
     StatusWith<boost::filesystem::path> orangePath = createIdent("fruit.orange", orange);
     ASSERT_OK(orangePath);
     ASSERT_EQ(fruitDir, orangePath.getValue().parent_path());
 
     // Different directory.
-    std::string potato = "veg/potato";
+    std::string potato = "veg/collection-potato";
     StatusWith<boost::filesystem::path> potatoPath = createIdent("veg.potato", potato);
     ASSERT_OK(potatoPath);
     ASSERT_NE(fruitDir, potatoPath.getValue().parent_path());
@@ -987,23 +987,20 @@ TEST_F(WiredTigerKVEngineDirectoryTest, RemovingLastIdentPromptsDirectoryRemoval
 }
 
 TEST_F(WiredTigerKVEngineDirectoryTest, HandlesNestedDirectories) {
-    std::string ident = "lots/and/lots/of/directories";
+    std::string ident = "dbname/collection/ident";
     StatusWith<boost::filesystem::path> path = createIdent("name.space", ident);
     ASSERT_OK(path);
     ASSERT_TRUE(boost::filesystem::exists(path.getValue()));
 
     ASSERT_OK(removeIdent(ident));
-    // directories
+    // ident
     ASSERT_FALSE(boost::filesystem::exists(path.getValue()));
-    // of
+    // collection
     ASSERT_FALSE(boost::filesystem::exists(path.getValue().parent_path()));
-    // lots
+    // dbname
     ASSERT_FALSE(boost::filesystem::exists(path.getValue().parent_path().parent_path()));
-    // and
-    ASSERT_FALSE(
-        boost::filesystem::exists(path.getValue().parent_path().parent_path().parent_path()));
-    // lots
-    ASSERT_FALSE(boost::filesystem::exists(
+    // the test parent directory
+    ASSERT_TRUE(boost::filesystem::exists(
         path.getValue().parent_path().parent_path().parent_path().parent_path()));
 }
 

@@ -38,6 +38,7 @@
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -455,7 +456,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
                                                              StringData ident,
                                                              const RecordStore::Options& options,
                                                              boost::optional<UUID> uuid) {
-    if (ident == "_mdb_catalog") {
+    if (ident == ident::kMbdCatalog) {
         return std::make_unique<EphemeralForTestRecordStore>(uuid, ident, &_catalogInfo);
     } else if (options.isOplog) {
         return std::make_unique<DevNullRecordStore::Oplog>(*uuid, ident, options.oplogMaxSize);

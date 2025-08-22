@@ -118,12 +118,12 @@ protected:
         KVEngine* engine = helper->getEngine();
         ASSERT_OK(
             engine->createRecordStore(NamespaceString::createNamespaceString_forTest("catalog"),
-                                      "catalog",
+                                      "collection-catalog",
                                       RecordStore::Options{}));
 
         return engine->getRecordStore(opCtx,
                                       NamespaceString::createNamespaceString_forTest("catalog"),
-                                      "catalog",
+                                      "collection-catalog",
                                       RecordStore::Options{},
                                       UUID::gen());
     }
@@ -193,7 +193,7 @@ class KVEngineTestHarness : public ServiceContextTest {
 protected:
     const NamespaceString kNss =
         NamespaceString::createNamespaceString_forTest("defaultDB.defaultColl");
-    const std::string kIdent = "defaultIdent";
+    const std::string kIdent = "collection-defaultIdent";
     const UUID kUUID = UUID::gen();
     const RecordStore::Options kRecordStoreOptions{};
 
@@ -382,7 +382,7 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
-    std::string ident = "temptemp";
+    std::string ident = "collection-temptemp";
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
@@ -798,8 +798,8 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
         oplogRecordStoreOptions.isOplog = true;
         oplogRecordStoreOptions.oplogMaxSize = 10240;
         NamespaceString oplogNss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
-        oplogRs =
-            newRecordStore(engine, oplogNss, "oplogIdent", oplogRecordStoreOptions, UUID::gen());
+        oplogRs = newRecordStore(
+            engine, oplogNss, "collection-oplog", oplogRecordStoreOptions, UUID::gen());
     }
 
     RecordData rd;

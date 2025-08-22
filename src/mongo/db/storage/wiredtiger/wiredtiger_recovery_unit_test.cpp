@@ -104,7 +104,8 @@ public:
 
     std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
                                                    const std::string& ns) final {
-        std::string ident = ns;
+        std::string ident = "collection-" + ns;
+        std::replace(ident.begin(), ident.end(), '.', '-');
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         const auto res = _engine->createRecordStore(nss, ident, RecordStore::Options{});
         return _engine->getRecordStore(opCtx, nss, ident, RecordStore::Options{}, UUID::gen());

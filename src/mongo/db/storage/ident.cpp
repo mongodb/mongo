@@ -40,7 +40,7 @@ namespace mongo {
 namespace {
 constexpr auto kCollectionIdentStem = "collection"_sd;
 constexpr auto kIndexIdentStem = "index"_sd;
-constexpr auto kInternalIdentPrefix = "internal-"_sd;
+constexpr auto kInternalIdentStem = "internal"_sd;
 
 // Does not escape letters, digits, '.', or '_'.
 // Otherwise escapes to a '.' followed by a zero-filled 2- or 3-digit decimal number.
@@ -105,6 +105,118 @@ std::string generateNewIdent(const DatabaseName& dbName,
     return buf.str();
 }
 
+enum class IdentType { collection, index, internal };
+
+boost::optional<IdentType> getIdentType(StringData str) {
+    if (str == kCollectionIdentStem)
+        return IdentType::collection;
+    if (str == kIndexIdentStem)
+        return IdentType::index;
+    if (str == kInternalIdentStem)
+        return IdentType::internal;
+    return boost::none;
+}
+struct ParsedIdent {
+    IdentType identType;
+    StringData uniqueTag;
+};
+
+bool validateTag(StringData uniqueTag) {
+    // The tag is pretty free-form, but must not contain any characters which would be special when
+    // interpreted as a path
+    return !uniqueTag.empty() && uniqueTag.find_first_of("./\\:") == uniqueTag.npos;
+}
+
+boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
+                                           StringData identType,
+                                           StringData uniqueTag) {
+    // Ident type must be one of a fixed set of values
+    auto parsedIdentType = getIdentType(identType);
+    if (!parsedIdentType)
+        return boost::none;
+    if (!validateTag(uniqueTag))
+        return boost::none;
+
+    // If the dbName is present it must be non-empty, must not change when escaped with
+    // createDBNamePathComponent(), and must not be "." or ".."
+    if (dbName) {
+        if (dbName->empty() || dbName == "."_sd || dbName == ".."_sd)
+            return boost::none;
+        for (char c : *dbName) {
+            if (escapeTable[c].size() != 1)
+                return boost::none;
+        }
+    }
+
+    return ParsedIdent{*parsedIdentType, uniqueTag};
+}
+
+// Valid idents can be one of the following formats:
+//
+// 1. "$identType-$uniqueTag" (default)
+// 2. "$identType/$uniqueTag" (directoryForIndexes but not directoryPerDB)
+// 3. "$dbName/$identType-$uniqueTag" (directoryPerDB but not directoryForIndexes)
+// 4. "$dbName/$identType/$uniqueTag" (both directoryForIndexes and directoryPerDB)
+//
+// $identType must be one of "collection", "index", or "internal".
+// $dbName is a string escaped by createDBNamePathComponent().
+// $uniqueTag is fairly free-form, but must not start with an ident type or contain any characters
+// which would be special when interpreted as a path.
+boost::optional<ParsedIdent> parseIdent(StringData str) {
+    struct Parts {
+        char delim;
+        StringData head;
+        StringData tail;
+    };
+    auto split = [](StringData in, StringData delims) -> boost::optional<Parts> {
+        auto pos = in.find_first_of(delims);
+        if (pos == in.npos)
+            return {};
+        return Parts{in[pos], in.substr(0, pos), in.substr(pos + 1)};
+    };
+
+    auto tok1 = split(str, "/-");
+    if (!tok1) {
+        // All formats have at least an ident type followed by a separator
+        return boost::none;
+    }
+
+    if (tok1->delim == '-') {
+        // Format 1: "$identType-$uniqueTag"
+        return validateIdent({}, tok1->head, tok1->tail);
+    }
+    invariant(tok1->delim == '/');
+
+    auto tok2 = split(tok1->tail, "/-");
+    if (!tok2) {
+        // Format 2: "$identType/$uniqueTag"
+        return validateIdent({}, tok1->head, tok1->tail);
+    }
+    if (tok2->delim == '/') {
+        // This is the only format with two slashes
+        // Format 4: "$dbName/$identType/$uniqueTag"
+        return validateIdent(tok1->head, tok2->head, tok2->tail);
+    }
+    invariant(tok2->delim == '-');
+
+    // "index/collection-something" is ambiguous: it could be either be a collection in a db named
+    // index with directoryPerDB=true, or an index with directoryForIndexes=true and
+    // directoryPerDB=false. We assume here that the unique tag won't start with a known ident type,
+    // and thus it's a collection in the db named "index".
+    if (auto identType = getIdentType(tok2->head)) {
+        // Format 3: "$dbName/$identType-$uniqueTag"
+        if (!validateTag(tok2->tail))
+            return boost::none;
+        return ParsedIdent{*identType, tok2->tail};
+    }
+    if (auto identType = getIdentType(tok1->head)) {
+        // Format 2: "$identType/$uniqueTag"
+        if (!validateTag(tok1->tail))
+            return boost::none;
+        return ParsedIdent{*identType, tok1->tail};
+    }
+    return boost::none;
+}
 }  // namespace
 
 namespace ident {
@@ -122,28 +234,33 @@ std::string generateNewIndexIdent(const DatabaseName& dbName,
 }
 
 std::string generateNewInternalIdent(StringData identStem) {
-    StringBuilder buf;
-    buf << kInternalIdentPrefix;
-    buf << identStem;
-    buf << UUID::gen();
-    return buf.str();
+    return fmt::format("{}-{}{}", kInternalIdentStem, identStem, UUID::gen().toString());
 }
 
 bool isCollectionOrIndexIdent(StringData ident) {
-    return ident.find(str::stream() << kIndexIdentStem << "-") != std::string::npos ||
-        ident.find(str::stream() << kIndexIdentStem << "/") != std::string::npos ||
-        isCollectionIdent(ident);
+    auto parsed = parseIdent(ident);
+    return parsed &&
+        (parsed->identType == IdentType::collection || parsed->identType == IdentType::index);
 }
 
 bool isInternalIdent(StringData ident, StringData identStem) {
-    return ident.find(str::stream() << kInternalIdentPrefix << identStem) != std::string::npos;
+    auto parsed = parseIdent(ident);
+    return parsed && parsed->identType == IdentType::internal &&
+        parsed->uniqueTag.starts_with(identStem);
 }
 
 bool isCollectionIdent(StringData ident) {
     // Internal idents prefixed "internal-" should not be considered collections, because
     // they are not eligible for orphan recovery through repair.
-    return ident.find(str::stream() << kCollectionIdentStem << "-") != std::string::npos ||
-        ident.find(str::stream() << kCollectionIdentStem << "/") != std::string::npos;
+    auto parsed = parseIdent(ident);
+    return parsed && parsed->identType == IdentType::collection;
+}
+
+bool isValidIdent(StringData ident) {
+    // These internal idents do not follow the normal scheme
+    if (ident == kSizeStorer || ident == kMbdCatalog)
+        return true;
+    return parseIdent(ident).has_value();
 }
 
 std::string createDBNamePathComponent(const DatabaseName& dbName) {

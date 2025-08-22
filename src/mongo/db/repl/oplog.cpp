@@ -110,6 +110,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -208,23 +209,36 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
 
 boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
     OperationContext* opCtx, const OplogEntry& oplogEntry) {
-    if (auto& o2 = oplogEntry.getObject2(); o2.has_value() &&
-        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
-        // TODO SERVER-106459: Utilize IDL parsing and input validation.
-        boost::optional<std::string> idIndexIdent;
-        if (auto idIdentElem = o2->getField("idIndexIdent"); idIdentElem) {
-            idIndexIdent = idIdentElem.String();
-        }
-        auto catalogIdElem = o2->getField("catalogId");
-        uassert(
-            ErrorCodes::InvalidOptions, "Missing 'catalogId' field from 'o2' entry", catalogIdElem);
-        return CreateCollCatalogIdentifier{.catalogId = RecordId::deserializeToken(catalogIdElem),
-                                           .ident = std::string(o2->getStringField("ident")),
-                                           .idIndexIdent = idIndexIdent};
+    auto& o2 = oplogEntry.getObject2();
+    if (!o2 || !shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
+        // Either no catalog identifier information was provided, or replicated local catalog
+        // identifiers are not supported.
+        return boost::none;
     }
-    // Either no catalog identifier information was provided, or replicated local catalog
-    // identifiers are not supported.
-    return boost::none;
+
+    // TODO SERVER-106459: Utilize IDL parsing and input validation.
+    boost::optional<std::string> idIndexIdent;
+    if (auto idIdentElem = o2->getField("idIndexIdent"); idIdentElem) {
+        uassert(ErrorCodes::InvalidOptions,
+                fmt::format(
+                    "'idIndexIdent' field must be a string containing a valid ident but got '{}'",
+                    idIdentElem.toString()),
+                idIdentElem.type() == BSONType::string &&
+                    ident::isValidIdent(idIdentElem.valueStringData()));
+        idIndexIdent = idIdentElem.str();
+    }
+
+    auto catalogIdElem = o2->getField("catalogId");
+    uassert(ErrorCodes::InvalidOptions, "Missing 'catalogId' field from 'o2' entry", catalogIdElem);
+
+    auto ident = o2->getStringField("ident");
+    uassert(ErrorCodes::InvalidOptions,
+            fmt::format("'ident' field must contain a valid ident but got '{}'", ident),
+            ident::isValidIdent(ident));
+
+    return CreateCollCatalogIdentifier{.catalogId = RecordId::deserializeToken(catalogIdElem),
+                                       .ident = std::string(ident),
+                                       .idIndexIdent = std::move(idIndexIdent)};
 }
 }  // namespace
 
@@ -364,8 +378,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
                 "Failed to create index because indexIdent field in metadata o2 was invalid: " +
                     indexMetadata->toString(),
                 indexIdentField.type() == BSONType::string &&
-                    !indexIdentField.valueStringData().empty());
-        IndexBuildInfo indexBuildInfo(indexSpec, indexIdentField.String());
+                    ident::isValidIdent(indexIdentField.valueStringData()));
+        IndexBuildInfo indexBuildInfo(indexSpec, indexIdentField.str());
         indexBuildInfo.setInternalIdents(*storageEngine);
         return indexBuildInfo;
     }();

@@ -165,13 +165,14 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
     // _mdb_catalog will reflect the "stable" set of collections/indexes. However, it's not
     // expected for a storage engine's ability to persist stable data to extend to "stable
     // tables".
-    std::set<std::string> engineIdents;
+    std::set<std::string, std::less<>> engineIdents;
     {
         std::vector<std::string> vec =
             engine->getEngine()->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx));
         for (auto& elem : vec)
             engineIdents.insert(std::move(elem));
-        engineIdents.erase(mongo::kCatalogInfo);
+        if (auto it = engineIdents.find(ident::kMbdCatalog); it != engineIdents.end())
+            engineIdents.erase(it);
     }
 
     LOGV2_FOR_RECOVERY(4615633, 2, "Reconciling collection and index idents.");

@@ -235,7 +235,7 @@ public:
         auto op = makeOperation();
         WriteUnitOfWork wuow(op);
         const auto nss = NamespaceString::createNamespaceString_forTest("a.b");
-        const auto ident = "ident";
+        const auto ident = "collection-ident";
         RecordStore::Options options;
         ASSERT_OK(engine->createRecordStore(nss, ident, options));
         rs = engine->getRecordStore(op, nss, ident, options, UUID::gen());

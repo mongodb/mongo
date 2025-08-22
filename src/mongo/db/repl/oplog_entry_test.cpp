@@ -939,6 +939,8 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     ASSERT_EQ(parse(baseObj, BSONObj()), ErrorCodes::BadValue);
     ASSERT_EQ(parse(baseObj, BSON("indexes" << 1)), ErrorCodes::BadValue);
     ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY(1))), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY("malformed-ident"))),
+              ErrorCodes::BadValue);
 
     baseObj =
         BSON("abortIndexBuild" << "test.coll"

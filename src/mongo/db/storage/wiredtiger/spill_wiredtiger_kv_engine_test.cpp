@@ -72,7 +72,7 @@ protected:
 
         _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
         auto ru = _kvEngine->newRecoveryUnit();
-        ASSERT_TRUE(_kvEngine->hasIdent(*ru, "a.b"));
+        ASSERT_TRUE(_kvEngine->hasIdent(*ru, "collection-a-b"));
     }
 
     ~SpillWiredTigerKVEngineTest() override {
@@ -86,7 +86,8 @@ protected:
 
     std::unique_ptr<WiredTigerRecordStore> makeTemporaryRecordStore(const std::string& ns,
                                                                     KeyFormat keyFormat) {
-        StringData ident = ns;
+        std::string ident = "collection-" + ns;
+        std::replace(ident.begin(), ident.end(), '.', '-');
         auto ru = _kvEngine->newRecoveryUnit();
         auto rs = _kvEngine->makeTemporaryRecordStore(*ru, ident, keyFormat);
         return std::unique_ptr<WiredTigerRecordStore>(

@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -181,6 +182,11 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                 return {ErrorCodes::BadValue,
                         fmt::format("'indexIdent' must be a string, got '{}'",
                                     indexIdentElem.toString())};
+            }
+            if (!ident::isValidIdent(indexIdentElem.valueStringData())) {
+                return {
+                    ErrorCodes::BadValue,
+                    fmt::format("'indexIdent' '{}' is not a valid ident", indexIdentElem.str())};
             }
             indexesVec[i].indexIdent = indexIdentElem.str();
         }

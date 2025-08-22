@@ -64,7 +64,6 @@ class StorageEngineMetadata;
 struct StorageGlobalParams;
 
 // StorageEngine constants
-const std::string kCatalogInfo = std::string{DatabaseName::kMdbCatalog.db(omitTenant)};
 const NamespaceString kCatalogInfoNamespace = NamespaceString(DatabaseName::kMdbCatalog);
 const auto kResumableIndexIdentStem = "resumable-index-build-"_sd;
 

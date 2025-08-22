@@ -38,6 +38,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/damage_vector.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
@@ -188,7 +190,8 @@ protected:
 
     WiredTigerHarnessHelper harnessHelper;
     WiredTigerSizeStorer sizeStorer{&harnessHelper.connection(),
-                                    WiredTigerUtil::kTableUriPrefix + "sizeStorer"};
+                                    std::string{WiredTigerUtil::kTableUriPrefix} +
+                                        ident::kSizeStorer};
     std::unique_ptr<RecordStore> rs;
     std::string ident;
     std::string uri;
@@ -311,7 +314,8 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     sizeStorer.flush(true);
 
     WiredTigerSizeStorer sizeStorer(&harnessHelper.connection(),
-                                    WiredTigerUtil::kTableUriPrefix + "sizeStorer");
+                                    std::string{WiredTigerUtil::kTableUriPrefix} +
+                                        ident::kSizeStorer);
     WiredTigerSession session{&harnessHelper.connection()};
 
     // As the operation was rolled back, numRecords and dataSize should be for the first op only. If

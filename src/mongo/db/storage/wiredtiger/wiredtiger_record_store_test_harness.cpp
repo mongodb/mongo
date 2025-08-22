@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
@@ -44,10 +43,7 @@
 
 #include <wiredtiger.h>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -98,7 +94,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
-    std::string ident = std::string{redactTenant(NamespaceString::kRsOplogNamespace)};
+    std::string ident = _identForNs(redactTenant(NamespaceString::kRsOplogNamespace));
     RecordStore::Options oplogRecordStoreOptions;
     oplogRecordStoreOptions.isOplog = true;
     oplogRecordStoreOptions.isCapped = true;

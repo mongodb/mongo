@@ -116,7 +116,7 @@ public:
      * Create a collection table in the KVEngine not reflected in the MDBCatalog / durable_catalog.
      */
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
-        const std::string identName = "collection-" + collName.ns_forTest();
+        const std::string identName = _storageEngine->generateNewCollectionIdent(collName.dbName());
         return _storageEngine->getEngine()->createRecordStore(
             collName, identName, RecordStore::Options{});
     }

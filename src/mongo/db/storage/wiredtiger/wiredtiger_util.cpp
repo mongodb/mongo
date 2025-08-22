@@ -112,6 +112,7 @@ using std::string;
 
 std::string WiredTigerUtil::buildTableUri(StringData ident) {
     invariant(ident.find(kTableUriPrefix) == string::npos);
+    invariant(ident::isValidIdent(ident), ident);
     return kTableUriPrefix + std::string{ident};
 }
 
