@@ -192,6 +192,7 @@ buildvariants:
     run_on:
       - rhel8.8-arm64-small
     expansions:
+      large_distro_name: rhel8.8-arm64-large
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
