@@ -650,14 +650,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
-    {
-        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
-        if (scopedSs.isInTransitionalPhase(opCtx)) {
-            scopedSs.checkDbVersionOrThrow(opCtx, source.dbName());
-        } else {
-            DatabaseShardingState::acquire(opCtx, source.dbName())->checkDbVersionOrThrow(opCtx);
-        }
-    }
+    DatabaseShardingState::acquire(opCtx, source.dbName())->checkDbVersionOrThrow(opCtx);
 
     DisableDocumentValidation validationDisabler(opCtx);
 

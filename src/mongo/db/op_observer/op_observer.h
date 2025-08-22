@@ -720,20 +720,6 @@ public:
      */
     virtual void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
 
-    /**
-     * Called when the sharded cluster enters the transitional state of the two step replicaset to
-     * shard promotion process.
-     */
-    virtual void onBeginPromotionToShardedCluster(OperationContext* opCtx,
-                                                  const repl::OplogEntry& op) = 0;
-
-    /**
-     * Called when the sharded cluster leaves the transitional state of the two step replicaset to
-     * shard promotion process.
-     */
-    virtual void onCompletePromotionToShardedCluster(OperationContext* opCtx,
-                                                     const repl::OplogEntry& op) = 0;
-
     struct Times;
 
 protected:

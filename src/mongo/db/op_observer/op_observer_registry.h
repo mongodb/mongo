@@ -611,18 +611,6 @@ public:
             o->onDropDatabaseMetadata(opCtx, op);
     }
 
-    void onBeginPromotionToShardedCluster(OperationContext* opCtx,
-                                          const repl::OplogEntry& op) override {
-        for (auto& o : _observers)
-            o->onBeginPromotionToShardedCluster(opCtx, op);
-    }
-
-    void onCompletePromotionToShardedCluster(OperationContext* opCtx,
-                                             const repl::OplogEntry& op) override {
-        for (auto& o : _observers)
-            o->onCompletePromotionToShardedCluster(opCtx, op);
-    }
-
 private:
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {

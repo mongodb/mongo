@@ -96,7 +96,6 @@ void CatalogRAIITestFixture::setUp() {
     DatabaseShardingStateFactory::set(getServiceContext(),
                                       std::make_unique<DatabaseShardingStateFactoryMock>());
     DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
-    ShardingState::create(getServiceContext());
 }
 
 void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis) {

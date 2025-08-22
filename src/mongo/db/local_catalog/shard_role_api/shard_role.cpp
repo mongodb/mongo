@@ -297,13 +297,8 @@ void checkPlacementVersion(OperationContext* opCtx,
                            const PlacementConcern& placementConcern) {
     const auto& receivedDbVersion = placementConcern.getDbVersion();
     if (receivedDbVersion) {
-        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
-        if (scopedSs.isInTransitionalPhase(opCtx)) {
-            scopedSs.checkDbVersionOrThrow(opCtx, nss.dbName(), *receivedDbVersion);
-        } else {
-            const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());
-            scopedDss->checkDbVersionOrThrow(opCtx, *receivedDbVersion);
-        }
+        const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());
+        scopedDss->checkDbVersionOrThrow(opCtx, *receivedDbVersion);
     }
 
     const auto& receivedShardVersion = placementConcern.getShardVersion();

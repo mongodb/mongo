@@ -160,14 +160,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
 
     auto* const css = shardingWriteRouter->getCss();
     css->checkShardVersionOrThrow(opCtx);
-    {
-        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
-        if (scopedSs.isInTransitionalPhase(opCtx)) {
-            scopedSs.checkDbVersionOrThrow(opCtx, nss.dbName());
-        } else {
-            DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
-        }
-    }
+    DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -238,14 +231,7 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
 
     auto* const css = shardingWriteRouter->getCss();
     css->checkShardVersionOrThrow(opCtx);
-    {
-        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
-        if (scopedSs.isInTransitionalPhase(opCtx)) {
-            scopedSs.checkDbVersionOrThrow(opCtx, nss.dbName());
-        } else {
-            DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
-        }
-    }
+    DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -292,14 +278,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
     ShardingWriteRouter shardingWriteRouter(opCtx, nss);
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    {
-        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
-        if (scopedSs.isInTransitionalPhase(opCtx)) {
-            scopedSs.checkDbVersionOrThrow(opCtx, nss.dbName());
-        } else {
-            DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
-        }
-    }
+    DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();

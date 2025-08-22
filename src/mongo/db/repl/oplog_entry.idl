@@ -99,8 +99,6 @@ enums:
             kImportCollection: "importCollection"
             kCreateDatabaseMetadata: "createDatabaseMetadata"
             kDropDatabaseMetadata: "dropDatabaseMetadata"
-            kBeginPromotionToShardedCluster: "beginPromotionToShardedCluster"
-            kCompletePromotionToShardedCluster: "completePromotionToShardedCluster"
 
 types:
     zeroOneManyStmtId:

@@ -1171,19 +1171,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
-    {"beginPromotionToShardedCluster",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-         opCtx->getServiceContext()->getOpObserver()->onBeginPromotionToShardedCluster(opCtx, *op);
-         return Status::OK();
-     }}},
-    {"completePromotionToShardedCluster",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-         opCtx->getServiceContext()->getOpObserver()->onCompletePromotionToShardedCluster(opCtx,
-                                                                                          *op);
-         return Status::OK();
-     }}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
