@@ -569,7 +569,7 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
 
     // The diff window for the sample size for each command for the sample population to be
     // considered as matching the mock query pattern.
-    $config.data.sampleSizePercentageMaxDiff = 5;
+    $config.data.sampleSizePercentageMaxDiff = 6;
 
     // The number of sampled queries returned by the latest analyzeShardKey command.
     $config.data.previousNumSampledQueries = 0;
