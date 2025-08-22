@@ -57,6 +57,7 @@ Status WiredTigerIntegerKeyedContainer::insert(RecoveryUnit& ru,
                                                std::span<const char> value) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
     return wtRCToStatus(insert(wtRu, *cursor.get(), key, value), cursor->session);
 }
 
@@ -64,7 +65,6 @@ int WiredTigerIntegerKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
                                             WT_CURSOR& cursor,
                                             int64_t key,
                                             std::span<const char> value) {
-    ru.assertInActiveTxn();
     cursor.set_key(&cursor, key);
     cursor.set_value(&cursor, WiredTigerItem{value}.get());
     return WT_OP_CHECK(wiredTigerCursorInsert(ru, &cursor));
@@ -73,13 +73,13 @@ int WiredTigerIntegerKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
 Status WiredTigerIntegerKeyedContainer::remove(RecoveryUnit& ru, int64_t key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
     return wtRCToStatus(remove(wtRu, *cursor.get(), key), cursor->session);
 }
 
 int WiredTigerIntegerKeyedContainer::remove(WiredTigerRecoveryUnit& ru,
                                             WT_CURSOR& cursor,
                                             int64_t key) {
-    ru.assertInActiveTxn();
     cursor.set_key(&cursor, key);
     return WT_OP_CHECK(wiredTigerCursorRemove(ru, &cursor));
 }
@@ -93,8 +93,8 @@ Status WiredTigerStringKeyedContainer::insert(RecoveryUnit& ru,
                                               std::span<const char> key,
                                               std::span<const char> value) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    wtRu.assertInActiveTxn();
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
     return wtRCToStatus(insert(wtRu, *cursor.get(), key, value), cursor->session);
 }
 
@@ -109,8 +109,8 @@ int WiredTigerStringKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
 
 Status WiredTigerStringKeyedContainer::remove(RecoveryUnit& ru, std::span<const char> key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    wtRu.assertInActiveTxn();
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
     return wtRCToStatus(remove(wtRu, *cursor.get(), key), cursor->session);
 }
 
