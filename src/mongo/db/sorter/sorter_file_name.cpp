@@ -34,10 +34,12 @@
 #include "mongo/util/str.h"
 
 namespace mongo::sorter {
-std::string nextFileName(StringData path) {
+boost::filesystem::path nextFileName(boost::filesystem::path path) {
     static AtomicWord<unsigned> fileCounter;
     static const uint64_t randomSuffix = SecureRandom().nextUInt64();
-    return str::stream() << path << "/extsort." << fileCounter.fetchAndAdd(1) << '-'
-                         << randomSuffix;
+    std::ostringstream fileName;
+    fileName << "extsort." << fileCounter.fetchAndAdd(1) << '-' << randomSuffix;
+    path /= fileName.str();
+    return path;
 }
 }  // namespace mongo::sorter

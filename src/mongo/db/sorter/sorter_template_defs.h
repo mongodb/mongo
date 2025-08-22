@@ -1394,7 +1394,7 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
 // SorterBase::File members
 //
 
-inline SorterBase::File::File(std::string path, SorterFileStats* stats)
+inline SorterBase::File::File(boost::filesystem::path path, SorterFileStats* stats)
     : _path(std::move(path)), _stats(stats) {
     invariant(!_path.empty());
     if (_stats && boost::filesystem::exists(_path) && boost::filesystem::is_regular_file(_path)) {

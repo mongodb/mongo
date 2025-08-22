@@ -314,7 +314,7 @@ public:
      */
     class File {
     public:
-        File(std::string path, SorterFileStats* stats = nullptr);
+        File(boost::filesystem::path path, SorterFileStats* stats = nullptr);
 
         ~File();
 
