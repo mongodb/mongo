@@ -68,6 +68,17 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                              bool forceRawDataMode = false);
 
 /**
+ * Performs a dry-run validation of dropping indexes without actually dropping them.
+ * Validates all the same constraints and throws the same errors as dropIndexes would.
+ */
+DropIndexesReply dropIndexesDryRun(OperationContext* opCtx,
+                                   const NamespaceString& origNss,
+                                   const boost::optional<UUID>& expectedUUID,
+                                   const IndexArgument& origIndexArgument,
+                                   const boost::optional<BSONObj>& shardKeyPattern,
+                                   bool forceRawDataMode = false);
+
+/**
  * Same behaviour as "dropIndexes" but only drops ready indexes.
  */
 Status dropIndexesForApplyOps(OperationContext* opCtx,

@@ -3,7 +3,7 @@ filters:
   - "auto_split_vector_basic.js":
     approvers:
       - 10gen/server-cluster-scalability
-  - "drop_indexes_participant.js":
+  - "drop_indexes_participant*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "*fsync_lock*":

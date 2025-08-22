@@ -660,6 +660,14 @@ commands:
         strict: false
         chained_structs:
             DropIndexesRequest: DropIndexesRequest
+        fields:
+            dryRun:
+                type: optionalBool
+                description: "Run dropIndexes in dryRun mode."
+            shardKeyPattern:
+                type: object_owned
+                description: "The shard key pattern of the collection in case it is sharded."
+                optional: true
 
     _configsvrCreateDatabase:
         description: "The internal createDatabase command on the config server"

@@ -451,6 +451,67 @@ BSONObj translateIndexSpec(OperationContext* opCtx,
 
 }  // namespace
 
+/**
+ * Precondition checks for dropIndexes operation
+ */
+Status validateDropIndexes(OperationContext* opCtx,
+                           const NamespaceString& origNss,
+                           const boost::optional<UUID>& expectedUUID,
+                           const boost::optional<BSONObj>& shardKeyPattern,
+                           const CollectionAcquisition& collAcq,
+                           const IndexArgument& index,
+                           const std::vector<std::string>& indexNames) {
+
+    uassertStatusOK(checkReplState(opCtx, collAcq.getCollectionPtr()));
+
+    if (collAcq.getCollectionPtr()->isClustered() &&
+        containsClusteredIndex(collAcq.getCollectionPtr(), index)) {
+        uasserted(5979800, "It is illegal to drop the clusteredIndex");
+    }
+
+    const bool isWildcard = holds_alternative<std::string>(index) && get<std::string>(index) == "*";
+
+    if (isWildcard) {
+        return Status::OK();
+    }
+
+    const IndexCatalog* indexCatalog = collAcq.getCollectionPtr()->getIndexCatalog();
+    IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto hasActiveIndexBuild =
+        indexBuildsCoord->hasIndexBuilder(opCtx, collAcq.uuid(), {indexNames});
+
+    for (const auto& indexName : indexNames) {
+        auto indexDescriptor =
+            indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kAll);
+
+        if (!indexDescriptor) {
+            continue;  // Skip non-existent indexes
+        }
+
+        auto entry = indexCatalog->getEntry(indexDescriptor);
+        if (entry->descriptor()->isIdIndex()) {
+            return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
+        }
+
+        if (!entry->isReady() && !entry->isFrozen() && !hasActiveIndexBuild) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream() << "can't drop unfinished index with name: "
+                                        << entry->descriptor()->indexName());
+        }
+
+        if (shardKeyPattern) {
+            if (isLastNonHiddenRangedShardKeyIndex(
+                    opCtx, collAcq.getCollectionPtr(), indexName, *shardKeyPattern)) {
+                return Status(ErrorCodes::CannotDropShardKeyIndex,
+                              "Cannot drop the only compatible index for this collection's "
+                              "shard key");
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 DropIndexesReply dropIndexes(OperationContext* opCtx,
                              const NamespaceString& origNss,
                              const boost::optional<UUID>& expectedUUID,
@@ -467,7 +528,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             .first);
 
     uassertStatusOK(checkCollExists(origNss, *collAcq));
-    uassertStatusOK(checkReplState(opCtx, collAcq->getCollectionPtr()));
 
     const auto index = [&]() -> IndexArgument {
         if (auto origIndexSpec = std::get_if<BSONObj>(&origIndexArgument)) {
@@ -475,6 +535,19 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         }
         return origIndexArgument;
     }();
+
+    auto indexNames = uassertStatusOK(getIndexNames(opCtx, collAcq->getCollectionPtr(), index));
+
+    auto shardKeyPattern = std::invoke([&]() -> boost::optional<BSONObj> {
+        const auto& collDesc = collAcq->getShardingDescription();
+        if (collDesc.isSharded()) {
+            return collDesc.getKeyPattern();
+        }
+        return boost::none;
+    });
+
+    uassertStatusOK(validateDropIndexes(
+        opCtx, origNss, expectedUUID, shardKeyPattern, *collAcq, index, indexNames));
 
     const UUID collectionUUID = collAcq->uuid();
     if (!serverGlobalParams.quiet.load()) {
@@ -492,11 +565,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                                      index));
     }
 
-    if (collAcq->getCollectionPtr()->isClustered() &&
-        containsClusteredIndex(collAcq->getCollectionPtr(), index)) {
-        uasserted(5979800, "It is illegal to drop the clusteredIndex");
-    }
-
     DropIndexesReply reply;
     reply.setNIndexesWas(collAcq->getCollectionPtr()->getIndexCatalog()->numIndexesTotal());
 
@@ -507,8 +575,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     // When releasing the collection lock to send the abort signal to the index builders, it's
     // possible for new index builds to start. Keep aborting in-progress index builds if they
     // satisfy the caller's input.
-    std::vector<std::string> indexNames =
-        uassertStatusOK(getIndexNames(opCtx, collAcq->getCollectionPtr(), index));
     NamespaceString collNs = collAcq->nss();
     // Release locks before aborting index builds. The helper will acquire locks on our behalf.
     collAcq.reset();
@@ -531,7 +597,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         // Abandon the snapshot as the index catalog will compare the in-memory state to the
         // disk state, which may have changed when we released the lock temporarily.
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
 
         // Take an exclusive lock on the collection now to be able to perform index catalog
         // writes when removing ready indexes from disk.
@@ -573,7 +638,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         indexNames = uassertStatusOK(getIndexNames(opCtx, collPtr, index));
         // The collection could have been renamed when we dropped locks.
         collNs = collPtr->ns();
-        // Reelase the lock and loop again.
+        // Release the lock and loop again.
         collection.reset();
     }
 
@@ -651,6 +716,60 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             dropReadyIndexes(opCtx, writer.getWritableCollection(opCtx), indexNames, &reply, false);
             wunit.commit();
         });
+
+    return reply;
+}
+
+DropIndexesReply dropIndexesDryRun(OperationContext* opCtx,
+                                   const NamespaceString& origNss,
+                                   const boost::optional<UUID>& expectedUUID,
+                                   const IndexArgument& origIndexArgument,
+                                   const boost::optional<BSONObj>& shardKeyPattern,
+                                   const bool forceRawDataMode) {
+    // We only need to hold an intent lock to send abort signals to the active index builder(s)
+    // we intend to abort.
+    auto collAcq =
+        timeseries::acquireCollectionWithBucketsLookup(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, origNss, AcquisitionPrerequisites::OperationType::kRead, expectedUUID),
+            LockMode::MODE_IX)
+            .first;
+
+
+    uassertStatusOK(checkCollExists(origNss, collAcq));
+
+    const auto index = [&]() -> IndexArgument {
+        if (auto origIndexSpec = std::get_if<BSONObj>(&origIndexArgument)) {
+            return translateIndexSpec(opCtx, collAcq, *origIndexSpec, forceRawDataMode);
+        }
+        return origIndexArgument;
+    }();
+
+    auto indexNames = uassertStatusOK(getIndexNames(opCtx, collAcq.getCollectionPtr(), index));
+
+    uassertStatusOK(validateDropIndexes(
+        opCtx, origNss, expectedUUID, shardKeyPattern, collAcq, index, indexNames));
+
+    DropIndexesReply reply;
+    reply.setNIndexesWas(collAcq.getCollectionPtr()->getIndexCatalog()->numIndexesTotal());
+
+    const bool isWildcard = holds_alternative<std::string>(index) && get<std::string>(index) == "*";
+
+    if (isWildcard) {
+        if (shardKeyPattern) {
+            reply.setMsg(
+                "non-_id indexes and non-shard key indexes would be dropped for collection"_sd);
+        } else {
+            reply.setMsg("non-_id indexes would be dropped for collection"_sd);
+        }
+    } else {
+        if (indexNames.size() == 1) {
+            reply.setMsg("index '" + indexNames[0] + "' would be dropped");
+        } else {
+            reply.setMsg(std::to_string(indexNames.size()) + " indexes would be dropped");
+        }
+    }
 
     return reply;
 }

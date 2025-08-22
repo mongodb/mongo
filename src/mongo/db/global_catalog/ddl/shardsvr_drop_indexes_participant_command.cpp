@@ -34,8 +34,10 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
 #include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/local_catalog/drop_indexes.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
 
@@ -80,6 +82,18 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto& req = request();
+
+            bool isDryRun = req.getDryRun().value_or(false);
+
+            if (isDryRun) {
+                return dropIndexesDryRun(
+                    opCtx,
+                    ns(),
+                    req.getCollectionUUID(),
+                    req.getIndex(),
+                    req.getShardKeyPattern(),
+                    timeseries::isRawDataRequest(opCtx, req) /* forceRawDataMode*/);
+            }
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
 
