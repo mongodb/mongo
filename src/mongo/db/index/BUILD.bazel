@@ -85,6 +85,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/exec:projection_executor",
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/fts:base_fts",

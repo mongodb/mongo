@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/matcher/matcher.h"
@@ -962,6 +963,13 @@ private:
 
     virtual void _insert(const key_string::Value& keyString) = 0;
 
+    virtual void _addKeyForCommit(OperationContext* opCtx,
+                                  RecoveryUnit& ru,
+                                  const CollectionPtr& coll,
+                                  const key_string::View& key) = 0;
+
+    virtual void _finishCommit() = 0;
+
     void _debugEnsureSorted(const Data& data);
 
     bool _duplicateCheck(OperationContext* opCtx,
@@ -1157,7 +1165,6 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
-    auto builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
     auto it = _finalizeSort();
 
     ProgressMeterHolder pm;
@@ -1222,7 +1229,7 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
         try {
             writeConflictRetry(opCtx, "addingKey", _ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                builder->addKey(ru, data.first);
+                _addKeyForCommit(opCtx, ru, collection, data.first);
                 wunit.commit();
             });
         } catch (DBException& e) {
@@ -1255,6 +1262,8 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
         pm.get(lk)->finished();
     }
 
+    _finishCommit();
+
     LOGV2(20685,
           "Index build: inserted keys from external sorter into index",
           logAttrs(_ns),
@@ -1282,6 +1291,13 @@ private:
     SharedBufferFragmentBuilder& _getMemPool() final;
 
     void _insert(const key_string::Value& keyString) final;
+
+    void _addKeyForCommit(OperationContext* opCtx,
+                          RecoveryUnit& ru,
+                          const CollectionPtr& coll,
+                          const key_string::View& key) final;
+
+    void _finishCommit() final {}
 
     void _insertMultikeyMetadataKeysIntoVec();
 
@@ -1323,6 +1339,19 @@ SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_finalizeSort() {
         _unsortedKeys);
 }
 
+void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_addKeyForCommit(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionPtr& coll,
+    const key_string::View& key) {
+    uassertStatusOK(container_write::insert(opCtx,
+                                            ru,
+                                            coll,
+                                            _iam->getSortedDataInterface()->getContainer(),
+                                            key.getKeyAndRecordIdView(),
+                                            key.getTypeBitsView()));
+}
+
 IndexStateInfo SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::persistDataForShutdown() {
     MONGO_UNREACHABLE_TASSERT(1081640);
 }
@@ -1360,6 +1389,13 @@ private:
 
     void _insert(const key_string::Value& keyString) final;
 
+    void _addKeyForCommit(OperationContext* opCtx,
+                          RecoveryUnit& ru,
+                          const CollectionPtr& coll,
+                          const key_string::View& key) final;
+
+    void _finishCommit() final;
+
     void _insertMultikeyMetadataKeysIntoSorter();
 
     std::unique_ptr<Sorter> _makeSorter(
@@ -1370,6 +1406,7 @@ private:
 
     Sorter::Settings _makeSorterSettings() const;
     std::unique_ptr<Sorter> _sorter;
+    std::unique_ptr<SortedDataBuilderInterface> _builder;
 };
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::initiateBulk(
@@ -1430,6 +1467,20 @@ IndexStateInfo SortedDataIndexAccessMethod::HybridBulkBuilder::persistDataForShu
 
 void SortedDataIndexAccessMethod::HybridBulkBuilder::_insert(const key_string::Value& keyString) {
     _sorter->add(keyString, mongo::NullValue());
+}
+
+void SortedDataIndexAccessMethod::HybridBulkBuilder::_addKeyForCommit(OperationContext* opCtx,
+                                                                      RecoveryUnit& ru,
+                                                                      const CollectionPtr& coll,
+                                                                      const key_string::View& key) {
+    if (!_builder) {
+        _builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
+    }
+    _builder->addKey(ru, key);
+}
+
+void SortedDataIndexAccessMethod::HybridBulkBuilder::_finishCommit() {
+    _builder.reset();
 }
 
 void SortedDataIndexAccessMethod::HybridBulkBuilder::_insertMultikeyMetadataKeysIntoSorter() {
