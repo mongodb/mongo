@@ -35,13 +35,17 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <span>
 #include <string>
+#include <variant>
 
 namespace mongo {
 
@@ -56,6 +60,22 @@ struct TargetingMetadata {
  * At the end of each request, either 'recordFailureAndEvaluateShouldRetry' or 'recordSuccess'
  * must be called. When the retry strategy returns that a retry should be done, it is expected
  * that users perform a wait for the amount of time returned by 'getNextRetryDelay'.
+ *
+ * Usage example:
+ *
+ *     Status status = ...;
+ *
+ *     while(!status.isOK() &&
+ *           strategy.recordFailureAndEvaluateShouldRetry(status, target, labels)) {
+ *         wait_for(strategy.getNextRetryDelay());
+ *         status = ...;
+ *     }
+ *
+ *     if (status.isOK()) {
+ *         strategy.recordSuccess();
+ *     }
+ *
+ *  See 'runWithRetryStrategy' for a reference usage of retry strategies.
  */
 class RetryStrategy {
 public:
@@ -83,6 +103,230 @@ public:
     virtual Milliseconds getNextRetryDelay() const = 0;
 
     virtual const TargetingMetadata& getTargetingMetadata() const = 0;
+
+    /**
+     * A type that encapsulates a value or a result with error labels, and also contains information
+     * about targeting.
+     *
+     * This utility type is necessary because there is no existing type that carries error labels
+     * alongside a status.
+     *
+     * TODO: SERVER-104141: Replace this type with StatusWith.
+     */
+    template <typename T>
+    class [[nodiscard]] Result {
+    public:
+        using value_type = T;
+
+        /**
+         * Constructor for the OK case.
+         *
+         * Not marked constexpr because HostAndPort is not constexpr compatible.
+         */
+        Result(T data, HostAndPort origin)
+            : _status{Status::OK()},
+              _valueOrError{std::in_place_type<T>, std::move(data)},
+              _origin{std::move(origin)} {}
+
+        /**
+         * Constructor for the OK case.
+         */
+        explicit(false) constexpr Result(T data)
+            : _status{Status::OK()}, _valueOrError{std::in_place_type<T>, std::move(data)} {}
+
+        /**
+         * Converting constructor for the OK case.
+         */
+        template <typename U>
+        requires(!std::same_as<std::remove_cvref_t<T>, std::remove_cvref_t<U>> &&
+                 std::constructible_from<T, U>)
+        explicit(!std::convertible_to<U, T>) constexpr Result(U&& data)
+            : _status{Status::OK()}, _valueOrError{std::in_place_type<T>, std::forward<U>(data)} {}
+
+        /**
+         * Converting constructor for the OK case.
+         *
+         * Not marked constexpr because HostAndPort is not constexpr compatible.
+         */
+        template <typename U>
+        requires(!std::same_as<std::remove_cvref_t<T>, std::remove_cvref_t<U>> &&
+                 std::constructible_from<T, U>)
+        Result(U&& data, HostAndPort origin)
+            : _status{Status::OK()},
+              _valueOrError{std::in_place_type<T>, std::forward<U>(data)},
+              _origin{std::move(origin)} {}
+
+        /**
+         * Converting constructor from another result type.
+         */
+        template <typename U>
+        requires(!std::same_as<T, U> && std::constructible_from<T, U>)
+        explicit(!std::convertible_to<U, T>) constexpr Result(const Result<U>& result)
+            : _status{result._status},
+              _valueOrError{convert_variant(result._valueOrError)},
+              _origin{result._origin} {}
+
+        /**
+         * Converting move constructor from another result type.
+         */
+        template <typename U>
+        requires(!std::same_as<T, U> && std::constructible_from<T, U>)
+        explicit(!std::convertible_to<U, T>) constexpr Result(Result<U>&& result)
+            : _status{std::exchange(result._status, Status::OK())},
+              _valueOrError{convert_variant(std::exchange(result._valueOrError, {}))},
+              _origin{std::exchange(result._origin, {})} {}
+
+        /**
+         * Constructor for the error case.
+         */
+        constexpr Result(Status s, std::vector<std::string> errorLabels)
+            : _status{std::move(s)},
+              _valueOrError{std::in_place_type<ErrorLabels>, std::move(errorLabels)} {
+            dassert(!_status.isOK());
+        }
+
+        /**
+         * Constructor for the error case.
+         *
+         * This constructor is not constexpr only because HostAndPort cannot be used in constexpr
+         * context.
+         */
+        Result(Status s, std::vector<std::string> errorLabels, HostAndPort origin)
+            : _status{std::move(s)},
+              _valueOrError{std::in_place_type<ErrorLabels>, std::move(errorLabels)},
+              _origin{std::move(origin)} {
+            dassert(!_status.isOK());
+        }
+
+        constexpr T& getValue() & {
+            dassert(isOK());
+            return std::get<T>(_valueOrError);
+        }
+
+        constexpr T&& getValue() && {
+            dassert(isOK());
+            return std::get<T>(std::move(_valueOrError));
+        }
+
+        constexpr const T& getValue() const& {
+            dassert(isOK());
+            return std::get<T>(_valueOrError);
+        }
+
+        constexpr const T&& getValue() const&& {
+            dassert(isOK());
+            return std::get<T>(std::move(_valueOrError));
+        }
+
+        constexpr bool isOK() const {
+            return std::holds_alternative<T>(_valueOrError);
+        }
+
+        constexpr const Status& getStatus() const {
+            return _status;
+        }
+
+        constexpr std::span<const std::string> getErrorLabels() const {
+            dassert(!isOK());
+            return std::get<ErrorLabels>(_valueOrError);
+        }
+
+        constexpr const boost::optional<HostAndPort>& getOrigin() const {
+            return _origin;
+        }
+
+        constexpr bool operator==(const T& value) const {
+            return isOK() && std::get<T>(_valueOrError) == value;
+        }
+
+        constexpr bool operator==(const Status& status) const {
+            return _status == status;
+        }
+
+        constexpr bool operator==(ErrorCodes::Error code) const {
+            return _status == code;
+        }
+
+        // This includes conversions to StatusWith<T> where T is this class's T.
+        template <typename U>
+        requires(std::constructible_from<T, U>)
+        explicit(!std::convertible_to<U, T>) operator StatusWith<U>() const& {
+            return std::visit(
+                [&]<typename V>(const V& value) {
+                    if constexpr (std::same_as<T, V>) {
+                        return StatusWith<U>{U(value)};
+                    } else if constexpr (std::same_as<ErrorLabels, V>) {
+                        return StatusWith<U>{_status};
+                    } else {
+                        static_assert(!std::same_as<V, V>, "condition not exhaustive");
+                    }
+                },
+                _valueOrError);
+        }
+
+        template <typename U>
+        requires(std::constructible_from<T, U>)
+        explicit(!std::convertible_to<U, T>) operator StatusWith<U>() && {
+            return std::visit(
+                [&]<typename V>(V& value) {
+                    if constexpr (std::same_as<std::remove_cvref_t<T>, std::remove_cvref_t<V>>) {
+                        return StatusWith<U>{U(std::move(value))};
+                    } else if constexpr (std::same_as<ErrorLabels, V>) {
+                        return StatusWith<U>{std::move(_status)};
+                    } else {
+                        static_assert(!std::same_as<V, V>, "condition not exhaustive");
+                    }
+                },
+                _valueOrError);
+        }
+
+        friend std::string stringify_forTest(const Result& result) {
+            if (result.isOK()) {
+                return unittest::stringify::invoke(result.getValue());
+            } else {
+                return unittest::stringify::invoke(result.getStatus());
+            }
+        }
+
+    private:
+        // We friend all templates of this class to allow direct access for
+        // constructors from other types of 'Result<T>'.
+        template <typename>
+        friend class Result;
+
+        using ErrorLabels = std::vector<std::string>;
+        using ValueOrErrorLabels = std::variant<T, ErrorLabels>;
+
+        template <typename U>
+        requires(std::constructible_from<T, U>)
+        auto convert_variant(const std::variant<U, ErrorLabels>& other_variant)
+            -> ValueOrErrorLabels {
+            if (auto* value = std::get_if<0>(&other_variant)) {
+                return ValueOrErrorLabels{std::in_place_index<0>, *value};
+            } else if (auto* errorLabels = std::get_if<1>(&other_variant)) {
+                return ValueOrErrorLabels{std::in_place_index<1>, *errorLabels};
+            }
+
+            MONGO_UNREACHABLE;
+        }
+
+        template <typename U>
+        requires(std::constructible_from<T, U>)
+        auto convert_variant(std::variant<U, ErrorLabels>&& other_variant) -> ValueOrErrorLabels {
+            if (auto* value = std::get_if<0>(&other_variant)) {
+                return ValueOrErrorLabels{std::in_place_index<0>, std::move(*value)};
+            } else if (auto* errorLabels = std::get_if<1>(&other_variant)) {
+                return ValueOrErrorLabels{std::in_place_index<1>, std::move(*errorLabels)};
+            }
+
+            MONGO_UNREACHABLE;
+        }
+
+
+        Status _status;
+        ValueOrErrorLabels _valueOrError;
+        boost::optional<HostAndPort> _origin;
+    };
 };
 
 /**
@@ -277,5 +521,78 @@ private:
     std::shared_ptr<RetryBudget> _budget;
     bool _previousAttemptOverloaded = false;
 };
+
+/**
+ * A reference implementation for running a function with a retry strategy. It calls
+ * 'runOperation' in a loop until one of the following conditions is met:
+ *  - The operation succeeds.
+ *  - The operation is interrupted.
+ *  - The retry strategy evaluates that the operation should not be retried.
+ *
+ * All template parameters are intended to be deduced.
+ *
+ * The 'runOperation' function must accept a 'const TargetingMetadata&' parameter and
+ * return a 'RetryStrategy::Result<T>'. The parameter is equivalent to a
+ * 'std::function<RetryStrategy::Result<T>(const TargetingMetadata&)>'.
+ *
+ * All exceptions thrown by 'runOperation' will be turned into Status and the retry strategy may
+ * choose to retry on that Status.
+ *
+ * Usage example:
+ *
+ *     StatusWith<StringData> result = runWithRetryStrategy(
+ *         opCtx,
+ *         strategy,
+ *         [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<StringData> {
+ *             // on success.
+ *             return "value"_sd;
+ *             // on failure. Target is the host and port on which the request was performed.
+ *             return {status, target, errorLabels};
+ *         }
+ *     );
+ */
+template <std::invocable<const TargetingMetadata&> F,
+          typename Result = std::invoke_result_t<F, const TargetingMetadata&>,
+          typename T = typename Result::value_type>
+requires(std::same_as<Result, RetryStrategy::Result<T>>)
+StatusWith<T> runWithRetryStrategy(Interruptible* interruptible,
+                                   RetryStrategy& strategy,
+                                   F runOperation) {
+    invariant(interruptible);
+
+    auto run = [&] {
+        try {
+            return runOperation(strategy.getTargetingMetadata());
+        } catch (const DBException& e) {
+            return RetryStrategy::Result<T>{e.toStatus(), {}};
+        }
+    };
+
+    auto result = run();
+
+    while (!result.isOK() &&
+           strategy.recordFailureAndEvaluateShouldRetry(
+               result.getStatus(), result.getOrigin(), result.getErrorLabels())) {
+        const auto delay = strategy.getNextRetryDelay();
+
+        try {
+            if (delay == Milliseconds{0}) {
+                interruptible->checkForInterrupt();
+            } else {
+                interruptible->sleepFor(delay);
+            }
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        result = run();
+    }
+
+    if (result.isOK()) {
+        strategy.recordSuccess(result.getOrigin());
+    }
+
+    return result;
+}
 
 }  // namespace mongo
