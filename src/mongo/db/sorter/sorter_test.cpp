@@ -590,9 +590,18 @@ public:
             MONGO_UNREACHABLE;
         }
     };
+    struct NoBoundAsc {
+        Key operator()(Key k, const Doc&) const {
+            return -1'000'000'000;
+        }
+        Document serialize(const SerializationOptions& opts = {}) const {
+            MONGO_UNREACHABLE;
+        }
+    };
 
     using S = BoundedSorterInterface<Key, Doc>;
     using SAsc = BoundedSorter<Key, Doc, ComparatorAsc, BoundMakerAsc>;
+    using SAscNoBound = BoundedSorter<Key, Doc, ComparatorAsc, NoBoundAsc>;
     using SDesc = BoundedSorter<Key, Doc, ComparatorDesc, BoundMakerDesc>;
 
     /**
@@ -633,6 +642,9 @@ public:
 
     std::unique_ptr<S> makeAsc(SortOptions options, bool checkInput = true) {
         return std::make_unique<SAsc>(options, ComparatorAsc{}, BoundMakerAsc{}, checkInput);
+    }
+    std::unique_ptr<S> makeAscNoBound(SortOptions options, bool checkInput = true) {
+        return std::make_unique<SAscNoBound>(options, ComparatorAsc{}, NoBoundAsc{}, checkInput);
     }
     std::unique_ptr<S> makeDesc(SortOptions options, bool checkInput = true) {
         return std::make_unique<SDesc>(options, ComparatorDesc{}, BoundMakerDesc{}, checkInput);
@@ -1266,6 +1278,25 @@ TEST_F(BoundedSorterTest, CompoundSpill) {
     });
     assertSorted(output);
     ASSERT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(BoundedSorterTest, LargeSpill) {
+    static const Key kKey = 1;
+    static constexpr uint64_t kMemoryLimit = 1024 * 1024;
+    static constexpr size_t kDocCount = kMemoryLimit;
+
+    unittest::TempDir tempDir = makeTempDir();
+    auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(kMemoryLimit);
+    sorter = makeAscNoBound(options);
+
+    std::vector<Doc> input;
+    input.reserve(kDocCount);
+    for (size_t i = 0; i < kDocCount; ++i) {
+        input.emplace_back(Doc{kKey});
+    }
+
+    assertSorted(sort(input));
+    ASSERT_GTE(sorter->stats().spilledRanges(), 1);
 }
 
 }  // namespace

@@ -1541,6 +1541,7 @@ inline void SorterBase::File::_ensureOpenForWriting() {
     if (_offset == -1) {
         _file.exceptions(std::ios::failbit | std::ios::badbit);
         _offset = boost::filesystem::file_size(_path);
+        _file.seekp(_offset);
     }
 }
 
