@@ -65,7 +65,6 @@
 #include "mongo/db/s/initialize_placement_history_coordinator.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/add_shard_coordinator.h"
-#include "mongo/db/topology/complete_promotion_to_sharded_cluster_coordinator.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
@@ -141,9 +140,6 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kCloneAuthoritativeMetadata:
             return std::make_shared<CloneAuthoritativeMetadataCoordinator>(service,
                                                                            std::move(initialState));
-        case DDLCoordinatorTypeEnum::kCompletePromotionToShardedCluster:
-            return std::make_shared<CompletePromotionToShardedClusterCoordinator>(
-                service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kInitializePlacementHistory:
             return std::make_shared<InitializePlacementHistoryCoordinator>(service,
                                                                            std::move(initialState));
