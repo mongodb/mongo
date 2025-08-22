@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_min_max_scaler_non_removable.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -61,9 +62,9 @@ public:
         const std::string& inputPath,
         WindowBounds::Bound<int> upper,
         std::pair<Value, Value> sMinAndMax = {Value(0), Value(1)}) {
-        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+        _docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
         _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), &_tracker, boost::none, boost::none);
+            getExpCtx().get(), _docStage.get(), &_tracker, boost::none, boost::none);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         return WindowFunctionExecMinMaxScalerNonRemovable(
@@ -89,7 +90,7 @@ public:
     MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
 
 private:
-    boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    boost::intrusive_ptr<exec::agg::MockStage> _docStage;
     std::unique_ptr<PartitionIterator> _iter;
 };
 
@@ -121,7 +122,7 @@ TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest, AccumulateMultiplePartiti
                                                                 Document{{"a", 0}, {"key", 2}},
                                                                 Document{{"a", 4}, {"key", 2}},
                                                                 Document{{"a", 3}, {"key", 3}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     auto iter = PartitionIterator(getExpCtx().get(),
@@ -156,7 +157,7 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest,
              "10487003") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", Value("invalid_string"_sd)}, {"key", 1}}, Document{{"a", 2}, {"key", 1}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     auto iter = PartitionIterator(getExpCtx().get(),
@@ -177,7 +178,7 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest,
 TEST_F(WindowFunctionExecMinMaxScalerNonRemovableTest, UpdateWindowValueThrowsWithNonNumericInput) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", Value("invalid_string"_sd)}, {"key", 1}}, Document{{"a", 2}, {"key", 1}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     auto iter = PartitionIterator(getExpCtx().get(),

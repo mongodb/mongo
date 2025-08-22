@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
@@ -134,8 +135,12 @@ public:
     }
 
     // Start of functions that are used for making parts of the sources for making a pipeline.
-    boost::intrusive_ptr<DocumentSourceMock> mockStage() {
-        return DocumentSourceMock::createForTest(_expCtx);
+    boost::intrusive_ptr<DocumentSourceMock> mockSource() {
+        return DocumentSourceMock::createForTest({}, _expCtx);
+    }
+
+    boost::intrusive_ptr<exec::agg::MockStage> mockStage() {
+        return exec::agg::MockStage::createForTest({}, _expCtx);
     }
 
     boost::intrusive_ptr<DocumentSourceDeferredMergeSort> mockDeferredSortStage() {

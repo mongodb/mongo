@@ -6202,16 +6202,16 @@ using PipelineRenameTracking = AggregationContextFixture;
 
 TEST_F(PipelineRenameTracking, ReportsIdentityMapWhenEmpty) {
     auto expCtx = getExpCtx();
-    auto pipeline = makePipeline({mockStage()});
+    auto pipeline = makePipeline({mockSource()});
     {
         // Tracking renames backwards.
-        trackPipelineRenames(makePipeline({mockStage()}),
+        trackPipelineRenames(makePipeline({mockSource()}),
                              {"a", "b", "c.d"} /* pathsOfInterest */,
                              Tracking::backwards);
     }
     {
         // Tracking renames forwards.
-        trackPipelineRenames(makePipeline({mockStage()}),
+        trackPipelineRenames(makePipeline({mockSource()}),
                              {"a", "b", "c.d"} /* pathsOfInterest */,
                              Tracking::forwards);
     }
@@ -6238,19 +6238,19 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
     auto expCtx = getExpCtx();
     {
         // Tracking renames backwards.
-        trackPipelineRenames(makePipeline({mockStage(), NoModifications::create(expCtx)}),
+        trackPipelineRenames(makePipeline({mockSource(), NoModifications::create(expCtx)}),
                              {"a", "b", "c.d"} /* pathsOfInterest */,
                              Tracking::backwards);
     }
     {
         // Tracking renames forwards.
-        trackPipelineRenames(makePipeline({mockStage(), NoModifications::create(expCtx)}),
+        trackPipelineRenames(makePipeline({mockSource(), NoModifications::create(expCtx)}),
                              {"a", "b", "c.d"} /* pathsOfInterest */,
                              Tracking::forwards);
     }
     {
         // Tracking renames backwards.
-        trackPipelineRenames(makePipeline({mockStage(),
+        trackPipelineRenames(makePipeline({mockSource(),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx)}),
@@ -6259,7 +6259,7 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
     }
     {
         // Tracking renames forwards.
-        trackPipelineRenames(makePipeline({mockStage(),
+        trackPipelineRenames(makePipeline({mockSource(),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx)}),
@@ -6287,7 +6287,7 @@ public:
 
 TEST_F(PipelineRenameTracking, DoesNotReportRenamesIfAStageDoesNotSupportTrackingThem) {
     auto expCtx = getExpCtx();
-    auto pipeline = makePipeline({mockStage(),
+    auto pipeline = makePipeline({mockSource(),
                                   NoModifications::create(expCtx),
                                   NotSupported::create(expCtx),
                                   NoModifications::create(expCtx)});
@@ -6323,7 +6323,7 @@ public:
 
 TEST_F(PipelineRenameTracking, ReportsNewNamesWhenSingleStageRenames) {
     auto expCtx = getExpCtx();
-    auto pipeline = makePipeline({mockStage(), RenamesAToB::create(expCtx)});
+    auto pipeline = makePipeline({mockSource(), RenamesAToB::create(expCtx)});
     {
         // Tracking backwards.
         auto renames = semantic_analysis::renamedPaths(
@@ -6408,25 +6408,25 @@ TEST_F(PipelineRenameTracking, ReportsIdentityMapWhenGivenEmptyIteratorRange) {
     auto expCtx = getExpCtx();
     {
         // Tracking backwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
                                          {"b"} /* pathsOfInterest */,
                                          Tracking::backwards);
     }
     {
         // Tracking forwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
                                          {"b"} /* pathsOfInterest */,
                                          Tracking::forwards);
     }
     {
         // Tracking backwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
                                          {"b", "c.d"} /* pathsOfInterest */,
                                          Tracking::backwards);
     }
     {
         // Tracking forwards.
-        trackPipelineRenamesOnEmptyRange(makePipeline({mockStage(), RenamesAToB::create(expCtx)}),
+        trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
                                          {"b", "c.d"} /* pathsOfInterest */,
                                          Tracking::forwards);
     }
@@ -6450,7 +6450,7 @@ TEST_F(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
     {
         // Tracking backwards.
         auto pipeline =
-            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
+            makePipeline({mockSource(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
         const auto& stages = pipeline->getSources();
         auto renames = semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), {"c"});
         ASSERT(static_cast<bool>(renames));
@@ -6461,7 +6461,7 @@ TEST_F(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
     {
         // Tracking forwards.
         auto pipeline =
-            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
+            makePipeline({mockSource(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
         const auto& stages = pipeline->getSources();
         auto renames = semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), {"a"});
         ASSERT(static_cast<bool>(renames));
@@ -6489,14 +6489,14 @@ TEST_F(PipelineRenameTracking, CanHandleBackAndForthRename) {
     {
         // Tracking backwards.
         trackPipelineRenames(
-            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
+            makePipeline({mockSource(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
             {"a"} /* pathsOfInterest */,
             Tracking::backwards);
     }
     {
         // Tracking forwards.
         trackPipelineRenames(
-            makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
+            makePipeline({mockSource(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
             {"a"} /* pathsOfInterest */,
             Tracking::forwards);
     }
@@ -6512,7 +6512,7 @@ protected:
 TEST_F(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {
     boost::intrusive_ptr<ExpressionContext> expCtx(getExpCtx());
     auto pipeline = makePipeline(
-        {mockStage(),
+        {mockSource(),
          matchStage("{x: 1}"),
          sortStage("{y: -1}"),
          DocumentSourceProject::create(BSON("x" << 1 << "y" << 1), expCtx, "$project"_sd)});
@@ -6528,7 +6528,7 @@ TEST_F(InvolvedNamespacesTest, IncludesLookupNamespace) {
     expCtx->setResolvedNamespace(lookupNss, {resolvedNss, std::vector<BSONObj>{}});
     auto lookupSpec =
         fromjson("{$lookup: {from: 'foo', as: 'x', localField: 'foo_id', foreignField: '_id'}}");
-    auto pipeline = makePipeline({mockStage(), lookupStage(lookupSpec)});
+    auto pipeline = makePipeline({mockSource(), lookupStage(lookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
@@ -6574,7 +6574,7 @@ TEST_F(InvolvedNamespacesTest, IncludesLookupSubpipelineNamespaces) {
         "  as: 'x', "
         "  pipeline: [{$lookup: {from: 'foo_inner', as: 'y', pipeline: []}}]"
         "}}");
-    auto pipeline = makePipeline({mockStage(), lookupStage(lookupSpec)});
+    auto pipeline = makePipeline({mockSource(), lookupStage(lookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 2UL);
@@ -6606,7 +6606,7 @@ TEST_F(InvolvedNamespacesTest, IncludesGraphLookupSubPipeline) {
         "  connectToField: 'y',"
         "  startWith: '$start'"
         "}}");
-    auto pipeline = makePipeline({mockStage(), graphLookupStage(graphLookupSpec)});
+    auto pipeline = makePipeline({mockSource(), graphLookupStage(graphLookupSpec)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 2UL);
@@ -6651,7 +6651,7 @@ TEST_F(InvolvedNamespacesTest, IncludesAllCollectionsWhenResolvingViews) {
         "  ]"
         "}}");
     auto pipeline = makePipeline(
-        {mockStage(), DocumentSourceFacet::createFromBson(facetSpec.firstElement(), expCtx)});
+        {mockSource(), DocumentSourceFacet::createFromBson(facetSpec.firstElement(), expCtx)});
 
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 3UL);

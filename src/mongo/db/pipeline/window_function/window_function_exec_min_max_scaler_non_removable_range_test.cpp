@@ -30,11 +30,11 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_min_max_scaler_non_removable_range.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
@@ -62,10 +62,10 @@ public:
         const std::string& sortByPath,
         WindowBounds::Bound<Value> upperBound,
         std::pair<Value, Value> sMinAndMax = {Value(0), Value(1)}) {
-        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+        _docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
         SortPattern sortPattern{BSON(sortByPath << 1), getExpCtx()};
         _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), &_tracker, boost::none, sortPattern);
+            getExpCtx().get(), _docStage.get(), &_tracker, boost::none, sortPattern);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         auto sortBy = ExpressionFieldPath::parse(
@@ -103,7 +103,7 @@ public:
     MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
 
 private:
-    boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    boost::intrusive_ptr<exec::agg::MockStage> _docStage;
     std::unique_ptr<PartitionIterator> _iter;
 };
 
@@ -144,7 +144,7 @@ TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTest, AccumulateMultiplePa
                                                   Document{{"a", 0}, {"y", 1}, {"key", 2}},
                                                   Document{{"a", 4}, {"y", 1}, {"key", 2}},
                                                   Document{{"a", 10}, {"y", 1}, {"key", 3}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     SortPattern sortPattern{BSON("y" << 1), getExpCtx()};
@@ -193,7 +193,7 @@ DEATH_TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTest,
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", Value("invalid_string"_sd)}, {"y", 1}, {"key", 1}},
         Document{{"a", 4}, {"y", 5}, {"key", 1}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     SortPattern sortPattern{BSON("y" << 1), getExpCtx()};
@@ -223,7 +223,7 @@ TEST_F(WindowFunctionExecMinMaxScalerNonRemovableRangeTest,
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", Value("invalid_string"_sd)}, {"y", 1}, {"key", 1}},
         Document{{"a", 4}, {"y", 5}, {"key", 1}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     SortPattern sortPattern{BSON("y" << 1), getExpCtx()};

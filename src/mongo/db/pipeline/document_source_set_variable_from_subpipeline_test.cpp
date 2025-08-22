@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <vector>
 
@@ -133,7 +133,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
     const auto inputDocs =
         std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
     auto expCtx = getExpCtx();
-    const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
+    const auto mockStageForSetVarStage = exec::agg::MockStage::createForTest(inputDocs[1], expCtx);
     auto ctxForSubPipeline =
         makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline =
@@ -146,7 +146,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testDoGetNext) {
 
     setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
     auto stage = exec::agg::buildStage(setVariableFromSubPipeline);
-    stage->setSource(mockSourceForSetVarStage.get());
+    stage->setSource(mockStageForSetVarStage.get());
 
     auto comparator = DocumentComparator();
     auto results = comparator.makeUnorderedDocumentSet();
@@ -161,7 +161,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
     const auto inputDocs =
         std::vector{Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}, Document{{"d", 1}}};
     auto expCtx = getExpCtx();
-    const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(inputDocs[1], expCtx);
+    const auto mockStageForSetVarStage = exec::agg::MockStage::createForTest(inputDocs[1], expCtx);
     auto ctxForSubPipeline =
         makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
     const auto mockSourceForSubPipeline =
@@ -174,7 +174,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
 
     setVariableFromSubPipeline->addSubPipelineInitialSource(mockSourceForSubPipeline);
     auto stage = exec::agg::buildStage(setVariableFromSubPipeline);
-    stage->setSource(mockSourceForSetVarStage.get());
+    stage->setSource(mockStageForSetVarStage.get());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$setVariableFromSubPipeline": {
@@ -199,11 +199,11 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
 TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ShouldPropagateDisposeThroughToSubpipeline) {
     auto expCtx = getExpCtx();
 
-    const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(expCtx);
+    const auto mockSourceForSetVarStage = exec::agg::MockStage::createForTest({}, expCtx);
 
     auto ctxForSubPipeline =
         makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString());
-    const auto mockSourceForSubPipeline = DocumentSourceMock::createForTest(ctxForSubPipeline);
+    const auto mockSourceForSubPipeline = DocumentSourceMock::createForTest({}, ctxForSubPipeline);
 
     auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
         expCtx,

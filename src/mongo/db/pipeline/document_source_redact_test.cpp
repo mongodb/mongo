@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -69,11 +70,11 @@ TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
     auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
     auto redactStage = exec::agg::buildStage(redact);
     auto mock =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 1}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 1}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            getExpCtx());
     redactStage->setSource(mock.get());
 
     // The $redact is keeping everything, so we should see everything from the mock, then EOF.

@@ -35,6 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -84,7 +85,7 @@ auto makeUnion(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
     const auto doc = Document{{"a", 1}};
-    const auto mock = DocumentSourceMock::createForTest(doc, getExpCtx());
+    const auto mock = exec::agg::MockStage::createForTest(doc, getExpCtx());
     const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{doc}};
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
     auto unionWithOneStage = exec::agg::buildStage(makeUnion(
@@ -113,7 +114,7 @@ TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
 
 TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
     const auto doc = Document{{"a", 1}};
-    const auto mock = DocumentSourceMock::createForTest(doc, getExpCtx());
+    const auto mock = exec::agg::MockStage::createForTest(doc, getExpCtx());
     const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{doc}};
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
     auto unionWithOne = make_intrusive<DocumentSourceUnionWith>(
@@ -143,7 +144,7 @@ TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
 TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
     const auto inputDoc = Document{{"a", 1}};
     const auto outputDocs = std::array{Document{{"a", 1}}, Document{{"a", 1}, {"d", 1}}};
-    const auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    const auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     const auto mockDeque = std::deque<DocumentSource::GetNextResult>{Document{inputDoc}};
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
     const auto filter = DocumentSourceMatch::create(BSON("d" << 1), getExpCtx());
@@ -307,11 +308,11 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
 
 TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     const auto mock =
-        DocumentSourceMock::createForTest({Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            getExpCtx());
     const auto mockDeque = std::deque<DocumentSource::GetNextResult>{};
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockDeque));
     auto unionWithOne = exec::agg::buildStage(makeUnion(
@@ -336,7 +337,8 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
 }
 
 TEST_F(DocumentSourceUnionWithTest, ReturnEOFAfterBeingDisposed) {
-    const auto mockInput = DocumentSourceMock::createForTest({Document(), Document()}, getExpCtx());
+    const auto mockInput =
+        exec::agg::MockStage::createForTest({Document(), Document()}, getExpCtx());
     const auto mockUnionInput = std::deque<DocumentSource::GetNextResult>{};
     const auto mockCtx = makeCopyFromExpressionContext(getExpCtx(), {});
     mockCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockUnionInput));
@@ -402,7 +404,7 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
         std::make_shared<MockMongoInterface>(std::move(mockForeignContents)));
 
     const auto localMock =
-        DocumentSourceMock::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
+        exec::agg::MockStage::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
     auto unionWith =
         exec::agg::buildStage(DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx));
@@ -438,7 +440,7 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
         std::make_shared<MockMongoInterface>(std::move(mockForeignContents)));
 
     const auto localMock =
-        DocumentSourceMock::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
+        exec::agg::MockStage::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
     auto bson = BSON("$unionWith" << BSON(
                          "coll" << viewNsToUnionWith.coll() << "pipeline"
                                 << BSON_ARRAY(fromjson(
@@ -497,7 +499,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithoutPipelineAreCorrect) {
 }
 
 TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
-    const auto mock = DocumentSourceMock::createForTest(getExpCtx());
+    const auto mock = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints stricterConstraint(StageConstraints::StreamType::kStreaming,
                                         StageConstraints::PositionRequirement::kNone,
                                         StageConstraints::HostTypeRequirement::kAnyShard,
@@ -515,7 +517,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
 }
 
 TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) {
-    const auto mockOne = DocumentSourceMock::createForTest(getExpCtx());
+    const auto mockOne = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints constraintTmpDataFacetLookupNotAllowedNoFieldMod(
         StageConstraints::StreamType::kStreaming,
         StageConstraints::PositionRequirement::kNone,
@@ -529,7 +531,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
     // constraints should have noFieldModifications = false (which is the default).
     constraintTmpDataFacetLookupNotAllowedNoFieldMod.noFieldModifications = true;
     mockOne->mockConstraints = constraintTmpDataFacetLookupNotAllowedNoFieldMod;
-    const auto mockTwo = DocumentSourceMock::createForTest(getExpCtx());
+    const auto mockTwo = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints constraintPermissive(StageConstraints::StreamType::kStreaming,
                                           StageConstraints::PositionRequirement::kNone,
                                           StageConstraints::HostTypeRequirement::kNone,
@@ -539,7 +541,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
                                           StageConstraints::LookupRequirement::kAllowed,
                                           StageConstraints::UnionRequirement::kAllowed);
     mockTwo->mockConstraints = constraintPermissive;
-    const auto mockThree = DocumentSourceMock::createForTest(getExpCtx());
+    const auto mockThree = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints constraintPersistentDataTransactionLookupNotAllowed(
         StageConstraints::StreamType::kStreaming,
         StageConstraints::PositionRequirement::kNone,
@@ -567,7 +569,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
 }
 
 TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInherited) {
-    const auto mock = DocumentSourceMock::createForTest(getExpCtx());
+    const auto mock = DocumentSourceMock::createForTest({}, getExpCtx());
     StageConstraints strictConstraint(StageConstraints::StreamType::kStreaming,
                                       StageConstraints::PositionRequirement::kNone,
                                       StageConstraints::HostTypeRequirement::kAnyShard,
@@ -732,7 +734,7 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     auto spec = BSON("$unionWith" << "some_coll");
     auto unionWithStage = DocumentSourceUnionWith::createFromBson(spec.firstElement(), expCtx);
     auto pipeline =
-        Pipeline::create({DocumentSourceMock::createForTest(expCtx), unionWithStage}, expCtx);
+        Pipeline::create({DocumentSourceMock::createForTest({}, expCtx), unionWithStage}, expCtx);
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
     ASSERT_EQ(1ul, involvedNssSet.count(unionWithNs));
@@ -741,7 +743,7 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
                                             << "pipeline" << BSONArray()));
     unionWithStage = DocumentSourceUnionWith::createFromBson(spec.firstElement(), expCtx);
     pipeline =
-        Pipeline::create({DocumentSourceMock::createForTest(expCtx), unionWithStage}, expCtx);
+        Pipeline::create({DocumentSourceMock::createForTest({}, expCtx), unionWithStage}, expCtx);
     involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
     ASSERT_EQ(1ul, involvedNssSet.count(unionWithNs));

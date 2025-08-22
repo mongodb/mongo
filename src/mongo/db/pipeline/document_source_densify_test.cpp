@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/densify_stage.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/expression/evaluate.h"
@@ -574,8 +575,8 @@ TEST_F(DensifyFullNumericTest, DensifySingleValue) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(2), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -590,9 +591,9 @@ TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyWithDuplicates) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(2), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 1}", "{a: 1}", "{a: 1}", "{a: 3}", "{a: 7}", "{a: 7}", "{a: 7}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -634,8 +635,8 @@ TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOffStep) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(3), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -665,8 +666,8 @@ TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOnStep) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(2), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -702,9 +703,9 @@ TEST_F(DensifyFullNumericTest,
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(2), Full(), boost::none));
-    auto source =
-        DocumentSourceMock::createForTest({"{a: 1}", "{a : 2}", "{a: 3}", "{a: 4}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage =
+        exec::agg::MockStage::createForTest({"{a: 1}", "{a : 2}", "{a: 3}", "{a: 4}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -731,8 +732,8 @@ TEST_F(DensifyFullNumericTest, DensificationFieldMissing) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(10), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest(
-        {"{b: 1}", "{a: 1}", "{a: 20}", "{b: 2}", "{b: 3}"}, getExpCtx());
+    auto source = exec::agg::buildStage(DocumentSourceMock::createForTest(
+        {"{b: 1}", "{a: 1}", "{a: 20}", "{b: 2}", "{b: 3}"}, getExpCtx()));
     densify.setSource(source.get());
 
     auto next = densify.getNext();
@@ -767,8 +768,8 @@ TEST_F(DensifyFullNumericTest, NoDensificationIfStepGreaterThanDocumentDifferenc
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(10), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -786,9 +787,9 @@ TEST_F(DensifyFullNumericTest, DensifyOverDocumentsWithGaps) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(3), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 1}", "{a: 2}", "{a : 3}", "{a : 4}", "{a : 9}", "{a : 10}", "{a : 15}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -835,9 +836,9 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(2), ExplicitBounds(Value(5), Value(15)), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 0}", "{a: 1}", "{a: 8}", "{a: 13}", "{a: 19}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -891,9 +892,9 @@ TEST_F(DensifyExplicitNumericTest,
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(5)), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 0}", "{a: 1}", "{a: 8}", "{a: 13}", "{a: 19}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -941,9 +942,9 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(4)), boost::none));
-    auto source =
-        DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 4}", "{a: 6}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage =
+        exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 4}", "{a: 6}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -984,9 +985,9 @@ TEST_F(DensifyExplicitNumericTest,
         "b",
         std::list<FieldPath>({"a"}),
         RangeStatement(Value(1), ExplicitBounds(Value(4), Value(8)), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 1, b: 2}", "{a: 1, b: 4}", "{a: 1, b: 6}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1022,9 +1023,9 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForPartionedRangeAcrossTwoP
         "b",
         std::list<FieldPath>({"a"}),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(10)), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 1, b: 2}", "{a: 2, b: 5}", "{a: 1, b: 7}", "{a: 2, b: 9}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1140,8 +1141,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnly
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(4)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1173,8 +1174,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(5)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 6}", "{a: 7}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 6}", "{a: 7}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1218,8 +1219,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(2), ExplicitBounds(Value(0), Value(4)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1252,8 +1253,8 @@ TEST_F(DensifyExplicitNumericTest,
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(4)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 1}", "{a: 6}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 1}", "{a: 6}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1293,9 +1294,9 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWith
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(20)), boost::none));
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{a: 1}", "{a: 7}", "{a: 7}", "{a: 7}", "{a: 15}"}, getExpCtx());
-    densify.setSource(source.get());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1339,8 +1340,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeAfte
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(2), Value(6)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 0}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 0}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1376,8 +1377,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWhen
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(5)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{b: 2}", "{b: 6}", "{a: 1}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{b: 2}", "{b: 6}", "{a: 1}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1421,8 +1422,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStep
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(6), ExplicitBounds(Value(0), Value(4)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1450,8 +1451,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeHitE
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(2), ExplicitBounds(Value(0), Value(3)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 0}", "{a: 2}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 0}", "{a: 2}"}, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -1475,9 +1476,9 @@ TEST_F(DensifyExplicitNumericTest, DensificationForNumericValuesErrorsIfFieldIsN
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(6), ExplicitBounds(Value(0), Value(4)), boost::none));
-    auto source =
-        DocumentSourceMock::createForTest({"{a: \"should be numeric\"}", "{a: 6}"}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage =
+        exec::agg::MockStage::createForTest({"{a: \"should be numeric\"}", "{a: 6}"}, getExpCtx());
+    densify.setSource(stage.get());
     ASSERT_THROWS_CODE(densify.getNext(), AssertionException, 5733201);
 }
 
@@ -1488,8 +1489,8 @@ TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOFExplictRange) {
         "a",
         std::list<FieldPath>(),
         RangeStatement(Value(1), ExplicitBounds(Value(0), Value(2)), boost::none));
-    auto source = DocumentSourceMock::createForTest({}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({}, getExpCtx());
+    densify.setSource(stage.get());
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
@@ -1506,8 +1507,8 @@ TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOFExplicitRange) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(3), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest({}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({}, getExpCtx());
+    densify.setSource(stage.get());
     auto next = densify.getNext();
     ASSERT_FALSE(next.isAdvanced());
 }
@@ -1518,8 +1519,8 @@ TEST_F(DensifyPartitionNumericTest, DensifiesOnImmediateEOFExplicitRange) {
                                         "a",
                                         std::list<FieldPath>(),
                                         RangeStatement(Value(3), Full(), boost::none));
-    auto source = DocumentSourceMock::createForTest({}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest({}, getExpCtx());
+    densify.setSource(stage.get());
     auto next = densify.getNext();
     ASSERT_FALSE(next.isAdvanced());
 }
@@ -1836,8 +1837,8 @@ TEST_F(DensifyMonthStepTest, CorrectlyDensifiesForDateExplicitRangeStartingInsid
                                             TimeUnit::month));
 
     Document doc{{"a", makeDate("2019-10-01T00:00:00.000Z")}};
-    auto source = DocumentSourceMock::createForTest({doc}, getExpCtx());
-    densify.setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest(doc, getExpCtx());
+    densify.setSource(stage.get());
 
     auto next = densify.getNext();
     ASSERT(next.isAdvanced());

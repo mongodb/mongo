@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -82,8 +83,8 @@ TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2HandleInputs) {
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto source = DocumentSourceMock::createForTest(inputDocs, getExpCtx());
-    handleTopologyChangeStage->setSource(source.get());
+    auto stage = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    handleTopologyChangeStage->setSource(stage.get());
 
     auto next = handleTopologyChangeStage->getNext();
     ASSERT_TRUE(next.isPaused());

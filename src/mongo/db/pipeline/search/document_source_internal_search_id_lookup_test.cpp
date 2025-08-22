@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -95,9 +96,9 @@ TEST_F(InternalSearchIdLookupTest, ShouldSkipResultsWhenIdNotFound) {
     auto idLookupStage = exec::agg::buildStage(idLookup);
 
     // Mock its input.
-    auto mockLocalSource =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
-    idLookupStage->setSource(mockLocalSource.get());
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
+    idLookupStage->setSource(mockLocalStage.get());
 
     // Mock documents for this namespace.
     deque<DocumentSource::GetNextResult> mockDbContents{Document{{"_id", 0}, {"color", "red"_sd}}};
@@ -122,7 +123,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotRemoveMetadata) {
     docOne.metadata().setSearchScore(0.123);
     auto searchScoreDetails = BSON("scoreDetails" << "foo");
     docOne.metadata().setSearchScoreDetails(searchScoreDetails);
-    DocumentSourceMock mockLocalSource({docOne.freeze()}, expCtx);
+    auto mockLocalStage = exec::agg::MockStage::createForTest({docOne.freeze()}, expCtx);
 
     // Set up the idLookup stage.
     auto specObj = BSON("$_internalSearchIdLookup" << BSONObj());
@@ -130,7 +131,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotRemoveMetadata) {
 
     auto idLookup = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
     auto idLookupStage = exec::agg::buildStage(idLookup);
-    idLookupStage->setSource(&mockLocalSource);
+    idLookupStage->setSource(mockLocalStage.get());
 
     // Set up a project stage that asks for metadata.
     auto projectSpec = fromjson(
@@ -212,11 +213,11 @@ TEST_F(InternalSearchIdLookupTest, ShouldAllowStringOrObjectIdValues) {
     auto idLookupStage = exec::agg::buildStage(idLookup);
 
     // Mock its input.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         {Document{{"_id", "tango"_sd}},
          Document{{"_id", Document{{"number", 42}, {"irrelevant", "something"_sd}}}}},
         expCtx);
-    idLookupStage->setSource(mockLocalSource.get());
+    idLookupStage->setSource(mockLocalStage.get());
 
     // Mock documents for this namespace.
     deque<DocumentSource::GetNextResult> mockDbContents{
@@ -251,8 +252,8 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotErrorOnEmptyResult) {
     auto idLookupStage = exec::agg::buildStage(idLookup);
 
     // Mock its input.
-    auto mockLocalSource = DocumentSourceMock::createForTest({}, expCtx);
-    idLookupStage->setSource(mockLocalSource.get());
+    auto mockLocalStage = exec::agg::MockStage::createForTest({}, expCtx);
+    idLookupStage->setSource(mockLocalStage.get());
 
     // Mock documents for this namespace.
     deque<DocumentSource::GetNextResult> mockDbContents{Document{{"_id", 0}, {"color", "red"_sd}}};

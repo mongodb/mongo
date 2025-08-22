@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/shard_filterer.h"
@@ -150,7 +151,7 @@ private:
 
 TEST_F(DocumentSourceInternalShardFilterTest, FiltersDocuments) {
     DocumentSourceContainer container;
-    auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
     const auto nToFilter = 2;
     DocumentSourceInternalShardFilter filter(getExpCtx(),
@@ -190,7 +191,7 @@ private:
 
 TEST_F(DocumentSourceInternalShardFilterTest, SkipDocumentsWithoutShardKey) {
     DocumentSourceContainer container;
-    auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
     DocumentSourceInternalShardFilter filter(getExpCtx(),
                                              std::make_unique<ShardFiltererNoShardKey>());

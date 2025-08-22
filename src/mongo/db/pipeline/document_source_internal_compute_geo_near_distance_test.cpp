@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -61,9 +62,9 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
         computeGeoSpec.firstElement(), getExpCtx());
     auto geoDistStage = exec::agg::buildStage(geoDist);
 
-    auto mock = DocumentSourceMock::createForTest(
-        DOC("loc" << DOC("type" << "Point"_sd
-                                << "coordinates" << DOC_ARRAY(1 << 1))),
+    auto mock = exec::agg::MockStage::createForTest(
+        {DOC("loc" << DOC("type" << "Point"_sd
+                                 << "coordinates" << DOC_ARRAY(1 << 1)))},
         getExpCtx());
 
     geoDistStage->setSource(mock.get());
@@ -89,9 +90,9 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
         computeGeoSpec.firstElement(), getExpCtx());
     auto geoDistStage = exec::agg::buildStage(geoDist);
 
-    auto mock = DocumentSourceMock::createForTest(
-        DOC("loc" << DOC("type" << "Point"_sd
-                                << "coordinates" << DOC_ARRAY(0 << 0))),
+    auto mock = exec::agg::MockStage::createForTest(
+        {DOC("loc" << DOC("type" << "Point"_sd
+                                 << "coordinates" << DOC_ARRAY(0 << 0)))},
         getExpCtx());
 
     geoDistStage->setSource(mock.get());
@@ -115,7 +116,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoLegacyPoints
         computeGeoSpec.firstElement(), getExpCtx());
     auto geoDistStage = exec::agg::buildStage(geoDist);
 
-    auto mock = DocumentSourceMock::createForTest(DOC("loc" << DOC_ARRAY(0 << 0)), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({DOC("loc" << DOC_ARRAY(0 << 0))}, getExpCtx());
 
     geoDistStage->setSource(mock.get());
     auto next = geoDistStage->getNext();
@@ -140,7 +141,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsS
         computeGeoSpec.firstElement(), getExpCtx());
     auto geoDistStage = exec::agg::buildStage(geoDist);
 
-    auto mock = DocumentSourceMock::createForTest(DOC("loc" << DOC_ARRAY(0 << 0)), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({DOC("loc" << DOC_ARRAY(0 << 0))}, getExpCtx());
 
     geoDistStage->setSource(mock.get());
     auto next = geoDistStage->getNext();

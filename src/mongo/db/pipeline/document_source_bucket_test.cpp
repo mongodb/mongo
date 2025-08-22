@@ -32,12 +32,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/unittest/unittest.h"
@@ -382,9 +382,9 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     ASSERT(sortStage);
 
     auto doc = Document{{"x", 4}};
-    auto source = DocumentSourceMock::createForTest(doc, getExpCtx());
+    auto stage = exec::agg::MockStage::createForTest(doc, getExpCtx());
 
-    groupStage->setSource(source.get());
+    groupStage->setSource(stage.get());
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }
 }  // namespace

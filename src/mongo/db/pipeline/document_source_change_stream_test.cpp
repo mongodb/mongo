@@ -35,6 +35,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -58,7 +59,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -2602,12 +2602,12 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
         {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, operationDescription}};
 
-    auto source =
-        DocumentSourceMock::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
+    auto stage =
+        exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
     auto transformStage = exec::agg::buildStage(transformDS);
-    transformStage->setSource(source.get());
+    transformStage->setSource(stage.get());
 
     auto next = transformStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -2675,12 +2675,12 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
     docs.push_back(Document{entry1.getEntry().toBSON()});
     docs.push_back(Document{entry2.getEntry().toBSON()});
     docs.push_back(Document{entry1.getEntry().toBSON()});
-    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto stage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
     auto transformStage = exec::agg::buildStage(transformDS);
 
-    transformStage->setSource(source.get());
+    transformStage->setSource(stage.get());
 
     auto next = transformStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -2713,12 +2713,12 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTest,
                                 false,
                                 BSON("unsupportedEventType" << BSONObj()));
 
-    auto source =
-        DocumentSourceMock::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
+    auto stage =
+        exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
     auto transformStage = exec::agg::buildStage(transformDS);
-    transformStage->setSource(source.get());
+    transformStage->setSource(stage.get());
 
     ASSERT_THROWS_CODE(transformStage->getNext(), AssertionException, 5052201);
 }
@@ -2978,9 +2978,9 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrect
             DocumentSource::GetNextResult::makeEOF(),
         };
 
-        auto source = DocumentSourceMock::createForTest(inputDocs, expCtx);
+        auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
         auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
-        injectControlEventsStage->setSource(source.get());
+        injectControlEventsStage->setSource(stage.get());
 
         auto next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isPaused());
@@ -3041,9 +3041,9 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto source = DocumentSourceMock::createForTest(inputDocs, expCtx);
+    auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
     auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
-    injectControlEventsStage->setSource(source.get());
+    injectControlEventsStage->setSource(stage.get());
 
     auto next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isPaused());

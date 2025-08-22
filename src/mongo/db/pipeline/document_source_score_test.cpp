@@ -31,11 +31,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -79,7 +79,7 @@ TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
     })");
 
     Document inputDoc = Document{{"myScore", 5}};
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
@@ -122,7 +122,7 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
      })");
 
     Document inputDoc = Document{{"myScore", 5}};
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
@@ -174,7 +174,7 @@ TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     stage->setSource(mock.get());
 
     auto next = stage->getNext();
@@ -199,7 +199,7 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     stage->setSource(mock.get());
 
     auto next = stage->getNext();
@@ -224,7 +224,7 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     stage->setSource(mock.get());
 
     auto next = stage->getNext();
@@ -249,7 +249,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     stage->setSource(mock.get());
 
     // Assert cannot evaluate expression into double
@@ -270,7 +270,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     stage->setSource(mock.get());
 
     // Assert cannot evaluate expression into double

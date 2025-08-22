@@ -31,30 +31,24 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
 
-#include <bitset>
 #include <cstddef>
-#include <memory>
 #include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -73,7 +67,7 @@ using AddFieldsTest = AggregationContextFixture;
 TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewFields) {
     auto addFields =
         DocumentSourceAddFields::create(BSON("e" << 2 << "b" << BSON("c" << 3)), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(
+    auto mock = exec::agg::MockStage::createForTest(
         Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}}, getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
@@ -135,7 +129,7 @@ TEST_F(AddFieldsTest, ShouldErrorOnNonObjectSpec) {
 
 TEST_F(AddFieldsTest, ShouldBeAbleToProcessMultipleDocuments) {
     auto addFields = DocumentSourceAddFields::create(BSON("a" << 10), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(
+    auto mock = exec::agg::MockStage::createForTest(
         {Document{{"a", 1}, {"b", 2}}, Document{{"c", 3}, {"d", 4}}}, getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
@@ -182,11 +176,11 @@ TEST_F(AddFieldsTest, ShouldAddReferencedFieldsToDependencies) {
 TEST_F(AddFieldsTest, ShouldPropagatePauses) {
     auto addFields = DocumentSourceAddFields::create(BSON("a" << 10), getExpCtx());
     auto mock =
-        DocumentSourceMock::createForTest({Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
 
@@ -202,7 +196,7 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
 
 TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
     auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd" << "$$REMOVE"), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"existingField", 1}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document{{"existingField", 1}}, getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
 
@@ -215,7 +209,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
 
 TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$ROOT"), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document{{"a", 1}}, getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
 
@@ -228,7 +222,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
 
 TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$CURRENT"), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document{{"a", 1}}, getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
 
@@ -256,7 +250,7 @@ BSONObj makeAddFieldsForNestedDocument(size_t depth) {
 TEST_F(AddFieldsTest, CanAddNestedDocumentExactlyAtDepthLimit) {
     auto addFields = DocumentSourceAddFields::create(
         makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"_id", 1}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document{{"_id", 1}}, getExpCtx());
     auto addFieldsStage = exec::agg::buildStage(addFields);
     addFieldsStage->setSource(mock.get());
 

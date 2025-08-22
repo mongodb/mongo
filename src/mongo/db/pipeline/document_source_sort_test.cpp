@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/sort_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -299,9 +300,9 @@ public:
                       DocumentSourceSort* sort,
                       string expectedResultSetString,
                       bool expectMemUse = true) {
-        auto source = DocumentSourceMock::createForTest(inputDocs, getExpCtx());
+        auto mockStage = exec::agg::MockStage::createForTest(std::move(inputDocs), getExpCtx());
         createSortStage();
-        _sortStage->setSource(source.get());
+        _sortStage->setSource(mockStage.get());
 
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
@@ -469,8 +470,8 @@ DEATH_TEST_REGEX_F(DocumentSourceSortExecutionTest,
 
     createSort(BSON("_id" << 1));
     createSortStage();
-    auto source = DocumentSourceMock::createForTest({doc.freeze()}, getExpCtx());
-    _sortStage->setSource(source.get());
+    auto mockStage = exec::agg::MockStage::createForTest({doc.freeze()}, getExpCtx());
+    _sortStage->setSource(mockStage.get());
     ASSERT_THROWS_CODE(_sortStage->getNext(), AssertionException, 10358905);
 }
 
@@ -535,10 +536,10 @@ TEST_F(DocumentSourceSortExecutionTest, FailsGracefullyWithInvalidInternalParame
 TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
     auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
     auto mock =
-        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"a", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"a", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            getExpCtx());
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
 
@@ -559,10 +560,10 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
 TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
     auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
     auto mock =
-        DocumentSourceMock::createForTest({Document{{"a", 1}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"a", 0}}},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({Document{{"a", 1}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"a", 0}}},
+                                            getExpCtx());
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
 
@@ -585,7 +586,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
     ASSERT_GT(sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 }
 
-std::tuple<boost::intrusive_ptr<DocumentSourceMock>,
+std::tuple<boost::intrusive_ptr<exec::agg::MockStage>,
            boost::intrusive_ptr<DocumentSourceSort>,
            intrusive_ptr<exec::agg::SortStage>>
 initSpillingTest(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -600,12 +601,12 @@ initSpillingTest(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     string largeStr(largeStrSize, 'x');
     auto mock =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 1}, {"largeStr", largeStr}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 2}, {"largeStr", largeStr}}},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 1}, {"largeStr", largeStr}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 2}, {"largeStr", largeStr}}},
+                                            expCtx);
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
 
@@ -629,7 +630,7 @@ void assertSpillingTestReturn(boost::intrusive_ptr<DocumentSourceSort> sort,
     ASSERT_TRUE(sortStage->getNext().isEOF());
 }
 
-std::tuple<boost::intrusive_ptr<DocumentSourceMock>,
+std::tuple<boost::intrusive_ptr<exec::agg::MockStage>,
            boost::intrusive_ptr<DocumentSourceSort>,
            intrusive_ptr<exec::agg::SortStage>>
 initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -654,7 +655,7 @@ initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
         mdoc.setMetadata(std::move(metadata));
         doc = mdoc.freeze();
     }
-    auto mock = DocumentSourceMock::createForTest(std::move(data), expCtx);
+    auto mock = exec::agg::MockStage::createForTest(std::move(data), expCtx);
 
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
@@ -820,7 +821,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
         doc = mdoc.freeze();
     }
 
-    auto mock = DocumentSourceMock::createForTest(std::move(data), expCtx);
+    auto mock = exec::agg::MockStage::createForTest(std::move(data), expCtx);
     auto sortStage = exec::agg::buildStage(sort);
     sortStage->setSource(mock.get());
 
@@ -881,7 +882,7 @@ TEST_F(DocumentSourceSortExecutionTest,
         doc = mdoc.freeze();
     }
 
-    auto mock = DocumentSourceMock::createForTest(std::move(data), expCtx);
+    auto mock = exec::agg::MockStage::createForTest(std::move(data), expCtx);
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
 
@@ -924,9 +925,9 @@ TEST_F(DocumentSourceSortExecutionTest,
         expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
 
     string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                                   Document{{"_id", 1}, {"largeStr", largeStr}}},
-                                                  expCtx);
+    auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                                     Document{{"_id", 1}, {"largeStr", largeStr}}},
+                                                    expCtx);
     auto sortStage = exec::agg::buildStage(sort);
     sortStage->setSource(mock.get());
 
@@ -945,11 +946,11 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
 
     string largeStr(maxMemoryUsageBytes / 5, 'x');
     auto mock =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 1}, {"largeStr", largeStr}},
-                                           Document{{"_id", 2}, {"largeStr", largeStr}}},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 1}, {"largeStr", largeStr}},
+                                             Document{{"_id", 2}, {"largeStr", largeStr}}},
+                                            expCtx);
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
 
@@ -1211,7 +1212,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
 
 void assertProducesSortKeyMetadata(auto expCtx, auto sort) {
     const auto mock =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
     auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
     sortStage->setSource(mock.get());
     const auto output1 = sortStage->getNext();

@@ -29,6 +29,7 @@
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -39,6 +40,8 @@
 namespace mongo {
 namespace {
 
+using GetNextResult = mongo::exec::agg::GetNextResult;
+
 /**
  * This is a subclass of DocumentSourceMock that will track the memory of each document it produces,
  * and reset the in-use memory bytes to zero when EOF is reached.
@@ -46,13 +49,20 @@ namespace {
  * It is templatized to be able to track with either MemoryUsageTracker or SimpleMemoryUsageTracker.
  */
 template <class Tracker>
-class DocumentSourceTrackingMock : public DocumentSourceMock {
+class MockStageTracking : public mongo::exec::agg::MockStage {
 public:
-    static boost::intrusive_ptr<DocumentSourceTrackingMock<Tracker>> createForTest(
+    static boost::intrusive_ptr<MockStageTracking<Tracker>> createForTest(
         std::deque<GetNextResult> results, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+private:
+    MockStageTracking(std::deque<GetNextResult> results,
+                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                      Tracker tracker)
+        : mongo::exec::agg::MockStage{"mockedStage"_sd, expCtx, std::move(results)},
+          _tracker{std::move(tracker)} {}
+
     GetNextResult doGetNext() override {
-        GetNextResult result = DocumentSourceMock::doGetNext();
+        GetNextResult result = MockStage::doGetNext();
         if (result.isAdvanced()) {
             _tracker.add(result.getDocument().getApproximateSize());
         } else if (result.isEOF()) {
@@ -62,12 +72,6 @@ public:
         return result;
     }
 
-private:
-    DocumentSourceTrackingMock(std::deque<GetNextResult> results,
-                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               Tracker tracker)
-        : DocumentSourceMock{std::move(results), expCtx}, _tracker{std::move(tracker)} {}
-
     Tracker _tracker;
 };
 
@@ -75,10 +79,10 @@ private:
  * Specialization for SimpleMemoryUsageTracker.
  */
 template <>
-boost::intrusive_ptr<DocumentSourceTrackingMock<SimpleMemoryUsageTracker>>
-DocumentSourceTrackingMock<SimpleMemoryUsageTracker>::createForTest(
+boost::intrusive_ptr<MockStageTracking<SimpleMemoryUsageTracker>>
+MockStageTracking<SimpleMemoryUsageTracker>::createForTest(
     std::deque<GetNextResult> results, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceTrackingMock(
+    return new MockStageTracking(
         std::move(results),
         expCtx,
         OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx));
@@ -88,10 +92,10 @@ DocumentSourceTrackingMock<SimpleMemoryUsageTracker>::createForTest(
  * Specialization for MemoryUsageTracker.
  */
 template <>
-boost::intrusive_ptr<DocumentSourceTrackingMock<MemoryUsageTracker>>
-DocumentSourceTrackingMock<MemoryUsageTracker>::createForTest(
+boost::intrusive_ptr<MockStageTracking<MemoryUsageTracker>>
+MockStageTracking<MemoryUsageTracker>::createForTest(
     std::deque<GetNextResult> results, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceTrackingMock(
+    return new MockStageTracking(
         std::move(results),
         expCtx,
         OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(*expCtx));
@@ -164,14 +168,14 @@ protected:
  * Show that memory tracking works for a mock node that uses SimpleMemoryUsageTracker.
  */
 TEST_F(OperationMemoryUsageTrackerTest, SimpleStageMemoryUsageAggregatedInOperationMemory) {
-    runTest(DocumentSourceTrackingMock<SimpleMemoryUsageTracker>::createForTest);
+    runTest(MockStageTracking<SimpleMemoryUsageTracker>::createForTest);
 }
 
 /**
  * Show that memory tracking works for a mock node that uses MemoryUsageTracker.
  */
 TEST_F(OperationMemoryUsageTrackerTest, StageMemoryUsageAggregatedInOperationMemory) {
-    runTest(DocumentSourceTrackingMock<MemoryUsageTracker>::createForTest);
+    runTest(MockStageTracking<MemoryUsageTracker>::createForTest);
 }
 
 /**
@@ -181,7 +185,7 @@ TEST_F(OperationMemoryUsageTrackerTest, StageMemoryUsageAggregatedInOperationMem
 TEST_F(OperationMemoryUsageTrackerTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                false);
-    auto mock = DocumentSourceTrackingMock<SimpleMemoryUsageTracker>::createForTest(
+    auto mock = MockStageTracking<SimpleMemoryUsageTracker>::createForTest(
         {Document{{"_id", 0}, {"a", 100}, {"b", "hello"_sd}}}, getExpCtx());
     ASSERT_TRUE(mock->getNext().isAdvanced());
 

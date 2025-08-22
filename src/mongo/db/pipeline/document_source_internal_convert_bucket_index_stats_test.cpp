@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -111,11 +112,11 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithoutMetaField) {
         std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
 
     // Create a mock index spec on the buckets collection.
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{spec: {name: 'twoFieldIndex', key: {'control.min.t': 1, 'control.max.t': 1, "
          "'control.min.metric': 1, 'control.max.metric': 1}}}"},
         expCtx);
-    convertIndexStatsStage->setSource(source.get());
+    convertIndexStatsStage->setSource(stage.get());
     auto next = convertIndexStatsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(
@@ -131,11 +132,11 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithMetaField) {
         std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
 
     // Create a mock index spec on the buckets collection.
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {"{spec: {name: 'threeFieldIndex', key: {'meta': 1, 'control.min.t': 1, 'control.max.t': "
          "1, 'control.min.metric': 1, 'control.max.metric': 1}}}"},
         expCtx);
-    convertIndexStatsStage->setSource(source.get());
+    convertIndexStatsStage->setSource(stage.get());
     auto next = convertIndexStatsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.getDocument(),

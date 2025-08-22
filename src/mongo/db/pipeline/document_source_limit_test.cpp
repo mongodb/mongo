@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -58,17 +59,17 @@ namespace {
 using DocumentSourceLimitTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
     auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
-    limit->setSource(source.get());
+    limit->setSource(stage.get());
     // The limit's result is as expected.
     auto next = limit->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
     // The limit is exhausted.
     ASSERT(limit->getNext().isEOF());
-    // The source has been disposed
-    ASSERT_TRUE(source->isDisposed);
+    // The stage has been disposed
+    ASSERT_TRUE(stage->isDisposed);
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldNotBeAbleToLimitToZeroDocuments) {
@@ -119,14 +120,14 @@ TEST_F(DocumentSourceLimitTest, DoesNotPushProjectBeforeSelf) {
 }
 
 TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 1}"}, getExpCtx());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 1}"}, getExpCtx());
 
     // Create a DocumentSourceMatch.
     BSONObj spec = BSON("$match" << BSON("a" << 1));
     BSONElement specElement = spec.firstElement();
     auto match = DocumentSourceMatch::createFromBson(specElement, getExpCtx());
     auto matchStage = exec::agg::buildStage(match);
-    matchStage->setSource(source.get());
+    matchStage->setSource(stage.get());
 
     auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
     limit->setSource(matchStage.get());
@@ -136,7 +137,7 @@ TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
     // The limit is exhausted.
     ASSERT(limit->getNext().isEOF());
-    ASSERT_TRUE(source->isDisposed);
+    ASSERT_TRUE(stage->isDisposed);
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
@@ -151,13 +152,13 @@ TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
 TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
     auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
     auto mock =
-        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document()},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document()},
+                                            getExpCtx());
     limit->setSource(mock.get());
 
     ASSERT_TRUE(limit->getNext().isPaused());

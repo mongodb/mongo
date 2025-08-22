@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -68,9 +69,9 @@ public:
         const std::string& inputPath,
         WindowBounds::Bound<int> upper,
         boost::optional<std::string> sortByPath = boost::none) {
-        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+        _docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
         _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), &_tracker, boost::none, boost::none);
+            getExpCtx().get(), _docStage.get(), &_tracker, boost::none, boost::none);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         if (sortByPath) {
@@ -101,7 +102,7 @@ public:
     MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
 
 private:
-    boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    boost::intrusive_ptr<exec::agg::MockStage> _docStage;
     std::unique_ptr<PartitionIterator> _iter;
 };
 
@@ -153,7 +154,7 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
     const auto docs = std::deque<DocumentSource::GetNextResult>{Document{{"a", 1}, {"key", 1}},
                                                                 Document{{"a", 2}, {"key", 2}},
                                                                 Document{{"a", 3}, {"key", 3}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     auto iter = PartitionIterator(getExpCtx().get(),
@@ -193,9 +194,9 @@ TEST_F(WindowFunctionExecNonRemovableTest, FullPartitionWindow) {
 TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariables) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
-    auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto iter = std::make_unique<PartitionIterator>(
-        getExpCtx().get(), docSource.get(), &_tracker, boost::none, boost::none);
+        getExpCtx().get(), docStage.get(), &_tracker, boost::none, boost::none);
     auto filterBSON =
         fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
     auto input = ExpressionFilter::parse(
@@ -266,7 +267,7 @@ public:
     }
 
 protected:
-    boost::intrusive_ptr<DocumentSourceMock> _mock;
+    boost::intrusive_ptr<exec::agg::MockStage> _mock;
     std::unique_ptr<SortPattern> _pattern;
     std::unique_ptr<SortKeyGenerator> _sortKeyGen;
 };

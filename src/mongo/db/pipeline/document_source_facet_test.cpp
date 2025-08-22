@@ -37,11 +37,13 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -255,15 +257,43 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    DocumentSource::GetNextResult doGetNext() final {
-        return pSource->getNext();
-    }
-
     static boost::intrusive_ptr<DocumentSourcePassthrough> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         return new DocumentSourcePassthrough(expCtx);
     }
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
 };
+
+class PassthroughStage final : public exec::agg::Stage {
+public:
+    PassthroughStage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : Stage("passthroughStage", expCtx) {}
+
+private:
+    exec::agg::GetNextResult doGetNext() final {
+        return pSource->getNext();
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(mockPassthrough, DocumentSourcePassthrough::id)
+
+// Create a mapping function from DocumentSourcePassthrough to PassthroughStage.
+boost::intrusive_ptr<exec::agg::Stage> documentSourcePassthroughToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSource) {
+    auto* dsMock = dynamic_cast<DocumentSourcePassthrough*>(documentSource.get());
+    tassert(10812601, "expected 'DocumentSourcePassthrough' type", dsMock);
+    return make_intrusive<PassthroughStage>(dsMock->getExpCtx());
+}
+
+REGISTER_AGG_STAGE_MAPPING(mockPassthroughStage,
+                           DocumentSourcePassthrough::id,
+                           documentSourcePassthroughToStageFn)
+
 
 TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) {
     auto ctx = getExpCtx();
@@ -326,7 +356,7 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto dummy = DocumentSourcePassthrough::create(ctx);
 
@@ -354,7 +384,7 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstDummy}, ctx);
@@ -394,7 +424,7 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, ctx);
+    auto mock = exec::agg::MockStage::createForTest(inputs, ctx);
 
     auto facetSource = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
     auto facetStage = exec::agg::buildStage(facetSource);
@@ -424,7 +454,7 @@ TEST_F(DocumentSourceFacetTest,
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto passthrough = DocumentSourcePassthrough::create(ctx);
     auto passthroughPipe = Pipeline::create({passthrough}, ctx);
@@ -480,7 +510,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
     auto ctx = getExpCtx();
 
     deque<DocumentSource::GetNextResult> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto secondDummy = DocumentSourcePassthrough::create(ctx);
@@ -501,7 +531,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
     auto ctx = getExpCtx();
 
-    auto mockSource = DocumentSourceMock::createForTest(getExpCtx());
+    auto mockSource = exec::agg::MockStage::createForTest({}, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipe = Pipeline::create({firstDummy}, ctx);
@@ -525,8 +555,8 @@ DEATH_TEST_REGEX_F(DocumentSourceFacetTest,
                    ShouldFailIfGivenPausedInput,
                    R"#(Invariant failure.*!input.isPaused\(\))#") {
     auto ctx = getExpCtx();
-    auto mock = DocumentSourceMock::createForTest(
-        DocumentSource::GetNextResult::makePauseExecution(), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(
+        {exec::agg::GetNextResult::makePauseExecution()}, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto pipeline = Pipeline::create({firstDummy}, ctx);

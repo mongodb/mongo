@@ -31,7 +31,10 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/db_command_test_fixture.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -89,17 +92,6 @@ public:
         return kStageName.data();
     }
 
-    GetNextResult doGetNext() override {
-        GetNextResult result = DocumentSourceMock::doGetNext();
-        if (result.isAdvanced()) {
-            _tracker.add(result.getDocument().getApproximateSize());
-        } else if (result.isEOF()) {
-            _tracker.add(-_tracker.inUseTrackedMemoryBytes());
-        }
-
-        return result;
-    }
-
     /**
      * Produce constraints consistent with a stage that takes no inputs and produces documents at
      * the beginning of a pipeline.
@@ -119,8 +111,7 @@ private:
      */
     DocumentSourceTrackingMock(std::deque<GetNextResult> results,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMock{std::move(results), expCtx},
-          _tracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)} {}
+        : DocumentSourceMock{std::move(results), expCtx} {}
 
     SimpleMemoryUsageTracker _tracker;
 };
@@ -130,6 +121,35 @@ REGISTER_DOCUMENT_SOURCE(trackingMock,
                          DocumentSourceTrackingMock::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(trackingMock, DocumentSourceTrackingMock::id)
+
+class TrackingMockStage : public mongo::exec::agg::MockStage {
+    using GetNextResult = exec::agg::GetNextResult;
+
+public:
+    TrackingMockStage(StringData stageName,
+                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                      std::deque<GetNextResult> results)
+        : mongo::exec::agg::MockStage(stageName, expCtx, std::move(results)),
+          _tracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)} {}
+
+private:
+    /**
+     * Override doGetNext to track memory usage for each document returned, and reset the in-use
+     * memory bytes when EOF is reached.
+     */
+    GetNextResult doGetNext() override {
+        GetNextResult result = MockStage::doGetNext();
+        if (result.isAdvanced()) {
+            _tracker.add(result.getDocument().getApproximateSize());
+        } else if (result.isEOF()) {
+            _tracker.add(-_tracker.inUseTrackedMemoryBytes());
+        }
+
+        return result;
+    }
+
+    SimpleMemoryUsageTracker _tracker;
+};
 
 /**
  * Test that when we have memory tracking turned on, queries producing memory statistics will
@@ -253,4 +273,21 @@ TEST_F(RunAggregateTest, MemoryTrackerWithinSubpipelineIsProperlyDestroyedOnKill
     ASSERT_TRUE(cursorsKilled.size() == 1 && cursorsKilled[0].Long() == cursorId);
 }
 }  // namespace
+
+// We have to define the mapping function outside the anonymous namespace in order to access private
+// members of the DocumentSourceMock class.
+boost::intrusive_ptr<exec::agg::Stage> documentSourceTrackingMockToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSource) {
+    auto* dsMock = dynamic_cast<DocumentSourceTrackingMock*>(documentSource.get());
+
+    tassert(10812602, "expected 'DocumentSourceTrackingMock' type", dsMock);
+
+    return make_intrusive<TrackingMockStage>(
+        dsMock->kStageName, dsMock->getExpCtx(), dsMock->_results);
+}
+
+REGISTER_AGG_STAGE_MAPPING(trackingMockStage,
+                           mongo::DocumentSourceTrackingMock::id,
+                           documentSourceTrackingMockToStageFn)
+
 }  // namespace mongo

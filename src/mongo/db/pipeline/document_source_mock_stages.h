@@ -101,11 +101,6 @@ public:
         return boost::none;
     }
 
-    // This is just to test splitting logic, doGetNext should not be called.
-    GetNextResult doGetNext() override {
-        MONGO_UNREACHABLE;
-    }
-
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,

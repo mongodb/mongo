@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
@@ -180,7 +181,7 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
             ->getNext()
             .isEOF());
     Document inputDoc = Document{{"foo", 1}};
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
     const_cast<mongo::extension::host::DocumentSourceExtension*>(documentSourceExtension)
         ->setSource(mock.get());
     auto next =

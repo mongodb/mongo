@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -56,8 +57,9 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAft
     SequentialDocumentCache cache(kDefaultMaxCacheSize);
     auto documentCache = DocumentSourceSequentialDocumentCache::create(getExpCtx(), &cache);
 
-    auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    documentCache->setSource(source.get());
+    auto mockStage =
+        exec::agg::MockStage::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
+    documentCache->setSource(mockStage.get());
 
     ASSERT(documentCache->getNext().isAdvanced());
     ASSERT(documentCache->getNext().isAdvanced());

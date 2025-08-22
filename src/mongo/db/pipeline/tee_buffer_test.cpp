@@ -29,12 +29,10 @@
 
 #include "mongo/db/pipeline/tee_buffer.h"
 
-#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -57,7 +55,7 @@ TEST_F(TeeBufferTest, ShouldRequirePositiveBatchSize) {
 }
 
 TEST_F(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
-    auto mock = DocumentSourceMock::createForTest(getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({}, getExpCtx());
     auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
 
@@ -68,7 +66,7 @@ TEST_F(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
 
 TEST_F(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
     auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
 
@@ -86,7 +84,7 @@ TEST_F(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
 
 TEST_F(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
     auto teeBuffer = TeeBuffer::create(1, bufferBytes);
@@ -106,7 +104,7 @@ TEST_F(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
 
 TEST_F(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsumers) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     const size_t nConsumers = 2;
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
@@ -149,7 +147,7 @@ TEST_F(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsu
 
 TEST_F(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDisposed) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"a", 1}}, Document{{"a", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     const size_t nConsumers = 2;
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.

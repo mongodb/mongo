@@ -29,9 +29,9 @@
 
 #include "mongo/db/pipeline/document_source_skip.h"
 
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -47,13 +47,13 @@ using DocumentSourceSkipTest = AggregationContextFixture;
 TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
     auto skip = DocumentSourceSkip::create(getExpCtx(), 2);
     auto mock =
-        DocumentSourceMock::createForTest({Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          getExpCtx());
+        exec::agg::MockStage::createForTest({Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            getExpCtx());
     skip->setSource(mock.get());
 
     // Skip the first document.

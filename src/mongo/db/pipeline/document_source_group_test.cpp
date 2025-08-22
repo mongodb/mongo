@@ -36,6 +36,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/group_base_stage.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -45,7 +46,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -154,14 +154,14 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto group = DocumentSourceGroup::create(
         expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement}, false);
     auto mock =
-        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document()},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document()},
+                                            expCtx);
     auto groupStage = exec::agg::buildStage(group);
 
     groupStage->setSource(mock.get());
@@ -197,12 +197,12 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
 
     std::string largeStr(maxMemoryUsageBytes, 'x');
     auto mock =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 1}, {"largeStr", largeStr}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 2}, {"largeStr", largeStr}}},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 1}, {"largeStr", largeStr}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 2}, {"largeStr", largeStr}}},
+                                            expCtx);
     auto groupStage = exec::agg::buildStage(group);
 
     groupStage->setSource(mock.get());
@@ -240,9 +240,9 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
         expCtx, groupByExpression, {pushStatement}, false, maxMemoryUsageBytes);
 
     std::string largeStr(maxMemoryUsageBytes, 'x');
-    auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                                   Document{{"_id", 1}, {"largeStr", largeStr}}},
-                                                  expCtx);
+    auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                                     Document{{"_id", 1}, {"largeStr", largeStr}}},
+                                                    expCtx);
     auto groupStage = exec::agg::buildStage(group);
     groupStage->setSource(mock.get());
 
@@ -269,10 +269,10 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToForceSpillAfterReturningResults) {
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
     std::string largeStr(maxMemoryUsageBytes / 16, 'x');
-    auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                                   Document{{"_id", 1}, {"largeStr", largeStr}},
-                                                   Document{{"_id", 2}, {"largeStr", largeStr}}},
-                                                  expCtx);
+    auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                                     Document{{"_id", 1}, {"largeStr", largeStr}},
+                                                     Document{{"_id", 2}, {"largeStr", largeStr}}},
+                                                    expCtx);
     auto groupStage = exec::agg::buildStage(group);
     groupStage->setSource(mock.get());
 
@@ -317,11 +317,11 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
 
     std::string largeStr(maxMemoryUsageBytes / 2, 'x');
     auto mock =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"_id", 1}, {"largeStr", largeStr}},
-                                           Document{{"_id", 2}, {"largeStr", largeStr}}},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"_id", 1}, {"largeStr", largeStr}},
+                                             Document{{"_id", 2}, {"largeStr", largeStr}}},
+                                            expCtx);
     auto groupStage = exec::agg::buildStage(group);
     groupStage->setSource(mock.get());
 
@@ -350,7 +350,7 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
     doc.metadata().setChangeStreamControlEvent();
-    auto mock = DocumentSourceMock::createForTest({doc.freeze()}, expCtx);
+    auto mock = exec::agg::MockStage::createForTest({doc.freeze()}, expCtx);
     auto groupStage = exec::agg::buildStage(group);
 
     groupStage->setSource(mock.get());
@@ -384,7 +384,7 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
     MutableDocument doc(Document{{"_id", 0}});
     doc.metadata().setChangeStreamControlEvent();
 
-    auto mock = DocumentSourceMock::createForTest({doc.freeze()}, expCtx);
+    auto mock = exec::agg::MockStage::createForTest({doc.freeze()}, expCtx);
     stage->setSource(mock.get());
 
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, 10358903);
@@ -536,7 +536,7 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     std::vector<AccumulationStatement> accumulationStatements;
     auto group =
         DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements, false);
-    auto mock = DocumentSourceMock::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
     auto groupStage = exec::agg::buildStage(group);
 
     groupStage->setSource(mock.get());
@@ -716,7 +716,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
                                                                    flagStatus);
 
         // Pause between input docs so we have a chance to check memory tracking.
-        auto mock = DocumentSourceMock::createForTest(
+        auto mock = exec::agg::MockStage::createForTest(
             {
                 Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
                 DocumentSource::GetNextResult::makePauseExecution(),
@@ -805,7 +805,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
                                                                true);
 
     // Pause between input docs so we have a chance to check memory tracking.
-    auto mock = DocumentSourceMock::createForTest(
+    auto mock = exec::agg::MockStage::createForTest(
         {
             Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
             DocumentSource::GetNextResult::makePauseExecution(),
@@ -910,7 +910,7 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
                                                                false);
 
     // Pause between input docs so we have a chance to check memory tracking.
-    auto mock = DocumentSourceMock::createForTest(
+    auto mock = exec::agg::MockStage::createForTest(
         {
             Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
             Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
@@ -1123,8 +1123,8 @@ public:
     ~ExpressionBase() override {}
     void _doTest() final {
         createGroup(spec());
-        auto source = DocumentSourceMock::createForTest(Document(doc()), ctx());
-        groupStage()->setSource(source.get());
+        auto mockStage = exec::agg::MockStage::createForTest(Document(doc()), ctx());
+        groupStage()->setSource(mockStage.get());
         // A group result is available.
         auto next = groupStage()->getNext();
         ASSERT(next.isAdvanced());
@@ -1373,15 +1373,15 @@ public:
     }
     void runSharded(bool sharded) {
         createGroup(groupSpec());
-        auto source = DocumentSourceMock::createForTest(inputData(), ctx());
-        groupStage()->setSource(source.get());
+        auto mockStage = exec::agg::MockStage::createForTest(inputData(), ctx());
+        groupStage()->setSource(mockStage.get());
 
         boost::intrusive_ptr<exec::agg::Stage> sink = groupStage();
         if (sharded) {
             sink = createMerger();
             // Serialize and re-parse the shard stage.
             createGroup(toBson(group())[group()->getSourceName()].Obj(), true);
-            groupStage()->setSource(source.get());
+            groupStage()->setSource(mockStage.get());
             sink->setSource(groupStage().get());
         }
 
@@ -1577,19 +1577,19 @@ class UndefinedAccumulatorValue : public CheckResultsBase {
 class RouterMerger : public CheckResultsBase {
 public:
     void _doTest() final {
-        auto source = DocumentSourceMock::createForTest({"{_id:0,list:[1,2]}",
-                                                         "{_id:1,list:[3,4]}",
-                                                         "{_id:0,list:[10,20]}",
-                                                         "{_id:1,list:[30,40]}"},
-                                                        ctx());
+        auto mockStage = exec::agg::MockStage::createForTest({"{_id:0,list:[1,2]}",
+                                                              "{_id:1,list:[3,4]}",
+                                                              "{_id:0,list:[10,20]}",
+                                                              "{_id:1,list:[30,40]}"},
+                                                             ctx());
 
-        // Create a group source.
+        // Create a group stage.
         createGroup(BSON("_id" << "$x"
                                << "list" << BSON("$push" << "$y")));
-        // Create a merger version of the source.
+        // Create a merger version of the stage.
         boost::intrusive_ptr<exec::agg::Stage> group = createMerger();
         // Attach the merger to the synthetic shard results.
-        group->setSource(source.get());
+        group->setSource(mockStage.get());
         // Check the merger's output.
         checkResultSet(group);
     }

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -58,7 +59,7 @@ using boost::intrusive_ptr;
 
 class SampleBasics : public AggregationContextFixture {
 public:
-    SampleBasics() : _mock(DocumentSourceMock::createForTest(getExpCtx())) {}
+    SampleBasics() : _mock(exec::agg::MockStage::createForTest({}, getExpCtx())) {}
 
 protected:
     virtual void createSample(long long size) {
@@ -66,7 +67,7 @@ protected:
         BSONElement specElement = spec.firstElement();
         _sample =
             exec::agg::buildStage(DocumentSourceSample::createFromBson(specElement, getExpCtx()));
-        sample()->setSource(_mock.get());
+        sample()->setSource(source());
         checkBsonRepresentation(spec);
     }
 
@@ -74,7 +75,7 @@ protected:
         return _sample.get();
     }
 
-    DocumentSourceMock* source() {
+    exec::agg::MockStage* source() {
         return _mock.get();
     }
 
@@ -122,7 +123,7 @@ protected:
 
 protected:
     intrusive_ptr<exec::agg::Stage> _sample;
-    intrusive_ptr<DocumentSourceMock> _mock;
+    intrusive_ptr<exec::agg::MockStage> _mock;
 
 private:
     /**

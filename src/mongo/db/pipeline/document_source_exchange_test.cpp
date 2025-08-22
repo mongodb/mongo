@@ -125,12 +125,13 @@ protected:
     }
 
     auto getMockSource(int cnt) {
-        auto source = DocumentSourceMock::createForTest(getExpCtx());
+        std::vector<Document> docs;
+        docs.reserve(cnt);
 
         for (int i = 0; i < cnt; ++i)
-            source->emplace_back(Document{{"a", i}, {"b", "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd}});
+            docs.emplace_back(Document{{"a", i}, {"b", "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd}});
 
-        return source;
+        return DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
     }
 
     static auto getNewSeed() {
@@ -142,14 +143,14 @@ protected:
 
     auto getRandomMockSource(size_t cnt, int64_t seed) {
         PseudoRandom prng(seed);
-
-        auto source = DocumentSourceMock::createForTest(getExpCtx());
+        std::vector<Document> docs;
+        docs.reserve(cnt);
 
         for (size_t i = 0; i < cnt; ++i)
-            source->emplace_back(Document{{"a", static_cast<int>(prng.nextInt32() % cnt)},
-                                          {"b", "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd}});
+            docs.emplace_back(Document{{"a", static_cast<int>(prng.nextInt32() % cnt)},
+                                       {"b", "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd}});
 
-        return source;
+        return DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
     }
 
     auto parseSpec(const BSONObj& spec) {

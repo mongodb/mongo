@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/matcher/matcher.h"
@@ -42,8 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
@@ -168,7 +167,7 @@ TEST_F(FindAndModifyImageLookupTest, NoopWhenEntryDoesNotHaveNeedsRetryImageFiel
                        preImageOpTime)
             .getEntry()
             .toBSON();
-    auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
     imageLookup->setSource(mock.get());
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -205,7 +204,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocMissing
                                 repl::RetryImageEnum::kPreImage)
                      .getEntry()
                      .toBSON());
-    auto mock = DocumentSourceMock::createForTest(oplogEntryDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(oplogEntryDoc, getExpCtx());
     imageLookup->setSource(mock.get());
 
     // Mock out the foreign collection.
@@ -247,7 +246,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
                                 repl::RetryImageEnum::kPreImage)
                      .getEntry()
                      .toBSON());
-    auto mock = DocumentSourceMock::createForTest(oplogEntryDoc, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(oplogEntryDoc, getExpCtx());
     imageLookup->setSource(mock.get());
 
     // Create an 'ImageEntry' with a higher 'txnNumber'.
@@ -308,7 +307,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                         .getEntry()
                                         .toBSON();
 
-        auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+        auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
         imageLookup->setSource(mock.get());
 
         const auto prePostImage = BSON("a" << 2);
@@ -403,7 +402,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                   .toBSON()
                                   .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
 
-        auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+        auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
         imageLookup->setSource(mock.get());
 
         const auto prePostImage = BSON("_id" << 1);
@@ -512,7 +511,7 @@ TEST_F(FindAndModifyImageLookupTest,
                               .toBSON()
                               .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
 
-    auto mock = DocumentSourceMock::createForTest(Document(oplogEntryBson), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
     imageLookup->setSource(mock.get());
 
     // Mock out the foreign collection.

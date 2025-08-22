@@ -37,6 +37,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -1166,12 +1168,12 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     // Mock the input of a foreign namespace, pausing every other result.
-    auto mockLocalSource =
-        DocumentSourceMock::createForTest({Document{{"foreignId", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"foreignId", 1}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          expCtx);
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"foreignId", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"foreignId", 1}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
 
     // Mock out the foreign collection.
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
@@ -1187,7 +1189,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
                                          {"as", "foreignDocs"_sd}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
-    lookup->setSource(mockLocalSource.get());
+
+    lookup->setSource(mockLocalStage.get());
 
     auto next = lookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -1220,12 +1223,12 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
         std::make_shared<MockMongoInterface>(std::move(mockForeignContents)));
 
     // Mock its input, pausing every other result.
-    auto mockLocalSource =
-        DocumentSourceMock::createForTest({Document{{"foreignId", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"foreignId", 1}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          expCtx);
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"foreignId", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"foreignId", 1}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
 
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
@@ -1241,7 +1244,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     lookup->setUnwindStage(DocumentSourceUnwind::create(
         expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
 
-    lookup->setSource(mockLocalSource.get());
+
+    lookup->setSource(mockLocalStage.get());
 
     auto next = lookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -1583,11 +1587,12 @@ TEST_F(DocumentSourceLookUpTest,
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    // Prepare the mocked local source.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    // Prepare the mocked local stage.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
 
-    lookupStage->setSource(mockLocalSource.get());
+
+    lookupStage->setSource(mockLocalStage.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
@@ -1661,10 +1666,11 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT(lookupStage);
 
     // Prepare the mocked local and foreign sources.
-    auto mockLocalSource =
-        DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
 
-    lookupStage->setSource(mockLocalSource.get());
+
+    lookupStage->setSource(mockLocalStage.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));

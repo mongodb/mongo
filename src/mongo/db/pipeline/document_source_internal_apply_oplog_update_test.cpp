@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -153,11 +154,11 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, UpdateMultipleDocuments) {
     auto source =
         DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx());
     auto stage = exec::agg::buildStage(source);
-    auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}},
-                                                   Document{{"a", 1}, {"b", 1}},
-                                                   Document{{"a", 2}, {"b", Document{{"c", 1}}}},
-                                                   Document{{"a", 3}, {"b", Document{{"d", 2}}}}},
-                                                  getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}},
+                                                     Document{{"a", 1}, {"b", 1}},
+                                                     Document{{"a", 2}, {"b", Document{{"c", 1}}}},
+                                                     Document{{"a", 3}, {"b", Document{{"d", 2}}}}},
+                                                    getExpCtx());
     stage->setSource(mock.get());
 
     auto next = stage->getNext();
@@ -194,7 +195,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
         auto stage = exec::agg::buildStage(source);
-        auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}}}, getExpCtx());
+        auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
         stage->setSource(mock.get());
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770500);
     }
@@ -207,7 +208,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
         auto stage = exec::agg::buildStage(source);
-        auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}}}, getExpCtx());
+        auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
         stage->setSource(mock.get());
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770503);
     }
@@ -220,7 +221,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
         auto stage = exec::agg::buildStage(source);
-        auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}}}, getExpCtx());
+        auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
         stage->setSource(mock.get());
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770505);
     }
@@ -233,7 +234,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
         auto stage = exec::agg::buildStage(source);
-        auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}}}, getExpCtx());
+        auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
         stage->setSource(mock.get());
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770507);
     }

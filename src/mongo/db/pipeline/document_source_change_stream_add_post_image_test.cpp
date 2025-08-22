@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -146,7 +147,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "documentKey" field.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"operationType", "update"_sd},
                  {"fullDocument", Document{{"_id", 0}}},
@@ -156,7 +157,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -172,7 +173,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"fullDocument", Document{{"_id", 0}}},
@@ -182,7 +183,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -198,7 +199,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{
             {"_id", makeResumeToken(0)},
             {"documentKey", Document{{"_id", 0}}},
@@ -207,7 +208,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -223,15 +224,15 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource =
-        DocumentSourceMock::createForTest(Document{{"_id", makeResumeToken(0)},
-                                                   {"documentKey", Document{{"_id", 0}}},
-                                                   {"operationType", "update"_sd},
-                                                   {"ns", 4}},
-                                          expCtx);
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest(Document{{"_id", makeResumeToken(0)},
+                                                     {"documentKey", Document{{"_id", 0}}},
+                                                     {"operationType", "update"_sd},
+                                                     {"ns", 4}},
+                                            expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -247,7 +248,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -256,7 +257,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -276,7 +277,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -284,7 +285,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
@@ -306,7 +307,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
     expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
 
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -316,7 +317,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -337,7 +338,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with an update document.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
@@ -347,7 +348,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection to have two documents with the same document key.
     deque<DocumentSource::GetNextResult> foreignCollection = {Document{{"_id", 0}},
@@ -366,7 +367,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input, pausing every other result.
-    auto mockLocalSource = DocumentSourceMock::createForTest(
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
         {Document{{"_id", makeResumeToken(0)},
                   {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
@@ -385,7 +386,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
         expCtx);
 
     auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalSource.get());
+    lookupChangeStage->setSource(mockLocalStage.get());
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},

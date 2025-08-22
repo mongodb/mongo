@@ -30,6 +30,8 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -46,9 +48,9 @@ using DocumentSourceMockTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceMockTest, OneDoc) {
     auto doc = Document{{"a", 1}};
-    auto source = DocumentSourceMock::createForTest(doc, getExpCtx());
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), doc);
-    ASSERT(source->getNext().isEOF());
+    auto stage = exec::agg::MockStage::createForTest({doc}, getExpCtx());
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), doc);
+    ASSERT(stage->getNext().isEOF());
 }
 
 // Test if we can return a control event.
@@ -58,8 +60,8 @@ TEST_F(DocumentSourceMockTest, SingleControlEvent) {
     MutableDocument doc(orig);
     doc.metadata().setChangeStreamControlEvent();
 
-    auto source = DocumentSourceMock::createForTest(doc.freeze(), getExpCtx());
-    auto next = source->getNext();
+    auto stage = exec::agg::MockStage::createForTest(doc.freeze(), getExpCtx());
+    auto next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_FALSE(next.isAdvanced());
     ASSERT_FALSE(next.isPaused());
@@ -67,7 +69,7 @@ TEST_F(DocumentSourceMockTest, SingleControlEvent) {
 
     ASSERT_DOCUMENT_EQ(next.getDocument(), orig);
     ASSERT_TRUE(next.getDocument().metadata().isChangeStreamControlEvent());
-    ASSERT_TRUE(source->getNext().isEOF());
+    ASSERT_TRUE(stage->getNext().isEOF());
 }
 
 // Test if we can return control events mixed with other events.
@@ -92,10 +94,10 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
             DocumentSource::GetNextResult::makeAdvancedControlDocument(docBuilder.freeze()));
     }
 
-    auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto stage = exec::agg::MockStage::createForTest(docs, getExpCtx());
 
     // Regular document: '{a:1}'.
-    auto next = source->getNext();
+    auto next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_FALSE(next.isPaused());
@@ -103,14 +105,14 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
     ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"a", 1}}));
 
     // Pause.
-    next = source->getNext();
+    next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_FALSE(next.isAdvanced());
     ASSERT_TRUE(next.isPaused());
     ASSERT_FALSE(next.isAdvancedControlDocument());
 
     // Regular document: '{a:2}'.
-    next = source->getNext();
+    next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_FALSE(next.isPaused());
@@ -118,7 +120,7 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
     ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"a", 2}}));
 
     // Control document: '{c:1}'.
-    next = source->getNext();
+    next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_FALSE(next.isAdvanced());
     ASSERT_FALSE(next.isPaused());
@@ -127,7 +129,7 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
     ASSERT_TRUE(next.getDocument().metadata().isChangeStreamControlEvent());
 
     // Regular document: '{a:3}'.
-    next = source->getNext();
+    next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_FALSE(next.isPaused());
@@ -135,7 +137,7 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
     ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"a", 3}}));
 
     // Control document: '{c:2}'.
-    next = source->getNext();
+    next = stage->getNext();
     ASSERT_FALSE(next.isEOF());
     ASSERT_FALSE(next.isAdvanced());
     ASSERT_FALSE(next.isPaused());
@@ -144,48 +146,48 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
 }
 
 TEST_F(DocumentSourceMockTest, ShouldBeConstructableFromInitializerListOfDocuments) {
-    auto source =
-        DocumentSourceMock::createForTest({Document{{"a", 1}}, Document{{"a", 2}}}, getExpCtx());
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
-    ASSERT(source->getNext().isEOF());
+    auto stage =
+        exec::agg::MockStage::createForTest({Document{{"a", 1}}, Document{{"a", 2}}}, getExpCtx());
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 1}}));
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 2}}));
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMockTest, ShouldBeConstructableFromDequeOfResults) {
-    auto source =
-        DocumentSourceMock::createForTest({Document{{"a", 1}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"a", 2}}},
-                                          getExpCtx());
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
-    ASSERT_TRUE(source->getNext().isPaused());
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
-    ASSERT(source->getNext().isEOF());
+    auto stage =
+        exec::agg::MockStage::createForTest({Document{{"a", 1}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"a", 2}}},
+                                            getExpCtx());
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 1}}));
+    ASSERT_TRUE(stage->getNext().isPaused());
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 2}}));
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMockTest, StringJSON) {
-    auto source = DocumentSourceMock::createForTest("{a : 1}", getExpCtx());
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
-    ASSERT(source->getNext().isEOF());
+    auto stage = exec::agg::MockStage::createForTest("{a : 1}", getExpCtx());
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 1}}));
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMockTest, DequeStringJSONs) {
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
-    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
-    ASSERT(source->getNext().isEOF());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 1}}));
+    ASSERT_DOCUMENT_EQ(stage->getNext().getDocument(), (Document{{"a", 2}}));
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMockTest, Empty) {
-    auto source = DocumentSourceMock::createForTest(getExpCtx());
-    ASSERT(source->getNext().isEOF());
+    auto stage = exec::agg::MockStage::createForTest({}, getExpCtx());
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMockTest, NonTestConstructor) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(getExpCtx());
 
-    auto source = DocumentSourceMock::create(expCtx);
-    ASSERT(source->getNext().isEOF());
+    auto stage = exec::agg::buildStage(DocumentSourceMock::create(expCtx));
+    ASSERT(stage->getNext().isEOF());
 }
 
 }  // namespace

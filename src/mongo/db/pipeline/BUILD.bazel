@@ -572,6 +572,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:list_local_sessions_stage.h",
         "//src/mongo/db/exec/agg:list_sampled_queries_stage.h",
         "//src/mongo/db/exec/agg:match_stage.h",
+        "//src/mongo/db/exec/agg:mock_stage.h",
         "//src/mongo/db/exec/agg:pipeline_builder.h",
         "//src/mongo/db/exec/agg:queue_stage.h",
         "//src/mongo/db/exec/agg:redact_stage.h",
@@ -1350,6 +1351,7 @@ mongo_cc_library(
     name = "document_source_mock",
     srcs = [
         "document_source_mock.cpp",
+        "//src/mongo/db/exec/agg:mock_stage.cpp",
         "//src/mongo/db/pipeline/process_interface:stub_lookup_single_document_process_interface.cpp",
         "//src/mongo/db/pipeline/process_interface:stub_lookup_single_document_process_interface.h",
     ],

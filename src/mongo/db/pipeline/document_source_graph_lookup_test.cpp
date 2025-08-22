@@ -36,6 +36,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -121,7 +122,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
        ShouldErrorWhenDoingInitialMatchIfDocumentInFromCollectionIsMissingId) {
     auto expCtx = getExpCtx();
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
@@ -150,7 +151,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"to", 1}}};
@@ -181,7 +182,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
@@ -221,7 +222,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     Document to0from1{{"_id", "a"_sd}, {"to", 0}, {"from", 1}};
     Document to0from2{{"_id", "a"_sd}, {"to", 0}, {"from", 2}};
@@ -286,11 +287,11 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
 
     auto inputMock =
-        DocumentSourceMock::createForTest({Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
@@ -354,11 +355,11 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     // Set up the $graphLookup stage
     auto inputMock =
-        DocumentSourceMock::createForTest({Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
@@ -433,7 +434,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillVisitedDocuments) {
         "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
 
     auto expCtx = getExpCtx();
-    auto inputMock = DocumentSourceMock::createForTest({Document{{"startPoint", 0}}}, expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
 
     static constexpr long long kPaddingSize = 1024;
     std::string padding(kPaddingSize, 'a');
@@ -494,7 +495,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillSeveralStructures) {
         "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
 
     auto expCtx = getExpCtx();
-    auto inputMock = DocumentSourceMock::createForTest({Document{{"startPoint", 0}}}, expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
 
     static constexpr long long kPaddingSize = 1024;
     std::string padding(kPaddingSize, 'a');
@@ -553,7 +554,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillSeveralStructures) {
 
 TEST_F(DocumentSourceGraphLookUpSpillingTest, CanForceSpill) {
     auto expCtx = getExpCtx();
-    auto inputMock = DocumentSourceMock::createForTest({Document{{"startPoint", 0}}}, expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
 
     static constexpr size_t kResultCount = 100;
     std::deque<DocumentSource::GetNextResult> fromContents;
@@ -677,7 +678,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
     auto expCtx = getExpCtx();
 
     auto inputMock =
-        DocumentSourceMock::createForTest(Document({{"_id", 0}, {"a", 1}, {"b", 2}}), expCtx);
+        exec::agg::MockStage::createForTest(Document({{"_id", 0}, {"a", 1}, {"b", 2}}), expCtx);
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
@@ -722,7 +723,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}, {"startVal", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     /* Make the following graph:
      *   ,> 1 .
@@ -790,7 +791,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
 
     std::deque<DocumentSource::GetNextResult> inputs{
         Document{{"_id", 0}, {"startVal", makeTupleValue(0, 0)}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     // Make the following graph:
     //
@@ -1070,7 +1071,7 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
                                                    << "connections"));
     auto graphLookupStage = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), expCtx);
     auto pipeline =
-        Pipeline::create({DocumentSourceMock::createForTest(expCtx), graphLookupStage}, expCtx);
+        Pipeline::create({DocumentSourceMock::createForTest({}, expCtx), graphLookupStage}, expCtx);
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
     ASSERT_EQ(1ul, involvedNssSet.count(graphLookupNs));

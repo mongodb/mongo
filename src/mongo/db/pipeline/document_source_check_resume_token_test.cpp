@@ -33,8 +33,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/exec/agg/change_stream_ensure_resume_token_present_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -215,14 +217,14 @@ private:
  *
  *   - The concept of GetNextResult::ReturnStatus::kPauseExecution does not exist in CollectionScan;
  *     NEED_TIME is somewhat analogous but cannot be artificially induced. For tests which exercise
- *     kPauseExecution, these events are stored only in the DocumentSourceChangeStreamMock queue
- *     with no corresponding entry in the ChangeStreamOplogCollectionMock queue.
+ *     kPauseExecution, these events are stored only in the ChangeStreamMockStage queue with no
+ *     corresponding entry in the ChangeStreamOplogCollectionMock queue.
  */
-class DocumentSourceChangeStreamMock : public DocumentSourceMock {
+class ChangeStreamMockStage : public exec::agg::MockStage {
 public:
     // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    DocumentSourceChangeStreamMock(const boost::intrusive_ptr<ExpressionContextForTest>& expCtx)
-        : DocumentSourceMock({}, expCtx),
+    ChangeStreamMockStage(const boost::intrusive_ptr<ExpressionContextForTest>& expCtx)
+        : exec::agg::MockStage("$changeStreamMock"_sd, expCtx, {}),
           _collectionPtr(CollectionPtr::CollectionPtr_UNSAFE(&_collection)) {
         _filterExpr = BSON("ns" << kTestNs);
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
@@ -240,7 +242,7 @@ public:
         _params.assertTsHasNotFallenOff = resumeToken.clusterTime;
     }
 
-    void push_back(GetNextResult&& result) {
+    void push_back(exec::agg::GetNextResult&& result) {
         // We should never push an explicit EOF onto the queue.
         invariant(!result.isEOF());
         // If there is a document supplied, add it to the mock collection.
@@ -248,10 +250,10 @@ public:
             _collection.push_back(result.getDocument());
         }
         // Both documents and pauses are stored in the DSMock queue.
-        DocumentSourceMock::push_back(std::move(result));
+        exec::agg::MockStage::push_back(std::move(result));
     }
 
-    void push_back(const GetNextResult& result) {
+    void push_back(const exec::agg::GetNextResult& result) {
         MONGO_UNREACHABLE;
     }
 
@@ -260,7 +262,7 @@ public:
     }
 
 protected:
-    GetNextResult doGetNext() override {
+    exec::agg::GetNextResult doGetNext() override {
         // If this is the first call to doGetNext, we must create the COLLSCAN.
         if (!_collScan) {
             _collScan = std::make_unique<CollectionScan>(
@@ -268,7 +270,7 @@ protected:
         }
         while (true) {
             // If the next result is a pause, return it and don't collscan.
-            auto nextResult = DocumentSourceMock::doGetNext();
+            auto nextResult = MockStage::doGetNext();
             if (nextResult.isPaused()) {
                 return nextResult;
             }
@@ -280,7 +282,7 @@ protected:
                     // The CollectionScan can immediately return EOF, in which case document in the
                     // pipeline should not be returned.
                     while (nextResult.isAdvanced()) {
-                        nextResult = DocumentSourceMock::doGetNext();
+                        nextResult = MockStage::doGetNext();
                     }
                     invariant(nextResult.isEOF());
                     return nextResult;
@@ -295,7 +297,7 @@ protected:
                     while (nextResult.isAdvanced() &&
                            nextResult.getDocument()["ts"].getTimestamp() <
                                _ws.get(id)->doc.value()["ts"].getTimestamp()) {
-                        nextResult = DocumentSourceMock::doGetNext();
+                        nextResult = MockStage::doGetNext();
                     }
                     ASSERT(nextResult.isAdvanced());
                     mutableDoc["_id"] = nextResult.getDocument()["_id"];
@@ -330,7 +332,7 @@ private:
 
 class CheckResumeTokenTest : public AggregationContextFixture {
 public:
-    CheckResumeTokenTest() : _mock(make_intrusive<DocumentSourceChangeStreamMock>(getExpCtx())) {}
+    CheckResumeTokenTest() : _mock(make_intrusive<ChangeStreamMockStage>(getExpCtx())) {}
 
 protected:
     /**
@@ -444,7 +446,7 @@ protected:
         return *uuid_gen;
     }
 
-    intrusive_ptr<DocumentSourceChangeStreamMock> _mock;
+    intrusive_ptr<ChangeStreamMockStage> _mock;
 };
 
 class CheckResumabilityTest : public CheckResumeTokenTest {

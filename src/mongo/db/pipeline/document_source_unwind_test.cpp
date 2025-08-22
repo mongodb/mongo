@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/unwind_stage.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -193,8 +194,8 @@ private:
      * '_unwind' must be initialized before calling this method.
      */
     void assertResultsMatch(BSONObj expectedResults) {
-        auto source = DocumentSourceMock::createForTest(inputData(), ctx());
-        _unwindStage->setSource(source.get());
+        auto stage = exec::agg::MockStage::createForTest(inputData(), ctx());
+        _unwindStage->setSource(stage.get());
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
         for (auto output = _unwindStage->getNext(); output.isAdvanced();
@@ -704,11 +705,11 @@ TEST_F(UnwindStageTest, ShouldPropagatePauses) {
     const boost::optional<std::string> includeArrayIndex = boost::none;
     auto unwind = DocumentSourceUnwind::create(
         getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
-    auto source =
-        DocumentSourceMock::createForTest({Document{{"array", vector<Value>{Value(1), Value(2)}}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"array", vector<Value>{Value(1), Value(2)}}}},
-                                          getExpCtx());
+    auto source = exec::agg::MockStage::createForTest(
+        {Document{{"array", vector<Value>{Value(1), Value(2)}}},
+         DocumentSource::GetNextResult::makePauseExecution(),
+         Document{{"array", vector<Value>{Value(1), Value(2)}}}},
+        getExpCtx());
     auto unwindStage = exec::agg::buildStage(unwind);
 
     unwindStage->setSource(source.get());
@@ -775,13 +776,13 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsSamePathAsArrayPath) {
     const boost::optional<std::string> includeArrayIndex = std::string("array");
     auto unwind = DocumentSourceUnwind::create(
         getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {Document{{"array", vector<Value>{Value(10), Value(20)}}},
          Document{{"array", vector<Value>{Value(30), Value(40)}}}},
         getExpCtx());
     auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwindStage->setSource(source.get());
+    unwindStage->setSource(stage.get());
 
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(0));
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(1));
@@ -794,13 +795,13 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
     const boost::optional<std::string> includeArrayIndex = std::string("obj");
     auto unwind = DocumentSourceUnwind::create(
         getExpCtx(), "obj.array", includeNullIfEmptyOrMissing, includeArrayIndex);
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {Document{{"obj", Document{{"array", vector<Value>{Value(10), Value(20)}}}}},
          Document{{"obj", Document{{"array", vector<Value>{Value(30), Value(40)}}}}}},
         getExpCtx());
     auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwindStage->setSource(source.get());
+    unwindStage->setSource(stage.get());
 
     Document res;
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(0));
@@ -814,13 +815,13 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
     const boost::optional<std::string> includeArrayIndex = std::string("array.index");
     auto unwind = DocumentSourceUnwind::create(
         getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
-    auto source = DocumentSourceMock::createForTest(
+    auto stage = exec::agg::MockStage::createForTest(
         {Document{{"array", vector<Value>{Value(10), Value(20)}}},
          Document{{"array", vector<Value>{Value(30), Value(40)}}}},
         getExpCtx());
     auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwindStage->setSource(source.get());
+    unwindStage->setSource(stage.get());
 
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 0)));
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 1)));
