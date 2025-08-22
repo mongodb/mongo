@@ -29,8 +29,8 @@ py_binary(
 
 format_multirun(
     name = "rules_lint_format",
-    #c = "//:clang_format",
-    #cc = "//:clang_format",
+    c = "//:clang_format",
+    cc = "//:clang_format",
     css = "//:prettier",
     graphql = "//:prettier",
     html = "//:prettier",

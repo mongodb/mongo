@@ -6,17 +6,17 @@
  * ]
  */
 let conn = MongoRunner.runMongod({useLogFiles: true});
-assert.neq(null, conn, "mongod was unable to start up");
+assert.neq(null, conn, 'mongod was unable to start up');
 
 let coll = conn.getCollection("test.foo");
 assert.commandWorked(coll.insert({_id: 1}));
 
 // Do a really slow query beyond the 100ms threshold
 let count = coll.count({
-    $where: function () {
+    $where: function() {
         sleep(1000);
         return true;
-    },
+    }
 });
 assert.eq(count, 1, "expected 1 document");
 
@@ -30,8 +30,7 @@ for (var a of log.split("\n")) {
     print("LOG_FILE_ENTRY: " + a);
 }
 
-assert(
-    predicate.test(log),
-    "'Slow query' log line missing in mongod log file!\n" + "Log file contents: " + conn.fullOptions.logFile,
-);
+assert(predicate.test(log),
+       "'Slow query' log line missing in mongod log file!\n" +
+           "Log file contents: " + conn.fullOptions.logFile);
 MongoRunner.stopMongod(conn);
