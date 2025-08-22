@@ -986,7 +986,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # original preserve_dbpath to restore after restarting the mongod.
         original_preserve_dbpath = chosen.preserve_dbpath
         chosen.preserve_dbpath = True
-        original_flags = chosen.mongod_options
+        original_flags = chosen.mongod_options.copy()
         try:
             for key, value in temporary_flags.items():
                 chosen.mongod_options[key] = value
@@ -994,7 +994,19 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.logger.info(interface.create_fixture_table(self))
             chosen.await_ready()
         finally:
-            chosen.mongod_options = original_flags
+            # If the temporary_flags key does not exist in the mongod_options, then somebody must
+            # had removed it after the startup, so we don't want to reset it.
+            # Otherwise if the value in the mongod_options is the same as in the temporary_flags,
+            # then we want to reset. If the key shows up in the original mongod_options, then use
+            # that value, otherwise just remove.
+            for key, value in temporary_flags.items():
+                if key in chosen.mongod_options:
+                    if chosen.mongod_options[key] == value:
+                        if key in original_flags:
+                            chosen.mongod_options[key] = original_flags[key]
+                        else:
+                            chosen.mongod_options.pop(key)
+
             chosen.preserve_dbpath = original_preserve_dbpath
 
     def get_secondaries(self):
