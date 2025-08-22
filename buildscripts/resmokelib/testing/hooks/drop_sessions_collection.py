@@ -293,7 +293,12 @@ class _DropSessionsCollectionThread(threading.Thread):
     def _recreate_sessions_collection(self, fixture):
         self.logger.info("Starting refresh of the sessions collection.")
         try:
-            with_naive_retry(lambda: self._refresh_sessions_collection(fixture))
+            # We retry also on NamespaceNotFound as this indicates we ran the command on a
+            # secondary. Since the function to retry includes the get_primary, this should find the
+            # new primary before retrying.
+            with_naive_retry(
+                lambda: self._refresh_sessions_collection(fixture), extra_retryable_error_codes=[26]
+            )
         except pymongo.errors.OperationFailure as err:
             if err.code != 64:
                 raise err
