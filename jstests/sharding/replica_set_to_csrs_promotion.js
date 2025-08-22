@@ -419,6 +419,7 @@ describe("operations during rolling restart", function () {
         });
 
         assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        this.rs.awaitSecondaryNodes();
         assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
     });
 
@@ -439,6 +440,7 @@ describe("operations during rolling restart", function () {
         });
 
         assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        this.rs.awaitSecondaryNodes();
         assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
     });
 
@@ -462,6 +464,7 @@ describe("operations during rolling restart", function () {
         );
 
         assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        this.rs.awaitSecondaryNodes();
         assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
     });
 
@@ -487,6 +490,7 @@ describe("operations during rolling restart", function () {
         );
 
         assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
+        this.rs.awaitSecondaryNodes();
         assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
     });
 });
