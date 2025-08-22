@@ -45,7 +45,8 @@ AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
     const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
     Date_t deadline)
     : _stepUpStepDownCoord(stepUpStepDownCoord), _opCtx(opCtx), _stateTransition(stateTransition) {
-    invariant(_stepUpStepDownCoord && _opCtx);
+    invariant(_stepUpStepDownCoord);
+    invariant(_opCtx);
 
     // The state transition should never be rollback within this class.
     invariant(_stateTransition != ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback);

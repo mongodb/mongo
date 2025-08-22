@@ -574,7 +574,8 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
         const auto txnNumber = *opSessionInfo.getTxnNumber();
         const auto wallClockTime = entry.getWallClockTime();
 
-        invariant(!prevWriteOpTime.isNull() && prevWriteOpTime.getTimestamp() <= stableTimestamp);
+        invariant(!prevWriteOpTime.isNull());
+        invariant(prevWriteOpTime.getTimestamp() <= stableTimestamp);
         // This is a retryable writes oplog entry with a non-null 'prevWriteOpTime' value that
         // is less than or equal to the 'stableTimestamp'.
         LOGV2(5530501,

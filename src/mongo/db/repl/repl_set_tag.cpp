@@ -152,14 +152,17 @@ int32_t ReplSetTagConfig::_findKeyIndex(StringData key) const {
 }
 
 std::string ReplSetTagConfig::getTagKey(const ReplSetTag& tag) const {
-    invariant(tag.isValid() && size_t(tag.getKeyIndex()) < _tagData.size());
+    invariant(tag.isValid());
+    invariant(size_t(tag.getKeyIndex()) < _tagData.size());
     return _tagData[tag.getKeyIndex()].first;
 }
 
 std::string ReplSetTagConfig::getTagValue(const ReplSetTag& tag) const {
-    invariant(tag.isValid() && size_t(tag.getKeyIndex()) < _tagData.size());
+    invariant(tag.isValid());
+    invariant(size_t(tag.getKeyIndex()) < _tagData.size());
     const ValueVector& values = _tagData[tag.getKeyIndex()].second;
-    invariant(tag.getValueIndex() >= 0 && size_t(tag.getValueIndex()) < values.size());
+    invariant(tag.getValueIndex() >= 0);
+    invariant(size_t(tag.getValueIndex()) < values.size());
     return values[tag.getValueIndex()];
 }
 

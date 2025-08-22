@@ -48,7 +48,10 @@ bool getReplSetMemberInStandaloneMode(ServiceContext* serviceCtx) {
 void setReplSetMemberInStandaloneMode(ServiceContext* serviceCtx,
                                       bool isReplSetMemberInStandaloneMode) {
     auto& replSetMemberInStandaloneModeBool = replSetMemberInStandaloneMode(serviceCtx);
-    invariant(!replSetMemberInStandaloneModeBool || isReplSetMemberInStandaloneMode);
+    invariant(
+        !replSetMemberInStandaloneModeBool || isReplSetMemberInStandaloneMode,
+        str::stream() << "replSetMemberInStandaloneModeBool: " << replSetMemberInStandaloneModeBool
+                      << ", isReplSetMemberInStandaloneMode: " << isReplSetMemberInStandaloneMode);
     replSetMemberInStandaloneModeBool = isReplSetMemberInStandaloneMode;
 }
 

@@ -631,8 +631,14 @@ PrimaryOnlyService::lookupInstance(OperationContext* opCtx, const InstanceID& id
     // interrupted at stepdown to prevent deadlocks.
     invariant(
         !shard_role_details::getLocker(opCtx)->isLocked() ||
-        opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
-        shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites());
+            opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
+            shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites(),
+        str::stream() << "isLocked: " << shard_role_details::getLocker(opCtx)->isLocked()
+                      << ", interruptibleByStepDownOrUp: "
+                      << opCtx->shouldAlwaysInterruptAtStepDownOrUp()
+                      << ", globalLockConflictingWithWrites: "
+                      << shard_role_details::getLocker(opCtx)
+                             ->wasGlobalLockTakenInModeConflictingWithWrites());
 
     stdx::unique_lock lk(_mutex);
     _waitForStateNotRebuilding(opCtx, lk);
@@ -660,8 +666,14 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
     // interrupted at stepdown to prevent deadlocks.
     invariant(
         !shard_role_details::getLocker(opCtx)->isLocked() ||
-        opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
-        shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites());
+            opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
+            shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites(),
+        str::stream() << "isLocked: " << shard_role_details::getLocker(opCtx)->isLocked()
+                      << ", interruptibleByStepDownOrUp: "
+                      << opCtx->shouldAlwaysInterruptAtStepDownOrUp()
+                      << ", globalLockConflictingWithWrites: "
+                      << shard_role_details::getLocker(opCtx)
+                             ->wasGlobalLockTakenInModeConflictingWithWrites());
 
     std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> instances;
 

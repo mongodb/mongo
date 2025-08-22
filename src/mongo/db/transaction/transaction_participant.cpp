@@ -826,12 +826,19 @@ bool TransactionParticipant::Participant::_shouldRestartTransactionOnReuseActive
 
     // We should only call this function if the request is attempting to reuse the active txnNumber
     // and retryCounter
-    invariant(
-        txnNumberAndRetryCounter.getTxnNumber() ==
-            o().activeTxnNumberAndRetryCounter.getTxnNumber() &&
-        (txnNumberAndRetryCounter.getTxnRetryCounter() ==
-             o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
-         o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() == kUninitializedTxnRetryCounter));
+    invariant(txnNumberAndRetryCounter.getTxnNumber() ==
+                  o().activeTxnNumberAndRetryCounter.getTxnNumber(),
+              str::stream() << "active transaction number: "
+                            << o().activeTxnNumberAndRetryCounter.getTxnNumber()
+                            << ", transaction number: " << txnNumberAndRetryCounter.getTxnNumber());
+    invariant(txnNumberAndRetryCounter.getTxnRetryCounter() ==
+                      o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
+                  o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ==
+                      kUninitializedTxnRetryCounter,
+              str::stream() << "active transaction retry counter: "
+                            << o().activeTxnNumberAndRetryCounter.getTxnRetryCounter()
+                            << ", transaction retry counter: "
+                            << txnNumberAndRetryCounter.getTxnRetryCounter());
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         // Servers in a sharded cluster can start a new transaction at the active transaction
@@ -1390,7 +1397,9 @@ TransactionParticipant::TxnResources::TxnResources(ClientLock& clientLock,
 
     // On secondaries, max lock timeout must not be set.
     invariant(!(stashStyle == StashStyle::kSecondary &&
-                shard_role_details::getLocker(opCtx)->hasMaxLockTimeout()));
+                shard_role_details::getLocker(opCtx)->hasMaxLockTimeout()),
+              str::stream() << "hasMaxLockTimeout: "
+                            << shard_role_details::getLocker(opCtx)->hasMaxLockTimeout());
 
     _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(opCtx, clientLock);
     // The recovery unit is detached from the OperationContext, but keep the OperationContext in the
@@ -1556,7 +1565,10 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
 
     invariant(!o().txnResourceStash);
     // If this is a prepared transaction, invariant that it does not hold the RSTL lock.
-    invariant(!o().txnState.isPrepared() || !shard_role_details::getLocker(opCtx)->isRSTLLocked());
+    invariant(!o().txnState.isPrepared() || !shard_role_details::getLocker(opCtx)->isRSTLLocked(),
+              str::stream() << "transaction is prepared: " << o().txnState.isPrepared()
+                            << ", isRSTLLocked: "
+                            << shard_role_details::getLocker(opCtx)->isRSTLLocked());
     auto stashStyle = opCtx->writesAreReplicated() ? TxnResources::StashStyle::kPrimary
                                                    : TxnResources::StashStyle::kSecondary;
     o(lk).txnResourceStash = TxnResources(lk, opCtx, stashStyle);
@@ -1754,7 +1766,10 @@ void TransactionParticipant::Participant::unstashTransactionResources(
 
     // On secondaries, max lock timeout must not be set.
     invariant(opCtx->writesAreReplicated() ||
-              !shard_role_details::getLocker(opCtx)->hasMaxLockTimeout());
+                  !shard_role_details::getLocker(opCtx)->hasMaxLockTimeout(),
+              str::stream() << "writes are replicated: " << opCtx->writesAreReplicated()
+                            << ", hasMaxLockTimeout: "
+                            << shard_role_details::getLocker(opCtx)->hasMaxLockTimeout());
 
     // Storage engine transactions may be started in a lazy manner. By explicitly
     // starting here we ensure that a point-in-time snapshot is established during the
@@ -2004,8 +2019,9 @@ void TransactionParticipant::Participant::addTransactionOperation(
     }
     invariant(o().txnState.isInProgress(), str::stream() << "Current state: " << o().txnState);
 
-    invariant(p().autoCommit && !*p().autoCommit &&
-              o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
+    invariant(p().autoCommit);
+    invariant(!*p().autoCommit);
+    invariant(o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     auto transactionSizeLimitBytes = static_cast<std::size_t>(gTransactionSizeLimitBytes.load());
@@ -2250,7 +2266,10 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
                                                                     bool isSplitPreparedTxn) {
     invariant(shard_role_details::getWriteUnitOfWork(opCtx));
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn ||
-              gFeatureFlagIntentRegistration.isEnabled());
+                  gFeatureFlagIntentRegistration.isEnabled(),
+              str::stream() << "isRSTLLocked: "
+                            << shard_role_details::getLocker(opCtx)->isRSTLLocked()
+                            << ", is split prepared transaction: " << isSplitPreparedTxn);
     try {
         shard_role_details::getWriteUnitOfWork(opCtx)->commit();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
@@ -2406,7 +2425,9 @@ void TransactionParticipant::Participant::setLastWriteOpTime(OperationContext* o
                                                              const repl::OpTime& lastWriteOpTime) {
     stdx::lock_guard<Client> lg(*opCtx->getClient());
     auto& curLastWriteOpTime = o(lg).lastWriteOpTime;
-    invariant(lastWriteOpTime.isNull() || lastWriteOpTime > curLastWriteOpTime);
+    invariant(lastWriteOpTime.isNull() || lastWriteOpTime > curLastWriteOpTime,
+              str::stream() << "current lastWrite opTime: " << curLastWriteOpTime.toString()
+                            << ", setting lastWrite opTime to: " << lastWriteOpTime.toString());
     curLastWriteOpTime = lastWriteOpTime;
 }
 
@@ -2692,8 +2713,14 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
         // 2. We have failed trying to get the initial global lock, in which case we will have
         //    a WriteUnitOfWork but not have allocated the storage transaction.
         invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn ||
-                  !shard_role_details::getRecoveryUnit(opCtx)->isActive() ||
-                  gFeatureFlagIntentRegistration.isEnabled());
+                      !shard_role_details::getRecoveryUnit(opCtx)->isActive() ||
+                      gFeatureFlagIntentRegistration.isEnabled(),
+                  str::stream() << "isRSTLLocked: "
+                                << shard_role_details::getLocker(opCtx)->isRSTLLocked()
+                                << ", is split prepared transaction: " << isSplitPreparedTxn
+                                << ", recovery unit state: "
+                                << RecoveryUnit::toString(
+                                       shard_role_details::getRecoveryUnit(opCtx)->getState()));
         shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
     }
 
@@ -3454,7 +3481,8 @@ void TransactionParticipant::Participant::_resetRetryableWriteState(WithLock wl)
 
 void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     stdx::unique_lock<Client>* lk, OperationContext* opCtx, TransactionState::StateFlag state) {
-    invariant(lk && lk->owns_lock());
+    invariant(lk);
+    invariant(lk->owns_lock());
 
     // If we are transitioning to kNone, we are either starting a new transaction or aborting a
     // prepared transaction for rollback. In the latter case, we will need to relax the

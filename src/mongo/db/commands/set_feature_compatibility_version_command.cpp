@@ -725,7 +725,8 @@ public:
                     !failAfterReachingTransitioningState.shouldFail());
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
-                invariant(role && role->has(ClusterRole::ShardServer));
+                invariant(role);
+                invariant(role->has(ClusterRole::ShardServer));
 
                 // This helper function is only for any actions that should be done specifically on
                 // shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
@@ -786,7 +787,8 @@ public:
             }
 
             if (request.getPhase() == SetFCVPhaseEnum::kPrepare) {
-                invariant(role && role->has(ClusterRole::ShardServer));
+                invariant(role);
+                invariant(role->has(ClusterRole::ShardServer));
                 // If we are only running the 'prepare' phase, then we are done
                 return true;
             }
@@ -1664,33 +1666,6 @@ private:
                     changeTimestamp);
         }
         return changeTimestamp;
-    }
-
-    void _assertNoCollectionsHaveChangeStreamsPrePostImages(OperationContext* opCtx) {
-        auto role = ShardingState::get(opCtx)->pollClusterRole();
-        invariant(role && role->has(ClusterRole::ConfigServer));
-
-        // Config servers only started allowing collections with changeStreamPreAndPostImages
-        // in 7.0, so don't allow downgrading with such a collection.
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-            catalog::forEachCollectionFromDb(
-                opCtx,
-                dbName,
-                MODE_S,
-                [&](const Collection* collection) {
-                    uassert(ErrorCodes::CannotDowngrade,
-                            str::stream() << "Cannot downgrade the config server as collection "
-                                          << collection->ns().toStringForErrorMsg()
-                                          << " has 'changeStreamPreAndPostImages' enabled. Please "
-                                             "unset the option or drop the collection.",
-                            !collection->isChangeStreamPreAndPostImagesEnabled());
-                    return true;
-                },
-                [&](const Collection* collection) {
-                    return collection->isChangeStreamPreAndPostImagesEnabled();
-                });
-        }
     }
 
     /**
