@@ -130,6 +130,13 @@ struct AcquisitionPrerequisites {
     OperationType operationType;
     ViewMode viewMode;
     Date_t lockAcquisitionDeadline;
+
+    // When true, present a catalog consistent with the read timestamp. When false, relax this by
+    // presenting always the latest catalog unconditionally.
+    // IMPORTANT: False has weaker consistency guarantees and must only be only used by
+    // IndexBuildsCoordinator.
+    // TODO SERVER-109542: Remove this.
+    bool useConsistentCatalog = true;
 };
 
 namespace shard_role_details {

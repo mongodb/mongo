@@ -100,23 +100,29 @@ void MultiIndexBlockTest::tearDown() {
 TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(getNSS(),
+                                     PlacementConcern::kPretendUnsharded,
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    CollectionWriter collWriter(operationContext(), &coll);
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
-                                                   coll,
+                                                   collWriter,
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState));
     ASSERT_EQUALS(0U, specs.size());
 
-    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
-    ASSERT_OK(indexer->checkConstraints(operationContext(), coll.get()));
+    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
+    ASSERT_OK(indexer->checkConstraints(operationContext(), coll.getCollectionPtr()));
 
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(indexer->commit(operationContext(),
-                                  coll.getWritableCollection(operationContext()),
+                                  collWriter.getWritableCollection(operationContext()),
                                   MultiIndexBlock::kNoopOnCreateEachFn,
                                   MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
@@ -126,11 +132,17 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
 TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(getNSS(),
+                                     PlacementConcern::kPretendUnsharded,
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    CollectionWriter collWriter(operationContext(), &coll);
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
-                                                   coll,
+                                                   collWriter,
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync));
@@ -138,25 +150,25 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
         operationContext(),
-        coll.get(),
+        coll.getCollectionPtr(),
         {},
         {},
         /*saveCursorBeforeWrite*/ []() {},
         /*restoreCursorAfterWrite*/ []() {}));
-    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
-    ASSERT_OK(indexer->checkConstraints(operationContext(), coll.get()));
+    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
+    ASSERT_OK(indexer->checkConstraints(operationContext(), coll.getCollectionPtr()));
 
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(indexer->commit(operationContext(),
-                                  coll.getWritableCollection(operationContext()),
+                                  collWriter.getWritableCollection(operationContext()),
                                   MultiIndexBlock::kNoopOnCreateEachFn,
                                   MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
     }
 
     // abort() should have no effect after the index build is committed.
-    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+    indexer->abortIndexBuild(operationContext(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
@@ -350,7 +362,7 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
         wuow.commit();
     }
 
-    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), coll.get()));
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
     ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
                                              RecoveryUnit::ReadSource::kNoTimestamp,
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));

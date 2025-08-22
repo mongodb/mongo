@@ -245,7 +245,7 @@ function waitForLock(nss, resource, expectedLockMode) {
         primary,
         kTenant,
         kOtherTenant,
-        "hangAfterIndexBuildDumpsInsertsFromBulkLock",
+        "hangAfterStartingIndexBuild",
         "Database",
         createIndexThreadFunc,
         "IX",

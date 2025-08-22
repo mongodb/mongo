@@ -113,6 +113,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
 
 namespace {
 
@@ -503,10 +505,17 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
 Status MultiIndexBlock::insertAllDocumentsInCollection(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const NamespaceStringOrUUID& nssOrUUID,
     const boost::optional<RecordId>& resumeAfterRecordId) {
-    invariant(!_buildIsCleanedUp);
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    // TODO SERVER-109542: Use regular ShardRole acquisitions for read.
+    boost::optional<CollectionAcquisition> collection = acquireLocalCollectionNoConsistentCatalog(
+        opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
+    tassert(7683100, "Expected collection to exist", collection->exists());
+
+    // This is stable under the collection lock. If the index build had been aborted, this opCtx
+    // would have been interrupted.
+    invariant(!_buildIsCleanedUp);
 
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
@@ -524,7 +533,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
 
     const char* curopMessage = "Index Build: scanning collection";
-    const auto numRecords = collection->numRecords(opCtx);
+    const auto numRecords = collection->getCollectionPtr()->numRecords(opCtx);
     ProgressMeterHolder progress;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
@@ -532,12 +541,15 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     }
 
     hangAfterSettingUpIndexBuild.executeIf(
-        [buildUUID = _buildUUID](const BSONObj& data) {
+        [buildUUID = _buildUUID, opCtx = opCtx](const BSONObj& data) {
             // Hang the build after the curOP info is set up.
             LOGV2(20387,
                   "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'",
                   "buildUUID"_attr = buildUUID);
+            auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
             hangAfterSettingUpIndexBuild.pauseWhileSet();
+            restoreTransactionResourcesToOperationContext(opCtx,
+                                                          std::move(yieldedTransactionResources));
         },
         [buildUUID = _buildUUID](const BSONObj& data) {
             if (!buildUUID || !data.hasField("buildUUIDs")) {
@@ -555,23 +567,20 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         uassert(4585200, "failpoint may not be set on foreground indexes", isBackgroundBuilding());
 
         // Unlock before hanging so replication recognizes we've completed.
-        collection.yield();
-        Locker::LockSnapshot lockInfo;
-        shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockInfo);
+        auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
 
         LOGV2(4585201,
-              "Hanging index build with no locks due to "
-              "'hangAfterSettingUpIndexBuildUnlocked' failpoint");
+              "Hanging index build with no locks due to 'hangAfterSettingUpIndexBuildUnlocked' "
+              "failpoint");
         hangAfterSettingUpIndexBuildUnlocked.pauseWhileSet();
 
-        shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, lockInfo);
-        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-        collection.restore();
+        restoreTransactionResourcesToOperationContext(opCtx,
+                                                      std::move(yieldedTransactionResources));
     }
 
     // If the collection is empty we can skip the collection scan and committing the bulk loader.
     // Note that this cannot use numRecords, as that's a fastcount and may be wrong.
-    if (collection->isEmpty(opCtx)) {
+    if (collection->getCollectionPtr()->isEmpty(opCtx)) {
         _phase = IndexBuildPhaseEnum::kBulkLoad;
         return Status::OK();
     }
@@ -585,6 +594,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     Timer timer;
 
     auto restart = [&](const DBException& ex) {
+        // Discard the previous CollectionAcquisition.
+        collection.reset();
+
         // Forced replica set re-configs will clear the majority committed snapshot, which may be
         // used by the collection scan. The collection scan will restart from the beginning in this
         // case. Capped cursors are invalidated when the document they were positioned on gets
@@ -605,23 +617,36 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                           shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                       "error"_attr = ex);
 
+        collection = acquireLocalCollectionNoConsistentCatalog(
+            opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
+        tassert(7683101, "Expected collection to exist", collection->exists());
+
+        // UUIDs are not guaranteed during startup because the check happens after indexes are
+        // rebuilt.
+        if (_collectionUUID) {
+            tassert(7683102,
+                    "Collection uuid does not match the expected",
+                    _collectionUUID.value() == collection->uuid());
+        }
+
         _lastRecordIdInserted = boost::none;
         for (auto& index : _indexes) {
-            auto indexCatalogEntry = index.block->getEntry(opCtx, collection);
+            auto indexCatalogEntry = index.block->getEntry(opCtx, collection->getCollectionPtr());
             index.bulk = index.real->initiateBulk(
                 indexCatalogEntry,
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
-                collection->ns().dbName(),
+                collection->nss().dbName(),
                 _method);
         }
     };
 
     do {
+        tassert(7683103, "Expected CollectionAcquisition to be initialized", collection);
         restartCollectionScan = false;
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
-            progress.get(lk)->reset(collection->numRecords(opCtx));
+            progress.get(lk)->reset(collection->getCollectionPtr()->numRecords(opCtx));
         }
         timer.reset();
 
@@ -629,7 +654,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
             // Resumable index builds can only be resumed prior to the oplog recovery phase of
             // startup. When restarting the collection scan, any saved index build progress is lost.
             _doCollectionScan(opCtx,
-                              collection,
+                              *collection,
                               numScanRestarts == 0 ? resumeAfterRecordId : boost::none,
                               &progress);
 
@@ -637,7 +662,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                   "Index build: collection scan done",
                   "buildUUID"_attr = _buildUUID,
                   "collectionUUID"_attr = _collectionUUID,
-                  logAttrs(collection->ns()),
+                  logAttrs(collection->nss()),
                   "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
                   "readSource"_attr = RecoveryUnit::toString(
                       shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
@@ -671,24 +696,21 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
     if (MONGO_unlikely(hangAfterStartingIndexBuildUnlocked.shouldFail())) {
         // Unlock before hanging so replication recognizes we've completed.
-        collection.yield();
-        Locker::LockSnapshot lockInfo;
-        shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockInfo);
+        auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
 
         LOGV2(20390,
-              "Hanging index build with no locks due to "
-              "'hangAfterStartingIndexBuildUnlocked' failpoint");
+              "Hanging index build with no locks due to 'hangAfterStartingIndexBuildUnlocked' "
+              "failpoint");
         hangAfterStartingIndexBuildUnlocked.pauseWhileSet();
 
         if (isBackgroundBuilding()) {
-            shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, lockInfo);
-            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+            restoreTransactionResourcesToOperationContext(opCtx,
+                                                          std::move(yieldedTransactionResources));
         } else {
             invariant(false,
                       "the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for "
                       "foreground index builds");
         }
-        collection.restore();
     }
 
     {
@@ -696,7 +718,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         progress.get(lk)->finished();
     }
 
-    Status ret = dumpInsertsFromBulk(opCtx, collection);
+    tassert(7683104, "Expected CollectionAcquisition to be initialized", collection);
+    Status ret = dumpInsertsFromBulk(opCtx, *collection);
     if (!ret.isOK())
         return ret;
 
@@ -704,7 +727,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 }
 
 void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
+                                        const CollectionAcquisition& collection,
                                         const boost::optional<RecordId>& resumeAfterRecordId,
                                         ProgressMeterHolder* progress) {
     PlanYieldPolicy::YieldPolicy yieldPolicy;
@@ -738,7 +761,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         exec->saveState();
     };
     std::function<void()> restoreCursorAfterWrite = [&] {
-        exec->restoreState(&collection);
+        exec->restoreState(nullptr);
     };
     // Callback to handle writing to the side table in case an error is suppressed, it is
     // constructed using the above callbacks to ensure the cursor is well positioned after the
@@ -758,7 +781,8 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
 
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
-            progress->get(lk)->setTotalWhileRunning(collection->numRecords(opCtx));
+            progress->get(lk)->setTotalWhileRunning(
+                collection.getCollectionPtr()->numRecords(opCtx));
         }
 
         uassertStatusOK(
@@ -776,8 +800,12 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         // If kRelaxConstraints, shouldRelaxConstraints will simply be ignored and all errors
         // suppressed. If kRelaxContraintsCallback, shouldRelaxConstraints is used to determine
         // whether the error is suppressed or an exception is thrown.
-        uassertStatusOK(
-            _insert(opCtx, collection, objToIndex, loc, onSuppressedError, shouldRelaxConstraints));
+        uassertStatusOK(_insert(opCtx,
+                                collection.getCollectionPtr(),
+                                objToIndex,
+                                loc,
+                                onSuppressedError,
+                                shouldRelaxConstraints));
 
         _failPointHangDuringBuild(opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -881,13 +909,13 @@ Status MultiIndexBlock::_insert(
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
-                                            const CollectionPtr& collection) {
+                                            const CollectionAcquisition& collection) {
     return dumpInsertsFromBulk(opCtx, collection, nullptr);
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionAcquisition& collection,
     const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
     opCtx->checkForInterrupt();
     invariant(!_buildIsCleanedUp);
@@ -913,9 +941,13 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         // When onDuplicateRecord is passed, 'dupsAllowed' should be passed to reflect whether or
         // not the index is unique.
         bool dupsAllowed = (onDuplicateRecord)
-            ? !_indexes[i].block->getEntry(opCtx, collection)->descriptor()->unique()
+            ? !_indexes[i]
+                   .block->getEntry(opCtx, collection.getCollectionPtr())
+                   ->descriptor()
+                   ->unique()
             : _indexes[i].options.dupsAllowed;
-        const IndexCatalogEntry* entry = _indexes[i].block->getEntry(opCtx, collection);
+        const IndexCatalogEntry* entry =
+            _indexes[i].block->getEntry(opCtx, collection.getCollectionPtr());
         LOGV2_DEBUG(20392,
                     1,
                     "Index build: inserting from external sorter into index",
@@ -925,11 +957,60 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         // SERVER-41918 This call to bulk->commit() results in file I/O that may result in an
         // exception.
         try {
-            const IndexCatalogEntry* entry = _indexes[i].block->getEntry(opCtx, collection);
+            const IndexCatalogEntry* entry =
+                _indexes[i].block->getEntry(opCtx, collection.getCollectionPtr());
+
+            /**
+             * Abandon the current snapshot and release then reacquire locks. Tests that target the
+             * behavior of bulk index builds that yield can use failpoints to stall this yield.
+             */
+            const auto yieldFn = [&collection,
+                                  indexIdent = entry->getIdent()](OperationContext* opCtx)
+                -> std::pair<const CollectionPtr*, const IndexCatalogEntry*> {
+                // Releasing locks means a new snapshot should be acquired when restored.
+                auto yieldedTransactionResources =
+                    yieldTransactionResourcesFromOperationContext(opCtx);
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+                // Track the number of yields in CurOp.
+                CurOp::get(opCtx)->yielded();
+
+                auto failPointHang = [opCtx, ns = collection.nss()](FailPoint* fp) {
+                    fp->executeIf(
+                        [fp](auto&&) {
+                            LOGV2(5180600, "Hanging index build during bulk load yield");
+                            fp->pauseWhileSet();
+                        },
+                        [opCtx, &ns](auto&& config) {
+                            return NamespaceStringUtil::parseFailPointData(config, "namespace") ==
+                                ns;
+                        });
+                };
+                failPointHang(&hangDuringIndexBuildBulkLoadYield);
+                failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
+
+                restoreTransactionResourcesToOperationContext(
+                    opCtx, std::move(yieldedTransactionResources));
+
+                // After yielding, the latest instance of the collection is fetched and can be
+                // different from the collection instance prior to yielding. For this reason we need
+                // to refresh the index entry pointer.
+                if (!collection.exists()) {
+                    return {&collection.getCollectionPtr(), nullptr};
+                }
+
+                return {&collection.getCollectionPtr(),
+                        collection.getCollectionPtr()
+                            ->getIndexCatalog()
+                            ->findIndexByIdent(
+                                opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)
+                            ->getEntry()};
+            };
+
             Status status = _indexes[i].bulk->commit(
                 opCtx,
                 *shard_role_details::getRecoveryUnit(opCtx),
-                collection,
+                &collection.getCollectionPtr(),
                 entry,
                 dupsAllowed,
                 kYieldIterations,
@@ -951,7 +1032,8 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                             return status;
                         });
                 },
-                onDuplicateRecord);
+                onDuplicateRecord,
+                yieldFn);
 
             if (!status.isOK()) {
                 return status;

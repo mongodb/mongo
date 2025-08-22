@@ -95,6 +95,8 @@ public:
                                                      const boost::optional<RecordId>& loc)>;
     using KeyHandlerFn = unique_function<Status(const key_string::View&)>;
     using RecordIdHandlerFn = unique_function<Status(const RecordId&)>;
+    using YieldFn = unique_function<std::pair<const CollectionPtr*, const IndexCatalogEntry*>(
+        OperationContext*)>;
 
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
@@ -264,15 +266,18 @@ public:
          * index.
          * @param onDuplicateRecord - If not nullptr, will be called for each RecordId of uninserted
          * duplicate keys.
+         * @param yieldFn - A function to invoke to request a yield and then restore. It returns the
+         * new CollectionPtr* and IndexCatalogEntry* entry that shall be used from this point on.
          */
         virtual Status commit(OperationContext* opCtx,
                               RecoveryUnit& ru,
-                              const CollectionPtr& collection,
+                              const CollectionPtr* collection,
                               const IndexCatalogEntry* entry,
                               bool dupsAllowed,
                               int32_t yieldIterations,
                               const KeyHandlerFn& onDuplicateKeyInserted,
-                              const RecordIdHandlerFn& onDuplicateRecord) = 0;
+                              const RecordIdHandlerFn& onDuplicateRecord,
+                              const YieldFn& yieldFn) = 0;
 
         virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 
@@ -288,15 +293,6 @@ public:
         static void countResumedBuildInStats();
         static SorterFileStats* bulkBuilderFileStats();
         static SorterTracker* bulkBuilderTracker();
-
-        /**
-         * Abandon the current snapshot and release then reacquire locks. Tests that target the
-         * behavior of bulk index builds that yield can use failpoints to stall this yield.
-         */
-        [[nodiscard]] static const IndexCatalogEntry* yield(OperationContext* opCtx,
-                                                            const CollectionPtr& collection,
-                                                            const NamespaceString& ns,
-                                                            const IndexCatalogEntry* entry);
     };
 
     /**

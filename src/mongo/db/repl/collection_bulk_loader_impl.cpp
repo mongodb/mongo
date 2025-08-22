@@ -251,8 +251,7 @@ Status CollectionBulkLoaderImpl::commit() {
         // Commit before deleting dups, so the dups will be removed from secondary indexes when
         // deleted.
         if (_secondaryIndexesBlock) {
-            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(
-                _opCtx.get(), _acquisition.getCollectionPtr());
+            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(_opCtx.get(), _acquisition);
             if (!status.isOK()) {
                 return status;
             }
@@ -285,7 +284,7 @@ Status CollectionBulkLoaderImpl::commit() {
         if (_idIndexBlock) {
             // Do not do inside a WriteUnitOfWork (required by dumpInsertsFromBulk).
             auto status = _idIndexBlock->dumpInsertsFromBulk(
-                _opCtx.get(), _acquisition.getCollectionPtr(), [&](const RecordId& rid) {
+                _opCtx.get(), _acquisition, [&](const RecordId& rid) {
                     writeConflictRetry(
                         _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss, [this, &rid] {
                             WriteUnitOfWork wunit(_opCtx.get());
