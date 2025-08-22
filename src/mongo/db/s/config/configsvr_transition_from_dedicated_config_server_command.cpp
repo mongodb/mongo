@@ -143,14 +143,6 @@ public:
             invariant(ddlLock);
             invariant(fcvRegion);
 
-            auto shardIdentityDoc = ShardingInitializationMongoD::getShardIdentityDoc(opCtx);
-            invariant(shardIdentityDoc);
-            if (shardIdentityDoc->getDeferShardingInitialization().value_or(false)) {
-                shardIdentityDoc->setDeferShardingInitialization(boost::none);
-                topology_change_helpers::updateShardIdentity(opCtx, *shardIdentityDoc);
-                ShardingState::get(opCtx)->awaitClusterRoleRecovery().get();
-            }
-
             const auto [configConnString, shardName] =
                 ShardingCatalogManager::get(opCtx)->getConfigShardParameters(opCtx);
 

@@ -34,8 +34,10 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/add_shard_gen.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/db/user_write_block/user_writes_critical_section_document_gen.h"
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
@@ -193,37 +195,23 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     throw;
                 }
             }))
-        .then(_buildPhaseHandler(
-            Phase::kPrepareNewShard,
-            [this, _ = shared_from_this()](auto* opCtx) {
-                auto& targeter = _getTargeter(opCtx);
+        .then(_buildPhaseHandler(Phase::kPrepareNewShard,
+                                 [this, _ = shared_from_this()](auto* opCtx) {
+                                     auto& targeter = _getTargeter(opCtx);
 
-                _dropSessionsCollection(opCtx);
+                                     _dropSessionsCollection(opCtx);
 
-                if (_doc.getIsConfigShard()) {
-                    return;
-                }
+                                     _installShardIdentity(opCtx, _executorWithoutGossip);
 
-                topology_change_helpers::getClusterTimeKeysFromReplicaSet(
-                    opCtx, targeter, _executorWithoutGossip);
+                                     if (_doc.getIsConfigShard()) {
+                                         return;
+                                     }
 
-                boost::optional<APIParameters> apiParameters;
-                if (const auto params = _doc.getApiParams(); params.has_value()) {
-                    apiParameters = APIParameters::fromBSON(params.value());
-                }
+                                     topology_change_helpers::getClusterTimeKeysFromReplicaSet(
+                                         opCtx, targeter, _executorWithoutGossip);
 
-                const auto shardIdentity = topology_change_helpers::createShardIdentity(
-                    opCtx, std::string{*_doc.getChosenName()});
-
-                topology_change_helpers::installShardIdentity(opCtx,
-                                                              shardIdentity,
-                                                              targeter,
-                                                              apiParameters,
-                                                              _osiGenerator(),
-                                                              _executorWithoutGossip);
-
-                _standardizeClusterParameters(opCtx);
-            }))
+                                     _standardizeClusterParameters(opCtx);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, _ = shared_from_this(), executor](auto* opCtx) {
@@ -326,6 +314,36 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
             return status;
         });
+}
+
+void AddShardCoordinator::_installShardIdentity(OperationContext* opCtx,
+                                                std::shared_ptr<executor::TaskExecutor> executor) {
+    auto& targeter = _getTargeter(opCtx);
+    if (_doc.getIsConfigShard()) {
+        // During a promotion to sharded, the config server will have a shard identity but with the
+        // `deferShardingIntiialization` flag set. If this is the case, we remove it here to trigger
+        // sharding initialization.
+        auto shardIdentityDoc = ShardingInitializationMongoD::getShardIdentityDoc(opCtx);
+        tassert(10964201, "Config server is missing shard identity document", shardIdentityDoc);
+        if (shardIdentityDoc->getDeferShardingInitialization().value_or(false)) {
+            shardIdentityDoc->setDeferShardingInitialization(boost::none);
+            topology_change_helpers::updateShardIdentity(opCtx, *shardIdentityDoc);
+            ShardingState::get(opCtx)->awaitClusterRoleRecovery().get();
+        }
+    } else {
+        // On shard servers, we write a new shard identity which will also trigger sharding
+        // initialization on the new shard.
+        boost::optional<APIParameters> apiParameters;
+        if (const auto params = _doc.getApiParams(); params.has_value()) {
+            apiParameters = APIParameters::fromBSON(params.value());
+        }
+
+        const auto shardIdentity =
+            topology_change_helpers::createShardIdentity(opCtx, std::string{*_doc.getChosenName()});
+
+        topology_change_helpers::installShardIdentity(
+            opCtx, shardIdentity, targeter, apiParameters, _osiGenerator(), _executorWithoutGossip);
+    }
 }
 
 void AddShardCoordinator::_dropBlockFCVChangesCollection(

@@ -714,12 +714,7 @@ std::pair<ConnectionString, std::string> ShardingCatalogManager::getConfigShardP
 
     auto configConnString = repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString();
 
-    auto shardingState = ShardingState::get(opCtx);
-    uassert(7368500, "sharding state not enabled", shardingState->enabled());
-
-    std::string shardName = shardingState->shardId().toString();
-
-    return std::make_pair(configConnString, shardName);
+    return std::make_pair(configConnString, ShardId::kConfigServerId.toString());
 }
 
 void ShardingCatalogManager::addConfigShard(OperationContext* opCtx,

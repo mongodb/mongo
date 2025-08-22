@@ -115,6 +115,9 @@ private:
 
     void _dropSessionsCollection(OperationContext* opCtx);
 
+    void _installShardIdentity(OperationContext* opCtx,
+                               std::shared_ptr<executor::TaskExecutor> executor);
+
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;
 
