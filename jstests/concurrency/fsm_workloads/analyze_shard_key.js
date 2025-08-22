@@ -1085,7 +1085,7 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
             } else {
                 assert.eq(this.analyzeShardKeyNumMostCommonValues, res.analyzeShardKeyNumMostCommonValues);
             }
-            if (this.analyzeShardKeyNumRanges === undefined) {
+            if (this.analyzeShardKeyNumRanges === undefined || TestData.fuzzMongodConfigs) {
                 this.analyzeShardKeyNumRanges = res.analyzeShardKeyNumRanges;
             } else {
                 assert.eq(this.analyzeShardKeyNumRanges, res.analyzeShardKeyNumRanges);
