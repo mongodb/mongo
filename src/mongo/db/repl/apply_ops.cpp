@@ -147,11 +147,22 @@ Status _applyOps(OperationContext* opCtx,
                                 return Status::OK();
                             }
                             invariant(shard_role_details::getLocker(opCtx)->isW());
+                            if (entry.getCommandType() == OplogEntry::CommandType::kCreate) {
+                                // Allow apply ops for a create oplog entry to create the collection
+                                // locally. This will bypass sharding, but we expect that users
+                                // running applyOps know what they are doing and will handle this.
+                                const auto& ns = OplogApplication::extractNsFromCmd(
+                                    entry.getNss().dbName(), entry.getObject());
+                                OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                                    allowCreate(opCtx, ns);
+                                uassertStatusOK(applyCommand_inlock(
+                                    opCtx, ApplierOperation{&entry}, oplogApplicationMode));
+                                return Status::OK();
+                            }
                             uassertStatusOK(applyCommand_inlock(
                                 opCtx, ApplierOperation{&entry}, oplogApplicationMode));
                             return Status::OK();
                         }
-
                         case OpTypeEnum::kInsert:
                         case OpTypeEnum::kUpdate:
                         case OpTypeEnum::kDelete: {

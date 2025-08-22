@@ -154,12 +154,11 @@ protected:
         return DatabaseType(_dbName, kMyShardName, DatabaseVersion(uuid, timestamp));
     }
 
-    NamespaceString createTestCollection(StringData coll, bool sharded) {
+    NamespaceString createTestCollectionWithMetadata(StringData coll, bool sharded) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(_dbName, coll);
         auto opCtx = operationContext();
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
-        uassertStatusOK(createCollection(opCtx, _dbName, BSON("create" << coll)));
+
+        createTestCollection(opCtx, nss);
 
         if (sharded) {
             installShardedCollectionMetadata(opCtx, nss, kMyShardName);
@@ -176,12 +175,10 @@ protected:
         auto nss = NamespaceString::createNamespaceString_forTest(_dbName, coll);
         auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
         auto opCtx = operationContext();
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
 
         auto timeseriesOptions = BSON("timeField" << "timestamp");
-        uassertStatusOK(createCollection(
-            opCtx, _dbName, BSON("create" << coll << "timeseries" << timeseriesOptions)));
+        createTestCollection(
+            opCtx, nss, BSON("create" << coll << "timeseries" << timeseriesOptions));
 
         if (sharded) {
             installShardedCollectionMetadata(
@@ -193,18 +190,15 @@ protected:
         return nss;
     }
 
-    std::pair<NamespaceString, std::vector<BSONObj>> createTestView(StringData viewName,
-                                                                    StringData collName) {
+    std::pair<NamespaceString, std::vector<BSONObj>> createTestViewWithMetadata(
+        StringData viewName, StringData collName) {
         NamespaceString viewNss = NamespaceString::createNamespaceString_forTest(_dbName, viewName);
-
+        NamespaceString collNss = NamespaceString::createNamespaceString_forTest(_dbName, collName);
         auto opCtx = operationContext();
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
+
         auto match = BSON("$match" << BSON("a" << 1));
-        uassertStatusOK(createCollection(
-            opCtx,
-            _dbName,
-            BSON("create" << viewName << "viewOn" << collName << "pipeline" << BSON_ARRAY(match))));
+        createTestView(opCtx, viewNss, collNss, {match});
+
         installUnshardedCollectionMetadata(opCtx, viewNss);
         std::vector<BSONObj> expectedResolvedPipeline = {match};
         return std::make_pair(viewNss, expectedResolvedPipeline);
@@ -336,7 +330,7 @@ void AggregationExecutionStateTest::setUp() {
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
     StringData coll{"coll"};
-    auto nss = createTestCollection(coll, false /*sharded*/);
+    auto nss = createTestCollectionWithMetadata(coll, false /*sharded*/);
     std::unique_ptr<AggExState> aggExState = createDefaultAggExState(coll);
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
@@ -366,8 +360,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryC
     StringData main{"main"};
     StringData secondaryColl{"secondaryColl"};
 
-    auto mainNss = createTestCollection(main, false /*sharded*/);
-    auto secondaryNssColl = createTestCollection(secondaryColl, false /*sharded*/);
+    auto mainNss = createTestCollectionWithMetadata(main, false /*sharded*/);
+    auto secondaryNssColl = createTestCollectionWithMetadata(secondaryColl, false /*sharded*/);
 
     std::unique_ptr<AggExState> aggExState =
         createDefaultAggExStateWithSecondaryCollections(main, secondaryColl);
@@ -402,8 +396,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryS
     StringData main{"main"};
     StringData secondaryColl{"secondaryColl"};
 
-    auto mainNss = createTestCollection(main, false /*sharded*/);
-    auto secondaryNssColl = createTestCollection(secondaryColl, true /*sharded*/);
+    auto mainNss = createTestCollectionWithMetadata(main, false /*sharded*/);
+    auto secondaryNssColl = createTestCollectionWithMetadata(secondaryColl, true /*sharded*/);
 
     // Add at least 1 shard version to the opCtx to simulate a router request. This is necessary
     // to correctly set the isAnySecondaryNamespaceAViewOrNotFullyLocal.
@@ -443,9 +437,9 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryV
     StringData secondaryColl{"secondaryColl"};
     StringData secondaryView{"secondaryView"};
 
-    auto mainNss = createTestCollection(main, false /*sharded*/);
-    auto secondaryNssColl = createTestCollection(secondaryColl, false /*sharded*/);
-    auto [secondaryNssView, _] = createTestView(secondaryView, secondaryColl);
+    auto mainNss = createTestCollectionWithMetadata(main, false /*sharded*/);
+    auto secondaryNssColl = createTestCollectionWithMetadata(secondaryColl, false /*sharded*/);
+    auto [secondaryNssView, _] = createTestViewWithMetadata(secondaryView, secondaryColl);
 
     std::unique_ptr<AggExState> aggExState =
         createDefaultAggExStateWithSecondaryCollections(main, secondaryView);
@@ -480,8 +474,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryV
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     StringData coll{"coll"};
     StringData view{"view"};
-    auto viewOn = createTestCollection(coll, false /*sharded*/);
-    auto [viewNss, expectedPipeline] = createTestView(view, coll);
+    auto viewOn = createTestCollectionWithMetadata(coll, false /*sharded*/);
+    auto [viewNss, expectedPipeline] = createTestViewWithMetadata(view, coll);
     std::unique_ptr<AggExState> aggExState = createDefaultAggExState(view);
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
@@ -555,7 +549,7 @@ TEST_F(AggregationExecutionStateTest, UnshardedSecondaryNssRequiresExtendedRange
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
 
-    createTestCollection(main, false /*sharded*/);
+    createTestCollectionWithMetadata(main, false /*sharded*/);
     createTimeseriesCollection(
         timeseriesColl, false /*sharded*/, true /*requiresExtendedRangeSupport*/);
 
@@ -570,7 +564,7 @@ TEST_F(AggregationExecutionStateTest, ShardedSecondaryNssRequiresExtendedRangeSu
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
 
-    createTestCollection(main, true /*sharded*/);
+    createTestCollectionWithMetadata(main, true /*sharded*/);
     createTimeseriesCollection(
         timeseriesColl, true /*sharded*/, true /*requiresExtendedRangeSupport*/);
 
@@ -585,7 +579,7 @@ TEST_F(AggregationExecutionStateTest, SecondaryNssNoExtendedRangeSupport) {
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
 
-    createTestCollection(main, false /*sharded*/);
+    createTestCollectionWithMetadata(main, false /*sharded*/);
     createTimeseriesCollection(
         timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
 
@@ -598,7 +592,7 @@ TEST_F(AggregationExecutionStateTest, SecondaryNssNoExtendedRangeSupport) {
 
 TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
     StringData coll{"coll"};
-    createTestCollection(coll, false /*sharded*/);
+    createTestCollectionWithMetadata(coll, false /*sharded*/);
     std::unique_ptr<AggExState> aggExState = createOplogAggExState(coll);
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
@@ -628,8 +622,8 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
 TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnView) {
     StringData coll{"coll"};
     StringData view{"view"};
-    createTestCollection(coll, false /*sharded*/);
-    createTestView(view, coll);
+    createTestCollectionWithMetadata(coll, false /*sharded*/);
+    createTestViewWithMetadata(view, coll);
 
     std::unique_ptr<AggExState> aggExState = createOplogAggExState(view);
 

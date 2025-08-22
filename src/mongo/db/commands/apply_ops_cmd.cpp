@@ -288,9 +288,6 @@ public:
                                                << repl::ApplyOps::kOplogApplicationModeFieldName));
         }
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
-
         auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
             result, repl::applyOps(opCtx, dbName, cmdObj, oplogApplicationMode, &result));
 

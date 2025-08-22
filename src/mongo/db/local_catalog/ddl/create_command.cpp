@@ -529,7 +529,7 @@ public:
             }
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
+                unsafeCreateCollection(opCtx, cmd.getNamespace());
 
             preImagesEnabledOnAllCollectionsByDefault.execute([&](const auto&) {
                 if (!cmd.getViewOn() && !cmd.getTimeseries() &&

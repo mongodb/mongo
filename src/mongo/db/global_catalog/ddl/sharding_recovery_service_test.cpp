@@ -224,8 +224,6 @@ public:
 
         // Create and lock the `config.collection_critical_sections` collection to allow
         // notifications on the operation observer.
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            operationContext());
         ASSERT_OK(
             createCollection(operationContext(),
                              CreateCommand(NamespaceString::kCollectionCriticalSectionsNamespace)));
@@ -257,8 +255,6 @@ public:
 
         // Create the `config.collection_critical_sections` collection to allow notifications on the
         // operation observer.
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            operationContext());
         ASSERT_OK(
             createCollection(operationContext(),
                              CreateCommand(NamespaceString::kCollectionCriticalSectionsNamespace)));

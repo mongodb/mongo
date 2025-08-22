@@ -728,12 +728,7 @@ protected:
      * the specified initial documents.
      */
     void createShardedCollection(const std::vector<BSONObj>& initialDocs) {
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(operationContext());
-            uassertStatusOK(
-                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
-        }
+        createTestCollection(operationContext(), kNss);
 
         const auto uuid = [&] {
             const auto collection = acquireCollection(operationContext(), kNss, MODE_IX);
@@ -1206,12 +1201,7 @@ TEST_F(MigrationChunkClonerSourceTest, CollectionNotFound) {
 }
 
 TEST_F(MigrationChunkClonerSourceTest, ShardKeyIndexNotFound) {
-    {
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            operationContext());
-        uassertStatusOK(
-            createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
-    }
+    createTestCollection(operationContext(), kNss);
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));

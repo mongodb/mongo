@@ -32,9 +32,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -139,6 +141,72 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFix
             DBException,
             7331300);
     }
+}
+
+TEST_F(OperationShardingStateTest, ScopedAllowImplicitCollectionCreateBasicUnallowed) {
+    ASSERT_THROWS_CODE(
+        [&] {
+            uassertStatusOK(
+                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
+        }(),
+        DBException,
+        ErrorCodes::CannotImplicitlyCreateCollection);
+}
+
+TEST_F(OperationShardingStateTest, ScopedAllowImplicitCollectionCreateBasicAllowed) {
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        operationContext(), kNss);
+    uassertStatusOK(
+        createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
+}
+
+TEST_F(OperationShardingStateTest, ScopedAllowImplicitCollectionCreateNestedSameNssCreate) {
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        operationContext(), kNss);
+    {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+            unsafeCreateCollectionNested(operationContext(), kNss);
+    }
+    uassertStatusOK(
+        createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
+}
+
+TEST_F(OperationShardingStateTest, ScopedAllowImplicitCollectionCreateNestedSameNssDestroyed) {
+    {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext(), kNss);
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+            unsafeCreateCollectionNested(operationContext(), kNss);
+    }
+    ASSERT_THROWS_CODE(
+        [&] {
+            uassertStatusOK(
+                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
+        }(),
+        DBException,
+        ErrorCodes::CannotImplicitlyCreateCollection);
+}
+
+DEATH_TEST_REGEX_F(OperationShardingStateTest,
+                   ScopedAllowImplicitCollectionCreateNestedDifferentNssFails,
+                   "Tripwire assertion.*10897901") {
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        operationContext(), kNss);
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollectionNested(
+        operationContext(), kAnotherNss);
+}
+
+DEATH_TEST_REGEX_F(OperationShardingStateTest,
+                   ScopedAllowImplicitCollectionCreateNestedMultipleNssFails,
+                   "Tripwire assertion.*10897901") {
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        operationContext(), kNss);
+    {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+            unsafeCreateCollectionNested(operationContext(), kNss);
+    }
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollectionNested(
+        operationContext(), kAnotherNss);
 }
 
 }  // namespace

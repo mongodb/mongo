@@ -158,6 +158,10 @@ struct DefaultClonerImpl::BatchHandler {
 
             // Make sure database still exists after we resume from the temp release
             if (!collection->exists()) {
+                OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                    unsafeCreateCollection(opCtx,
+                                           nss,
+                                           /* forceCSRAsUnknownAfterCollectionCreation */ true);
                 WriteUnitOfWork wunit(opCtx);
                 ScopedLocalCatalogWriteFence fence(opCtx, &collection.get());
                 const bool createDefaultIndexes = true;
@@ -484,6 +488,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                 {
                     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                         unsafeCreateCollection(opCtx,
+                                               nss,
                                                /* forceCSRAsUnknownAfterCollectionCreation */ true);
                     Status createStatus = db->userCreateNS(
                         opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);

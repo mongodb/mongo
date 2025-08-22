@@ -402,7 +402,7 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
             !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
             !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
             opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite()) {
-            allowCollectionCreation.emplace(opCtx);
+            allowCollectionCreation.emplace(opCtx, ns);
         }
         auto createStatus =
             createCollection(opCtx, ns.dbName(), builder.obj().getOwned(), idIndexSpec);

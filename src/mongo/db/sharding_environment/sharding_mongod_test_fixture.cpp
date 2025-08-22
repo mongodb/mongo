@@ -37,6 +37,7 @@
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/catalog_cache/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
 #include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -337,6 +338,42 @@ void ShardingMongoDTestFixture::setupOpObservers() {
     opObserverRegistry->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
     opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
+}
+
+void ShardingMongoDTestFixture::createTestCollection(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& cmdObj) {
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(opCtx,
+                                                                                              nss);
+    uassertStatusOK(createCollection(opCtx, nss.dbName(), cmdObj));
+}
+
+void ShardingMongoDTestFixture::createTestCollection(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
+    createTestCollection(opCtx, nss, BSON("create" << nss.coll()));
+}
+
+Status ShardingMongoDTestFixture::createTestCollectionNoThrow(OperationContext* opCtx,
+                                                              const NamespaceString& nss) {
+    // Note that we use a try/catch here rather that calling createCollection without a
+    // uassertStatusOK because the createCollection function throws on some errors (ex.
+    // CannotImplicitlyCreateCollection) anyways.
+    try {
+        createTestCollection(opCtx, nss, BSON("create" << nss.coll()));
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
+void ShardingMongoDTestFixture::createTestView(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               const NamespaceString& viewOn,
+                                               const std::vector<BSONObj>& pipeline) {
+    createTestCollection(
+        opCtx,
+        nss,
+        BSON("create" << nss.coll() << "viewOn" << viewOn.coll() << "pipeline" << pipeline));
 }
 
 }  // namespace mongo

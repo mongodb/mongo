@@ -196,23 +196,52 @@ using ScopedAllowImplicitCollectionCreate_UNSAFE =
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE;
 
 ScopedAllowImplicitCollectionCreate_UNSAFE::ScopedAllowImplicitCollectionCreate_UNSAFE(
-    OperationContext* opCtx, bool forceCSRAsUnknownAfterCollectionCreation)
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool forceCSRAsUnknownAfterCollectionCreation)
     : _opCtx(opCtx) {
     auto& oss = get(_opCtx);
-    // TODO (SERVER-82066): Re-enable invariant if possible after updating direct connection
-    // handling.
+    // TODO (SERVER-82066): Re-enable invariant and remove recursion if possible after updating
+    // direct connection handling.
     // invariant(!oss._allowCollectionCreation);
-    oss._allowCollectionCreation = true;
-    oss._forceCSRAsUnknownAfterCollectionCreation = forceCSRAsUnknownAfterCollectionCreation;
+    tassert(10897901,
+            str::stream()
+                << "Request to implicitly create collection with namespace "
+                << nss.toStringForErrorMsg()
+                << " conflicts with existing implicit collection creation request for namespace "
+                << oss._implicitCreationInfo._creationNss->toStringForErrorMsg(),
+            !oss._implicitCreationInfo._creationNss ||
+                nss == oss._implicitCreationInfo._creationNss);
+    tassert(10897902,
+            str::stream() << "Request to implicitly create collection with namespace "
+                          << nss.toStringForErrorMsg()
+                          << " and `forceCSRAsUnknownAfterCollectionCreation` "
+                          << forceCSRAsUnknownAfterCollectionCreation
+                          << " conflict with existing request where "
+                             "`forceCSRAsUnknownAfterCollectionCreation` is "
+                          << oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation,
+            !oss._implicitCreationInfo._creationNss ||
+                forceCSRAsUnknownAfterCollectionCreation ==
+                    oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation);
+    oss._implicitCreationInfo.recursion++;
+    oss._implicitCreationInfo._creationNss = nss;
+    oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation =
+        forceCSRAsUnknownAfterCollectionCreation;
 }
 
 ScopedAllowImplicitCollectionCreate_UNSAFE::~ScopedAllowImplicitCollectionCreate_UNSAFE() {
     auto& oss = get(_opCtx);
-    // TODO (SERVER-82066): Re-enable invariant if possible after updating direct connection
-    // handling.
+    // TODO (SERVER-82066): Re-enable invariant and remove recursion if possible after updating
+    // direct connection handling.
     // invariant(oss._allowCollectionCreation);
-    oss._allowCollectionCreation = false;
-    oss._forceCSRAsUnknownAfterCollectionCreation = false;
+    if (oss._implicitCreationInfo.recursion > 1) {
+        oss._implicitCreationInfo.recursion--;
+        return;
+    } else {
+        oss._implicitCreationInfo.recursion = 0;
+        oss._implicitCreationInfo._creationNss.reset();
+        oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation = false;
+    }
 }
 
 ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,

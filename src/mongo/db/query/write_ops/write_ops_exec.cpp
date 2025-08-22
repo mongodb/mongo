@@ -277,7 +277,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
                 !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
                 (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
-                allowCollectionCreation.emplace(opCtx);
+                allowCollectionCreation.emplace(opCtx, ns);
             }
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
@@ -809,7 +809,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
             !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
             !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
             (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
-            allowCollectionCreation.emplace(opCtx);
+            allowCollectionCreation.emplace(opCtx, nsString);
         }
         WriteUnitOfWork wuow(opCtx);
         ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &collection);

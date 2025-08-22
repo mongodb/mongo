@@ -247,7 +247,7 @@ private:
             }
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
+                unsafeCreateCollection(opCtx, nss);
             auto db = autoDb.ensureDbExists(opCtx);
             ASSERT(db->createCollection(opCtx, nss)) << nss.toStringForErrorMsg();
             wunit.commit();

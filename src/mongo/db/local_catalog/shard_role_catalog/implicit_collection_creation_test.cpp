@@ -76,7 +76,7 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("AllowImplicitCollectionCreateDB.TestColl");
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-        operationContext());
+        operationContext(), nss);
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
     auto db = autoColl.ensureDbExists(operationContext());
     WriteUnitOfWork wuow(operationContext());
@@ -92,7 +92,7 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreateWithSetCSRAs
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("AllowImplicitCollectionCreateDB.TestColl");
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-        operationContext(), /* forceCSRAsUnknownAfterCollectionCreation */ true);
+        operationContext(), nss, /* forceCSRAsUnknownAfterCollectionCreation */ true);
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
     auto db = autoColl.ensureDbExists(operationContext());
     WriteUnitOfWork wuow(operationContext());

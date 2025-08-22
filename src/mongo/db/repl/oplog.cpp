@@ -1294,6 +1294,11 @@ void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
     }
 }
 
+NamespaceString OplogApplication::extractNsFromCmd(DatabaseName dbName, const BSONObj& cmdObj) {
+    return extractNs(dbName, cmdObj);
+}
+
+
 // Logger for oplog constraint violations.
 OplogConstraintViolationLogger* oplogConstraintViolationLogger;
 

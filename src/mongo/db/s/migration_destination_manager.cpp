@@ -1196,7 +1196,8 @@ void _cloneCollectionIndexesAndOptions(
 
             // We do not have a collection by this name. Create it with the donor's options.
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx, true /* forceCSRAsUnknownAfterCollectionCreation */);
+                unsafeCreateCollection(
+                    opCtx, nss, true /* forceCSRAsUnknownAfterCollectionCreation */);
             WriteUnitOfWork wuow(opCtx);
             // The write fence will invalid and reload the acquisition on destruction, leaving the
             // acquisition pointing to the latest collection instance

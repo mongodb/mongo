@@ -128,6 +128,26 @@ protected:
      */
     virtual void setupOpObservers();
 
+    /**
+     * Helper functions to acquire the scoped allow creation object and to create a collection in
+     * the local catalog. The second is a shortcut to create a normal collection via just the
+     * namespace. The final helper is to provide a noThrow option which returns the result as a
+     * Status.
+     */
+    void createTestCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& cmdObj);
+    void createTestCollection(OperationContext* opCtx, const NamespaceString& nss);
+    Status createTestCollectionNoThrow(OperationContext* opCtx, const NamespaceString& nss);
+    /**
+     * Helper function to acquire the scoped allow creation object and to create a view in
+     * the local catalog. Expects that the viewOn collection already exists.
+     */
+    void createTestView(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const NamespaceString& viewOn,
+                        const std::vector<BSONObj>& pipeline);
+
 private:
     /**
      * Base class returns a TaskExecutorPool with a fixed TaskExecutor and a set of arbitrary

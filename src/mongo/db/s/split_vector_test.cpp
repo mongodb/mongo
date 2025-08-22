@@ -75,12 +75,7 @@ public:
 
         auto opCtx = operationContext();
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            uassertStatusOK(
-                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
-        }
+        createTestCollection(opCtx, kNss);
         setUnshardedFilteringMetadata(opCtx, kNss);
         DBDirectClient client(opCtx);
         client.createIndex(kNss, BSON(kPattern << 1));
@@ -336,12 +331,7 @@ public:
 
         auto opCtx = operationContext();
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            uassertStatusOK(createCollection(
-                operationContext(), kJumboNss.dbName(), BSON("create" << kJumboNss.coll())));
-        }
+        createTestCollection(opCtx, kJumboNss);
         setUnshardedFilteringMetadata(opCtx, kJumboNss);
         DBDirectClient client(opCtx);
         client.createIndex(kJumboNss, BSON(kJumboPattern << 1));
@@ -401,13 +391,7 @@ public:
 
         auto opCtx = operationContext();
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            uassertStatusOK(createCollection(operationContext(),
-                                             kMaxResponseNss.dbName(),
-                                             BSON("create" << kMaxResponseNss.coll())));
-        }
+        createTestCollection(opCtx, kMaxResponseNss);
         setUnshardedFilteringMetadata(opCtx, kMaxResponseNss);
         DBDirectClient client(opCtx);
         client.createIndex(kMaxResponseNss, BSON("a" << 1));

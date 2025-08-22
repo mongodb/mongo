@@ -101,12 +101,7 @@ public:
 
         auto opCtx = operationContext();
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            uassertStatusOK(
-                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
-        }
+        createTestCollection(opCtx, kNss);
 
         DBDirectClient client(opCtx);
         client.createIndex(kNss, BSON(kPattern_id << 1));

@@ -715,13 +715,16 @@ void ShardServerOpObserver::onCreateCollection(
     uassert(CannotImplicitlyCreateCollectionInfo(collectionName),
             "Implicit collection creation on a sharded cluster must go through the "
             "CreateCollectionCoordinator",
-            oss._allowCollectionCreation);
+            oss._implicitCreationInfo._creationNss &&
+                (oss._implicitCreationInfo._creationNss == collectionName ||
+                 collectionName ==
+                     oss._implicitCreationInfo._creationNss->makeTimeseriesBucketsNamespace()));
 
     // If the check above passes, this means the collection doesn't exist and is being created and
     // that the caller will be responsible to eventually set the proper placement version.
     auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collectionName);
-    if (oss._forceCSRAsUnknownAfterCollectionCreation) {
+    if (oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation) {
         scopedCsr->clearFilteringMetadata(opCtx);
     } else if (!scopedCsr->getCurrentMetadataIfKnown()) {
         scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());

@@ -762,6 +762,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                       options.newTargetCollectionUuid.get_value_or(UUID::gen())};
 
     {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx, tmpName);
         auto collectionOptions = sourceColl->getCollectionOptions();
         collectionOptions.uuid = tmpCollUUID.uuid();
 
@@ -1091,8 +1093,6 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
 
     validateNamespacesForRenameCollection(opCtx, source, target, options);
 
-    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-        opCtx);
     uassertStatusOK(renameCollection(opCtx, source, target, options));
 }
 

@@ -102,9 +102,6 @@ protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            operationContext());
-
         Lock::GlobalWrite globalLock(operationContext());
         bool justCreated = false;
         auto databaseHolder = DatabaseHolder::get(operationContext());
@@ -112,10 +109,8 @@ protected:
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
 
-        uassertStatusOK(createCollection(
-            operationContext(), kTestNss.dbName(), BSON("create" << kTestNss.coll())));
-        uassertStatusOK(createCollection(
-            operationContext(), kUnshardedNss.dbName(), BSON("create" << kUnshardedNss.coll())));
+        createTestCollection(operationContext(), kTestNss);
+        createTestCollection(operationContext(), kUnshardedNss);
     }
 
     /**

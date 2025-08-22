@@ -161,12 +161,7 @@ protected:
         _tempNss = resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
         _reshardingUUID = UUID::gen();
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(operationContext());
-            uassertStatusOK(createCollection(
-                operationContext(), _tempNss.dbName(), BSON("create" << _tempNss.coll())));
-        }
+        createTestCollection(operationContext(), _tempNss);
 
         _metrics = ReshardingMetrics::makeInstance_forTest(
             _sourceUUID,
@@ -214,8 +209,6 @@ protected:
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheMock::setUp();
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            operationContext());
         uassertStatusOK(createCollection(
             operationContext(),
             NamespaceString::kRecipientReshardingResumeDataNamespace.dbName(),

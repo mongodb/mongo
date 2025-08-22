@@ -107,12 +107,6 @@ TimeseriesOptions generateTimeseriesOptions(
     return options;
 }
 
-void createLocalCollection(OperationContext* opCtx, const CreateCommand& cmd) {
-    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-        opCtx);
-    uassertStatusOK(createCollection(opCtx, cmd));
-}
-
 std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     std::vector<CollectionPtr> localCatalogCollections;
@@ -392,7 +386,7 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
     CreateCommand cmd(_nss);
     cmd.getCreateCollectionRequest().setCapped(true);
     cmd.getCreateCollectionRequest().setSize(100);
-    createLocalCollection(opCtx, cmd);
+    createTestCollection(opCtx, _nss, cmd.toBSON());
 
     const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
@@ -440,7 +434,7 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
         if (localCollation) {
             cmd.getCreateCollectionRequest().setCollation(*localCollation);
         }
-        createLocalCollection(opCtx, cmd);
+        createTestCollection(opCtx, nss, cmd.toBSON());
 
         const auto localCatalogCollections = getLocalCatalogCollections(opCtx, nss);
         ASSERT_EQ(1, localCatalogCollections.size());
@@ -519,7 +513,7 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
             if (localTimeseries) {
                 cmd.getCreateCollectionRequest().setTimeseries(localTimeseries);
             }
-            createLocalCollection(opCtx, cmd);
+            createTestCollection(opCtx, nss, cmd.toBSON());
 
             const auto& actualNss = (localTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss);
 
@@ -779,8 +773,7 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
 TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
     OperationContext* opCtx = operationContext();
 
-    CreateCommand cmd(_nss);
-    createLocalCollection(opCtx, cmd);
+    createTestCollection(opCtx, _nss);
 
     const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());
@@ -819,8 +812,7 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
 TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
     OperationContext* opCtx = operationContext();
 
-    CreateCommand cmd(_nss);
-    createLocalCollection(opCtx, cmd);
+    createTestCollection(opCtx, _nss);
 
     const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
     ASSERT_EQ(1, localCatalogCollections.size());

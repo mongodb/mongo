@@ -121,22 +121,26 @@ public:
     static bool shouldBeTreatedAsFromRouter(OperationContext* opCtx);
 
     /**
-     * NOTE: DO NOT ADD any new usages of this class without including someone from the Sharding
-     * Team on the code review.
+     * NOTE: DO NOT ADD any new usages of this class without including someone from the Catalog and
+     * Routing team on the code review. Using this object will allow creating a collection in the
+     * local catalog without registering anything in the global catalog.
      *
      * Instantiating this object on the stack indicates to the storage execution subsystem that it
-     * is allowed to create any collection in this context and that the caller will be responsible
-     * for notifying the shard Sharding subsystem of the collection creation. Note that in most of
-     * cases the CollectionShardingRuntime associated to that nss will be set as UNSHARDED. However,
-     * there are some scenarios in which it is required to set is as UNKNOWN: that's the reason why
-     * the constructor has the 'forceCSRAsUnknownAfterCollectionCreation' parameter. You can find
-     * more information about how the CSR is modified in ShardServerOpObserver::onCreateCollection.
+     * is allowed to create a collection with the specified namespace (or the equivalent bucket
+     * namespace) in this context and that the caller will be responsible for notifying the shard
+     * Sharding subsystem of the collection creation. Note that in most of cases the
+     * CollectionShardingRuntime associated to that nss will be set as UNSHARDED. However, there are
+     * some scenarios in which it is required to set is as UNKNOWN: that's the reason why the
+     * constructor has the 'forceCSRAsUnknownAfterCollectionCreation' parameter. You can find more
+     * information about how the CSR is modified in ShardServerOpObserver::onCreateCollection.
      */
     class ScopedAllowImplicitCollectionCreate_UNSAFE {
     public:
         /* Please read the comment associated to this class */
         ScopedAllowImplicitCollectionCreate_UNSAFE(
-            OperationContext* opCtx, bool forceCSRAsUnknownAfterCollectionCreation = false);
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            bool forceCSRAsUnknownAfterCollectionCreation = false);
         ~ScopedAllowImplicitCollectionCreate_UNSAFE();
 
     private:
@@ -206,11 +210,20 @@ private:
     friend class ScopedStashShardRole;
     friend class ShardServerOpObserver;  // For access to _allowCollectionCreation below
 
-    // Specifies whether the request is allowed to create database/collection implicitly
-    MONGO_MOD_NEEDS_REPLACEMENT bool _allowCollectionCreation{false};
-    // Specifies whether the CollectionShardingRuntime should be set as unknown after collection
-    // creation
-    MONGO_MOD_NEEDS_REPLACEMENT bool _forceCSRAsUnknownAfterCollectionCreation{false};
+    // Stores information about allowed implicit collection creation
+    struct ImplicitCreationInfo {
+        // Specifies which namesace implicit creation is allowed on. If none, then implicit creation
+        // if not allowed.
+        boost::optional<NamespaceString> _creationNss{boost::none};
+        // Specifies whether the CollectionShardingRuntime should be set as unknown after collection
+        // creation
+        bool _forceCSRAsUnknownAfterCollectionCreation{false};
+        // Used to track multiple creations of the scoped object to know when to disallow creation.
+        int recursion{0};
+    };
+
+    MONGO_MOD_NEEDS_REPLACEMENT ImplicitCreationInfo _implicitCreationInfo;
+
 
     // Stores the shard version expected for each collection that will be accessed
     struct ShardVersionTracker {

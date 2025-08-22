@@ -250,6 +250,9 @@ public:
                                                const mongo::NamespaceString& nss,
                                                const mongo::BSONObj& oplogEntry,
                                                const std::string& errorMsg);
+
+    // Extracts the namespace from a command oplog entry object.
+    static NamespaceString extractNsFromCmd(DatabaseName dbName, const BSONObj& cmdObj);
 };
 
 inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {

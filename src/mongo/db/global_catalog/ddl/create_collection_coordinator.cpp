@@ -1275,7 +1275,7 @@ boost::optional<UUID> createCollectionAndIndexes(
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (!fcvSnapshot.isVersionInitialized() ||
         feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot)) {
-        allowCollectionCreation.emplace(opCtx);
+        allowCollectionCreation.emplace(opCtx, originalNss);
     }
 
     auto translatedRequest = request;

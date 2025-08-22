@@ -118,9 +118,7 @@ public:
         AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_X);
         autoDb.ensureDbExists(opCtx);
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
-        uassertStatusOK(createCollection(opCtx, nss.dbName(), BSON("create" << nss.coll())));
+        createTestCollection(opCtx, nss);
 
         DBDirectClient client(opCtx);
         for (int i = minDocValue; i <= maxDocValue; i++) {
@@ -147,12 +145,8 @@ public:
 
         BSONObj timeseriesOptions = BSON("timeField" << "timestamp");
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
-        uassertStatusOK(
-            createCollection(opCtx,
-                             nss.dbName(),
-                             BSON("create" << nss.coll() << "timeseries" << timeseriesOptions)));
+        createTestCollection(
+            opCtx, nss, BSON("create" << nss.coll() << "timeseries" << timeseriesOptions));
 
         DBDirectClient client(opCtx);
         for (int i = minDocValue; i <= maxDocValue; i++) {
@@ -862,10 +856,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, EnsurePromiseFulfilledOnReachingRecip
 TEST_F(ReshardingChangeStreamsMonitorTest, EnsurePromiseFulfilledOnReachingDonorFinalEvent) {
     AutoGetDb autoDb(opCtx, sourceNss.dbName(), LockMode::MODE_X);
     autoDb.ensureDbExists(opCtx);
-    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-        opCtx);
-    uassertStatusOK(
-        createCollection(opCtx, sourceNss.dbName(), BSON("create" << sourceNss.coll())));
+    createTestCollection(opCtx, sourceNss);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     insertDonorFinalEventNoopOplogEntry(sourceNss);

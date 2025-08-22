@@ -80,14 +80,8 @@ void RangeDeleterServiceTest::setUp() {
     RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
     RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
 
-    {
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
-        uassertStatusOK(
-            createCollection(opCtx, nsCollA.dbName(), BSON("create" << nsCollA.coll())));
-        uassertStatusOK(
-            createCollection(opCtx, nsCollB.dbName(), BSON("create" << nsCollB.coll())));
-    }
+    createTestCollection(opCtx, nsCollA);
+    createTestCollection(opCtx, nsCollB);
 
     {
         AutoGetCollection autoColl(opCtx, nsCollA, MODE_X);

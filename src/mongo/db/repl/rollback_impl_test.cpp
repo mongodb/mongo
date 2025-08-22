@@ -205,7 +205,7 @@ protected:
         CollectionOptions options;
         options.uuid = uuid;
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
+            opCtx, nss);
         ASSERT_OK(_storageInterface->createCollection(opCtx, nss, options));
 
         // Initialize a mock collection.

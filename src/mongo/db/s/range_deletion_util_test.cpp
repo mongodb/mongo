@@ -101,11 +101,7 @@ public:
         });
         repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(_opCtx);
-            uassertStatusOK(createCollection(_opCtx, kNss.dbName(), BSON("create" << kNss.coll())));
-        }
+        createTestCollection(_opCtx, kNss);
 
         AutoGetCollection autoColl(_opCtx, kNss, MODE_IX);
         _uuid = autoColl.getCollection()->uuid();

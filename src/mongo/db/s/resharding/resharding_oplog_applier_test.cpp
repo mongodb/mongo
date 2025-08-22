@@ -201,15 +201,9 @@ public:
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            operationContext());
-        uassertStatusOK(createCollection(
-            operationContext(), kAppliedToNs.dbName(), BSON("create" << kAppliedToNs.coll())));
-        uassertStatusOK(createCollection(
-            operationContext(), kStashNs.dbName(), BSON("create" << kStashNs.coll())));
-        uassertStatusOK(createCollection(operationContext(),
-                                         kOtherDonorStashNs.dbName(),
-                                         BSON("create" << kOtherDonorStashNs.coll())));
+        createTestCollection(operationContext(), kAppliedToNs);
+        createTestCollection(operationContext(), kStashNs);
+        createTestCollection(operationContext(), kOtherDonorStashNs);
 
         _cm = createChunkManagerForOriginalColl();
 

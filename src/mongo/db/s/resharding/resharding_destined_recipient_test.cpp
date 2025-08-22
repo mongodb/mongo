@@ -232,11 +232,7 @@ protected:
         ASSERT(client.createCollection(NamespaceString::kSessionTransactionsTableNamespace));
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
-
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
-        Status status =
-            createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll()));
+        Status status = createTestCollectionNoThrow(opCtx, kNss);
         if (status != ErrorCodes::NamespaceExists) {
             uassertStatusOK(status);
         }
@@ -251,8 +247,7 @@ protected:
                         NamespaceString::kTemporaryReshardingCollectionPrefix,
                         env.sourceUuid.toString()));
 
-        uassertStatusOK(createCollection(
-            operationContext(), env.tempNss.dbName(), BSON("create" << env.tempNss.coll())));
+        createTestCollection(opCtx, env.tempNss);
 
         TypeCollectionReshardingFields reshardingFields;
         reshardingFields.setReshardingUUID(UUID::gen());
