@@ -783,7 +783,6 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"round", BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::round, false}},
     {"concat", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::concat, false}},
     {"concatArrays", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::concatArrays, false}},
-    {"zipArrays", BuiltinFn{[](size_t n) { return n >= 2; }, vm::Builtin::zipArrays, false}},
     {"aggConcatArraysCapped",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggConcatArraysCapped, true}},
     {"isMember", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isMember, false}},

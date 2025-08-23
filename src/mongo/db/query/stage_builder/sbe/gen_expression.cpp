@@ -3057,53 +3057,7 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionZip* expr) final {
-        const size_t localVariables = 2;
-        const size_t numChildren = expr->getChildren().size();
-        _context->ensureArity(numChildren);
-
-        SbExpr::Vector binds;
-        binds.resize(localVariables + numChildren);
-
-        binds[0] = _b.makeInt32Constant(expr->getInputs().size());
-        binds[1] = _b.makeBoolConstant(expr->getUseLongestLength());
-        // Pop expressions from the stack in reverse, so that inputs come before defaults.
-        for (size_t i = binds.size(); i > localVariables;) {
-            --i;
-            binds[i] = popExpr();
-        }
-
-        SbExpr::Vector variables;
-        SbExpr::Vector checkNulls;
-        SbExpr::Vector checkNotArrays;
-        variables.reserve(binds.size());
-        checkNulls.reserve(expr->getInputs().size());
-        checkNotArrays.reserve(expr->getInputs().size());
-
-        auto frameId = _context->state.frameId();
-        for (size_t i = 0; i < binds.size(); ++i) {
-            SbVar argVar(frameId, i);
-            variables.emplace_back(argVar);
-
-            if (i >= localVariables && checkNulls.size() != expr->getInputs().size()) {
-                checkNulls.emplace_back(_b.generateNullMissingOrUndefined(argVar));
-                checkNotArrays.emplace_back(_b.generateNonArrayCheck(argVar));
-            }
-        }
-
-        auto checkNullAnyInput = _b.makeBooleanOpTree(abt::Operations::Or, std::move(checkNulls));
-        auto checkNotArrayAnyInput =
-            _b.makeBooleanOpTree(abt::Operations::Or, std::move(checkNotArrays));
-
-        SbExpr zip = _b.buildMultiBranchConditionalFromCaseValuePairs(
-            SbExpr::makeExprPairVector(
-                SbExprPair{std::move(checkNullAnyInput), _b.makeNullConstant()},
-                SbExprPair{std::move(checkNotArrayAnyInput),
-                           _b.makeFail(ErrorCodes::Error{5156500},
-                                       str::stream() << "All operands of $zip"
-                                                     << " must be array expressions.")}),
-            _b.makeFunction("zipArrays", std::move(variables)));
-
-        pushExpr(_b.makeLet(frameId, std::move(binds), std::move(zip)));
+        unsupportedExpression("$zip");
     }
     void visit(const ExpressionConvert* expr) final {
         unsupportedExpression("$convert");

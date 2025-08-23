@@ -1,7 +1,5 @@
 // SERVER-20163 introduced the $zip expression. In this test file, we check the behavior and error
 // cases of the expression.
-import "jstests/libs/query/sbe_assert_error_override.js";
-
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.zip;
