@@ -271,7 +271,9 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
         // which child's cardinality is not that of the original collection (e.g. Fetch above an
         // index union). In this case, the collection cardinality and input cardinality differ and
         // we need to scale our estimate accordingly.
-        auto sel = _samplingEstimator->estimateCardinality(node) / _collCard;
+        const auto ce = _ceCache.getOrCompute(
+            node, [&] { return _samplingEstimator->estimateCardinality(node); });
+        auto sel = ce / _collCard;
         _conjSels.emplace_back(sel);
         return sel * _inputCard;
     }
@@ -451,7 +453,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     est.inCE = ceRes1.getValue();
 
     // Sampling will attempt to get an estimate for the number of RIDs that the scan returns after
-    // dedupication and applying the filter. This approach does not combine selectivity computed
+    // deduplication and applying the filter. This approach does not combine selectivity computed
     // from the index scan.
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
         auto ridsEst = [&]() -> CardinalityEstimate {
@@ -460,9 +462,13 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
                 // Try to estimate using transformation to match expression.
                 auto matchExpr = getMatchExpressionFromBounds(node->bounds, node->filter.get());
                 if (matchExpr) {
-                    return _samplingEstimator->estimateCardinality(matchExpr.get());
+                    const auto matchExprPtr = matchExpr.get();
+                    return _ceCache.getOrCompute(std::move(matchExpr), [&] {
+                        return _samplingEstimator->estimateCardinality(matchExprPtr);
+                    });
                 }
             }
+            // Rare case, CE not cached.
             return _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
         }();
 
@@ -525,9 +531,13 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
                 // Try to estimate using transformation to match expression.
                 auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
                 if (matchExpr) {
-                    return _samplingEstimator->estimateCardinality(matchExpr.get());
+                    const auto matchExprPtr = matchExpr.get();
+                    return _ceCache.getOrCompute(std::move(matchExpr), [&] {
+                        return _samplingEstimator->estimateCardinality(matchExprPtr);
+                    });
                 }
             }
+            // Rare case, CE not cached.
             return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
         }();
 
@@ -1104,15 +1114,15 @@ OrderedIntervalList openOil(std::string fieldName) {
     return out;
 }
 
-IndexBounds equalityPrefix(const IndexBounds* node) {
-    IndexBounds eqPrefix;
+std::unique_ptr<IndexBounds> equalityPrefix(const IndexBounds* node) {
+    auto eqPrefix = std::make_unique<IndexBounds>();
     bool isEqPrefix = true;
     for (auto&& oil : node->fields) {
         if (isEqPrefix) {
-            eqPrefix.fields.push_back(oil);
+            eqPrefix->fields.push_back(oil);
             isEqPrefix = isEqPrefix && oil.isPoint();
         } else {
-            eqPrefix.fields.push_back(openOil(oil.name));
+            eqPrefix->fields.push_back(openOil(oil.name));
         }
     }
     return eqPrefix;
@@ -1127,7 +1137,11 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
         // TODO: avoid copies to construct the equality prefix. We could do this by teaching
         // SamplingEstimator or IndexBounds about the equality prefix concept.
-        return _samplingEstimator->estimateKeysScanned(equalityPrefix(node));
+        auto eqPrefix = equalityPrefix(node);
+        const auto eqPrefixPtr = eqPrefix.get();
+        return _ceCache.getOrCompute(std::move(eqPrefix), [&] {
+            return _samplingEstimator->estimateKeysScanned(*eqPrefixPtr);
+        });
     }
 
     // Iterate over all intervals over individual index fields (OILs). These intervals are

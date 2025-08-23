@@ -14,10 +14,12 @@ mongo_cc_library(
     srcs = [
         "cardinality_estimator.cpp",
         "cbr_rewrites.cpp",
+        "ce_cache.cpp",
     ],
     hdrs = [
         "cardinality_estimator.h",
         "cbr_rewrites.h",
+        "ce_cache.h",
         "//src/mongo/db/query:query_planner_params.h",
     ],
     deps = [

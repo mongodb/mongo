@@ -27,33 +27,48 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
-
-/**
- * This file containf rewrites from IndexBounds to MatchExpression for the purpose of cardinality
- * estimation.
- */
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_cache.h"
 
 namespace mongo::cost_based_ranker {
-/**
- * Create a match expression equivalent to the index bounds intervals and a possible filter
- * expression.
- * Params: 'bounds': index bounds from a IndexScanNode,
- *         'filterExpr': a filter expression of the IndexScanNode, in case of inexact match,
- *          or a filter expression in the parent FetchNode.
- * If the 'filterExpr' is not null, create a conjunction of the index-bounds expression
- * and the filter expression.
- * The function returns nullptr if it encounters an interval in the index bounds for which
- * the transformation to match expression is not supported. The nullptr notifies the
- * caller to use an alternative implementation.
- * The final condition that combines the expression generated from 'bounds' and 'filterExpr' are
- * simplified and normalized before returning. This is done to enable faster estimation with fewer
- * terms, and to also ensure that logically equivalent expressions have the same form, and thus
- * will be detected as equivalent by the CE cache.
- */
-std::unique_ptr<MatchExpression> getMatchExpressionFromBounds(const IndexBounds& bounds,
-                                                              const MatchExpression* filterExpr);
+
+template <bool EnableLogging>
+CECache<EnableLogging>::CECache() {
+    if constexpr (EnableLogging) {
+        _logStream << std::fixed << std::setprecision(2);
+    }
+}
+
+template <bool EnableLogging>
+CECache<EnableLogging>::~CECache() {
+    if constexpr (EnableLogging) {
+        auto hits = _meHits + _ibHits;
+        auto misses = _meMisses + _ibMisses;
+        double cacheHitRatio =
+            misses > 0 ? static_cast<double>(hits) / static_cast<double>(misses) : 0;
+        log("CECache summary: ",
+            "[MatchExpressions] cached: ",
+            _exprCache.size(),
+            ", hits: ",
+            _meHits,
+            ", misses: ",
+            _meMisses,
+            "; [IntervalBounds] cached: ",
+            _intervalCache.size(),
+            ", hits: ",
+            _ibHits,
+            ", misses: ",
+            _ibMisses,
+            "; [Total] hits: ",
+            hits,
+            ", misses: ",
+            misses,
+            "; Cache hit ratio: ",
+            cacheHitRatio);
+        std::cout << _logStream.str() << std::endl;
+    }
+}
+
+// Explicit instantiation definitions
+template class CECache<true>;
+template class CECache<false>;
 }  // namespace mongo::cost_based_ranker

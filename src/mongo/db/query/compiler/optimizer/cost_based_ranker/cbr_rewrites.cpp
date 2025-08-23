@@ -30,58 +30,28 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_rewrites.h"
 
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 
 namespace mongo::cost_based_ranker {
 
 namespace {
-BSONObj minForType(BSONType type) {
-    BSONObjBuilder bMin;
-    bMin.appendMinForType("", stdx::to_underlying(type));
-    return bMin.obj();
-}
 
-BSONObj maxForType(BSONType type) {
-    BSONObjBuilder bMax;
-    bMax.appendMaxForType("", stdx::to_underlying(type));
-    return bMax.obj();
-}
-
-static const BSONObj kMinBsonInt = minForType(BSONType::numberInt);
-static const BSONObj kMaxBsonInt = maxForType(BSONType::numberInt);
-static const BSONObj kMinBsonString = minForType(BSONType::string);
-static const BSONObj kMaxBsonString = maxForType(BSONType::string);
-
-BSONObj maxBsonForType(BSONType type) {
-    switch (type) {
-        case BSONType::numberInt:
-        case BSONType::numberDouble:
-        case BSONType::numberLong:
-        case BSONType::numberDecimal:
-            return kMaxBsonInt;
-        case BSONType::string:
-            return kMaxBsonString;
-        default:
-            return maxForType(type);
-    }
-}
-
-BSONObj minBsonForType(BSONType type) {
-    switch (type) {
-        case BSONType::numberInt:
-        case BSONType::numberDouble:
-        case BSONType::numberLong:
-        case BSONType::numberDecimal:
-            return kMinBsonInt;
-        case BSONType::string:
-            return kMinBsonString;
-        default:
-            return minForType(type);
-    }
-}
-
+/**
+ * Given a 'path' and an 'interval' on that path, generate a minimal logically equivalent
+ * MatchExpression. In principle the expression could be less strict than the interval because it
+ * is used for CE, however currently it is strictly equivalent.
+ * Example:
+ * Consider an open range condition such as {a: {$gt: 42}} and an index on 'a'. This results in an
+ * interval [42, inf]. During CE of this interval CBR ends up calling this function to convert it to
+ * an equivalent condition, ideally the same one that was used to generate the interval.
+ * This function implements careful handling of interval bounds in order to avoid adding
+ * logically redundant terms such as the comparison to inf as in this logically equivalent
+ * expression: {$and: [{a: {$gt: 42}}, {a: {$lt: inf}}]}
+ */
 std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
                                                                 const Interval& interval) {
     if (interval.isFullyOpen()) {
@@ -113,12 +83,20 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
 
     bool gtIncl = (isAscending) ? interval.startInclusive : interval.endInclusive;
     auto& gtVal = (isAscending) ? interval.start : interval.end;
+    bool isLB = isLowerBound(gtVal, gtIncl);  // Low type bracket or -inf
+
     bool ltIncl = (isAscending) ? interval.endInclusive : interval.startInclusive;
     auto& ltVal = (isAscending) ? interval.end : interval.start;
+    bool isUB = isUpperBound(ltVal, ltIncl);  // Upper type bracket or inf
 
-    BSONObj minObj = minBsonForType(ltVal.type());
-    if (gtVal.woCompare(minObj.firstElement(), false) != 0) {
-        // Create an expression for the lower bound only if it is not minimal for the type.
+    // If this is a type bracket interval create a condition that represents it even if both
+    // bounds are minimal/maximal. Such intervals are usually part of an OIL and are complimentary
+    // to the other OIL intervals.
+    bool isTypeBracketInterval = isLB && isUB;
+
+    if (isTypeBracketInterval || !isLB) {
+        // Create an expression for the lower bound only if it is not minimal for the type. This
+        // avoids adding redundant always true conditions such as {a: {$gt: -inf}}.
         if (gtIncl) {
             expressions.push_back(std::make_unique<GTEMatchExpression>(path, gtVal));
         } else {
@@ -126,9 +104,9 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
         };
     }
 
-    BSONObj maxObj = maxBsonForType(gtVal.type());
-    if (ltVal.woCompare(maxObj.firstElement(), false) != 0) {
-        // Create an expression for the upper bound only if it is not maximal for the type.
+    if (isTypeBracketInterval || !isUB) {
+        // Create an expression for the upper bound only if it is not maximal for the type. This
+        // avoids adding redundant always true conditions such as {a: {$lt: inf}}.
         if (ltIncl) {
             expressions.push_back(std::make_unique<LTEMatchExpression>(path, ltVal));
         } else {
@@ -138,7 +116,8 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
 
     if (expressions.size() > 1) {
         return std::make_unique<AndMatchExpression>(std::move(expressions));
-    } else if (expressions.size() == 1) {
+    }
+    if (expressions.size() == 1) {
         return std::move(expressions[0]);
     }
     // The transformation of this interval to match expression is not supported.
@@ -170,13 +149,15 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromOIL(const OrderedInterval
 
     if (expressions.size() == 1) {
         return std::move(expressions[0]);
-    } else if (expressions.size() > 1) {
+    }
+    if (expressions.size() > 1) {
         // Make an OR match expression for the disjunction of intervals.
         return std::make_unique<OrMatchExpression>(std::move(expressions));
     }
 
     return nullptr;
 }
+
 }  // namespace
 
 std::unique_ptr<MatchExpression> getMatchExpressionFromBounds(const IndexBounds& bounds,
@@ -184,21 +165,31 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromBounds(const IndexBounds&
     std::vector<std::unique_ptr<MatchExpression>> expressions;
 
     for (auto& oil : bounds.fields) {
-        auto conj = getMatchExpressionFromOIL(&oil);
-        if (!conj) {
+        auto disj = getMatchExpressionFromOIL(&oil);
+        if (!disj) {
             // We found an OIL with an interval that cannot be transformed to match expression, bail
             // out.
             return nullptr;
         }
-        expressions.push_back(std::move(conj));
+        expressions.push_back(std::move(disj));
     }
 
     if (filterExpr) {
         expressions.push_back(filterExpr->clone());
     }
+
     if (expressions.size() > 1) {
-        return std::make_unique<AndMatchExpression>(std::move(expressions));
-    } else if (expressions.size() == 1) {
+        // Normalize and simplify the resulting conjunction in order to enable better detection of
+        // expression equivalence.
+        auto conj = std::make_unique<AndMatchExpression>(std::move(expressions));
+        auto simplified = normalizeMatchExpression(std::move(conj), true);
+        if (simplified->isTriviallyTrue()) {
+            // There are at least two different forms of true expressions. Return the same form.
+            return std::make_unique<AlwaysTrueMatchExpression>();
+        }
+        return simplified;
+    }
+    if (expressions.size() == 1) {
         return std::move(expressions[0]);
     }
     return nullptr;

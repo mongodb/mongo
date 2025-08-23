@@ -578,10 +578,10 @@ TEST(CardinalityEstimator, RangeIntervalToAndMatchExpression) {
 
 TEST(CardinalityEstimator, OpenRangeIntervalToGTEMatchExpression) {
     std::vector<std::string> indexFields = {"a"};
-    // Bounds for [3, inf)
+    // Bounds for [3, inf]
     IndexBounds bounds =
         makeRangeIntervalBounds(BSON("" << 3.0 << "" << std::numeric_limits<double>::infinity()),
-                                BoundInclusion::kIncludeStartKeyOnly,
+                                BoundInclusion::kIncludeBothStartAndEndKeys,
                                 indexFields[0]);
     auto expr = getMatchExpressionFromBounds(bounds, nullptr);
 
@@ -616,12 +616,13 @@ TEST(CardinalityEstimator, TwoIntervalsAndExpressionToAndMatchExpression) {
     auto parsedPred = parse(pred);
 
     auto expr = getMatchExpressionFromBounds(bounds, parsedPred.get());
-    auto optExpr = optimizeMatchExpression(std::move(expr), true);
 
-    BSONObj query = fromjson("{a: 100,  c : 'xyz', b: {$gte: 5, $lte: 10}}");
+    // Notice the order of the predicates here specifically matches the order of the generated
+    // MatchExpressions by getMatchExpressionFromBounds
+    BSONObj query = fromjson("{a: 100, c : 'xyz', b: {$lte: 10, $gte: 5}}");
     auto parsedExpr = parse(query);
 
-    ASSERT(optExpr->equivalent(parsedExpr.get()));
+    ASSERT(expr->equivalent(parsedExpr.get()));
 }
 
 TEST(CardinalityEstimator, UndefinedIntervalToNullptrMatchExpression) {

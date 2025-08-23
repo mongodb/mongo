@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_cache.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
@@ -258,5 +259,9 @@ private:
     // matches index keys from the sample documents to the index bounds in the index scan node.
     // TODO: remove the flag and use one implementation of the estimate when SPM-4214 finishes.
     bool _useIndexBounds;
+
+    // Cache cardinality estimates of logically equivalent MatchExpressions and IndexBounds.
+    CECache<false /* disable logging */> _ceCache;
 };
+
 }  // namespace mongo::cost_based_ranker

@@ -911,4 +911,95 @@ IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
     return where;
 }
 
+bool isLowerBound(const BSONElement& value, bool isInclusive) {
+    switch (value.type()) {
+        case BSONType::numberInt:
+        case BSONType::numberDouble:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+            // Lower bound value for numbers.
+            return (std::isinf(value.numberDouble()) || std::isnan(value.numberDouble())) &&
+                isInclusive == true;
+        case BSONType::string:
+            // Lower bound value for strings.
+            return value.str().empty() && isInclusive == true;
+        case BSONType::date:
+            // Lower bound value for dates.
+            return value.date() == Date_t::min() && isInclusive == true;
+        case BSONType::timestamp:
+            // Lower bound value for timestamps.
+            return value.timestamp() == Timestamp::min() && isInclusive == true;
+        case BSONType::oid:
+            // Lower bound value for ObjectID.
+            return value.OID() == OID() && isInclusive == true;
+        case BSONType::object:
+        case BSONType::array:
+            // Lower bound value for Object and Array.
+            return value.Obj().isEmpty() && isInclusive == true;
+        case BSONType::binData:
+        case BSONType::eoo:
+        case BSONType::minKey:
+        case BSONType::maxKey:
+        case BSONType::boolean:  // Boolean bounds are considered always open since they are
+                                 // non-selective.
+        case BSONType::null:
+        case BSONType::undefined:
+        case BSONType::symbol:
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::code:
+        case BSONType::codeWScope:
+            return true;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(8102100);
+}
+
+bool isUpperBound(const BSONElement& value, bool isInclusive) {
+    switch (value.type()) {
+        case BSONType::numberInt:
+        case BSONType::numberDouble:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+            // Upper bound value for numbers.
+            return std::isinf(value.numberDouble()) && isInclusive == true;
+        case BSONType::string:
+            // A string value cannot be an upper bound value.
+            return false;
+        case BSONType::date:
+            // Upper bound value for Date.
+            return value.date() == Date_t::max() && isInclusive == true;
+        case BSONType::timestamp:
+            // Upper bound value for Timestamp.
+            return value.timestamp() == Timestamp::max() && isInclusive == true;
+        case BSONType::oid:
+            // Upper bound value for ObjectID.
+            return value.OID() == OID::max() && isInclusive == true;
+        case BSONType::object:
+            // Upper bound value for String.
+            return value.Obj().isEmpty() && isInclusive == false;
+        case BSONType::array:
+            // Upper bound value for Object.
+            return value.Obj().isEmpty() && isInclusive == false;
+        case BSONType::binData:
+            // Upper bound value for Array.
+            return value.valuesize() == 0 && isInclusive == false;
+        case BSONType::eoo:
+        case BSONType::minKey:
+        case BSONType::maxKey:
+        case BSONType::boolean:  // Boolean bounds are considered always open since they are
+                                 // non-selective.
+        case BSONType::null:
+        case BSONType::undefined:
+        case BSONType::symbol:
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::code:
+        case BSONType::codeWScope:
+            return true;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(8102101);
+}
+
 }  // namespace mongo
