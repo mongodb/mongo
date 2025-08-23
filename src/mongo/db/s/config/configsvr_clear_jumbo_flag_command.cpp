@@ -96,7 +96,7 @@ public:
                                         << " is not sharded");
             }
 
-            uassert(ErrorCodes::StaleEpoch,
+            uassert(StaleEpochInfo(nss, ShardVersion{}, ShardVersion{}),
                     str::stream()
                         << "clearJumboFlag namespace " << nss.toStringForErrorMsg()
                         << " has a different epoch than mongos had in its routing table cache",

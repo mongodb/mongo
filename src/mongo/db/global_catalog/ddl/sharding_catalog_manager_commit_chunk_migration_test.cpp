@@ -420,17 +420,17 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
-        ShardingCatalogManager::get(operationContext())
-            ->commitChunkMigration(operationContext(),
-                                   kNamespace,
-                                   chunk0,
-                                   OID::gen(),
-                                   Timestamp(52),
-                                   ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()));
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunkMigration(operationContext(),
+                                                  kNamespace,
+                                                  chunk0,
+                                                  OID::gen(),
+                                                  Timestamp(52),
+                                                  ShardId(shard0.getName()),
+                                                  ShardId(shard1.getName())),
+                       DBException,
 
-    ASSERT_EQ(ErrorCodes::StaleEpoch, result.getStatus());
+                       ErrorCodes::StaleEpoch);
 }
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
@@ -473,17 +473,16 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     // get version from the control chunk this time
     setupCollection(kNamespace, kKeyPattern, {chunk1, chunk0});
 
-    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
-        ShardingCatalogManager::get(operationContext())
-            ->commitChunkMigration(operationContext(),
-                                   kNamespace,
-                                   chunk0,
-                                   origVersion.epoch(),
-                                   origVersion.getTimestamp(),
-                                   ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()));
-
-    ASSERT_EQ(ErrorCodes::StaleEpoch, result.getStatus());
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunkMigration(operationContext(),
+                                                  kNamespace,
+                                                  chunk0,
+                                                  origVersion.epoch(),
+                                                  origVersion.getTimestamp(),
+                                                  ShardId(shard0.getName()),
+                                                  ShardId(shard1.getName())),
+                       DBException,
+                       ErrorCodes::StaleEpoch);
 }
 
 TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks) {
@@ -715,17 +714,16 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
-    auto result = ShardingCatalogManager::get(operationContext())
-                      ->commitChunkMigration(operationContext(),
-                                             kNamespace,
-                                             migratedChunk,
-                                             origVersion.epoch(),
-                                             origVersion.getTimestamp(),
-                                             ShardId(shard0.getName()),
-                                             ShardId(shard1.getName()));
-
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus(), ErrorCodes::StaleEpoch);
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunkMigration(operationContext(),
+                                                  kNamespace,
+                                                  migratedChunk,
+                                                  origVersion.epoch(),
+                                                  origVersion.getTimestamp(),
+                                                  ShardId(shard0.getName()),
+                                                  ShardId(shard1.getName())),
+                       DBException,
+                       ErrorCodes::StaleEpoch);
 }
 
 class CommitMoveRangeTest : public CommitChunkMigrate {

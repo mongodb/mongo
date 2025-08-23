@@ -500,15 +500,16 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
         setupCollection(nss, _keyPattern, {chunk});
 
-        auto splitStatus = ShardingCatalogManager::get(operationContext())
+        ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
                                ->commitChunkSplit(operationContext(),
                                                   nss,
                                                   OID::gen(),
                                                   Timestamp{50, 0},
                                                   ChunkRange(chunkMin, chunkMax),
                                                   splitPoints,
-                                                  "shard0000");
-        ASSERT_EQ(ErrorCodes::StaleEpoch, splitStatus.getStatus());
+                                                  "shard0000"),
+                           DBException,
+                           ErrorCodes::StaleEpoch);
     };
 
     test(_nss2, Timestamp(42));

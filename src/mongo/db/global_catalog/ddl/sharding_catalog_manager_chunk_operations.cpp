@@ -870,12 +870,12 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     // Return an error if collection epoch does not match epoch of request.
     if (coll.getEpoch() != requestEpoch ||
         (requestTimestamp && coll.getTimestamp() != requestTimestamp)) {
-        return {ErrorCodes::StaleEpoch,
-                str::stream() << "splitChunk cannot split chunk " << range.toString()
-                              << ". Epoch of collection '" << nss.toStringForErrorMsg()
-                              << "' has changed."
-                              << " Current epoch: " << coll.getEpoch()
-                              << ", cmd epoch: " << requestEpoch};
+        uasserted(StaleEpochInfo(nss, ShardVersion{}, ShardVersion{}),
+                  str::stream() << "splitChunk cannot split chunk " << range.toString()
+                                << ". Epoch of collection '" << nss.toStringForErrorMsg()
+                                << "' has changed."
+                                << " Current epoch: " << coll.getEpoch()
+                                << ", cmd epoch: " << requestEpoch);
     }
 
     // Find the chunk history.
@@ -1078,7 +1078,7 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
     // 1. Retrieve the initial collection placement version info to build up the logging info.
     const auto [coll, collPlacementVersion] =
         uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
-    uassert(ErrorCodes::StaleEpoch,
+    uassert(StaleEpochInfo(nss, ShardVersion{}, ShardVersion{}),
             "Collection changed",
             (!epoch || collPlacementVersion.epoch() == epoch) &&
                 (!timestamp || collPlacementVersion.getTimestamp() == timestamp));
@@ -1555,7 +1555,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     const auto& currentCollectionPlacementVersion = chunk.getVersion();
 
     if (MONGO_unlikely(migrationCommitVersionError.shouldFail())) {
-        uasserted(ErrorCodes::StaleEpoch,
+        uasserted(StaleEpochInfo(nss, ShardVersion{}, ShardVersion{}),
                   "Failpoint 'migrationCommitVersionError' generated error");
     }
 
@@ -1564,14 +1564,14 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     // shard key refined since the migration began.
     if (currentCollectionPlacementVersion.epoch() != collectionEpoch ||
         currentCollectionPlacementVersion.getTimestamp() != collectionTimestamp) {
-        return {ErrorCodes::StaleEpoch,
-                str::stream() << "The epoch of collection '" << nss.toStringForErrorMsg()
-                              << "' has changed since the migration began. The config server's "
-                                 "collection placement version epoch is now '"
-                              << currentCollectionPlacementVersion.epoch().toString()
-                              << "', but the shard's is " << collectionEpoch.toString()
-                              << "'. Aborting migration commit for chunk ("
-                              << migratedChunk.getRange().toString() << ")."};
+        uasserted(StaleEpochInfo(nss, ShardVersion{}, ShardVersion{}),
+                  str::stream() << "The epoch of collection '" << nss.toStringForErrorMsg()
+                                << "' has changed since the migration began. The config server's "
+                                   "collection placement version epoch is now '"
+                                << currentCollectionPlacementVersion.epoch().toString()
+                                << "', but the shard's is " << collectionEpoch.toString()
+                                << "'. Aborting migration commit for chunk ("
+                                << migratedChunk.getRange().toString() << ").");
     }
 
     uassert(4683300,
@@ -1984,7 +1984,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     // Check that current collection epoch and timestamp still matches the one sent by the shard.
     // This is to spot scenarios in which the collection have been dropped and recreated or had its
     // shard key refined since the migration began.
-    uassert(ErrorCodes::StaleEpoch,
+    uassert(StaleEpochInfo(nss, ShardVersion{}, ShardVersion{}),
             str::stream() << "The epoch of collection '" << nss.toStringForErrorMsg()
                           << "' has changed since the migration began. The config server's "
                              "collection placement version epoch is now '"
