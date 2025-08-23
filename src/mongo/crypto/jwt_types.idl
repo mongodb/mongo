@@ -41,7 +41,7 @@ structs:
         fields:
             kty:
                 description: Key type
-                type: string # Either 'RSA' or 'EC'
+                type: string # Always 'RSA' currently
                 cpp_name: type
             kid:
                 description: Unique Key ID
@@ -64,26 +64,6 @@ structs:
                 type: base64urlstring
                 cpp_name: publicExponent
 
-    JWKEC:
-        description: EC Specialization of the JWK type.
-        strict: false
-        inline_chained_structs: true
-        chained_structs:
-            JWK: JWK
-        fields:
-            crv:
-                description: Elliptical curve type, e.g. P-256, P-384, P-512
-                type: string
-                cpp_name: curve
-            x:
-                description: Base64 URL-encoded X-coordinate of the EC public key
-                type: base64urlstring
-                cpp_name: xcoordinate
-            y:
-                description: Base64 URL-encoded Y-coordinate of the EC public key
-                type: base64urlstring
-                cpp_name: ycoordinate
-
     JWKSet:
         # RFC 7517 Section 5
         description: A set of JSON Web Keys
@@ -105,7 +85,7 @@ structs:
                 cpp_name: type
                 optional: true
             alg:
-                description: Algorithm used to secure the JWT, e.g. 'RS256' or 'ES256'.
+                description: Algorithm used to secure the JWT, e.g. 'RS256'.
                 type: string
                 cpp_name: algorithm
             kid:

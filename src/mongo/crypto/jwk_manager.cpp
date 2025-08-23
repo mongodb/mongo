@@ -74,7 +74,6 @@ JWKManager::JWKManager(std::unique_ptr<JWKSFetcher> fetcher)
 StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     auto currentValidators = std::atomic_load(&_validators);  // NOLINT
     auto it = currentValidators->find(std::string{keyId});
-
     if (it == currentValidators->end()) {
         // We were asked to handle an unknown keyId. Try refreshing, to see if the JWKS has been
         // updated.
@@ -103,53 +102,6 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     return it->second;
 }
 
-/**
- * Helper function to load and validate an RSA key and return a key ID
- */
-std::string JWKManager::_loadAndValidateRSAKey(const JWKRSA& RSAkey) {
-    // Sanity check so that we don't load a dangerously small key.
-    auto N = reduceInt(RSAkey.getModulus());
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Key scale is smaller (" << (N.size() << 3)
-                          << " bits) than minimum required: " << (kMinKeySizeBytes << 3),
-            N.size() >= kMinKeySizeBytes);
-
-    // Sanity check so that we don't load an insensible encrypt component.
-    auto E = reduceInt(RSAkey.getPublicExponent());
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Public key component invalid: "
-                          << base64url::encode(RSAkey.getPublicExponent()),
-            (E.size() > 1) || ((E.size() == 1) && (E[0] >= 3)));
-
-    return std::string{RSAkey.getKeyId()};
-}
-
-/**
- * Helper function to load and validate an EC key and return a key ID
- */
-std::string JWKManager::_loadAndValidateECKey(const JWKEC& ECkey) {
-    // Sanity check to ensure the x and y coordinates are a minimum value
-    // For P-256, length of X and Y coordinates is 32 bytes
-    // For P-384, length of X and Y coordinates is 48 bytes
-    size_t coordinateSize = [&ECkey]() {
-        if (ECkey.getCurve() == "P-256"_sd) {
-            return 32;
-        } else if (ECkey.getCurve() == "P-384"_sd) {
-            return 48;
-        }
-        uasserted(10858402, "Unsupported curve in fetched JWKSet");
-    }();
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "X-coordinate of EC component invalid: "
-                          << base64url::encode(ECkey.getXcoordinate()),
-            (ECkey.getXcoordinate().size() == coordinateSize));
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Y-coordinate of EC component invalid: "
-                          << base64url::encode(ECkey.getYcoordinate()),
-            (ECkey.getYcoordinate().size() == coordinateSize));
-    return std::string{ECkey.getKeyId()};
-}
-
 Status JWKManager::loadKeys() try {
     if (_fetcher->quiesce()) {
         return {ErrorCodes::OperationFailed, "Skipping refresh due to IdP quiesce"};
@@ -162,19 +114,30 @@ Status JWKManager::loadKeys() try {
     for (const auto& key : parsedKeys.getKeys()) {
         auto JWK = JWK::parse(IDLParserContext("JWK"), key);
 
-        if ((JWK.getType() != "RSA"_sd) && (JWK.getType() != "EC")) {
+        if (JWK.getType() != "RSA"_sd) {
             LOGV2_WARNING(
                 8733001, "Unsupported key type in fetched JWK Set", "type"_attr = JWK.getType());
             continue;
         }
         uassert(ErrorCodes::BadValue, "Key ID must be non-empty", !JWK.getKeyId().empty());
 
-        std::string keyId;
-        if (JWK.getType() == "RSA") {
-            keyId = _loadAndValidateRSAKey(JWKRSA::parse(IDLParserContext("JWKRSA"), key));
-        } else if (JWK.getType() == "EC") {
-            keyId = _loadAndValidateECKey(JWKEC::parse(IDLParserContext("JWKEC"), key));
-        }
+        auto RSAKey = JWKRSA::parse(IDLParserContext("JWKRSA"), key);
+
+        // Sanity check so that we don't load a dangerously small key.
+        auto N = reduceInt(RSAKey.getModulus());
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Key scale is smaller (" << (N.size() << 3)
+                              << " bits) than minimum required: " << (kMinKeySizeBytes << 3),
+                N.size() >= kMinKeySizeBytes);
+
+        // Sanity check so that we don't load an insensible encrypt component.
+        auto E = reduceInt(RSAKey.getPublicExponent());
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Public key component invalid: "
+                              << base64url::encode(RSAKey.getPublicExponent()),
+                (E.size() > 1) || ((E.size() == 1) && (E[0] >= 3)));
+
+        auto keyId = std::string{RSAKey.getKeyId()};
         uassert(ErrorCodes::DuplicateKeyId,
                 str::stream() << "Key IDs must be unique, duplicate '" << keyId << "'",
                 newKeyMaterial->find(keyId) == newKeyMaterial->end());
