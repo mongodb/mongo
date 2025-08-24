@@ -269,6 +269,11 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "internal"
+            # Requires the action type performRawDataOperations. Specifies whether the operation
+            # should be a "raw data" operation. For collections that store their information in
+            # a different format than what users interact with, "raw data" operations will operate
+            # directly on the stored format. For collections where the storage and interaction
+            # format are the same, 'rawData' has no effect but may still be specified.
             rawData:
                 type: optionalBool
                 # Even though we do want this field to be forwarded to shards, we set
