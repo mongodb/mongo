@@ -12,6 +12,14 @@
         mongos_options:
           set_parameters:
             featureFlagCreateViewlessTimeseriesCollections: 1
+- name: do_not_use_rawdata_for_legacy_timeseries
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              doNotUseRawDataOperations: true
 - name: enable_viewless_timeseries_feature_flag_testdata_parameter_mongod
   value:
     executor:
@@ -37,6 +45,12 @@
       roots:
         - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
         - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+- name: all_jscore_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/core/timeseries/**/*.js
 - name: all_sharding_timeseries_tests_selector
   value:
     selector:

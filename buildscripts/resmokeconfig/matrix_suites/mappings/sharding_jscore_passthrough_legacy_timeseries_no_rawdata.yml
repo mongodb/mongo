@@ -1,0 +1,9 @@
+# Temporary suites to assists the development of new viewless timeseries collection.
+# Run all jstests/core/timeseries/* tests in sharding jscore pasthrough suite without using rawData,
+# to validate routing of requests to system.buckets collections (no rawData) still works in mongos.
+#
+# TODO SERVER-109519: remove this temporary suite and all its usages.
+base_suite: sharding_jscore_passthrough
+overrides:
+  - "viewless_timeseries.all_jscore_timeseries_tests_selector"
+  - "viewless_timeseries.do_not_use_rawdata_for_legacy_timeseries"

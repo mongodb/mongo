@@ -1,0 +1,45 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_jscore_passthrough_legacy_timeseries_no_rawdata.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          doNotUseRawDataOperations: true
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 1
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
+  roots:
+    - jstests/core/timeseries/**/*.js
+test_kind: js_test

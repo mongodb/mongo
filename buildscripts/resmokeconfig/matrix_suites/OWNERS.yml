@@ -9,6 +9,9 @@ filters:
   - "/generated_suites/*viewless_timeseries.yml":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "/generated_suites/*legacy_timeseries_no_rawdata.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "/generated_suites/*injected_catalog_metadata.yml":
     approvers:
       - 10gen/server-catalog-and-routing

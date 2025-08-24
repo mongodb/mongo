@@ -95,6 +95,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/ @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/README.md @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*viewless_timeseries.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/generated_suites/*legacy_timeseries_no_rawdata.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*injected_catalog_metadata.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/sharding_task_executor_pool_size* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/change_streams_* @10gen/query-execution-change-streams @svc-auto-approve-bot
@@ -121,6 +122,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_query_shape_hash_stability* @10gen/query-execution-query-settings @10gen/query-integration-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*viewless_timeseries* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/*legacy_timeseries_no_rawdata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_task_executor_pool_size* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot

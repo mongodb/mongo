@@ -9,6 +9,8 @@
  * ]
  */
 
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -34,8 +36,12 @@ toInsert.forEach((doc) => coll.insertOne(doc));
 
 // Test findAndModify rawData update queries.
 {
-    const doc = coll.findAndModify({query: {}, update: {$set: {"control.max._id": 100}}, rawData: true});
-    assert.eq(1, coll.find({"control.max._id": 100}).rawData().toArray().length);
+    const doc = getTimeseriesCollForRawOps(coll).findAndModify({
+        query: {},
+        update: {$set: {"control.max._id": 100}},
+        ...kRawOperationSpec,
+    });
+    assert.eq(1, getTimeseriesCollForRawOps(coll).find({"control.max._id": 100}).rawData().toArray().length);
     assert.eq(numDocs - 1, coll.find({_id: {$gt: 0}}).toArray().length);
 }
 
@@ -51,6 +57,6 @@ toInsert.forEach((doc) => coll.insertOne(doc));
 // Test findAndModify rawData delete queries.
 {
     const doc = coll.findAndModify({query: {}, remove: true});
-    assert.eq(0, coll.find({_id: doc._id}).rawData().toArray().length);
+    assert.eq(0, getTimeseriesCollForRawOps(coll).find({_id: doc._id}).rawData().toArray().length);
     assert.gt(numDocs, coll.find({}).toArray().length);
 }

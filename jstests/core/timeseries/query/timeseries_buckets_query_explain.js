@@ -5,10 +5,14 @@
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
- *   requires_fcv_82,
  *   requires_timeseries,
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kIsRawOperationSupported,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
@@ -64,19 +68,24 @@ const assertQueryPlannerNamespace = function (explain) {
 const assertCommandNamespace = function (explain, commandRun) {
     assert.eq(
         explain.command[commandRun],
-        coll.getName(),
-        `Expected command namespace to be ${tojson(coll.getName())} but got ${tojson(explain)}`,
+        getTimeseriesCollForRawOps(coll).getName(),
+        `Expected command namespace to be ${tojson(getTimeseriesCollForRawOps(coll).getName())} but got ${tojson(explain)}`,
     );
 };
 
 const assertExplain = function (explain, commandRun) {
     assertQueryPlannerNamespace(explain);
     assertCommandNamespace(explain, commandRun);
-    assert(explain.command.rawData);
+    assert(kIsRawOperationSupported === (explain.command.rawData ?? false));
     assert(!getPlanStage(explain, "UNPACK_TS_BUCKET"), `Expected to find no unpack stage but got ${tojson(explain)}`);
 };
 
-assertExplain(coll.explain().aggregate([{$match: {"control.count": 2}}], {rawData: true}), "aggregate");
-assertExplain(coll.explain().count({"control.count": 2}, {rawData: true}), "count");
-assertExplain(coll.explain().distinct("control.count", {}, {rawData: true}), "distinct");
-assertExplain(coll.explain().find({"control.count": 2}).rawData().finish(), "find");
+assertExplain(
+    getTimeseriesCollForRawOps(coll)
+        .explain()
+        .aggregate([{$match: {"control.count": 2}}], kRawOperationSpec),
+    "aggregate",
+);
+assertExplain(getTimeseriesCollForRawOps(coll).explain().count({"control.count": 2}, kRawOperationSpec), "count");
+assertExplain(getTimeseriesCollForRawOps(coll).explain().distinct("control.count", {}, kRawOperationSpec), "distinct");
+assertExplain(getTimeseriesCollForRawOps(coll).explain().find({"control.count": 2}).rawData().finish(), "find");

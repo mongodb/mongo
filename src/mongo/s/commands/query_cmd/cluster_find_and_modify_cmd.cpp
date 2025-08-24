@@ -523,11 +523,18 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
                                                const BSONObj& cmdObj,
                                                const NamespaceString& maybeTsNss) {
     // Apparently, we should return the CollectionRoutingInfo for the original namespace if we're
-    // not writing to a timeseries collection.
+    // not writing to a legacy timeseries collection.
     auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, maybeTsNss));
 
-    // Note: We try to get CollectionRoutingInfo for the timeseries buckets collection only when the
-    // timeseries deletes or updates feature flag is enabled.
+    if (cri.hasRoutingTable()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform findAndModify with sort on a sharded timeseries collection",
+                !cri.getChunkManager().isNewTimeseriesWithoutView() || !cmdObj.hasField("sort") ||
+                    isRawDataOperation(opCtx));
+        return cri;
+    }
+
+    // If this is not a (valid) operation over timeseries measurements, skip checking buckets NSS
     const bool arbitraryTimeseriesWritesEnabled =
         feature_flags::gTimeseriesDeletesSupport.isEnabled(
             VersionContext::getDecoration(opCtx),
@@ -535,12 +542,7 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
         feature_flags::gTimeseriesUpdatesSupport.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (!arbitraryTimeseriesWritesEnabled || cri.hasRoutingTable() ||
-        maybeTsNss.isTimeseriesBucketsCollection()) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform findAndModify with sort on a sharded timeseries collection",
-                !cri.getChunkManager().isNewTimeseriesWithoutView() || !cmdObj.hasField("sort") ||
-                    isRawDataOperation(opCtx));
+    if (!arbitraryTimeseriesWritesEnabled || maybeTsNss.isTimeseriesBucketsCollection()) {
         return cri;
     }
 

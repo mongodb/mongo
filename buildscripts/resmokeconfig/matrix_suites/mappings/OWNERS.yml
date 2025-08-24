@@ -50,6 +50,9 @@ filters:
   - "*viewless_timeseries*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "*legacy_timeseries_no_rawdata*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "sharding_pqs*":
     approvers:
       - 10gen/query-execution-query-settings

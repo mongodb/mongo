@@ -2443,6 +2443,18 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: sharding_jscore_passthrough_legacy_timeseries_no_rawdata_gen
+    # TODO (SERVER-109519): Remove this temporary suite.
+    tags:
+      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          # Requires legacy timeseries (system.buckets) even in all feature flags variants
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+
+  - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_injected_catalog_metadata_gen
     tags:
       [
@@ -2498,6 +2510,23 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_legacy_timeseries_no_rawdata_gen
+    # TODO (SERVER-109519): Remove this temporary suite.
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          # Requires legacy timeseries (system.buckets) even in all feature flags variants
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template

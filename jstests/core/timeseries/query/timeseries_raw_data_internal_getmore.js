@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   requires_fcv_82,
  *   does_not_support_transactions,
  *   # Refusing to run a test that issues commands that may return different values after a failover
  *   does_not_support_stepdowns,
@@ -14,6 +13,7 @@
  * ]
  */
 
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const timeField = "t";
@@ -49,8 +49,8 @@ const runCrudTest = () => {
             {[timeField]: t, [metaField]: "2", v: "baz"},
         ]),
     );
-    assert.eq(coll.find().rawData().length(), 2);
-    assert.eq(coll.find({"control.count": 2}).rawData().length(), 1);
+    assert.eq(getTimeseriesCollForRawOps(coll).find().rawData().length(), 2);
+    assert.eq(getTimeseriesCollForRawOps(coll).find({"control.count": 2}).rawData().length(), 1);
     assert(coll.drop());
 };
 

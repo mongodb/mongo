@@ -1,0 +1,24 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_legacy_timeseries_no_rawdata.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    tests:
+      - jstests/sharding/*reshard*.js
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          doNotUseRawDataOperations: true
+      nodb: ""
+matrix_suite: true
+selector:
+  roots:
+    - jstests/sharding/*timeseries*/*.js
+    - jstests/sharding/**/*timeseries*.js
+test_kind: js_test

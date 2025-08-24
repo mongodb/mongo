@@ -34,6 +34,11 @@ export const kRawOperationFieldName = "rawData";
 
 // TODO (SERVER-103187): Remove these functions once v9.0 becomes last-LTS.
 export function isRawOperationSupported(db) {
+    if (TestData.doNotUseRawDataOperations) {
+        assert(!FeatureFlagUtil.isEnabled(db, "CreateViewlessTimeseriesCollections"));
+        return false;
+    }
+
     // getParameter can't be used inside transactions, so issue the command directly on the
     // connection, rather than using the session potentially linked to the DB object.
     const conn = db.getMongo();

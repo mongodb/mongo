@@ -1,0 +1,9 @@
+# Temporary suites to assists the development of new viewless timeseries collection.
+# Run all timeseries tests in the sharding suite without using rawData,
+# to validate routing of requests to system.buckets collections (no rawData) still works in mongos.
+#
+# TODO SERVER-109519: remove this temporary suite and all its usages.
+base_suite: sharding
+overrides:
+  - "viewless_timeseries.all_sharding_timeseries_tests_selector"
+  - "viewless_timeseries.do_not_use_rawdata_for_legacy_timeseries"

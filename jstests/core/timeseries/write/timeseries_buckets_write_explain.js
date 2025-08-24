@@ -2,12 +2,15 @@
  * Tests explaining write operations on the raw buckets of a timeseries collection.
  *
  * @tags: [
- *   requires_fcv_82,
  *   requires_timeseries,
  * ]
  */
 
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kIsRawOperationSupported,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -37,21 +40,21 @@ const assertExplain = function (commandResult, commandName) {
         );
         assert.eq(
             commandResult.command.nsInfo[0].ns,
-            coll.getFullName(),
-            `Expected command namespace to be ${tojson(coll.getFullName())} but got ${tojson(
+            getTimeseriesCollForRawOps(coll).getFullName(),
+            `Expected command namespace to be ${tojson(getTimeseriesCollForRawOps(coll).getFullName())} but got ${tojson(
                 commandResult.command.nsInfo[0].ns,
             )}`,
         );
     } else {
         assert.eq(
             commandResult.command[commandName],
-            coll.getName(),
-            `Expected command namespace to be ${tojson(coll.getName())} but got ${tojson(
+            getTimeseriesCollForRawOps(coll).getName(),
+            `Expected command namespace to be ${tojson(getTimeseriesCollForRawOps(coll).getName())} but got ${tojson(
                 commandResult.command[commandName],
             )}`,
         );
     }
-    assert(commandResult.command.rawData);
+    assert(kIsRawOperationSupported === (commandResult.command.rawData ?? false));
     assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
         "Expected not to find TS_MODIFY stage " + tojson(commandResult);
 };
