@@ -154,18 +154,6 @@ struct __wt_cell {
     uint8_t __chunk[98];
 };
 
-/*
- * WT_DELTA_CELL_INT --
- *  Variable-length, delta internal cell header.
- */
-struct __wt_delta_cell_int {
-    /*
-     * Maximum of 1 byte:
-     *  1: cell descriptor byte
-     */
-    uint8_t __chunk[1];
-};
-
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CELL_UNPACK_OVERFLOW 0x1u            /* cell is an overflow */
 #define WT_CELL_UNPACK_TIME_WINDOW_CLEARED 0x2u /* time window cleared because of restart */
@@ -237,9 +225,6 @@ struct __wt_cell_unpack_delta_int {
     uint32_t __len;
     WT_CELL_UNPACK_KV key;
     WT_CELL_UNPACK_ADDR value;
-
-#define WT_DELTA_INT_IS_DELETE 0x01u
-    uint8_t flags;
 };
 
 #define WT_VALUE_IS_DELETE 0x01u

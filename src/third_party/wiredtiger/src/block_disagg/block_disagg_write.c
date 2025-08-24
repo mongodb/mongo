@@ -287,9 +287,11 @@ __wti_block_disagg_page_discard(
     WT_PAGE_LOG_DISCARD_ARGS discard_args;
     WT_CLEAR(discard_args);
 
-    /* Always 0 for full page. */
-    discard_args.base_lsn = 0;
+    /* Set the base LSN to the last full page image. */
+    bool is_delta = FLD_ISSET(cookie.flags, WT_BLOCK_DISAGG_ADDR_FLAG_DELTA);
+    discard_args.base_lsn = is_delta ? cookie.base_lsn : cookie.lsn;
 
+    /* Set the backlink LSN to the LSN of the last page version. */
     discard_args.backlink_lsn = cookie.lsn;
 
     WT_STAT_CONN_INCR(session, disagg_block_page_discard);

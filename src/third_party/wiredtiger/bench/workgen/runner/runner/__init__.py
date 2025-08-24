@@ -98,3 +98,4 @@ except:
 
 from .core import txn, extensions_config, op_append, op_group_transaction, op_log_like, op_multi_table, op_populate_with_range, sleep, timed
 from .latency import workload_latency
+from .wtcache import get_cache_eviction_stats

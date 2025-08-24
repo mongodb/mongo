@@ -119,6 +119,7 @@ typedef struct {
     uint64_t last_materialized_lsn;    /* The last materialized LSN (0 if not set) */
     uint32_t verbose;                  /* Verbose level */
     bool verbose_msg;                  /* Send verbose messages to msg callback interface */
+    bool verify;                       /* Perform verification throughout the workload. */
 
     /*
      * Statistics are collected but not yet exposed.
@@ -200,6 +201,8 @@ palm_configure(PALM *palm, WT_CONFIG_ARG *config)
         goto err;
     if ((ret = palm_configure_bool(palm, env_parser, config, "verbose_msg", &palm->verbose_msg)) !=
       0)
+        goto err;
+    if ((ret = palm_configure_bool(palm, env_parser, config, "verify", &palm->verify)) != 0)
         goto err;
 
 err:
@@ -681,6 +684,75 @@ err:
     return (ret);
 }
 
+#define PALM_VERIFY_EQUAL(a, b)                                                                   \
+    {                                                                                             \
+        if ((a) != (b)) {                                                                         \
+            ret = palm_kv_err(palm, session, EINVAL,                                              \
+              "%s:%d: Delta chain validation failed at position %" PRIu32                         \
+              ": %s != %s. Page details: table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64 \
+              ", flags=%" PRIx64 ", %s=%" PRIu64 ", %s=%" PRIu64,                                 \
+              __func__, __LINE__, count, #a, #b, palm_handle->table_id, page_id, matches.lsn,     \
+              matches.flags, #a, (a), #b, (b));                                                   \
+            goto err;                                                                             \
+        }                                                                                         \
+    }
+
+static int
+palm_handle_verify_page(
+  WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id, uint64_t lsn)
+{
+    PALM *palm;
+    PALM_KV_CONTEXT context;
+    PALM_HANDLE *palm_handle;
+    PALM_KV_PAGE_MATCHES matches;
+    uint32_t count;
+    uint64_t last_base_lsn, last_lsn;
+    bool last_tombstone;
+    int ret;
+
+    count = 0;
+    last_base_lsn = last_lsn = 0;
+    last_tombstone = false;
+    palm_handle = (PALM_HANDLE *)plh;
+    palm = palm_handle->palm;
+
+    palm_init_context(palm, &context);
+    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
+    PALM_KV_ERR(palm, session,
+      palm_kv_get_page_matches(&context, palm_handle->table_id, page_id, lsn, &matches));
+    while (palm_kv_next_page_match(&matches)) {
+
+        /* FIXME-WT-15041: Enable the following once PALM can handle abandoned checkpoints. */
+        (void)last_tombstone;
+#if 0
+        /* Only the last page in the chain can be a tombstone. */
+        PALM_VERIFY_EQUAL(last_tombstone, false);
+
+        /* Validate backlink LSN. */
+        if (count > 0)
+            PALM_VERIFY_EQUAL(matches.backlink_lsn, last_lsn);
+#endif
+
+        /* Validate base LSN. */
+        if (count == 1) {
+            PALM_VERIFY_EQUAL(matches.base_lsn, last_lsn);
+        } else if (count > 1) {
+            PALM_VERIFY_EQUAL(matches.base_lsn, last_base_lsn);
+        }
+
+        count++;
+        last_base_lsn = matches.base_lsn;
+        last_lsn = matches.lsn;
+        if ((matches.flags & WT_PALM_KV_TOMBSTONE) != 0)
+            last_tombstone = true;
+    }
+    PALM_KV_ERR(palm, session, matches.error);
+
+err:
+    palm_kv_rollback_transaction(&context);
+    return (ret);
+}
+
 static int
 palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *discard_args)
@@ -696,9 +768,9 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
 
     (void)checkpoint_id; /* Unused parameter */
 
-    /* We always write full pages for tombstones, PALM has its own flag. */
-    bool is_delta = false;
-    uint32_t flags = WT_PALM_KV_TOMBSTONE;
+    /* Tombstones are deltas. */
+    bool is_delta = true;
+    uint32_t flags = WT_PALM_KV_TOMBSTONE | WT_PAGE_LOG_DELTA;
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     uint64_t lsn;
@@ -729,6 +801,10 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
 
     discard_args->lsn = lsn;
+
+    /* Verify the delta chain. */
+    if (palm->verify)
+        PALM_KV_ERR(palm, session, palm_handle_verify_page(plh, session, page_id, lsn));
 
     if (0) {
 err:
@@ -804,19 +880,6 @@ err:
     return (ret);
 }
 
-#define PALM_GET_VERIFY_EQUAL(a, b)                                                                \
-    {                                                                                              \
-        if ((a) != (b)) {                                                                          \
-            ret = palm_kv_err(palm, session, EINVAL,                                               \
-              "%s:%d: Delta chain validation failed at position %" PRIu32                          \
-              ": %s != %s. Page details: table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64  \
-              ", %s=%" PRIu64 ", %s=%" PRIu64,                                                     \
-              __func__, __LINE__, count, #a, #b, palm_handle->table_id, page_id, lsn, #a, (a), #b, \
-              (b));                                                                                \
-            goto err;                                                                              \
-        }                                                                                          \
-    }
-
 static int
 palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
@@ -861,15 +924,17 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
         PALM_KV_ERR(palm, session, palm_resize_item(&results_array[count], matches.size));
         memcpy(results_array[count].mem, matches.data, matches.size);
 
-        /* Validate back links. */
-        if (count > 0)
-            PALM_GET_VERIFY_EQUAL(matches.backlink_lsn, last_lsn);
+        if (palm->verify) {
+            /* Validate backlink LSN. */
+            if (count > 0)
+                PALM_VERIFY_EQUAL(matches.backlink_lsn, last_lsn);
 
-        /* Validate base. */
-        if (count == 1) {
-            PALM_GET_VERIFY_EQUAL(matches.base_lsn, last_lsn);
-        } else if (count > 1) {
-            PALM_GET_VERIFY_EQUAL(matches.base_lsn, get_args->base_lsn);
+            /* Validate base LSN. */
+            if (count == 1) {
+                PALM_VERIFY_EQUAL(matches.base_lsn, last_lsn);
+            } else if (count > 1) {
+                PALM_VERIFY_EQUAL(matches.base_lsn, get_args->base_lsn);
+            }
         }
 
         /* We should not request a page that is discarded. */
@@ -1075,6 +1140,9 @@ palm_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      * The first reference is implied by the call to add_page_log.
      */
     palm->reference_count = 1;
+
+    /* Turn on verification by default, as PALM is used primarily for testing. */
+    palm->verify = true;
 
     if ((ret = palm_configure(palm, config)) != 0)
         goto err;

@@ -181,6 +181,7 @@ func_ok()
         -e '/int nop_terminate$/d' \
         -e '/int os_errno$/d' \
         -e '/int palm_err$/d' \
+        -e '/int palm_handle_verify_page$/d' \
         -e '/int palm_kv_err$/d' \
         -e '/int palm_set_last_materialized_lsn$/d' \
         -e '/int revint_terminate$/d' \

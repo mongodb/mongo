@@ -1396,37 +1396,6 @@ __wt_cell_unpack_kv(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL
 }
 
 /*
- * __wt_cell_unpack_delta_int --
- *     Unpack an internal delta cell into a structure.
- */
-static WT_INLINE void
-__wt_cell_unpack_delta_int(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *page_dsk,
-  const WT_PAGE_HEADER *dsk, WT_DELTA_CELL_INT *cell, WT_CELL_UNPACK_DELTA_INT *unpack_delta)
-{
-    WT_DECL_RET;
-    const uint8_t *p;
-
-    WT_UNUSED(dsk);
-
-    unpack_delta->flags = cell->__chunk[0];
-    p = (uint8_t *)&cell->__chunk[1];
-
-    /* Unpack the key. */
-    __wt_cell_unpack_kv(session, page_dsk, (WT_CELL *)p, &unpack_delta->key);
-    p += unpack_delta->key.__len;
-
-    /* Optionally unpack the value if it exists. */
-    if (!F_ISSET(unpack_delta, WT_DELTA_INT_IS_DELETE)) {
-        __wt_cell_unpack_addr(session, page_dsk, (WT_CELL *)p, &unpack_delta->value);
-        p += unpack_delta->value.__len;
-    }
-
-    unpack_delta->__len = (uint32_t)WT_PTRDIFF(p, &cell->__chunk[0]);
-
-    WT_UNUSED(ret); /* Avoid "unused variable" warnings in non-debug builds. */
-}
-
-/*
  * __wt_cell_unpack_delta_leaf_value --
  *     Unpack a leaf delta value cell into a structure.
  */
@@ -1547,10 +1516,12 @@ __wt_page_cell_data_ref_kv(
         uint32_t __i;                                                                           \
         uint8_t *__cell;                                                                        \
         for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-             --__i) {                                                                           \
-            __wt_cell_unpack_delta_int(                                                         \
-              session, page_dsk, dsk, (WT_DELTA_CELL_INT *)__cell, &(unpack));                  \
-            __cell += (unpack).__len;
+             __i -= 2) {                                                                        \
+            WT_CELL_UNPACK_DELTA_INT *t_unpack = &unpack;                                       \
+            __wt_cell_unpack_kv(session, page_dsk, (WT_CELL *)__cell, &t_unpack->key);          \
+            __cell += t_unpack->key.__len;                                                      \
+            __wt_cell_unpack_addr(session, page_dsk, (WT_CELL *)__cell, &t_unpack->value);      \
+            __cell += t_unpack->value.__len;
 
 #define WT_CELL_FOREACH_DELTA_LEAF(session, dsk, unpack)                                        \
     do {                                                                                        \

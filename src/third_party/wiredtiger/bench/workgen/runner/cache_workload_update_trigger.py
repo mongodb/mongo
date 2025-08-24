@@ -34,97 +34,6 @@ from runner import *
 from wiredtiger import *
 from workgen import *
 
-def get_cache_eviction_stats(session, cache_eviction_file):
-
-    if cache_eviction_file:
-        fh = open(cache_eviction_file, 'a')
-    else:
-        fh = sys.stdout
-
-    stat_cursor = session.open_cursor('statistics:')
-    print('----- Start of Cache Eviction statistics -----', file=fh)
-    # Cache statistics
-    cache_total = stat_cursor[wiredtiger.stat.conn.cache_bytes_max][2]
-    print('Cache size          : 100 % :' + str(cache_total), file=fh)
-    bytes_inuse = stat_cursor[wiredtiger.stat.conn.cache_bytes_inuse][2]
-    value = ((bytes_inuse / cache_total) * 100 )
-    print('Cache_bytes_inuse   : ' + str(round(value,2)) +' % : ' + str(bytes_inuse), file=fh)
-    bytes_image = stat_cursor[wiredtiger.stat.conn.cache_bytes_image][2]
-    value = ((bytes_image / cache_total) * 100 )
-    print('Cache_bytes_image   : ' + str(round(value,2)) +' % : ' + str(bytes_image), file=fh)
-    bytes_updates = stat_cursor[wiredtiger.stat.conn.cache_bytes_updates][2]
-    value = ((bytes_updates / cache_total) * 100 )
-    print('Cache_bytes_updates : ' + str(round(value,2)) +' % : ' + str(bytes_updates), file=fh)
-    bytes_dirty = stat_cursor[wiredtiger.stat.conn.cache_bytes_dirty][2]
-    value = ((bytes_dirty / cache_total) * 100 )
-    print('Cache_bytes_dirty   : ' + str(round(value,2)) +' % : ' + str(bytes_dirty), file=fh)
-
-
-    # History store statistics
-    bytes_hs = stat_cursor[wiredtiger.stat.conn.cache_bytes_hs][2]
-    value = ((bytes_hs / cache_total) * 100 )
-    print('Cache_bytes_hs      : ' + str(round(value,2)) +' % : ' + str(bytes_hs), file=fh)
-    bytes_hs_dirty = stat_cursor[wiredtiger.stat.conn.cache_bytes_hs_dirty][2]
-    value = ((bytes_hs_dirty / cache_total) * 100 )
-    print('Cache_bytes_hs_dirty : ' + str(round(value,2)) +' % : ' + str(bytes_hs_dirty), file=fh)
-    bytes_hs_updates = stat_cursor[wiredtiger.stat.conn.cache_bytes_hs_updates][2]
-    value = ((bytes_hs_updates / cache_total) * 100 )
-    print('Cache_bytes_hs_updates : ' + str(round(value,2)) +' % : ' + str(bytes_hs_updates), file=fh)
-    print(' ', file=fh)
-
-    # Cache configured trigger statistics
-    trigger_updates = stat_cursor[wiredtiger.stat.conn.cache_eviction_trigger_updates_reached][2]
-    print('Cache updates trigger  : ' + str(trigger_updates), file=fh)
-    trigger_dirty = stat_cursor[wiredtiger.stat.conn.cache_eviction_trigger_dirty_reached][2]
-    print('Cache dirty trigger : ' + str(trigger_dirty), file=fh)
-    trigger_usage = stat_cursor[wiredtiger.stat.conn.cache_eviction_trigger_reached][2]
-    print('Cache usage trigger : ' + str(trigger_usage), file=fh)
-    print(' ', file=fh)
-
-    # App cache statistics
-    value = stat_cursor[wiredtiger.stat.conn.cache_read_app_count][2]
-    print('App pages read  : ' + str(value), file=fh)
-    value = stat_cursor[wiredtiger.stat.conn.cache_write_app_count][2]
-    print('App pages wrote : ' + str(value), file=fh)
-    print(' ', file=fh)
-
-    #App eviction statistics
-    app_dirty_attempt = stat_cursor[wiredtiger.stat.conn.eviction_app_dirty_attempt][2]
-    print('App evict dirty attempts        : ' + str(app_dirty_attempt), file=fh)
-    app_dirty_fail = stat_cursor[wiredtiger.stat.conn.eviction_app_dirty_fail][2]
-    print('App evict dirty attempts failed : ' + str(app_dirty_fail), file=fh)
-    app_attempt = stat_cursor[wiredtiger.stat.conn.eviction_app_attempt][2]
-    print('App evict clean attempts        : ' + str(app_attempt - app_dirty_attempt), file=fh)
-    app_fail = stat_cursor[wiredtiger.stat.conn.eviction_app_fail][2]
-    print('App evict clean attempts failed : ' + str(app_fail - app_dirty_fail), file=fh)
-    print(' ', file=fh)
-
-    # Force eviction statistics
-    force = stat_cursor[wiredtiger.stat.conn.eviction_force][2]
-    print('Force evict attempts         : ' + str(force), file=fh)
-    force_clean = stat_cursor[wiredtiger.stat.conn.eviction_force_clean][2]
-    print('Force evict clean attempts   : ' + str(force_clean), file=fh)
-    force_dirty = stat_cursor[wiredtiger.stat.conn.eviction_force_dirty][2]
-    print('Force evict dirty attempts   : ' + str(force_dirty), file=fh)
-    force_long_update = stat_cursor[wiredtiger.stat.conn.eviction_force_long_update_list][2]
-    print('Force evict long update list : ' + str(force_long_update), file=fh)
-    force_delete = stat_cursor[wiredtiger.stat.conn.eviction_force_delete][2]
-    print('Force evict too many deletes : ' + str(force_delete), file=fh)
-    force_fail = stat_cursor[wiredtiger.stat.conn.eviction_force_fail][2]
-    print('Force evict failed           : ' + str(force_fail), file=fh)
-    print(' ', file=fh)
-
-    # Eviction worker statistics
-    worker_attempt = stat_cursor[wiredtiger.stat.conn.eviction_worker_evict_attempt][2]
-    print('Eviction worker attempts        : ' + str(worker_attempt), file=fh)
-    worker_attempt_fail = stat_cursor[wiredtiger.stat.conn.eviction_worker_evict_fail][2]
-    print('Eviction worker attempts failed : ' + str(worker_attempt_fail), file=fh)
-    print('----- End of Cache Eviction statistics -----', file=fh)
-    print(' ', file=fh)
-
-
-    stat_cursor.close()
-
 context = Context()
 # eviction_updates_trigger=30
 conn_config = ""
@@ -132,10 +41,7 @@ conn_config += ",cache_size=10GB,eviction=(threads_max=8),log=(enabled=true),ses
 conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
-wtperf_table_config = "key_format=S,value_format=S," +\
-    "exclusive=true,allocation_size=4kb," +\
-    "internal_page_max=64kb,leaf_page_max=4kb,split_pct=100,"
-compress_table_config = ""
+wtperf_table_config = "key_format=S,value_format=S,exclusive=true,allocation_size=4kb,internal_page_max=64kb,"
 table_config = "memory_page_max=10m,leaf_value_max=64MB,checksum=on,split_pct=90,type=file,log=(enabled=false),leaf_page_max=32k"
 tables = []
 table_count = 10
@@ -145,8 +51,7 @@ cfg_value_size = 2000
 for i in range(0, table_count):
     tname = "table:test" + str(i)
     table = Table(tname)
-    s.create(tname, wtperf_table_config +\
-             compress_table_config + table_config)
+    s.create(tname, wtperf_table_config + table_config)
     table.options.key_size = cfg_key_size
     table.options.value_size = cfg_value_size
     tables.append(table)
@@ -162,13 +67,12 @@ pop_thread = Thread(pop_ops * nops_per_thread)
 pop_workload = Workload(context, populate_threads * pop_thread)
 ret = pop_workload.run(conn)
 assert ret == 0, ret
-cache_eviction_file = context.args.home + "/cache_eviction.stat"
 
 print('Populate complete')
 
 # Log like file, requires that logging be enabled in the connection config.
 log_name = "table:log"
-s.create(log_name, wtperf_table_config + "key_format=S,value_format=S," + compress_table_config + table_config + ",log=(enabled=true)")
+s.create(log_name, wtperf_table_config + table_config + ",log=(enabled=true)")
 log_table = Table(log_name)
 log_table.options.key_size = cfg_key_size
 log_table.options.value_size = cfg_value_size
@@ -258,6 +162,7 @@ ret = cache_workload.run(conn)
 assert ret == 0, ret
 
 # print stats after workload run
+cache_eviction_file = context.args.home + "/cache_eviction.stat"
 get_cache_eviction_stats(s, cache_eviction_file)
 
 latency_filename = context.args.home + "/latency.stat"

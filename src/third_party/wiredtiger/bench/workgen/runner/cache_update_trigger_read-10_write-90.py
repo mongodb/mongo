@@ -65,6 +65,7 @@ pop_ops = op_multi_table(pop_ops, tables)
 nops_per_thread = icount // (populate_threads * table_count)
 pop_thread = Thread(pop_ops * nops_per_thread)
 pop_workload = Workload(context, populate_threads * pop_thread)
+pop_workload.options.report_enabled=False
 ret = pop_workload.run(conn)
 assert ret == 0, ret
 
@@ -94,6 +95,11 @@ thread_log_read.options.session_config="isolation=snapshot"
 thread_log_read.options.throttle=60
 thread_log_read.options.throttle_burst=0
 
+checkpoint_ops = Operation(Operation.OP_SLEEP, "30") + \
+      Operation(Operation.OP_CHECKPOINT, "")
+ops = checkpoint_ops * 10
+checkpoint_thread = Thread(ops)
+
 ############################################################################
 # This part was added to the generated file.
 # Add threads that do a bunch of operations and sleep, all in a loop.
@@ -101,7 +107,7 @@ thread_log_read.options.throttle_burst=0
 # but that effect will dissipate over time.
 
 # This workload is to hit the update trigger
-ops = Operation(Operation.OP_UPDATE, tables[0])
+ops = Operation(Operation.OP_UPDATE, tables[0],Key(Key.KEYGEN_PARETO, 0, ParetoOptions(1)))
 ops = txn(ops, 'isolation=snapshot')
 # use_commit_timestamp - Commit the transaction with commit_timestamp.
 ops.transaction.use_commit_timestamp = True
@@ -116,7 +122,7 @@ ops = txn(ops, 'isolation=snapshot')
 # use_commit_timestamp - Commit the transaction with commit_timestamp.
 ops.transaction.use_commit_timestamp = True
 ops = op_multi_table(ops, tables, False)
-ops = ops * 10000 + Operation(Operation.OP_SLEEP, "10")
+ops = ops * 1000 + Operation(Operation.OP_SLEEP, "10")
 thread_read10k_sleep10 = Thread(ops)
 thread_upd10k_sleep10.options.name = "Search"
 thread_read10k_sleep10.options.session_config="isolation=snapshot"
@@ -126,28 +132,29 @@ thread_read10k_sleep10.options.session_config="isolation=snapshot"
 ############################################################################
 
 #Configure only the expected % of read operations
-#15% update workload to hit the cache dirty trigger threshold
-read_ops = 85
+read_ops = 10
+#Calculate the write operations based on configured write operations.
+write_ops = (100 - read_ops)
 
-#Specify number of threads for workload
+#Calculate threads for read operations
 total_thread_num = 128
 log_read_thread_num = 1
 log_write_thread_num = 1
-#Calculate threads for read operations based on % of read operations
 read_thread_num = int(((read_ops * total_thread_num) / 100))
-#Remaining threads for write operations
 write_thread_num = (total_thread_num - read_thread_num)
+
 
 cache_workload = Workload(context,\
                         + log_write_thread_num * thread_log_upd \
                         + log_read_thread_num * thread_log_read \
+                        + checkpoint_thread \
                         + write_thread_num * thread_upd10k_sleep10 \
                         + read_thread_num * thread_read10k_sleep10)
 
 cache_workload.options.report_interval=10
 # max operational latency in milli seconds.
 cache_workload.options.max_latency=1000
-cache_workload.options.run_time=200
+cache_workload.options.run_time=300
 cache_workload.options.sample_rate=1
 cache_workload.options.warmup=0
 cache_workload.options.sample_interval_ms = 1000
@@ -155,7 +162,6 @@ cache_workload.options.sample_interval_ms = 1000
 ret = cache_workload.run(conn)
 assert ret == 0, ret
 
-# print stats after workload run
 cache_eviction_file = context.args.home + "/cache_eviction.stat"
 get_cache_eviction_stats(s, cache_eviction_file)
 
