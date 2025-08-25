@@ -57,6 +57,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
@@ -67,6 +68,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
@@ -95,6 +97,227 @@ namespace mongo {
 namespace {
 
 void callbackMock() {}
+
+TEST_F(StorageEngineTest, DirectWritesInsertTest) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const int64_t intKey{1};
+    const std::span<const char> strKey{"key"_sd};
+    const std::span<const char> value{"test"_sd};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    const auto intIdent = intRs->rs()->getIdent();
+    const auto strIdent = strRs->rs()->getIdent();
+
+    // Perform direct writes.
+    {
+        StorageWriteTransaction txn(*ru);
+        ASSERT_OK(
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value));
+        ASSERT_OK(
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value));
+        txn.commit();
+    }
+
+    // Verify results.
+    auto intOut = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
+    auto strOut = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
+
+    ASSERT_OK(intOut);
+    ASSERT_OK(strOut);
+    ASSERT_EQ(value.size(), intOut.getValue().capacity());
+    ASSERT_EQ(value.size(), strOut.getValue().capacity());
+    ASSERT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
+    ASSERT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
+}
+
+TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const int64_t intKey{1};
+    const std::span<const char> strKey{"key"_sd};
+    const std::span<const char> value{"test"_sd};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    const auto intIdent = intRs->rs()->getIdent();
+    const auto strIdent = strRs->rs()->getIdent();
+
+    // Initial insertions.
+    {
+        StorageWriteTransaction txn(*ru);
+        ASSERT_OK(
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value));
+        ASSERT_OK(
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value));
+        txn.commit();
+    }
+
+    // Verify initial insertions.
+    auto intOut = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
+    auto strOut = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
+
+    ASSERT_OK(intOut);
+    ASSERT_OK(strOut);
+    ASSERT_EQ(value.size(), intOut.getValue().capacity());
+    ASSERT_EQ(value.size(), strOut.getValue().capacity());
+    ASSERT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
+    ASSERT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
+
+
+    // Perform deletes.
+    {
+        StorageWriteTransaction txn(*ru);
+        ASSERT_OK(storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, intKey));
+        ASSERT_OK(storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, strKey));
+        txn.commit();
+    }
+
+    // Check for successful deletes.
+    auto s1 = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
+    ASSERT_NOT_OK(s1);
+    ASSERT_EQ(ErrorCodes::NoSuchKey, s1.getStatus().code());
+    auto s2 = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
+    ASSERT_NOT_OK(s2);
+    ASSERT_EQ(ErrorCodes::NoSuchKey, s2.getStatus().code());
+}
+
+
+TEST_F(StorageEngineTest, DirectWritesFailures) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const int64_t intKey{1};
+    const int64_t nonExistentIntKey{2};
+    const std::span<const char> strKey{"key"_sd};
+    const std::span<const char> nonExistentStrKey{"nonExistentKey"_sd};
+    const std::span<const char> value1{"test1"_sd};
+    const std::span<const char> value2{"test2"_sd};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    const auto intIdent = intRs->rs()->getIdent();
+    const auto strIdent = strRs->rs()->getIdent();
+
+    // Initial insertions.
+    {
+        StorageWriteTransaction txn(*ru);
+        ASSERT_OK(
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1));
+        ASSERT_OK(
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1));
+        txn.commit();
+    }
+
+
+    // Duplicate key insertion will return DuplicateKey.
+    {
+        StorageWriteTransaction txn(*ru);
+        auto s1 =
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1);
+        ASSERT_NOT_OK(s1);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, s1.code());
+        auto s2 =
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1);
+        ASSERT_NOT_OK(s2);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, s2.code());
+    }
+
+
+    // Duplicate keys with different values will also return DuplicateKey.
+    {
+        StorageWriteTransaction txn(*ru);
+        auto s1 =
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value2);
+        ASSERT_NOT_OK(s1);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, s1.code());
+        auto s2 =
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value2);
+        ASSERT_NOT_OK(s2);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, s2.code());
+    }
+
+    // Deleting non-existent keys will return NoSuchKey.
+    {
+        StorageWriteTransaction txn(*ru);
+        auto s1 =
+            storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, nonExistentIntKey);
+        ASSERT_NOT_OK(s1);
+        ASSERT_EQ(ErrorCodes::NoSuchKey, s1.code());
+
+        auto s2 =
+            storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, nonExistentStrKey);
+        ASSERT_NOT_OK(s2);
+        ASSERT_EQ(ErrorCodes::NoSuchKey, s2.code());
+    }
+}
+
+DEATH_TEST_F(StorageEngineTest, DirectWritesInsertRequiresStorageTransaction, "invariant") {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const char* key = "key";
+    const char* valueToStore = "test";
+    const int64_t intKey{1};
+    const std::span<const char> value{valueToStore, std::strlen(valueToStore)};
+    const std::span<const char> strKey{key, std::strlen(key)};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    const auto intIdent = intRs->rs()->getIdent();
+
+    // This should fail an invariant from missing a storage transaction.
+    {
+        auto status =
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value);
+    }
+}
+
+DEATH_TEST_F(StorageEngineTest, DirectWritesDeleteRequiresStorageTransaction, "invariant") {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const char* key = "key";
+    const char* valueToStore = "test";
+    const int64_t intKey{1};
+    const std::span<const char> value{valueToStore, std::strlen(valueToStore)};
+    const std::span<const char> strKey{key, std::strlen(key)};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    const auto intIdent = intRs->rs()->getIdent();
+
+    {
+        StorageWriteTransaction txn(*ru);
+        auto status =
+            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value);
+        ASSERT_OK(status);
+        txn.commit();
+    }
+
+    // This should fail an invariant from missing a storage transaction.
+    {
+        auto status = storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, intKey);
+    }
+}
 
 TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();

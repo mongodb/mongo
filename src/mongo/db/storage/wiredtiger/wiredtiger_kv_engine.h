@@ -269,6 +269,17 @@ public:
         return _wtConfig.inMemory;
     }
 
+    Status insertIntoIdent(RecoveryUnit& ru,
+                           StringData ident,
+                           IdentKey key,
+                           std::span<const char> value) override;
+
+    StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
+                                          StringData ident,
+                                          IdentKey key) override;
+
+    Status deleteFromIdent(RecoveryUnit& ru, StringData ident, IdentKey key) override;
+
     virtual Status alterMetadata(StringData uri, StringData config) {
         MONGO_UNREACHABLE;
     }

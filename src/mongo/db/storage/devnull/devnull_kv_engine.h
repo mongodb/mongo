@@ -226,6 +226,23 @@ public:
 
     void dump() const override {}
 
+    Status insertIntoIdent(RecoveryUnit& ru,
+                           StringData ident,
+                           IdentKey key,
+                           std::span<const char> value) override {
+        return Status::OK();
+    }
+
+    StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
+                                          StringData ident,
+                                          IdentKey key) override {
+        return Status::OK();
+    }
+
+    Status deleteFromIdent(RecoveryUnit& ru, StringData ident, IdentKey key) override {
+        return Status::OK();
+    }
+
     // This sets the results of the backup cursor for unit tests.
     void setBackupBlocks_forTest(std::deque<KVBackupBlock> newBackupBlocks) {
         _mockBackupBlocks = std::move(newBackupBlocks);

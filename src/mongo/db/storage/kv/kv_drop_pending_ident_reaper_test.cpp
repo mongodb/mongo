@@ -205,6 +205,23 @@ public:
 
     void dump() const override {}
 
+    Status insertIntoIdent(RecoveryUnit& ru,
+                           StringData ident,
+                           IdentKey key,
+                           std::span<const char> value) override {
+        MONGO_UNREACHABLE;
+    }
+
+    StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
+                                          StringData ident,
+                                          IdentKey key) override {
+        MONGO_UNREACHABLE;
+    }
+
+    Status deleteFromIdent(RecoveryUnit& ru, StringData ident, IdentKey key) override {
+        MONGO_UNREACHABLE;
+    }
+
     // List of ident names removed using dropIdent().
     std::vector<std::string> droppedIdents;
 

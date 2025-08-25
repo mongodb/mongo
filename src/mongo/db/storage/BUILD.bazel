@@ -521,6 +521,21 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "storage_engine_direct_crud",
+    srcs = [
+        "storage_engine_direct_crud.cpp",
+    ],
+    hdrs = [
+        "storage_engine_direct_crud.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:recovery_unit_base",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+    ],
+)
+
+mongo_cc_library(
     name = "ident",
     srcs = [
         "ident.cpp",
@@ -746,6 +761,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/local_catalog:collection_options",
         "//src/mongo/db/local_catalog:durable_catalog",
         "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage:storage_engine_direct_crud",
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/db/storage:storage_repair_observer",
         "//src/mongo/db/storage/devnull:storage_devnull_core",

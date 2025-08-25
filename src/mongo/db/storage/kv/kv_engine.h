@@ -50,6 +50,8 @@ class SnapshotManager;
 
 class KVEngine {
 public:
+    using IdentKey = std::variant<std::span<const char>, int64_t>;
+
     /**
      * During the startup process, the storage engine is one of the first components to be started
      * up and fully initialized. But that fully initialized storage engine may not be recognized as
@@ -491,6 +493,37 @@ public:
      * See `StorageEngine::setPinnedOplogTimestamp`
      */
     virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) = 0;
+
+    /**
+     * Inserts a key-value pair into the specified 'ident'. Must be called from within a
+     * storage transaction. Duplicate keys (and by extension, updates) are not allowed.
+     *
+     * Returns OK on success, 'DuplicateKey' if the key already exists, or the error returned by
+     * the underlying storage engine on other failures.
+     */
+    virtual Status insertIntoIdent(RecoveryUnit& ru,
+                                   StringData ident,
+                                   IdentKey key,
+                                   std::span<const char> value) = 0;
+
+    /**
+     * Retrieves the value associated with 'key' from the specified 'ident'.
+     *
+     * Returns a 'UniqueBuffer' containing the value on success, 'KeyNotFound' if the key does not
+     * exist, or the error returned by the underlying storage engine on other failures.
+     */
+    virtual StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
+                                                  StringData ident,
+                                                  IdentKey key) = 0;
+
+    /**
+     * Deletes the key from the specified 'ident'.
+     *
+     * Returns OK on success, 'KeyNotFound' if the key does not exist, or the error returned by the
+     * underlying storage engine on other failures. Must be called from within a storage
+     * transaction.
+     */
+    virtual Status deleteFromIdent(RecoveryUnit& ru, StringData ident, IdentKey key) = 0;
 
     /**
      * See `StorageEngine::dump`
