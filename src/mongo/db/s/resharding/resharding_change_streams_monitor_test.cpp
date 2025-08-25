@@ -325,7 +325,7 @@ public:
     }
 
     /**
-     * Returns true if there is an idle cursor with the given namespace.
+     * Returns true if there is an open cursor with the given namespace.
      */
     bool hasOpenCursor(const NamespaceString& nss, const BSONObj& aggComment) {
         // Create an alternative client and opCtx since the original opCtx may have been used to
@@ -338,13 +338,9 @@ public:
         pipeline.push_back(BSON("$currentOp" << BSON("allUsers" << true << "idleCursors" << true)));
         // Filter by aggregation comment to identify reshardingChangeStreamsMonitor cursors and ops.
         pipeline.push_back(
-            BSON("$match" << BSON("$or" << BSON_ARRAY(
-                                      BSON("cursor.originatingCommand.comment"
-                                           << aggComment << "ns"
-                                           << NamespaceStringUtil::serialize(
-                                                  nss, SerializationContext::stateDefault()))
-                                      << BSON("command.aggregate" << nss.coll() << "command.comment"
-                                                                  << aggComment)))));
+            BSON("$match" << BSON(
+                     "$or" << BSON_ARRAY(BSON("cursor.originatingCommand.comment" << aggComment)
+                                         << BSON("command.comment" << aggComment)))));
 
         DBDirectClient dbclient(opCtx.get());
         AggregateCommandRequest aggRequest(
@@ -353,17 +349,44 @@ public:
             &dbclient, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
 
         bool openCursorExists = false;
-        if (cursor->more()) {
-            while (cursor->more()) {
-                auto doc = cursor->next();
+        while (cursor->more()) {
+            auto doc = cursor->next();
+            LOGV2(10066810,
+                  "Found currentOp with reshardingChangeStreamsMonitor comment",
+                  "doc"_attr = doc);
+
+            if (doc.getBoolField("killPending")) {
                 // Cursors with {killPending: true} will eventually get killed. They should not
                 // be consider as open cursors.
-                if (!doc.getBoolField("killPending")) {
-                    LOGV2(10066810, "Found open cursor", "doc"_attr = doc);
+                continue;
+            }
+
+            auto typeStr = doc.getStringField("type");
+            if (typeStr == "idleCursor") {
+                // For idle cursors, top-level ns is correct.
+                if (doc.getStringField("ns") == nss.ns_forTest()) {
+                    LOGV2(10764600, "Found idle cursor", "ns"_attr = nss, "doc"_attr = doc);
+                    openCursorExists = true;
+                }
+            } else if (typeStr == "op") {
+                auto opStr = doc.getStringField("op");
+
+                BSONObj aggregation;
+                if (opStr == "getMore") {
+                    // For getMore ops, look at the originiation agg command.
+                    aggregation = doc["originatingCommand"].Obj();
+                } else if (opStr == "command") {
+                    aggregation = doc["command"].Obj();
+                }
+
+                if (aggregation.getStringField("aggregate") == nss.coll()) {
+                    LOGV2(
+                        10764601, "Found active cursor command", "ns"_attr = nss, "doc"_attr = doc);
                     openCursorExists = true;
                 }
             }
         }
+
         return openCursorExists;
     }
 
