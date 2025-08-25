@@ -36,7 +36,7 @@ import enum
 import bson
 from datagen.util import MISSING, Specification
 
-DATETIME = datetime.datetime(2024, 1, 1, 12, 11, 10)
+DATETIME = datetime.datetime(2024, 1, 1, 12, 11, 10, tzinfo=datetime.timezone.utc)
 
 
 class TestEnum(enum.Enum):

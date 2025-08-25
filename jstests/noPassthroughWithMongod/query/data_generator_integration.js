@@ -44,7 +44,7 @@ try {
     assert.eq(fields.bool_field.types.bool.unique[0], true);
 
     printjson(fields.datetime_datetime_field);
-    assert.eq(fields.datetime_datetime_field.types.dt.unique[0], "2024-01-01T12:11:10");
+    assert.eq(fields.datetime_datetime_field.types.dt.unique[0], "2024-01-01T12:11:10+00:00");
     assert.eq(fields.bson_datetime_ms_field.types.dt_ms.unique[0], 1704111070);
     assert.eq(fields.bson_timestamp_field.types.ts.unique[0], 1704111070);
 

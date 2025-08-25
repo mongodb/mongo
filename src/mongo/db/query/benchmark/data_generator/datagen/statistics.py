@@ -154,7 +154,7 @@ def serialize_supported(v):
         return str(v)
     elif isinstance(v,
                     (bson.datetime_ms.DatetimeMS, bson.timestamp.Timestamp)):
-        return v.as_datetime().timestamp()
+        return v.as_datetime().replace(tzinfo=datetime.timezone.utc).timestamp()
     elif issubclass(type(v), Enum):
         # We expect that the Enum will have a __repr__ method that returns
         # something that can be inserted into MongoDB
