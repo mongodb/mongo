@@ -114,7 +114,8 @@ void AuthOpObserver::onCreateCollection(
     const BSONObj& idIndex,
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-    bool fromMigrate) {
+    bool fromMigrate,
+    bool isViewlessTimeseries) {
     const auto cmdNss = collectionName.getCommandNS();
 
     const auto cmdObj =
@@ -139,7 +140,8 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
                                const UUID& uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
-                               boost::optional<IndexCollModInfo> indexInfo) {
+                               boost::optional<IndexCollModInfo> indexInfo,
+                               bool isViewlessTimeseries) {
     const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
@@ -165,7 +167,8 @@ repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              bool markFromMigrate) {
+                                              bool markFromMigrate,
+                                              bool isViewlessTimeseries) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
 
@@ -180,7 +183,8 @@ void AuthOpObserver::onDropIndex(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const UUID& uuid,
                                  const std::string& indexName,
-                                 const BSONObj& indexInfo) {
+                                 const BSONObj& indexInfo,
+                                 bool isViewlessTimeseries) {
     const auto cmdNss = nss.getCommandNS();
     const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
@@ -219,7 +223,8 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp,
-                                        bool markFromMigrate) {
+                                        bool markFromMigrate,
+                                        bool isViewlessTimeseries) {
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
@@ -230,7 +235,8 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
                                         long long dataSize,
                                         const BSONObj& catalogEntry,
                                         const BSONObj& storageMetadata,
-                                        bool isDryRun) {
+                                        bool isDryRun,
+                                        bool isViewlessTimeseries) {
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
     AuthorizationManager::get(opCtx->getService())

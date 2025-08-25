@@ -541,7 +541,7 @@ protected:
 
     // Tests the oplog entry generated from 'onCreateCollection'. Simulates the creation of a
     // non-clustered collection.
-    void testOnCreateCollBasic(bool catalogReplicationEnabled) {
+    void testOnCreateCollBasic(bool catalogReplicationEnabled, bool viewless = false) {
         RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
 
@@ -564,7 +564,8 @@ protected:
                                                    << "_id_") /* idIndex */,
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/);
+                                          false /* fromMigrate*/,
+                                          viewless);
             wuow.commit();
         }
 
@@ -572,6 +573,8 @@ protected:
         const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
         validateReplicatedCatalogIdentifier(
             oplogEntry, catalogIdentifier, catalogReplicationEnabled);
+        bool isViewlessTimeseries = oplogEntryBSON.getBoolField("isViewlessTimeseries");
+        ASSERT_EQ(viewless, isViewlessTimeseries);
     }
 
     void testOnCreateCollClustered(bool catalogReplicationEnabled) {
@@ -664,6 +667,12 @@ TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnable
 }
 TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabled) {
     testOnCreateCollBasic(false /* catalogReplicationEnabled */);
+}
+TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnabledWithTimeseries) {
+    testOnCreateCollBasic(true /* catalogReplicationEnabled */, true /* viewless */);
+}
+TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabledWithTimeseries) {
+    testOnCreateCollBasic(false /* catalogReplicationEnabled */, true /* viewless */);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
@@ -1157,7 +1166,8 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
                                       dropTargetUuid,
                                       0U,
                                       stayTemp,
-                                      /*markFromMigrate=*/false);
+                                      /*markFromMigrate=*/false,
+                                      /*isViewlessTimeseries*/ false);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -1200,7 +1210,8 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
                                       dropTargetUuid,
                                       0U,
                                       stayTemp,
-                                      /*markFromMigrate=*/false);
+                                      /*markFromMigrate=*/false,
+                                      /*isViewlessTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1243,7 +1254,8 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
                                       dropTargetUuid,
                                       0U,
                                       stayTemp,
-                                      /*markFromMigrate=*/false);
+                                      /*markFromMigrate=*/false,
+                                      /*isViewlessTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1276,8 +1288,15 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(
-            opCtx.get(), sourceNss, targetNss, uuid, {}, 0U, stayTemp, /*markFromMigrate=*/false);
+        opObserver.onRenameCollection(opCtx.get(),
+                                      sourceNss,
+                                      targetNss,
+                                      uuid,
+                                      {},
+                                      0U,
+                                      stayTemp,
+                                      /*markFromMigrate=*/false,
+                                      /*isViewlessTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1331,7 +1350,8 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
                                       dataSize,
                                       catalogEntry,
                                       storageMetadata,
-                                      isDryRun);
+                                      isDryRun,
+                                      /*isViewlessTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1373,7 +1393,8 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
                                       dataSize,
                                       catalogEntry,
                                       storageMetadata,
-                                      isDryRun);
+                                      isDryRun,
+                                      /*isViewlessTimeseries*/ false);
         wunit.commit();
     }
 
@@ -5355,6 +5376,27 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
     ASSERT_BSONOBJ_EQ(enabledEntry.getObject(),
                       BSON("createIndexes" << "coll"
                                            << "spec" << indexes[0].spec));
+}
+
+TEST_F(OpObserverTest, OnCreateIndexTimeseriesFlag) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto indexes = makeSpecs(opCtx.get(), {"a"});
+
+    for (bool timeseries : {false, true}) {
+        RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+            "featureFlagReplicateLocalCatalogIdentifiers", true);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexes[0], false, timeseries);
+        wunit.commit();
+    }
+
+    auto oplogEntries = getNOplogEntries(opCtx.get(), 2);
+    ASSERT_FALSE(oplogEntries[0].getBoolField("isViewlessTimeseries"));
+    ASSERT_TRUE(oplogEntries[1].getBoolField("isViewlessTimeseries"));
 }
 
 TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {

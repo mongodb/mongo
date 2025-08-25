@@ -16,6 +16,7 @@
  *   does_not_support_viewless_timeseries_yet,
  *  ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const tsOptions = {
@@ -138,16 +139,17 @@ db.dropDatabase();
         // Creation of bucket namespace is not idempotent before 8.0 (SERVER-89827)
         "8.0", // minRequiredVersion
     );
-
-    jsTest.log("Case collection: timeseries / collection: bucket timeseries with different options.");
-    runTest(() => {
-        createWorked(kColl, tsOptions);
-        createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
-    });
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
+        jsTest.log("Case collection: timeseries / collection: bucket timeseries with different options.");
+        runTest(() => {
+            createWorked(kColl, tsOptions);
+            createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
+        });
+    }
 }
 
 // Case prexisting bucket collection timeseries.
-{
+if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
     jsTest.log("Case collection: bucket timeseries / collection: standard.");
     runTest(() => {
         createWorked(kBucket, tsOptions);

@@ -82,6 +82,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -241,6 +242,8 @@ Status renameCollectionDirectly(OperationContext* opCtx,
                                 NamespaceString target,
                                 RenameCollectionOptions options) {
     return writeConflictRetry(opCtx, "renameCollection", target, [&] {
+        auto preConditions =
+            timeseries::CollectionPreConditions::getCollectionPreConditions(opCtx, source, uuid);
         WriteUnitOfWork wunit(opCtx);
 
         {
@@ -255,8 +258,15 @@ Status renameCollectionDirectly(OperationContext* opCtx,
         // avoid unintentionally removing a collection on a secondary with the same name as
         // the target.
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        opObserver->onRenameCollection(
-            opCtx, source, target, uuid, {}, 0U, options.stayTemp, options.markFromMigrate);
+        opObserver->onRenameCollection(opCtx,
+                                       source,
+                                       target,
+                                       uuid,
+                                       {},
+                                       0U,
+                                       options.stayTemp,
+                                       options.markFromMigrate,
+                                       preConditions.isViewlessTimeseriesCollection());
 
         wunit.commit();
         return Status::OK();

@@ -101,21 +101,24 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
-                       bool fromMigrate) override;
+                       bool fromMigrate,
+                       bool isViewlessTimeseries) override;
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
-                           bool fromMigrate) override;
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override;
 
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) override;
+                            bool fromMigrate,
+                            bool isViewlessTimeseries) override;
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -123,7 +126,8 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
-                           bool fromMigrate) override;
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override;
 
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
@@ -141,13 +145,15 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-        bool fromMigrate) override;
+        bool fromMigrate,
+        bool isViewlessTimeseries) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  bool markFromMigrate) override;
+                                  bool markFromMigrate,
+                                  bool isViewlessTimeseries) override;
 
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
@@ -156,7 +162,8 @@ public:
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
-                            bool markFromMigrate) override;
+                            bool markFromMigrate,
+                            bool isViewlessTimeseries) override;
 
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
@@ -165,7 +172,8 @@ public:
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp,
-                                     bool markFromMigrate) override;
+                                     bool markFromMigrate,
+                                     bool isViewlessTimeseries) override;
 
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
@@ -200,9 +208,11 @@ void OpObserverMock::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,
                                    const IndexBuildInfo& indexBuildInfo,
-                                   bool fromMigrate) {
+                                   bool fromMigrate,
+                                   bool isViewlessTimeseries) {
     _logOp(opCtx, nss, "index");
-    OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexBuildInfo, fromMigrate);
+    OpObserverNoop::onCreateIndex(
+        opCtx, nss, uuid, indexBuildInfo, fromMigrate, isViewlessTimeseries);
 }
 
 void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
@@ -210,9 +220,11 @@ void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
                                        const UUID& collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<IndexBuildInfo>& indexes,
-                                       bool fromMigrate) {
+                                       bool fromMigrate,
+                                       bool isViewlessTimeseries) {
     _logOp(opCtx, nss, "startIndex");
-    OpObserverNoop::onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+    OpObserverNoop::onStartIndexBuild(
+        opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate, isViewlessTimeseries);
 }
 
 void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,
@@ -220,9 +232,11 @@ void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,
                                         const UUID& collUUID,
                                         const UUID& indexBuildUUID,
                                         const std::vector<BSONObj>& indexes,
-                                        bool fromMigrate) {
+                                        bool fromMigrate,
+                                        bool isViewlessTimeseries) {
     _logOp(opCtx, nss, "commitIndex");
-    OpObserverNoop::onCommitIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+    OpObserverNoop::onCommitIndexBuild(
+        opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate, isViewlessTimeseries);
 }
 
 void OpObserverMock::onAbortIndexBuild(OperationContext* opCtx,
@@ -231,10 +245,11 @@ void OpObserverMock::onAbortIndexBuild(OperationContext* opCtx,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
                                        const Status& cause,
-                                       bool fromMigrate) {
+                                       bool fromMigrate,
+                                       bool isViewlessTimeseries) {
     _logOp(opCtx, nss, "abortIndex");
     OpObserverNoop::onAbortIndexBuild(
-        opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate);
+        opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate, isViewlessTimeseries);
 }
 
 void OpObserverMock::onInserts(OperationContext* opCtx,
@@ -264,7 +279,8 @@ void OpObserverMock::onCreateCollection(
     const BSONObj& idIndex,
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-    bool fromMigrate) {
+    bool fromMigrate,
+    bool isViewlessTimeseries) {
     _logOp(opCtx, collectionName, "create");
     OpObserverNoop::onCreateCollection(opCtx,
                                        collectionName,
@@ -272,22 +288,24 @@ void OpObserverMock::onCreateCollection(
                                        idIndex,
                                        createOpTime,
                                        createCollCatalogIdentifier,
-                                       fromMigrate);
+                                       fromMigrate,
+                                       isViewlessTimeseries);
 }
 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              bool markFromMigrate) {
+                                              bool markFromMigrate,
+                                              bool isViewlessTimeseries) {
     _logOp(opCtx, collectionName, "drop");
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
     }
-    auto noopOptime =
-        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, markFromMigrate);
+    auto noopOptime = OpObserverNoop::onDropCollection(
+        opCtx, collectionName, uuid, numRecords, markFromMigrate, isViewlessTimeseries);
     invariant(noopOptime.isNull());
     return {};
 }
@@ -299,7 +317,8 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                         const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp,
-                                        bool markFromMigrate) {
+                                        bool markFromMigrate,
+                                        bool isViewlessTimeseries) {
     preRenameCollection(opCtx,
                         fromCollection,
                         toCollection,
@@ -307,7 +326,8 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                         dropTargetUUID,
                         numRecords,
                         stayTemp,
-                        markFromMigrate);
+                        markFromMigrate,
+                        isViewlessTimeseries);
     OpObserverNoop::onRenameCollection(opCtx,
                                        fromCollection,
                                        toCollection,
@@ -315,7 +335,8 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                        dropTargetUUID,
                                        numRecords,
                                        stayTemp,
-                                       markFromMigrate);
+                                       markFromMigrate,
+                                       isViewlessTimeseries);
     onRenameCollectionCalled = true;
     onRenameCollectionDropTarget = dropTargetUUID;
 }
@@ -339,7 +360,8 @@ repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
                                                  const boost::optional<UUID>& dropTargetUUID,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp,
-                                                 bool markFromMigrate) {
+                                                 bool markFromMigrate,
+                                                 bool isViewlessTimeseries) {
     _logOp(opCtx, fromCollection, "rename");
     OpObserver::Times::get(opCtx).reservedOpTimes.push_back(renameOpTime);
     OpObserverNoop::preRenameCollection(opCtx,
@@ -349,7 +371,8 @@ repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
                                         dropTargetUUID,
                                         numRecords,
                                         stayTemp,
-                                        /*markFromMigrate=*/false);
+                                        /*markFromMigrate=*/false,
+                                        isViewlessTimeseries);
     return {};
 }
 

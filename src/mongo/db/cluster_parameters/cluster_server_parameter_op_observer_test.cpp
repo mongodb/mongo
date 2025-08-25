@@ -166,7 +166,8 @@ public:
                                   nss,
                                   UUID::gen(),
                                   0U,
-                                  /*markFromMigrate=*/false);
+                                  /*markFromMigrate=*/false,
+                                  /*isViewlessTimeseries*/ false);
         if (commit)
             wuow.commit();
     }

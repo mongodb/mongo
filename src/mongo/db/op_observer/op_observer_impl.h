@@ -80,14 +80,16 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
-                       bool fromMigrate) final;
+                       bool fromMigrate,
+                       bool isViewlessTimeseries = false) final;
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
-                           bool fromMigrate) final;
+                           bool fromMigrate,
+                           bool isViewlessTimeseries = false) final;
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final;
 
     void onCommitIndexBuild(OperationContext* opCtx,
@@ -95,7 +97,8 @@ public:
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) final;
+                            bool fromMigrate,
+                            bool isViewlessTimeseries = false) final;
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -103,7 +106,8 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
-                           bool fromMigrate) final;
+                           bool fromMigrate,
+                           bool isViewlessTimeseries = false) final;
 
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
@@ -171,13 +175,15 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-        bool fromMigrate) final;
+        bool fromMigrate,
+        bool isViewlessTimeseries = false) final;
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const UUID& uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<IndexCollModInfo> indexInfo) final;
+                   boost::optional<IndexCollModInfo> indexInfo,
+                   bool isViewlessTimeseries = false) final;
     void onDropDatabase(OperationContext* opCtx,
                         const DatabaseName& dbName,
                         bool markFromMigrate) final;
@@ -185,12 +191,14 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  bool markFromMigrate) final;
+                                  bool markFromMigrate,
+                                  bool isViewlessTimeseries = false) final;
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const UUID& uuid,
                      const std::string& indexName,
-                     const BSONObj& indexInfo) final;
+                     const BSONObj& indexInfo,
+                     bool isViewlessTimeseries = false) final;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
@@ -198,7 +206,8 @@ public:
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp,
-                                     bool markFromMigrate) final;
+                                     bool markFromMigrate,
+                                     bool isViewlessTimeseries = false) final;
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
@@ -212,7 +221,8 @@ public:
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
-                            bool markFromMigrate) final;
+                            bool markFromMigrate,
+                            bool isViewlessTimeseries) final;
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
                             const NamespaceString& nss,
@@ -220,7 +230,8 @@ public:
                             long long dataSize,
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
-                            bool isDryRun) final;
+                            bool isDryRun,
+                            bool isViewlessTimeseries) final;
     void onTransactionStart(OperationContext* opCtx) final;
     void onUnpreparedTransactionCommit(
         OperationContext* opCtx,

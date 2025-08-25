@@ -172,7 +172,8 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& collCatalogIdentifier,
-        bool fromMigrate) override {
+        bool fromMigrate,
+        bool isViewlessTimeseries) override {
         const auto catalogEntry = getLocalCatalogEntry(opCtx, collectionName);
 
         // First, validate the test correctly configured whether collections are persisted in

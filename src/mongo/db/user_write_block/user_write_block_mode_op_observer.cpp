@@ -164,7 +164,8 @@ void UserWriteBlockModeOpObserver::onCreateIndex(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  const UUID& uuid,
                                                  const IndexBuildInfo& indexBuildInfo,
-                                                 bool fromMigrate) {
+                                                 bool fromMigrate,
+                                                 bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, nss);
 }
 
@@ -173,7 +174,8 @@ void UserWriteBlockModeOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                                      const UUID& collUUID,
                                                      const UUID& indexBuildUUID,
                                                      const std::vector<IndexBuildInfo>& indexes,
-                                                     bool fromMigrate) {
+                                                     bool fromMigrate,
+                                                     bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, nss);
 }
 
@@ -189,7 +191,8 @@ void UserWriteBlockModeOpObserver::onCreateCollection(
     const BSONObj& idIndex,
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-    bool fromMigrate) {
+    bool fromMigrate,
+    bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, collectionName);
 }
 
@@ -198,7 +201,8 @@ void UserWriteBlockModeOpObserver::onCollMod(OperationContext* opCtx,
                                              const UUID& uuid,
                                              const BSONObj& collModCmd,
                                              const CollectionOptions& oldCollOptions,
-                                             boost::optional<IndexCollModInfo> indexInfo) {
+                                             boost::optional<IndexCollModInfo> indexInfo,
+                                             bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, nss);
 }
 
@@ -212,7 +216,8 @@ repl::OpTime UserWriteBlockModeOpObserver::onDropCollection(OperationContext* op
                                                             const NamespaceString& collectionName,
                                                             const UUID& uuid,
                                                             std::uint64_t numRecords,
-                                                            bool markFromMigrate) {
+                                                            bool markFromMigrate,
+                                                            bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, collectionName);
     return repl::OpTime();
 }
@@ -221,7 +226,8 @@ void UserWriteBlockModeOpObserver::onDropIndex(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& uuid,
                                                const std::string& indexName,
-                                               const BSONObj& indexInfo) {
+                                               const BSONObj& indexInfo,
+                                               bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, nss);
 }
 
@@ -233,7 +239,8 @@ repl::OpTime UserWriteBlockModeOpObserver::preRenameCollection(
     const boost::optional<UUID>& dropTargetUUID,
     std::uint64_t numRecords,
     bool stayTemp,
-    bool markFromMigrate) {
+    bool markFromMigrate,
+    bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, fromCollection);
     _checkWriteAllowed(opCtx, toCollection);
     return repl::OpTime();
@@ -246,7 +253,8 @@ void UserWriteBlockModeOpObserver::onRenameCollection(OperationContext* opCtx,
                                                       const boost::optional<UUID>& dropTargetUUID,
                                                       std::uint64_t numRecords,
                                                       bool stayTemp,
-                                                      bool markFromMigrate) {
+                                                      bool markFromMigrate,
+                                                      bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, fromCollection);
     _checkWriteAllowed(opCtx, toCollection);
 }
@@ -258,7 +266,8 @@ void UserWriteBlockModeOpObserver::onImportCollection(OperationContext* opCtx,
                                                       long long dataSize,
                                                       const BSONObj& catalogEntry,
                                                       const BSONObj& storageMetadata,
-                                                      bool isDryRun) {
+                                                      bool isDryRun,
+                                                      bool isViewlessTimeseries) {
     _checkWriteAllowed(opCtx, nss);
 }
 

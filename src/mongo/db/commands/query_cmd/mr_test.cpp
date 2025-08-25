@@ -279,7 +279,8 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
-                       bool fromMigrate) override;
+                       bool fromMigrate,
+                       bool isViewlessTimeseries) override;
 
     /**
      * This function is called whenever mapReduce copies indexes from an existing output collection
@@ -290,7 +291,8 @@ public:
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
-                           bool fromMigrate) override;
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override;
 
     /**
      * This function is called whenever mapReduce inserts documents into a temporary output
@@ -315,13 +317,15 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-        bool fromMigrate) override;
+        bool fromMigrate,
+        bool isViewlessTimeseries) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  bool markFromMigrate) override;
+                                  bool markFromMigrate,
+                                  bool isViewlessTimeseries) override;
 
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
     // while mapReduce inserts its results into the temporary output collection.
@@ -341,7 +345,8 @@ void MapReduceOpObserver::onCreateIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const UUID& uuid,
                                         const IndexBuildInfo& indexBuildInfo,
-                                        bool fromMigrate) {
+                                        bool fromMigrate,
+                                        bool isViewlessTimeseries) {
     indexesCreated.push_back(indexBuildInfo.spec.getOwned());
 }
 
@@ -350,7 +355,8 @@ void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                             const UUID& collUUID,
                                             const UUID& indexBuildUUID,
                                             const std::vector<IndexBuildInfo>& indexes,
-                                            bool fromMigrate) {
+                                            bool fromMigrate,
+                                            bool isViewlessTimeseries) {
     for (const auto& indexBuildInfo : indexes) {
         indexesCreated.push_back(indexBuildInfo.spec.getOwned());
     }
@@ -374,7 +380,8 @@ void MapReduceOpObserver::onCreateCollection(
     const BSONObj&,
     const OplogSlot&,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-    bool fromMigrate) {
+    bool fromMigrate,
+    bool isViewlessTimeseries) {
     if (!options.temp) {
         return;
     }
@@ -385,7 +392,8 @@ repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
                                                    const UUID& uuid,
                                                    std::uint64_t numRecords,
-                                                   bool markFromMigrate) {
+                                                   bool markFromMigrate,
+                                                   bool isViewlessTimeseries) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.
     if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {

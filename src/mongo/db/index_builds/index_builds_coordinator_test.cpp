@@ -228,7 +228,8 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
-                       bool fromMigrate) override {
+                       bool fromMigrate,
+                       bool isViewlessTimeseries) override {
         createIndexIdents.emplace_back(indexBuildInfo.indexIdent);
     }
 
@@ -237,7 +238,8 @@ public:
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
-                           bool fromMigrate) override {
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override {
         for (const auto& indexBuildInfo : indexes) {
             startIndexBuildIdents.push_back(indexBuildInfo.indexIdent);
         }

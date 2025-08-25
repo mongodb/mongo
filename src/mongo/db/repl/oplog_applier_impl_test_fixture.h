@@ -145,7 +145,8 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-        bool fromMigrate) override;
+        bool fromMigrate,
+        bool isViewlessTimeseries) override;
 
     /**
      * Called when OplogApplierImpl renames a collection.
@@ -157,7 +158,8 @@ public:
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
-                            bool markFromMigrate) override;
+                            bool markFromMigrate,
+                            bool isViewlessTimeseries) override;
 
     /**
      * Called when OplogApplierImpl creates an index.
@@ -166,7 +168,8 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
-                       bool fromMigrate) override;
+                       bool fromMigrate,
+                       bool isViewlessTimeseries) override;
 
     /**
      * Called when OplogApplierImpl drops an index.
@@ -175,7 +178,8 @@ public:
                      const NamespaceString& nss,
                      const UUID& uuid,
                      const std::string& indexName,
-                     const BSONObj& idxDescriptor) override;
+                     const BSONObj& idxDescriptor,
+                     bool isViewlessTimeseries) override;
 
     /**
      * Called when OplogApplierImpl performs a CollMod.
@@ -185,7 +189,8 @@ public:
                    const UUID& uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<IndexCollModInfo> indexInfo) override;
+                   boost::optional<IndexCollModInfo> indexInfo,
+                   bool isViewlessTimeseries) override;
 
     // Hooks for OpObserver functions. Defaults to a no-op function but may be overridden to
     // check actual documents mutated.

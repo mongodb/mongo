@@ -94,7 +94,8 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  bool markFromMigrate) override;
+                                  bool markFromMigrate,
+                                  bool isViewlessTimeseries) override;
 
     std::set<DatabaseName> droppedDatabaseNames;
     std::set<NamespaceString> droppedCollectionNames;
@@ -116,10 +117,11 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              bool markFromMigrate) {
+                                              bool markFromMigrate,
+                                              bool isViewlessTimeseries) {
     ASSERT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    auto opTime =
-        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, markFromMigrate);
+    auto opTime = OpObserverNoop::onDropCollection(
+        opCtx, collectionName, uuid, numRecords, markFromMigrate, isViewlessTimeseries);
     invariant(opTime.isNull());
     // Do not update 'droppedCollectionNames' if OpObserverNoop::onDropCollection() throws.
     droppedCollectionNames.insert(collectionName);

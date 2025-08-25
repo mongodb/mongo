@@ -196,7 +196,8 @@ repl::OpTime FallbackOpObserver::onDropCollection(OperationContext* opCtx,
                                                   const NamespaceString& collectionName,
                                                   const UUID& uuid,
                                                   std::uint64_t numRecords,
-                                                  bool markFromMigrate) {
+                                                  bool markFromMigrate,
+                                                  bool isViewlessTimeseries) {
     if (collectionName.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (collectionName.isSystemDotViews()) {

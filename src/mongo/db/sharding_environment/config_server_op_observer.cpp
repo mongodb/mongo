@@ -85,7 +85,8 @@ repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                       const NamespaceString& collectionName,
                                                       const UUID& uuid,
                                                       std::uint64_t numRecords,
-                                                      bool markFromMigrate) {
+                                                      bool markFromMigrate,
+                                                      bool isViewlessTimeseries) {
     if (collectionName == NamespaceString::kConfigVersionNamespace) {
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40303, "cannot drop config.version document while in --configsvr mode");

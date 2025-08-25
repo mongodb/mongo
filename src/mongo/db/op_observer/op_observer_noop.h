@@ -49,14 +49,16 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
-                       bool fromMigrate) override {}
+                       bool fromMigrate,
+                       bool isViewlessTimeseries) override {}
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
-                           bool fromMigrate) override {}
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override {}
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                       const NamespaceString& nss) override {}
@@ -66,7 +68,8 @@ public:
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) override {}
+                            bool fromMigrate,
+                            bool isViewlessTimeseries) override {}
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -74,7 +77,8 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
-                           bool fromMigrate) override {}
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override {}
 
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
@@ -140,14 +144,16 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-        bool fromMigrate) override {}
+        bool fromMigrate,
+        bool isViewlessTimeseries) override {}
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const UUID& uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<IndexCollModInfo> indexInfo) override {}
+                   boost::optional<IndexCollModInfo> indexInfo,
+                   bool isViewlessTimeseries) override {}
 
     void onDropDatabase(OperationContext* opCtx,
                         const DatabaseName& dbName,
@@ -157,7 +163,8 @@ public:
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
-                                  bool markFromMigrate) override {
+                                  bool markFromMigrate,
+                                  bool isViewlessTimeseries) override {
         return {};
     }
 
@@ -165,7 +172,8 @@ public:
                      const NamespaceString& nss,
                      const UUID& uuid,
                      const std::string& indexName,
-                     const BSONObj& idxDescriptor) override {}
+                     const BSONObj& idxDescriptor,
+                     bool isViewlessTimeseries) override {}
 
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
@@ -174,7 +182,8 @@ public:
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
-                            bool markFromMigrate) override {}
+                            bool markFromMigrate,
+                            bool isViewlessTimeseries) override {}
 
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
@@ -183,7 +192,8 @@ public:
                             long long dataSize,
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
-                            bool isDryRun) override {}
+                            bool isDryRun,
+                            bool isViewlessTimeseries) override {}
 
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
@@ -192,7 +202,8 @@ public:
                                      const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp,
-                                     bool markFromMigrate) override {
+                                     bool markFromMigrate,
+                                     bool isViewlessTimeseries) override {
         return {};
     }
 

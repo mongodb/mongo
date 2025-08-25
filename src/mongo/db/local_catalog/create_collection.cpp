@@ -81,6 +81,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
@@ -282,7 +283,8 @@ Status renameOutOfTheWayForApplyOps(OperationContext* opCtx,
             // Conflicting on generating a unique temp collection name. Try again.
             continue;
         }
-
+        auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+            opCtx, newCollName, uuid);
         // It is ok to log this because this doesn't happen very frequently.
         LOGV2(20309,
               "CMD: create -- renaming existing collection with conflicting UUID to "
@@ -304,7 +306,8 @@ Status renameOutOfTheWayForApplyOps(OperationContext* opCtx,
                                            {}, /*dropTargetUUID*/
                                            0U, /*numRecords*/
                                            true /*stayTemp*/,
-                                           false /*markFromMigrate*/);
+                                           false /*markFromMigrate*/,
+                                           preConditions.isViewlessTimeseriesCollection());
             wuow.commit();
             // Re-fetch collection after commit to get a valid pointer
             futureColl =
@@ -351,6 +354,8 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
         Status status = db->renameCollection(opCtx, currentName, newCollName, true /*stayTemp*/);
         if (!status.isOK())
             return status;
+        auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+            opCtx, currentName, uuid);
         opObserver->onRenameCollection(opCtx,
                                        currentName,
                                        newCollName,
@@ -358,7 +363,8 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
                                        {},   /*dropTargetUUID*/
                                        0U,   /*numRecords*/
                                        true, /*stayTemp*/
-                                       false /*markFromMigrate*/);
+                                       false /*markFromMigrate*/,
+                                       preConditions.isViewlessTimeseriesCollection());
         wuow.commit();
         return Status::OK();
     });

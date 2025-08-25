@@ -131,7 +131,8 @@ void OplogApplierImplOpObserver::onCreateCollection(
     const BSONObj& idIndex,
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-    bool fromMigrate) {
+    bool fromMigrate,
+    bool isViewlessTimeseries) {
     if (!onCreateCollectionFn) {
         return;
     }
@@ -145,7 +146,8 @@ void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
                                                     const boost::optional<UUID>& dropTargetUUID,
                                                     std::uint64_t numRecords,
                                                     bool stayTemp,
-                                                    bool markFromMigrate) {
+                                                    bool markFromMigrate,
+                                                    bool isViewlessTimeseries) {
     if (!onRenameCollectionFn) {
         return;
     }
@@ -163,7 +165,8 @@ void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& uuid,
                                                const IndexBuildInfo& indexBuildInfo,
-                                               bool fromMigrate) {
+                                               bool fromMigrate,
+                                               bool isViewlessTimeseries) {
     if (!onCreateIndexFn) {
         return;
     }
@@ -174,7 +177,8 @@ void OplogApplierImplOpObserver::onDropIndex(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const UUID& uuid,
                                              const std::string& indexName,
-                                             const BSONObj& idxDescriptor) {
+                                             const BSONObj& idxDescriptor,
+                                             bool isViewlessTimeseries) {
     if (!onDropIndexFn) {
         return;
     }
@@ -186,7 +190,8 @@ void OplogApplierImplOpObserver::onCollMod(OperationContext* opCtx,
                                            const UUID& uuid,
                                            const BSONObj& collModCmd,
                                            const CollectionOptions& oldCollOptions,
-                                           boost::optional<IndexCollModInfo> indexInfo) {
+                                           boost::optional<IndexCollModInfo> indexInfo,
+                                           bool isViewlessTimeseries) {
     if (!onCollModFn) {
         return;
     }

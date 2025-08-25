@@ -203,14 +203,16 @@ public:
                                const NamespaceString& nss,
                                const UUID& uuid,
                                const IndexBuildInfo& indexBuildInfo,
-                               bool fromMigrate) = 0;
+                               bool fromMigrate,
+                               bool isViewlessTimeseries = false) = 0;
 
     virtual void onStartIndexBuild(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<IndexBuildInfo>& indexes,
-                                   bool fromMigrate) = 0;
+                                   bool fromMigrate,
+                                   bool isViewlessTimeseries = false) = 0;
 
     virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                               const NamespaceString& nss) = 0;
@@ -220,7 +222,8 @@ public:
                                     const UUID& collUUID,
                                     const UUID& indexBuildUUID,
                                     const std::vector<BSONObj>& indexes,
-                                    bool fromMigrate) = 0;
+                                    bool fromMigrate,
+                                    bool isViewlessTimeseries = false) = 0;
 
     virtual void onAbortIndexBuild(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -228,7 +231,8 @@ public:
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
                                    const Status& cause,
-                                   bool fromMigrate) = 0;
+                                   bool fromMigrate,
+                                   bool isViewlessTimeseries = false) = 0;
 
     /**
      * 'recordIds' is a vector of recordIds corresponding to the inserted documents.
@@ -354,7 +358,8 @@ public:
         const BSONObj& idIndex,
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
-        bool fromMigrate) = 0;
+        bool fromMigrate,
+        bool isViewlessTimeseries = false) = 0;
 
     /**
      * This function logs an oplog entry when a 'collMod' command on a collection is executed.
@@ -392,7 +397,8 @@ public:
                            const UUID& uuid,
                            const BSONObj& collModCmd,
                            const CollectionOptions& oldCollOptions,
-                           boost::optional<IndexCollModInfo> indexInfo) = 0;
+                           boost::optional<IndexCollModInfo> indexInfo,
+                           bool isViewlessTimeseries = false) = 0;
     virtual void onDropDatabase(OperationContext* opCtx,
                                 const DatabaseName& dbName,
                                 bool markFromMigrate) = 0;
@@ -408,7 +414,8 @@ public:
                                           const NamespaceString& collectionName,
                                           const UUID& uuid,
                                           std::uint64_t numRecords,
-                                          bool markFromMigrate) = 0;
+                                          bool markFromMigrate,
+                                          bool isViewlessTimeseries = false) = 0;
 
 
     /**
@@ -424,7 +431,8 @@ public:
                              const NamespaceString& nss,
                              const UUID& uuid,
                              const std::string& indexName,
-                             const BSONObj& indexInfo) = 0;
+                             const BSONObj& indexInfo,
+                             bool isViewlessTimeseries = false) = 0;
 
     /**
      * This function logs an oplog entry when a 'renameCollection' command on a collection is
@@ -441,7 +449,8 @@ public:
                                              const boost::optional<UUID>& dropTargetUUID,
                                              std::uint64_t numRecords,
                                              bool stayTemp,
-                                             bool markFromMigrate) = 0;
+                                             bool markFromMigrate,
+                                             bool isViewlessTimeseries = false) = 0;
 
     /**
      * This function performs all op observer handling for a 'renameCollection' command except for
@@ -467,7 +476,8 @@ public:
                                     const boost::optional<UUID>& dropTargetUUID,
                                     std::uint64_t numRecords,
                                     bool stayTemp,
-                                    bool markFromMigrate) = 0;
+                                    bool markFromMigrate,
+                                    bool isViewlessTimeseries) = 0;
 
     virtual void onImportCollection(OperationContext* opCtx,
                                     const UUID& importUUID,
@@ -476,7 +486,8 @@ public:
                                     long long dataSize,
                                     const BSONObj& catalogEntry,
                                     const BSONObj& storageMetadata,
-                                    bool isDryRun) = 0;
+                                    bool isDryRun,
+                                    bool isViewlessTimeseries) = 0;
 
     /**
      * The onTransaction Start method is called at the beginning of a multi-document transaction.

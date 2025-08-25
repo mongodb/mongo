@@ -532,6 +532,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:catalog_helper",
+        "//src/mongo/db/timeseries:collection_pre_conditions_util",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries:viewless_timeseries_collection_creation_helpers",

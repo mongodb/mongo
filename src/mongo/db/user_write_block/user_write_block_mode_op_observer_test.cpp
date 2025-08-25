@@ -180,19 +180,20 @@ protected:
         if (shouldSucceed) {
             try {
                 opObserver.onCreateIndex(
-                    opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false);
-                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false);
+                    opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false, false);
+                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false, false);
                 opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
                 opObserver.onCreateCollection(
-                    opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false);
-                opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none);
+                    opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false, false);
+                opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false);
                 opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/);
                 opObserver.onDropCollection(opCtx,
                                             nss,
                                             uuid,
                                             0,
-                                            /*markFromMigrate=*/false);
-                opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj());
+                                            /*markFromMigrate=*/false,
+                                            /*isViewlessTimeseries*/ false);
+                opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false);
                 // For renames, make sure we check both from and to for the given namespace
                 opObserver.preRenameCollection(opCtx,
                                                nss,
@@ -201,7 +202,8 @@ protected:
                                                boost::none,
                                                0,
                                                /*stayTemp=*/false,
-                                               /*markFromMigrate=*/false);
+                                               /*markFromMigrate=*/false,
+                                               /*isViewlessTimeseries*/ false);
                 opObserver.preRenameCollection(opCtx,
                                                adminNss,
                                                nss,
@@ -209,7 +211,8 @@ protected:
                                                boost::none,
                                                0,
                                                /*stayTemp=*/false,
-                                               /*markFromMigrate=*/false);
+                                               /*markFromMigrate=*/false,
+                                               /*isViewlessTimeseries*/ false);
                 opObserver.onRenameCollection(opCtx,
                                               nss,
                                               adminNss,
@@ -217,7 +220,8 @@ protected:
                                               boost::none,
                                               0,
                                               /*stayTemp=*/false,
-                                              /*markFromMigrate=*/false);
+                                              /*markFromMigrate=*/false,
+                                              /*isViewlessTimeseries*/ false);
                 opObserver.onRenameCollection(opCtx,
                                               adminNss,
                                               nss,
@@ -225,23 +229,26 @@ protected:
                                               boost::none,
                                               0,
                                               /*stayTemp=*/false,
-                                              /*markFromMigrate=*/false);
-                opObserver.onImportCollection(opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false);
+                                              /*markFromMigrate=*/false,
+                                              /*isViewlessTimeseries*/ false);
+                opObserver.onImportCollection(
+                    opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false);
             } catch (...) {
                 // Make it easier to see that this is where we failed.
                 ASSERT_OK(exceptionToStatus());
             }
         } else {
-            ASSERT_THROWS(opObserver.onCreateIndex(
-                              opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false),
-                          AssertionException);
-            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false),
+            ASSERT_THROWS(
+                opObserver.onCreateIndex(
+                    opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false, false),
+                AssertionException);
+            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false, false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onStartIndexBuildSinglePhase(opCtx, nss), AssertionException);
             ASSERT_THROWS(opObserver.onCreateCollection(
-                              opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false),
+                              opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false, false),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none),
+            ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/),
                           AssertionException);
@@ -249,9 +256,10 @@ protected:
                                                       nss,
                                                       uuid,
                                                       0,
-                                                      /*markFromMigrate=*/false),
+                                                      /*markFromMigrate=*/false,
+                                                      /*isViewlessTimeseries*/ false),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj()),
+            ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false),
                           AssertionException);
             ASSERT_THROWS(opObserver.preRenameCollection(opCtx,
                                                          nss,
@@ -260,7 +268,8 @@ protected:
                                                          boost::none,
                                                          0,
                                                          /*stayTemp=*/false,
-                                                         /*markFromMigrate=*/false),
+                                                         /*markFromMigrate=*/false,
+                                                         /*isViewlessTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.preRenameCollection(opCtx,
                                                          adminNss,
@@ -269,7 +278,8 @@ protected:
                                                          boost::none,
                                                          0,
                                                          /*stayTemp=*/false,
-                                                         /*markFromMigrate=*/false),
+                                                         /*markFromMigrate=*/false,
+                                                         /*isViewlessTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         nss,
@@ -278,7 +288,8 @@ protected:
                                                         boost::none,
                                                         0,
                                                         /*stayTemp=*/false,
-                                                        /*markFromMigrate=*/false),
+                                                        /*markFromMigrate=*/false,
+                                                        /*isViewlessTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         adminNss,
@@ -287,11 +298,12 @@ protected:
                                                         boost::none,
                                                         0,
                                                         /*stayTemp=*/false,
-                                                        /*markFromMigrate=*/false),
+                                                        /*markFromMigrate=*/false,
+                                                        /*isViewlessTimeseries*/ false),
                           AssertionException);
-            ASSERT_THROWS(
-                opObserver.onImportCollection(opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false),
-                AssertionException);
+            ASSERT_THROWS(opObserver.onImportCollection(
+                              opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false),
+                          AssertionException);
         }
     }
 

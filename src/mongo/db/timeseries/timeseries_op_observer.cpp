@@ -160,7 +160,8 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
                                                     const NamespaceString& collectionName,
                                                     const UUID& uuid,
                                                     std::uint64_t numRecords,
-                                                    bool markFromMigrate) {
+                                                    bool markFromMigrate,
+                                                    bool isViewlessTimeseries) {
     auto& bucketCatalog =
         timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     timeseries::bucket_catalog::drop(bucketCatalog, uuid);
