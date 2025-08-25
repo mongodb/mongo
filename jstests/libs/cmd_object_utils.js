@@ -19,7 +19,6 @@ export const kGenericArgFieldNames = [
     "$audit",
     "$client",
     "$configServerState",
-    "allowImplicitCollectionCreation",
     "$oplogQueryData",
     "$queryOptions",
     "$replData",

@@ -166,11 +166,6 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
-            allowImplicitCollectionCreation:
-                type: bool
-                forward_to_shards: false
-                optional: true
-                stability: "internal"
             $oplogQueryData:
                 type: IDLAnyTypeOwned
                 cpp_name: "dollarOplogQueryData"

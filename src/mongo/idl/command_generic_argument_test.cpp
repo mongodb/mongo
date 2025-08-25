@@ -62,7 +62,6 @@ static constexpr std::array<SpecialArgRecord, 35> specials{{
     {"$client"_sd,                           1, 0, 1, 0},
     {"$configServerState"_sd,                1, 1, 1, 1},
     {"$db"_sd,                               1, 0, 1, 0},
-    {"allowImplicitCollectionCreation"_sd,   1, 0, 1, 0},
     {"$oplogQueryData"_sd,                   1, 1, 1, 1},
     {"$queryOptions"_sd,                     1, 0, 0, 0},
     {"$readPreference"_sd,                   1, 0, 1, 0},
