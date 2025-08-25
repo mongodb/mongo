@@ -6,8 +6,6 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   # TODO SERVER-109351 Re-enable aubsan coverage by resolving memory leak
- *   incompatible_aubsan,
  * ]
  */
 import {isLinux} from "jstests/libs/os_helpers.js";

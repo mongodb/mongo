@@ -148,7 +148,11 @@ void ExtensionLoader::load(const std::string& extensionPath) {
             str::stream() << "Loading extension '" << extensionPath
                           << "' failed: " << swExtensionLib.getStatus().reason(),
             swExtensionLib.isOK());
-    auto& extensionLib = swExtensionLib.getValue();
+
+    // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
+    // lifetime of the server.
+    loadedExtensions.emplace(extensionPath, std::move(swExtensionLib.getValue()));
+    auto& extensionLib = loadedExtensions[extensionPath];
 
     ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
     // Validate that the major and minor versions from the extension implementation are compatible
@@ -164,9 +168,5 @@ void ExtensionLoader::load(const std::string& extensionPath) {
 
     HostPortal portal{extHandle.getVersion(), maxWireVersion};
     extHandle.initialize(portal);
-
-    // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
-    // lifetime of the server.
-    loadedExtensions.emplace(extensionPath, std::move(extensionLib));
 }
 }  // namespace mongo::extension::host
