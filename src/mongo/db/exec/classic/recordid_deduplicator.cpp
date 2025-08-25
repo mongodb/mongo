@@ -160,8 +160,10 @@ void RecordIdDeduplicator::spill(SpillingStats& stats, uint64_t maximumMemoryUsa
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()));
     };
 
-    stats.updateSpillingStats(
-        1, additionalSpilledBytes, additionalSpilledRecords, currentSpilledDataStorageSize);
+    if (additionalSpilledBytes > 0) {
+        stats.updateSpillingStats(
+            1, additionalSpilledBytes, additionalSpilledRecords, currentSpilledDataStorageSize);
+    }
 }
 
 }  // namespace mongo

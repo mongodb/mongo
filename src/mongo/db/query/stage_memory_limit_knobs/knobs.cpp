@@ -63,6 +63,8 @@ AtomicWord<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
             return internalQueryMaxBlockingSortMemoryUsageBytes;
         case StageMemoryLimit::OrStageMaxMemoryBytes:
             return internalOrStageMaxMemoryBytes;
+        case StageMemoryLimit::NearStageMaxMemoryBytes:
+            return internalNearStageMaxMemoryBytes;
     };
     MONGO_UNREACHABLE_TASSERT(10869600);
 }

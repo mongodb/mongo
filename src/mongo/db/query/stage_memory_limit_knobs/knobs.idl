@@ -202,3 +202,16 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+
+    internalNearStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the NearStage stage will cache in-memory before
+            spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalNearStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
