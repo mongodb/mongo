@@ -39,6 +39,7 @@
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
@@ -67,6 +68,9 @@ public:
      * Creates a collection with a default CollectionsOptions and the given UUID.
      */
     void createCollection(const NamespaceString& nss, UUID uuid);
+
+    CollectionAcquisition getCollectionExclusive(OperationContext* opCtx,
+                                                 const NamespaceString& nss);
 
     std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys, std::vector<int32_t> ids);
 
@@ -124,6 +128,14 @@ void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& n
                                                  repl::OpTime::kUninitializedTerm));
 }
 
+CollectionAcquisition IndexBuildsCoordinatorMongodTest::getCollectionExclusive(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+}
+
 std::vector<IndexBuildInfo> IndexBuildsCoordinatorMongodTest::makeSpecs(
     std::vector<std::string> keys, std::vector<int32_t> ids) {
     invariant(keys.size());
@@ -166,6 +178,95 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
               ErrorCodes::IndexBuildAlreadyInProgress);
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+    auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
+    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, RestartIndexBuild_HandlesPendingIndexBuild) {
+    repl::ReplSettings settings;
+    settings.setReplSetString("mySet/node1:12345");
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(),
+                                                                        std::move(settings));
+    ASSERT_OK(replCoord->setFollowerModeRollback(operationContext()));
+    replCoord->alwaysAllowWrites(true);
+    repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
+
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+
+    // Register an index build on _testFooNss.
+    auto testFoo1Future =
+        assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                     _testFooNss.dbName(),
+                                                     _testFooUUID,
+                                                     makeSpecs({"a", "b"}, {1, 2}),
+                                                     UUID::gen(),
+                                                     IndexBuildProtocol::kTwoPhase,
+                                                     _indexBuildOptions));
+    ASSERT_TRUE(
+        _indexBuildsCoord->inProgForCollection(_testFooUUID, IndexBuildProtocol::kTwoPhase));
+
+    auto thread = stdx::thread([&] {
+        // We would not be able to restart the index build.
+        auto indexBuilds = _indexBuildsCoord->restartAllTwoPhaseIndexBuilds(operationContext());
+        ASSERT_EQ(1, indexBuilds.size());
+    });
+
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+
+    thread.join();
+
+    // Verify that the startIndexBuild() call above fails.
+    ASSERT_THROWS(testFoo1Future.get(), ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>);
+
+    _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
+        operationContext(), _testFooUUID, IndexBuildProtocol::kTwoPhase);
+    ASSERT_FALSE(
+        _indexBuildsCoord->inProgForCollection(_testFooUUID, IndexBuildProtocol::kTwoPhase));
+    auto collection = getCollectionExclusive(operationContext(), _testFooNss);
+    ASSERT_EQ(
+        3,
+        _indexBuildsCoord->getNumIndexesTotal(operationContext(), collection.getCollectionPtr()));
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, RestartIndexBuild_HandlesCommittedIndexBuild) {
+    repl::ReplSettings settings;
+    settings.setReplSetString("mySet/node1:12345");
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(),
+                                                                        std::move(settings));
+    ASSERT_OK(replCoord->setFollowerModeRollback(operationContext()));
+    replCoord->alwaysAllowWrites(true);
+    repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
+
+    auto failPoint = globalFailPointRegistry().find("hangIndexBuildBeforeCommit");
+    failPoint->setMode(FailPoint::Mode::alwaysOn);
+
+    // Register an index build on _testFooNss.
+    auto testFoo1Future =
+        assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                     _testFooNss.dbName(),
+                                                     _testFooUUID,
+                                                     makeSpecs({"a", "b"}, {1, 2}),
+                                                     UUID::gen(),
+                                                     IndexBuildProtocol::kTwoPhase,
+                                                     _indexBuildOptions));
+    ASSERT_TRUE(
+        _indexBuildsCoord->inProgForCollection(_testFooUUID, IndexBuildProtocol::kTwoPhase));
+    // Wait until the index build is ready to commit.
+    failPoint->waitForTimesEntered(1);
+
+    auto thread = stdx::thread([&] {
+        // We would not be able to restart the index build now as it's about to commit, but we
+        // should gracefully handle it.
+        auto indexBuilds = _indexBuildsCoord->restartAllTwoPhaseIndexBuilds(operationContext());
+        ASSERT_TRUE(indexBuilds.empty());
+    });
+
+    failPoint->setMode(FailPoint::Mode::off);
+
+    thread.join();
+
+    // Verify that the startIndexBuild() call above succeeds.
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
     ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
     ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);

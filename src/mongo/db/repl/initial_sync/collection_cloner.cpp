@@ -53,6 +53,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -383,13 +384,21 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
         // This spawns a new thread and returns immediately once the index build has been
         // registered with the IndexBuildsCoordinator.
         try {
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            auto indexBuildMethod =
+                ((fcvSnapshot.isVersionInitialized() &&
+                  mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                      VersionContext::getDecoration(opCtx.get()), fcvSnapshot))
+                     ? IndexBuildMethodEnum::kPrimaryDriven
+                     : IndexBuildMethodEnum::kHybrid);
+
             IndexBuildsCoordinator::get(opCtx.get())
                 ->applyStartIndexBuild(opCtx.get(),
                                        IndexBuildsCoordinator::ApplicationMode::kInitialSync,
                                        {getSourceUuid(),
                                         repl::OplogEntry::CommandType::kStartIndexBuild,
                                         "createIndexes",
-                                        IndexBuildMethodEnum::kHybrid,
+                                        indexBuildMethod,
                                         groupedIndexSpec.first,
                                         std::move(indexes),
                                         boost::none});

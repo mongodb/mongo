@@ -387,6 +387,13 @@ public:
     IndexBuilds stopIndexBuildsForRollback(OperationContext* opCtx);
 
     /**
+     * Restarts all active two-phase index builds. The restarts are performed only on this node, so
+     * no abortIndexBuild or startIndexBuild oplog entries are generated. Returns an IndexBuilds of
+     * restarted index builds. Single-phase index builds are not restarted.
+     */
+    IndexBuilds restartAllTwoPhaseIndexBuilds(OperationContext* opCtx);
+
+    /**
      * Handles the 'voteAbortIndexBuild' command request.
      */
     virtual Status voteAbortIndexBuild(OperationContext* opCtx,
@@ -573,6 +580,15 @@ private:
                                        IndexBuildProtocol protocol);
 
     /**
+     * Restarts the specified index build that is currently not running. Uses
+     * ApplicationMode::kStartupRepair to avoid generating any oplog entries for this operation.
+     */
+    void _restartIndexBuild(OperationContext* opCtx,
+                            const UUID& collUUID,
+                            const UUID& buildUUID,
+                            const std::vector<IndexBuildInfo>& indexes);
+
+    /**
      * Removes the in-memory and durable state of the passed in indexes in preparation of rebuilding
      * them for repair.
      *
@@ -725,7 +741,6 @@ protected:
      * allows handling shutdown errors during the clean-up itself, in _cleanUpAfterFailure.
      */
     void _cleanUpSinglePhaseAfterNonShutdownFailure(OperationContext* opCtx,
-                                                    const CollectionPtr& collection,
                                                     std::shared_ptr<ReplIndexBuildState> replState,
                                                     const IndexBuildOptions& indexBuildOptions);
 
@@ -734,7 +749,6 @@ protected:
      * handling shutdown errors during the clean-up itself, in _cleanUpAfterFailure.
      */
     void _cleanUpTwoPhaseAfterNonShutdownFailure(OperationContext* opCtx,
-                                                 const CollectionPtr& collection,
                                                  std::shared_ptr<ReplIndexBuildState> replState,
                                                  const IndexBuildOptions& indexBuildOptions);
 

@@ -465,7 +465,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                   "properties"_attr = *descriptor,
                   "specIndex"_attr = i,
                   "numSpecs"_attr = indexes.size(),
-                  "method"_attr = _method,
+                  "method"_attr = IndexBuildMethod_serializer(_method),
                   "ident"_attr = indexCatalogEntry->getIdent(),
                   "indexBuildInfo"_attr = indexes[i].toBSON(),
                   "collectionIdent"_attr = collection->getSharedIdent()->getIdent(),

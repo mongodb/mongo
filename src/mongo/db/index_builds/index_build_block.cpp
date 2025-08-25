@@ -93,6 +93,7 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto desc = getEntry(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection))->descriptor();
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(desc->indexName());
     CollectionIndexUsageTrackerDecoration::write(collection)
         .registerIndex(desc->indexName(),
                        desc->keyPattern(),

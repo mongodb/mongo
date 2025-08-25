@@ -1889,6 +1889,86 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
     return buildsStopped;
 }
 
+IndexBuilds IndexBuildsCoordinator::restartAllTwoPhaseIndexBuilds(OperationContext* opCtx) {
+    LOGV2(10705500, "Restarting all two-phase index builds");
+
+    IndexBuilds buildsRestarted;
+    auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
+        if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
+            return;
+        }
+
+        // This will unblock the index build and allow it to complete without cleaning up.
+        if (!abortIndexBuildByBuildUUID(opCtx,
+                                        replState->buildUUID,
+                                        IndexBuildAction::kRollbackAbort,
+                                        Status{ErrorCodes::InterruptedDueToReplStateChange,
+                                               "restarting all two-phase index builds"})) {
+            // The index build may already be in the midst of tearing down.
+            // Leave this index build out of 'buildsStopped'.
+            LOGV2(10705501,
+                  "Index build: failed to abort index build",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "database"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+            return;
+        }
+
+        _restartIndexBuild(
+            opCtx, replState->collectionUUID, replState->buildUUID, replState->getIndexes());
+
+        IndexBuildsEntry indexBuildEntry{replState->collectionUUID};
+        for (const auto& spec : toIndexSpecs(replState->getIndexes())) {
+            indexBuildEntry.indexSpecs.emplace_back(spec.getOwned());
+        }
+        buildsRestarted.insert({replState->buildUUID, std::move(indexBuildEntry)});
+    };
+
+    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
+    forEachIndexBuild(
+        indexBuilds, "IndexBuildsCoordinator::restartAllTwoPhaseIndexBuilds"_sd, onIndexBuild);
+
+    return buildsRestarted;
+}
+
+void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
+                                                const UUID& collUUID,
+                                                const UUID& buildUUID,
+                                                const std::vector<IndexBuildInfo>& indexes) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, collUUID);
+    invariant(nss);
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+        .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
+                              feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                                  VersionContext::getDecoration(opCtx), fcvSnapshot))
+                                 ? IndexBuildMethodEnum::kPrimaryDriven
+                                 : IndexBuildMethodEnum::kHybrid)};
+    LOGV2(20660,
+          "Index build: restarting",
+          "buildUUID"_attr = buildUUID,
+          "collectionUUID"_attr = collUUID,
+          logAttrs(nss.value()),
+          "method"_attr = IndexBuildMethod_serializer(indexBuildOptions.indexBuildMethod));
+
+    // Indicate that the initialization should not generate oplog entries or timestamps for the
+    // first catalog write, and that the original durable catalog entries should be dropped and
+    // replaced.
+    indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
+
+    // This spawns a new thread and returns immediately. These index builds will start and wait
+    // for a commit or abort to be replicated.
+    [[maybe_unused]] auto fut = uassertStatusOK(startIndexBuild(opCtx,
+                                                                nss->dbName(),
+                                                                collUUID,
+                                                                indexes,
+                                                                buildUUID,
+                                                                IndexBuildProtocol::kTwoPhase,
+                                                                indexBuildOptions));
+}
+
 void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
     OperationContext* opCtx,
     const IndexBuilds& buildsToRestart,
@@ -1991,20 +2071,6 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
             continue;
         }
 
-        boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, build.collUUID);
-        invariant(nss);
-
-        LOGV2(20660,
-              "Index build: restarting",
-              "buildUUID"_attr = buildUUID,
-              "collectionUUID"_attr = build.collUUID,
-              logAttrs(nss.value()));
-        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-        // Indicate that the initialization should not generate oplog entries or timestamps for the
-        // first catalog write, and that the original durable catalog entries should be dropped and
-        // replaced.
-        indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
-
         // Convert each index spec into a corresponding IndexBuildInfo instance.
         std::vector<IndexBuildInfo> indexes;
         indexes.reserve(build.indexSpecs.size());
@@ -2015,15 +2081,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
             indexes.push_back(std::move(indexBuildInfo));
         }
 
-        // This spawns a new thread and returns immediately. These index builds will start and wait
-        // for a commit or abort to be replicated.
-        [[maybe_unused]] auto fut = uassertStatusOK(startIndexBuild(opCtx,
-                                                                    nss->dbName(),
-                                                                    build.collUUID,
-                                                                    indexes,
-                                                                    buildUUID,
-                                                                    IndexBuildProtocol::kTwoPhase,
-                                                                    indexBuildOptions));
+        _restartIndexBuild(opCtx, build.collUUID, buildUUID, indexes);
     }
 }
 
@@ -2788,11 +2846,9 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
             }
 
             if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
-                _cleanUpSinglePhaseAfterNonShutdownFailure(
-                    opCtx, collection, replState, indexBuildOptions);
+                _cleanUpSinglePhaseAfterNonShutdownFailure(opCtx, replState, indexBuildOptions);
             } else {
-                _cleanUpTwoPhaseAfterNonShutdownFailure(
-                    opCtx, collection, replState, indexBuildOptions);
+                _cleanUpTwoPhaseAfterNonShutdownFailure(opCtx, replState, indexBuildOptions);
             }
             return;
         } catch (const DBException& ex) {
@@ -2809,7 +2865,6 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
 
 void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions) {
 
@@ -2828,7 +2883,6 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
 
 void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions) {
 
