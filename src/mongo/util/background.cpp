@@ -79,10 +79,6 @@ private:
 
     void run() override;
 
-    // Returns true if shutdown has been requested.  You must hold _mutex to call this
-    // function.
-    bool _isShutdownRequested() const;
-
     // Runs all registered tasks. You must hold _mutex to call this function.
     void _runTasks();
 
@@ -322,10 +318,6 @@ void PeriodicTaskRunner::run() {
         }
         _runTasks();
     }
-}
-
-bool PeriodicTaskRunner::_isShutdownRequested() const {
-    return _shutdownRequested;
 }
 
 void PeriodicTaskRunner::_runTasks() {
