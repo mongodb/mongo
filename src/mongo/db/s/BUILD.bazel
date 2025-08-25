@@ -1565,8 +1565,13 @@ mongo_cc_unit_test(
         "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
     tags = [
+        "incompatible_with_bazel_remote_test",
         "mongo_unittest_seventh_group",
     ],
+    target_compatible_with = select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":config_server_test_fixture",
         ":sharding_commands_d",

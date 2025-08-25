@@ -1015,7 +1015,12 @@ mongo_cc_unit_test(
         # Time functions seem to be incompatible with the sandbox
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98848",
+        "incompatible_with_bazel_remote_test",
     ],
+    target_compatible_with = select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "packaged_task",
         ":alarm",

@@ -43,6 +43,7 @@ load(
     "propeller_profile_use",
     "release",
     "remote_link",
+    "remote_test_build",
     "sdkroot",
     "separate_debug",
     "server_js",
@@ -737,6 +738,32 @@ selects.config_setting_group(
         "@platforms//cpu:aarch64",
         "@platforms//os:linux",
     ],
+)
+
+selects.config_setting_group(
+    name = "remote_link_arm_linux_linkstatic",
+    match_all = [
+        ":remote_link_enabled",
+        ":linkstatic_enabled",
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
+# ==========
+# remote test
+# ==========
+
+remote_test_build(
+    name = "remote_test",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "remote_test_enabled",
+    flag_values = {
+        "//bazel/config:remote_test": "True",
+    },
 )
 
 # --------------------------------------

@@ -59,7 +59,14 @@ mongo_cc_unit_test(
     srcs = [
         "test/socket_timeout_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = [
+        "incompatible_with_bazel_remote_test",
+        "mongo_unittest_fourth_group",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":asio",
         "//src/mongo:base",

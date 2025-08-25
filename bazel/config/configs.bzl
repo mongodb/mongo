@@ -578,6 +578,19 @@ remote_link = rule(
 )
 
 # =========
+# remote test
+# =========
+remote_test_provider = provider(
+    doc = """Enable remote testing via remote bazel execution.""",
+    fields = ["enabled"],
+)
+
+remote_test_build = rule(
+    implementation = lambda ctx: remote_test_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # dwarf_version
 # =========
 dwarf_version_values = ["4", "5"]

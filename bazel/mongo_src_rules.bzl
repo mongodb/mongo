@@ -813,7 +813,7 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:thin_lto_enabled": {"cpp_link.cpus": str(NUM_CPUS)},
             "//conditions:default": {},
         }) | select({
-            "//bazel/config:remote_link_arm_linux_enabled": {"cpp_link.Pool": "arm_linker"},
+            "//bazel/config:remote_link_arm_linux_linkstatic": {"cpp_link.Pool": "arm_linker"},
             "//conditions:default": {},
         }),
         "env": env | SANITIZER_ENV,

@@ -252,9 +252,13 @@ mongo_cc_unit_test(
         "//jstests/libs:test_pem_files",
     ],
     tags = [
+        "incompatible_with_bazel_remote_test",
         "mongo_unittest_second_group",
     ],
-    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH + select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":grpc_async_client_factory",
         ":grpc_transport_layer",

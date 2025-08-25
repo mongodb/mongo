@@ -380,6 +380,21 @@ common:remote_link --strategy=StripDebugInfo=remote
 common:remote_link --//bazel/config:remote_link=True
 common:remote_link --features=-thin_archive
 
+--config=remote_test
+common:remote_test --strategy=CppLink=remote
+common:remote_test --strategy=CppArchive=remote
+common:remote_test --strategy=SolibSymlink=remote
+common:remote_test --strategy=ExtractDebugInfo=remote
+common:remote_test --strategy=StripDebugInfo=remote
+common:remote_test --//bazel/config:remote_link=True
+common:remote_test --//bazel/config:remote_test=True
+common:remote_test --strategy=TestRunner=remote
+common:remote_test --features=-thin_archive
+common:remote_test --remote_download_outputs=minimal
+common:remote_test --test_output=summary
+test:remote_test --test_timeout=600
+test:remote_test --test_tag_filters=-incompatible_with_bazel_remote_test
+
 # Coverage
 coverage --config=dbg
 coverage --compiler_type=clang
