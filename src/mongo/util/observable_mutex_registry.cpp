@@ -29,6 +29,7 @@
 
 #include "mongo/util/observable_mutex_registry.h"
 
+#include "mongo/util/scoped_unlock.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {
@@ -38,12 +39,34 @@ ObservableMutexRegistry& ObservableMutexRegistry::get() {
     return *obj;
 }
 
-void ObservableMutexRegistry::iterate(CollectionCallback cb) const {
-    stdx::lock_guard lk(_mutex);
-    for (const auto& [tag, entries] : _mutexEntries) {
-        for (const auto& entry : entries) {
-            cb(tag, entry.mode, *entry.token);
+void ObservableMutexRegistry::iterate(CollectionCallback cb) {
+    std::vector<StringData> tags;
+    stdx::unique_lock lk(_mutex);
+    tags.reserve(_mutexEntries.size());
+    for (const auto& [tag, _] : _mutexEntries) {
+        tags.emplace_back(tag);
+    }
+
+    for (const auto& tag : tags) {
+        auto& entries = _mutexEntries[tag];
+        std::list<MutexEntry> entriesSnapshot(entries);
+
+        // Garbage collect invalid entries.
+        entries.remove_if([&](auto& entry) { return MONGO_unlikely(!entry.token->isValid()); });
+
+        ScopedUnlock scopedUnlock(lk);
+        for (const auto& entry : entriesSnapshot) {
+            cb(tag, entry.registrationTime, *entry.token);
         }
     }
+}
+
+size_t ObservableMutexRegistry::getNumRegistered_forTest() const {
+    stdx::lock_guard lk(_mutex);
+    size_t size = 0;
+    for (const auto& [_, entries] : _mutexEntries) {
+        size += entries.size();
+    }
+    return size;
 }
 }  // namespace mongo

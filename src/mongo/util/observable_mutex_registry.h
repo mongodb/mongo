@@ -30,6 +30,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/system_clock_source.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -39,11 +41,14 @@ namespace mongo {
  */
 class ObservableMutexRegistry {
 public:
-    enum class TrackingMode { kAggregate, kSeparate };
-
     // TODO SERVER-108695: modify the following typedef with public ObservationToken
     using CollectionCallback =
-        std::function<void(StringData, TrackingMode, observable_mutex_details::ObservationToken&)>;
+        std::function<void(StringData tag,
+                           const Date_t& registered,
+                           observable_mutex_details::ObservationToken& token)>;
+
+    ObservableMutexRegistry() : ObservableMutexRegistry(SystemClockSource::get()) {}
+    explicit ObservableMutexRegistry(ClockSource* clk) : _clockSource(clk) {}
 
     /**
      * This may have performance implications as it serializes registering
@@ -51,42 +56,33 @@ public:
      * created on a hot path, with visible performance implications for the user.
      */
     template <typename MutexType>
-    void add(StringData tag, const MutexType& mutex, TrackingMode mode = TrackingMode::kAggregate) {
+    void add(StringData tag, const MutexType& mutex) {
 #ifdef MONGO_CONFIG_MUTEX_OBSERVATION
         auto hashedTag = _mutexEntries.hash_function().hashed_key(tag);
         stdx::lock_guard lk(_mutex);
-        auto& entries = _mutexEntries[hashedTag];
-
-        iassert(ErrorCodes::InternalError,
-                "Unable to register the same tag under different tracking modes",
-                entries.empty() || entries.begin()->mode == mode);
-
-        if (mode == TrackingMode::kSeparate) {
-            iassert(ErrorCodes::InternalError,
-                    "Unable to register more than one mutex with separate tracking mode",
-                    entries.empty() || !entries.front().token->isValid());
-            invariant(entries.size() <= 1);
-            entries.clear();
-        }
-        entries.emplace_back(tag, mode, mutex.token());
+        _mutexEntries[hashedTag].emplace_back(_clockSource->now(), mutex.token());
 #endif
     }
 
     /**
-     * Runs the provided callback on each registered mutex object. The callback is invoked while
-     * holding a lock on the registry, so the callback must be tightly-scoped, avoiding allocations
-     * and I/O.
+     * Iterates over all registered mutex objects and runs the provided callback without holding the
+     * registry's mutex. Mutex objects with invalid tokens are removed from the registry but are
+     * still visited in the same iteration. This is to allow consumers to know when a token becomes
+     * invalid.
      */
-    void iterate(CollectionCallback cb) const;
+    void iterate(CollectionCallback cb);
 
     static ObservableMutexRegistry& get();
 
+    size_t getNumRegistered_forTest() const;
+
 private:
     struct MutexEntry {
-        StringData tag;
-        TrackingMode mode;
+        Date_t registrationTime;
         std::shared_ptr<observable_mutex_details::ObservationToken> token;
     };
+
+    ClockSource* _clockSource;
 
     mutable stdx::mutex _mutex;
     StringMap<std::list<MutexEntry>> _mutexEntries;

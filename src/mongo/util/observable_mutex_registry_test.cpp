@@ -30,6 +30,7 @@
 #include "mongo/util/observable_mutex_registry.h"
 
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -42,111 +43,91 @@ public:
 
 class ObservableMutexRegistryTest : public unittest::Test {
 public:
-    using TrackingMode = ObservableMutexRegistry::TrackingMode;
-
     struct RegisteredEntry {
         StringData tag;
         observable_mutex_details::ObservationToken* token;
-        TrackingMode mode;
 
-        bool operator==(const RegisteredEntry& other) const = default;
+        auto operator<=>(const RegisteredEntry& other) const = default;
     };
 
     void iterateOnRegistryAndVerify(std::vector<RegisteredEntry> expectedEntries) {
         std::vector<RegisteredEntry> entries;
-        registry.iterate([&](StringData tag,
-                             TrackingMode mode,
-                             observable_mutex_details::ObservationToken& token) {
-            entries.emplace_back(tag, &token, mode);
-        });
+        registry.iterate(
+            [&](StringData tag, const Date_t&, observable_mutex_details::ObservationToken& token) {
+                entries.emplace_back(tag, &token);
+            });
+
+        // Sort the vectors since the registry does not guarantee order when iterating.
+        std::sort(entries.begin(), entries.end());
+        std::sort(expectedEntries.begin(), expectedEntries.end());
         ASSERT_EQ(entries, expectedEntries);
     }
 
-    StringData tag{"dummy-tag"_sd};
-    ObservableMutexRegistry registry;
+    StringData tagA{"A"_sd};
+    StringData tagB{"B"_sd};
+    ClockSourceMock clk;
+    ObservableMutexRegistry registry{&clk};
 };
 
 TEST_F(ObservableMutexRegistryTest, EmptyRegistry) {
     iterateOnRegistryAndVerify({});
 }
 
-TEST_F(ObservableMutexRegistryTest, AggregateNew) {
+TEST_F(ObservableMutexRegistryTest, AddSingle) {
     ObservableMutex<DummyMutex> m;
 
-    registry.add(tag, m);
+    registry.add(tagA, m);
 
-    iterateOnRegistryAndVerify({{tag, m.token().get(), TrackingMode::kAggregate}});
+    iterateOnRegistryAndVerify({{tagA, m.token().get()}});
 }
 
-TEST_F(ObservableMutexRegistryTest, SeparateNew) {
-    ObservableMutex<DummyMutex> m;
-
-    registry.add(tag, m, TrackingMode::kSeparate);
-
-    iterateOnRegistryAndVerify({{tag, m.token().get(), TrackingMode::kSeparate}});
-}
-
-TEST_F(ObservableMutexRegistryTest, AggregateReused) {
+TEST_F(ObservableMutexRegistryTest, AddMultiple) {
     ObservableMutex<DummyMutex> one;
     ObservableMutex<DummyMutex> two;
+    ObservableMutex<DummyMutex> three;
 
-    registry.add(tag, one);
-    registry.add(tag, two);
+    registry.add(tagA, one);
+    registry.add(tagA, two);
+    registry.add(tagB, three);
 
-    iterateOnRegistryAndVerify({{tag, one.token().get(), TrackingMode::kAggregate},
-                                {tag, two.token().get(), TrackingMode::kAggregate}});
+    iterateOnRegistryAndVerify(
+        {{tagA, one.token().get()}, {tagA, two.token().get()}, {tagB, three.token().get()}});
 }
 
-TEST_F(ObservableMutexRegistryTest, SeparateReusedWhenOldValid) {
+TEST_F(ObservableMutexRegistryTest, AddMultipleWithSomeInvalid) {
     ObservableMutex<DummyMutex> one;
     ObservableMutex<DummyMutex> two;
+    registry.add(tagA, one);
+    registry.add(tagB, two);
+    one.token()->invalidate();
+    two.token()->invalidate();
 
-    registry.add(tag, one, TrackingMode::kSeparate);
-    ASSERT_THROWS_CODE_AND_WHAT(
-        registry.add(tag, two, TrackingMode::kSeparate),
-        DBException,
-        ErrorCodes::InternalError,
-        "Unable to register more than one mutex with separate tracking mode");
+    ObservableMutex<DummyMutex> three;
+    registry.add(tagA, three);
 
-    iterateOnRegistryAndVerify({{tag, one.token().get(), TrackingMode::kSeparate}});
+    ASSERT_EQ(registry.getNumRegistered_forTest(), 3);
+    iterateOnRegistryAndVerify(
+        {{tagA, one.token().get()}, {tagB, two.token().get()}, {tagA, three.token().get()}});
+
+    // Garbage collection only happens during iteration and after the cb is run.
+    ASSERT_EQ(registry.getNumRegistered_forTest(), 1);
+    iterateOnRegistryAndVerify({{tagA, three.token().get()}});
 }
 
-TEST_F(ObservableMutexRegistryTest, SeparateReusedWhenOldInvalid) {
-    {
-        ObservableMutex<DummyMutex> one;
-        registry.add(tag, one, TrackingMode::kSeparate);
-        iterateOnRegistryAndVerify({{tag, one.token().get(), TrackingMode::kSeparate}});
-    };
-
-    ObservableMutex<DummyMutex> two;
-    registry.add(tag, two, TrackingMode::kSeparate);
-    iterateOnRegistryAndVerify({{tag, two.token().get(), TrackingMode::kSeparate}});
-}
-
-TEST_F(ObservableMutexRegistryTest, SameTagUnderDifferentModesSepFirst) {
+TEST_F(ObservableMutexRegistryTest, RegistrationTimestamp) {
     ObservableMutex<DummyMutex> one;
     ObservableMutex<DummyMutex> two;
+    registry.add(tagA, one);
+    clk.advance(Milliseconds(1));
+    registry.add(tagB, two);
 
-    registry.add(tag, one, TrackingMode::kSeparate);
-    iterateOnRegistryAndVerify({{tag, one.token().get(), TrackingMode::kSeparate}});
+    StringMap<Date_t> timestamps;
+    registry.iterate(
+        [&](StringData tag,
+            const Date_t& registrationTime,
+            observable_mutex_details::ObservationToken&) { timestamps[tag] = registrationTime; });
 
-    ASSERT_THROWS_CODE_AND_WHAT(registry.add(tag, two, TrackingMode::kAggregate),
-                                DBException,
-                                ErrorCodes::InternalError,
-                                "Unable to register the same tag under different tracking modes");
-}
-
-TEST_F(ObservableMutexRegistryTest, SameTagUnderDifferentModesAggFirst) {
-    ObservableMutex<DummyMutex> one;
-    ObservableMutex<DummyMutex> two;
-
-    registry.add(tag, one, TrackingMode::kAggregate);
-    iterateOnRegistryAndVerify({{tag, one.token().get(), TrackingMode::kAggregate}});
-
-    ASSERT_THROWS_CODE_AND_WHAT(registry.add(tag, two, TrackingMode::kSeparate),
-                                DBException,
-                                ErrorCodes::InternalError,
-                                "Unable to register the same tag under different tracking modes");
+    ASSERT_LT(timestamps[tagA], timestamps[tagB]);
 }
 
 }  // namespace

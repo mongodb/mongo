@@ -1087,7 +1087,10 @@ mongo_cc_unit_test(
 
 mongo_cc_library(
     name = "observable_mutex_registry",
-    srcs = ["observable_mutex_registry.cpp"],
+    srcs = [
+        "observable_mutex_registry.cpp",
+        "scoped_unlock.h",
+    ],
     hdrs = ["observable_mutex_registry.h"],
     deps = ["//src/mongo:base"],
 )
@@ -1103,7 +1106,10 @@ mongo_cc_unit_test(
         "//bazel/config:mutex_observation_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    deps = ["observable_mutex_registry"],
+    deps = [
+        ":observable_mutex_registry",
+        "//src/mongo/util:clock_source_mock",
+    ],
 )
 
 mongo_cc_unit_test(
