@@ -31,6 +31,10 @@ if [ "$DISTRO" == "amazon2023" ]; then
     TAG_SUFFIX="$ARCH-al2023"
 fi
 
+if [ "$PATCH" ]; then
+    TAG_SUFFIX="$TAG_SUFFIX-$revision_order_id"
+fi
+
 attempts=0
 max_attempts=4
 

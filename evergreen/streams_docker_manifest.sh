@@ -8,6 +8,7 @@ REPO="mongo/mongostream"
 IMAGE="$REGISTRY/$REPO"
 GITSHA="$github_commit"
 DISTRO="$packager_distro"
+PATCH="$is_patch"
 
 attempts=0
 max_attempts=4
@@ -22,6 +23,10 @@ DISTRO_SUFFIX=""
 
 if [ "$DISTRO" == "amazon2023" ]; then
     DISTRO_SUFFIX="-al2023"
+fi
+
+if [ "$PATCH" ]; then
+    DISTRO_SUFFIX="$DISTRO_SUFFIX-$revision_order_id"
 fi
 
 # Creating the manifest.
