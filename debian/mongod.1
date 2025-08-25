@@ -11,7 +11,7 @@ for testing: In common operation, use the \fBconfiguration file
 options\f1 to control the behavior of
 your database.
 .PP
-\fBConfiguration File Settings and Command\-Line Options Mapping\f1
+\fBSelf\-Managed Configuration File Settings and Command\-Line Options Mapping\f1
 .PP
 MongoDB disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available.
@@ -20,7 +20,7 @@ encryption on systems where TLS 1.1+ is available.
 Deployments hosted in the following environments use \fBmongod\f1:
 .RS
 .IP \(bu 2
-MongoDB Atlas (https://www.mongodb.com/docs/atlas?tck=docs_server): The fully
+MongoDB Atlas (https://www.mongodb.com/docs/atlas): The fully
 managed service for MongoDB deployments in the cloud
 .RE
 .PP
@@ -61,16 +61,133 @@ corresponding \fBnet.serviceExecutor\f1 configuration option.
 .RE
 .SS CORE OPTIONS
 .PP
-\fBmongod \-\-help\f1, \fBmongod \-h\f1
+\fBmongod \-\-auth\f1
 .RS
 .PP
-Returns information on the options and use of \fBmongod\f1\&.
+Enables authorization to control user\(aqs access to database resources
+and operations. When authorization is enabled, MongoDB requires all
+clients to authenticate themselves first in order to determine the
+access for the client.
+.PP
+To configure users, use the \fBmongosh\f1\f1 client. If no users
+exist, the localhost interface has access to the
+database until you create the first user.
+.PP
+See \fBSecurity\f1 for more information.
 .RE
 .PP
-\fBmongod \-\-version\f1
+\fBmongod \-\-bind_ip\f1
 .RS
 .PP
-Returns the \fBmongod\f1 release number.
+\fIDefault\f1: localhost
+.PP
+The hostnames and/or IP addresses and/or full Unix domain socket
+paths on which \fBmongod\f1 should listen for client connections. You
+may attach \fBmongod\f1 to any interface. To bind to multiple
+addresses, enter a list of comma\-separated values.
+.PP
+You can specify both IPv4 and IPv6 addresses, or hostnames that
+resolve to an IPv4 or IPv6 address.
+.PP
+If specifying an IPv6 address \fIor\f1 a hostname that resolves to an
+IPv6 address to \fB\-\-bind_ip\f1\f1, you must start \fBmongod\f1 with
+\fB\-\-ipv6\f1\f1 to enable IPv6 support. Specifying an IPv6 address
+to \fB\-\-bind_ip\f1\f1 does not enable IPv6 support.
+.PP
+If specifying a
+link\-local IPv6 address (https://en.wikipedia.org/wiki/Link\-local_address#IPv6)
+(\fBfe80::/10\f1), you must append the
+zone index (https://en.wikipedia.org/wiki/IPv6_address#Scoped_literal_IPv6_addresses_(with_zone_index))
+to that address (i.e. \fBfe80::<address>%<adapter\-name>\f1).
+.PP
+To avoid configuration updates due to IP address changes, use DNS
+hostnames instead of IP addresses. It is particularly important to
+use a DNS hostname instead of an IP address when configuring replica
+set members or sharded cluster members.
+.PP
+Use hostnames instead of IP addresses to configure clusters across a
+split network horizon. Starting in MongoDB 5.0, nodes that are only
+configured with an IP address fail startup validation and do not start.
+.PP
+Before you bind your instance to a publicly\-accessible IP address,
+you must secure your cluster from unauthorized access. For a complete
+list of security recommendations, see
+\fBSecurity Checklist for Self\-Managed Deployments\f1\&. At minimum, consider
+\fBenabling authentication\f1 and \fBhardening
+network infrastructure\f1\&.
+.PP
+For more information about IP Binding, refer to the
+\fBIP Binding in Self\-Managed Deployments\f1 documentation.
+.PP
+To bind to all IPv4 addresses, enter \fB0.0.0.0\f1\&.
+.PP
+To bind to all IPv4 and IPv6 addresses, enter \fB::,0.0.0.0\f1 or
+an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename
+pattern expansion). Alternatively, use the \fBnet.bindIpAll\f1\f1 setting.
+.RS
+.IP \(bu 2
+\fB\-\-bind_ip\f1 and \fB\-\-bind_ip_all\f1 are mutually exclusive.
+Specifying both options causes \fBmongod\f1 to throw an error and
+terminate.
+.IP \(bu 2
+The command\-line option \fB\-\-bind\f1 overrides the configuration
+file setting \fBnet.bindIp\f1\f1\&.
+.RE
+.RE
+.PP
+\fBmongod \-\-bind_ip_all\f1
+.RS
+.PP
+If specified, the \fBmongod\f1 instance binds to all IPv4
+addresses (i.e. \fB0.0.0.0\f1). If \fBmongod\f1 starts with
+\fB\-\-ipv6\f1\f1, \fB\-\-bind_ip_all\f1\f1 also binds to all IPv6 addresses
+(i.e. \fB::\f1).
+.PP
+\fBmongod\f1 only supports IPv6 if started with \fB\-\-ipv6\f1\f1\&. Specifying
+\fB\-\-bind_ip_all\f1\f1 alone does not enable IPv6 support.
+.PP
+Before you bind your instance to a publicly\-accessible IP address,
+you must secure your cluster from unauthorized access. For a complete
+list of security recommendations, see
+\fBSecurity Checklist for Self\-Managed Deployments\f1\&. At minimum, consider
+\fBenabling authentication\f1 and \fBhardening
+network infrastructure\f1\&.
+.PP
+For more information about IP Binding, refer to the
+\fBIP Binding in Self\-Managed Deployments\f1 documentation.
+.PP
+Alternatively, you can set the \fB\-\-bind_ip\f1 option to \fB::,0.0.0.0\f1
+or to an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename
+pattern expansion).
+.PP
+\fB\-\-bind_ip\f1 and \fB\-\-bind_ip_all\f1 are mutually exclusive. That
+is, you can specify one or the other, but not both.
+.RE
+.PP
+\fBmongod \-\-clusterIpSourceAllowlist\f1
+.RS
+.PP
+A list of IP addresses/CIDR (Classless Inter\-Domain Routing (https://tools.ietf.org/html/rfc4632)) ranges against which the
+\fBmongod\f1 validates authentication requests from other members of
+the replica set and, if part of a sharded cluster, the \fBmongos\f1\f1
+instances. The \fBmongod\f1 verifies that the originating IP is
+either explicitly in the list or belongs to a CIDR range in the list. If the
+IP address is not present, the server does not authenticate the
+\fBmongod\f1 or \fBmongos\f1\f1\&.
+.PP
+\fB\-\-clusterIpSourceAllowlist\f1\f1 has no effect on a \fBmongod\f1 started without
+\fBauthentication\f1\&.
+.PP
+\fB\-\-clusterIpSourceAllowlist\f1\f1 accepts multiple comma\-separated IPv4/6 addresses or Classless
+Inter\-Domain Routing (CIDR (https://tools.ietf.org/html/rfc4632)) ranges:
+.PP
+.EX
+  mongod \-\-clusterIpSourceAllowlist 192.0.2.0/24,127.0.0.1,::1
+.EE
+.PP
+Ensure \fB\-\-clusterIpSourceAllowlist\f1\f1 includes the IP address \fIor\f1 CIDR ranges that include the
+IP address of each replica set member or \fBmongos\f1\f1 in the
+deployment to ensure healthy communication between cluster components.
 .RE
 .PP
 \fBmongod \-\-config\f1, \fBmongod \-f\f1
@@ -79,7 +196,7 @@ Returns the \fBmongod\f1 release number.
 Specifies a configuration file for runtime configuration options. The
 configuration file is the preferred method for runtime configuration of
 \fBmongod\f1\&. The options are equivalent to the command\-line
-configuration options. See \fBConfiguration File Options\f1 for
+configuration options. See \fBSelf\-Managed Configuration File Options\f1 for
 more information.
 .PP
 Ensure the configuration file uses ASCII encoding. The \fBmongod\f1
@@ -137,488 +254,8 @@ list, for example: \fBrest, exec\f1\&. If the configuration file contains
 expansion directives not specified to \fB\-\-configExpand\f1\f1, the \fBmongod\f1
 returns an error and terminates.
 .PP
-See \fBExternally Sourced Configuration File Values\f1 for configuration files
+See \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1 for configuration files
 for more information on expansion directives.
-.RE
-.PP
-\fBmongod \-\-verbose\f1, \fBmongod \-v\f1
-.RS
-.PP
-Increases the amount of internal reporting returned on standard output
-or in log files. Increase the verbosity with the \fB\-v\f1 form by
-including the option multiple times, for example: \fB\-vvvvv\f1\&.
-.PP
-Starting in version 4.2, MongoDB includes the Debug verbosity level
-(1\-5) in the \fBlog messages\f1\&. For example,
-if the verbosity level is 2, MongoDB logs \fBD2\f1\&. In previous
-versions, MongoDB log messages only specified \fBD\f1 for Debug level.
-.RE
-.PP
-\fBmongod \-\-quiet\f1
-.RS
-.PP
-Runs \fBmongod\f1 in a quiet mode that attempts to limit the amount
-of output.
-.PP
-This option suppresses:
-.RS
-.IP \(bu 2
-output from \fBdatabase commands\f1
-.IP \(bu 2
-replication activity
-.IP \(bu 2
-connection accepted events
-.IP \(bu 2
-connection closed events
-.RE
-.RE
-.PP
-\fBmongod \-\-port\f1
-.RS
-.PP
-\fIDefault\f1:
-.RS
-.IP \(bu 2
-27017 if \fBmongod\f1 is not a shard member or a config server member
-.IP \(bu 2
-27018 if \fBmongod\f1 is a \fBshard member\f1\f1
-.IP \(bu 2
-27019 if \fBmongod\f1 is a \fBconfig server member\f1\f1
-.RE
-.PP
-The TCP port on which the MongoDB instance listens for
-client connections.
-.PP
-The \fB\-\-port\f1 option accepts a range of values between \fB0\f1 and \fB65535\f1\&.
-Setting the port to \fB0\f1 configures \fBmongod\f1 to use an arbitrary port
-assigned by the operating system.
-.RE
-.PP
-\fBmongod \-\-bind_ip\f1
-.RS
-.PP
-\fIDefault\f1: localhost
-.PP
-The hostnames and/or IP addresses and/or full Unix domain socket
-paths on which \fBmongod\f1 should listen for client connections. You
-may attach \fBmongod\f1 to any interface. To bind to multiple
-addresses, enter a list of comma\-separated values.
-.PP
-You can specify both IPv4 and IPv6 addresses, or hostnames that
-resolve to an IPv4 or IPv6 address.
-.PP
-If specifying an IPv6 address \fIor\f1 a hostname that resolves to an
-IPv6 address to \fB\-\-bind_ip\f1\f1, you must start \fBmongod\f1 with
-\fB\-\-ipv6\f1\f1 to enable IPv6 support. Specifying an IPv6 address
-to \fB\-\-bind_ip\f1\f1 does not enable IPv6 support.
-.PP
-If specifying a
-link\-local IPv6 address (https://en.wikipedia.org/wiki/Link\-local_address#IPv6)
-(\fBfe80::/10\f1), you must append the
-zone index (https://en.wikipedia.org/wiki/IPv6_address#Scoped_literal_IPv6_addresses_(with_zone_index))
-to that address (i.e. \fBfe80::<address>%<adapter\-name>\f1).
-.PP
-To avoid configuration updates due to IP address changes, use DNS
-hostnames instead of IP addresses. It is particularly important to
-use a DNS hostname instead of an IP address when configuring replica
-set members or sharded cluster members.
-.PP
-Use hostnames instead of IP addresses to configure clusters across a
-split network horizon. Starting in MongoDB 5.0, nodes that are only
-configured with an IP address fail startup validation and do not start.
-.PP
-Before you bind your instance to a publicly\-accessible IP address,
-you must secure your cluster from unauthorized access. For a complete
-list of security recommendations, see
-\fBSecurity Checklist\f1\&. At minimum, consider
-\fBenabling authentication\f1 and \fBhardening
-network infrastructure\f1\&.
-.PP
-For more information about IP Binding, refer to the
-\fBIP Binding\f1 documentation.
-.PP
-To bind to all IPv4 addresses, enter \fB0.0.0.0\f1\&.
-.PP
-To bind to all IPv4 and IPv6 addresses, enter \fB::,0.0.0.0\f1 or
-an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename
-pattern expansion). Alternatively, use the \fBnet.bindIpAll\f1\f1 setting.
-.RS
-.IP \(bu 2
-\fB\-\-bind_ip\f1 and \fB\-\-bind_ip_all\f1 are mutually exclusive.
-Specifying both options causes \fBmongod\f1 to throw an error and
-terminate.
-.IP \(bu 2
-The command\-line option \fB\-\-bind\f1 overrides the configuration
-file setting \fBnet.bindIp\f1\f1\&.
-.RE
-.RE
-.PP
-\fBmongod \-\-bind_ip_all\f1
-.RS
-.PP
-If specified, the \fBmongod\f1 instance binds to all IPv4
-addresses (i.e. \fB0.0.0.0\f1). If \fBmongod\f1 starts with
-\fB\-\-ipv6\f1\f1, \fB\-\-bind_ip_all\f1\f1 also binds to all IPv6 addresses
-(i.e. \fB::\f1).
-.PP
-\fBmongod\f1 only supports IPv6 if started with \fB\-\-ipv6\f1\f1\&. Specifying
-\fB\-\-bind_ip_all\f1\f1 alone does not enable IPv6 support.
-.PP
-Before you bind your instance to a publicly\-accessible IP address,
-you must secure your cluster from unauthorized access. For a complete
-list of security recommendations, see
-\fBSecurity Checklist\f1\&. At minimum, consider
-\fBenabling authentication\f1 and \fBhardening
-network infrastructure\f1\&.
-.PP
-For more information about IP Binding, refer to the
-\fBIP Binding\f1 documentation.
-.PP
-Alternatively, you can set the \fB\-\-bind_ip\f1 option to \fB::,0.0.0.0\f1
-or to an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename
-pattern expansion).
-.PP
-\fB\-\-bind_ip\f1 and \fB\-\-bind_ip_all\f1 are mutually exclusive. That
-is, you can specify one or the other, but not both.
-.RE
-.PP
-\fBmongod \-\-clusterIpSourceAllowlist\f1
-.RS
-.PP
-A list of IP addresses/CIDR (Classless Inter\-Domain Routing (https://tools.ietf.org/html/rfc4632)) ranges against which the
-\fBmongod\f1 validates authentication requests from other members of
-the replica set and, if part of a sharded cluster, the \fBmongos\f1\f1
-instances. The \fBmongod\f1 verifies that the originating IP is
-either explicitly in the list or belongs to a CIDR range in the list. If the
-IP address is not present, the server does not authenticate the
-\fBmongod\f1 or \fBmongos\f1\f1\&.
-.PP
-\fB\-\-clusterIpSourceAllowlist\f1\f1 has no effect on a \fBmongod\f1 started without
-\fBauthentication\f1\&.
-.PP
-\fB\-\-clusterIpSourceAllowlist\f1\f1 accepts multiple comma\-separated IPv4/6 addresses or Classless
-Inter\-Domain Routing (CIDR (https://tools.ietf.org/html/rfc4632)) ranges:
-.PP
-.EX
-  mongod \-\-clusterIpSourceAllowlist 192.0.2.0/24,127.0.0.1,::1
-.EE
-.PP
-Ensure \fB\-\-clusterIpSourceAllowlist\f1\f1 includes the IP address \fIor\f1 CIDR ranges that include the
-IP address of each replica set member or \fBmongos\f1\f1 in the
-deployment to ensure healthy communication between cluster components.
-.RE
-.PP
-\fBmongod \-\-clusterIpSourceWhitelist\f1
-.RS
-.PP
-\fIDeprecated in version 5.0:\f1
-Use \fB\-\-clusterIpSourceAllowlist\f1\f1 instead.
-.PP
-A list of IP addresses/CIDR (Classless Inter\-Domain Routing (https://tools.ietf.org/html/rfc4632)) ranges against which the
-\fBmongod\f1 validates authentication requests from other members of
-the replica set and, if part of a sharded cluster, the \fBmongos\f1\f1
-instances. The \fBmongod\f1 verifies that the originating IP is
-either explicitly in the list or belongs to a CIDR range in the list. If the
-IP address is not present, the server does not authenticate the
-\fBmongod\f1 or \fBmongos\f1\f1\&.
-.PP
-\fB\-\-clusterIpSourceWhitelist\f1\f1 has no effect on a \fBmongod\f1 started without
-\fBauthentication\f1\&.
-.PP
-\fB\-\-clusterIpSourceWhitelist\f1\f1 accepts multiple comma\-separated IPv4/6 addresses or Classless
-Inter\-Domain Routing (CIDR (https://tools.ietf.org/html/rfc4632)) ranges:
-.PP
-.EX
-  mongod \-\-clusterIpSourceWhitelist 192.0.2.0/24,127.0.0.1,::1
-.EE
-.PP
-Ensure \fB\-\-clusterIpSourceWhitelist\f1\f1 includes the IP address \fIor\f1 CIDR ranges that include the
-IP address of each replica set member or \fBmongos\f1\f1 in the
-deployment to ensure healthy communication between cluster components.
-.RE
-.PP
-\fBmongod \-\-ipv6\f1
-.RS
-.PP
-Enables IPv6 support. \fBmongod\f1 disables IPv6 support by default.
-.PP
-Setting \fB\-\-ipv6\f1\f1 does \fInot\f1 direct the \fBmongod\f1 to listen on any
-local IPv6 addresses or interfaces. To configure the \fBmongod\f1 to
-listen on an IPv6 interface, you must either:
-.RS
-.IP \(bu 2
-Configure \fB\-\-bind_ip\f1\f1 with one or more IPv6 addresses or
-hostnames that resolve to IPv6 addresses, \fBor\f1
-.IP \(bu 2
-Set \fB\-\-bind_ip_all\f1\f1 to \fBtrue\f1\&.
-.RE
-.RE
-.PP
-\fBmongod \-\-listenBacklog\f1
-.RS
-.PP
-\fIDefault\f1: Target system specific maximum value
-.PP
-The maximum number of connections that can exist in the listen
-queue.
-.PP
-Consult your local system\(aqs documentation to understand the
-limitations and configuration requirements before using this
-parameter.
-.PP
-To prevent undefined behavior, specify a value for this
-parameter between \fB1\f1 and the local system \fBSOMAXCONN\f1
-constant.
-.PP
-The default value for the \fBlistenBacklog\f1 parameter depends on the target
-system. On Linux, \fB/proc/sys/net/core/somaxconn\f1 is used. On all other
-target systems, the compile time constant \fBSOMAXCONN\f1 is used.
-\fBSOMAXCONN\f1 is the maximum valid value that is documented for
-the \fIbacklog\f1 parameter to the \fIlisten\f1 system call.
-.PP
-Some systems may interpret \fBSOMAXCONN\f1 symbolically, and others
-numerically. The actual \fIlisten backlog\f1 applied in practice may
-differ from any numeric interpretation of the \fBSOMAXCONN\f1 constant
-or argument to \fB\-\-listenBacklog\f1, and may also be constrained by
-system settings like \fB/proc/sys/net/core/somaxconn\f1 on Linux.
-.PP
-Passing a value for the \fBlistenBacklog\f1 parameter that exceeds the
-\fBSOMAXCONN\f1 constant for the local system is, by the letter of the
-standards, undefined behavior. Higher values may be silently integer
-truncated, may be ignored, may cause unexpected resource
-consumption, or have other adverse consequences.
-.PP
-On systems with workloads that exhibit connection spikes, for which
-it is empirically known that the local system can honor higher
-values for the \fIbacklog\f1 parameter than the \fBSOMAXCONN\f1 constant,
-setting the \fBlistenBacklog\f1 parameter to a higher value may reduce
-operation latency as observed by the client by reducing the number
-of connections which are forced into a backoff state.
-.RE
-.PP
-\fBmongod \-\-maxConns\f1
-.RS
-.PP
-The maximum number of simultaneous connections that \fBmongod\f1
-accepts. This setting has no effect if it is higher than your operating
-system\(aqs configured maximum connection tracking threshold.
-.PP
-Do not assign too low of a value to this option, or you will
-encounter errors during normal application operation.
-.RE
-.PP
-\fBmongod \-\-logpath\f1
-.RS
-.PP
-Sends all diagnostic logging information to a log file instead of to
-standard output or to the host\(aqs \fBsyslog\f1 system. MongoDB creates
-the log file at the path you specify.
-.PP
-By default, MongoDB moves any existing log file rather than overwriting
-it. To instead append to the log file, set the \fB\-\-logappend\f1\f1 option.
-.RE
-.PP
-\fBmongod \-\-syslog\f1
-.RS
-.PP
-Sends all logging output to the host\(aqs \fBsyslog\f1 system rather
-than to standard output or to a log file (\fB\-\-logpath\f1\f1).
-.PP
-The \fB\-\-syslog\f1\f1 option is not supported on Windows.
-.PP
-The \fBsyslog\f1 daemon generates timestamps when it logs a message, not
-when MongoDB issues the message. This can lead to misleading timestamps
-for log entries, especially when the system is under heavy load. We
-recommend using the \fB\-\-logpath\f1\f1 option for production systems to
-ensure accurate timestamps.
-.PP
-MongoDB includes the \fBcomponent\f1 in its log
-messages to \fBsyslog\f1\&.
-.PP
-.EX
-  ...  ACCESS   [repl writer worker 5] Unsupported modification to roles collection ...
-.EE
-.RE
-.PP
-\fBmongod \-\-syslogFacility\f1
-.RS
-.PP
-\fIDefault\f1: user
-.PP
-Specifies the facility level used when logging messages to syslog.
-The value you specify must be supported by your
-operating system\(aqs implementation of syslog. To use this option, you
-must  enable the \fB\-\-syslog\f1\f1 option.
-.RE
-.PP
-\fBmongod \-\-logappend\f1
-.RS
-.PP
-Appends new entries to the end of the existing log file when the \fBmongod\f1
-instance restarts. Without this option, \fBmongod\f1 backs up the
-existing log and create a new file.
-.RE
-.PP
-\fBmongod \-\-logRotate\f1
-.RS
-.PP
-\fIDefault\f1: rename
-.PP
-Determines the behavior for the \fBlogRotate\f1\f1 command when
-rotating the server log and/or the audit log. Specify either
-\fBrename\f1 or \fBreopen\f1:
-.RS
-.IP \(bu 2
-\fBrename\f1 renames the log file.
-.IP \(bu 2
-\fBreopen\f1 closes and reopens the log file following the typical
-Linux/Unix log rotate behavior. Use \fBreopen\f1 when using the
-Linux/Unix logrotate utility to avoid log loss.
-.IP
-If you specify \fBreopen\f1, you must also use \fB\-\-logappend\f1\f1\&.
-.RE
-.RE
-.PP
-\fBmongod \-\-timeStampFormat\f1
-.RS
-.PP
-\fIDefault\f1: iso8601\-local
-.PP
-The time format for timestamps in log messages. Specify one of the
-following values:
-.RS
-.IP \(bu 2
-.RS
-.IP \(bu 4
-Value
-.IP \(bu 4
-Description
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBiso8601\-utc\f1
-.IP \(bu 4
-Displays timestamps in Coordinated Universal Time (UTC) in the
-ISO\-8601 format. For example, for New York at the start of the
-Epoch: \fB1970\-01\-01T00:00:00.000Z\f1
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBiso8601\-local\f1
-.IP \(bu 4
-Displays timestamps in local time in the ISO\-8601
-format. For example, for New York at the start of the Epoch:
-\fB1969\-12\-31T19:00:00.000\-05:00\f1
-.RE
-.RE
-.PP
-\fB\-\-timeStampFormat\f1\f1 no longer supports \fBctime\f1\&. An example of \fBctime\f1
-formatted date is: \fBWed Dec 31 18:17:54.811\f1\&.
-.RE
-.PP
-\fBmongod \-\-traceExceptions\f1
-.RS
-.PP
-For internal diagnostic use only.
-.RE
-.PP
-\fBmongod \-\-pidfilepath\f1
-.RS
-.PP
-Specifies a file location to store the process ID (PID) of the \fBmongod\f1
-process. The user running the \fBmongod\f1 or \fBmongos\f1
-process must be able to write to this path. If the \fB\-\-pidfilepath\f1\f1 option is not
-specified, the process does not create a PID file. This option is generally
-only useful in combination with the \fB\-\-fork\f1\f1 option.
-.PP
-On Linux, PID file management is generally the responsibility of
-your distro\(aqs init system: usually a service file in the \fB/etc/init.d\f1
-directory, or a systemd unit file registered with \fBsystemctl\f1\&. Only
-use the \fB\-\-pidfilepath\f1\f1 option if you are not using one of these init
-systems. For more information, please see the respective
-\fBInstallation Guide\f1 for your operating system.
-.PP
-On macOS, PID file management is generally handled by \fBbrew\f1\&. Only use
-the \fB\-\-pidfilepath\f1\f1 option if you are not using \fBbrew\f1 on your macOS system.
-For more information, please see the respective Installation
-Guide for your operating system.
-.RE
-.PP
-\fBmongod \-\-keyFile\f1
-.RS
-.PP
-Specifies the path to a key file that stores the shared secret
-that MongoDB instances use to authenticate to each other in a
-\fBsharded cluster\f1 or \fBreplica set\f1\&. \fB\-\-keyFile\f1\f1 implies
-\fB\-\-auth\f1\f1\&. See \fBInternal/Membership Authentication\f1 for more
-information.
-.PP
-\fBKeyfiles for internal membership authentication\f1 use YAML format to allow for multiple keys in a
-keyfile. The YAML format accepts either:
-.RS
-.IP \(bu 2
-A single key string (same as in earlier versions)
-.IP \(bu 2
-A sequence of key strings
-.RE
-.PP
-The YAML format is compatible with the existing single\-key
-keyfiles that use the text file format.
-.RE
-.PP
-\fBmongod \-\-setParameter\f1
-.RS
-.PP
-Specifies one of the MongoDB parameters described in
-\fBMongoDB Server Parameters\f1\&. You can specify multiple \fBsetParameter\f1
-fields.
-.RE
-.PP
-\fBmongod \-\-nounixsocket\f1
-.RS
-.PP
-Disables listening on the UNIX domain socket. \fB\-\-nounixsocket\f1\f1 applies only
-to Unix\-based systems.
-.PP
-The \fBmongod\f1 process
-always listens on the UNIX socket unless one of the following is true:
-.RS
-.IP \(bu 2
-\fB\-\-nounixsocket\f1\f1 is set
-.IP \(bu 2
-\fBnet.bindIp\f1\f1 is not set
-.IP \(bu 2
-\fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
-.RE
-.PP
-\fBmongod\f1 installed from official \fB\&.deb\f1 and \fB\&.rpm\f1 packages
-have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
-default.
-.RE
-.PP
-\fBmongod \-\-unixSocketPrefix\f1
-.RS
-.PP
-\fIDefault\f1: /tmp
-.PP
-The path for the UNIX socket. \fB\-\-unixSocketPrefix\f1\f1 applies only
-to Unix\-based systems.
-.PP
-If this option has no value, the
-\fBmongod\f1 process creates a socket with \fB/tmp\f1 as a prefix. MongoDB
-creates and listens on a UNIX socket unless one of the following is true:
-.RS
-.IP \(bu 2
-\fBnet.unixDomainSocket.enabled\f1\f1 is \fBfalse\f1
-.IP \(bu 2
-\fB\-\-nounixsocket\f1\f1 is set
-.IP \(bu 2
-\fBnet.bindIp\f1\f1 is not set
-.IP \(bu 2
-\fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
-.RE
 .RE
 .PP
 \fBmongod \-\-filePermissions\f1
@@ -650,120 +287,132 @@ To use \fB\-\-fork\f1\f1, configure log output for the \fBmongod\f1 with one of 
 .RE
 .RE
 .PP
-\fBmongod \-\-auth\f1
+\fBmongod \-\-help\f1, \fBmongod \-h\f1
 .RS
 .PP
-Enables authorization to control user\(aqs access to database resources
-and operations. When authorization is enabled, MongoDB requires all
-clients to authenticate themselves first in order to determine the
-access for the client.
-.PP
-To configure users, use the \fBmongosh\f1\f1 client. If no users
-exist, the localhost interface has access to the
-database until you create the first user.
-.PP
-See \fBSecurity\f1 for more information.
+Returns information on the options and use of \fBmongod\f1\&.
 .RE
 .PP
-\fBmongod \-\-noauth\f1
+\fBmongod \-\-ipv6\f1
 .RS
 .PP
-Disables authentication. Currently the default. Exists for future
-compatibility and clarity.
+Enables IPv6 support. \fBmongod\f1 disables IPv6 support by default.
+.PP
+Setting \fB\-\-ipv6\f1\f1 does \fInot\f1 direct the \fBmongod\f1 to listen on any
+local IPv6 addresses or interfaces. To configure the \fBmongod\f1 to
+listen on an IPv6 interface, you must either:
+.RS
+.IP \(bu 2
+Configure \fB\-\-bind_ip\f1\f1 with one or more IPv6 addresses or
+hostnames that resolve to IPv6 addresses, \fBor\f1
+.IP \(bu 2
+Set \fB\-\-bind_ip_all\f1\f1 to \fBtrue\f1\&.
+.RE
 .RE
 .PP
-\fBmongod \-\-transitionToAuth\f1
+\fBmongod \-\-keyFile\f1
 .RS
 .PP
-Allows the \fBmongod\f1 to accept and create authenticated and
-non\-authenticated connections to and from other \fBmongod\f1
-and \fBmongos\f1\f1 instances in the deployment. Used for
-performing rolling transition of replica sets or sharded clusters
-from a no\-auth configuration to \fBinternal authentication\f1\&. Requires specifying a \fBinternal
-authentication\f1 mechanism such as
-\fB\-\-keyFile\f1\f1\&.
+Specifies the path to a key file that stores the shared secret
+that MongoDB instances use to authenticate to each other in a
+\fBsharded cluster\f1 or \fBreplica set\f1\&. \fB\-\-keyFile\f1\f1 implies
+\fB\-\-auth\f1\f1\&. See \fBSelf\-Managed Internal/Membership Authentication\f1 for more
+information.
 .PP
-For example, if using \fBkeyfiles\f1 for
-\fBinternal authentication\f1, the \fBmongod\f1 creates
-an authenticated connection with any \fBmongod\f1 or \fBmongos\f1\f1
-in the deployment using a matching keyfile. If the security mechanisms do
-not match, the \fBmongod\f1 utilizes a non\-authenticated connection instead.
-.PP
-A \fBmongod\f1 running with \fB\-\-transitionToAuth\f1\f1 does not enforce \fBuser access
-controls\f1\&. Users may connect to your deployment without any
-access control checks and perform read, write, and administrative operations.
-.PP
-A \fBmongod\f1 running with \fBinternal authentication\f1 and \fIwithout\f1 \fB\-\-transitionToAuth\f1\f1 requires clients to connect
-using \fBuser access controls\f1\&. Update clients to
-connect to the \fBmongod\f1 using the appropriate \fBuser\f1
-prior to restarting \fBmongod\f1 without \fB\-\-transitionToAuth\f1\f1\&.
+\fBKeyfiles for internal membership authentication\f1 use YAML format to allow for multiple keys in a
+keyfile. The YAML format accepts either:
+.RS
+.IP \(bu 2
+A single key string (same as in earlier versions)
+.IP \(bu 2
+A sequence of key strings
 .RE
 .PP
-\fBmongod \-\-sysinfo\f1
-.RS
-.PP
-Returns diagnostic system information and then exits. The
-information provides the page size, the number of physical pages,
-and the number of available physical pages.
+The YAML format is compatible with the existing single\-key
+keyfiles that use the text file format.
 .RE
 .PP
-\fBmongod \-\-noscripting\f1
+\fBmongod \-\-listenBacklog\f1
 .RS
 .PP
-Disables the scripting engine.
+\fIDefault\f1: Target system \fBSOMAXCONN\f1 constant
+.PP
+The maximum number of connections that can exist in the listen
+queue.
+.PP
+Consult your local system\(aqs documentation to understand the
+limitations and configuration requirements before using this
+parameter.
+.PP
+To prevent undefined behavior, specify a value for this
+parameter between \fB1\f1 and the local system \fBSOMAXCONN\f1
+constant.
+.PP
+The default value for the \fBlistenBacklog\f1 parameter depends on the
+target system. On Linux, MongoDB uses \fB/proc/sys/net/core/somaxconn\f1\&.
+On all other target systems, MongoDB uses the compile time constant
+\fBSOMAXCONN\f1\&.
+.PP
+Some systems may interpret \fBSOMAXCONN\f1 symbolically, and others
+numerically. The actual \fIlisten backlog\f1 applied in practice may
+differ from any numeric interpretation of the \fBSOMAXCONN\f1 constant
+or argument to \fB\-\-listenBacklog\f1\&.
+.PP
+Passing a value for the \fBlistenBacklog\f1 parameter that exceeds the
+\fBSOMAXCONN\f1 constant for the local system is, by the letter of the
+standards, undefined behavior. Higher values may be silently integer
+truncated, may be ignored, may cause unexpected resource
+consumption, or have other adverse consequences.
 .RE
 .PP
-\fBmongod \-\-notablescan\f1
+\fBmongod \-\-logappend\f1
 .RS
 .PP
-Forbids operations that require a collection scan. See \fBnotablescan\f1\f1 for additional information.
+Appends new entries to the end of the existing log file when the \fBmongod\f1
+instance restarts. Without this option, \fBmongod\f1 backs up the
+existing log and create a new file.
 .RE
 .PP
-\fBmongod \-\-shutdown\f1
+\fBmongod \-\-logpath\f1
 .RS
 .PP
-The \fB\-\-shutdown\f1\f1 option cleanly and safely terminates the \fBmongod\f1
-process. When invoking \fBmongod\f1 with this option you must set the
-\fB\-\-dbpath\f1\f1 option either directly or by way of the
-\fBconfiguration file\f1 and the
-\fB\-\-config\f1\f1 option.
+Sends all diagnostic logging information to a log file instead of to
+standard output or to the host\(aqs \fBsyslog\f1 system. MongoDB creates
+the log file at the path you specify.
 .PP
-The \fB\-\-shutdown\f1\f1 option is available only on Linux systems.
-.PP
-For additional ways to shut down, see also \fBStop mongod\f1 Processes\f1\&.
+By default, MongoDB moves any existing log file rather than overwriting
+it. To instead append to the log file, set the \fB\-\-logappend\f1\f1 option.
 .RE
 .PP
-\fBmongod \-\-redactClientLogData\f1
+\fBmongod \-\-logRotate\f1
 .RS
 .PP
-\fIAvailable in MongoDB Enterprise only.\f1
+\fIDefault\f1: rename
 .PP
-A \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 redacts any message accompanying a given
-log event before logging. This prevents the \fBmongod\f1 from writing
-potentially sensitive data stored on the database to the diagnostic log.
-Metadata such as error or operation codes, line numbers, and source file
-names are still visible in the logs.
+Determines the behavior for the \fBlogRotate\f1\f1 command when
+rotating the server log and/or the audit log. Specify either
+\fBrename\f1 or \fBreopen\f1:
+.RS
+.IP \(bu 2
+\fBrename\f1 renames the log file.
+.IP \(bu 2
+\fBreopen\f1 closes and reopens the log file following the typical
+Linux/Unix log rotate behavior. Use \fBreopen\f1 when using the
+Linux/Unix logrotate utility to avoid log loss.
+.IP
+If you specify \fBreopen\f1, you must also use \fB\-\-logappend\f1\f1\&.
+.RE
+.RE
 .PP
-Use \fB\-\-redactClientLogData\f1\f1 in conjunction with
-\fBEncryption at Rest\f1 and
-\fBTLS/SSL (Transport Encryption)\f1 to assist compliance with
-regulatory requirements.
+\fBmongod \-\-maxConns\f1
+.RS
 .PP
-For example, a MongoDB deployment might store Personally Identifiable
-Information (PII) in one or more collections. The \fBmongod\f1 logs events
-such as those related to CRUD operations, sharding metadata, etc. It is
-possible that the \fBmongod\f1 may expose PII as a part of these logging
-operations. A \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 removes any message
-accompanying these events before being output to the log, effectively
-removing the PII.
+The maximum number of simultaneous connections that \fBmongod\f1
+accepts. This setting has no effect if it is higher than your operating
+system\(aqs configured maximum connection tracking threshold.
 .PP
-Diagnostics on a \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 may be more difficult
-due to the lack of data related to a log event. See the
-\fBprocess logging\f1 manual page for an
-example of the effect of \fB\-\-redactClientLogData\f1\f1 on log output.
-.PP
-On a running \fBmongod\f1, use \fBsetParameter\f1\f1 with the
-\fBredactClientLogData\f1\f1 parameter to configure this setting.
+Do not assign too low of a value to this option, or you will
+encounter errors during normal application operation.
 .RE
 .PP
 \fBmongod \-\-networkMessageCompressors\f1
@@ -816,6 +465,265 @@ between \fBmongosh\f1\f1 and \fBmongod\f1\f1 are not
 compressed.
 .RE
 .PP
+\fBmongod \-\-noauth\f1
+.RS
+.PP
+Disables authentication. Currently the default. Exists for future
+compatibility and clarity.
+.RE
+.PP
+\fBmongod \-\-noscripting\f1
+.RS
+.PP
+Disables the scripting engine.
+.RE
+.PP
+\fBmongod \-\-notablescan\f1
+.RS
+.PP
+Forbids operations that require a collection scan. See \fBnotablescan\f1\f1 for additional information.
+.RE
+.PP
+\fBmongod \-\-nounixsocket\f1
+.RS
+.PP
+Disables listening on the UNIX domain socket. \fB\-\-nounixsocket\f1\f1 applies only
+to Unix\-based systems.
+.PP
+The \fBmongod\f1 process
+always listens on the UNIX socket unless one of the following is true:
+.RS
+.IP \(bu 2
+\fB\-\-nounixsocket\f1\f1 is set
+.IP \(bu 2
+\fBnet.bindIp\f1\f1 is not set
+.IP \(bu 2
+\fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
+.RE
+.PP
+\fBmongod\f1 installed from official \fBInstall MongoDB Community Edition on Debian\f1
+and \fBInstall MongoDB Community Edition on Red Hat or CentOS\f1 packages
+have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
+default.
+.RE
+.PP
+\fBmongod \-\-outputConfig\f1
+.RS
+.PP
+Outputs the \fBmongod\f1 instance\(aqs configuration options, formatted
+in YAML, to \fBstdout\f1 and exits the \fBmongod\f1 instance. For
+configuration options that uses \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1,
+\fB\-\-outputConfig\f1\f1 returns the resolved value for those options.
+.PP
+This may include any configured passwords or secrets previously
+obfuscated through the external source.
+.PP
+For usage examples, see:
+.RS
+.IP \(bu 2
+\fBOutput the Configuration File with Resolved Expansion Directive Values\f1
+.IP \(bu 2
+\fBConvert Self\-Managed Command\-Line Options to YAML\f1
+.RE
+.RE
+.PP
+\fBmongod \-\-pidfilepath\f1
+.RS
+.PP
+Specifies a file location to store the process ID (PID) of the \fBmongod\f1
+process. The user running the \fBmongod\f1 or \fBmongos\f1
+process must be able to write to this path. If the \fB\-\-pidfilepath\f1\f1 option is not
+specified, the process does not create a PID file. This option is generally
+only useful in combination with the \fB\-\-fork\f1\f1 option.
+.PP
+On Linux, PID file management is generally the responsibility of
+your distro\(aqs init system: usually a service file in the \fB/etc/init.d\f1
+directory, or a systemd unit file registered with \fBsystemctl\f1\&. Only
+use the \fB\-\-pidfilepath\f1\f1 option if you are not using one of these init
+systems. For more information, please see the respective
+\fBInstallation Guide\f1 for your operating system.
+.PP
+On macOS, PID file management is generally handled by \fBbrew\f1\&. Only use
+the \fB\-\-pidfilepath\f1\f1 option if you are not using \fBbrew\f1 on your macOS system.
+For more information, please see the respective Installation
+Guide for your operating system.
+.RE
+.PP
+\fBmongod \-\-port\f1
+.RS
+.PP
+\fIDefault\f1:
+.RS
+.IP \(bu 2
+27017 if \fBmongod\f1 is not a shard member or a config server member
+.IP \(bu 2
+27018 if \fBmongod\f1 is a \fBshard member\f1\f1
+.IP \(bu 2
+27019 if \fBmongod\f1 is a \fBconfig server member\f1\f1
+.RE
+.PP
+The TCP port on which the MongoDB instance listens for
+client connections.
+.PP
+The \fB\-\-port\f1 option accepts a range of values between \fB0\f1 and \fB65535\f1\&.
+Setting the port to \fB0\f1 configures \fBmongod\f1 to use an arbitrary port
+assigned by the operating system.
+.RE
+.PP
+\fBmongod \-\-quiet\f1
+.RS
+.PP
+Runs \fBmongod\f1 in a quiet mode that attempts to limit the amount
+of output.
+.PP
+This option suppresses:
+.RS
+.IP \(bu 2
+output from \fBdatabase commands\f1
+.IP \(bu 2
+replication activity
+.IP \(bu 2
+connection accepted events
+.IP \(bu 2
+connection closed events
+.RE
+.RE
+.PP
+\fBmongod \-\-redactClientLogData\f1
+.RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
+A \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 redacts any message accompanying a given
+log event before logging. This prevents the \fBmongod\f1 from writing
+potentially sensitive data stored on the database to the diagnostic log.
+Metadata such as error or operation codes, line numbers, and source file
+names are still visible in the logs.
+.PP
+Use \fB\-\-redactClientLogData\f1\f1 in conjunction with
+\fBEncryption at Rest\f1 and
+\fBTLS/SSL (Transport Encryption)\f1 to assist compliance with
+regulatory requirements.
+.PP
+For example, a MongoDB deployment might store Personally Identifiable
+Information (PII) in one or more collections. The \fBmongod\f1 logs events
+such as those related to CRUD operations, sharding metadata, etc. It is
+possible that the \fBmongod\f1 may expose PII as a part of these logging
+operations. A \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 removes any message
+accompanying these events before being output to the log, effectively
+removing the PII.
+.PP
+Diagnostics on a \fBmongod\f1 running with \fB\-\-redactClientLogData\f1\f1 may be more difficult
+due to the lack of data related to a log event. See the
+\fBprocess logging\f1 manual page for an
+example of the effect of \fB\-\-redactClientLogData\f1\f1 on log output.
+.PP
+On a running \fBmongod\f1, use \fBsetParameter\f1\f1 with the
+\fBredactClientLogData\f1\f1 parameter to configure this setting.
+.RE
+.PP
+\fBmongod \-\-setParameter\f1
+.RS
+.PP
+Specifies one of the MongoDB parameters described in
+\fBMongoDB Server Parameters for a Self\-Managed Deployment\f1\&. You can specify multiple \fBsetParameter\f1
+fields.
+.RE
+.PP
+\fBmongod \-\-shutdown\f1
+.RS
+.PP
+The \fB\-\-shutdown\f1\f1 option cleanly and safely terminates the \fBmongod\f1
+process. When invoking \fBmongod\f1 with this option you must set the
+\fB\-\-dbpath\f1\f1 option either directly or by way of the
+\fBconfiguration file\f1 and the
+\fB\-\-config\f1\f1 option.
+.PP
+The \fB\-\-shutdown\f1\f1 option is available only on Linux systems.
+.PP
+For additional ways to shut down, see also \fBStop mongod\f1 Processes\f1\&.
+.RE
+.PP
+\fBmongod \-\-sysinfo\f1
+.RS
+.PP
+Returns diagnostic system information and then exits. The
+information provides the page size, the number of physical pages,
+and the number of available physical pages.
+.RE
+.PP
+\fBmongod \-\-syslog\f1
+.RS
+.PP
+Sends all logging output to the host\(aqs \fBsyslog\f1 system rather
+than to standard output or to a log file (\fB\-\-logpath\f1\f1).
+.PP
+The \fB\-\-syslog\f1\f1 option is not supported on Windows.
+.PP
+The \fBsyslog\f1 daemon generates timestamps when it logs a message, not
+when MongoDB issues the message. This can lead to misleading timestamps
+for log entries, especially when the system is under heavy load. We
+recommend using the \fB\-\-logpath\f1\f1 option for production systems to
+ensure accurate timestamps.
+.PP
+MongoDB includes the \fBcomponent\f1 in its log
+messages to \fBsyslog\f1\&.
+.PP
+.EX
+  ...  ACCESS   [repl writer worker 5] Unsupported modification to roles collection ...
+.EE
+.RE
+.PP
+\fBmongod \-\-syslogFacility\f1
+.RS
+.PP
+\fIDefault\f1: user
+.PP
+Specifies the facility level used when logging messages to syslog.
+The value you specify must be supported by your
+operating system\(aqs implementation of syslog. To use this option, you
+must  enable the \fB\-\-syslog\f1\f1 option.
+.RE
+.PP
+\fBmongod \-\-timeStampFormat\f1
+.RS
+.PP
+\fIDefault\f1: iso8601\-local
+.PP
+The time format for timestamps in log messages. Specify one of the
+following values:
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Value
+.IP \(bu 4
+Description
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBiso8601\-utc\f1
+.IP \(bu 4
+Displays timestamps in Coordinated Universal Time (UTC) in the
+ISO\-8601 format. For example, for New York at the start of the
+Epoch: \fB1970\-01\-01T00:00:00.000Z\f1
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBiso8601\-local\f1
+.IP \(bu 4
+Displays timestamps in local time in the ISO\-8601
+format. For example, for New York at the start of the Epoch:
+\fB1969\-12\-31T19:00:00.000\-05:00\f1
+.RE
+.RE
+.PP
+\fB\-\-timeStampFormat\f1\f1 no longer supports \fBctime\f1\&. An example of \fBctime\f1
+formatted date is: \fBWed Dec 31 18:17:54.811\f1\&.
+.RE
+.PP
 \fBmongod \-\-timeZoneInfo\f1
 .RS
 .PP
@@ -849,26 +757,88 @@ and use the \fBtimeZoneInfo\f1\f1 parameter.
 \fBprocessManagement.timeZoneInfo\f1\f1\&.
 .RE
 .PP
-\fBmongod \-\-outputConfig\f1
+\fBmongod \-\-traceExceptions\f1
 .RS
 .PP
-Outputs the \fBmongod\f1 instance\(aqs configuration options, formatted
-in YAML, to \fBstdout\f1 and exits the \fBmongod\f1 instance. For
-configuration options that uses \fBExternally Sourced Configuration File Values\f1,
-\fB\-\-outputConfig\f1\f1 returns the resolved value for those options.
-.PP
-This may include any configured passwords or secrets previously
-obfuscated through the external source.
-.PP
-For usage examples, see:
-.RS
-.IP \(bu 2
-\fBOutput the Configuration File with Resolved Expansion Directive Values\f1
-.IP \(bu 2
-\fBConvert Command\-Line Options to YAML\f1
+For internal diagnostic use only.
 .RE
+.PP
+\fBmongod \-\-transitionToAuth\f1
+.RS
+.PP
+Allows the \fBmongod\f1 to accept and create authenticated and
+non\-authenticated connections to and from other \fBmongod\f1
+and \fBmongos\f1\f1 instances in the deployment. Used for
+performing rolling transition of replica sets or sharded clusters
+from a no\-auth configuration to \fBinternal authentication\f1\&. Requires specifying a \fBinternal
+authentication\f1 mechanism such as
+\fB\-\-keyFile\f1\f1\&.
+.PP
+For example, if using \fBkeyfiles\f1 for
+\fBinternal authentication\f1, the \fBmongod\f1 creates
+an authenticated connection with any \fBmongod\f1 or \fBmongos\f1\f1
+in the deployment using a matching keyfile. If the security mechanisms do
+not match, the \fBmongod\f1 utilizes a non\-authenticated connection instead.
+.PP
+A \fBmongod\f1 running with \fB\-\-transitionToAuth\f1\f1 does not enforce \fBuser access
+controls\f1\&. Users may connect to your deployment without any
+access control checks and perform read, write, and administrative operations.
+.PP
+A \fBmongod\f1 running with \fBinternal authentication\f1 and \fIwithout\f1 \fB\-\-transitionToAuth\f1\f1 requires clients to connect
+using \fBuser access controls\f1\&. Update clients to
+connect to the \fBmongod\f1 using the appropriate \fBuser\f1
+prior to restarting \fBmongod\f1 without \fB\-\-transitionToAuth\f1\f1\&.
+.RE
+.PP
+\fBmongod \-\-unixSocketPrefix\f1
+.RS
+.PP
+\fIDefault\f1: /tmp
+.PP
+The path for the UNIX socket. \fB\-\-unixSocketPrefix\f1\f1 applies only
+to Unix\-based systems.
+.PP
+If this option has no value, the
+\fBmongod\f1 process creates a socket with \fB/tmp\f1 as a prefix. MongoDB
+creates and listens on a UNIX socket unless one of the following is true:
+.RS
+.IP \(bu 2
+\fBnet.unixDomainSocket.enabled\f1\f1 is \fBfalse\f1
+.IP \(bu 2
+\fB\-\-nounixsocket\f1\f1 is set
+.IP \(bu 2
+\fBnet.bindIp\f1\f1 is not set
+.IP \(bu 2
+\fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
+.RE
+.RE
+.PP
+\fBmongod \-\-verbose\f1, \fBmongod \-v\f1
+.RS
+.PP
+Increases the amount of internal reporting returned on standard output
+or in log files. Increase the verbosity with the \fB\-v\f1 form by
+including the option multiple times, for example: \fB\-vvvvv\f1\&.
+.PP
+Starting in version 4.2, MongoDB includes the Debug verbosity level
+(1\-5) in the \fBlog messages\f1\&. For example,
+if the verbosity level is 2, MongoDB logs \fBD2\f1\&. In previous
+versions, MongoDB log messages only specified \fBD\f1 for Debug level.
+.RE
+.PP
+\fBmongod \-\-version\f1
+.RS
+.PP
+Returns the \fBmongod\f1 release number.
 .RE
 .SS LDAP AUTHENTICATION OR AUTHORIZATION OPTIONS
+.PP
+Starting in MongoDB 8.0, LDAP authentication and authorization is
+deprecated. LDAP is available and will continue to operate without
+changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
+future major release.
+.PP
+For details, see \fBLDAP Deprecation\f1\&.
 .PP
 \fBmongod \-\-ldapServers\f1
 .RS
@@ -1031,7 +1001,7 @@ libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
-\fBKerberos Authentication\f1, verify the following for the
+\fBKerberos Authentication on Self\-Managed Deployments\f1, verify the following for the
 \fBmongod\f1 host machine:
 .PP
 \fBLinux\f1\f1
@@ -1416,7 +1386,7 @@ To specify the \fBWiredTiger Storage Engine\f1\&.
 .IP \(bu 4
 \fBinMemory\f1
 .IP \(bu 4
-To specify the \fBIn\-Memory Storage Engine\f1\&.
+To specify the \fBIn\-Memory Storage Engine for Self\-Managed Deployments\f1\&.
 .IP
 \fIAvailable in MongoDB Enterprise only.\f1
 .RE
@@ -1577,7 +1547,7 @@ a replica set member:
 To repair a \fBreplica set\f1 member, if you have an intact
 copy of your data available (e.g. a recent backup or an intact
 member of the \fBreplica set\f1), restore from that intact
-copy instead. To learn more, see \fBResync a Member of a Replica Set\f1\&.
+copy instead. To learn more, see \fBResync a Member of a Self\-Managed Replica Set\f1\&.
 .IP \(bu 4
 If you choose to run \fBmongod \-\-repair\f1\f1 against a
 replica set member and the operation modifies the data or the
@@ -1623,7 +1593,10 @@ uses for all data. The memory consumed by an index build (see
 \fBmaxIndexBuildMemoryUsageMegabytes\f1\f1) is separate from the
 WiredTiger cache memory.
 .PP
-Values can range from \fB0.25\f1 GB to \fB10000\f1 GB.
+Avoid increasing the WiredTiger internal cache size above its
+default value. If your use case requires to do so, you can use
+\fB\-\-wiredTigerCacheSizePct\f1\f1 to specify a percentage of up to 80% of available
+memory. Values can range from \fB0.25\f1 GB to \fB10000\f1 GB.
 .PP
 The default WiredTiger internal cache size is the larger of either:
 .RS
@@ -1647,9 +1620,6 @@ system memory, is used as the maximum RAM available.
 .PP
 To see the memory limit, see \fBhostInfo.system.memLimitMB\f1\f1\&.
 .PP
-Avoid increasing the WiredTiger internal cache size above its
-default value.
-.PP
 With WiredTiger, MongoDB utilizes both the WiredTiger internal cache
 and the filesystem cache.
 .PP
@@ -1668,9 +1638,8 @@ decrease WiredTiger internal cache size.
 .PP
 The default WiredTiger internal cache size value assumes that there is a
 single \fBmongod\f1\f1 instance per machine. If a single machine
-contains multiple MongoDB instances, then you should decrease the setting to
-accommodate the other \fBmongod\f1\f1
-instances.
+contains multiple MongoDB instances, decrease the setting to accommodate
+the other \fBmongod\f1\f1 instances.
 .PP
 If you run \fBmongod\f1\f1 in a container (for example, \fBlxc\f1,
 \fBcgroups\f1, Docker, etc.) that does \fInot\f1 have access to all of the
@@ -1678,6 +1647,74 @@ RAM available in a system, you must set \fB\-\-wiredTigerCacheSizeGB\f1\f1 to a 
 less than the amount of RAM available in the container. The exact
 amount depends on the other processes running in the container. See
 \fBmemLimitMB\f1\f1\&.
+.PP
+You can only provide one of either \fB\-\-wiredTigerCacheSizeGB\f1\f1 or
+\fB\-\-wiredTigerCacheSizePct\f1\f1\&.
+.RE
+.PP
+\fBmongod \-\-wiredTigerCacheSizePct\f1
+.RS
+.PP
+Defines the maximum amount of memory to allocate for cache as a
+percentage of physical RAM. The memory that an index build consumes (see
+\fBmaxIndexBuildMemoryUsageMegabytes\f1\f1) is separate from the
+WiredTiger cache memory.
+.PP
+You can specify a percentage of up to 80% of available memory.
+Values range from \fB0.25\f1 GB to \fB10000\f1 GB.
+.PP
+The default WiredTiger internal cache size is the larger of either:
+.RS
+.IP \(bu 2
+50% of (RAM \- 1 GB), or
+.IP \(bu 2
+256 MB.
+.RE
+.PP
+For example, on a system with a total of 4GB of RAM the
+WiredTiger cache uses 1.5GB of RAM (\fB0.5 * (4 GB \- 1 GB) =
+1.5 GB\f1). Conversely, on a system with a total of 1.25 GB of
+RAM WiredTiger allocates 256 MB to the WiredTiger cache
+because that is more than half of the total RAM minus one
+gigabyte (\fB0.5 * (1.25 GB \- 1 GB) = 128 MB < 256 MB\f1).
+.PP
+In some instances, such as when running in a container, the database
+can have memory constraints that are lower than the total system
+memory. In such instances, this memory limit, rather than the total
+system memory, is used as the maximum RAM available.
+.PP
+To see the memory limit, see \fBhostInfo.system.memLimitMB\f1\f1\&.
+.PP
+With WiredTiger, MongoDB utilizes both the WiredTiger internal cache
+and the filesystem cache.
+.PP
+With the filesystem cache, MongoDB automatically uses all free memory
+that is not used by the WiredTiger cache or by other processes.
+.PP
+The \fB\-\-wiredTigerCacheSizePct\f1\f1 limits the size of the WiredTiger internal
+cache. The operating system uses the available free memory
+for filesystem cache, which allows the compressed MongoDB data
+files to stay in memory. In addition, the operating system
+uses any free RAM to buffer file system blocks and file system
+cache.
+.PP
+To accommodate the additional consumers of RAM, you may have to
+decrease WiredTiger internal cache size.
+.PP
+The default WiredTiger internal cache size value assumes that there is a
+single \fBmongod\f1\f1 instance per machine. If a single machine
+contains multiple MongoDB instances, decrease the setting to accommodate
+the other \fBmongod\f1\f1 instances.
+.PP
+If you run \fBmongod\f1\f1 in a container (for example, \fBlxc\f1,
+\fBcgroups\f1, Docker, etc.) that does \fInot\f1 have access to all of the
+RAM available in a system, you must set \fB\-\-wiredTigerCacheSizePct\f1\f1 to a value
+less than the amount of RAM available in the container. The exact
+amount depends on the other processes running in the container. See
+\fBmemLimitMB\f1\f1\&.
+.PP
+You can only provide one of either \fB\-\-wiredTigerCacheSizePct\f1\f1 or
+\fB\-\-wiredTigerCacheSizeGB\f1\f1\&.
 .RE
 .PP
 \fBmongod \-\-wiredTigerJournalCompressor\f1
@@ -1855,6 +1892,18 @@ through a restart, update the value of
 \fB\-\-oplogMinRetentionHours\f1\f1\&.
 .RE
 .PP
+\fBmongod \-\-enableMajorityReadConcern\f1
+.RS
+.PP
+\fIDefault\f1: true
+.PP
+Configures support for \fB"majority"\f1\f1 read concern.
+.PP
+Starting in MongoDB 5.0,
+\fB\-\-enableMajorityReadConcern\f1\f1 cannot be changed
+and is always set to \fBtrue\f1\&. In earlier versions of MongoDB,
+\fB\-\-enableMajorityReadConcern\f1\f1 was configurable.
+.PP
 If you are using a three\-member primary\-secondary\-arbiter (PSA)
 architecture, consider the following:
 .RS
@@ -1862,7 +1911,7 @@ architecture, consider the following:
 The write concern \fB"majority"\f1\f1 can cause
 performance issues if a secondary is unavailable or lagging. For
 advice on how to mitigate these issues, see
-\fBMitigate Performance Issues with PSA Replica Set\f1\&.
+\fBMitigate Performance Issues with a Self\-Managed PSA Replica Set\f1\&.
 .IP \(bu 2
 If you are using a global default \fB"majority"\f1\f1
 and the write concern is less than the size of the majority,
@@ -1980,11 +2029,11 @@ The server uses and accepts only TLS encrypted connections.
 .RE
 .PP
 If \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1 is not
-specified and you are not using x.509 authentication, you must set the
+specified and you are not using X.509 authentication, you must set the
 \fBtlsUseSystemCA\f1\f1 parameter to \fBtrue\f1\&. This makes MongoDB use
 the system\-wide CA certificate store when connecting to a TLS\-enabled server.
 .PP
-If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
+If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
@@ -2063,7 +2112,7 @@ For more information about TLS and MongoDB, see
 \fIDefault\f1: keyFile
 .PP
 The authentication mode used for cluster authentication. If you use
-\fBinternal x.509 authentication\f1,
+\fBinternal X.509 authentication\f1,
 specify so here. This option can have one of the following values:
 .RS
 .IP \(bu 2
@@ -2087,7 +2136,7 @@ Accept only keyfiles.
 \fBsendKeyFile\f1
 .IP \(bu 4
 For rolling upgrade purposes. Send a keyfile for
-authentication but can accept both keyfiles and x.509
+authentication but can accept both keyfiles and X.509
 certificates.
 .RE
 .IP \(bu 2
@@ -2095,8 +2144,8 @@ certificates.
 .IP \(bu 4
 \fBsendX509\f1
 .IP \(bu 4
-For rolling upgrade purposes. Send the x.509 certificate for
-authentication but can accept both keyfiles and x.509
+For rolling upgrade purposes. Send the X.509 certificate for
+authentication but can accept both keyfiles and X.509
 certificates.
 .RE
 .IP \(bu 2
@@ -2104,17 +2153,17 @@ certificates.
 .IP \(bu 4
 \fBx509\f1
 .IP \(bu 4
-Recommended. Send the x.509 certificate for authentication and
-accept only x.509 certificates.
+Recommended. Send the X.509 certificate for authentication and
+accept only X.509 certificates.
 .RE
 .RE
 .PP
 If \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1 is not
-specified and you are not using x.509 authentication, you must set the
+specified and you are not using X.509 authentication, you must set the
 \fBtlsUseSystemCA\f1\f1 parameter to \fBtrue\f1\&. This makes MongoDB use
 the system\-wide CA certificate store when connecting to a TLS\-enabled server.
 .PP
-If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
+If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
@@ -2125,7 +2174,7 @@ For more information about TLS and MongoDB, see
 \fBmongod \-\-tlsClusterFile\f1
 .RS
 .PP
-Specifies the \&.pem file that contains the x.509
+Specifies the \&.pem file that contains the X.509
 certificate\-key file for \fBmembership authentication\f1 for the cluster or replica set.
 .PP
 On macOS or Windows, you can use the
@@ -2142,14 +2191,12 @@ internal cluster authentication or the alternative
 option or the certificate returned by the
 \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
-If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
+If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 \fBmongod\f1\f1 / \fBmongos\f1\f1 logs a warning on
-connection if the presented x.509 certificate expires within \fB30\f1
-days of the \fBmongod/mongos\f1 host system time. See
-\fBx.509 Certificates Nearing Expiry Trigger Warnings\f1 for more
-information.
+connection if the presented X.509 certificate expires within \fB30\f1
+days of the \fBmongod/mongos\f1 host system time.
 .PP
 For more information about TLS and MongoDB, see
 \fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
@@ -2247,7 +2294,7 @@ Available on Windows and macOS as an alternative to
 .PP
 Specifies a certificate property in order to select a matching
 certificate from the operating system\(aqs certificate store
-for \fBinternal x.509 membership authentication\f1\&.
+for \fBinternal X.509 membership authentication\f1\&.
 .PP
 \fB\-\-tlsClusterFile\f1\f1 and
 \fB\-\-tlsClusterCertificateSelector\f1\f1 options are mutually
@@ -2306,28 +2353,26 @@ intermediate CA certificate, the secure certificate store must
 contain the intermedia CA certificate \fIand\f1 the root CA certificate.
 .PP
 \fBmongod\f1\f1 / \fBmongos\f1\f1 logs a warning on
-connection if the presented x.509 certificate expires within \fB30\f1
-days of the \fBmongod/mongos\f1 host system time. See
-\fBx.509 Certificates Nearing Expiry Trigger Warnings\f1 for more
-information.
+connection if the presented X.509 certificate expires within \fB30\f1
+days of the \fBmongod/mongos\f1 host system time.
 .RE
 .PP
 \fBmongod \-\-tlsClusterPassword\f1
 .RS
 .PP
-Specifies the password to decrypt the x.509 certificate\-key file
+Specifies the password to decrypt the X.509 certificate\-key file
 specified with \fB\-\-tlsClusterFile\f1\f1\&. Use the
 \fB\-\-tlsClusterPassword\f1\f1 option only if the certificate\-key
 file is encrypted. In all cases, the \fBmongod\f1 redacts
 the password from all logging and reporting output.
 .RS
 .IP \(bu 2
-On Linux/BSD, if the private key in the x.509 file is encrypted and
+On Linux/BSD, if the private key in the X.509 file is encrypted and
 you do not specify the \fB\-\-tlsClusterPassword\f1\f1 option,
 MongoDB prompts for a passphrase. See
 \fBTLS/SSL Certificate Passphrase\f1\&.
 .IP \(bu 2
-On macOS, if the private key in the x.509 file is
+On macOS, if the private key in the X.509 file is
 encrypted, you must explicitly specify the
 \fB\-\-tlsClusterPassword\f1\f1 option. Alternatively, you can
 either use a certificate from the secure system store (see
@@ -2450,7 +2495,7 @@ connect.
 .PP
 If you specify
 \fB\-\-tlsAllowInvalidCertificates\f1 or \fBtls.allowInvalidCertificates:
-true\f1 when using x.509 authentication, an invalid certificate is
+true\f1 when using X.509 authentication, an invalid certificate is
 only sufficient to establish a TLS connection but is
 \fIinsufficient\f1 for authentication.
 .PP
@@ -2559,47 +2604,35 @@ available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-e
 .PP
 Configures the \fBdatabase profiler\f1 level.
 The following profiler levels are available:
+.PP
+\fB0\f1\f1
 .RS
-.IP \(bu 2
-.RS
-.IP \(bu 4
-Level
-.IP \(bu 4
-Description
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fB0\f1
-.IP \(bu 4
+.PP
 The profiler is off and does not collect any data.
 This is the default profiler level.
 .RE
-.IP \(bu 2
+.PP
+\fB1\f1\f1
 .RS
-.IP \(bu 4
-\fB1\f1
-.IP \(bu 4
+.PP
 The profiler collects data for operations that exceed the
 \fBslowms\f1 threshold or match a specified \fBfilter\f1\&.
-.IP
+.PP
 When a filter is set:
 .RS
-.IP \(bu 6
+.IP \(bu 2
 The \fBslowms\f1 and \fBsampleRate\f1 options are not used for
 profiling.
-.IP \(bu 6
+.IP \(bu 2
 The profiler only captures operations that match the
 \fBfilter\f1\&.
 .RE
 .RE
-.IP \(bu 2
+.PP
+\fB2\f1\f1
 .RS
-.IP \(bu 4
-\fB2\f1
-.IP \(bu 4
+.PP
 The profiler collects data for all operations.
-.RE
 .RE
 .PP
 Profiling can degrade performance and expose unencrypted query data in the
@@ -2845,8 +2878,9 @@ The \fB<field>\f1 can be \fBany field in the audit message\f1, including fields 
 To specify an audit filter, enclose the filter document in single
 quotes to pass the document as a string.
 .PP
-To specify the audit filter in a \fBconfiguration file\f1, you must use the YAML format of
-the configuration file.
+To specify the audit filter in a
+\fBconfiguration file\f1, you must use the YAML format
+of the configuration file.
 .PP
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
@@ -3161,10 +3195,10 @@ Available in MongoDB Enterprise only.
 \fBmongod \-\-kmipClientCertificatePassword\f1
 .RS
 .PP
-The password (if one exists) for the client certificate passed into
-\fB\-\-kmipClientCertificateFile\f1\f1\&. Is used for
-authenticating MongoDB to the KMIP server. Requires that a
-\fB\-\-kmipClientCertificateFile\f1\f1 be provided.
+The password to decrypt the Private Key of the Client Certificate that
+connects to the KMIP server. This option authenticates
+MongoDB to the KMIP server and requires that you provide a
+\fB\-\-kmipClientCertificateFile\f1\f1\&.
 .PP
 Available in MongoDB Enterprise only.
 .RE

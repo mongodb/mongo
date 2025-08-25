@@ -1,5 +1,5 @@
 .TH mongos 1
-.SH MONGOS
+.SH MONGOS INSTANCES
 .SH SYNOPSIS
 For a \fBsharded cluster\f1, the \fBmongos\f1
 instances provide the interface between the client applications and the
@@ -16,12 +16,12 @@ MongoDB disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available.
 .IP \(bu 2
 The \fBmongos\f1\f1 binary cannot connect to \fBmongod\f1\f1
-instances whose \fBfeature compatibility version (fCV)\f1 is greater
+instances whose \fBfeature compatibility version (FCV)\f1 is greater
 than that of the \fBmongos\f1\f1\&. For example, you cannot connect
-a MongoDB 5.0 version \fBmongos\f1\f1 to a 7.0
-sharded cluster with \fBfCV\f1 set to 7.0\&. You
+a MongoDB 5.0 version \fBmongos\f1\f1 to a 8.0
+sharded cluster with \fBFCV\f1 set to 8.0\&. You
 can, however, connect a MongoDB 5.0 version
-\fBmongos\f1\f1 to a 7.0 sharded cluster with \fBfCV\f1 set to 5.0\&.
+\fBmongos\f1\f1 to a 8.0 sharded cluster with \fBFCV\f1 set to 5.0\&.
 .IP \(bu 2
 \fBmongod\f1\f1 includes a \fBFull Time Diagnostic Data Capture\f1 mechanism to assist MongoDB engineers with troubleshooting
 deployments. If this thread fails, it terminates the originating process.
@@ -32,7 +32,7 @@ directory. For \fBmongod\f1 the directory is within
 .RE
 .SH OPTIONS
 .PP
-\fBConfiguration File Settings and Command\-Line Options Mapping\f1
+\fBSelf\-Managed Configuration File Settings and Command\-Line Options Mapping\f1
 .RS
 .IP \(bu 2
 MongoDB deprecates the SSL options and instead adds new
@@ -66,7 +66,7 @@ Returns the \fBmongos\f1 release number.
 Specifies a configuration file for runtime configuration options. The
 configuration file is the preferred method for runtime configuration of
 \fBmongos\f1\&. The options are equivalent to the command\-line
-configuration options. See \fBConfiguration File Options\f1 for
+configuration options. See \fBSelf\-Managed Configuration File Options\f1 for
 more information.
 .PP
 Ensure the configuration file uses ASCII encoding. The \fBmongos\f1
@@ -124,7 +124,7 @@ list, for example: \fBrest, exec\f1\&. If the configuration file contains
 expansion directives not specified to \fB\-\-configExpand\f1\f1, the \fBmongos\f1
 returns an error and terminates.
 .PP
-See \fBExternally Sourced Configuration File Values\f1 for configuration files
+See \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1 for configuration files
 for more information on expansion directives.
 .RE
 .PP
@@ -204,12 +204,12 @@ configured with an IP address fail startup validation and do not start.
 Before you bind your instance to a publicly\-accessible IP address,
 you must secure your cluster from unauthorized access. For a complete
 list of security recommendations, see
-\fBSecurity Checklist\f1\&. At minimum, consider
+\fBSecurity Checklist for Self\-Managed Deployments\f1\&. At minimum, consider
 \fBenabling authentication\f1 and \fBhardening
 network infrastructure\f1\&.
 .PP
 For more information about IP Binding, refer to the
-\fBIP Binding\f1 documentation.
+\fBIP Binding in Self\-Managed Deployments\f1 documentation.
 .PP
 To bind to all IPv4 addresses, enter \fB0.0.0.0\f1\&.
 .PP
@@ -241,12 +241,12 @@ addresses (i.e. \fB0.0.0.0\f1). If \fBmongos\f1 starts with
 Before you bind your instance to a publicly\-accessible IP address,
 you must secure your cluster from unauthorized access. For a complete
 list of security recommendations, see
-\fBSecurity Checklist\f1\&. At minimum, consider
+\fBSecurity Checklist for Self\-Managed Deployments\f1\&. At minimum, consider
 \fBenabling authentication\f1 and \fBhardening
 network infrastructure\f1\&.
 .PP
 For more information about IP Binding, refer to the
-\fBIP Binding\f1 documentation.
+\fBIP Binding in Self\-Managed Deployments\f1 documentation.
 .PP
 Alternatively, you can set the \fB\-\-bind_ip\f1 option to \fB::,0.0.0.0\f1
 or to an asterisk \fB"*"\f1 (enclose the asterisk in quotes to avoid filename
@@ -259,7 +259,7 @@ is, you can specify one or the other, but not both.
 \fBmongos \-\-listenBacklog\f1
 .RS
 .PP
-\fIDefault\f1: Target system specific maximum value
+\fIDefault\f1: Target system \fBSOMAXCONN\f1 constant
 .PP
 The maximum number of connections that can exist in the listen
 queue.
@@ -272,30 +272,21 @@ To prevent undefined behavior, specify a value for this
 parameter between \fB1\f1 and the local system \fBSOMAXCONN\f1
 constant.
 .PP
-The default value for the \fBlistenBacklog\f1 parameter depends on the target
-system. On Linux, \fB/proc/sys/net/core/somaxconn\f1 is used. On all other
-target systems, the compile time constant \fBSOMAXCONN\f1 is used.
-\fBSOMAXCONN\f1 is the maximum valid value that is documented for
-the \fIbacklog\f1 parameter to the \fIlisten\f1 system call.
+The default value for the \fBlistenBacklog\f1 parameter depends on the
+target system. On Linux, MongoDB uses \fB/proc/sys/net/core/somaxconn\f1\&.
+On all other target systems, MongoDB uses the compile time constant
+\fBSOMAXCONN\f1\&.
 .PP
 Some systems may interpret \fBSOMAXCONN\f1 symbolically, and others
 numerically. The actual \fIlisten backlog\f1 applied in practice may
 differ from any numeric interpretation of the \fBSOMAXCONN\f1 constant
-or argument to \fB\-\-listenBacklog\f1, and may also be constrained by
-system settings like \fB/proc/sys/net/core/somaxconn\f1 on Linux.
+or argument to \fB\-\-listenBacklog\f1\&.
 .PP
 Passing a value for the \fBlistenBacklog\f1 parameter that exceeds the
 \fBSOMAXCONN\f1 constant for the local system is, by the letter of the
 standards, undefined behavior. Higher values may be silently integer
 truncated, may be ignored, may cause unexpected resource
 consumption, or have other adverse consequences.
-.PP
-On systems with workloads that exhibit connection spikes, for which
-it is empirically known that the local system can honor higher
-values for the \fIbacklog\f1 parameter than the \fBSOMAXCONN\f1 constant,
-setting the \fBlistenBacklog\f1 parameter to a higher value may reduce
-operation latency as observed by the client by reducing the number
-of connections which are forced into a backoff state.
 .RE
 .PP
 \fBmongos \-\-maxConns\f1
@@ -316,7 +307,7 @@ In this case, set \fBmaxIncomingConnections\f1\f1 to a value slightly
 higher than the maximum number of connections that the client creates, or the
 maximum size of the connection pool.
 .PP
-This setting prevents the \fBmongos\f1\f1 from causing connection spikes on
+This setting prevents the \fBmongos\f1 from causing connection spikes on
 the individual \fBshards\f1\&. Spikes like these may disrupt the
 operation and memory allocation of the \fBsharded cluster\f1\&.
 .RE
@@ -493,7 +484,7 @@ Installation Guide for your operating system.
 Specifies the path to a key file that stores the shared secret
 that MongoDB instances use to authenticate to each other in a
 \fBsharded cluster\f1 or \fBreplica set\f1\&. \fB\-\-keyFile\f1\f1 implies
-\fBclient authorization\f1\&. See \fBInternal/Membership Authentication\f1 for more
+\fBclient authorization\f1\&. See \fBSelf\-Managed Internal/Membership Authentication\f1 for more
 information.
 .PP
 \fBKeyfiles for internal membership authentication\f1 use YAML format to allow for multiple keys in a
@@ -513,7 +504,7 @@ keyfiles that use the text file format.
 .RS
 .PP
 Specifies one of the MongoDB parameters described in
-\fBMongoDB Server Parameters\f1\&. You can specify multiple \fBsetParameter\f1
+\fBMongoDB Server Parameters for a Self\-Managed Deployment\f1\&. You can specify multiple \fBsetParameter\f1
 fields.
 .RE
 .PP
@@ -545,7 +536,8 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\f1\f1 does not specify \fBlocalhost\f1 or its associated IP address
 .RE
 .PP
-\fBmongos\f1 installed from official \fB\&.deb\f1 and \fB\&.rpm\f1 packages
+\fBmongos\f1 installed from official \fBInstall MongoDB Community Edition on Debian\f1
+and \fBInstall MongoDB Community Edition on Red Hat or CentOS\f1 packages
 have the \fBbind_ip\f1 configuration set to \fB127.0.0.1\f1 by
 default.
 .RE
@@ -716,7 +708,7 @@ and use the \fBtimeZoneInfo\f1\f1 parameter.
 .PP
 Outputs the \fBmongos\f1 instance\(aqs configuration options, formatted
 in YAML, to \fBstdout\f1 and exits the \fBmongos\f1 instance. For
-configuration options that uses \fBExternally Sourced Configuration File Values\f1,
+configuration options that uses \fBExternally Sourced Configuration File Values for Self\-Managed Deployments\f1,
 \fB\-\-outputConfig\f1\f1 returns the resolved value for those options.
 .PP
 This may include any configured passwords or secrets previously
@@ -727,7 +719,7 @@ For usage examples, see:
 .IP \(bu 2
 \fBOutput the Configuration File with Resolved Expansion Directive Values\f1
 .IP \(bu 2
-\fBConvert Command\-Line Options to YAML\f1
+\fBConvert Self\-Managed Command\-Line Options to YAML\f1
 .RE
 .RE
 .SS SHARDED CLUSTER OPTIONS
@@ -841,11 +833,11 @@ The server uses and accepts only TLS encrypted connections.
 .RE
 .PP
 If \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1 is not
-specified and you are not using x.509 authentication, you must set the
+specified and you are not using X.509 authentication, you must set the
 \fBtlsUseSystemCA\f1\f1 parameter to \fBtrue\f1\&. This makes MongoDB use
 the system\-wide CA certificate store when connecting to a TLS\-enabled server.
 .PP
-If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
+If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
@@ -906,7 +898,7 @@ For more information about TLS and MongoDB, see
 \fIDefault\f1: keyFile
 .PP
 The authentication mode used for cluster authentication. If you use
-\fBinternal x.509 authentication\f1,
+\fBinternal X.509 authentication\f1,
 specify so here. This option can have one of the following values:
 .RS
 .IP \(bu 2
@@ -930,7 +922,7 @@ Accept only keyfiles.
 \fBsendKeyFile\f1
 .IP \(bu 4
 For rolling upgrade purposes. Send a keyfile for
-authentication but can accept both keyfiles and x.509
+authentication but can accept both keyfiles and X.509
 certificates.
 .RE
 .IP \(bu 2
@@ -938,8 +930,8 @@ certificates.
 .IP \(bu 4
 \fBsendX509\f1
 .IP \(bu 4
-For rolling upgrade purposes. Send the x.509 certificate for
-authentication but can accept both keyfiles and x.509
+For rolling upgrade purposes. Send the X.509 certificate for
+authentication but can accept both keyfiles and X.509
 certificates.
 .RE
 .IP \(bu 2
@@ -947,17 +939,17 @@ certificates.
 .IP \(bu 4
 \fBx509\f1
 .IP \(bu 4
-Recommended. Send the x.509 certificate for authentication and
-accept only x.509 certificates.
+Recommended. Send the X.509 certificate for authentication and
+accept only X.509 certificates.
 .RE
 .RE
 .PP
 If \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1 is not
-specified and you are not using x.509 authentication, you must set the
+specified and you are not using X.509 authentication, you must set the
 \fBtlsUseSystemCA\f1\f1 parameter to \fBtrue\f1\&. This makes MongoDB use
 the system\-wide CA certificate store when connecting to a TLS\-enabled server.
 .PP
-If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
+If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 For more information about TLS and MongoDB, see
@@ -972,7 +964,7 @@ On macOS or Windows, you can use a certificate
 from the operating system\(aqs secure store instead of a PEM
 file. See \fB\-\-tlsClusterCertificateSelector\f1\f1\&.
 .PP
-Specifies the \&.pem file that contains the x.509 certificate\-key
+Specifies the \&.pem file that contains the X.509 certificate\-key
 file for \fBmembership authentication\f1
 for the cluster or replica set.
 .PP
@@ -982,14 +974,12 @@ authentication or the alternative
 \fB\&.pem\f1 file specified in the \fB\-\-tlsCertificateKeyFile\f1\f1 option or
 the certificate returned by the \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
-If using x.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
+If using X.509 authentication, \fB\-\-tlsCAFile\f1 or \fBtls.CAFile\f1
 must be specified unless using \fB\-\-tlsCertificateSelector\f1\f1\&.
 .PP
 \fBmongod\f1\f1 / \fBmongos\f1\f1 logs a warning on
-connection if the presented x.509 certificate expires within \fB30\f1
-days of the \fBmongod/mongos\f1 host system time. See
-\fBx.509 Certificates Nearing Expiry Trigger Warnings\f1 for more
-information.
+connection if the presented X.509 certificate expires within \fB30\f1
+days of the \fBmongod/mongos\f1 host system time.
 .PP
 For more information about TLS and MongoDB, see
 \fBConfigure mongod\f1 and mongos\f1 for TLS/SSL\f1 and
@@ -999,17 +989,17 @@ For more information about TLS and MongoDB, see
 \fBmongos \-\-tlsClusterPassword\f1
 .RS
 .PP
-Specifies the password to decrypt the x.509 certificate\-key file
+Specifies the password to decrypt the X.509 certificate\-key file
 specified with \fB\-\-tlsClusterFile\f1\&. Use the \fB\-\-tlsClusterPassword\f1\f1 option only
 if the certificate\-key file is encrypted. In all cases, the \fBmongos\f1
 redacts the password from all logging and reporting output.
 .RS
 .IP \(bu 2
-On Linux/BSD, if the private key in the x.509 file is encrypted and
+On Linux/BSD, if the private key in the X.509 file is encrypted and
 you do not specify the \fB\-\-tlsClusterPassword\f1\f1 option, MongoDB prompts for a
 passphrase. See \fBTLS/SSL Certificate Passphrase\f1\&.
 .IP \(bu 2
-On macOS or Windows, if the private key in the x.509 file is
+On macOS or Windows, if the private key in the X.509 file is
 encrypted, you must explicitly specify the \fB\-\-tlsClusterPassword\f1\f1 option.
 Alternatively, you can either use a certificate from the secure
 system store (see \fB\-\-tlsClusterCertificateSelector\f1\f1) instead of a cluster PEM file or
@@ -1173,10 +1163,8 @@ The \fBthumbprint\f1 is sometimes referred to as a
 .RE
 .PP
 \fBmongod\f1\f1 / \fBmongos\f1\f1 logs a warning on
-connection if the presented x.509 certificate expires within \fB30\f1
-days of the \fBmongod/mongos\f1 host system time. See
-\fBx.509 Certificates Nearing Expiry Trigger Warnings\f1 for more
-information.
+connection if the presented X.509 certificate expires within \fB30\f1
+days of the \fBmongod/mongos\f1 host system time.
 .RE
 .PP
 \fBmongos \-\-tlsCRLFile\f1
@@ -1242,7 +1230,7 @@ connect.
 .PP
 If you specify
 \fB\-\-tlsAllowInvalidCertificates\f1 or \fBtls.allowInvalidCertificates:
-true\f1 when using x.509 authentication, an invalid certificate is
+true\f1 when using X.509 authentication, an invalid certificate is
 only sufficient to establish a TLS connection but is
 \fIinsufficient\f1 for authentication.
 .PP
@@ -1504,8 +1492,9 @@ The \fB<field>\f1 can be \fBany field in the audit message\f1, including fields 
 To specify an audit filter, enclose the filter document in single
 quotes to pass the document as a string.
 .PP
-To specify the audit filter in a \fBconfiguration file\f1, you must use the YAML format of
-the configuration file.
+To specify the audit filter in a
+\fBconfiguration file\f1, you must use the YAML format
+of the configuration file.
 .PP
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
@@ -1585,6 +1574,13 @@ only and not the profiler since profiling is not available on
 \fBmongos\f1\&.
 .RE
 .SS LDAP AUTHENTICATION AND AUTHORIZATION OPTIONS
+.PP
+Starting in MongoDB 8.0, LDAP authentication and authorization is
+deprecated. LDAP is available and will continue to operate without
+changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
+future major release.
+.PP
+For details, see \fBLDAP Deprecation\f1\&.
 .PP
 \fBmongos \-\-ldapServers\f1
 .RS
@@ -1745,7 +1741,7 @@ libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
-\fBKerberos Authentication\f1, verify the following for the
+\fBKerberos Authentication on Self\-Managed Deployments\f1, verify the following for the
 \fBmongos\f1 host machine:
 .PP
 \fBLinux\f1\f1
