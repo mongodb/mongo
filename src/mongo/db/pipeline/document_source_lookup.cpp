@@ -132,18 +132,13 @@ void lookupPipeValidator(const Pipeline& pipeline) {
     }
 }
 
-// Parses $lookup 'from' field. The 'from' field must be a string or one of the following
-// exceptions:
-// {from: {db: "config", coll: "cache.chunks.*"}, ...} or
-// {from: {db: "local", coll: "oplog.rs"}, ...}
+// Parses $lookup 'from' field. The 'from' field must be a string object with the following syntax
+// {from: {db: "dbName", coll: "collName"}, ...}
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
                                                    bool allowGenericForeignDbLookup) {
-    // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs'
-    //  which are not user namespaces so object type is
-    // omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "$lookup 'from' field must be a string, but found "
+            str::stream() << "$lookup 'from' field must be a string or object, but found "
                           << typeName(elem.type()),
             elem.type() == BSONType::string || elem.type() == BSONType::object);
 
@@ -151,7 +146,6 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         return NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData());
     }
 
-    // Valdate the db and coll names.
     const auto tenantId = defaultDb.tenantId();
     const auto vts = tenantId
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
@@ -163,16 +157,6 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         elem.embeddedObject());
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
-    // In the cases nss == config.collections and nss == config.chunks we can proceed with the
-    // lookup as the merge will be done on the config server
-    bool isConfigSvrSupportedCollection = nss == NamespaceString::kConfigsvrCollectionsNamespace ||
-        nss == NamespaceString::kConfigsvrChunksNamespace;
-    uassert(
-        ErrorCodes::FailedToParse,
-        str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
-                      << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
-        nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
-            isConfigSvrSupportedCollection || allowGenericForeignDbLookup);
     return nss;
 }
 
