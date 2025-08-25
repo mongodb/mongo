@@ -761,11 +761,6 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
-      - func: "bazel compile"
-        vars:
-          targets: //src/mongo/...
-          bazel_args: >-
-            --config=mod-scanner
       - command: subprocess.exec
         type: test
         params:
