@@ -317,8 +317,8 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match
     // stage we'll eventually construct from the input document.
+    _fromPipeline.reserve(resolvedNamespace.pipeline.size() + 1);
     _fromPipeline = resolvedNamespace.pipeline;
-    _fromPipeline.reserve(_fromPipeline.size() + 1);
     _fromPipeline.push_back(BSON("$match" << BSONObj()));
 }
 
