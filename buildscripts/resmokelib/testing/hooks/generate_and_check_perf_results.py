@@ -3,10 +3,13 @@
 import collections
 import datetime
 import json
+import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List
 
+import requests
+import tenacity
 import yaml
 
 from buildscripts.resmokelib import config as _config
@@ -15,6 +18,10 @@ from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
 
 THRESHOLD_LOCATION = "etc/performance_thresholds.yml"
+SEP_BENCHMARKS_PROJECT = "mongodb-mongo-master"
+SEP_BENCHMARKS_TASK_NAME = "benchmarks_sep"
+GET_TIMESERIES_URL = "https://performance-monitoring-api.corp.mongodb.com/time_series/?summarized_executions=false"
+MAINLINE_REQUESTERS = frozenset(["git_tag_request", "gitter_request"])
 
 
 class BoundDirection(str, Enum):
@@ -33,6 +40,7 @@ class IndividualMetricThreshold:
     test_name: str
     value: int
     bound_direction: BoundDirection
+    threshold_limit: int
 
 
 @dataclass(frozen=True, eq=True)
@@ -107,7 +115,19 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 "No variant information was given to resmoke. Please set the --variantName flag to let resmoke know what thresholds to use when checking."
             )
             return
-
+        
+        # For mainline builds, Evergreen does not make the base commit available in the expansions
+        # we retrieve it by looking for the previous commit in the Git log
+        if _config.EVERGREEN_REQUESTER in MAINLINE_REQUESTERS:
+            base_commit_hash = subprocess.check_output(
+                ["git", "log", "-1", "--pretty=format:%H", "HEAD~1"],
+                cwd=".",
+                text=True
+            ).strip()
+        # For patch builds the evergreen revision is set to the base commit
+        else:
+            base_commit_hash = _config.EVERGREEN_REVISION
+        
         for test_name in benchmark_reports.keys():
             variant_thresholds = self.performance_thresholds.get(test_name, None)
             if variant_thresholds is None:
@@ -126,13 +146,24 @@ class GenerateAndCheckPerfResults(interface.Hook):
             for item in test_thresholds:
                 thread_level = item["thread_level"]
                 for metric in item["metrics"]:
+                    value = self._retrieve_base_commit_value(
+                        url=GET_TIMESERIES_URL,
+                        test_name=test_name,
+                        task_name=SEP_BENCHMARKS_TASK_NAME,
+                        variant=self.variant,
+                        measurement=metric["name"],
+                        args={"thread_level": thread_level},
+                        base_commit=base_commit_hash,
+                        project=SEP_BENCHMARKS_PROJECT,
+                    )
                     metrics_to_check.append(
                         IndividualMetricThreshold(
                             test_name=test_name,
                             thread_level=thread_level,
                             metric_name=metric["name"],
-                            value=metric["value"],
+                            value=value,
                             bound_direction=metric["bound_direction"],
+                            threshold_limit=metric["threshold_limit"],
                         )
                     )
             # Transform the reported performance results into something we can more easily use.
@@ -231,6 +262,76 @@ class GenerateAndCheckPerfResults(interface.Hook):
             benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
         return benchmark_reports
 
+    def _retrieve_base_commit_value(
+        self,
+        url: str,
+        test_name: str,
+        task_name: str,
+        variant: str,
+        measurement: str,
+        args: Dict[str, Any],
+        base_commit: str,
+        project: str,
+    ) -> int:
+        """Retrieve the base commit value for a given timeseries for a specific commit hash."""
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "infos": [
+                {
+                    "project": project,
+                    "variant": variant,
+                    "task": task_name,
+                    "test": test_name,
+                    "measurement": measurement,
+                    "args": args
+                }
+            ]
+        }
+
+        @tenacity.retry(
+            stop=tenacity.stop_after_attempt(3),
+            wait=tenacity.wait_exponential(multiplier=1, min=2, max=10),
+            retry=tenacity.retry_if_exception_type(requests.RequestException),
+            reraise=True,
+        )
+        def _post_with_retry():
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            response.raise_for_status()
+            return response.json()
+
+        try:
+            data = _post_with_retry()
+        except requests.RequestException as exc:
+            raise CedarReportError(f"Failed to retrieve base commit value: {exc}")
+
+        time_series = data.get("time_series", [])
+        if not time_series or not time_series[0].get("data"):
+            raise CedarReportError(
+                f"No time series data found for test {test_name}, measurement {measurement} on variant {variant} in project {project}."
+            )
+
+        for point in time_series[0]["data"]:
+            if point.get("commit") == base_commit:
+                value = point.get("value")
+                if value is not None:
+                    return value
+                break
+
+        self.logger.info(f"No base commit value found for test {test_name}, measurement {measurement} on variant {variant} in project {project} for commit {base_commit}. \
+                         Using value from latest successful run instead")
+
+        # If no base commit value is found, use the latest successful run's value, which is the latest element added to the data array
+        latest_run = time_series[0]["data"][-1]
+        value = latest_run.get("value")
+        if value is not None:
+            return value
+
+        raise CedarReportError(
+            f"No value found for test {test_name}, measurement {measurement} on variant {variant} in project {project}"
+        )
 
 class CheckPerfResultTestCase(interface.DynamicTestCase):
     """CheckPerfResultTestCase class."""
@@ -275,20 +376,20 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 continue
             if (
                 metric_to_check.bound_direction == BoundDirection.UPPER
-                and metric_to_check.value < reported_metric.value
+                and reported_metric.value - metric_to_check.value >= metric_to_check.threshold_limit
             ) or (
                 metric_to_check.bound_direction == BoundDirection.LOWER
-                and metric_to_check.value > reported_metric.value
+                and metric_to_check.value - reported_metric.value >= metric_to_check.threshold_limit
             ):
                 if metric_to_check.bound_direction == BoundDirection.LOWER:
                     self.logger.error(
-                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the set threshold of {metric_to_check.value}."
+                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the base commit value of {metric_to_check.value} by more than the threshold limit of {metric_to_check.threshold_limit}."
                         " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True
                 else:
                     self.logger.error(
-                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the set threshold of {metric_to_check.value}."
+                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the base commit value of {metric_to_check.value} by more than the threshold limit of {metric_to_check.threshold_limit}."
                         " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True

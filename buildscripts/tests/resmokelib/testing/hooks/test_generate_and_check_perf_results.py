@@ -376,6 +376,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
                 test_name="fake-test",
                 value=10,
                 bound_direction="upper",
+                threshold_limit=20,
             )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
@@ -404,12 +405,13 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
                 test_name="fake-test",
                 value=10,
                 bound_direction="upper",
+                threshold_limit=20,
             )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
             cbr.ReportedMetric(
                 test_name="fake-test", thread_level=1, metric_name="latency"
-            ): CedarMetric(name="latency", type="LATENCY", value=11)
+            ): CedarMetric(name="latency", type="LATENCY", value=100)
         }
         test_case = cbr.CheckPerfResultTestCase(
             logging.getLogger("hook_logger"),
@@ -432,6 +434,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
                 test_name="fake-test",
                 value=10,
                 bound_direction="upper",
+                threshold_limit=20,
             )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
@@ -460,6 +463,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
                 test_name="fake-test",
                 value=10,
                 bound_direction="upper",
+                threshold_limit=20,
             )
         ]
         reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
