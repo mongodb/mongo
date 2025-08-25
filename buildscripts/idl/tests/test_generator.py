@@ -456,6 +456,23 @@ class TestGenerator(testcase.IDLTestcase):
         expected = dedent("BSONObj _anchorObj;")
         self.assertNotIn(expected, header)
 
+    def test_server_parameter_constant_name(self) -> None:
+        """Test generation of constants of server parameter names."""
+        header, _ = self.assert_generate(
+            self.view_test_common_types
+            + dedent("""
+        server_parameters:
+                testServerParameter:
+                    description: "Test server parameter"
+                    set_at: ["startup", "runtime"]
+                    redact: false
+                    cpp_varname: testParameter
+        """)
+        )
+
+        expected = dedent("constexpr inline auto kTestServerParameterName = \"testServerParameter\"_sd;")
+        self.assertIn(expected, header)
+
     def test_command_view_type_generates_anchor(self) -> None:
         """Test anchor generation on command with view parameter."""
         header, _ = self.assert_generate(

@@ -1445,6 +1445,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             for scp in spec.server_parameters:
                 if scp.cpp_class is None:
                     self._gen_exported_constexpr(scp.name, "Default", scp.default, scp.condition)
+                self._writer.write_line(
+                    f"constexpr inline auto {_get_constant(scp.name + 'Name')} = \"{scp.name}\"_sd;"
+                )
                 self._gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
                 self.gen_server_parameter_class(scp)
 
