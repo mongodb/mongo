@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import NamedTuple, Optional
 
 from github import GithubIntegration
@@ -17,6 +18,15 @@ from github import GithubIntegration
 from buildscripts.util.read_config import read_config_file
 from evergreen.api import RetryingEvergreenApi
 
+# this will be populated by the github jwt tokens (1 hour lifetimes)
+REDACTED_STRINGS = []
+
+# This is the list of file globs to check for 
+# after the dryrun has created the destination output tree
+EXCLUDED_PATTERNS = [  
+    "src/mongo/db/modules/",
+    "buildscripts/modules/",
+]
 
 class CopybaraRepoConfig(NamedTuple):
     """Copybara source and destination repo sync configuration."""
@@ -40,7 +50,7 @@ class CopybaraConfig(NamedTuple):
         )
 
     @classmethod
-    def from_copybara_sky_file(cls, file_path: str) -> CopybaraConfig:
+    def from_copybara_sky_file(cls, workflow: str, branch: str, file_path: str) -> CopybaraConfig:
         with open(file_path, "r") as file:
             content = file.read()
             # Delete comments
@@ -50,17 +60,14 @@ class CopybaraConfig(NamedTuple):
             if source_url_match is None:
                 return cls.empty()
 
-            source_branch_name_match = re.search(r'ref = "(.+?)"', content)
-            if source_branch_name_match is None:
-                return cls.empty()
-
-            destination_url_match = re.search(r'destinationUrl = "(.+?)"', content)
-            if destination_url_match is None:
-                return cls.empty()
-
-            destination_branch_name_match = re.search(r'push = "(.+?)"', content)
-            if destination_branch_name_match is None:
-                return cls.empty()
+            if workflow == "prod":
+                destination_url_match = re.search(r'prodUrl = "(.+?)"', content)
+                if destination_url_match is None:
+                    return cls.empty()
+            else:
+                destination_url_match = re.search(r'testUrl = "(.+?)"', content)
+                if destination_url_match is None:
+                    return cls.empty()
 
             repo_name_regex = re.compile(r"([^:/]+/[^:/]+)\.git")
 
@@ -78,12 +85,12 @@ class CopybaraConfig(NamedTuple):
                 source=CopybaraRepoConfig(
                     git_url=source_git_url,
                     repo_name=source_repo_name_match.group(1),
-                    branch=source_branch_name_match.group(1),
+                    branch=branch,
                 ),
                 destination=CopybaraRepoConfig(
                     git_url=destination_git_url,
                     repo_name=destination_repo_name_match.group(1),
-                    branch=destination_branch_name_match.group(1),
+                    branch=branch,
                 ),
             )
 
@@ -91,28 +98,39 @@ class CopybaraConfig(NamedTuple):
         return self.source is not None and self.destination is not None
 
 
-def run_command(command):
-    """
-    Execute a shell command and return its standard output (`stdout`).
-
-    Args:
-        command (str): The shell command to be executed.
-
-    Returns
-        str: The standard output of the executed command.
-
-    Raises
-        subprocess.CalledProcessError: If the command execution fails.
-
-    """
-    try:
-        return subprocess.run(
-            command, shell=True, check=True, text=True, capture_output=True
-        ).stdout
-    except subprocess.CalledProcessError as e:
-        print(f"Error while executing: '{command}'.\n{e}\nStandard Error: {e.stderr}")
-        raise
-
+def run_command(command):  
+    print(command)  
+    try:  
+        process = subprocess.Popen(  
+            command,  
+            shell=True,  
+            stdout=subprocess.PIPE,  
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout  
+            text=True,  
+            bufsize=1  
+        )  
+  
+        output_lines = []  
+        for line in process.stdout:  
+            for redact in filter(None, REDACTED_STRINGS):  # avoid None replacements  
+                line = line.replace(redact, "<REDACTED>")  
+            print(line, end="")  
+            output_lines.append(line)  
+  
+        full_output = ''.join(output_lines)  
+        process.wait()  
+  
+        if process.returncode != 0:  
+            # Attach output so except block can read it  
+            raise subprocess.CalledProcessError(  
+                process.returncode, command, output=full_output  
+            )  
+  
+        return full_output  
+  
+    except subprocess.CalledProcessError:  
+        # Let main handle it  
+        raise 
 
 def create_mongodb_bot_gitconfig():
     """Create the mongodb-bot.gitconfig file with the desired content."""
@@ -197,7 +215,6 @@ def check_destination_branch_exists(copybara_config: CopybaraConfig) -> bool:
     )
     output = run_command(command)
     return copybara_config.destination.branch in output
-
 
 def find_matching_commit(dir_source_repo: str, dir_destination_repo: str) -> Optional[str]:
     """
@@ -306,6 +323,20 @@ def push_branch_to_destination_repo(
         f"git push {copybara_config.destination.git_url} {copybara_config.destination.branch}"
     )
 
+def handle_failure(expansions, error_message, output_logs):
+    acceptable_error_messages = [
+        # Indicates the two repositories are identical
+        "No new changes to import for resolved ref",
+        # Indicates differences exist but no changes affect the destination, for example: exclusion rules
+        "Iterative workflow produced no changes in the destination for resolved ref",
+        # Indicates the commits have already been synced over with another copybara task
+        "Updates were rejected because the remote contains work that you do",
+    ]
+
+    if not any(
+        acceptable_message in output_logs for acceptable_message in acceptable_error_messages
+    ):
+        send_failure_message_to_slack(expansions, error_message)
 
 def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
     """
@@ -316,7 +347,7 @@ def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
         copybara_config (CopybaraConfig): Copybara configuration.
     """
 
-    # Save original dirtory
+    # Save original directory
     original_dir = os.getcwd()
 
     try:
@@ -366,8 +397,64 @@ def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
         # Change back to the original directory
         os.chdir(original_dir)
 
+def is_current_repo_origin(expected_repo: str) -> bool:  
+    """Check if the current repo's origin matches 'owner/repo'."""  
+    try:  
+        url = run_command("git config --get remote.origin.url").strip()  
+    except subprocess.CalledProcessError:  
+        return False  
+    m = re.search(r"([^/:]+/[^/:]+)\.git$", url)  
+    return bool(m and m.group(1) == expected_repo)  
+  
+
+def sky_file_has_version_id(config_file: str, version_id: str) -> bool:  
+    contents = Path(config_file).read_text()  
+    return str(version_id) in contents  
+
+def branch_exists_remote(remote_url: str, branch_name: str) -> bool:  
+    """Return True if branch exists on the remote."""  
+    try:  
+        output = run_command(f"git ls-remote --heads {remote_url} {branch_name}")  
+        return bool(output.strip())  
+    except subprocess.CalledProcessError:  
+        return False  
+  
+def delete_remote_branch(remote_url: str, branch_name: str):  
+    """Delete branch from remote if it exists."""  
+    if branch_exists_remote(remote_url, branch_name):  
+        print(f"Deleting remote branch {branch_name} from {remote_url}")  
+        run_command(f"git push {remote_url} --delete {branch_name}")  
+  
+def push_test_branches(copybara_config, expansions):  
+    """Push test branch with Evergreen patch changes to source, and clean revision to destination."""  
+    # Safety checks  
+    if copybara_config.source.branch != copybara_config.destination.branch:  
+        print(f"ERROR: test branches must match: source={copybara_config.source.branch} dest={copybara_config.destination.branch}")  
+        sys.exit(1)  
+    if not copybara_config.source.branch.startswith("copybara_test_branch") \
+        or not copybara_config.destination.branch.startswith("copybara_test_branch"):  
+        print(f"ERROR: can not push non copybara test branch: {copybara_config.source.branch}")  
+        sys.exit(1)  
+    if not is_current_repo_origin("10gen/mongo"):          
+        print("Refusing to push copybara_test_branch to non 10gen/mongo repo")  
+        sys.exit(1)  
+  
+    # First, delete stale remote branches if present  
+    delete_remote_branch(copybara_config.source.git_url, copybara_config.source.branch)  
+    delete_remote_branch(copybara_config.destination.git_url, copybara_config.destination.branch)  
+  
+    # --- Push patched branch to DEST repo (local base Evergreen state) --- 
+    run_command(f"git remote add dest_repo {copybara_config.destination.git_url}")   
+    run_command(f"git checkout -B {copybara_config.destination.branch}")
+    run_command(f"git push dest_repo {copybara_config.destination.branch}")
+
+    # --- Push patched branch to SOURCE repo (local patched Evergreen state) --- 
+    run_command(f'git commit -am "Evergreen patch for version_id {expansions["version_id"]}"')    
+    run_command(f"git remote add source_repo {copybara_config.source.git_url}")  
+    run_command(f"git push source_repo {copybara_config.source.branch}")   
 
 def main():
+    global REDACTED_STRINGS
     """Clone the Copybara repo, build its Docker image, and set up and run migrations."""
     parser = argparse.ArgumentParser()
 
@@ -376,6 +463,13 @@ def main():
         "-e",
         default="../expansions.yml",
         help="Location of expansions file generated by evergreen.",
+    )
+
+    parser.add_argument(
+        "--workflow",
+        default="test",
+        choices = ["prod", "test"],
+        help="The copybara workflow to use (test is a dryrun)",
     )
 
     args = parser.parse_args()
@@ -387,7 +481,7 @@ def main():
         run_command("git clone https://github.com/10gen/copybara.git")
 
     # Navigate to the Copybara directory and build the Copybara Docker image
-    run_command("cd copybara && docker build --rm -t copybara .")
+    run_command("cd copybara && docker build --rm -t copybara_container .")
 
     # Read configurations
     expansions = read_config_file(args.expansions_file)
@@ -403,9 +497,12 @@ def main():
         expansions["installation_id_copybara_syncer_10gen"],
     )
 
+    REDACTED_STRINGS += [token_mongodb_mongo, token_10gen_mongo]
+
     tokens_map = {
         "https://github.com/mongodb/mongo.git": token_mongodb_mongo,
         "https://github.com/10gen/mongo.git": token_10gen_mongo,
+        "https://github.com/10gen/mongo-copybara.git": token_10gen_mongo,
     }
 
     # Create the mongodb-bot.gitconfig file as necessary.
@@ -414,26 +511,63 @@ def main():
     current_dir = os.getcwd()
     config_file = f"{current_dir}/copy.bara.sky"
 
+    if args.workflow == "test":
+        test_args = ["--init-history", f"--last-rev={expansions['revision']}"]
+        branch = f"copybara_test_branch_{expansions['version_id']}"
+        test_branch_str = 'testBranch = "copybara_test_branch"'
+    elif args.workflow == "prod":
+        if expansions['is_patch'] == "true":
+            print("ERROR: prod workflow should not be run in patch builds!")
+            sys.exit(1)
+        test_args = []
+        branch = "master"
+    else:
+        raise Exception(f"invalid workflow {args.workflow}")
+
     # Overwrite repo urls in copybara config in-place
-    with fileinput.FileInput(config_file, inplace=True) as file:
-        for line in file:
-            token = None
-            for repo, value in tokens_map.items():
-                if repo in line:
-                    token = value
+    with fileinput.FileInput(config_file, inplace=True) as file:  
+        for line in file:  
+            token = None  
+    
+            # Replace GitHub URL with token-authenticated URL  
+            for repo, value in tokens_map.items():  
+                if repo in line:  
+                    token = value  
+                    break  # no need to check other repos  
+    
+            if token:  
+                print(  
+                    line.replace(  
+                        "https://github.com",  
+                        f"https://x-access-token:{token}@github.com",  
+                    ),  
+                    end="",  
+                )  
+    
+            # Update testBranch in .sky file if running test workflow  
+            elif args.workflow == "test" and test_branch_str in line:  
+                print(  
+                    line.replace(  
+                        test_branch_str,  
+                        test_branch_str[:-1] + f"_{expansions['version_id']}\"\n",
+                    ),  
+                    end="",  
+                )  
+    
+            else:  
+                print(line, end="") 
 
-            if token:
-                print(
-                    line.replace(
-                        "https://github.com",
-                        f"https://x-access-token:{token}@github.com",
-                    ),
-                    end="",
-                )
-            else:
-                print(line, end="")
+    if args.workflow == "test":  
+        if not sky_file_has_version_id(config_file, expansions["version_id"]):  
+            print(  
+                f"Copybara test branch in {config_file} does not contain version_id {expansions['version_id']}"  
+            )  
+            sys.exit(1)
 
-    copybara_config = CopybaraConfig.from_copybara_sky_file(config_file)
+    copybara_config = CopybaraConfig.from_copybara_sky_file(args.workflow, branch, config_file)
+
+    if args.workflow == "test":
+        push_test_branches(copybara_config, expansions)
 
     # Create destination branch if it does not exist
     if not copybara_config.is_complete():
@@ -444,50 +578,61 @@ def main():
         print("ERROR!!!")
         sys.exit(1)
     else:
-        if not check_destination_branch_exists(copybara_config):
-            create_branch_from_matching_commit(copybara_config)
-            print(
-                f"New branch named '{copybara_config.destination.branch}' has been created"
-                f" for the '{copybara_config.destination.repo_name}' repo"
-            )
-        else:
-            print(
-                f"The branch named '{copybara_config.destination.branch}' already exists"
-                f" in the '{copybara_config.destination.repo_name}' repo."
-            )
+        if args.workflow == "prod":
+            if not check_destination_branch_exists(copybara_config):
+                create_branch_from_matching_commit(copybara_config)
+                print(
+                    f"New branch named '{copybara_config.destination.branch}' has been created"
+                    f" for the '{copybara_config.destination.repo_name}' repo"
+                )
+            else:
+                print(
+                    f"The branch named '{copybara_config.destination.branch}' already exists"
+                    f" in the '{copybara_config.destination.repo_name}' repo."
+                )
 
-    # Set up the Docker command and execute it
-    docker_cmd = [
-        "docker run",
-        "-v ~/.ssh:/root/.ssh",
-        "-v ~/mongodb-bot.gitconfig:/root/.gitconfig",
-        f'-v "{config_file}":/usr/src/app/copy.bara.sky',
-        "-e COPYBARA_CONFIG='copy.bara.sky'",
-        "-e COPYBARA_SUBCOMMAND='migrate'",
-        "-e COPYBARA_OPTIONS='-v'",
-        "copybara copybara",
+    os.makedirs("tmp_copybara")
+
+    docker_cmd = [  
+        "docker", "run", "--rm",  
+        "-v", f"{os.path.expanduser('~/.ssh')}:/root/.ssh",  
+        "-v", f"{os.path.expanduser('~/mongodb-bot.gitconfig')}:/root/.gitconfig",  
+        "-v", f"{config_file}:/usr/src/app/copy.bara.sky",
+        "-v", f"{os.getcwd()}/tmp_copybara:/tmp/copybara-preview",
+        "copybara_container",
+        "migrate", "/usr/src/app/copy.bara.sky", args.workflow,  
+        "-v", "--output-root=/tmp/copybara-preview",
     ]
 
     try:
-        run_command(" ".join(docker_cmd))
+        run_command(" ".join(docker_cmd + ["--dry-run"] + test_args))
+
+        
+        found_forbidden = False  
+        preview_dir = Path("tmp_copybara")  
+  
+        
+        for file_path in preview_dir.rglob("*"):  
+            if file_path.is_file():  
+                for pattern in EXCLUDED_PATTERNS: 
+                    if pattern in str(file_path):  
+                        print(f"ERROR: Found excluded path: {file_path}")  
+                        found_forbidden = True  
+        
+        if found_forbidden:  
+            sys.exit(1)  
     except subprocess.CalledProcessError as err:
-        error_message = str(err.stderr)
-        acceptable_error_messages = [
-            # Indicates the two repositories are identical
-            "No new changes to import for resolved ref",
-            # Indicates differences exist but no changes affect the destination, for example: exclusion rules
-            "Iterative workflow produced no changes in the destination for resolved ref",
-            # Indicates the commits have already been synced over with another copybara task
-            "Updates were rejected because the remote contains work that you do",
-        ]
+        if args.workflow == "prod":
+            error_message = f"Copybara failed with error: {err.returncode}" 
+            handle_failure(expansions, error_message, err.output)
 
-        if any(
-            acceptable_message in error_message for acceptable_message in acceptable_error_messages
-        ):
-            return
-
-        # Send a failure message to #devprod-build-automation if the Copybara sync task fails.
-        send_failure_message_to_slack(expansions, error_message)
+    # dry run successful, time to push
+    try:  
+        run_command(" ".join(docker_cmd + test_args))  
+    except subprocess.CalledProcessError as err:  
+        if args.workflow == "prod":  
+            error_message = f"Copybara failed with error: {err.returncode}"  
+            handle_failure(expansions, error_message, err.output)
 
 
 if __name__ == "__main__":

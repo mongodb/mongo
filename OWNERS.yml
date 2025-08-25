@@ -41,9 +41,6 @@ filters:
     approvers:
       - IamXander
       - smcclure15
-  - "copy.bara.staging.sky":
-    approvers:
-      - 10gen/devprod-correctness
   - "eslint.config.mjs":
     approvers:
       - 10gen/devprod-correctness

@@ -1644,6 +1644,19 @@ tasks:
       - func: "configure evergreen api credentials"
       - func: "sync repo with copybara"
 
+  - name: test_copybara_sync
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    patch_only: true
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - func: "test copybara sync"
+
   - name: test_api_version_compatibility
     tags:
       [

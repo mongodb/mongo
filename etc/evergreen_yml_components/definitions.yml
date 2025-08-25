@@ -2152,6 +2152,19 @@ functions:
         args:
           - "src/evergreen/run_python_script.sh"
           - "buildscripts/sync_repo_with_copybara.py"
+          - "--workflow=prod"
+
+  "test copybara sync":
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "test copybara sync"
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "buildscripts/sync_repo_with_copybara.py"
+          - "--workflow=test"
 
   # Used by generator
   "run jstestfuzz":

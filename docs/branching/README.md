@@ -47,10 +47,10 @@ VERSION=8.3
 Run the following automation and verify results:
 
 ```sh
-sed -i "s/master/v$VERSION/g" copy.bara.sky copy.bara.staging.sky
+sed -i "s/master/v$VERSION/g" copy.bara.sky buildscripts/sync_repo_with_copybara.py
 ```
 
-For each file [`copy.bara.sky`](../../copy.bara.sky) and [`copy.bara.staging.sky`](../../copy.bara.staging.sky), the "master" branch references should be replaced with the new branch name.
+For each file [`copy.bara.sky`](../../copy.bara.sky) and [`sync_repo_with_copybara.py`](../../buildscripts/sync_repo_with_copybara.py), the "master" branch references should be replaced with the new branch name.
 
 ### Evergreen YAML configurations
 
