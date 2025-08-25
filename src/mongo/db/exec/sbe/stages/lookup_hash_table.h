@@ -114,6 +114,7 @@ public:
 
     /**
      * Resets the iterator state to the start of a (new) outer key or key array.
+     * Must be called before "getNextMatchingIndex()" or "getAllMatchingIndices()" are called.
      */
     void reset(const value::TypeTags& outerKeyTag, const value::Value& outerKeyVal);
 
@@ -135,20 +136,19 @@ private:
     // The LookupHashTable instance this is iterating, so we can call some methods in it.
     LookupHashTable& _hashTable;
 
-    // Have we looked for the current individual key yet ('_hashTableMatchXyz' members are valid)?
-    bool _hashTableSearched;
-
     // Tag of the current outer key, which may be a scalar or array.
-    value::TypeTags _outerKeyTag;
+    value::TypeTags _outerKeyTag = value::TypeTags::Nothing;
     // Value of the current outer key, which may be a scalar or array.
-    value::Value _outerKeyVal;
+    value::Value _outerKeyVal = 0;
     // Indicates whether the outer key is a scalar or array.
-    bool _outerKeyIsArray;
+    bool _outerKeyIsArray = false;
+    // Have we looked for the current individual key yet ('_hashTableMatchXyz' members are valid)?
+    bool _hashTableSearched = false;
 
     // If '_outerKeyIsArray' is false, a sorted vector of inner key match buffer indices.
     std::vector<size_t> _hashTableMatchVector;
     // If '_outerKeyIsArray' is false, the current position's index into '_hashTableMatchVector'.
-    size_t _hashTableMatchVectorIdx;
+    size_t _hashTableMatchVectorIdx = 0;
     // If '_outerKeyIsArray' is true, a sorted set of inner key match buffer indices.
     std::set<size_t> _hashTableMatchSet;
     // If '_outerKeyIsArray' is true, the current position in '_hashTableMatchSet'.
