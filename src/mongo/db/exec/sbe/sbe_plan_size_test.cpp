@@ -157,7 +157,7 @@ TEST_F(PlanSizeTest, HashAgg) {
         makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                        generateSlotId(), generateSlotId(), mockE(), mockE()),
                                    std::make_unique<ArithmeticAverageHashAggAccumulatorTerminal>(
-                                       generateSlotId(), generateSlotId(), mockE())),
+                                       generateSlotId(), generateSlotId(), mockE(), boost::none)),
         makeSV(),
         true,
         generateSlotId(),

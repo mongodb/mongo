@@ -29,8 +29,10 @@
 
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/util.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_datetime.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 namespace sbe {
@@ -300,37 +302,90 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggCollSetUnion(
     return {ownAcc, tagAcc, valAcc};
 }
 
+namespace {
+FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCappedImpl(
+    value::TypeTags tagLhsAccumulatorState,
+    value::Value valLhsAccumulatorState,  // Owned
+    value::TypeTags tagRhsAccumulatorState,
+    value::Value valRhsAccumulatorState,  // Owned
+    int32_t sizeCap,
+    CollatorInterface* collator) {
+    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
+    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
+
+    tassert(7039526,
+            "Expected array for capped set union operand",
+            tagRhsAccumulatorState == value::TypeTags::Array);
+
+    auto rhsAccumulatorState = value::getArrayView(valRhsAccumulatorState);
+    tassert(7039528,
+            "Capped set union operand with invalid length",
+            rhsAccumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+
+    auto [tagNewSetMembers, valNewSetMembers] = rhsAccumulatorState->swapAt(
+        static_cast<size_t>(AggArrayWithSize::kValues), value::TypeTags::Null, 0);
+    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
+    tassert(7039525,
+            "Expected ArraySet in capped set union operand",
+            tagNewSetMembers == value::TypeTags::ArraySet);
+
+    guardLhsAccumulatorState.reset();
+    guardNewSetMembers.reset();
+    return ByteCode::setUnionAccumImpl(tagLhsAccumulatorState,
+                                       valLhsAccumulatorState,
+                                       tagNewSetMembers,
+                                       valNewSetMembers,
+                                       sizeCap,
+                                       collator);
+}
+}  // namespace
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnionCapped(ArityType arity) {
-    auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [tagLhsAccumulatorState, valLhsAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
+
+    auto [tagRhsAccumulatorState, valRhsAccumulatorState] = moveOwnedFromStack(1);
+    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
 
     auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
     tassert(7039509,
             "'cap' parameter must be a 32-bit int",
             tagSizeCap == value::TypeTags::NumberInt32);
-    const size_t sizeCap = value::bitcastTo<int32_t>(valSizeCap);
 
-    guardNewElem.reset();
-    return aggSetUnionCappedImpl(tagNewElem, valNewElem, sizeCap, nullptr /*collator*/);
+    guardLhsAccumulatorState.reset();
+    guardRhsAccumulatorState.reset();
+    return builtinAggSetUnionCappedImpl(tagLhsAccumulatorState,
+                                        valLhsAccumulatorState,
+                                        tagRhsAccumulatorState,
+                                        valRhsAccumulatorState,
+                                        value::bitcastTo<int32_t>(valSizeCap),
+                                        nullptr /*collator*/);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggCollSetUnionCapped(
     ArityType arity) {
-    auto [_1, tagColl, valColl] = getFromStack(1);
-    auto [tagNewElem, valNewElem] = moveOwnedFromStack(2);
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
+    auto [tagLhsAccumulatorState, valLhsAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
 
+    auto [_1, tagColl, valColl] = getFromStack(1);
     tassert(7039510, "expected value of type 'collator'", tagColl == value::TypeTags::collator);
+
+    auto [tagRhsAccumulatorState, valRhsAccumulatorState] = moveOwnedFromStack(2);
+    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
+
+    auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
     tassert(7039511,
             "'cap' parameter must be a 32-bit int",
             tagSizeCap == value::TypeTags::NumberInt32);
 
-    guardNewElem.reset();
-    return aggSetUnionCappedImpl(tagNewElem,
-                                 valNewElem,
-                                 value::bitcastTo<int32_t>(valSizeCap),
-                                 value::getCollatorView(valColl));
+    guardLhsAccumulatorState.reset();
+    guardRhsAccumulatorState.reset();
+    return builtinAggSetUnionCappedImpl(tagLhsAccumulatorState,
+                                        valLhsAccumulatorState,
+                                        tagRhsAccumulatorState,
+                                        valRhsAccumulatorState,
+                                        value::bitcastTo<int32_t>(valSizeCap),
+                                        value::getCollatorView(valColl));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNNeedsMoreInput(

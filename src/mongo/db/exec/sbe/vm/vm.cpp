@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/util.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -733,185 +734,171 @@ bool hasSeparatorAt(size_t idx, StringData input, StringData separator) {
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
+    value::TypeTags tagAccumulatorState,
+    value::Value valAccumulatorState,  // Owned
+    bool ownedNewElem,
     value::TypeTags tagNewElem,
     value::Value valNewElem,
     int32_t sizeCap,
     CollatorInterface* collator) {
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [ownArr, tagArr, valArr] = getFromStack(0);
+    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
 
-    // Create a new array is it does not exist yet.
-    if (tagArr == value::TypeTags::Nothing) {
-        ownArr = true;
-        std::tie(tagArr, valArr) = value::makeNewArray();
-        auto arr = value::getArrayView(valArr);
+    // The capped addToSet accumulator holds a value of Nothing at first and gets initialized on
+    // demand when the first value gets added. Once initialized, the state is a two-element array
+    // containing the set and its size in bytes, which is necessary to enforce the memory cap.
+    if (tagAccumulatorState == value::TypeTags::Nothing) {
+        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
+        value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+        auto accumulatorState = value::getArrayView(valAccumulatorState);
 
         auto [tagAccSet, valAccSet] = value::makeNewArraySet(collator);
 
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        arr->push_back(tagAccSet, valAccSet);
-        arr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
-    } else {
-        // Take ownership of the accumulator.
-        topStack(false, value::TypeTags::Nothing, 0);
-    }
-    value::ValueGuard guardArr{tagArr, valArr};
+        accumulatorState->push_back(tagAccSet, valAccSet);
+        accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
 
-    invariant(ownArr && tagArr == value::TypeTags::Array);
-    auto arr = value::getArrayView(valArr);
-    invariant(arr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+        // Transfer ownership to the 'ValueGuard' in the enclosing scope.
+        guardAccumulatorState.reset();
+    }
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+    tassert(10936800,
+            "Expected array for set accumulator state",
+            tagAccumulatorState == value::TypeTags::Array);
+
+    auto accumulatorState = value::getArrayView(valAccumulatorState);
+    tassert(10936801,
+            "Set accumulator with invalid length",
+            accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
     // Check that the accumulated size of the set won't exceed the limit after adding the new value,
     // and if so, add the value.
-    auto [tagAccSet, valAccSet] = arr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    invariant(tagAccSet == value::TypeTags::ArraySet);
+    auto [tagAccSet, valAccSet] =
+        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(
+        10936802, "Expected ArraySet in accumulator state", tagAccSet == value::TypeTags::ArraySet);
     auto accSet = value::getArraySetView(valAccSet);
     if (!accSet->values().contains({tagNewElem, valNewElem})) {
         auto elemSize = value::getApproximateSize(tagNewElem, valNewElem);
         auto [tagAccSize, valAccSize] =
-            arr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
-        invariant(tagAccSize == value::TypeTags::NumberInt64);
+            accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+        tassert(10936803,
+                "Expected integer value for ArraySet size",
+                tagAccSize == value::TypeTags::NumberInt64);
         const int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
         int64_t newSize = currentSize + elemSize;
 
-        if (newSize >= static_cast<int64_t>(sizeCap)) {
-            uasserted(ErrorCodes::ExceededMemoryLimit,
-                      str::stream()
-                          << "Used too much memory for a single set. Memory limit: " << sizeCap
-                          << " bytes. The set contains " << accSet->size()
-                          << " elements and is of size " << currentSize
-                          << " bytes. The element being added has size " << elemSize << " bytes.");
-        }
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream() << "Used too much memory for a single set. Memory limit: " << sizeCap
+                              << " bytes. The set contains " << accSet->size()
+                              << " elements and is of size " << currentSize
+                              << " bytes. The element being added has size " << elemSize
+                              << " bytes.",
+                newSize < static_cast<int64_t>(sizeCap));
 
-        arr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
-                   value::TypeTags::NumberInt64,
-                   value::bitcastFrom<int64_t>(newSize));
+        accumulatorState->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                                value::TypeTags::NumberInt64,
+                                value::bitcastFrom<int64_t>(newSize));
 
-        // Push back the new value. Note that array will ignore Nothing.
+        // Insert the new value. Note that array will ignore Nothing.
         guardNewElem.reset();
-        accSet->push_back(tagNewElem, valNewElem);
+        if (ownedNewElem) {
+            accSet->push_back(tagNewElem, valNewElem);
+        } else {
+            accSet->push_back_clone(tagNewElem, valNewElem);
+        }
     }
 
-    guardArr.reset();
-    return {ownArr, tagArr, valArr};
+    guardAccumulatorState.reset();
+    return {true, tagAccumulatorState, valAccumulatorState};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::setUnionAccumImpl(
-    value::TypeTags newElemTag,
-    value::Value newElemVal,
+    value::TypeTags tagAccumulatorState,
+    value::Value valAccumulatorState,  // Owned
+    value::TypeTags tagNewSetMembers,
+    value::Value valNewSetMembers,  // Owned
     int32_t sizeCap,
-    bool accOwned,
-    value::TypeTags accTag,
-    value::Value accVal,
     CollatorInterface* collator) {
+    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
 
-    // Create a new array as it does not exist yet.
-    if (accTag == value::TypeTags::Nothing) {
-        accOwned = true;
-        std::tie(accTag, accVal) = value::makeNewArray();
-        auto accArray = value::getArrayView(accVal);
+    // The capped addToSet accumulator holds a value of Nothing at first and gets initialized on
+    // demand when the first value gets added. Once initialized, the state is a two-element array
+    // containing the set and its size in bytes, which is necessary to enforce the memory cap.
+    if (tagAccumulatorState == value::TypeTags::Nothing) {
+        auto [tagAccSet, valAccSet] = value::makeNewArraySet(collator);
 
-        auto [accSetTag, accSetVal] = value::makeNewArraySet(collator);
+        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
+        auto accumulatorState = value::getArrayView(valAccumulatorState);
 
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accArray->push_back(accSetTag, accSetVal);
-        accArray->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
-    } else {
-        // Take ownership of the accumulator.
-        topStack(false, value::TypeTags::Nothing, 0);
+        accumulatorState->push_back(tagAccSet, valAccSet);
+        accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
     }
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+    tassert(7039521,
+            "Expected array for set accumulator state",
+            tagAccumulatorState == value::TypeTags::Array);
 
-    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
-    // leave the accumulator as is.
-    if (newElemTag == value::TypeTags::Nothing) {
-        return {accOwned, accTag, accVal};
-    }
+    tassert(10936804,
+            "Expected right-hand side of union to have array type",
+            value::isArray(tagNewSetMembers) || tagNewSetMembers == value::TypeTags::Nothing);
 
-    tassert(7039520, "expected accumulator value to be owned", accOwned);
-    value::ValueGuard arrGuard{accTag, accVal};
+    auto accumulatorState = value::getArrayView(valAccumulatorState);
+    tassert(1093605,
+            "Set accumulator with invalid length",
+            accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
-    // We expect the field to be an array. Thus, we return Nothing on an unexpected input type.
-    if (!value::isArray(newElemTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
+    auto [tagAccSet, valAccSet] =
+        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
     tassert(
-        7039521, "expected accumulator to be of type 'Array'", accTag == value::TypeTags::Array);
-    auto accArray = value::getArrayView(accVal);
-    tassert(7039522,
-            "array had unexpected size",
-            accArray->size() == static_cast<size_t>(AggArrayWithSize::kLast));
-
-    auto [accArrSetTag, accArrSetVal] =
-        accArray->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(
-        7039523, "expected value of type 'ArraySet'", accArrSetTag == value::TypeTags::ArraySet);
-    auto accArrSet = value::getArraySetView(accArrSetVal);
+        7039523, "Expected ArraySet in accumulator state", tagAccSet == value::TypeTags::ArraySet);
+    auto accSet = value::getArraySetView(valAccSet);
 
     // Extract the current size of the accumulator. As we add elements to the set, we will increment
     // the current size accordingly and throw an exception if we ever exceed the size limit. We
     // cannot simply sum the two sizes, since the two sets could have a substantial intersection.
     auto [accSizeTag, accSizeVal] =
-        accArray->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
     tassert(7039524, "expected 64-bit int", accSizeTag == value::TypeTags::NumberInt64);
     int64_t currentSize = value::bitcastTo<int64_t>(accSizeVal);
 
-    value::arrayForEach<true>(
-        newElemTag, newElemVal, [&](value::TypeTags elTag, value::Value elVal) {
-            int elemSize = value::getApproximateSize(elTag, elVal);
-            bool inserted = accArrSet->push_back(elTag, elVal);
+    if (tagNewSetMembers != value::TypeTags::Nothing) {
+        value::arrayForEach<true>(
+            tagNewSetMembers,
+            valNewSetMembers,
+            [&](value::TypeTags tagNewElem, value::Value valNewElem) {
+                value::ValueGuard guardNewElem{tagNewElem, valNewElem};
 
-            if (inserted) {
-                currentSize += elemSize;
-                if (currentSize >= static_cast<int64_t>(sizeCap)) {
-                    uasserted(ErrorCodes::ExceededMemoryLimit,
-                              str::stream()
-                                  << "Used too much memory for a single array. Memory limit: "
-                                  << sizeCap << ". Current set has " << accArrSet->size()
-                                  << " elements and is " << currentSize << " bytes.");
+                if (accSet->values().contains({tagNewElem, valNewElem})) {
+                    // Skip this element, because it's already in the set, and continue with the
+                    // remaining elements.
+                    return;
                 }
-            }
-        });
+
+                int elemSize = value::getApproximateSize(tagNewElem, valNewElem);
+                currentSize += elemSize;
+                uassert(ErrorCodes::ExceededMemoryLimit,
+                        str::stream() << "Used too much memory for a single array. Memory limit: "
+                                      << sizeCap << ". Current set has " << accSet->size()
+                                      << " elements and is " << currentSize << " bytes.",
+                        currentSize < static_cast<int64_t>(sizeCap));
+
+                guardNewElem.reset();
+                accSet->push_back(tagNewElem, valNewElem);
+            });
+    }
 
     // Update the accumulator with the new total size.
-    accArray->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
-                    value::TypeTags::NumberInt64,
-                    value::bitcastFrom<int64_t>(currentSize));
+    accumulatorState->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                            value::TypeTags::NumberInt64,
+                            value::bitcastFrom<int64_t>(currentSize));
 
-    arrGuard.reset();
-    return {accOwned, accTag, accVal};
-}
-
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
-    value::TypeTags newElemTag,
-    value::Value newElemVal,
-    int32_t sizeCap,
-    CollatorInterface* collator) {
-    // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
-    // callers will manage the memory associated with 'newElemTag/Val'. See the comment on
-    // 'setUnionAccumImpl' for more details.
-    value::ValueGuard newElemGuard{newElemTag, newElemVal};
-    auto [accOwned, accTag, accVal] = getFromStack(0);
-
-    // We expect the new value we are adding to the accumulator to be a two-element array where
-    // the first element is the new set of values and the second value is the corresponding size.
-    tassert(7039526, "expected value of type 'Array'", newElemTag == value::TypeTags::Array);
-    auto newArr = value::getArrayView(newElemVal);
-    tassert(7039528,
-            "array had unexpected size",
-            newArr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
-
-    auto [newValSetTag, newValSetVal] =
-        newArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(
-        7039525, "expected value of type 'ArraySet'", newValSetTag == value::TypeTags::ArraySet);
-
-    return setUnionAccumImpl(
-        newValSetTag, newValSetVal, sizeCap, accOwned, accTag, accVal, collator);
+    guardAccumulatorState.reset();
+    return {true, tagAccumulatorState, valAccumulatorState};
 }
 
 ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,

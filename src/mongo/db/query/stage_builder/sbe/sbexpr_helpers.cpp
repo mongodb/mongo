@@ -745,7 +745,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                     return std::make_unique<Implementation>(
                         outSlot.getId(),
                         sbAccumulator.spillSlot.getId(),
-                        implementation.transform.clone().lower(_state, &varTypes));
+                        implementation.transform.clone().lower(_state, &varTypes),
+                        collatorSlot);
                 }},
             sbAccumulator.implementation);
 

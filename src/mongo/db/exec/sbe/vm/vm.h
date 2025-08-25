@@ -384,6 +384,39 @@ public:
                                                                      value::TypeTags rhsTag,
                                                                      value::Value rhsValue);
 
+    static FastTuple<bool, value::TypeTags, value::Value> addToSetCappedImpl(
+        value::TypeTags tagAccumulatorState,
+        value::Value valAccumulatorState,  // Owned
+        bool ownedNewElem,
+        value::TypeTags tagNewElem,
+        value::Value valNewElem,
+        int32_t sizeCap,
+        CollatorInterface* collator);
+
+    /**
+     * Moves the elements from the (tagNewSetMembers, valNewSetMembers) array into the
+     * (tagAccumulatorState, valAccumulatorState) capped set accumulator, preserving set semantics
+     * by ignoring duplicates and enforcing the cap by throwing an exception if the operation would
+     * result in an accumulator state that exceeds it.
+     *
+     * Either the accumulator state or new members array may be Nothing, which gets treated as an
+     * empty accumlator or empty array, respectively.
+     *
+     * The capped accumulator state is a two-element array, where the first element is an 'ArraySet'
+     * and the second element is the set's pre-computed size. The return value is also an array
+     * with the same structure.
+     *
+     * Takes ownership of both the accumulator state and the new elements array. The caller takes
+     * ownership of the returned value iff the 'bool' component is true.
+     */
+    static FastTuple<bool, value::TypeTags, value::Value> setUnionAccumImpl(
+        value::TypeTags tagAccumulatorState,
+        value::Value valAccumulatorState,  // Owned
+        value::TypeTags tagNewSetMembers,
+        value::Value valNewSetMembers,  // Owned
+        int32_t sizeCap,
+        CollatorInterface* collator);
+
     ByteCode() {
         _argStack = static_cast<uint8_t*>(::operator new(sizeOfElement * 4));
         _argStackEnd = _argStack + sizeOfElement * 4;
@@ -784,10 +817,6 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> addToSetCappedImpl(value::TypeTags tagNewElem,
-                                                                      value::Value valNewElem,
-                                                                      int32_t sizeCap,
-                                                                      CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> isMemberImpl(value::TypeTags exprTag,
                                                                 value::Value exprVal,
                                                                 value::TypeTags arrTag,
@@ -891,29 +920,6 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(
-        value::TypeTags tagNewElem,
-        value::Value valNewElem,
-        int32_t sizeCap,
-        CollatorInterface* collator);
-
-    /**
-     * Given an array of new values via 'newElemVal' and a set accumulator via 'accVal', add the new
-     * values into the set accumulator. Note that the accumulator is an array of two elements where
-     * the first element is the set of values in the accumulator and the second element is the size
-     * of the current accumulated values.
-     * IMPORTANT: this function does NOT create a ValueGuard over 'newElemTag' and 'newElemVal'. It
-     * is the responsibility of callers of this function to manage the memory associated with
-     * 'newElemTag/Val'.
-     */
-    FastTuple<bool, value::TypeTags, value::Value> setUnionAccumImpl(value::TypeTags newElemTag,
-                                                                     value::Value newElemVal,
-                                                                     int32_t sizeCap,
-                                                                     bool accOwned,
-                                                                     value::TypeTags accTag,
-                                                                     value::Value accVal,
-                                                                     CollatorInterface* collator);
-
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);

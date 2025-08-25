@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/values/util.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo {
@@ -60,19 +61,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityTy
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSetCapped(ArityType arity) {
-    auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
+    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
 
+    auto [ownedNewElem, tagNewElem, valNewElem] = moveFromStack(1);
+    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
+
+    auto [_ownedSizeCap, tagSizeCap, valSizeCap] = getFromStack(2);
+
+    // Return the unmodified accumulator state when the size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        auto [ownArr, tagArr, valArr] = getFromStack(0);
-        topStack(false, value::TypeTags::Nothing, 0);
-        return {ownArr, tagArr, valArr};
+        guardAccumulatorState.reset();
+        return {true, tagAccumulatorState, valAccumulatorState};
     }
 
+    guardAccumulatorState.reset();
     guardNewElem.reset();
-    return addToSetCappedImpl(
-        tagNewElem, valNewElem, value::bitcastTo<int32_t>(valSizeCap), nullptr /*collator*/);
+    return addToSetCappedImpl(tagAccumulatorState,
+                              valAccumulatorState,
+                              ownedNewElem,
+                              tagNewElem,
+                              valNewElem,
+                              value::bitcastTo<int32_t>(valSizeCap),
+                              nullptr /*collator*/);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(ArityType arity) {
@@ -111,80 +122,85 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(Ari
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapped(
     ArityType arity) {
-    auto [_1, tagColl, valColl] = getFromStack(1);
-    auto [tagNewElem, valNewElem] = moveOwnedFromStack(2);
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
+    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
 
-    // If the collator is Nothing or if it's some unexpected type, don't push back the value
-    // and just return the accumulator.
-    if (tagColl != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
-        auto [ownArr, tagArr, valArr] = getFromStack(0);
-        topStack(false, value::TypeTags::Nothing, 0);
-        return {ownArr, tagArr, valArr};
+    auto [_ownedCollator, tagCollator, valCollator] = getFromStack(1);
+
+    auto [ownedNewElem, tagNewElem, valNewElem] = moveFromStack(2);
+    value::ValueGuard guardNewElem{ownedNewElem, tagNewElem, valNewElem};
+
+    auto [_ownedSizeCap, tagSizeCap, valSizeCap] = getFromStack(3);
+
+    // Return the unmodified accumulator state when the collator or size cap is malformed.
+    if (tagCollator != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
+        guardAccumulatorState.reset();
+        return {true, tagAccumulatorState, valAccumulatorState};
     }
 
+    guardAccumulatorState.reset();
     guardNewElem.reset();
-    return addToSetCappedImpl(tagNewElem,
+    return addToSetCappedImpl(tagAccumulatorState,
+                              valAccumulatorState,
+                              ownedNewElem,
+                              tagNewElem,
                               valNewElem,
                               value::bitcastTo<int32_t>(valSizeCap),
-                              value::getCollatorView(valColl));
+                              value::getCollatorView(valCollator));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnionCapped(ArityType arity) {
-    auto [newElemTag, newElemVal] = moveOwnedFromStack(1);
+    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
 
-    // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
-    // callers will manage the memory associated with 'newElemTag/Val'. See the comment on
-    // 'setUnionAccumImpl' for more details.
-    value::ValueGuard newElemGuard{newElemTag, newElemVal};
-    auto [_, sizeCapTag, sizeCapVal] = getFromStack(2);
+    auto [tagNewSetMembers, valNewSetMembers] = moveOwnedFromStack(1);
+    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
 
-    if (sizeCapTag != value::TypeTags::NumberInt32) {
-        auto [arrOwned, arrTag, arrVal] = getFromStack(0);
-        topStack(false, value::TypeTags::Nothing, 0);
-        return {arrOwned, arrTag, arrVal};
+    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
+
+    // Return the unmodified accumulator state when the size cap is malformed.
+    if (tagSizeCap != value::TypeTags::NumberInt32) {
+        guardAccumulatorState.reset();
+        return {true, tagAccumulatorState, valAccumulatorState};
     }
 
-    auto [accOwned, accTag, accVal] = getFromStack(0);
-
-    return setUnionAccumImpl(newElemTag,
-                             newElemVal,
-                             value::bitcastTo<int32_t>(sizeCapVal),
-                             accOwned,
-                             accTag,
-                             accVal,
+    guardAccumulatorState.reset();
+    guardNewSetMembers.reset();
+    return setUnionAccumImpl(tagAccumulatorState,
+                             valAccumulatorState,
+                             tagNewSetMembers,
+                             valNewSetMembers,
+                             value::bitcastTo<int32_t>(valSizeCap),
                              nullptr /*collator*/);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapped(
     ArityType arity) {
-    auto [_1, collTag, collVal] = getFromStack(1);
-    auto [newElemTag, newElemVal] = moveOwnedFromStack(2);
+    auto [tagAccumulatorState, valAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
 
-    // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
-    // callers will manage the memory associated with 'newElemTag/Val'. See the comment on
-    // 'setUnionAccumImpl' for more details.
-    value::ValueGuard newElemGuard{newElemTag, newElemVal};
-    auto [_2, sizeCapTag, sizeCapVal] = getFromStack(3);
+    auto [_ownedCollator, tagCollator, valCollator] = getFromStack(1);
 
-    // If the collator is Nothing or if it's some unexpected type, don't push back the value and
-    // just return the accumulator.
-    if (collTag != value::TypeTags::collator || sizeCapTag != value::TypeTags::NumberInt32) {
+    auto [tagNewSetMembers, valNewSetMembers] = moveOwnedFromStack(2);
+    value::ValueGuard guardNewSetMembers{tagNewSetMembers, valNewSetMembers};
+
+    auto [_ownedSizeCap, tagSizeCap, valSizeCap] = getFromStack(3);
+
+    // Return the unmodified accumulator state when the size cap or collator is malformed.
+    if (tagCollator != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
         auto [arrOwned, arrTag, arrVal] = getFromStack(0);
         topStack(false, value::TypeTags::Nothing, 0);
         return {arrOwned, arrTag, arrVal};
     }
 
-    auto [accOwned, accTag, accVal] = getFromStack(0);
-
-    return setUnionAccumImpl(newElemTag,
-                             newElemVal,
-                             value::bitcastTo<int32_t>(sizeCapVal),
-                             accOwned,
-                             accTag,
-                             accVal,
-                             value::getCollatorView(collVal));
+    guardAccumulatorState.reset();
+    guardNewSetMembers.reset();
+    return setUnionAccumImpl(tagAccumulatorState,
+                             valAccumulatorState,
+                             tagNewSetMembers,
+                             valNewSetMembers,
+                             value::bitcastTo<int32_t>(valSizeCap),
+                             value::getCollatorView(valCollator));
 }
 
 namespace {

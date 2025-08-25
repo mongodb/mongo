@@ -701,7 +701,8 @@ struct SbHashAggAccumulator {
     std::variant<
         SbHashAggCompiledAccumulator,
         SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorTerminal>,
-        SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorPartial>>
+        SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorPartial>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>>
         implementation;
 };
 using SbHashAggAccumulatorVector = std::vector<SbHashAggAccumulator>;

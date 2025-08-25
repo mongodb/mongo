@@ -1806,7 +1806,9 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsTopBottomN(
 static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
     // AddToSet
     {AccumulatorAddToSet::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsAddToSet),
+     AccumOpInfo{.buildSinglePurposeAccum =
+                     makeBuildFn(&buildSinglePurposeAccum<sbe::AddToSetHashAggAccumulator>),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsAddToSet),
                  .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsAddToSet)}},
 
