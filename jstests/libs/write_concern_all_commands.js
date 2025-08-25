@@ -295,7 +295,7 @@ const wcCommandsTests = {
                 lsid: getLSID()
             }),
             setupFunc: (coll) => {
-                assert.commandWorked(coll.getDB().adminCommand({
+                assert.commandWorked(coll.getDB().runCommand({
                     insert: collName,
                     documents: [{_id: 1}],
                     lsid: getLSID(),
@@ -312,7 +312,7 @@ const wcCommandsTests = {
                 }));
             },
             confirmFunc: (res, coll) => {
-                assert.commandFailedWithCode(res, ErrorCodes.TransactionTooOld);
+                assert.commandFailedWithCode(res, ErrorCodes.TransactionCommitted);
                 assert.eq(coll.find().itcount(), 1);
                 genNextTxnNumber();
             },
@@ -5138,17 +5138,15 @@ function shouldSkipTestCase(clusterType,
 
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
 
-        // TODO SERVER-100943 abortTransaction does not return WCE
-
         // TODO SERVER-100936 create does note return WCE, returns StaleConfig
 
         // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
         // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
         if (clusterType == "sharded" &&
                 shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-            command == "abortTransaction" || command == "create" || command == "createRole" ||
-            command == "createUser" || command == "dropRole" || command == "dropUser" ||
-            command == "grantRolesToUser" || command == "updateRole" || command == "updateUser" ||
+            command == "create" || command == "createRole" || command == "createUser" ||
+            command == "dropRole" || command == "dropUser" || command == "grantRolesToUser" ||
+            command == "updateRole" || command == "updateUser" ||
             command == "setDefaultRWConcern" || (command == "findOneAndUpdate") ||
             (command == "findAndModify") || (TestData.configShard && command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for failure case.");
@@ -5160,13 +5158,10 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100943 abortTransaction does not return WCE
-
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
         if (clusterType == "rs" &&
-            (command == "abortTransaction" || command == "dropRole" ||
-             command == "grantRolesToUser" || command == "updateRole" || command == "updateUser" ||
-             command == "setDefaultRWConcern")) {
+            (command == "dropRole" || command == "grantRolesToUser" || command == "updateRole" ||
+             command == "updateUser" || command == "setDefaultRWConcern")) {
             return true;
         }
     }
