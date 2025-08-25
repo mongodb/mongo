@@ -32,7 +32,11 @@
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/query/random_utils.h"
+#include "mongo/util/str_escape.h"
 #include "mongo/util/text.h"
+
+#include <fmt/compile.h>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -721,6 +725,9 @@ Value evaluate(const ExpressionTrunc& expr, const Document& root, Variables* var
 
 namespace {
 
+
+std::string stringifyObjectOrArray(ExpressionContext* expCtx, Value val);
+
 /**
  * $convert supports a big grab bag of conversions, so ConversionTable maintains a collection of
  * conversion functions, as well as a table to organize them by inputType and targetType.
@@ -998,6 +1005,36 @@ public:
             &performConvertToTrue;
         table[stdx::to_underlying(BSONType::timestamp)][stdx::to_underlying(BSONType::boolean)] =
             &performConvertToTrue;
+
+        //
+        // Any remaining type to String
+        //
+        fcvGatedTable[stdx::to_underlying(BSONType::regEx)][stdx::to_underlying(BSONType::string)] =
+            &performConvertToString;
+        fcvGatedTable[stdx::to_underlying(BSONType::undefined)]
+                     [stdx::to_underlying(BSONType::string)] = &performConvertToString;
+        fcvGatedTable[stdx::to_underlying(BSONType::timestamp)]
+                     [stdx::to_underlying(BSONType::string)] = &performConvertToString;
+        fcvGatedTable[stdx::to_underlying(BSONType::dbRef)][stdx::to_underlying(BSONType::string)] =
+            &performConvertToString;
+        fcvGatedTable[stdx::to_underlying(BSONType::codeWScope)]
+                     [stdx::to_underlying(BSONType::string)] = &performConvertToString;
+        fcvGatedTable[stdx::to_underlying(BSONType::code)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const, Value inputValue) {
+                return Value(inputValue.getCode());
+            };
+        fcvGatedTable[stdx::to_underlying(BSONType::symbol)][stdx::to_underlying(
+            BSONType::string)] = [](ExpressionContext* const, Value inputValue) {
+            return Value(inputValue.getSymbol());
+        };
+        fcvGatedTable[stdx::to_underlying(BSONType::array)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value val) {
+                return Value(stringifyObjectOrArray(expCtx, std::move(val)));
+            };
+        fcvGatedTable[stdx::to_underlying(BSONType::object)][stdx::to_underlying(
+            BSONType::string)] = [](ExpressionContext* const expCtx, Value val) {
+            return Value(stringifyObjectOrArray(expCtx, std::move(val)));
+        };
     }
 
     ConversionFunc findConversionFunc(BSONType inputType,
@@ -1005,22 +1042,34 @@ public:
                                       boost::optional<ConversionBase> base,
                                       boost::optional<FormatArg> format,
                                       SubtypeArg subtype,
-                                      boost::optional<ByteOrderArg> byteOrder) const {
+                                      boost::optional<ByteOrderArg> byteOrder,
+                                      const bool featureFlagMqlJsEngineGapEnabled) const {
         AnyConversionFunc foundFunction;
 
         // Note: We can't use BSONType::minKey (-1) or BSONType::maxKey (127) as table indexes,
         // so we have to treat them as special cases.
         if (inputType != BSONType::minKey && inputType != BSONType::maxKey &&
             targetType != BSONType::minKey && targetType != BSONType::maxKey) {
-            invariant(stdx::to_underlying(inputType) >= 0 &&
-                      stdx::to_underlying(inputType) <= stdx::to_underlying(BSONType::jsTypeMax));
-            invariant(stdx::to_underlying(targetType) >= 0 &&
-                      stdx::to_underlying(targetType) <= stdx::to_underlying(BSONType::jsTypeMax));
-            foundFunction = table[stdx::to_underlying(inputType)][stdx::to_underlying(targetType)];
+            const int inputT = stdx::to_underlying(inputType);
+            const int targetT = stdx::to_underlying(targetType);
+            tassert(4607900,
+                    str::stream() << "Unexpected input type: " << stdx::to_underlying(inputType),
+                    inputT >= 0 && inputT <= stdx::to_underlying(BSONType::jsTypeMax));
+            tassert(4607901,
+                    str::stream() << "Unexpected target type: " << stdx::to_underlying(targetType),
+                    targetT >= 0 && targetT <= stdx::to_underlying(BSONType::jsTypeMax));
+            foundFunction = table[inputT][targetT];
+            if (featureFlagMqlJsEngineGapEnabled &&
+                std::holds_alternative<std::monostate>(foundFunction)) {
+                foundFunction = fcvGatedTable[inputT][targetT];
+            }
         } else if (targetType == BSONType::boolean) {
             // This is a conversion from MinKey or MaxKey to Bool, which is allowed (and always
             // returns true).
             foundFunction = &performConvertToTrue;
+        } else if (featureFlagMqlJsEngineGapEnabled && targetType == BSONType::string) {
+            // Similarly, Min/MaxKey to String is also allowed.
+            foundFunction = &performConvertToString;
         } else {
             // Any other conversions involving MinKey or MaxKey (either as the target or input) are
             // illegal.
@@ -1036,8 +1085,10 @@ public:
     }
 
 private:
-    AnyConversionFunc table[stdx::to_underlying(BSONType::jsTypeMax) + 1]
-                           [stdx::to_underlying(BSONType::jsTypeMax) + 1];
+    static constexpr int kTableSize = stdx::to_underlying(BSONType::jsTypeMax) + 1;
+    AnyConversionFunc table[kTableSize][kTableSize];
+    // For conversions that are gated behind featureFlagMqlJsEngineGap.
+    AnyConversionFunc fcvGatedTable[kTableSize][kTableSize];
 
     ConversionFunc makeConversionFunc(AnyConversionFunc foundFunction,
                                       BSONType inputType,
@@ -1112,6 +1163,10 @@ private:
             ErrorCodes::ConversionFailure,
             "Attempt to convert infinity value to integer type in $convert with no onError value",
             std::isfinite(inputDouble));
+    }
+
+    static Value performConvertToString(ExpressionContext* const, Value inputValue) {
+        return Value(inputValue.toString());
     }
 
     static Value performCastDoubleToInt(ExpressionContext* const expCtx, Value inputValue) {
@@ -1760,8 +1815,167 @@ Value performConversion(const ExpressionConvert& expr,
                 !requestingConvertBinDataNumeric(targetTypeInfo, inputType));
 
     return table.findConversionFunc(
-        inputType, targetTypeInfo.type, base, format, targetTypeInfo.subtype, byteOrder)(
+        inputType,
+        targetTypeInfo.type,
+        base,
+        format,
+        targetTypeInfo.subtype,
+        byteOrder,
+        expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled())(
         expr.getExpressionContext(), inputValue);
+}
+
+/**
+ * Stringifies BSON objects and arrays to produce a valid JSON string. Types that have a JSON
+ * counterpart are not wrapped in strings and can be parsed back to the same value. BSON specific
+ * types are written as JSON string literals.
+ */
+class JsonStringGenerator {
+public:
+    JsonStringGenerator(ExpressionContext* expCtx, size_t maxSize)
+        : _expCtx(expCtx), _maxSize(maxSize) {}
+
+    void writeValue(fmt::memory_buffer& buffer, const Value& val) const {
+        switch (val.getType()) {
+            // The below types have a JSON counterpart.
+            case BSONType::eoo:
+            case BSONType::null:
+            case BSONType::undefined:
+                // Existing behavior in $convert is to treat all nullish values as null.
+                appendTo(buffer, "null"_sd);
+                break;
+            case BSONType::boolean:
+                appendTo(buffer, val.getBool() ? "true"_sd : "false"_sd);
+                break;
+            case BSONType::numberDecimal:
+            case BSONType::numberDouble:
+            case BSONType::numberLong:
+            case BSONType::numberInt:
+                writeNumeric(buffer, val);
+                break;
+            // The below types (except string) don't have a JSON counterpart so we must wrap them in
+            // a string.
+            case BSONType::minKey:
+            case BSONType::maxKey:
+            case BSONType::oid:
+            case BSONType::binData:
+            case BSONType::date:
+            case BSONType::timestamp:
+                writeUnescapedString(buffer, stringifyValue(val));
+                break;
+            case BSONType::string:
+            case BSONType::regEx:
+            case BSONType::symbol:
+            case BSONType::codeWScope:
+            case BSONType::dbRef:
+            case BSONType::code:
+                writeEscapedString(buffer, stringifyValue(val));
+                break;
+            // Nested types.
+            case BSONType::object:
+                writeObject(buffer, val.getDocument());
+                break;
+            case BSONType::array:
+                writeArray(buffer, val.getArray());
+                break;
+            default:
+                MONGO_UNREACHABLE_TASSERT(4607906);
+        }
+
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream() << "Resulting string exceeds maximum size (" << _maxSize << " bytes)",
+                buffer.size() <= _maxSize);
+    }
+
+private:
+    static void appendTo(fmt::memory_buffer& buffer, StringData data) {
+        buffer.append(data.data(), data.data() + data.size());
+    }
+
+    static void writeEscapedString(fmt::memory_buffer& buffer, StringData str) {
+        buffer.push_back('"');
+        str::escapeForJSON(buffer, str);
+        buffer.push_back('"');
+    }
+
+    static void writeUnescapedString(fmt::memory_buffer& buffer, StringData str) {
+        buffer.push_back('"');
+        appendTo(buffer, str);
+        buffer.push_back('"');
+    }
+
+    void writeNumeric(fmt::memory_buffer& buffer, const Value& val) const {
+        tassert(4607904, "Expected a number", val.numeric());
+
+        if (val.isNaN() || val.isInfinite()) {
+            writeUnescapedString(buffer, stringifyValue(val));
+        } else {
+            appendTo(buffer, stringifyValue(val));
+        }
+    }
+
+    void writeObject(fmt::memory_buffer& buffer, const Document& doc) const {
+        buffer.push_back('{');
+        bool first{true};
+        for (auto it = doc.fieldIterator(); it.more();) {
+            if (!first) {
+                buffer.push_back(',');
+            }
+            first = false;
+
+            auto&& [key, value] = it.next();
+            fmt::format_to(std::back_inserter(buffer), FMT_COMPILE(R"("{}":)"), key);
+            writeValue(buffer, value);
+        }
+        buffer.push_back('}');
+    }
+
+    void writeArray(fmt::memory_buffer& buffer, const std::vector<Value>& arr) const {
+        buffer.push_back('[');
+        for (size_t i = 0; i < arr.size(); i++) {
+            if (i > 0) {
+                buffer.push_back(',');
+            }
+
+            writeValue(buffer, arr[i]);
+        }
+        buffer.push_back(']');
+    }
+
+    /**
+     * Stringifies a value as if it was passed as an input to $toString.
+     */
+    std::string stringifyValue(Value input) const {
+        tassert(4607905,
+                "Expected a non-nested value",
+                input.getType() != BSONType::array && input.getType() != BSONType::object);
+
+        static const ConversionTable table;
+        auto conversionFunc =
+            table.findConversionFunc(input.getType(),
+                                     BSONType::string,
+                                     boost::none /*base*/,
+                                     BinDataFormat::kAuto,
+                                     // Unused.
+                                     ExpressionConvert::ConvertTargetTypeInfo::defaultSubtypeVal,
+                                     boost::none /*byteOrder*/,
+                                     // Conversions using this class are already gated by this FF.
+                                     true /*featureFlagMqlJsEngineGapEnabled*/);
+
+        Value result = conversionFunc(_expCtx, input);
+        tassert(4607903, "Expected string", result.getType() == BSONType::string);
+        return result.getString();
+    }
+
+    ExpressionContext* const _expCtx;
+    const size_t _maxSize;
+};
+
+std::string stringifyObjectOrArray(ExpressionContext* const expCtx, Value val) {
+    fmt::memory_buffer buffer;
+    JsonStringGenerator generator{expCtx, BSONObjMaxUserSize};
+    generator.writeValue(buffer, val);
+    return fmt::to_string(buffer);
 }
 
 }  // namespace

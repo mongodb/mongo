@@ -288,9 +288,48 @@ TEST_F(EvaluateConvertTest, NegativeNumericTargetTypeFails) {
         });
 }
 
-TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvided) {
-    auto expCtx = getExpCtx();
+void assertUnsupportedConversionBehavior(
+    ExpressionContext* expCtx, std::vector<std::pair<Value, Value>> unsupportedConversions) {
+    // Attempt all of the unsupported conversions listed above.
+    for (const auto& conversion : unsupportedConversions) {
+        auto inputValue = conversion.first;
+        auto toValue = conversion.second;
 
+        auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                    << "to" << toValue));
+
+        Document input{{"path1", inputValue}};
+
+        auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
+                                 AssertionException,
+                                 [](const AssertionException& exception) {
+                                     ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                     ASSERT_STRING_CONTAINS(exception.reason(),
+                                                            "Unsupported conversion");
+                                 });
+    }
+
+    // Attempt them again, this time with an "onError" value.
+    for (const auto& conversion : unsupportedConversions) {
+        auto inputValue = conversion.first;
+        auto toValue = conversion.second;
+
+        auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                    << "to" << toValue << "onError"
+                                                    << "X"));
+
+        Document input{{"path1", inputValue}};
+
+        auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(input, &expCtx->variables), "X"_sd, BSONType::string);
+    }
+}
+
+TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvided) {
     std::vector<std::pair<Value, Value>> unsupportedConversions{
         // Except for the ones listed below, $convert supports all conversions between the supported
         // types: double, string, int, long, decimal, objectId, bool, int, and date.
@@ -321,45 +360,29 @@ TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvide
         {Value(1.0), Value("maxKey"_sd)},
     };
 
-    // Attempt all of the unsupported conversions listed above.
-    for (const auto& conversion : unsupportedConversions) {
-        auto inputValue = conversion.first;
-        auto toValue = conversion.second;
+    assertUnsupportedConversionBehavior(getExpCtx().get(), std::move(unsupportedConversions));
+}
 
-        auto spec = BSON("$convert" << BSON("input" << "$path1"
-                                                    << "to" << toValue));
+TEST_F(EvaluateConvertTest, FeatureFlagGatedConversionShouldThrowUnlessOnErrorProvided) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", false);
 
-        Document input{{"path1", inputValue}};
+    Value str{"string"_sd};
+    std::vector<std::pair<Value, Value>> unsupportedConversions{
+        // Leaf types
+        {Value(MINKEY), str},
+        {Value(MAXKEY), str},
+        {Value(BSONRegEx("^ABC"_sd, "i"_sd)), str},
+        {Value(Timestamp(Seconds{1}, 2)), str},
+        {Value(BSONDBRef("coll"_sd, OID::createFromString("0102030405060708090A0B0C"_sd))), str},
+        {Value(BSONCodeWScope{"function() {}"_sd, BSONObj()}), str},
+        {Value(BSONCode("function() {}"_sd)), str},
+        {Value(BSONSymbol("foo"_sd)), str},
+        // Nested types
+        {Value(Document{{"foo", BSONNULL}}), str},
+        {Value(std::vector<Value>{Value(Document()), Value()}), str},
+    };
 
-        auto convertExp =
-            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-
-        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
-                                 AssertionException,
-                                 [](const AssertionException& exception) {
-                                     ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
-                                     ASSERT_STRING_CONTAINS(exception.reason(),
-                                                            "Unsupported conversion");
-                                 });
-    }
-
-    // Attempt them again, this time with an "onError" value.
-    for (const auto& conversion : unsupportedConversions) {
-        auto inputValue = conversion.first;
-        auto toValue = conversion.second;
-
-        auto spec = BSON("$convert" << BSON("input" << "$path1"
-                                                    << "to" << toValue << "onError"
-                                                    << "X"));
-
-        Document input{{"path1", inputValue}};
-
-        auto convertExp =
-            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-
-        ASSERT_VALUE_CONTENTS_AND_TYPE(
-            convertExp->evaluate(input, &expCtx->variables), "X"_sd, BSONType::string);
-    }
+    assertUnsupportedConversionBehavior(getExpCtx().get(), std::move(unsupportedConversions));
 }
 
 TEST_F(EvaluateConvertTest, ConvertNullishInput) {
@@ -1059,6 +1082,92 @@ TEST_F(EvaluateConvertTest, ConvertMaxKeyToBool) {
     Document maxKeyInput{{"path1", MAXKEY}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(maxKeyInput, &expCtx->variables), true, BSONType::boolean);
+}
+
+TEST_F(EvaluateConvertTest, ConvertAnyLeafValueToString) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::vector<std::pair<Value, StringData>> cases{
+        {Value(MINKEY), "MinKey"_sd},
+        {Value(MAXKEY), "MaxKey"_sd},
+        {Value(BSONRegEx("^ABC"_sd, "i"_sd)), "/^ABC/i"_sd},
+        {Value(Timestamp(Seconds{1}, 2)), "Timestamp(1, 2)"_sd},
+        {Value(BSONDBRef("coll"_sd, OID::createFromString("0102030405060708090A0B0C"_sd))),
+         "DBRef(\"coll\", 0102030405060708090a0b0c)"_sd},
+        {Value(BSONCodeWScope{"function() {}"_sd, BSONObj()}),
+         "CodeWScope(\"function() {}\", {})"_sd},
+        {Value(BSONCode("function() {}"_sd)), "function() {}"_sd},
+        {Value(BSONSymbol("foo"_sd)), "foo"_sd},
+    };
+
+    for (auto&& [in, out] : cases) {
+        Document inputDoc{{"path1", std::move(in)}};
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(inputDoc, &expCtx->variables), out, BSONType::string);
+    }
+
+    Document inputDoc{{"path1", Value(BSONUndefined)}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(inputDoc, &expCtx->variables), BSONNULL, BSONType::null);
+}
+
+TEST_F(EvaluateConvertTest, ConvertAnyNestedValueToString) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << "$path1"
+                                                << "to"
+                                                << "string"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document obj{
+        {"arr",
+         std::vector<Value>{
+             Value(BSONNULL),
+             Value(BSONUndefined),
+             Value(MINKEY),
+             Value(MAXKEY),
+             Value(BSONRegEx("^ABC"_sd, "i"_sd)),
+             Value(Timestamp(Seconds{1}, 2)),
+             Value(BSONDBRef("coll"_sd, OID::createFromString("0102030405060708090A0B0C"_sd))),
+             Value(BSONCodeWScope{"function() {}"_sd, BSONObj()}),
+             Value(BSONCode("function() {}"_sd)),
+             Value(BSONSymbol("foo"_sd)),
+             Value(Document{{"obj", Value(1)}}),
+             Value(std::vector<Value>{
+                 Value(1),
+                 Value(std::vector<Value>{Value("foo"_sd)}),
+             }),
+         }}};
+
+    // Test with top-level object.
+    {
+        const std::string expected =
+            "{\"arr\":[null,null,\"MinKey\",\"MaxKey\",\"/^ABC/i\",\"Timestamp(1, "
+            "2)\",\"DBRef(\\\"coll\\\", 0102030405060708090a0b0c)\",\"CodeWScope(\\\"function() "
+            "{}\\\", {})\",\"function() {}\",\"foo\",{\"obj\":1},[1,[\"foo\"]]]}";
+        Document inputDoc{{"path1", obj}};
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(inputDoc, &expCtx->variables), expected, BSONType::string);
+    }
+
+    // Test with top-level array.
+    {
+        std::vector<Value> arr{Value(std::move(obj))};
+        const std::string expected =
+            "[{\"arr\":[null,null,\"MinKey\",\"MaxKey\",\"/^ABC/i\",\"Timestamp(1, "
+            "2)\",\"DBRef(\\\"coll\\\", 0102030405060708090a0b0c)\",\"CodeWScope(\\\"function() "
+            "{}\\\", {})\",\"function() {}\",\"foo\",{\"obj\":1},[1,[\"foo\"]]]}]";
+        Document inputDoc{{"path1", std::move(arr)}};
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(inputDoc, &expCtx->variables), expected, BSONType::string);
+    }
 }
 
 TEST_F(EvaluateConvertTest, ConvertNumericToDouble) {

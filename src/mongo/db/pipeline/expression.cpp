@@ -3855,6 +3855,9 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                                  allowBinDataConvertNumeric);
 }
 
+const Value ExpressionConvert::ConvertTargetTypeInfo::defaultSubtypeVal{
+    static_cast<int>(BinDataType::BinDataGeneral)};
+
 boost::optional<ExpressionConvert::ConvertTargetTypeInfo>
 ExpressionConvert::ConvertTargetTypeInfo::parse(Value value) {
     if (value.nullish()) {
@@ -3874,7 +3877,7 @@ ExpressionConvert::ConvertTargetTypeInfo::parse(Value value) {
     }
 
     if (subtypeValue.missing()) {
-        subtypeValue = Value(static_cast<int>(BinDataType::BinDataGeneral));
+        subtypeValue = defaultSubtypeVal;
     }
 
     auto targetType = computeTargetType(typeValue);

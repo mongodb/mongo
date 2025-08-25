@@ -4048,6 +4048,7 @@ public:
         BSONType type;
         Value subtype;
 
+        static const Value defaultSubtypeVal;
         static boost::optional<ConvertTargetTypeInfo> parse(Value value);
     };
 

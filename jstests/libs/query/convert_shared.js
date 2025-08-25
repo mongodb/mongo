@@ -114,6 +114,12 @@ class ConvertTest {
             assert.eq(doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
             assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
             assert.eq(doc.output, doc.roundTripOutput);
+
+            if (doc.outputType === "string" && ["array", "object"].includes(doc.inputType)) {
+                // Array/object to string conversion is guaranteed to produce a valid JSON
+                // string.
+                assert.doesNotThrow(() => JSON.parse(doc.output));
+            }
         });
     }
 
@@ -382,6 +388,17 @@ class ConvertTest {
 
             aggResult.forEach((doc) => {
                 assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
+            });
+        }
+
+        {
+            // Test that $toString on any nullish input results in null.
+            const pipeline = [{$project: {output: {$toString: "$input"}}}, {$sort: {_id: 1}}];
+            const aggResult = coll.aggregate(pipeline).toArray();
+            assert.eq(aggResult.length, nullTestDocs.length);
+
+            aggResult.forEach((doc) => {
+                assert.eq(doc.output, null, "Unexpected result: _id = " + doc._id);
             });
         }
     }
