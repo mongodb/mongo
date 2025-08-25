@@ -27,7 +27,7 @@ if [ -n "${build_timeout_seconds}" ]; then
     TIMEOUT_CMD="timeout ${build_timeout_seconds}"
 fi
 
-ci_flags="--//bazel/resmoke:in_evergreen --test_output=all"
+ci_flags="--//bazel/resmoke:in_evergreen --test_output=all --noincompatible_enable_cc_toolchain_resolution --repo_env=no_c++_toolchain=1"
 
 if [ ${should_shuffle} = true ]; then
     ci_flags+=" --test_arg=--shuffle"

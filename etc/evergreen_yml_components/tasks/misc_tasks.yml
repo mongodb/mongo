@@ -1818,7 +1818,10 @@ tasks:
       - func: "build all resmoke configs"
         vars:
           targets: //...
-          bazel_args: --build_tag_filters=resmoke_config
+          bazel_args: >-
+            --build_tag_filters=resmoke_config
+            --noincompatible_enable_cc_toolchain_resolution
+            --repo_env=no_c++_toolchain=1
       - func: "generate version"
 
   - name: version_gen_validation
@@ -1842,7 +1845,10 @@ tasks:
       - func: "build all resmoke configs"
         vars:
           targets: //...
-          bazel_args: --build_tag_filters=resmoke_config
+          bazel_args: >-
+            --build_tag_filters=resmoke_config
+            --noincompatible_enable_cc_toolchain_resolution
+            --repo_env=no_c++_toolchain=1
       - func: "generate version validation"
 
   # Package the supplementary DSI data (mongo tools, feature flag list,
