@@ -289,56 +289,6 @@ buildvariants:
       - name: concurrency_sharded_replication_gen
       - name: .fuzzer_deterministic
 
-  - name: amazon2023-x86-compile
-    display_name: "* Compile Amazon Linux 2023 x86 for sys-perf"
-    tags: ["suggested"]
-    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
-    expansions:
-      <<: *sys_perf_compile_expansions
-      compile_variant: amazon2023-x86-compile
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=amazon2023
-        --release=True
-      evergreen_remote_exec: on
-    run_on:
-      - amazon2023.3-xlarge
-    tasks:
-      - name: compile_and_package_serial_no_unittests_TG
-      - name: package_supplementary_data
-
-  - name: amazon2023-arm64-compile
-    display_name: "* Compile Amazon Linux 2023 arm64 for sys-perf"
-    tags: ["suggested"]
-    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
-    expansions:
-      <<: *sys_perf_compile_expansions
-      compile_variant: amazon2023-arm64-compile
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=amazon2023
-        --release=True
-      evergreen_remote_exec: on
-    run_on:
-      - amazon2023.3-arm64-xlarge
-    tasks:
-      - name: compile_and_package_serial_no_unittests_TG
-      - name: package_supplementary_data
-
-  - name: amazon2023-arm64-mongocrypt-shlib-compile
-    display_name: "* Compile mongo_crypt_v1.so Amazon Linux 2023 arm64 for sys-perf"
-    tags: ["suggested"]
-    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
-    expansions:
-      <<: *sys_perf_compile_expansions
-      compile_variant: amazon2023-arm64-compile
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=amazon2023
-        --release=True
-      evergreen_remote_exec: on
-    run_on:
-      - amazon2023.3-arm64-xlarge
-    tasks:
-      - name: .crypt
-
   - name: amazon2023-arm64-grav4
     display_name: "Amazon Linux 2023 arm64 Graviton 4"
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
@@ -411,6 +361,59 @@ buildvariants:
       - name: .release_critical .requires_large_host !.publish !.publish_crypt
         distros:
           - amazon2023-arm64-latest-large-m8g
+
+  - name: amazon2023-x86-compile
+    display_name: "* Compile Amazon Linux 2023 x86 for sys-perf"
+    tags: ["suggested"]
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
+    expansions:
+      <<: *sys_perf_compile_expansions
+      compile_variant: amazon2023-x86-compile
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+      evergreen_remote_exec: on
+      skip_debug_link: true
+    run_on:
+      - amazon2023.3-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
+
+  - name: amazon2023-arm64-compile
+    display_name: "* Compile Amazon Linux 2023 arm64 for sys-perf"
+    tags: ["suggested"]
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
+    expansions:
+      <<: *sys_perf_compile_expansions
+      compile_variant: amazon2023-arm64-compile
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+      evergreen_remote_exec: on
+      skip_debug_link: true
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
+
+  - name: amazon2023-arm64-mongocrypt-shlib-compile
+    display_name: "* Compile mongo_crypt_v1.so Amazon Linux 2023 arm64 for sys-perf"
+    tags: ["suggested"]
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
+    expansions:
+      <<: *sys_perf_compile_expansions
+      compile_variant: amazon2023-arm64-compile
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+      evergreen_remote_exec: on
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: .crypt
+
   - name: amazon2023-x86-streams-compile
     display_name: "* Compile Streams Amazon Linux 2023 x86 for sys-perf"
     tags: ["suggested"]
@@ -422,11 +425,13 @@ buildvariants:
         --define=MONGO_DISTMOD=amazon2023
         --release=True
         --streams_release_build=True
+      skip_debug_link: true
     run_on:
       - amazon2023.3-xlarge
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
       - name: package_supplementary_data
+
   - name: amazon2023-arm64-streams-compile
     display_name: "* Compile Streams Amazon Linux 2023 arm64 for sys-perf"
     tags: ["suggested"]
@@ -438,6 +443,7 @@ buildvariants:
         --define=MONGO_DISTMOD=amazon2023
         --release=True
         --streams_release_build=True
+      skip_debug_link: true
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
