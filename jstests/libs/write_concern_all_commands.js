@@ -1158,24 +1158,22 @@ const wcCommandsTests = {
         noop: {
             // Passing "*" will drop all indexes except the _id index. The only index on this
             // collection is the _id index, so the command will be a no-op.
-            req: {
-                dropIndexes: collName,
-                index: "*",
-            },
+            req: {dropIndexes: collName, index: "*"},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorked(coll.insert({a: "a"}));
-                assert.eq(coll.getIndexes().length, 1);
+                // Implicitly create the collection via insert if it doesn't exist
+                assert.commandWorked(coll.insert({b: "b"}));
 
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
+
+                optionalArgs.numIndexesBefore = coll.getIndexes().length;
+                // Make a non-acknowledged write so that the no-op will have to fail with WCE
+                assert.commandWorkedIgnoringWriteConcernErrors(
+                    coll.insert({b: "b"}, {writeConcern: {w: 3, wtimeout: 100}}));
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
-                let details = res;
-                if ("raw" in details) {
-                    const raw = details.raw;
-                    details = raw[Object.keys(raw)[0]];
-                }
-                assert.eq(coll.getIndexes().length, 1);
+                assert.eq(coll.getIndexes().length, optionalArgs.numIndexesBefore);
+
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3655,25 +3653,18 @@ const wcTimeseriesViewsCommandsTests = {
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({meta: "a", time: timeValue}));
                 assert.commandWorked(coll.getDB().runCommand({dropIndexes: collName, index: "*"}));
-                if (clusterType == "sharded") {
-                    assert.eq(coll.getIndexes().length, 1);
-                } else {
-                    assert.eq(coll.getIndexes().length, 0);
-                }
+                optionalArgs.numIndexesBefore = coll.getIndexes().length;
+
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
+
+                // Make a non-acknowledged write so that the no-op will have to fail with WCE
+                assert.commandWorkedIgnoringWriteConcernErrors(coll.insert(
+                    {meta: "a", time: timeValue}, {writeConcern: {w: 'majority', wtimeout: 100}}));
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
-                let details = res;
-                if ("raw" in details) {
-                    const raw = details.raw;
-                    details = raw[Object.keys(raw)[0]];
-                }
-                if (clusterType == "sharded") {
-                    assert.eq(coll.getIndexes().length, 1);
-                } else {
-                    assert.eq(coll.getIndexes().length, 0);
-                }
+                assert.eq(coll.getIndexes().length, optionalArgs.numIndexesBefore);
+
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3701,12 +3692,8 @@ const wcTimeseriesViewsCommandsTests = {
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
-                let details = res;
-                if ("raw" in details) {
-                    const raw = details.raw;
-                    details = raw[Object.keys(raw)[0]];
-                }
                 assert.eq(coll.getIndexes().length, optionalArgs.numIndexesBefore);
+
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -5109,19 +5096,18 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateUser does not return WCE
 
         // TODO SERVER-100936 create returns NamespaceExists without a WCE
-        // TODO SERVER-100937 dropIndexes does not return WCE
 
         // TODO SERVER-100939 setFeatureCompatibilityVersion does not return WCE
 
         // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
                 (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-                 command == "dropIndexes" || command == "dropAllUsersFromDatabase" ||
-                 command == "grantPrivilegesToRole" || command == "grantRolesToRole" ||
-                 command == "grantRolesToUser" || command == "revokePrivilegesFromRole" ||
-                 command == "revokeRolesFromRole" || command == "revokeRolesFromUser" ||
-                 command == "updateRole" || command == "updateUser" ||
-                 command == "setFeatureCompatibilityVersion" || command == "enableSharding") ||
+                 command == "dropAllUsersFromDatabase" || command == "grantPrivilegesToRole" ||
+                 command == "grantRolesToRole" || command == "grantRolesToUser" ||
+                 command == "revokePrivilegesFromRole" || command == "revokeRolesFromRole" ||
+                 command == "revokeRolesFromUser" || command == "updateRole" ||
+                 command == "updateUser" || command == "setFeatureCompatibilityVersion" ||
+                 command == "enableSharding") ||
             (isTimeseries && command == "create")) {
             jsTestLog("Skipping " + command + " test for no-op case.");
             return true;
@@ -5129,12 +5115,11 @@ function shouldSkipTestCase(clusterType,
     }
 
     if (testCase == "success") {
-        // TODO SERVER-100937 dropIndexes does not return WCE
         // TODO SERVER-100936 For ts collection, create does note return WCE, returns StaleConfig
 
         if (clusterType == "sharded" &&
                 (shardedDDLCommandsRequiringMajorityCommit.includes(command)) ||
-            command == "dropIndexes" || (TestData.configShard && command == "enableSharding") ||
+            (TestData.configShard && command == "enableSharding") ||
             (isTimeseries && command == "create")) {
             jsTestLog("Skipping " + command + " test for success case.");
             return true;
