@@ -35,12 +35,6 @@ const st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
 });
 
-// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
-    st.stop();
-    quit();
-}
-
 const configCS = st.configRS.getURL();
 
 // Dedicated config server mode tests (pre addShard).

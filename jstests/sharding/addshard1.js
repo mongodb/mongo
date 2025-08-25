@@ -14,12 +14,6 @@ import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database
 
 var s = new ShardingTest({name: "add_shard1", shards: 0, useHostname: false});
 
-// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(s.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
-    s.stop();
-    quit();
-}
-
 // Create a shard and add a database; for the first shard we allow data on the replica set
 var rs1 = new ReplSetTest({name: "addshard1-1", host: "localhost", nodes: 1});
 rs1.startSet({shardsvr: ""});

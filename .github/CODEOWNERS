@@ -1286,7 +1286,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/server_parameters/**/* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/sharded_cluster_topology/OWNERS.yml
-/jstests/noPassthrough/sharded_cluster_topology/**/* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/noPassthrough/sharded_cluster_topology/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/shell/OWNERS.yml
 /jstests/noPassthrough/shell/**/* @10gen/devprod-correctness @svc-auto-approve-bot

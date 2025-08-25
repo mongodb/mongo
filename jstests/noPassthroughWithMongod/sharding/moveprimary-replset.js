@@ -26,12 +26,6 @@ var shardingTestConfig = {
 
 var shardingTest = new ShardingTest(shardingTestConfig);
 
-// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(shardingTest.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
-    shardingTest.stop();
-    quit();
-}
-
 var replSet1 = shardingTest.rs0;
 var replSet2 = shardingTest.rs1;
 

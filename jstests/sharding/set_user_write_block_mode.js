@@ -25,12 +25,6 @@ import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
         const st = new ShardingTest({shards: 0});
 
-        // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-        if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
-            st.stop();
-            quit();
-        }
-
         const newShardName = "newShard";
         const newShard = new ReplSetTest({name: newShardName, nodes: 1});
         newShard.startSet({shardsvr: ""});

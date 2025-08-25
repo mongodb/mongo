@@ -82,22 +82,11 @@ describe("promote and demote replicaset to sharded cluster", function () {
 
         this.shards = [];
 
-        // TODO(SERVER-100403): remove ShardAuthoritative parameters
-        const shardParameters = {
-            featureFlagShardAuthoritativeDbMetadataDDL: false,
-            featureFlagShardAuthoritativeDbMetadataCRUD: false,
-            featureFlagShardAuthoritativeCollMetadata: false,
-        };
-
         this.addNewShard = () => {
             const name = `shard-${this.shards.length}`;
             const rs = new ReplSetTest({
                 name,
-                nodes: [
-                    {setParameter: shardParameters},
-                    {setParameter: shardParameters},
-                    {setParameter: shardParameters},
-                ],
+                nodes: 3,
                 keyFile: this.keyFile,
             });
 
@@ -110,7 +99,7 @@ describe("promote and demote replicaset to sharded cluster", function () {
         };
 
         this.configRS = new ReplSetTest({
-            nodes: [{setParameter: shardParameters}, {setParameter: shardParameters}, {setParameter: shardParameters}],
+            nodes: 3,
             keyFile: this.keyFile,
         });
     });

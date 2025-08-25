@@ -19,12 +19,6 @@ import {forceSyncSource} from "jstests/replsets/libs/sync_source.js";
 
 let st = new ShardingTest({shards: 0});
 
-// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
-    st.stop();
-    quit();
-}
-
 // Set up replica set that we'll add as shard
 let replTest = new ReplSetTest({nodes: 3, name: jsTest.name() + "-newReplSet"});
 replTest.startSet({shardsvr: ""});

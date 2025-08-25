@@ -33,7 +33,9 @@
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/local_catalog/ddl/list_collections_gen.h"
+#include "mongo/db/local_catalog/shard_role_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/add_shard_gen.h"
@@ -63,7 +65,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterLockingNewShard);
 
 AddShardCoordinator::AddShardCoordinator(ShardingDDLCoordinatorService* service,
                                          const BSONObj& initialState)
-    : RecoverableShardingDDLCoordinator(service, "AddShardCoordinator", initialState) {
+    : RecoverableShardingDDLCoordinator(service, "AddShardCoordinator", initialState),
+      _critSecReason(BSON("addShard" << "")) {
     auto net = executor::makeNetworkInterface("AddShardCoordinator-TaskExecutor");
     auto netPtr = net.get();
     _executorWithoutGossip =
@@ -100,7 +103,6 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             Phase::kCheckShardPreconditions,
             [this, &token, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
-
                 try {
                     _runWithRetries(
                         [&]() {
@@ -201,6 +203,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                                      _dropSessionsCollection(opCtx);
 
+                                     _doc.setPreExistingDatabasesOnPromotion(
+                                         topology_change_helpers::getDBNamesListFromReplicaSet(
+                                             opCtx, targeter, _executorWithoutGossip));
+
                                      _installShardIdentity(opCtx, _executorWithoutGossip);
 
                                      if (_doc.getIsConfigShard()) {
@@ -213,12 +219,41 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                      _standardizeClusterParameters(opCtx);
                                  }))
         .then(_buildPhaseHandler(
-            Phase::kCommit,
-            [this, _ = shared_from_this(), executor](auto* opCtx) {
+            Phase::kEnterCriticalSection,
+            [this, _ = shared_from_this()](auto* opCtx) {
+                return feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            },
+            [this, &token, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
+                const auto dbs = _doc.getPreExistingDatabasesOnPromotion();
+                for (const auto& database : dbs) {
+                    ShardsvrParticipantBlock blockCRUDOperationsRequest(
+                        NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(database));
+                    blockCRUDOperationsRequest.setBlockType(
+                        mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
+                    blockCRUDOperationsRequest.setReason(_critSecReason);
+                    blockCRUDOperationsRequest.setClearDbInfo(false);
+                    const auto session = getNewSession(opCtx);
+                    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
+                    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
+                                                                   session);
 
-                auto dbList = topology_change_helpers::getDBNamesListFromReplicaSet(
-                    opCtx, targeter, _executorWithoutGossip);
+                    uassertStatusOK(topology_change_helpers::runCommandForAddShard(
+                                        opCtx,
+                                        targeter,
+                                        database,
+                                        blockCRUDOperationsRequest.toBSON(),
+                                        **executor)
+                                        .commandStatus);
+                }
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kCommit,
+            [this, &token, _ = shared_from_this(), executor](auto* opCtx) {
+                auto& targeter = _getTargeter(opCtx);
+                auto dbList = _doc.getPreExistingDatabasesOnPromotion();
 
                 topology_change_helpers::blockDDLCoordinatorsAndDrain(
                     opCtx, /*persistRecoveryDocument*/ false);
@@ -255,6 +290,20 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     }
                 }
 
+                if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    const auto dbs = _doc.getPreExistingDatabasesOnPromotion();
+
+                    for (const auto& dbName : dbs) {
+                        auto database = shardingCatalogManager.localCatalogClient()->getDatabase(
+                            opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
+                        const auto& session = getNewSession(opCtx);
+                        sharding_ddl_util::commitCreateDatabaseMetadataToShardCatalog(
+                            opCtx, database, session, executor, token);
+                    }
+                }
+
                 BSONObjBuilder shardDetails;
                 shardDetails.append("name", shard.getName());
                 shardDetails.append("host", shard.getHost());
@@ -280,6 +329,37 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 topology_change_helpers::updateClusterCardinalityParameter(
                     clusterCardinalityParameterLock, opCtx);
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kExitCriticalSection,
+            [this, _ = shared_from_this()](auto* opCtx) {
+                return feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            },
+            [this, &token, _ = shared_from_this(), executor](auto* opCtx) {
+                auto& targeter = _getTargeter(opCtx);
+                const auto dbs = _doc.getPreExistingDatabasesOnPromotion();
+                for (const auto& database : dbs) {
+                    ShardsvrParticipantBlock unblockCRUDOperationsRequest(
+                        NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(database));
+                    unblockCRUDOperationsRequest.setBlockType(
+                        mongo::CriticalSectionBlockTypeEnum::kUnblock);
+                    unblockCRUDOperationsRequest.setReason(_critSecReason);
+                    unblockCRUDOperationsRequest.setClearDbInfo(false);
+                    const auto session = getNewSession(opCtx);
+                    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
+                    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
+                                                                   session);
+
+                    uassertStatusOK(topology_change_helpers::runCommandForAddShard(
+                                        opCtx,
+                                        targeter,
+                                        database,
+                                        unblockCRUDOperationsRequest.toBSON(),
+                                        **executor)
+                                        .commandStatus);
+                }
             }))
         .then(_buildPhaseHandler(
             Phase::kCleanup,
@@ -423,6 +503,7 @@ std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
     coordinatorDoc.setConnectionString(target);
     coordinatorDoc.setIsConfigShard(isConfigShard);
     coordinatorDoc.setProposedName(name);
+    coordinatorDoc.setPreExistingDatabasesOnPromotion(std::vector<mongo::DatabaseName>());
     auto metadata = ShardingDDLCoordinatorMetadata(
         {{NamespaceString::kConfigsvrShardsNamespace, DDLCoordinatorTypeEnum::kAddShard}});
     auto fwdOpCtx = metadata.getForwardableOpMetadata();

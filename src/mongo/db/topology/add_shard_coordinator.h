@@ -130,6 +130,8 @@ private:
     // it could potentially corrupt another cluster's vector clock during a subsequent attempt to
     // join.
     std::shared_ptr<executor::ShardingTaskExecutor> _executorWithoutGossip;
+
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo

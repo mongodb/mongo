@@ -42,7 +42,9 @@ enums:
             kCheckLocalPreconditions: "checkLocalPreconditions"
             kCheckShardPreconditions: "checkShardPreconditions"
             kPrepareNewShard: "prepareNewShard"
+            kEnterCriticalSection: "enterCriticalSection"
             kCommit: "commit"
+            kExitCriticalSection: "exitCriticalSection"
             kCleanup: "cleanup"
             kFinal: "final"
 
@@ -82,3 +84,8 @@ structs:
                 type: object
                 description: "The API parameter attached to the config server command"
                 optional: true
+            preExistingDatabasesOnPromotion:
+                type: array<database_name>
+                description: >
+                    "List of databases that exist on the replicaset when it gets promoted to a
+                    shard"
