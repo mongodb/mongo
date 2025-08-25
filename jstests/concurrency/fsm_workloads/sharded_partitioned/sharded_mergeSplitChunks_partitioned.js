@@ -8,11 +8,12 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {minimumIterations} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/minimum_iterations.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_mergeChunks_partitioned.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
-    $config.iterations = 6;
+    $config.iterations = minimumIterations($config.states);
     $config.threadCount = 5;
 
     $config.data.partitionSize = 1100; // number of shard key values

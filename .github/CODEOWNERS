@@ -486,6 +486,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/concurrency/fsm_libs/OWNERS.yml
 /jstests/concurrency/fsm_libs/**/reshard_collection_util.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/concurrency/fsm_workload_helpers/cluster_scalability/OWNERS.yml
+/jstests/concurrency/fsm_workload_helpers/cluster_scalability/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/concurrency/fsm_workload_helpers/fcv/OWNERS.yml
 /jstests/concurrency/fsm_workload_helpers/fcv/**/OWNERS.yml @10gen/server-fcv @svc-auto-approve-bot
 /jstests/concurrency/fsm_workload_helpers/fcv/**/handle_setFCV_errors.js @10gen/server-fcv @svc-auto-approve-bot
