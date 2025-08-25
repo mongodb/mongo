@@ -3727,6 +3727,16 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toUUID,
                                       AllowedWithApiStrict::kAlways,
                                       AllowedWithClientType::kAny,
                                       &feature_flags::gFeatureFlagBinDataConvert);
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toArray,
+                                      makeConversionAlias("$toArray"_sd, BSONType::array),
+                                      AllowedWithApiStrict::kAlways,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagMqlJsEngineGap);
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toObject,
+                                      makeConversionAlias("$toObject"_sd, BSONType::object),
+                                      AllowedWithApiStrict::kAlways,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagMqlJsEngineGap);
 
 boost::intrusive_ptr<Expression> ExpressionConvert::create(
     ExpressionContext* const expCtx,

@@ -2489,6 +2489,7 @@ mongo_cc_library(
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/crypto:fle_tokens",
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec:convert_utils",
         "//src/mongo/db/exec:str_trim_utils",
         "//src/mongo/db/exec:substr_utils",
         "//src/mongo/db/exec/document_value",

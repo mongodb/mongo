@@ -171,6 +171,16 @@ class ConvertTest {
             },
         };
 
+        const toArrayCase = {
+            case: {$eq: ["$target", "array"]},
+            then: {$toArray: "$input"},
+        };
+
+        const toObjectCase = {
+            case: {$eq: ["$target", "object"]},
+            then: {$toObject: "$input"},
+        };
+
         const pipeline = [
             {
                 $project: {
@@ -223,6 +233,8 @@ class ConvertTest {
                                 },
                                 // $toUUID is not supported in FCVs prior to v8.0.
                                 ...(this.requiresFCV80 ? [toUUIDCase] : []),
+                                // $toArray and $toObject are not supported on FCVs prior to v8.3.
+                                ...(this.requiresFCV83 ? [toArrayCase, toObjectCase] : []),
                             ],
                             default: {
                                 $convert: {
@@ -362,43 +374,43 @@ class ConvertTest {
 
         const coll = this.coll;
 
-        {
-            // Test that all nullish inputs result in the 'onNull' output.
-            const pipeline = [
-                {$project: {output: {$convert: {to: "int", input: "$input", onNull: "NULL"}}}},
-                {$sort: {_id: 1}},
-            ];
+        const assertNullishInputResultsInValue = ({expr, value}) => {
+            const pipeline = [{$project: {output: expr}}, {$sort: {_id: 1}}];
             const aggResult = coll.aggregate(pipeline).toArray();
             assert.eq(aggResult.length, nullTestDocs.length);
 
             aggResult.forEach((doc) => {
-                assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
+                assert.eq(doc.output, value, "Unexpected result: _id = " + doc._id);
             });
-        }
+        };
 
-        {
-            // Test that all nullish inputs result in the 'onNull' output _even_ if 'to' is
-            // nullish.
-            const pipeline = [
-                {$project: {output: {$convert: {to: null, input: "$input", onNull: "NULL"}}}},
-                {$sort: {_id: 1}},
-            ];
-            const aggResult = coll.aggregate(pipeline).toArray();
-            assert.eq(aggResult.length, nullTestDocs.length);
+        // Test that all nullish inputs result in the 'onNull' output.
+        assertNullishInputResultsInValue({
+            expr: {$convert: {to: "int", input: "$input", onNull: "NULL"}},
+            value: "NULL",
+        });
 
-            aggResult.forEach((doc) => {
-                assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
+        // Test that all nullish inputs result in the 'onNull' output _even_ if 'to' is
+        // nullish.
+        assertNullishInputResultsInValue({
+            expr: {$convert: {to: null, input: "$input", onNull: "NULL"}},
+            value: "NULL",
+        });
+
+        // Test that $toString on any nullish input results in null.
+        assertNullishInputResultsInValue({expr: {$toString: "$input"}, value: null});
+
+        // Test all of the above but with conversions to array and object.
+        if (this.requiresFCV83) {
+            assertNullishInputResultsInValue({expr: {$toArray: "$input"}, value: null});
+            assertNullishInputResultsInValue({expr: {$toObject: "$input"}, value: null});
+            assertNullishInputResultsInValue({
+                expr: {$convert: {to: "array", input: "$input", onNull: "NULL"}},
+                value: "NULL",
             });
-        }
-
-        {
-            // Test that $toString on any nullish input results in null.
-            const pipeline = [{$project: {output: {$toString: "$input"}}}, {$sort: {_id: 1}}];
-            const aggResult = coll.aggregate(pipeline).toArray();
-            assert.eq(aggResult.length, nullTestDocs.length);
-
-            aggResult.forEach((doc) => {
-                assert.eq(doc.output, null, "Unexpected result: _id = " + doc._id);
+            assertNullishInputResultsInValue({
+                expr: {$convert: {to: "object", input: "$input", onNull: "NULL"}},
+                value: "NULL",
             });
         }
     }

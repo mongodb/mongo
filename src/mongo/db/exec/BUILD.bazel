@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -278,5 +278,33 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_library(
+    name = "convert_utils",
+    srcs = [
+        "convert_utils.cpp",
+    ],
+    hdrs = [
+        "convert_utils.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+        "//src/third_party/nlohmann-json:json",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "convert_string_to_object_fuzzer",
+    srcs = [
+        "//src/mongo/db/exec:convert_string_to_object_fuzzer.cpp",
+    ],
+    deps = [
+        ":convert_utils",
+        # TODO(SERVER-93876): Remove. Once the dependency on query_knobs is removed
+        # from field_path, we will no longer transitively depend on this.
+        "//src/mongo/transport:transport_layer_common",
     ],
 )

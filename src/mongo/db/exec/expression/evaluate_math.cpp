@@ -29,6 +29,7 @@
 
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/query/random_utils.h"
@@ -725,7 +726,6 @@ Value evaluate(const ExpressionTrunc& expr, const Document& root, Variables* var
 
 namespace {
 
-
 std::string stringifyObjectOrArray(ExpressionContext* expCtx, Value val);
 
 /**
@@ -1034,6 +1034,18 @@ public:
         fcvGatedTable[stdx::to_underlying(BSONType::object)][stdx::to_underlying(
             BSONType::string)] = [](ExpressionContext* const expCtx, Value val) {
             return Value(stringifyObjectOrArray(expCtx, std::move(val)));
+        };
+
+        //
+        // String to object/array
+        //
+        fcvGatedTable[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::array)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return convert_utils::parseJson(inputValue.getStringData(), BSONType::array);
+            };
+        fcvGatedTable[stdx::to_underlying(BSONType::string)][stdx::to_underlying(
+            BSONType::object)] = [](ExpressionContext* const expCtx, Value inputValue) {
+            return convert_utils::parseJson(inputValue.getStringData(), BSONType::object);
         };
     }
 

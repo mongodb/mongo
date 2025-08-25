@@ -1170,6 +1170,262 @@ TEST_F(EvaluateConvertTest, ConvertAnyNestedValueToString) {
     }
 }
 
+TEST_F(EvaluateConvertTest, ConvertStringToObject) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << "$path1" << "to" << "object"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::vector<std::pair<StringData, BSONObj>> cases{
+        {"{}"_sd, BSONObj()},
+        {"{\"\": \"emptyKey\"}"_sd, BSON("" << "emptyKey")},
+        {"{\"foo\": \"bar\"}"_sd, BSON("foo" << "bar")},
+        {"{\"foo\": null}"_sd, BSON("foo" << BSONNULL)},
+        {"{\"foo\": false}"_sd, BSON("foo" << false)},
+        {"{\"foo\": true}"_sd, BSON("foo" << true)},
+        {"{\"foo\": 123}"_sd, BSON("foo" << 123)},
+        // Embedded nulls are allowed in values
+        {"{\"name\": \"fo\\u0000o\"}"_sd, BSON("name" << "fo\u0000o"_sd)},
+        // Duplicate field names are allowed, we keep the last value.
+        {"{\"a\": 1, \"b\": 2, \"a\": 3}"_sd, BSON("a" << 3 << "b" << 2)},
+        // Nested objects
+        {"{\"__proto__\": { \"foo\": null }}"_sd, BSON("__proto__" << BSON("foo" << BSONNULL))},
+        {"{\"objectId\": \"507f1f77bcf86cd799439011\", \"uuid\": "
+         "\"3b241101-e2bb-4255-8caf-4136c566a962\", \"date\": \"2018-03-27T16:58:51.538Z\", "
+         "\"regex\": \"/^ABC/i\", \"js\": \"function (s) {return s + \\\"foo\\\";}\", "
+         "\"timestamp\": \"Timestamp(1565545664, 1)\", \"arr\": [1,2,3], \"obj\": {\"in\": 1}}",
+         BSON("objectId" << "507f1f77bcf86cd799439011" << "uuid"
+                         << "3b241101-e2bb-4255-8caf-4136c566a962" << "date"
+                         << "2018-03-27T16:58:51.538Z" << "regex" << "/^ABC/i" << "js"
+                         << "function (s) {return s + \"foo\";}" << "timestamp"
+                         << "Timestamp(1565545664, 1)" << "arr" << BSON_ARRAY(1 << 2 << 3) << "obj"
+                         << BSON("in" << 1))},
+    };
+
+    for (auto&& [input, expected] : cases) {
+        Document inputDoc{{"path1", Value(input)}};
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(inputDoc, &expCtx->variables), expected, BSONType::object);
+    }
+}
+
+TEST_F(EvaluateConvertTest, ConvertStringToArray) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$convert" << BSON("input" << "$path1" << "to" << "array"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::vector<std::pair<StringData, BSONArray>> cases{
+        {"[]"_sd, BSONArray()},
+        {"[\"bar\"]"_sd, BSON_ARRAY("bar")},
+        {"[null]"_sd, BSON_ARRAY(BSONNULL)},
+        {"[false]"_sd, BSON_ARRAY(false)},
+        {"[true]"_sd, BSON_ARRAY(true)},
+        {"[123]"_sd, BSON_ARRAY(123)},
+        // Embedded nulls are allowed in values
+        {"[\"fo\\u0000o\"]"_sd, BSON_ARRAY("fo\u0000o"_sd)},
+        // Nested arrays
+        {"[[1,2],{\"__proto__\": { \"foo\": null }}]"_sd,
+         BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON("__proto__" << BSON("foo" << BSONNULL)))},
+        {"[1, {\"objectId\": \"507f1f77bcf86cd799439011\", \"uuid\": "
+         "\"3b241101-e2bb-4255-8caf-4136c566a962\", \"date\": \"2018-03-27T16:58:51.538Z\", "
+         "\"regex\": \"/^ABC/i\", \"js\": \"function (s) {return s + \\\"foo\\\";}\", "
+         "\"timestamp\": \"Timestamp(1565545664, 1)\", \"arr\": [1,2,3], \"obj\": {\"in\": 1}}, "
+         "[null]]",
+         BSON_ARRAY(1 << BSON("objectId"
+                              << "507f1f77bcf86cd799439011" << "uuid"
+                              << "3b241101-e2bb-4255-8caf-4136c566a962" << "date"
+                              << "2018-03-27T16:58:51.538Z" << "regex" << "/^ABC/i" << "js"
+                              << "function (s) {return s + \"foo\";}" << "timestamp"
+                              << "Timestamp(1565545664, 1)" << "arr" << BSON_ARRAY(1 << 2 << 3)
+                              << "obj" << BSON("in" << 1))
+                      << BSON_ARRAY(BSONNULL))},
+    };
+
+    for (auto&& [input, expected] : cases) {
+        Document inputDoc{{"path1", Value(input)}};
+        ASSERT_VALUE_CONTENTS_AND_TYPE(
+            convertExp->evaluate(inputDoc, &expCtx->variables), expected, BSONType::array);
+    }
+}
+
+TEST_F(EvaluateConvertTest, ConvertStringToObjectOrArrayNumberHandling) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+
+    auto toObjectSpec = BSON("$convert" << BSON("input" << "$path1" << "to" << "object"));
+    auto toObjectExp =
+        Expression::parseExpression(expCtx.get(), toObjectSpec, expCtx->variablesParseState);
+
+    auto toArraySpec = BSON("$convert" << BSON("input" << "$path1" << "to" << "array"));
+    auto toArrayExp =
+        Expression::parseExpression(expCtx.get(), toArraySpec, expCtx->variablesParseState);
+
+    auto assertParsedNumberEquals = [&](StringData numStr,
+                                        Value expectedValue,
+                                        BSONType expectedType) {
+        // Test inside object.
+        {
+            std::string input = str::stream() << "{\"f\":" << numStr << "}";
+            Document inputDoc{{"path1", Value(input)}};
+            auto result = toObjectExp->evaluate(inputDoc, &expCtx->variables);
+            ASSERT_EQ(result.getType(), BSONType::object);
+            ASSERT_VALUE_CONTENTS_AND_TYPE(
+                result.getDocument().getField("f"_sd), expectedValue, expectedType);
+        }
+        // Test inside array.
+        {
+            std::string input = str::stream() << "[" << numStr << "]";
+            Document inputDoc{{"path1", Value(input)}};
+            auto result = toArrayExp->evaluate(inputDoc, &expCtx->variables);
+            ASSERT_EQ(result.getType(), BSONType::array);
+            ASSERT_VALUE_CONTENTS_AND_TYPE(result.getArray().front(), expectedValue, expectedType);
+        }
+    };
+
+    assertParsedNumberEquals("\"NaN\""_sd, Value("NaN"_sd), BSONType::string);
+    assertParsedNumberEquals("123"_sd, Value(123), BSONType::numberInt);
+    assertParsedNumberEquals("-123"_sd, Value(-123), BSONType::numberInt);
+    assertParsedNumberEquals("4294967296"_sd, Value(4294967296LL), BSONType::numberLong);
+    assertParsedNumberEquals("-4294967296"_sd, Value(-4294967296LL), BSONType::numberLong);
+    assertParsedNumberEquals("1.123123"_sd, Value(1.123123), BSONType::numberDouble);
+    assertParsedNumberEquals("-1.123123"_sd, Value(-1.123123), BSONType::numberDouble);
+    assertParsedNumberEquals("1.2e+3"_sd, Value(1200.0), BSONType::numberDouble);
+    assertParsedNumberEquals("-1.2e+3"_sd, Value(-1200.0), BSONType::numberDouble);
+    // This would fit in a 64-bit unsigned integer but BSON doesn't have that.
+    assertParsedNumberEquals(
+        "18446744073709551615"_sd, Value(18446744073709551615.0), BSONType::numberDouble);
+    assertParsedNumberEquals(
+        "-18446744073709551615"_sd, Value(-18446744073709551615.0), BSONType::numberDouble);
+}
+
+TEST_F(EvaluateConvertTest, ConvertStringToObjectOrArrayInvalidConversions) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    auto expCtx = getExpCtx();
+
+    auto toObjectExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1" << "to" << "object")),
+        expCtx->variablesParseState);
+
+    auto toObjectWithOnErrorExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1" << "to" << "object" << "onError" << "error!")),
+        expCtx->variablesParseState);
+
+    auto toArrayExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1" << "to" << "array")),
+        expCtx->variablesParseState);
+
+    auto toArrayWithOnErrorExp = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$convert" << BSON("input" << "$path1" << "to" << "array" << "onError" << "error!")),
+        expCtx->variablesParseState);
+
+    auto assertThrowsInvalidJson = [&](StringData input) {
+        Document inputDoc{{"path1", Value(input)}};
+
+        // Test without 'onError'.
+        for (const auto& exp : {toObjectExp, toArrayExp}) {
+            ASSERT_THROWS_WITH_CHECK(exp->evaluate(inputDoc, &expCtx->variables),
+                                     AssertionException,
+                                     [](const AssertionException& exception) {
+                                         ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                         ASSERT_STRING_CONTAINS(
+                                             exception.reason(),
+                                             "Input doesn't represent valid JSON"_sd);
+                                     });
+        }
+
+        // Test with 'onError'.
+        for (const auto& exp : {toObjectWithOnErrorExp, toArrayWithOnErrorExp}) {
+            ASSERT_VALUE_CONTENTS_AND_TYPE(
+                exp->evaluate(inputDoc, &expCtx->variables), "error!"_sd, BSONType::string);
+        }
+    };
+
+    // Some examples of invalid JSON. The main purpose of these is to ensure that we either handle a
+    // parsing error correctly or throw the right error when parsing event handlers are called in an
+    // unexpected order. The latter can happen before the parsing library parses far enough to
+    // encounter a syntax error. E.g. when an opening brace is missing, the parser won't detect
+    // invalid syntax until it reaches the unmatched closing brace.
+    //
+    // For more exhaustive testing we rely on libfuzz. Some specific security concerns like embedded
+    // nulls are also tested below.
+    assertThrowsInvalidJson("}\"closingBraceFirst1\": 123{"_sd);
+    assertThrowsInvalidJson("}\"closingBraceFirst2\": 123}"_sd);
+    assertThrowsInvalidJson("]\"closingBracketFirst1\": 123["_sd);
+    assertThrowsInvalidJson("]\"closingBracketFirst2\": 123]"_sd);
+    assertThrowsInvalidJson("{\"missingClosingBrace\": 123"_sd);
+    assertThrowsInvalidJson("\"missingOpeningBrace\": 123}"_sd);
+    assertThrowsInvalidJson("[\"missingClosingBracket\": 123"_sd);
+    assertThrowsInvalidJson("\"missingOpeningBracket\": 123]"_sd);
+    assertThrowsInvalidJson("{\"missingClosingQuote: 123}"_sd);
+    assertThrowsInvalidJson("[\"bracketMismatch1\": 123}"_sd);
+    assertThrowsInvalidJson("{\"bracketMismatch2\": 123]"_sd);
+    assertThrowsInvalidJson("{\"bracketMismatch3\"]"_sd);
+    assertThrowsInvalidJson("[\"bracketMismatch4\"}"_sd);
+    assertThrowsInvalidJson("{\"extraClosingBrace\": 123}}"_sd);
+    assertThrowsInvalidJson("{{\"extraOpeningBrace\": 123}"_sd);
+    assertThrowsInvalidJson("[\"extraClosingBracket\"]]"_sd);
+    assertThrowsInvalidJson("[[\"extraOpeningBracket\"]"_sd);
+    assertThrowsInvalidJson("null: null}"_sd);
+    assertThrowsInvalidJson("{null: null}"_sd);
+    assertThrowsInvalidJson("{\"semicolon\"; null}"_sd);
+    assertThrowsInvalidJson("{\"oid\": ObjectId(\"6592008029c8c3e4dc76256c\")}"_sd);
+    assertThrowsInvalidJson("{\"multilinejson\": 1}\n{\"multilinejson\": 2}"_sd);
+    assertThrowsInvalidJson("[{\"multilinejson\": 1}\n{\"multilinejson\": 2}]"_sd);
+    assertThrowsInvalidJson("{\"trailingComma\": 123,}"_sd);
+    assertThrowsInvalidJson("[1, 2, 3, ]"_sd);
+    assertThrowsInvalidJson("[1, 2, , 3]"_sd);
+    assertThrowsInvalidJson("{\"missingColon\" 123}"_sd);
+    assertThrowsInvalidJson("{unquotedKey: 123}"_sd);
+    assertThrowsInvalidJson("{\"invalidLiteral\": nope}"_sd);
+    assertThrowsInvalidJson("{'singleQuotes': 'invalid'}"_sd);
+    assertThrowsInvalidJson("{\"extraToken\": 1} 123"_sd);
+    // Control character in string without escaping
+    assertThrowsInvalidJson("{\"foo\": \"bar\tbaz\"}"_sd);
+    // Backslash at end of string
+    assertThrowsInvalidJson("{\"foo\": \"bar\\\"}"_sd);
+    // Invalid UTF-8
+    assertThrowsInvalidJson("{\"\xC3\x28\": 123}"_sd);
+    // Bad unicode
+    assertThrowsInvalidJson("{\"badUnicode\": \"\\uZZZZ\"}"_sd);
+    assertThrowsInvalidJson("{\"tooLargeCodepoint\": \"\\u{110000}\"}"_sd);
+    assertThrowsInvalidJson("{\"orphanSurrogate\": \"\\uD800\"}"_sd);
+    assertThrowsInvalidJson("{\"badSurrogates\": \"\\uDC00\\uD800\"}"_sd);
+    // NaN or Infinity (valid in JS, invalid in JSON)
+    assertThrowsInvalidJson("{\"value\": NaN}"_sd);
+    assertThrowsInvalidJson("{\"value\": Infinity}"_sd);
+    // Leading + before a number
+    assertThrowsInvalidJson("{\"plusNumber\": +42}"_sd);
+    // Escaped null byte in field name
+    assertThrowsInvalidJson("{\"fo\\u0000o\": 123}"_sd);
+    // Unescaped null byte in field name
+    assertThrowsInvalidJson("{\"fo\0o\": 123}"_sd);
+    // Unescaped null byte in value
+    assertThrowsInvalidJson("{\"foo\": \"fo\0o\"}"_sd);
+
+    // Type mismatch
+    ASSERT_THROWS_WITH_CHECK(
+        toArrayExp->evaluate(Document{{"path1", Value("{\"foo\": 1}"_sd)}}, &expCtx->variables),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(),
+                                   "Input doesn't match expected type 'array'"_sd);
+        });
+    ASSERT_THROWS_WITH_CHECK(
+        toObjectExp->evaluate(Document{{"path1", Value("[{\"foo\": 1}]"_sd)}}, &expCtx->variables),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(),
+                                   "Input doesn't match expected type 'object'"_sd);
+        });
+}
+
 TEST_F(EvaluateConvertTest, ConvertNumericToDouble) {
     auto expCtx = getExpCtx();
 
