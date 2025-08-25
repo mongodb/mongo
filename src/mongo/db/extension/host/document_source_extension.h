@@ -45,6 +45,79 @@ namespace extension::host {
  */
 class DocumentSourceExtension : public DocumentSource, public exec::agg::Stage {
 public:
+    /**
+     * A LiteParsedDocumentSource implementation for source and transformation extension stages.
+     */
+    class LiteParsed : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+            return std::make_unique<LiteParsed>(spec.fieldName(), spec.Obj());
+        }
+
+        LiteParsed(std::string stageName, BSONObj spec)
+            : LiteParsedDocumentSource(std::move(stageName)), _ownedSpec(spec.getOwned()) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override;
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override;
+
+        const BSONObj& originalStageBson() const {
+            return _ownedSpec;
+        }
+
+        bool isInitialSource() const override {
+            // TODO SERVER-109569 Change this to return true if the stage is a source stage.
+            return false;
+        }
+
+    protected:
+        // Note that this BSON object must be an owned copy belonging to the LiteParsed document
+        // source.
+        BSONObj _ownedSpec;
+    };
+
+    /**
+     * A LiteParsedDocumentSource implementation for desugar extension stages. A derived class
+     * should implement a parse() function that passes into the LiteParsedDesugar constructor a
+     * function of type signature DesugaredPipelineInitializerType that returns the desugared BSON
+     * pipeline representation of the stage.
+     *
+     * See the following example:
+     *
+     * class FooDesugar : LiteParsedDesugar {
+     *   static std::unique_ptr<LiteParsedDesugar> parse(...) {
+     *       return std::make_unique<LiteParsedDesugar>(
+     *                                          spec.fieldName(),
+     *                                          spec.Obj().getOwned(),
+     *                                          Deferred<DesugaredPipelineInitializerType>{[](BSONObj
+     * spec) {
+     *                                              // Create desugared pipeline from spec.
+     *                                                  return std::list<BSONObj>();
+     *                                              }});
+     *   }
+     * };
+     */
+    class LiteParsedDesugar : public LiteParsed {
+    public:
+        using DesugaredPipelineInitializerType = std::function<std::list<BSONObj>(BSONObj)>;
+
+        LiteParsedDesugar(std::string stageName,
+                          BSONObj ownedSpec,
+                          Deferred<DesugaredPipelineInitializerType> init)
+            : LiteParsed(std::move(stageName), std::move(ownedSpec)),
+              _desugaredPipeline(std::move(init)) {}
+
+        const std::list<BSONObj>& getDesugaredPipeline() const {
+            return _desugaredPipeline.get(_ownedSpec);
+        }
+
+    private:
+        Deferred<DesugaredPipelineInitializerType> _desugaredPipeline;
+    };
+
     const char* getSourceName() const override;
 
     Id getId() const override;

@@ -39,6 +39,18 @@
 
 namespace mongo::extension::host {
 
+stdx::unordered_set<NamespaceString> DocumentSourceExtension::LiteParsed::getInvolvedNamespaces()
+    const {
+    return stdx::unordered_set<NamespaceString>();
+}
+
+
+PrivilegeVector DocumentSourceExtension::LiteParsed::requiredPrivileges(
+    bool isMongos, bool bypassDocumentValidation) const {
+    // TODO SERVER-109056 Support getting required privileges from extensions.
+    return {};
+}
+
 // static
 void DocumentSourceExtension::registerStage(ExtensionAggregationStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor.getName();
@@ -55,8 +67,13 @@ void DocumentSourceExtension::registerStage(ExtensionAggregationStageDescriptorH
                           << "Received unknown stage type while registering extension stage: "
                           << descriptor.getType());
     };
+    // TODO SERVER-109558 Call the correct version of DocumentSourceExtension::LiteParsed::parse or
+    // the correct desugar parse function based on the descriptor type.
+    // TODO SERVER-109558 We probably need to implement some kind of parser or registration macro
+    // so that we can call the correct desugared stage parser, since there is no
+    // DocumentSourceExtension::LiteParsedDesugar::parse.
     LiteParsedDocumentSource::registerParser(nameAsString,
-                                             LiteParsedDocumentSourceDefault::parse,
+                                             DocumentSourceExtension::LiteParsed::parse,
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
 }

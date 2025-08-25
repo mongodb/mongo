@@ -99,6 +99,30 @@ public:
     }
 };
 
+namespace extension::host {
+static int fooInitializationCounter = 0;
+class LiteParsedDesugarFooTest : public DocumentSourceExtension::LiteParsedDesugar {
+public:
+    static std::unique_ptr<LiteParsedDesugar> parse(const NamespaceString& nss,
+                                                    const BSONElement& spec,
+                                                    const LiteParserOptions& options) {
+        return std::make_unique<LiteParsedDesugar>(
+            spec.fieldName(),
+            spec.Obj(),
+            Deferred<DesugaredPipelineInitializerType>{[](BSONObj spec) {
+                fooInitializationCounter++;
+                // Note that these stages can be anything.
+                // It could be a recursively defined extension desugar stage, or just a regular
+                // stage, or anything in between.
+                auto stage1 = BSON("$foo" << BSONObj());
+                auto stage2 = BSON("$bar" << BSONObj());
+                return std::list<BSONObj>{stage1, stage2};
+            }});
+    }
+};
+
+}  // namespace extension::host
+
 auto nss = NamespaceString::createNamespaceString_forTest("document_source_extension_test"_sd);
 
 class DocumentSourceExtensionTest : public AggregationContextFixture {
@@ -144,6 +168,22 @@ protected:
 };
 
 namespace {
+
+TEST_F(DocumentSourceExtensionTest, liteParsedDesugarTest) {
+    auto spec = BSON("$foo" << BSONObj());
+    auto lp = extension::host::LiteParsedDesugarFooTest::parse(
+        nss, spec.firstElement(), LiteParserOptions{});
+
+    // Ensure that we can desugar once.
+    auto pipeline = lp->getDesugaredPipeline();
+    ASSERT_EQUALS(pipeline.size(), 2);
+    ASSERT_EQUALS(extension::host::fooInitializationCounter, 1);
+
+    // Ensure that we do not do the work to desugar again the next time we try to access the
+    // desugared pipeline.
+    auto pipelineAgain = lp->getDesugaredPipeline();
+    ASSERT_EQUALS(extension::host::fooInitializationCounter, 1);
+}
 
 TEST_F(DocumentSourceExtensionTest, noOpStaticDescriptorTest) {
     extension::host::ExtensionAggregationStageDescriptorHandle handle(&_noOpStaticDescriptor);
