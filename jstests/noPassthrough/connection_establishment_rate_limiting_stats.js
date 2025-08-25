@@ -9,13 +9,15 @@
 (function() {
 'use strict';
 
-if (_isWindows()) {
-    quit();
-}
-
+load("jstests/libs/os_helpers.js");
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallelTester.js');
 load('jstests/noPassthrough/libs/conn_establishment_rate_limiter_helpers.js');
+
+if (_isWindows() || isMacOS()) {
+    jsTestLog("Skipping test due to unsupported OS");
+    quit();
+}
 
 // Return whether the left Number or NumberLong is equal to the right Number or NumberLong.
 const equal = (left, right) => {
