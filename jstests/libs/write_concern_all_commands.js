@@ -843,7 +843,7 @@ const wcCommandsTests = {
                 assert.commandWorked(coll.insert({b: 1}));
                 assert.commandWorkedIgnoringWriteConcernErrors(coll.getDB().runCommand({
                     createIndexes: collName,
-                    indexes: [{key: {b: 1}, name: "b_1"}],
+                    indexes: [{key: {b: -1}, name: "b_1"}],
                     commitQuorum: "majority"
                 }));
             },
@@ -3529,7 +3529,7 @@ const wcTimeseriesViewsCommandsTests = {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
                 assert.commandWorkedIgnoringWriteConcernErrors(coll.getDB().runCommand({
                     createIndexes: collName,
-                    indexes: [{key: {b: 1}, name: "b_1"}],
+                    indexes: [{key: {b: -1}, name: "b_1"}],
                     commitQuorum: "majority"
                 }));
             },
@@ -5142,18 +5142,15 @@ function shouldSkipTestCase(clusterType,
 
         // TODO SERVER-100936 create does note return WCE, returns StaleConfig
 
-        // TODO SERVER-100938 createIndexes does not return WCE
-
         // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
         // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
         if (clusterType == "sharded" &&
                 shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-            command == "abortTransaction" || command == "create" || command == "createIndexes" ||
-            command == "createRole" || command == "createUser" || command == "dropRole" ||
-            command == "dropUser" || command == "grantRolesToUser" || command == "updateRole" ||
-            command == "updateUser" || command == "setDefaultRWConcern" ||
-            (command == "findOneAndUpdate") || (command == "findAndModify") ||
-            (TestData.configShard && command == "enableSharding")) {
+            command == "abortTransaction" || command == "create" || command == "createRole" ||
+            command == "createUser" || command == "dropRole" || command == "dropUser" ||
+            command == "grantRolesToUser" || command == "updateRole" || command == "updateUser" ||
+            command == "setDefaultRWConcern" || (command == "findOneAndUpdate") ||
+            (command == "findAndModify") || (TestData.configShard && command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }

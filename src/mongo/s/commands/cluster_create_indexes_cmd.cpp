@@ -123,9 +123,33 @@ public:
             boost::none /*letParameters*/,
             boost::none /*runtimeConstants*/);
 
+        BSONObjBuilder rawResBuilder;
         std::string errmsg;
         const bool ok =
-            appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses)).responseOK;
+            appendRawResponses(opCtx, &errmsg, &rawResBuilder, shardResponses).responseOK;
+
+        // If the command fails and one of the shards returns a WCE, attach the first WCE reported
+        // by the shards. In case of success, instead, the WCE is already attached by the
+        // `appendRawResponses` utility.
+        // TODO (SERVER-103580): Replace this logic with a generic implementation. For example,
+        // `appendRawResponses` could always attach the WCE anyway, even if the command fails.
+        if (!ok) {
+            for (const auto& shardRes : shardResponses) {
+                const auto& resStatus = shardRes.swResponse.getStatus();
+                if (!resStatus.isOK()) {
+                    continue;
+                }
+
+                const auto& resData = shardRes.swResponse.getValue().data;
+                if (resData["writeConcernError"]) {
+                    appendWriteConcernErrorToCmdResponse(
+                        shardRes.shardId, resData["writeConcernError"], rawResBuilder);
+                    break;
+                }
+            }
+        }
+
+        output.appendElements(rawResBuilder.obj());
         CommandHelpers::appendSimpleCommandStatus(output, ok, errmsg);
 
         if (ok) {
