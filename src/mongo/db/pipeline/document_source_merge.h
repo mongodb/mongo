@@ -89,7 +89,7 @@ namespace mongo {
  * this class must be initialized (via a constructor) with a 'MergeDescriptor', which defines a
  * a particular merge strategy for a pair of 'whenMatched' and 'whenNotMatched' merge  modes.
  */
-class DocumentSourceMerge final : public DocumentSourceWriter<MongoProcessInterface::BatchObject> {
+class DocumentSourceMerge final : public DocumentSourceWriter {
 public:
     static constexpr StringData kStageName = "$merge"_sd;
     static constexpr auto kDefaultWhenMatched = MergeStrategyDescriptor::WhenMatched::kMerge;
@@ -165,7 +165,7 @@ public:
     }
 
     MergeProcessor* getMergeProcessor() {
-        return _mergeProcessor.get_ptr();
+        return _mergeProcessor.get();
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
@@ -198,19 +198,6 @@ public:
         return _mergeProcessor->getPipeline();
     }
 
-    void initialize() override {
-        // This implies that the stage will soon start to write, so it's safe to verify the target
-        // collection placement version. This is done here instead of parse time since it requires
-        // that locks are not held.
-        const auto& collectionPlacementVersion = _mergeProcessor->getCollectionPlacementVersion();
-        if (!pExpCtx->getInRouter() && collectionPlacementVersion) {
-            // If a router has sent us a target placement version, we need to be sure we are
-            // prepared to act as a router which is at least as recent as that router.
-            pExpCtx->getMongoProcessInterface()->checkRoutingInfoEpochOrThrow(
-                pExpCtx, getOutputNs(), *collectionPlacementVersion);
-        }
-    }
-
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         // Although $merge is not allowed in sub-pipelines and this method is used for correlation
         // analysis, the method is generic enough to be used in the future for other purposes.
@@ -219,11 +206,11 @@ public:
         }
     }
 
-    BatchedCommandRequest makeBatchedWriteRequest() const override;
-
-    std::pair<BatchObject, int> makeBatchObject(Document doc) const override;
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceMergeToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Builds a new $merge stage which will merge all documents into 'outputNs'. If
      * 'collectionPlacementVersion' is provided then processing will stop with an error if the
@@ -240,20 +227,17 @@ private:
                         boost::optional<ChunkVersion> collectionPlacementVersion,
                         bool allowMergeOnNullishValues);
 
-    void flush(BatchedCommandRequest bcr, BatchedObjects batch) override;
-
-    void waitWhileFailPointEnabled() override;
 
     // Holds the fields used for uniquely identifying documents. There must exist a unique index
     // with this key pattern. Default is "_id" for unsharded collections, and "_id" plus the shard
     // key for sharded collections.
-    std::set<FieldPath> _mergeOnFields;
+    std::shared_ptr<std::set<FieldPath>> _mergeOnFields;
 
     // True if '_mergeOnFields' contains the _id. We store this as a separate boolean to avoid
     // repeated lookups into the set.
     bool _mergeOnFieldsIncludesId;
 
-    boost::optional<MergeProcessor> _mergeProcessor;
+    std::shared_ptr<MergeProcessor> _mergeProcessor;
 };
 
 }  // namespace mongo
