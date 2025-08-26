@@ -379,12 +379,13 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
     auto currentRecords =
         collectionIterator.numRecords() - estimatedRecordsPerMarker * wholeMarkers;
     auto currentBytes = collectionIterator.dataSize() - estimatedBytesPerMarker * wholeMarkers;
-    return CollectionTruncateMarkers::InitialSetOfMarkers{
-        std::move(markers),
-        currentRecords,
-        currentBytes,
-        Microseconds{static_cast<int64_t>(curTimeMicros64() - startTime)},
-        MarkersCreationMethod::Sampling};
+    auto duration = static_cast<int64_t>(curTimeMicros64() - startTime);
+    LOGV2_DEBUG(10621100, 1, "createMarkersBySampling finished", "durationMicros"_attr = duration);
+    return CollectionTruncateMarkers::InitialSetOfMarkers{std::move(markers),
+                                                          currentRecords,
+                                                          currentBytes,
+                                                          Microseconds{duration},
+                                                          MarkersCreationMethod::Sampling};
 }
 
 CollectionTruncateMarkers::MarkersCreationMethod
