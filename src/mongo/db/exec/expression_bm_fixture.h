@@ -325,6 +325,11 @@ public:
     void benchmarkMQLSubtype(benchmark::State& state);
     void benchmarkJSSubtype(benchmark::State& state);
 
+    void benchmarkMQLConvertObjectToString(size_t fields, size_t depth, benchmark::State& state);
+    void benchmarkJSConvertObjectToString(size_t fields, size_t depth, benchmark::State& state);
+    void benchmarkMQLConvertStringToObject(size_t fields, size_t depth, benchmark::State& state);
+    void benchmarkJSConvertStringToObject(size_t fields, size_t depth, benchmark::State& state);
+
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -1205,6 +1210,30 @@ private:
                                                                                                 \
     BENCHMARK_F(Fixture, JSSubtype)(benchmark::State & state) {                                 \
         benchmarkJSSubtype(state);                                                              \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, MQLConvertObjectToString5FieldsDepth1)(benchmark::State & state) {     \
+        benchmarkMQLConvertObjectToString(5, 1, state);                                         \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, JSConvertObjectToString5FieldsDepth1)(benchmark::State & state) {      \
+        benchmarkJSConvertObjectToString(5, 1, state);                                          \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, MQLConvertObjectToString50FieldsDepth10)(benchmark::State & state) {   \
+        benchmarkMQLConvertObjectToString(50, 10, state);                                       \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, JSConvertObjectToString50FieldsDepth10)(benchmark::State & state) {    \
+        benchmarkJSConvertObjectToString(50, 10, state);                                        \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, MQLConvertStringToObject5FieldsDepth1)(benchmark::State & state) {     \
+        benchmarkMQLConvertStringToObject(5, 1, state);                                         \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, JSConvertStringToObject5FieldsDepth1)(benchmark::State & state) {      \
+        benchmarkJSConvertStringToObject(5, 1, state);                                          \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, MQLConvertStringToObject50FieldsDepth10)(benchmark::State & state) {   \
+        benchmarkMQLConvertStringToObject(50, 10, state);                                       \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, JSConvertStringToObject50FieldsDepth10)(benchmark::State & state) {    \
+        benchmarkJSConvertStringToObject(50, 10, state);                                        \
     }
 
 
