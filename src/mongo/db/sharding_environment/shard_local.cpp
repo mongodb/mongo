@@ -69,7 +69,7 @@ std::string ShardLocal::toString() const {
     return getId().toString() + ":<local>";
 }
 
-bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) const {
     return localIsRetriableError(code, options);
 }
 

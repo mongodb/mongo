@@ -181,6 +181,7 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:cluster_identity_loader.cpp",
         "//src/mongo/db/sharding_environment:grid.cpp",
         "//src/mongo/db/sharding_environment:router_uptime_reporter.cpp",
+        "//src/mongo/db/sharding_environment:shard_retry_server_parameters_gen",
         "//src/mongo/db/sharding_environment/client:config_shard_wrapper.cpp",
         "//src/mongo/db/sharding_environment/client:shard_factory.cpp",
         "//src/mongo/db/topology:shard_registry.cpp",

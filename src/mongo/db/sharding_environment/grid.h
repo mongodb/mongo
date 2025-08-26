@@ -155,6 +155,16 @@ public:
     }
 
     /**
+     * Called when the value of the server parameter ShardRetryTokenReturnRate changes.
+     */
+    static Status updateRetryBudgetReturnRate(double returnRate);
+
+    /**
+     * Called when the value of the server parameter ShardRetryTokenBucketCapacity changes.
+     */
+    static Status updateRetryBudgetCapacity(std::int32_t capacity);
+
+    /**
      * Shuts down all the services that are managed by the Grid class.
      */
     void shutdown(OperationContext* opCtx,
@@ -173,6 +183,11 @@ public:
     void clearForUnitTests();
 
 private:
+    /**
+     * Helper function to set retry budget server parameters on shard instances.
+     */
+    static Status _updateRetryBudgetRateParameters(double returnRate, double capacity);
+
     void _assertInitialized() const {
         uassert(ErrorCodes::ShardingStateNotInitialized,
                 "Grid cannot be accessed before it is initialized",

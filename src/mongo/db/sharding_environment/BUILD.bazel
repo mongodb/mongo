@@ -15,6 +15,11 @@ idl_generator(
 )
 
 idl_generator(
+    name = "shard_retry_server_parameters_gen",
+    src = "shard_retry_server_parameters.idl",
+)
+
+idl_generator(
     name = "sharding_runtime_d_params_gen",
     src = "sharding_runtime_d_params.idl",
 )

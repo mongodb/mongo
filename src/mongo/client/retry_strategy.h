@@ -29,10 +29,8 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/client/backoff_with_jitter.h"
-#include "mongo/db/error_labels.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -40,7 +38,6 @@
 #include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 
-#include <algorithm>
 #include <concepts>
 #include <cstdint>
 #include <span>
@@ -348,17 +345,7 @@ public:
      *  - 'RetryableWriteError'
      *  - 'RetryableError'
      */
-    // TODO: SERVER-108613 Implement this function as a normal static function and relocate
-    // implementation in the cpp file.
-    static constexpr auto defaultRetryCriteria = [](Status s,
-                                                    std::span<const std::string> errorLabels) {
-        constexpr auto isRetryableErrorLabel = [](StringData label) {
-            return label == ErrorLabel::kRetryableWrite || label == ErrorLabel::kRetryableError;
-        };
-
-        return s.isA<ErrorCategory::RetriableError>() ||
-            std::ranges::find_if(errorLabels, isRetryableErrorLabel) != errorLabels.end();
-    };
+    static bool defaultRetryCriteria(Status s, std::span<const std::string> errorLabels);
 
     struct BackoffParameters {
         // Maximum number of retries after initial retriable error.
@@ -469,7 +456,10 @@ public:
 
     using RetryCriteria = DefaultRetryStrategy::RetryCriteria;
     using BackoffParameters = DefaultRetryStrategy::BackoffParameters;
-    static constexpr auto defaultRetryCriteria = DefaultRetryStrategy::defaultRetryCriteria;
+
+    static bool defaultRetryCriteria(Status s, std::span<const std::string> errorLabels) {
+        return DefaultRetryStrategy::defaultRetryCriteria(s, errorLabels);
+    }
 
     AdaptiveRetryStrategy(std::shared_ptr<RetryBudget> budget,
                           std::unique_ptr<RetryStrategy> underlyingStrategy)

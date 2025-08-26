@@ -80,7 +80,7 @@ public:
 
     std::string toString() const override;
 
-    bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
+    bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) const final;
 
     void runFireAndForgetCommand(OperationContext* opCtx,
                                  const ReadPreferenceSetting& readPref,

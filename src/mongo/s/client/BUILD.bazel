@@ -20,6 +20,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/client:remote_command_retry_scheduler",
+        "//src/mongo/client:retry_strategy",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/s/write_ops:batch_write_types",
     ],

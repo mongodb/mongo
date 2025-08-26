@@ -29,9 +29,23 @@
 
 #include "mongo/client/retry_strategy.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
+#include "mongo/db/error_labels.h"
+
+#include <algorithm>
 
 namespace mongo {
+
+bool DefaultRetryStrategy::defaultRetryCriteria(Status s,
+                                                std::span<const std::string> errorLabels) {
+    constexpr auto isRetryableErrorLabel = [](StringData label) {
+        return label == ErrorLabel::kRetryableWrite || label == ErrorLabel::kRetryableError;
+    };
+
+    return s.isA<ErrorCategory::RetriableError>() ||
+        std::ranges::find_if(errorLabels, isRetryableErrorLabel) != errorLabels.end();
+}
 
 bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,

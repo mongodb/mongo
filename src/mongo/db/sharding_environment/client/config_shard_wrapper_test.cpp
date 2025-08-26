@@ -79,7 +79,7 @@ public:
         return getId().toString();
     }
 
-    bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final {
+    bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) const final {
         return false;
     }
 

@@ -37,6 +37,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/sharding_environment/client/shard_remote.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
@@ -110,6 +111,9 @@ protected:
                               maxTimeMS,
                               Shard::RetryPolicy::kNoRetry));
     }
+
+    inline static auto errorLabelsSystemOverloaded =
+        std::vector{std::string{ErrorLabel::kSystemOverloadedError}};
 };
 
 TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
@@ -123,6 +127,76 @@ TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::PrimarySteppedDown);
     ASSERT_EQ(1UL, configTargeter()->getAndClearMarkedDownHosts().size());
+}
+
+TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
+    auto targetedNode = ShardId("config");
+
+    auto firstShard = kTestShardIds.front();
+    auto firstShardHostAndPort = kTestShardHosts.front();
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryBudget = shard->getRetryBudget_forTest();
+    auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
+
+    auto initialBalance = retryBudget->getBalance_forTest();
+
+    {
+        auto _ = RAIIServerParameterControllerForTest{"shardRetryTokenBucketCapacity",
+                                                      retryBudget->getBalance_forTest() + 1};
+        retryStrategy.recordSuccess(firstShardHostAndPort);
+        ASSERT_GT(retryBudget->getBalance_forTest(), initialBalance);
+    }
+}
+
+TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
+    auto targetedNode = ShardId("config");
+
+    auto firstShard = kTestShardIds.front();
+    auto firstShardHostAndPort = kTestShardHosts.front();
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryBudget = shard->getRetryBudget_forTest();
+    auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
+
+    auto initialBalance = retryBudget->getBalance_forTest();
+    auto error = Status(ErrorCodes::PrimarySteppedDown, "Interrupted at shutdown");
+
+    constexpr auto kReturnRate = 0.5;
+
+    {
+        auto _ = RAIIServerParameterControllerForTest{"shardRetryTokenReturnRate", kReturnRate};
+        // We consume some tokens in order to be able to observe the return rate.
+        for (int i = 0; i < 2; ++i) {
+            ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
+                error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        }
+
+        // We test that the return rate was changed by observing how many tokens were returned by
+        // recordSuccess.
+        retryStrategy.recordSuccess(firstShardHostAndPort);
+        ASSERT_EQ(retryBudget->getBalance_forTest(), initialBalance - 1 + kReturnRate);
+    }
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategy) {
+    auto targetedNode = ShardId("config");
+
+    auto firstShard = kTestShardIds.front();
+    auto firstShardHostAndPort = kTestShardHosts.front();
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryBudget = shard->getRetryBudget_forTest();
+    auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
+
+    auto initialBalance = retryBudget->getBalance_forTest();
+    auto error = Status(ErrorCodes::PrimarySteppedDown, "Interrupted at shutdown");
+
+    ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+    ASSERT_LT(retryBudget->getBalance_forTest(), initialBalance);
+    ASSERT(
+        retryStrategy.getTargetingMetadata().deprioritizedServers.contains(firstShardHostAndPort));
 }
 
 TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigShuttingDown) {

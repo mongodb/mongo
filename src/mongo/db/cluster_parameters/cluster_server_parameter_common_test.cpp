@@ -38,6 +38,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_local.h"
+#include "mongo/db/sharding_environment/shard_retry_server_parameters_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -56,6 +57,10 @@ public:
     void setUp() override {
         ClusterServerParameterTestBase::setUp();
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+        // Since Grid::init is not called in this test, we need to init the server parameter
+        // pointers manually.
+        Shard::initServerParameterPointersToAvoidLinking(&gShardRetryTokenReturnRate,
+                                                         &gShardRetryTokenBucketCapacity);
         _shardLocal = std::make_unique<ShardLocal>(ShardId::kConfigServerId);
     }
 

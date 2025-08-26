@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -115,11 +116,54 @@ public:
         kNoRetry,
     };
 
+    /**
+     * Shard specific retry strategy. An instance of this class cannot outlive the shard passed in
+     * as it internally holds a pointer to the shard.
+     */
+    class RetryStrategy : public mongo::RetryStrategy {
+    public:
+        RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy);
+
+        bool recordFailureAndEvaluateShouldRetry(
+            Status s,
+            const boost::optional<HostAndPort>& target,
+            std::span<const std::string> errorLabels) override {
+            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+        }
+
+        void recordSuccess(const boost::optional<HostAndPort>& target) override {
+            _underlyingStrategy.recordSuccess(target);
+        }
+
+        Milliseconds getNextRetryDelay() const override {
+            return _underlyingStrategy.getNextRetryDelay();
+        }
+
+        const TargetingMetadata& getTargetingMetadata() const override {
+            return _underlyingStrategy.getTargetingMetadata();
+        }
+
+    private:
+        AdaptiveRetryStrategy _underlyingStrategy;
+    };
+
     virtual ~Shard() = default;
 
     const ShardId& getId() const {
         return _id;
     }
+
+    /**
+     * This function is called by Grid during initialization and must be invoked before creating an
+     * instance of Shard. This was introduced to work around a linking issue between grid and shard.
+     *
+     * The parameters returnRate and capacity are expected to be pointers to the server parameters
+     * gShardRetryTokenReturnRate and gShardRetryTokenBucketCapacity respectively.
+     *
+     * To determine if the server parameters have been initialized, use Grid::isInitialized.
+     */
+    static void initServerParameterPointersToAvoidLinking(Atomic<double>* returnRate,
+                                                          Atomic<std::int32_t>* capacity);
 
     /**
      * Returns true if this shard object represents the config server.
@@ -162,7 +206,7 @@ public:
      */
     static bool localIsRetriableError(ErrorCodes::Error code, RetryPolicy options);
     static bool remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options);
-    virtual bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) = 0;
+    virtual bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) const = 0;
 
     /**
      * Runs the specified command returns the BSON command response plus parsed out Status of this
@@ -282,6 +326,17 @@ public:
      */
     static bool shouldErrorBePropagated(ErrorCodes::Error code);
 
+    /**
+     * Called when the value of the server parameters 'ShardRetryTokenBucketCapacity' or
+     * 'ShardRetryTokenReturnRate' changes.
+     */
+    void updateRetryBudgetRateParameters(double returnRate, double capacity);
+
+    /**
+     * Returns the retry budget instance for testing purposes.
+     */
+    std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> getRetryBudget_forTest() const;
+
 protected:
     Shard(const ShardId& id);
 
@@ -333,6 +388,11 @@ private:
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
      */
     const ShardId _id;
+
+    // TODO: SERVER-109573 Consider changing this shared pointer by a value, since the lifetime
+    // relationships are already well established. A Shard::RetryStrategy already cannot outlive the
+    // shard it was created for.
+    std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> _retryBudget;
 
     friend class ConfigShardWrapper;
 };

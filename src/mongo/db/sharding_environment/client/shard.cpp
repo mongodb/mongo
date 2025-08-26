@@ -30,6 +30,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 
 #include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -46,7 +47,28 @@ namespace mongo {
 namespace {
 
 const int kOnErrorNumRetries = 3;
+
+Atomic<double>* gRetryBudgetReturnRateServerParameter;
+Atomic<std::int32_t>* gRetryBudgetCapacityServerParameter;
+
+auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy) {
+    return [retryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
+        return shard->isRetriableError(s.code(), retryPolicy);
+    };
+}
+
 }  // namespace
+
+Shard::RetryStrategy::RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy)
+    : _underlyingStrategy{shard._retryBudget, makeRetryCriteriaForShard(shard, retryPolicy)} {}
+
+void Shard::initServerParameterPointersToAvoidLinking(Atomic<double>* returnRate,
+                                                      Atomic<std::int32_t>* capacity) {
+    invariant(returnRate);
+    invariant(capacity);
+    gRetryBudgetReturnRateServerParameter = returnRate;
+    gRetryBudgetCapacityServerParameter = capacity;
+}
 
 Status Shard::CommandResponse::getEffectiveStatus(
     const StatusWith<Shard::CommandResponse>& swResponse) {
@@ -95,7 +117,21 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return !isMongosRetriableError(code) && (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
-Shard::Shard(const ShardId& id) : _id(id) {}
+Shard::Shard(const ShardId& id) : _id(id) {
+    invariant(gRetryBudgetReturnRateServerParameter);
+    invariant(gRetryBudgetCapacityServerParameter);
+    _retryBudget = std::make_shared<AdaptiveRetryStrategy::RetryBudget>(
+        gRetryBudgetReturnRateServerParameter->loadRelaxed(),
+        gRetryBudgetCapacityServerParameter->loadRelaxed());
+}
+
+void Shard::updateRetryBudgetRateParameters(double returnRate, double capacity) {
+    _retryBudget->updateRateParameters(returnRate, capacity);
+}
+
+std::shared_ptr<AdaptiveRetryStrategy::RetryBudget> Shard::getRetryBudget_forTest() const {
+    return _retryBudget;
+}
 
 bool Shard::isConfig() const {
     return _id == ShardId::kConfigServerId;

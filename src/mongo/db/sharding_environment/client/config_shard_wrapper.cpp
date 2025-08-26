@@ -61,7 +61,7 @@ std::string ConfigShardWrapper::toString() const {
     return _configShard->toString();
 }
 
-bool ConfigShardWrapper::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+bool ConfigShardWrapper::isRetriableError(ErrorCodes::Error code, RetryPolicy options) const {
     return _configShard->isRetriableError(code, options);
 }
 

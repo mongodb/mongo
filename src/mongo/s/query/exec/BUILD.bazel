@@ -63,6 +63,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/client:retry_strategy",
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:auth_checks",
