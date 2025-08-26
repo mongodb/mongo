@@ -132,6 +132,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
@@ -490,7 +491,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _splitSessionManager(InternalSessionPool::get(service)),
       _intentRegistry(rss::consensus::IntentRegistry::get(service)),
       _primaryMajorityReadsAvailability(PrimaryMajorityReadsAvailability()) {
-    // TODO SERVER-108397: Add mutex to the registry
+    ObservableMutexRegistry::get().add("ReplicationCoordinatorImpl::_mutex", _mutex);
 
     _termShadow.store(OpTime::kUninitializedTerm);
     _electionIdTermShadow.store(_topCoord->getElectionIdTerm());

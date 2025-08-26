@@ -43,6 +43,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -640,7 +641,8 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
       _options(std::move(options)),
       _controller(_options.controllerFactory()),
       _manager(_options.egressConnectionCloserManager) {
-    // TODO SERVER-108397: Add mutex to the registry
+    ObservableMutexRegistry::get().add("ConnectionPool::_mutex", _mutex);
+
     if (_manager) {
         _manager->add(this);
     }

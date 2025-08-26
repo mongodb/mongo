@@ -37,6 +37,7 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/testing_proctor.h"
 
 #include <utility>
@@ -49,7 +50,7 @@ const auto grid = ServiceContext::declareDecoration<Grid>();
 }  // namespace
 
 Grid::Grid() {
-    // TODO SERVER-108397: Add mutex to the registry
+    ObservableMutexRegistry::get().add("Grid::_mutex", _mutex);
 }
 
 Grid::~Grid() = default;

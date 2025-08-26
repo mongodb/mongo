@@ -2194,6 +2194,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/util:clock_sources",
+        "//src/mongo/util:observable_mutex_registry",
         "//src/mongo/util:periodic_runner",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",

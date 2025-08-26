@@ -50,6 +50,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #include <cstdint>
 #include <mutex>
@@ -73,7 +74,7 @@ const auto transactionCoordinatorServiceDecoration =
 }  // namespace
 
 TransactionCoordinatorService::TransactionCoordinatorService() {
-    // TODO SERVER-108397: Add mutex to the registry
+    ObservableMutexRegistry::get().add("TransactionCoordinatorService::_mutex", _mutex);
 }
 
 TransactionCoordinatorService::~TransactionCoordinatorService() {

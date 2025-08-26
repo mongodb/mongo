@@ -49,6 +49,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/system_clock_source.h"
@@ -144,7 +145,7 @@ ServiceContext::ServiceContext(std::unique_ptr<ClockSource> fastClockSource,
       _fastClockSource(std::move(fastClockSource)),
       _preciseClockSource(std::move(preciseClockSource)),
       _serviceSet(std::make_unique<ServiceSet>(this)) {
-    // TODO SERVER-108397: Add mutex to the registry
+    ObservableMutexRegistry::get().add("ServiceContext::_mutex", _mutex);
 }
 
 

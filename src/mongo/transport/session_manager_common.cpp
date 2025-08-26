@@ -48,6 +48,7 @@
 #include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -140,7 +141,7 @@ std::size_t getSupportedMax() {
 class SessionManagerCommon::Sessions {
 public:
     Sessions() {
-        // TODO SERVER-108397: Add mutex to the registry
+        ObservableMutexRegistry::get().add("SessionManagerCommon::Sessions::_mutex", _mutex);
     }
     struct Entry {
         explicit Entry(std::shared_ptr<SessionWorkflow> workflow) : workflow{std::move(workflow)} {}
