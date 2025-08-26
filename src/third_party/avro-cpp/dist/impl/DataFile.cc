@@ -22,7 +22,6 @@
 
 #include <sstream>
 
-#include <boost/crc.hpp> // for boost::crc_32_type
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
@@ -30,6 +29,9 @@
 
 #ifdef SNAPPY_CODEC_AVAILABLE
 #include <snappy.h>
+#endif
+#ifdef ZLIB_AVAILABLE
+#include <boost/crc.hpp> // for boost::crc_32_type
 #endif
 
 namespace avro {
@@ -55,12 +57,14 @@ const string AVRO_SNAPPY_CODEC = "snappy";
 const size_t minSyncInterval = 32;
 const size_t maxSyncInterval = 1u << 30;
 
+#ifdef ZLIB_AVAILABLE
 boost::iostreams::zlib_params get_zlib_params() {
     boost::iostreams::zlib_params ret;
     ret.method = boost::iostreams::zlib::deflated;
     ret.noheader = true;
     return ret;
 }
+#endif
 } // namespace
 
 DataFileWriterBase::DataFileWriterBase(const char *filename, const ValidSchema &schema, size_t syncInterval,
@@ -142,6 +146,7 @@ void DataFileWriterBase::sync() {
         encoderPtr_->flush();
         std::unique_ptr<InputStream> in = memoryInputStream(*buffer_);
         copy(*in, *stream_);
+#ifdef ZLIB_AVAILABLE
     } else if (codec_ == DEFLATE_CODEC) {
         std::vector<char> buf;
         {
@@ -162,6 +167,7 @@ void DataFileWriterBase::sync() {
         avro::encode(*encoderPtr_, byteCount);
         encoderPtr_->flush();
         copy(*in, *stream_);
+#endif
 #ifdef SNAPPY_CODEC_AVAILABLE
     } else if (codec_ == SNAPPY_CODEC) {
         std::vector<char> temp;
@@ -423,6 +429,7 @@ void DataFileReaderBase::readDataBlock() {
         dataDecoder_->init(*in);
         dataStream_ = std::move(in);
 #endif
+#ifdef ZLIB_AVAILABLE
     } else {
         compressed_.clear();
         const uint8_t *data;
@@ -438,6 +445,7 @@ void DataFileReaderBase::readDataBlock() {
         std::unique_ptr<InputStream> in = nonSeekableIstreamInputStream(*os_);
         dataDecoder_->init(*in);
         dataStream_ = std::move(in);
+#endif
     }
 }
 
