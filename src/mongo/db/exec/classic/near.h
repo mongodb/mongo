@@ -152,6 +152,11 @@ private:
     StageState bufferNext(WorkingSetID* toReturn);
     StageState advanceNext(WorkingSetID* toReturn);
 
+    SortOptions makeSortOptions();
+    void updateSpillingStats();
+
+    void spill(uint64_t maxMemoryBytes);
+
     //
     // Generic state for progressive near search
     //
@@ -163,6 +168,7 @@ private:
 
     // Tracks RecordIds from the child stage to do our own deduping.
     RecordIdDeduplicator _seenDocuments;
+    SpillingStats _seenDocumentsSpillingStats;
 
     // Stats for the stage covering this interval
     // This is owned by _specificStats
@@ -223,6 +229,7 @@ private:
         }
     };
 
+    SorterFileStats _sorterFileStats;
     using ResultBufferSorter =
         BoundedSorter<SorterKey, SorterValue, SorterKeyComparator, NoOpBound>;
     ResultBufferSorter _resultBuffer;

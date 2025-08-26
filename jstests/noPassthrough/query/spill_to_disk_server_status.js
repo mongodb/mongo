@@ -5,6 +5,7 @@
 //   requires_persistence,
 // ]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {getPlanStages, getQueryPlanner, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -18,6 +19,9 @@ coll.drop();
 const foreignCollName = "spill_to_disk_server_status_foreign";
 const foreignColl = db[foreignCollName];
 foreignColl.drop();
+const geoCollName = "spill_to_disk_server_status_geo";
+const geoColl = db[geoCollName];
+geoColl.drop();
 const isSbeEnabled = checkSbeFullyEnabled(db);
 
 // Set up relevant query knobs so that the query will spill for every document.
@@ -37,12 +41,17 @@ assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemory
 assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1));
 // Spilling memory threshold for $graphLookup
 assert.commandWorked(setParameter(db, "internalDocumentSourceGraphLookupMaxMemoryBytes", 1));
+// Spilling memory threshold for geo near
+assert.commandWorked(setParameter(db, "internalNearStageMaxMemoryBytes", 1));
 
 const nDocs = 10;
 for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({_id: i}));
     assert.commandWorked(foreignColl.insert({_id: i}));
+    assert.commandWorked(geoColl.insert({_id: i, geo: [(Math.cos(i) * i) / 10, (Math.sin(i) * i) / 10]}));
 }
+
+assert.commandWorked(geoColl.createIndex({geo: "2d"}));
 
 const pipelines = {
     sort: [{$sort: {a: 1}}],
@@ -75,6 +84,7 @@ const pipelines = {
             },
         },
     ],
+    geoNear: [{$geoNear: {near: [0, 0]}}],
 };
 
 function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
@@ -121,6 +131,12 @@ function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
             spills: graphLookupMetrics.spills,
             spilledBytes: graphLookupMetrics.spilledBytes,
         };
+    } else if (stageName === "geoNear") {
+        const geoNearMetrics = serverStatus.metrics.query.geoNear;
+        return {
+            spills: geoNearMetrics.spills,
+            spilledBytes: geoNearMetrics.spilledBytes,
+        };
     } else {
         return {
             spills: 0,
@@ -129,7 +145,13 @@ function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
     }
 }
 
-function testSpillingMetrics({stageName, expectedSpillingMetrics, expectedSbeSpillingMetrics, getLegacy = false}) {
+function testSpillingMetrics({
+    stageName,
+    expectedSpillingMetrics,
+    expectedSbeSpillingMetrics,
+    getLegacy = false,
+    collName = coll.getName(),
+}) {
     const pipeline = pipelines[stageName];
 
     // Check whether the aggregation uses SBE.
@@ -229,6 +251,15 @@ testSpillingMetrics({
     expectedSpillingMetrics: {spills: 30, spilledBytes: 1460},
     expectedSbeSpillingMetrics: {spills: 30, spilledBytes: 1460},
 });
+
+if (FeatureFlagUtil.isPresentAndEnabled(db, "ExtendedAutoSpilling")) {
+    testSpillingMetrics({
+        stageName: "geoNear",
+        expectedSpillingMetrics: {spills: 20, spilledBytes: 1130},
+        expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 1130},
+        collName: geoCollName,
+    });
+}
 
 /*
  * Tests that query fails when attempting to spill with insufficient disk space

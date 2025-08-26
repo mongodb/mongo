@@ -97,12 +97,13 @@ struct PlanSummaryStats {
     // Stages that report SpillingStats.
     enum class SpillingStage {
         BUCKET_AUTO,
+        GEO_NEAR,
         GRAPH_LOOKUP,
         GROUP,
+        HASH_LOOKUP,
         SET_WINDOW_FIELDS,
         SORT,
         TEXT_OR,
-        HASH_LOOKUP,
     };
 
     // The accumulated spilling statistics per stage type.

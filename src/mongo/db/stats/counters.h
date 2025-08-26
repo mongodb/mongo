@@ -574,6 +574,12 @@ public:
 };
 extern BucketAutoCounters bucketAutoCounters;
 
+class GeoNearCounters : public SpillingCounters {
+public:
+    GeoNearCounters() : SpillingCounters("geoNear") {}
+};
+extern GeoNearCounters geoNearCounters;
+
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.
  */

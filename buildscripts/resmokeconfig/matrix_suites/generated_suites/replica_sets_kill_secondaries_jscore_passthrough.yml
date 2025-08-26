@@ -54,6 +54,7 @@ selector:
     - jstests/core/query/partial_index_pbt.js
     - jstests/core/query/query_knob_correctness_pbt.js
     - jstests/core/query/or/subplanning_pbt.js
+    - jstests/core/**/geo_circle_spilling.js
     - jstests/core/**/explain_execution_error.js
     - jstests/core/**/sortb.js
     - jstests/core/**/sortg.js

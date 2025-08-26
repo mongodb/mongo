@@ -35,6 +35,8 @@ selector:
     - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
     # This test change $group memory limits, so analyze command fails
     - jstests/core/query/release_memory/group.js
+    # Running analyze on a query from this test creates a BSON document that is larger than 16 MB
+    - jstests/core/index/geo/geo_circle_spilling.js
 
     # TODO SERVER-100451: $elemMatch estimation using histograms
     - jstests/core/query/boolean_expression_simplification.js
