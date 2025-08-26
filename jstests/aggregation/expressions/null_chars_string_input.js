@@ -5,6 +5,8 @@
  * @tags: [
  *   # $listMqlEntities cannot be wrapped in a $facet stage.
  *   do_not_wrap_aggregations_in_facets,
+ *   # TODO SERVER-109838: Remove incompatible_with_extensions tag.
+ *   incompatible_with_extensions
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -459,10 +461,6 @@ const skips = new Set([
     "$tumblingWindow",
     "$validate",
     "$vectorSearch",
-    // TODO SERVER-108821: Remove $testFoo and $testBar from the skips list once extensions aren't
-    // listed by $listMqlEntities.
-    "$testFoo",
-    "$testBar",
 ]);
 
 const allPipelines = [
