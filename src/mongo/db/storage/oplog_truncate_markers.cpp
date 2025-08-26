@@ -104,6 +104,8 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
     LOGV2(22382,
           "Record store oplog processing finished",
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
+    LOGV2(
+        10621110, "Initial set of markers created.", "Oplog size (in bytes)"_attr = rs.dataSize());
 
     // This value will eventually replace the empty OplogTruncateMarker object with this newly
     // populated object now that initial sampling has finished.
@@ -207,9 +209,11 @@ bool OplogTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) 
     // Wait until kill() is called or there are too many collection markers.
     stdx::unique_lock<stdx::mutex> lock(_reclaimMutex);
     MONGO_IDLE_THREAD_BLOCK;
+    LOGV2_DEBUG(10621102, 1, "OplogCapMaintainerThread is idle");
     auto isWaitConditionSatisfied = opCtx->waitForConditionOrInterruptFor(
         _reclaimCv, lock, Seconds(gOplogTruncationCheckPeriodSeconds), [this, opCtx] {
             if (_isDead) {
+                LOGV2_DEBUG(10621103, 1, "OplogCapMaintainerThread is active");
                 return true;
             }
 
@@ -221,12 +225,15 @@ bool OplogTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) 
                             "Collection has excess markers",
                             "lastRecord"_attr = marker->lastRecord,
                             "wallTime"_attr = marker->wallTime);
+                LOGV2_DEBUG(10621104, 1, "OplogCapMaintainerThread is active");
                 return true;
             }
 
+            LOGV2_DEBUG(10621105, 1, "OplogCapMaintainerThread is active");
             return false;
         });
 
+    LOGV2_DEBUG(10621106, 1, "OplogCapMaintainerThread is active");
     // Return true only when we have detected excess markers, not because the record store
     // is being destroyed (_isDead) or we timed out waiting on the condition variable.
     return !(_isDead || !isWaitConditionSatisfied);

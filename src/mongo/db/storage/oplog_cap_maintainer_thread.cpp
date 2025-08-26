@@ -152,6 +152,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;
         }
+        LOGV2(10621107, "Deleting excess documents", "Oplog size (in bytes)"_attr = rs->dataSize());
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
@@ -212,7 +213,8 @@ void OplogCapMaintainerThread::_run() {
         toStringForLogging(NamespaceString::kRsOplogNamespace);
     setThreadName(name);
 
-    LOGV2_DEBUG(5295000, 1, "Oplog cap maintainer thread started", "threadName"_attr = name);
+    LOGV2_DEBUG(
+        5295000, 1, "Oplog cap maintainer thread started and active", "threadName"_attr = name);
     ThreadClient tc(name,
                     getGlobalServiceContext()->getService(ClusterRole::ShardServer),
                     Client::noSession(),
@@ -245,9 +247,11 @@ void OplogCapMaintainerThread::_run() {
                 }
                 // Wait a bit to give the oplog a chance to be created.
                 MONGO_IDLE_THREAD_BLOCK;
+                LOGV2_DEBUG(10621101, 1, "OplogCapMaintainerThread is idle");
                 // Reset the oplogRead so we don't hold a lock while we sleep.
                 oplogRead.reset();
                 sleepFor(Milliseconds(100));
+                LOGV2_DEBUG(10621109, 1, "OplogCapMaintainerThread is active");
             } while (!rs);
 
             // Initial sampling and marker creation.
