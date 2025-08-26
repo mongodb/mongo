@@ -2777,6 +2777,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/idl/OWNERS.yml
 /src/mongo/idl/**/* @10gen/server-programmability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/installer/OWNERS.yml
+/src/mongo/installer/ @10gen/devprod-build @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/logv2/OWNERS.yml
 /src/mongo/logv2/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/logv2/**/*redaction* @10gen/server-security @svc-auto-approve-bot
