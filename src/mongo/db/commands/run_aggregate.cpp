@@ -968,7 +968,7 @@ Status runAggregateOnView(OperationContext* opCtx,
     // TODO SERVER-101661 Enable $rankFusion run on views.
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "$rankFusion is currently unsupported on views",
-            !request.getIsRankFusion() && !liteParsedPipeline.startsWithRankFusionStage());
+            !request.getIsHybridSearch() && !liteParsedPipeline.startsWithRankFusionStage());
 
     // Check that the default collation of 'view' is compatible with the operation's
     // collation. The check is skipped if the request did not specify a collation.

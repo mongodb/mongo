@@ -1091,7 +1091,7 @@ BSONObj createPassthroughCommandForShard(
     }
 
     if (expCtx->isRankFusion()) {
-        targetedCmd[AggregateCommandRequest::kIsRankFusionFieldName] = Value(true);
+        targetedCmd[AggregateCommandRequest::kIsHybridSearchFieldName] = Value(true);
     }
 
     auto shardCommand = genericTransformForShards(
@@ -1143,7 +1143,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
         Value(splitPipeline.shardsPipeline->serialize());
 
     if (expCtx->isRankFusion()) {
-        targetedCmd[AggregateCommandRequest::kIsRankFusionFieldName] = Value(true);
+        targetedCmd[AggregateCommandRequest::kIsHybridSearchFieldName] = Value(true);
     }
 
     // When running on many shards with the exchange we may not need merging.
