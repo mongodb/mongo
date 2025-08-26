@@ -306,6 +306,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL, the
      * return value may be inaccurate by the time the function returns.
      */
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesForDatabase)
     virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                                    const DatabaseName& dbName) = 0;
 
@@ -367,9 +368,10 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_PRIVATE virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
-                                                                  const NamespaceString& ns,
-                                                                  bool secondaryOk) = 0;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::checkCanServeReadsFor)
+    virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
+                                                const NamespaceString& ns,
+                                                bool secondaryOk) = 0;
 
     /**
      * Returns true if this node should ignore index constraints for idempotency reasons.
@@ -736,8 +738,8 @@ public:
      * internal structure that could change at any time, and getting member information is
      * inherently racy; member configuration can change at any time.
      */
-    virtual boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
-        const HostAndPort& hap) const = 0;
+    MONGO_MOD_NEEDS_REPLACEMENT virtual boost::optional<MemberConfig>
+    findConfigMemberByHostAndPort_deprecated(const HostAndPort& hap) const = 0;
 
     /**
      * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.

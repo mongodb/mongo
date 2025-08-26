@@ -59,6 +59,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -78,7 +79,7 @@ namespace repl {
  * Stub implementation for tests, or programs like mongocryptd, that want a non-null
  * ReplicationCoordinator but don't need any replication logic.
  */
-class ReplicationCoordinatorNoOp final : public ReplicationCoordinator {
+class MONGO_MOD_PUB ReplicationCoordinatorNoOp final : public ReplicationCoordinator {
 
 public:
     ReplicationCoordinatorNoOp(ServiceContext* serviceContext);
@@ -107,19 +108,23 @@ public:
 
     bool isWritablePrimaryForReportingPurposes() final;
     bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::isInPrimaryOrSecondaryState)
     bool isInPrimaryOrSecondaryState_UNSAFE() const final;
 
     bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::canAcceptWritesForDatabase)
     bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                            const DatabaseName& dbName) final;
 
     bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::canAcceptWritesFor)
     bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                    const NamespaceStringOrUUID& nsOrUUID) final;
 
     Status checkCanServeReadsFor(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  bool secondaryOk) final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::checkCanServeReadsFor)
     Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         bool secondaryOk) final;

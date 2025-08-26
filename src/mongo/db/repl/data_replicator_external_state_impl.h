@@ -48,6 +48,7 @@
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -63,7 +64,7 @@ class ReplicationCoordinatorExternalState;
  * Data replicator external state implementation using a replication coordinator.
  */
 
-class DataReplicatorExternalStateImpl : public DataReplicatorExternalState {
+class MONGO_MOD_OPEN DataReplicatorExternalStateImpl : public DataReplicatorExternalState {
 public:
     DataReplicatorExternalStateImpl(
         ReplicationCoordinator* replicationCoordinator,

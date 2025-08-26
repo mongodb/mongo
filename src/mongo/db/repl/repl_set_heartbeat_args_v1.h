@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
@@ -50,7 +51,7 @@ namespace repl {
 /**
  * Arguments to the replSetHeartbeat command.
  */
-class ReplSetHeartbeatArgsV1 {
+class MONGO_MOD_PUB ReplSetHeartbeatArgsV1 {
 public:
     /**
      * Initializes this ReplSetHeartbeatArgsV1 from the contents of args.

@@ -42,9 +42,10 @@
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace executor {
 class TaskExecutor;
@@ -65,7 +66,7 @@ using OpTimeWithTerm = OpTimeWith<long long>;
  * dependencies on large sections of the server code and thus break the unit testability of
  * InitialSyncer should be moved here.
  */
-class DataReplicatorExternalState {
+class MONGO_MOD_PUB DataReplicatorExternalState {
     DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
     DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
 
@@ -156,4 +157,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

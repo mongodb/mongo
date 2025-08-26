@@ -64,6 +64,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -85,7 +86,7 @@ struct ConnectionPoolStats;
 
 namespace repl {
 
-inline repl::ReplSettings createServerlessReplSettings() {
+MONGO_MOD_PUB inline repl::ReplSettings createServerlessReplSettings() {
     repl::ReplSettings settings;
     settings.setOplogSizeBytes(5 * 1024 * 1024);
     settings.setServerlessMode();
@@ -96,7 +97,7 @@ inline repl::ReplSettings createServerlessReplSettings() {
  * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
  * into dbtests.
  */
-class ReplicationCoordinatorMock : public ReplicationCoordinator {
+class MONGO_MOD_OPEN ReplicationCoordinatorMock : public ReplicationCoordinator {
     ReplicationCoordinatorMock(const ReplicationCoordinatorMock&) = delete;
     ReplicationCoordinatorMock& operator=(const ReplicationCoordinatorMock&) = delete;
 
@@ -160,12 +161,14 @@ public:
 
     bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
 
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::canAcceptWritesForDatabase)
     bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                            const DatabaseName& dbName) override;
 
     bool canAcceptWritesFor(OperationContext* opCtx,
                             const NamespaceStringOrUUID& nsOrUUID) override;
 
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::canAcceptWritesFor)
     bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                    const NamespaceStringOrUUID& nsOrUUID) override;
 
@@ -181,6 +184,7 @@ public:
     Status checkCanServeReadsFor(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  bool secondaryOk) override;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::checkCanServeReadsFor)
     Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         bool secondaryOk) override;

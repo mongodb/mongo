@@ -1075,6 +1075,14 @@ replication.replication_coordinator:
     - src/mongo/db/repl/*external_state*
     - src/mongo/db/repl/*heartbeat*
     - src/mongo/db/repl/*topology_coordinator*
+    - src/mongo/db/repl/*member_data*
+    - src/mongo/db/repl/*check_quorum_for_config_change*
+    - src/mongo/db/repl/*scatter_gather*
+    - src/mongo/db/repl/*vote_requester*
+    - src/mongo/db/repl/*parsing_utils*
+    - src/mongo/db/repl/*repl_set_config_checks*
+    - src/mongo/db/repl/*repl_set_commands*
+    - src/mongo/db/repl/replication_waiter_list_bm.cpp
 
 replication.recovery:
   meta:

@@ -51,6 +51,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -78,7 +79,7 @@ using executor::NetworkInterfaceMock;
 /**
  * Fixture for testing ReplicationCoordinatorImpl behaviors.
  */
-class ReplCoordTest : public ServiceContextMongoDTest {
+class MONGO_MOD_OPEN ReplCoordTest : public ServiceContextMongoDTest {
 public:
     /**
      * Makes a command response with the given "doc" response and optional elapsed time "millis".

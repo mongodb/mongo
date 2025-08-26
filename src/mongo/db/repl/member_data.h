@@ -35,6 +35,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -47,7 +48,7 @@ namespace repl {
  * This class contains the data from heartbeat responses and replSetUpdatePosition commands for one
  * member of a replica set.
  **/
-class MemberData {
+class MONGO_MOD_PUB MemberData {
 public:
     class HeartbeatChanges {
     public:

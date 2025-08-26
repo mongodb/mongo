@@ -33,6 +33,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
@@ -61,7 +62,7 @@ class ReplicationCoordinator;
  * dependencies on large sections of the server code and thus break the unit testability of
  * ReplicationCoordinatorImpl should be moved here.
  */
-class ReplicationCoordinatorExternalState {
+class MONGO_MOD_PUB ReplicationCoordinatorExternalState {
     ReplicationCoordinatorExternalState(const ReplicationCoordinatorExternalState&) = delete;
     ReplicationCoordinatorExternalState& operator=(const ReplicationCoordinatorExternalState&) =
         delete;

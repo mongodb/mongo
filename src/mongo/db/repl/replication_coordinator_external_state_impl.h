@@ -55,6 +55,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -71,8 +72,9 @@ class StorageInterface;
 
 class NoopWriter;
 
-class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordinatorExternalState,
-                                                      public JournalListener {
+class MONGO_MOD_PUB ReplicationCoordinatorExternalStateImpl final
+    : public ReplicationCoordinatorExternalState,
+      public JournalListener {
     ReplicationCoordinatorExternalStateImpl(const ReplicationCoordinatorExternalStateImpl&) =
         delete;
     ReplicationCoordinatorExternalStateImpl& operator=(

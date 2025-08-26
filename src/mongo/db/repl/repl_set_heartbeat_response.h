@@ -37,6 +37,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -53,7 +54,7 @@ namespace repl {
 /**
  * Response structure for the replSetHeartbeat command.
  */
-class ReplSetHeartbeatResponse {
+class MONGO_MOD_PUB ReplSetHeartbeatResponse {
 public:
     /**
      * Initializes this ReplSetHeartbeatResponse from the contents of "doc".
@@ -134,14 +135,14 @@ public:
     /**
      * Sets _setName to "name".
      */
-    void setSetName(StringData name) {
+    MONGO_MOD_PRIVATE void setSetName(StringData name) {
         _setName = std::string{name};
     }
 
     /**
      * Sets _state to "state".
      */
-    void setState(MemberState state) {
+    MONGO_MOD_PRIVATE void setState(MemberState state) {
         _stateSet = true;
         _state = state;
     }
@@ -149,7 +150,7 @@ public:
     /**
      * Sets the optional "electionTime" field to the given Timestamp.
      */
-    void setElectionTime(Timestamp time) {
+    MONGO_MOD_PRIVATE void setElectionTime(Timestamp time) {
         _electionTimeSet = true;
         _electionTime = time;
     }
@@ -157,60 +158,60 @@ public:
     /**
      * Sets _syncingTo to "syncingTo".
      */
-    void setSyncingTo(const HostAndPort& syncingTo) {
+    MONGO_MOD_PRIVATE void setSyncingTo(const HostAndPort& syncingTo) {
         _syncingTo = syncingTo;
     }
 
     /**
      * Sets _configVersion to "configVersion".
      */
-    void setConfigVersion(int configVersion) {
+    MONGO_MOD_PRIVATE void setConfigVersion(int configVersion) {
         _configVersion = configVersion;
     }
 
     /**
      * Sets _configTerm to "configTerm".
      */
-    void setConfigTerm(int configTerm) {
+    MONGO_MOD_PRIVATE void setConfigTerm(int configTerm) {
         _configTerm = configTerm;
     }
 
     /**
      * Initializes _config with "config".
      */
-    void setConfig(const ReplSetConfig& config) {
+    MONGO_MOD_PRIVATE void setConfig(const ReplSetConfig& config) {
         _configSet = true;
         _config = config;
     }
 
-    void setPrimaryId(long long primaryId) {
+    MONGO_MOD_PRIVATE void setPrimaryId(long long primaryId) {
         _primaryIdSet = true;
         _primaryId = primaryId;
     }
-    void setAppliedOpTimeAndWallTime(OpTimeAndWallTime time) {
+    MONGO_MOD_PRIVATE void setAppliedOpTimeAndWallTime(OpTimeAndWallTime time) {
         _appliedOpTimeSet = true;
         _appliedOpTime = time.opTime;
         _appliedWallTime = time.wallTime;
     }
-    void setWrittenOpTimeAndWallTime(OpTimeAndWallTime time) {
+    MONGO_MOD_PRIVATE void setWrittenOpTimeAndWallTime(OpTimeAndWallTime time) {
         _writtenOpTimeSet = true;
         _writtenOpTime = time.opTime;
         _writtenWallTime = time.wallTime;
     }
-    void setDurableOpTimeAndWallTime(OpTimeAndWallTime time) {
+    MONGO_MOD_PRIVATE void setDurableOpTimeAndWallTime(OpTimeAndWallTime time) {
         _durableOpTimeSet = true;
         _durableOpTime = time.opTime;
         _durableWallTime = time.wallTime;
     }
-    void unsetDurableOpTimeAndWallTime() {
+    MONGO_MOD_PRIVATE void unsetDurableOpTimeAndWallTime() {
         _durableOpTimeSet = false;
         _durableOpTime = OpTime();
         _durableWallTime = Date_t();
     }
-    void setTerm(long long term) {
+    MONGO_MOD_PRIVATE void setTerm(long long term) {
         _term = term;
     }
-    void setElectable(bool electable) {
+    MONGO_MOD_PRIVATE void setElectable(bool electable) {
         _electableSet = true;
         _electable = electable;
     }

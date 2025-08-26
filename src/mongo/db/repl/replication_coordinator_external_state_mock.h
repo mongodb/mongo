@@ -47,6 +47,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -63,7 +64,8 @@ class ServiceContext;
 
 namespace repl {
 
-class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
+class MONGO_MOD_PUB ReplicationCoordinatorExternalStateMock
+    : public ReplicationCoordinatorExternalState {
     ReplicationCoordinatorExternalStateMock(const ReplicationCoordinatorExternalStateMock&) =
         delete;
     ReplicationCoordinatorExternalStateMock& operator=(

@@ -49,6 +49,7 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -67,7 +68,7 @@ class ReplicationCoordinator;
  * Data replicator external state implementation for testing.
  */
 
-class DataReplicatorExternalStateMock : public DataReplicatorExternalState {
+class MONGO_MOD_PUB DataReplicatorExternalStateMock : public DataReplicatorExternalState {
 public:
     DataReplicatorExternalStateMock();
 
