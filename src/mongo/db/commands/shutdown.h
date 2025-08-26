@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_type.h"

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 {&getEdgesDoubleForTest,
  0.00000000000000000,
  0.00000000000000000,

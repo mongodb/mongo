@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/util/uuid.h"
 

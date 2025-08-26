@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 // TODO SERVER-92265 evaluate getting rid of this file
 
 #include "mongo/base/string_data.h"

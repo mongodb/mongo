@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/client_strand.h"

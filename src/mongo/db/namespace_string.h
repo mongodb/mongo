@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string_reserved.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -116,16 +117,16 @@ public:
 
     // Maintainers Note: The large set of `NamespaceString`-typed static data
     // members of the `NamespaceString` class representing system-reserved
-    // collections is now generated from "namespace_string_reserved.def.h".
+    // collections is now generated from "namespace_string_reserved.h".
     // Please make edits there to add or change such constants.
 
     // The constants are declared as merely `const` but have `constexpr`
     // definitions below. Because the `NamespaceString` class enclosing their
     // type is incomplete, they can't be _declared_ fully constexpr (a constexpr
     // limitation).
-#define NSS_CONSTANT(id, db, coll) static const NamespaceString id;
-#include "namespace_string_reserved.def.h"  // IWYU pragma: keep
-#undef NSS_CONSTANT
+#define X(id, db, coll) static const NamespaceString id;
+    EXPAND_NSS_CONSTANT_TABLE(X)
+#undef X
 
     /**
      * Constructs an empty NamespaceString.
@@ -998,17 +999,17 @@ constexpr auto makeNsData(const char* db, const char* coll) {
     return result;
 }
 
-#define NSS_CONSTANT(id, dbname, coll) \
-    constexpr inline auto id##_data =  \
+#define X(id, dbname, coll)           \
+    constexpr inline auto id##_data = \
         makeNsData<dbname.size(), coll.size()>(dbname.db(OmitTenant{}).data(), coll.data());
-#include "namespace_string_reserved.def.h"
-#undef NSS_CONSTANT
+EXPAND_NSS_CONSTANT_TABLE(X)
+#undef X
 }  // namespace namespace_string_data
 
-#define NSS_CONSTANT(id, db, coll)                                                                \
+#define X(id, db, coll)                                                                           \
     constexpr inline NamespaceString NamespaceString::id(namespace_string_data::id##_data.data(), \
                                                          namespace_string_data::id##_data.size());
-#include "namespace_string_reserved.def.h"
-#undef NSS_CONSTANT
+EXPAND_NSS_CONSTANT_TABLE(X)
+#undef X
 
 }  // namespace mongo

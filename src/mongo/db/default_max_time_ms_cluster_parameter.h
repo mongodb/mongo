@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands.h"

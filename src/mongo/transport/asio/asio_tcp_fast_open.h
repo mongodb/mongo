@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/status.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_transport_layer.h"

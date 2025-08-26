@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 {&getEdgesDecimal128ForTest,
  Decimal128(0),
  Decimal128(0),

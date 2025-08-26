@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
 

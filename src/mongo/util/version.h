@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #ifndef UTIL_VERSION_HEADER
 #define UTIL_VERSION_HEADER
 

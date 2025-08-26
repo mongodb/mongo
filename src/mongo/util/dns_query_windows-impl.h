@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #ifndef MONGO_ALLOW_INCLUDE_UTIL_DNS_QUERY_PLATFORM
 #error Do not include the DNS Query platform implementation headers.  Please use "mongo/util/dns_query.h" instead.
 #endif

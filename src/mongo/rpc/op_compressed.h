@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/data_range_cursor.h"
 
 #include <cstddef>

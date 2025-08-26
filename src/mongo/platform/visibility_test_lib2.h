@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 
 #include "mongo/platform/visibility.h"
 #include "mongo/platform/visibility_test_lib1.h"

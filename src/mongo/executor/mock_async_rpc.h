@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

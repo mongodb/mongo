@@ -28,11 +28,13 @@
  */
 
 #pragma once
+
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/database_name_reserved.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
@@ -76,9 +78,9 @@ protected:
     class Storage;
 
 public:
-#define DBNAME_CONSTANT(id, db) static const DatabaseName id;
-#include "database_name_reserved.def.h"  // IWYU pragma: keep
-#undef DBNAME_CONSTANT
+#define X(id, db) static const DatabaseName id;
+    EXPAND_DBNAME_CONSTANT_TABLE(X)
+#undef X
 
     static constexpr size_t kMaxDatabaseNameLength = 63;
 
@@ -788,16 +790,16 @@ constexpr auto makeDbData(const char* db) {
     p = std::copy_n(db, dbSize, p);
     return result;
 }
-#define DBNAME_CONSTANT(id, db) constexpr inline auto id##_data = makeDbData<db.size()>(db.data());
-#include "database_name_reserved.def.h"
-#undef DBNAME_CONSTANT
+#define X(id, db) constexpr inline auto id##_data = makeDbData<db.size()>(db.data());
+EXPAND_DBNAME_CONSTANT_TABLE(X)
+#undef X
 }  // namespace dbname_detail::constexpr_data
 
-#define DBNAME_CONSTANT(id, db)                          \
+#define X(id, db)                                        \
     constexpr inline DatabaseName DatabaseName::id(      \
         dbname_detail::constexpr_data::id##_data.data(), \
         dbname_detail::constexpr_data::id##_data.size());
-#include "database_name_reserved.def.h"
-#undef DBNAME_CONSTANT
+EXPAND_DBNAME_CONSTANT_TABLE(X)
+#undef X
 
 }  // namespace mongo

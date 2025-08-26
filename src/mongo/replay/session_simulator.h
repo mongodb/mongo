@@ -26,6 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
 /**
  * SessionSimulator handles events from a recording, and at the appropriate time point
  * dispatches requests to the contained ReplayCommandExecutor.

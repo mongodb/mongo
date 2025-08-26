@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 {&getEdgesInt64,
  7,
  0,

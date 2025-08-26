@@ -26,6 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/record_store.h"

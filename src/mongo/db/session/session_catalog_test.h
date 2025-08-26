@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/session_catalog.h"
 

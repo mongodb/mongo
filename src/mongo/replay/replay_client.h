@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/replay/replay_config.h"
 
 namespace mongo {

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

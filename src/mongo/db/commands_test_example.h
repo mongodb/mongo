@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example_gen.h"
 

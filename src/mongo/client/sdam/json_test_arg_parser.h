@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/client/sdam/json_test_runner_cli_options_gen.h"
 
 #include <cstdlib>

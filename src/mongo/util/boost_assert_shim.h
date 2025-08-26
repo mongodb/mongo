@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
 #include <functional>
 

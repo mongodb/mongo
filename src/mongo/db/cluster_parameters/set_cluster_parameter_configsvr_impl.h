@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cluster_parameters/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"

@@ -26,6 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
 #ifndef HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED
 #define HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED
 

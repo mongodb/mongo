@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 /**
  * This header and its source file are for testing that static, hidden, etc.
  * functions appear in backtraces, see unwind_test.cpp.

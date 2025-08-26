@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"

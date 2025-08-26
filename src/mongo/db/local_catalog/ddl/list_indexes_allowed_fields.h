@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/ddl/list_indexes_gen.h"

@@ -851,9 +851,9 @@ mongo_cc_binary(
     srcs = [
         "pretty_printer_test_program.cpp",
         "//src/mongo/db:database_name.h",
-        "//src/mongo/db:database_name_reserved.def.h",
+        "//src/mongo/db:database_name_reserved.h",
         "//src/mongo/db:namespace_string.h",
-        "//src/mongo/db:namespace_string_reserved.def.h",
+        "//src/mongo/db:namespace_string_reserved.h",
         "//src/mongo/db:server_options.h",
         "//src/mongo/db:tenant_id.h",
         "//src/mongo/db/auth:cluster_auth_mode.h",

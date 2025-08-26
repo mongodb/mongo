@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 // this file was generated using code in
 // https://github.com/10gen/ost1-misc/tree/master/my-app
 //

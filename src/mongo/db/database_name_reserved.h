@@ -27,31 +27,25 @@
  *    it in the license file.
  */
 
+#pragma once
+
+// IWYU pragma: private, include "mongo/db/database_name.h"
+
 /**
- * This file is included multiple times into `database_name.h`, in order to
- * define DatabaseName constexpr values. The `DBNAME_CONSTANT` macro callback
- * will be defined differently at each include. Lines here are of the form:
+ * This X-macro expands the provided macro as `X(id, db)` for each dbname:
  *
- *     DBNAME_CONSTANT(id, db)
- *
- * - `id` is the `ConstantProxy` data member of `DatabaseName` being defined.
- * - `db` : must be a constexpr StringData expression.
+ * - `id` : the `ConstantProxy` data member of `DatabaseName` being defined.
+ * - `db` : a constexpr StringData expression.
  */
 
-DBNAME_CONSTANT(kAdmin, "admin"_sd)
-
-DBNAME_CONSTANT(kLocal, "local"_sd)
-
-DBNAME_CONSTANT(kConfig, "config"_sd)
-
-DBNAME_CONSTANT(kSystem, "system"_sd)
-
-DBNAME_CONSTANT(kExternal, "$external"_sd)
-
-DBNAME_CONSTANT(kEmpty, ""_sd)
-
-DBNAME_CONSTANT(kMdbTesting, "mdb_testing"_sd)
-
-DBNAME_CONSTANT(kGlobal, "global"_sd)
-
-DBNAME_CONSTANT(kMdbCatalog, "_mdb_catalog"_sd)
+#define EXPAND_DBNAME_CONSTANT_TABLE(X) \
+    X(kAdmin, "admin"_sd)               \
+    X(kLocal, "local"_sd)               \
+    X(kConfig, "config"_sd)             \
+    X(kSystem, "system"_sd)             \
+    X(kExternal, "$external"_sd)        \
+    X(kEmpty, ""_sd)                    \
+    X(kMdbTesting, "mdb_testing"_sd)    \
+    X(kGlobal, "global"_sd)             \
+    X(kMdbCatalog, "_mdb_catalog"_sd)   \
+    /**/

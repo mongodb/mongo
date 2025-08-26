@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
 

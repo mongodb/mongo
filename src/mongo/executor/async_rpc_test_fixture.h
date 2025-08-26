@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"

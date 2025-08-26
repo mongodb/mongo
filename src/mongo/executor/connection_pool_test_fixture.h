@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/status.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/transport/transport_layer.h"

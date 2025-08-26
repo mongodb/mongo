@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_validated.h"
