@@ -85,6 +85,8 @@ class test_timestamp26_wtu_never(wttest.WiredTigerTestCase):
         else:
             self.session.commit_transaction()
 
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one/")
+
 # Test assert read timestamp settings.
 class test_timestamp26_read_timestamp(wttest.WiredTigerTestCase):
     read_ts = [
@@ -195,6 +197,8 @@ class test_timestamp26_alter(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg)
 
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")
+
 # Test timestamp settings with alter and inconsistent updates.
 class test_timestamp26_alter_inconsistent_update(wttest.WiredTigerTestCase):
     types = [
@@ -275,6 +279,8 @@ class test_timestamp26_alter_inconsistent_update(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg)
 
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")
+
 # Test timestamp settings with inconsistent updates.
 class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
     types = [
@@ -342,6 +348,8 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
             lambda: self.session.commit_transaction(), msg)
         self.ignoreStdoutPatternIfExists(msg)
 
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")
+
     # Try to update a key previously used with timestamps without one. We should get the
     # inconsistent usage error/message.
     def test_timestamp_ts_then_nots(self):
@@ -374,6 +382,7 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
             lambda: self.session.commit_transaction(), msg)
 
         self.ignoreStdoutPatternIfExists(msg)
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")
 
     # Smoke test setting the timestamp at various points in the transaction.
     def test_timestamp_ts_order(self):
@@ -423,6 +432,8 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(33))
         self.assertEqual(c[key1], ds.value(20))
         self.assertEqual(c[key2], ds.value(21))
+
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")
 
 # Test that timestamps are ignored in logged files.
 class test_timestamp26_log_ts(wttest.WiredTigerTestCase):
@@ -543,3 +554,5 @@ class test_timestamp26_in_memory_ts(wttest.WiredTigerTestCase):
 
         self.ignoreStdoutPatternIfExists('/unexpected timestamp usage/')
         self.ignoreStdoutPatternIfExists('/no timestamp provided/')
+
+        self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")

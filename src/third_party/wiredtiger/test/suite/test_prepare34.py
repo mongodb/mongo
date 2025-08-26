@@ -37,6 +37,7 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare34(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare34'
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
@@ -76,12 +77,14 @@ class test_prepare34(test_prepare_preserve_prepare_base):
 
         for i in range(1, 21):
             cursor_prepare.set_key(i)
-            modifications = [wiredtiger.Modify('b', 0, 1)]  # Modify 'aaaaa' to `baaaaa`
+            long_b_string = 'b' * 65  # String of 65 'b' characters
+            modifications = [wiredtiger.Modify(long_b_string, 0, 65)]  # Modify 'aaaaa' to include 65 'b' characters at start
             self.assertEqual(cursor_prepare.modify(modifications), 0)
 
         for i in range(1, 21):
             cursor_prepare.set_key(i)
-            modifications = [wiredtiger.Modify('d', 0, 1)]  # Modify 'baaaaa' to `dbaaaaa`
+            long_d_string = 'd' * 70  # String of 70 'd' characters
+            modifications = [wiredtiger.Modify(long_d_string, 0, 70)]  # Modify to include 70 'd' characters at start
             self.assertEqual(cursor_prepare.modify(modifications), 0)
         # Prepare the transaction at timestamp 70
         session_prepare.prepare_transaction('prepare_timestamp=' + self.timestamp_str(70)+',prepared_id=' + self.prepared_id_str(1))
@@ -120,12 +123,15 @@ class test_prepare34(test_prepare_preserve_prepare_base):
             self.assertEqual(value, cursor[i])
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
         do not affect checkpoint behavior or data reconstruction.
         """
         value = 'aaaaa'
+        long_b_string = 'b' * 65  # String of 65 'b' characters
+        long_d_string = 'd' * 70  # String of 70 'd' characters
         # Set initial timestamps
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
@@ -158,14 +164,13 @@ class test_prepare34(test_prepare_preserve_prepare_base):
 
         for i in range(1, 21):
             cursor_prepare.set_key(i)
-
-            modifications = [wiredtiger.Modify('b', 0, 0)]  # Modify 'aaaaa' to `baaaaa`
+            modifications = [wiredtiger.Modify(long_b_string, 0, 0)]  # Modify 'aaaaa' to include 65 'b' characters at start
             self.assertEqual(cursor_prepare.modify(modifications), 0)
 
         for i in range(1, 21):
             cursor_prepare.set_key(i)
 
-            modifications = [wiredtiger.Modify('d', 0, 0)]  # Modify `baaaaa` to 'dbaaaaa'
+            modifications = [wiredtiger.Modify(long_d_string, 0, 0)]  # Modify to include 70 'd' characters at start
             self.assertEqual(cursor_prepare.modify(modifications), 0)
 
         # Prepare the transaction at timestamp 70
@@ -212,5 +217,6 @@ class test_prepare34(test_prepare_preserve_prepare_base):
 
         self.session.begin_transaction('read_timestamp='+ self.timestamp_str(81))
         for i in range(1, 21):
-            self.assertEqual('dbaaaaa', cursor[i])
+            expected_value = long_d_string + long_b_string + 'aaaaa'
+            self.assertEqual(expected_value, cursor[i])
         self.session.rollback_transaction()

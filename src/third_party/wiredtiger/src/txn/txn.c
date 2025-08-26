@@ -2678,10 +2678,17 @@ __wt_verbose_dump_txn_one(
     txn_shared = WT_SESSION_TXN_SHARED(txn_session);
     WT_ERROR_INFO *txn_err_info = &(txn_session->err_info);
 
-    if (txn->isolation != WT_ISO_READ_UNCOMMITTED && !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+    /*
+     * Unless an error occurs, there's no need to print transactions without a snapshot, as they are
+     * typically harmless to the database.
+     */
+    if (error_code == 0 && txn->isolation != WT_ISO_READ_UNCOMMITTED &&
+      !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         return (0);
 
-    WT_RET(__wt_msg(session,
+    buf_len = 512;
+    WT_RET(__wt_scr_alloc(session, buf_len, &buf));
+    WT_ERR(__wt_snprintf((char *)buf->data, buf_len,
       "session ID: %" PRIu32 ", txn ID: %" PRIu64 ", pinned ID: %" PRIu64
       ", metadata pinned ID: %" PRIu64 ", name: %s",
       txn_session->id, __wt_atomic_loadv64(&txn_shared->id),
@@ -2689,20 +2696,28 @@ __wt_verbose_dump_txn_one(
       __wt_atomic_loadv64(&txn_shared->metadata_pinned),
       txn_session->name == NULL ? "EMPTY" : txn_session->name));
 
+    if (error_code != 0)
+        WT_ERR_MSG(session, error_code, "%s, %s", (char *)buf->data,
+          error_string != NULL ? error_string : "");
+    else
+        WT_ERR(__wt_msg(session, "%s", (char *)buf->data));
+
+    __wt_scr_free(session, &buf);
+
+    /* Since read uncommitted isolation doesn't create snapshots, there is no need to log them. */
     if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
-        return (0);
+        goto err;
 
     WT_NOT_READ(iso_tag, "INVALID");
     switch (txn->isolation) {
     case WT_ISO_READ_COMMITTED:
         iso_tag = "WT_ISO_READ_COMMITTED";
         break;
-    case WT_ISO_READ_UNCOMMITTED:
-        iso_tag = "WT_ISO_READ_UNCOMMITTED";
-        break;
     case WT_ISO_SNAPSHOT:
         iso_tag = "WT_ISO_SNAPSHOT";
         break;
+    case WT_ISO_READ_UNCOMMITTED:
+        return (__wt_illegal_value(session, txn->isolation));
     }
 
     WT_ERR(__wt_scr_alloc(session, 2048, &snapshot_buf));

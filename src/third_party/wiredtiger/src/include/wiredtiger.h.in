@@ -2140,6 +2140,15 @@ struct __wt_connection {
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default
      * empty.}
      * @config{ ),,}
+     * @config{cache_eviction_controls = (, Controls the experimental incremental cache eviction
+     * features., a set of related configuration options defined as follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;incremental_app_eviction, Only a part of application threads
+     * will participate in cache management when a cache threshold reaches its trigger limit., a
+     * boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+     * scrub_evict_under_target_limit, Change the eviction strategy to scrub eviction when the cache
+     * usage is under the target limit., a boolean flag; default \c false.}
+     * @config{ ),,}
      * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will wait
      * for space to be available in cache before giving up.  Default or 0 will wait forever.  1 will
      * never wait., an integer greater than or equal to \c 0; default \c 0.}
@@ -2971,6 +2980,15 @@ struct __wt_connection {
  * @config{cache_cursors, enable caching of cursors for reuse.  This is the default value for any
  * sessions created\, and can be overridden in configuring \c cache_cursors in
  * WT_CONNECTION.open_session., a boolean flag; default \c true.}
+ * @config{cache_eviction_controls = (, Controls the experimental incremental cache eviction
+ * features., a set of related configuration options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;incremental_app_eviction, Only a part of application threads will
+ * participate in cache management when a cache threshold reaches its trigger limit., a boolean
+ * flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;scrub_evict_under_target_limit, Change
+ * the eviction strategy to scrub eviction when the cache usage is under the target limit., a
+ * boolean flag; default \c false.}
+ * @config{ ),,}
  * @config{cache_max_wait_ms, the maximum number of milliseconds an application thread will wait for
  * space to be available in cache before giving up.  Default or 0 will wait forever.  1 will never
  * wait., an integer greater than or equal to \c 0; default \c 0.}

@@ -95,12 +95,12 @@ class test_checkpoint35(wttest.WiredTigerTestCase):
         simulate_crash_restart(self, ".", "RESTART")
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        self.assertEquals(stat_cursor[stat.conn.txn_rts_upd_aborted][2], 0)
+        self.assertEqual(stat_cursor[stat.conn.txn_rts_upd_aborted][2], 0)
         stat_cursor.close()
 
         cursor = self.session.open_cursor(ds.uri, None, None)
         for i in range(1, nrows + 1):
-            self.assertEquals(cursor[ds.key(i)], value_a)
+            self.assertEqual(cursor[ds.key(i)], value_a)
 
 if __name__ == '__main__':
     wttest.run()

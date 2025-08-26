@@ -34,6 +34,7 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare37(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare37'
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -145,6 +146,7 @@ class test_prepare37(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor[20], "committed_value_20_1")
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -250,6 +252,7 @@ class test_prepare37(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor[20], "committed_value_20_1")
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare_delete(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -358,6 +361,7 @@ class test_prepare37(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor[20], "committed_value_20_1")
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare_delete(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))

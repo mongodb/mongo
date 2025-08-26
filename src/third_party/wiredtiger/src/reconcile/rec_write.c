@@ -672,7 +672,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     __wt_txn_pinned_timestamp(session, &r->rec_start_pinned_ts);
     r->rec_start_oldest_id = __wt_txn_oldest_id(session);
 
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_PRECISE_CHECKPOINT))
+    if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT))
         __wt_txn_pinned_stable_timestamp(session, &r->rec_start_pinned_stable_ts);
     else
         r->rec_start_pinned_stable_ts = WT_TS_NONE;
@@ -695,7 +695,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
         WT_ACQUIRE_READ_WITH_BARRIER(ckpt_txn, txn_global->checkpoint_txn_shared.id);
         if (ckpt_txn != WT_TXN_NONE && (ckpt_txn < r->last_running))
             r->last_running = ckpt_txn;
-    } else if (F_ISSET_ATOMIC_32(conn, WT_CONN_PRECISE_CHECKPOINT) && LF_ISSET(WT_REC_EVICT)) {
+    } else if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && LF_ISSET(WT_REC_EVICT)) {
         /*
          * If we race with checkpoint start and read an obsolete global checkpoint gen, we will
          * wrongly not pin the checkpoint transaction. Ensure the read order here.

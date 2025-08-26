@@ -30,22 +30,25 @@ import wttest
 class test_prepare_preserve_prepare_base(wttest.WiredTigerTestCase):
     conn_config = 'precise_checkpoint=true,preserve_prepared=true,statistics=(all)'
 
-    def get_stats(self, stats, uri):
+    def get_stats(self, stats, uri, session):
         """Get the current values of multiple statistics."""
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
+        stat_cursor = session.open_cursor('statistics:' + uri)
         results = {}
         for stat in stats:
             results[stat] = stat_cursor[stat][2]
         stat_cursor.close()
         return results
 
-    def checkpoint_and_verify_stats(self, expected_changes, uri):
+    def checkpoint_and_verify_stats(self, expected_changes, uri, session = None):
+        if session is None:
+            session = self.session
+
         stats_to_check = list(expected_changes.keys())
-        old_stats = self.get_stats(stats_to_check, uri)
+        old_stats = self.get_stats(stats_to_check, uri, session)
 
-        self.session.checkpoint()
+        session.checkpoint()
 
-        new_stats = self.get_stats(stats_to_check, uri)
+        new_stats = self.get_stats(stats_to_check, uri, session)
 
         for stat, expect_increase in expected_changes.items():
             diff = new_stats[stat] - old_stats[stat]

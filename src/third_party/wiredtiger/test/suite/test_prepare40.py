@@ -26,35 +26,28 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover01.py
-#   Test discovering prepared transaction artifacts after recovery
-#
+# test_prepare40.py
+# Test that checkpoint after opening a backup with prepared updates (preserve prepared on) doesn't crash by:
+# - Checkpoint writes prepared update to disk
+# - Rollback the transaction with rollback timestamp > stable timestamp
+# - Checkpoint again. it should not crash and should write the rolled back update as prepared to disk
 
-import random, sys
-from suite_subprocess import suite_subprocess
-import wttest
+import wiredtiger
+from prepare_util import test_prepare_preserve_prepare_base
 from wtscenario import make_scenarios
 
-class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_prepare_discover01'
+class test_prepare40(test_prepare_preserve_prepare_base):
+    tablename = 'test_prepare40'
     uri = 'table:' + tablename
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
 
-    types = [
-        ('row', dict(s_config='key_format=i,value_format=S')),
-    ]
 
-    # Transaction end types
-    txn_end = [
-        ('txn_commit', dict(txn_commit=True)),
-    ]
+    def test_prepare40(self):
 
-    scenarios = make_scenarios(types, txn_end)
-
-    def test_prepare_discover01(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
-        self.session.create(self.uri, self.s_config)
+        create_params = 'key_format=i,value_format=S'
+        self.session.create(self.uri, create_params)
         c = self.session.open_cursor(self.uri)
 
         self.session.begin_transaction()
@@ -75,27 +68,24 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
         session2 = self.conn.open_session()
         session2.checkpoint()
 
-        # Creating backup that will preserve artifacts
-        backup_dir = 'bkp'
-        self.backup(backup_dir, session2)
+        # Force eviction to ensures the committed update gets written to disk storage
+        # and flush in-memory updates. The aim of this is to hit RESOLVE_PREPARE_ON_DISK case
+        # when we rollback the transaction
+        session_evict = self.conn.open_session("debug=(release_evict_page=true)")
+        session_evict.begin_transaction("ignore_prepare=true")
+        evict_cursor = session_evict.open_cursor(self.uri, None, None)
+        for i in range(1, 3):  # Evict to trigger reconciliation
+            evict_cursor.set_key(i)
+            self.assertEqual(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        evict_cursor.close()
+        session_evict.rollback_transaction()
+        session_evict.close()
 
-        # Opening backup database
-        conn2 = self.wiredtiger_open(backup_dir, self.conn_config)
+        self.session.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
 
-        c2s1 = conn2.open_session()
-
-        # Opening prepared discover cursor
-        prepared_discover_cursor = c2s1.open_cursor("prepared_discover:")
-
-        # Walking through prepared discover cursor
-        c2s2 = conn2.open_session()
-        count = 0
-        while prepared_discover_cursor.next() == 0:
-            count += 1
-            prepared_id = prepared_discover_cursor.get_key()
-            self.assertEqual(prepared_id, 100)
-            c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(prepared_id))
-            c2s2.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
-        self.assertEqual(count, 1)
-
-        prepared_discover_cursor.close()
+        session3 = self.conn.open_session()
+        # Check that we're writing updates as prepared again
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: True,
+        }, self.uri, session3)

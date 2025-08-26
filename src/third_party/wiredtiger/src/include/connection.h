@@ -323,6 +323,20 @@ struct __wt_bucket_storage {
     } while (0)
 
 /*
+ * WT_CACHE_EVICTION_CONTROLS --
+ *  Cache eviction controls configuration.
+ *  WT_CACHE_EVICT_INCREMENTAL_APP: Only a part of application threads will participate in cache
+ * management when a cache threshold reaches its trigger limit. WT_CACHE_EVICT_SCRUB_UNDER_TARGET:
+ * Change the eviction strategy to scrub eviction when the cache usage is under the target limit.
+ */
+struct __wt_cache_eviction_controls {
+/* cache eviction controls bit positions */
+#define WT_CACHE_EVICT_INCREMENTAL_APP 0x1u
+#define WT_CACHE_EVICT_SCRUB_UNDER_TARGET 0x2u
+    uint64_t flags;
+};
+
+/*
  * WT_HEURISTIC_CONTROLS --
  *  Heuristic controls configuration.
  */
@@ -681,6 +695,7 @@ struct __wt_connection_impl {
                                      configured or the current size
                                      within a cache pool). */
     WT_EVICT *evict;
+    WT_CACHE_EVICTION_CONTROLS cache_eviction_controls;
 
     WT_TXN_GLOBAL txn_global; /* Global transaction state */
 
@@ -997,13 +1012,14 @@ struct __wt_connection_impl {
 #define WT_CONN_CKPT_SYNC 0x0010u
 #define WT_CONN_IN_MEMORY 0x0020u
 #define WT_CONN_LIVE_RESTORE_FS 0x0040u
-#define WT_CONN_PRESERVE_PREPARED 0x0080u
-#define WT_CONN_READONLY 0x0100u
-#define WT_CONN_RECOVERING 0x0200u
-#define WT_CONN_RECOVERING_METADATA 0x0400u
-#define WT_CONN_RECOVERY_COMPLETE 0x0800u
-#define WT_CONN_SALVAGE 0x1000u
-#define WT_CONN_WAS_BACKUP 0x2000u
+#define WT_CONN_PRECISE_CHECKPOINT 0x0080u
+#define WT_CONN_PRESERVE_PREPARED 0x0100u
+#define WT_CONN_READONLY 0x0200u
+#define WT_CONN_RECOVERING 0x0400u
+#define WT_CONN_RECOVERING_METADATA 0x0800u
+#define WT_CONN_RECOVERY_COMPLETE 0x1000u
+#define WT_CONN_SALVAGE 0x2000u
+#define WT_CONN_WAS_BACKUP 0x4000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 
@@ -1021,10 +1037,9 @@ struct __wt_connection_impl {
 #define WT_CONN_MINIMAL 0x00000400u
 #define WT_CONN_OPTRACK 0x00000800u
 #define WT_CONN_PANIC 0x00001000u
-#define WT_CONN_PRECISE_CHECKPOINT 0x00002000u
-#define WT_CONN_READY 0x00004000u
-#define WT_CONN_RECONFIGURING 0x00008000u
-#define WT_CONN_TIERED_FIRST_FLUSH 0x00010000u
+#define WT_CONN_READY 0x00002000u
+#define WT_CONN_RECONFIGURING 0x00004000u
+#define WT_CONN_TIERED_FIRST_FLUSH 0x00008000u
     /* AUTOMATIC ATOMIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags_atomic;
 };

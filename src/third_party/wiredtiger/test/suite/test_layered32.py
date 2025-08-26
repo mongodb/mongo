@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import random, wttest
+import random, platform, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -129,6 +129,9 @@ class test_layered32(wttest.WiredTigerTestCase, DisaggConfigMixin):
         cursor.close()
 
     def test_internal_page_delta_simple(self):
+        if platform.processor() == 's390x':
+            self.skipTest("FIXME-WT-14904: not working on zSeries")
+
         self.session.create(self.uri, self.session_create_config())
 
         # Populate the table with nitems.

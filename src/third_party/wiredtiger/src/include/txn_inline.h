@@ -582,6 +582,7 @@ __wt_txn_timestamp_usage_check(
         __wt_err(session, EINVAL,
           "%s: " WT_TS_VERBOSE_PREFIX "timestamp %s set when disallowed by table configuration",
           name, __wt_timestamp_to_string(op_ts, ts_string[0]));
+        WT_IGNORE_RET(__wt_verbose_dump_txn_one(session, session, EINVAL, NULL));
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
@@ -599,6 +600,7 @@ __wt_txn_timestamp_usage_check(
           "no timestamp provided for an update to a table configured to always use timestamps "
           "once they are first used",
           name);
+        WT_IGNORE_RET(__wt_verbose_dump_txn_one(session, session, EINVAL, NULL));
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
@@ -612,6 +614,7 @@ __wt_txn_timestamp_usage_check(
           "updating a value with a timestamp %s before the previous update %s",
           name, __wt_timestamp_to_string(op_ts, ts_string[0]),
           __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1]));
+        WT_IGNORE_RET(__wt_verbose_dump_txn_one(session, session, EINVAL, NULL));
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
@@ -846,7 +849,7 @@ __wt_txn_pinned_stable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinne
      */
     WT_ACQUIRE_READ(pinned_stable_ts, txn_global->stable_timestamp);
 
-    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_PRECISE_CHECKPOINT)) {
+    if (!F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
         *pinned_stable_tsp = pinned_stable_ts;
         return;
     }

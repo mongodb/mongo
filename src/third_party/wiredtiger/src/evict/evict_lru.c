@@ -2068,7 +2068,7 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
       __wt_atomic_loadv64(&conn->txn_global.last_running)) {
         WT_STAT_CONN_INCR(session, eviction_server_skip_pages_last_running);
         return (true);
-    } else if (F_ISSET_ATOMIC_32(conn, WT_CONN_PRECISE_CHECKPOINT)) {
+    } else if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
         wt_timestamp_t pinned_stable_ts;
         __wt_txn_pinned_stable_timestamp(session, &pinned_stable_ts);
         if (__wt_atomic_load64(&page->modify->newest_commit_timestamp) > pinned_stable_ts) {

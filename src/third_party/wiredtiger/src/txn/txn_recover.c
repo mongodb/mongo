@@ -1189,9 +1189,10 @@ done:
      * 1. The connection is not read-only. A read-only connection expects that there shouldn't be
      *    any changes that need to be done on the database other than reading.
      * 2. The history store file was found in the metadata.
-     * 3. We are not using disaggregated storage.
+     * 3. We are not using disaggregated storage or precise checkpoint
      */
-    if (hs_exists_local && !F_ISSET(conn, WT_CONN_READONLY) && !disagg) {
+    if (hs_exists_local && !F_ISSET(conn, WT_CONN_READONLY | WT_CONN_PRECISE_CHECKPOINT) &&
+      !disagg) {
         const char *rts_cfg[] = {
           WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
         __wt_timer_start(session, &rts_timer);

@@ -111,6 +111,8 @@ struct __wt_bucket_storage;
 typedef struct __wt_bucket_storage WT_BUCKET_STORAGE;
 struct __wt_cache;
 typedef struct __wt_cache WT_CACHE;
+struct __wt_cache_eviction_controls;
+typedef struct __wt_cache_eviction_controls WT_CACHE_EVICTION_CONTROLS;
 struct __wt_cache_pool;
 typedef struct __wt_cache_pool WT_CACHE_POOL;
 struct __wt_capacity;

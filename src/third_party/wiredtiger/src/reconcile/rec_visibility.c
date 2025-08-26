@@ -728,12 +728,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
                     break;
                 continue;
             }
-
-            /*
-             * If we have seen a tombstone that rolled back the prepared update, this must be the
-             * prepared update. No need to walk further.
-             */
-            prepare_rollback_tombstone = NULL;
             txnid = upd->upd_saved_txnid;
         }
 
@@ -809,13 +803,9 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
          * this through reconfiguration, we need to ensure we have run a rollback to stable before
          * we run the first checkpoint with the precise mode.
          */
-        if (F_ISSET_ATOMIC_32(conn, WT_CONN_PRECISE_CHECKPOINT) &&
+        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) &&
           !F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DELTA)) {
             if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
-                WT_ASSERT_ALWAYS(session,
-                  upd_select->upd == NULL || F_ISSET(r, WT_REC_CHECKPOINT) ||
-                    upd_select->upd->txnid == upd->txnid,
-                  "Cannot have two different prepared transactions active on the same key");
 
                 if (upd->prepare_ts > r->rec_start_pinned_stable_ts) {
                     WT_ASSERT(session, !is_hs_page);
@@ -933,6 +923,11 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
               *write_prepare && upd->prepare_state == WT_PREPARE_INPROGRESS &&
                 prepare_rollback_tombstone->next == upd);
             upd_select->upd = upd;
+            /*
+             * If we have seen a tombstone that rolled back the prepared update, this must be the
+             * prepared update. No need to walk further.
+             */
+            prepare_rollback_tombstone = NULL;
         }
 
         /* Track the selected update transaction id and timestamp. */

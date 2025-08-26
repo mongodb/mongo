@@ -204,6 +204,37 @@ format_meta = common_meta + [
         type='format', func='__wt_struct_confchk'),
 ]
 
+# We need to be able to understand these forever, even if they're just empty strings. It's OK
+# to reject them if there's any real config -- the feature is gone.
+lsm_config = [
+    Config('lsm', '', r'''
+        Removed options, preserved to allow parsing old metadata''',
+        type='category', undoc=True, subconfig=[
+        Config('auto_throttle', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('bloom', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('bloom_bit_count', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('bloom_config', '', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('bloom_hash_count', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('bloom_oldest', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('chunk_count_limit', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('chunk_max', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('chunk_size', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('merge_max', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('merge_min', 'none', r'''
+            removed option, preserved to allow parsing old metadata''', undoc=True),
+    ]),
+]
+
 tiered_config = [
     Config('tiered_storage', '', r'''
         configure a storage source for this table''',
@@ -479,6 +510,8 @@ table_only_config = [
 ]
 
 index_only_config = [
+    Config('extractor', 'none', r'''
+        removed option, preserved to allow parsing old metadata''', undoc=True),
     Config('immutable', 'false', r'''
         configure the index to be immutable -- that is, the index is not changed by any update to
         a record in the table''',
@@ -545,6 +578,18 @@ connection_runtime_config = [
             min='0', max='1024GB'),
         Config('type', '', r'''
             cache location: DRAM or NVRAM'''),
+        ]),
+    Config('cache_eviction_controls', '', r'''
+        Controls the experimental incremental cache eviction features.''',
+        type='category', subconfig=[
+            Config('incremental_app_eviction', 'false', r'''
+                Only a part of application threads will participate in cache management 
+                when a cache threshold reaches its trigger limit.''',
+                type='boolean'),
+            Config('scrub_evict_under_target_limit', 'false', 
+                r'''Change the eviction strategy to scrub eviction when the cache usage is under
+                the target limit.''',
+                type='boolean'),
         ]),
     Config('cache_size', '100MB', r'''
         maximum heap memory to allocate for the cache. A database should configure either
@@ -1526,8 +1571,9 @@ methods = {
         type='int'),
 ]),
 
-'WT_SESSION.create' : Method(file_config + tiered_config + file_disaggregated_config +\
-        source_meta + index_only_config + table_only_config + layered_config + [
+'WT_SESSION.create' : Method(file_config + lsm_config + tiered_config +\
+        file_disaggregated_config + source_meta + index_only_config + table_only_config +\
+        layered_config + [
     Config('exclusive', 'false', r'''
         explicitly fail with EEXIST if the object exists. When false (the default), if the object
         exists, silently fail without creating a new object.''',
