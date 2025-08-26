@@ -18,6 +18,7 @@ mongo_cc_library(
         ],
         exclude = [
             "dist/impl/avrogencpp.cc",  # Code generator tool with heavy boost deps
+            "dist/impl/DataFile.cc",  # File I/O with boost iostreams deps
         ],
     ) + [
         "//src/third_party/boost:headers",  # For boost headers
