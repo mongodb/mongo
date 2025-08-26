@@ -43,6 +43,13 @@ const expressionsWithNewFeaturesThatCanBeParsedByOldFCV = [
         expression: {$split: ["$splitParams.input", "$splitParams.delimiter"]},
         failureErrorCode: [40086, 10503900],
     },
+    ...["convertStringToObject", "convertStringToArray", "convertObjectToString", "convertArrayToString"].map(
+        (convertCase) => ({
+            viewName: convertCase + "View",
+            expression: {$convert: {input: `\$${convertCase}Params.input`, to: `\$${convertCase}Params.to`}},
+            failureErrorCode: [ErrorCodes.ConversionFailure],
+        }),
+    ),
 ];
 
 // These expressions are either completely new, or have new syntactic parameters, that
@@ -80,6 +87,16 @@ const expressionsWithNewFeaturesThatCannotBeParsedByOldFCV = [
         expression: {$subtype: "$binDataInput"},
         failureErrorCode: [31325, ErrorCodes.QueryFeatureNotAllowed],
     },
+    {
+        viewName: "toObjectView",
+        expression: {$toObject: "$convertStringToObjectParams.input"},
+        failureErrorCode: [ErrorCodes.QueryFeatureNotAllowed],
+    },
+    {
+        viewName: "toArrayView",
+        expression: {$toArray: "$convertStringToArrayParams.input"},
+        failureErrorCode: [ErrorCodes.QueryFeatureNotAllowed],
+    },
 ];
 
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
@@ -92,6 +109,13 @@ function setupCollection(primaryConnection, shardingTest = null) {
         shardingTest.shardColl(coll, {_id: 1}, {_id: 1});
     }
 
+    const stringObjectArrayConvertParams = {
+        convertStringToObjectParams: {input: '{"foo": 1}', to: "object"},
+        convertStringToArrayParams: {input: "[1,2,3]", to: "array"},
+        convertObjectToStringParams: {input: {foo: 1}, to: "string"},
+        convertArrayToStringParams: {input: [1, 2, 3], to: "string"},
+    };
+
     assert.commandWorked(
         coll.insertMany([
             {
@@ -101,6 +125,7 @@ function setupCollection(primaryConnection, shardingTest = null) {
                 convertToNumberParams: {input: "1010", to: "int", base: 2},
                 convertToStringParams: {input: NumberInt("10"), to: "string", base: 2},
                 binDataInput: BinData(0, "CQDoAwAAAAAAAAA="),
+                ...stringObjectArrayConvertParams,
             },
             {
                 _id: 1,
@@ -109,6 +134,7 @@ function setupCollection(primaryConnection, shardingTest = null) {
                 convertToNumberParams: {input: "12", to: "long", base: 8},
                 convertToStringParams: {input: NumberLong("10"), to: "string", base: 8},
                 binDataInput: UUID("81fd5473-1747-4c9d-8743-f10642b3bb99"),
+                ...stringObjectArrayConvertParams,
             },
             {
                 _id: 2,
@@ -117,6 +143,7 @@ function setupCollection(primaryConnection, shardingTest = null) {
                 convertToNumberParams: {input: "10", to: "double", base: 10},
                 convertToStringParams: {input: 10, to: "string", base: 10},
                 binDataInput: BinData(4, "CQDoAwAAAAAAAAA="),
+                ...stringObjectArrayConvertParams,
             },
             {
                 _id: 3,
@@ -125,6 +152,7 @@ function setupCollection(primaryConnection, shardingTest = null) {
                 convertToNumberParams: {input: "A", to: "decimal", base: 16},
                 convertToStringParams: {input: NumberDecimal("10"), to: "string", base: 16},
                 binDataInput: BinData(128, "CQDoAwAAAAAAAAA="),
+                ...stringObjectArrayConvertParams,
             },
         ]),
     );
