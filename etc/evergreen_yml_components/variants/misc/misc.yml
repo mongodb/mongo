@@ -7,6 +7,7 @@
 buildvariants:
   - name: test-release
     display_name: "Test Release"
+    # tasks may use "Admin Only" variables, so patch runs may only succeed for admins
     allowed_requesters: ["commit", "patch"]
     tags: ["assigned_to_jira_team_devprod_release_infrastructure"]
     activate: true
