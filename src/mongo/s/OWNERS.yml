@@ -67,9 +67,3 @@ filters:
   - "balancer_feature_flag*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "list_shards.idl":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology
-  - "README_router_role_api.md":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology

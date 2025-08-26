@@ -3,18 +3,12 @@ filters:
   - "*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*coordinator*":
-    approvers:
-      - 10gen/server-catalog-and-routing-ddl
   - "*transaction*":
     approvers:
       - 10gen/server-transactions
   - "*txn*":
     approvers:
       - 10gen/server-transactions
-  - "README_timeseries.md":
-    approvers:
-      - 10gen/server-catalog-and-routing-shard-catalog
   - "shardsvr_resolve_view_command_test.cpp":
     approvers:
       - 10gen/query-integration-search

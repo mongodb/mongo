@@ -43,21 +43,21 @@ return router.route(
 You can also find below two real usage examples for each case:
 
 - [CollectionRouter example](https://github.com/mongodb/mongo/blob/66405cdf815cdd2504ea4360f3317657e0dbda92/src/mongo/db/s/rename_collection_coordinator.cpp#L630-L642). In this case we need to create indexes for the `config.system.sessions` collection to on all the shards owning data for that collection.
-- [DBPrimaryRouter example](https://github.com/mongodb/mongo/blob/25ddfc96fc2adb2859e91f0401d95b32f3d7af40/src/mongo/db/s/resharding/resharding_manual_cleanup.cpp#L288-L304). In this example, we must target the DBPrimary of the collection’s database to drop the resharding temporary collection. On sharded clusters, it’s important to note that most DDL operations must be directed exclusively to the DBPrimary shard. This is because the DBPrimary is responsible for instantiating a ShardingDDLCoordinator, which coordinates the operation across all shards. To learn more about how DDL operations work in a sharded cluster, go [here](../db/s/README_ddl_operations.md).
+- [DBPrimaryRouter example](https://github.com/mongodb/mongo/blob/25ddfc96fc2adb2859e91f0401d95b32f3d7af40/src/mongo/db/s/resharding/resharding_manual_cleanup.cpp#L288-L304). In this example, we must target the DBPrimary of the collection’s database to drop the resharding temporary collection. On sharded clusters, it’s important to note that most DDL operations must be directed exclusively to the DBPrimary shard. This is because the DBPrimary is responsible for instantiating a ShardingDDLCoordinator, which coordinates the operation across all shards. To learn more about how DDL operations work in a sharded cluster, go [here](../ddl/README_ddl_operations.md).
 
 These classes handle the following processes internally:
 
-1. Fetch the routing information for the specified collection or DBPrimary shard, and pass it to the lambda function as either a [RoutingContext](./query/README_aggregation.md) or a `CachedDatabaseInfo` object.
+1. Fetch the routing information for the specified collection or DBPrimary shard, and pass it to the lambda function as either a [RoutingContext](../s/query/README_aggregation.md) or a `CachedDatabaseInfo` object.
 2. Detect and handle stale routing errors coming from shard responses. If the routing data is outdated, it is automatically refreshed and the operation is retried.
-3. Once the operation succeeds, the `RoutingContext` gets validated ([here](./query/README_routing_context.md#invariants) you'll find a more clear understanding of what's checked under a `RoutingContext` validation).
+3. Once the operation succeeds, the `RoutingContext` gets validated ([here](../s/query/README_routing_context.md#invariants) you'll find a more clear understanding of what's checked under a `RoutingContext` validation).
 
 When using `CollectionRouter` or `DBPrimaryRouter`, keep the following in mind:
 
-- The lambda function passed to `CollectionRouter::routeWithRoutingContext()` or `DBPrimaryRouter::route()` must use the provided [RoutingContext](./query/README_aggregation.md) or `CachedDatabaseInfo` objects to dispatch a shard-versioned command to the shards.
+- The lambda function passed to `CollectionRouter::routeWithRoutingContext()` or `DBPrimaryRouter::route()` must use the provided [RoutingContext](../s/query/README_aggregation.md) or `CachedDatabaseInfo` objects to dispatch a shard-versioned command to the shards.
 - Any stale routing error returned by a shard must be thrown so that it can be properly handled by the router logic.
 - During a single routing operation, it is crucial to consult only one version of the routing table.
 
-For more details on routing internals, see the [Versioning Protocols](../db/s/README_versioning_protocols.md) architecture guide.
+For more details on routing internals, see the [Versioning Protocols](../versioning_protocol/README_versioning_protocols.md) architecture guide.
 
 ## MultiCollectionRouter
 

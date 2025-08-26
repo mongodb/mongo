@@ -1,6 +1,6 @@
 # Consistency Model of the Routing Info Cache
 
-This section builds upon the definitions of the sharding catalog in [this section](README_sharding_catalog.md#catalog-containers) and elaborates on the consistency model of the [CatalogCache](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134), which is what backs the [Router role](README_sharding_catalog.md#router-role).
+This section builds upon the definitions of the sharding catalog in [this section](../../local_catalog/README_sharding_catalog.md#catalog-containers) and elaborates on the consistency model of the [CatalogCache](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134), which is what backs the [Router role](../../local_catalog/README_sharding_catalog.md#router-role).
 
 ## Timelines
 

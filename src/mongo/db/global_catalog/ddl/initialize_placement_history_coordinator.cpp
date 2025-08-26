@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/initialize_placement_history_coordinator.h"
+#include "mongo/db/global_catalog/ddl/initialize_placement_history_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"

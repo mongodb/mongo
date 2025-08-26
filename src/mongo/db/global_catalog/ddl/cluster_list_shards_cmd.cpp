@@ -37,6 +37,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/ddl/list_shards_gen.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/operation_context.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/s/request_types/list_shards_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <string>

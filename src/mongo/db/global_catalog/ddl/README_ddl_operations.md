@@ -1,6 +1,6 @@
 # DDL Operations
 
-On the Sharding team, we use the term _DDL_ to mean any operation that needs to update any subset of [catalog containers](README_sharding_catalog.md#catalog-containers). Within this definition, there are standard DDLs that use the DDL coordinator infrastructure as well as non-standard DDLs that each have their own implementations.
+On the Sharding team, we use the term _DDL_ to mean any operation that needs to update any subset of [catalog containers](../../local_catalog/README_sharding_catalog.md#catalog-containers). Within this definition, there are standard DDLs that use the DDL coordinator infrastructure as well as non-standard DDLs that each have their own implementations.
 
 ## Standard DDLs
 
@@ -72,11 +72,11 @@ When a new primary node is elected, the DDL primary only service is rebuilt, and
 
 ### Sections about specific standard DDL operations
 
-- [User write blocking](README_user_write_blocking.md)
+- [User write blocking](../../user_write_block/README_user_write_blocking.md)
 
 ## Non-Standard DDLs
 
-Some DDL operations do not follow the structure outlined in the section above. These operations are [chunk migration](README_migrations.md), resharding, and refine collection shard key. There are also other operations such as add and remove shard that do not modify the sharding catalog but do modify local metadata and need to coordinate with ddl operations. These operations also do not use the DDL coordinator infrastructure, but they do take the DDl lock to synchronize with other ddls.
+Some DDL operations do not follow the structure outlined in the section above. These operations are [chunk migration](../../s/README_migrations.md), resharding, and refine collection shard key. There are also other operations such as add and remove shard that do not modify the sharding catalog but do modify local metadata and need to coordinate with ddl operations. These operations also do not use the DDL coordinator infrastructure, but they do take the DDl lock to synchronize with other ddls.
 
 Both chunk migration and resharding have to copy user data across shards. This is too time intensive to happen entirely while holding the collection critical section, so these operations have separate machinery to transfer the data and commit the changes. These commands do not commit transactionally across the shards and the config server, rather they commit on the config server and rely on shards pulling the updated commit information from the config server after learning via a router that there is new information. They also do not have the same requirement as standard DDL operations that they must complete after starting except after entering their commit phases.
 
@@ -84,4 +84,4 @@ Refine shard key commits only on the config server, again relying on shards to p
 
 ### Sections explaining specific non-standard DDL operations
 
-- [Chunk Migration](README_migrations.md)
+- [Chunk Migration](../../s/README_migrations.md)

@@ -102,7 +102,7 @@ An index version change indicates that there has been some change in the global 
 
 ## Routing Information Refreshes
 
-For sharded collections, there are two sets of information that compose the routing information - the chunk placement information and the collection index information. The config server is [authoritative](README_sharding_catalog.md#authoritative-containers) for the placement information, while both the shards and the config server are authoritative for the index information.
+For sharded collections, there are two sets of information that compose the routing information - the chunk placement information and the collection index information. The config server is [authoritative](../local_catalog/README_sharding_catalog.md#authoritative-containers) for the placement information, while both the shards and the config server are authoritative for the index information.
 
 When a router receives a stale config error, it will refresh whichever component is stale. If the router has an older CollectionGeneration or CollectionPlacement, it will refresh the placement information, whereas if it has an older IndexVersion, it will refresh the index information.
 

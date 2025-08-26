@@ -350,9 +350,6 @@ ddl:
 
     # DDL operations
     - src/mongo/db/global_catalog/ddl/*
-    - src/mongo/s/request_types/list_shards.idl
-    - src/mongo/db/s/config/sharding_catalog_manager_collection_operations_test.cpp
-    - src/mongo/db/s/*placement_history*
 
     # metadata consistency checkers
     - src/mongo/db/global_catalog/metadata_consistency_validation/*
@@ -369,8 +366,6 @@ routing_and_topology:
     jira: Catalog and Routing
   files:
     - src/mongo/db/topology/*
-    - src/mongo/db/s/config/configsvr_commit_shard_removal_command.cpp
-    - src/mongo/s/commands/cluster_commit_shard_removal_cmd.cpp
 
     # shard versioning protocol
     - src/mongo/db/versioning_protocol/*

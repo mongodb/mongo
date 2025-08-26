@@ -84,6 +84,3 @@ filters:
   - "*read_write_concern_defaults*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-  - "cluster_commit_shard_removal_cmd.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology

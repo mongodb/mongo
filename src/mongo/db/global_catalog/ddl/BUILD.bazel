@@ -430,3 +430,20 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+idl_generator(
+    name = "initialize_placement_history_coordinator_document_gen",
+    src = "initialize_placement_history_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_shards_gen",
+    src = "list_shards.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
