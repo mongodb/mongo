@@ -35,7 +35,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -59,7 +58,7 @@ namespace mongo {
  * be executed on router if all other stages are eligible, and will be sent to a random
  * participating shard otherwise.
  */
-class DocumentSourceInternalSplitPipeline final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalSplitPipeline final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSplitPipeline"_sd;
 
@@ -115,12 +114,8 @@ private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         HostTypeRequirement mergeType,
                                         boost::optional<ShardId> mergeShardId)
-        : DocumentSource(kStageName, expCtx),
-          exec::agg::Stage(kStageName, expCtx),
-          _mergeType(mergeType),
-          _mergeShardId(mergeShardId) {}
+        : DocumentSource(kStageName, expCtx), _mergeType(mergeType), _mergeShardId(mergeShardId) {}
 
-    GetNextResult doGetNext() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 

@@ -34,7 +34,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -53,8 +52,7 @@ namespace mongo {
  * pushdown into the query system, so this stage can be useful in tests to ensure that an
  * unoptimized code path is being exercised.
  */
-class DocumentSourceInternalInhibitOptimization final : public DocumentSource,
-                                                        public exec::agg::Stage {
+class DocumentSourceInternalInhibitOptimization final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalInhibitOptimization"_sd;
 
@@ -62,7 +60,7 @@ public:
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
     DocumentSourceInternalInhibitOptimization(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
+        : DocumentSource(kStageName, expCtx) {}
 
     const char* getSourceName() const final {
         return kStageName.data();
@@ -95,7 +93,6 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    GetNextResult doGetNext() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 };
 

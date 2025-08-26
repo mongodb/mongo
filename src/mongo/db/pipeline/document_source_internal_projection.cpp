@@ -54,7 +54,6 @@ DocumentSourceInternalProjection::DocumentSourceInternalProjection(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceInternalProjectionSpec spec)
     : DocumentSource(kStageNameInternal, pExpCtx),
-      exec::agg::Stage(kStageNameInternal, pExpCtx),
       _stageSpec(std::move(spec)),
       _projection(projection_ast::parseAndAnalyze(
           pExpCtx, _stageSpec.getSpec(), lookUpPolicies(_stageSpec.getPolicies()))) {}
@@ -71,9 +70,5 @@ DocumentSourceContainer::iterator DocumentSourceInternalProjection::doOptimizeAt
 
 Value DocumentSourceInternalProjection::serialize(const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _stageSpec.toBSON()}});
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalProjection::doGetNext() {
-    tasserted(7824602, "Execution reached non-executable pipeline stage");
 }
 }  // namespace mongo

@@ -118,10 +118,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     return new DocumentSourceInternalSplitPipeline(expCtx, mergeType, mergeShardId);
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::doGetNext() {
-    return pSource->getNext();
-}
-
 Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions& opts) const {
     std::string mergeTypeString;
     Document specificShardDoc;
@@ -137,7 +133,7 @@ Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions&
 
         case HostTypeRequirement::kRouter:
             if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
-                    VersionContext::getDecoration(pExpCtx->getOperationContext()),
+                    VersionContext::getDecoration(getExpCtx()->getOperationContext()),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 mergeTypeString = "router";
             } else {

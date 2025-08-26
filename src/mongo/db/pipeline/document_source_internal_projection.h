@@ -40,7 +40,7 @@ namespace mongo {
  * represented by a 'projection_ast::Projection' node since $addFields is implemented as a minor
  * variant of $project.
  */
-class DocumentSourceInternalProjection final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalProjection final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalProjection"_sd;
 
@@ -97,8 +97,6 @@ public:
     }
 
 private:
-    GetNextResult doGetNext() final;
-
     // The specification for the $_internalProjection stage (defined by
     // document_source_internal_projection.idl).
     DocumentSourceInternalProjectionSpec _stageSpec;

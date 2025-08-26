@@ -68,10 +68,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::
     return new DocumentSourceInternalInhibitOptimization(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalInhibitOptimization::doGetNext() {
-    return pSource->getNext();
-}
-
 Value DocumentSourceInternalInhibitOptimization::serialize(const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), Value{Document{}}}});
 }
