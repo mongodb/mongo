@@ -1,5 +1,6 @@
 """The unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark."""
 
+import copy
 from typing import Optional
 
 from buildscripts.resmokelib import config as _config
@@ -76,6 +77,10 @@ class BenchmarkTestCase(interface.ProcessTestCase):
                 if key == "benchmark_min_time":
                     value = value.total_seconds()
                 bm_options[key] = value
+
+        process_kwargs = copy.deepcopy(bm_options.get("process_kwargs", {}))
+        interface.append_process_tracking_options(process_kwargs, self._id)
+        bm_options["process_kwargs"] = process_kwargs
 
         self.bm_options = bm_options
 

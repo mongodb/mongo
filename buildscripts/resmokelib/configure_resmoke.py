@@ -535,6 +535,9 @@ flags in common: {common_set}
 
     _config.FAIL_FAST = not config.pop("continue_on_failure")
 
+    timeout = config.pop("test_timeout")
+    _config.TEST_TIMEOUT = int(timeout) if timeout else None
+
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
     _config.INCLUDE_TAGS = _tags_from_list(config.pop("include_with_all_tags"))
 

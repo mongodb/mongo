@@ -39,6 +39,8 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
 
         os.makedirs(self.corpus_directory, exist_ok=True)
 
+        interface.append_process_tracking_options(self.program_options, self._id)
+
     def _make_process(self):
         default_args = [
             self.program_executable,

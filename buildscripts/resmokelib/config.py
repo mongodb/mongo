@@ -60,6 +60,7 @@ DEFAULTS = {
     "backup_on_restart_dir": None,
     "config_shard": None,
     "continue_on_failure": False,
+    "test_timeout": None,
     "dbpath_prefix": None,
     "dbtest_executable": None,
     "dry_run": None,
@@ -463,6 +464,9 @@ EXCLUDED_TAG = "__TEMPORARILY_DISABLED__"
 
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
+
+# Timeout for execution of a single test, in seconds.
+TEST_TIMEOUT = None
 
 # Defines how to fuzz mongod parameters on startup
 FUZZ_MONGOD_CONFIGS = None

@@ -31,7 +31,11 @@ class _ResmokeSelftest(unittest.TestCase):
     def setUpClass(cls):
         cls.end2end_root = "buildscripts/tests/resmoke_end2end"
         cls.test_dir = os.path.normpath("/data/db/selftest")
-        cls.resmoke_const_args = ["run", "--dbpathPrefix={}".format(cls.test_dir)]
+        cls.resmoke_const_args = [
+            "run",
+            "--dbpathPrefix={}".format(cls.test_dir),
+            "--skipSymbolization",
+        ]
         cls.suites_root = os.path.join(cls.end2end_root, "suites")
         cls.testfiles_root = os.path.join(cls.end2end_root, "testfiles")
         cls.report_file = os.path.join(cls.test_dir, "reports.json")
@@ -253,6 +257,37 @@ class TestTimeout(_ResmokeSelftest):
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
         self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
+
+class TestTestTimeout(_ResmokeSelftest):
+    def test_individual_test_timeout(self):
+        # The --originSuite argument is to trick the resmoke local invocation into passing
+        # because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+        # and cannot normally find an evergreen task associated with
+        # buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout.yml
+        reportFile = os.path.join(self.test_dir, "report.json")
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_test_timeout.yml",
+            "--taskId=123",
+            "--originSuite=resmoke_end2end_tests",
+            "--testTimeout=2",
+            "--internalParam=test_analysis",
+            "--continueOnFailure",
+            f"--reportFile={reportFile}",
+        ]
+        self.execute_resmoke(resmoke_args)
+        self.resmoke_process.wait()
+
+        analysis_pids_to_expect = 2  # 1 tests * (1 mongod + 1 mongo)
+        self.assert_dir_file_count(self.test_dir, "test_analysis.txt", analysis_pids_to_expect)
+
+        with open(reportFile, "r") as f:
+            report = json.load(f)
+        timeout = [test for test in report["results"] if test["status"] == "timeout"]
+        passed = [test for test in report["results"] if test["status"] == "pass"]
+        self.assertEqual(len(timeout), 1, f"Expected one timed out test. Got {timeout}")  # one jstest
+        self.assertEqual(
+            len(passed), 3, f"Expected 3 passing tests. Got {passed}"
+        )  # one jstest, one fixture setup, one fixture teardown
 
 class TestTestSelection(_ResmokeSelftest):
     def parse_reports_json(self):

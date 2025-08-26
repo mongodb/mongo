@@ -46,3 +46,7 @@ Subclasses:
 - [`JSRunnerFileTestCase`](./jsrunnerfile.py) - A test case with a static JavaScript runner file to execute.
 - [`MultiClientsTestCase`](./jstest.py) - A wrapper for several copies of a SingleTestCase to execute.
 - [`TestCaseFactory`](./interface.py) - Convenience interface to initialize and build test cases
+
+## Testing TestCases
+
+Self-tests for the testcases themselves can be found in [buildscripts/tests/resmokelib/testing/testcases/](../../../../buildscripts/tests/resmokelib/testing/testcases/)

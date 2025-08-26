@@ -1,5 +1,6 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
 
+import copy
 import os
 from typing import Optional
 
@@ -43,6 +44,10 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
+        
+        process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
+        interface.append_process_tracking_options(process_kwargs, self._id)
+        self.shell_options["process_kwargs"] = process_kwargs
 
     def _populate_test_data(self, test_data):
         """Provide base method.

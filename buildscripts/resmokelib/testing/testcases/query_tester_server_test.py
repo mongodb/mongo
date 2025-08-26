@@ -72,7 +72,8 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
         ]
         if self.override:
             command = command + ["--override", self.override]
-        return core.programs.generic_program(
-            self.logger,
-            command,
-        )
+        
+        program_options = {}
+        interface.append_process_tracking_options(program_options, self._id)
+        
+        return core.programs.generic_program(self.logger, command, program_options)

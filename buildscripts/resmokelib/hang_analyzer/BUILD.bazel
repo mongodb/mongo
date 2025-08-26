@@ -10,6 +10,7 @@ py_library(
         "extractor.py",
         "gen_hang_analyzer_tasks.py",
         "hang_analyzer.py",
+        "plugin.py",
         "process.py",
         "process_list.py",
     ],

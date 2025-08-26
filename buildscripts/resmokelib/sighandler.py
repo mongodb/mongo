@@ -12,6 +12,7 @@ import psutil
 
 from buildscripts.resmokelib import config, parser, reportfile, testing
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
+from buildscripts.resmokelib.utils.self_test_fakes import test_analysis
 
 _IS_WINDOWS = sys.platform == "win32"
 if _IS_WINDOWS:
@@ -140,17 +141,7 @@ def _analyze_pids(logger, pids):
     # If 'test_analysis' is specified, we will just write the pids out to a file and kill them
     # Instead of running analysis. This option will only be specified in resmoke selftests.
     if "test_analysis" in config.INTERNAL_PARAMS:
-        with open(os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w") as analysis_file:
-            analysis_file.write("\n".join([str(pid) for pid in pids]))
-            for pid in pids:
-                try:
-                    proc = psutil.Process(pid)
-                    logger.info("Killing process pid %d", pid)
-                    proc.kill()
-                except psutil.NoSuchProcess:
-                    # Process has already terminated.
-                    pass
-
+        test_analysis(logger, pids)
         return
 
     # See hang-analyzer argument options here:

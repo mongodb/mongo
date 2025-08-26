@@ -38,11 +38,11 @@ from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.run import (
     generate_multiversion_exclude_tags,
     list_tags,
-    runtime_recorder,
 )
 from buildscripts.resmokelib.suitesconfig import get_suite_files
 from buildscripts.resmokelib.testing.docker_cluster_image_builder import build_images
 from buildscripts.resmokelib.testing.suite import Suite
+from buildscripts.resmokelib.utils import runtime_recorder
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 from buildscripts.util.teststats import HistoricTaskData
 
@@ -1296,6 +1296,12 @@ class RunPlugin(PluginInterface):
             action="store_true",
             dest="continue_on_failure",
             help="Executes all tests in all suites, even if some of them fail.",
+        )
+
+        parser.add_argument(
+            "--testTimeout",
+            dest="test_timeout",
+            help="Timeout for execution of a single test, in seconds.",
         )
 
         parser.add_argument(

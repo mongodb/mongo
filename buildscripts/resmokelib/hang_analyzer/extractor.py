@@ -21,7 +21,6 @@ from opentelemetry.trace.status import StatusCode
 from retry import retry
 
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
-from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
@@ -32,6 +31,7 @@ from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 from buildscripts.resmokelib.utils.otel_thread_pool_executor import OtelThreadPoolExecutor
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
+from buildscripts.resmokelib.utils.runtime_recorder import compare_start_time
 from evergreen.task import Artifact, Task
 
 _DEBUG_FILE_BASE_NAMES = ["mongo", "mongod", "mongos"]

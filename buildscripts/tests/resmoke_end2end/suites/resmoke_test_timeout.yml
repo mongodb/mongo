@@ -1,0 +1,13 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/long_running.js
+    - buildscripts/tests/resmoke_end2end/testfiles/one.js
+
+executor:
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

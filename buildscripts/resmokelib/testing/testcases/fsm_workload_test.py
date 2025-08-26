@@ -1,5 +1,6 @@
 """The unittest.TestCase for FSM workloads."""
 
+import copy
 import hashlib
 import threading
 import uuid
@@ -79,6 +80,10 @@ class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
+
+        process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
+        interface.append_process_tracking_options(process_kwargs, self.test_id)
+        self.shell_options["process_kwargs"] = process_kwargs
 
     def _populate_test_data(self, test_data):
         test_data["fsmWorkloads"] = self.fsm_workload_group

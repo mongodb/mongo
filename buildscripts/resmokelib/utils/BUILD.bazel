@@ -20,6 +20,8 @@ py_library(
         "otel_utils.py",
         "queue.py",
         "registry.py",
+        "runtime_recorder.py",
+        "self_test_fakes.py",
         "sharded_cluster_util.py",
     ],
     visibility = ["//visibility:public"],

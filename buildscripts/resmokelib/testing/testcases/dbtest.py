@@ -1,5 +1,6 @@
 """The unittest.TestCase for dbtests."""
 
+import copy
 import os
 import os.path
 import shutil
@@ -48,6 +49,11 @@ class DBTestCase(interface.ProcessTestCase):
         except os.error:
             # Directory already exists.
             pass
+
+        process_kwargs = copy.deepcopy(self.dbtest_options.get("process_kwargs", {}))
+        interface.append_process_tracking_options(process_kwargs, self._id)
+        self.dbtest_options["process_kwargs"] = process_kwargs
+
 
     def _execute(self, process):
         interface.ProcessTestCase._execute(self, process)

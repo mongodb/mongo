@@ -21,6 +21,8 @@ class MongosTestCase(interface.ProcessTestCase):
         interface.ProcessTestCase.__init__(self, logger, "mongos test", self.mongos_executable)
         self.options = mongos_options[0].copy()
 
+        self.process_kwargs = {}
+
     def configure(self, fixture, *args, **kwargs):
         """Ensure the --test option is present in the mongos options."""
 
@@ -29,10 +31,13 @@ class MongosTestCase(interface.ProcessTestCase):
         if "test" not in self.options:
             self.options["test"] = ""
 
+        interface.append_process_tracking_options(self.process_kwargs, self._id)
+
     def _make_process(self):
         return core.programs.mongos_program(
             self.logger,
             self.fixture.job_num,
             executable=self.mongos_executable,
             mongos_options=self.options,
+            process_kwargs=self.process_kwargs,
         )[0]

@@ -22,7 +22,9 @@ class QueryTesterSelfTestCase(interface.ProcessTestCase):
         interface.ProcessTestCase.__init__(self, logger, "QueryTesterSelfTest", test_filenames[0])
         self.test_file = test_filenames[0]
 
-    def _make_process(self):
+    def _make_process(self): 
+        program_options = {}
+        interface.append_process_tracking_options(program_options, self._id)
         return core.programs.generic_program(
             self.logger,
             [
@@ -33,4 +35,5 @@ class QueryTesterSelfTestCase(interface.ProcessTestCase):
                 "-b",
                 _config.DEFAULT_MONGOTEST_EXECUTABLE,
             ],
+            program_options,
         )

@@ -81,7 +81,7 @@ if sys.platform == "win32":
 class Process(object):
     """Wrapper around subprocess.Popen class."""
 
-    def __init__(self, logger, args, env=None, env_vars=None, cwd=None):
+    def __init__(self, logger, args, env=None, env_vars=None, cwd=None, start_new_session=False):
         """Initialize the process with the specified logger, arguments, and environment."""
 
         # Ensure that executable files that don't already have an
@@ -118,6 +118,7 @@ class Process(object):
         self._stdout_pipe = None
         self._stderr_pipe = None
         self._cwd = cwd
+        self._start_new_session = start_new_session
 
         if sys.platform == "win32":
             self._windows_shutdown_event_set = False
@@ -152,6 +153,7 @@ class Process(object):
                 env=self.env,
                 creationflags=creation_flags,
                 cwd=self._cwd,
+                start_new_session=self._start_new_session,
             )
             self.pid = self._process.pid
 

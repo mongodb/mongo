@@ -17,6 +17,7 @@ class TLAPlusTestCase(interface.ProcessTestCase):
         logger: logging.Logger,
         model_config_files: list[str],
         java_binary: Optional[str] = None,
+        model_check_command: Optional[str] = "sh model-check.sh",
     ):
         """Initialize the TLAPlusTestCase with a TLA+ model config file.
 
@@ -42,6 +43,8 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
         self.java_binary = java_binary
 
+        self.model_check_command = model_check_command
+
         interface.ProcessTestCase.__init__(self, logger, "TLA+ test", spec_dir)
 
     def _make_process(self):
@@ -49,8 +52,10 @@ class TLAPlusTestCase(interface.ProcessTestCase):
         if self.java_binary is not None:
             process_kwargs["env_vars"] = {"JAVA_BINARY": self.java_binary}
 
+        interface.append_process_tracking_options(process_kwargs, self._id)
+
         return core.programs.generic_program(
             self.logger,
-            ["sh", "model-check.sh", self.test_name],
+            [self.model_check_command, self.test_name],
             process_kwargs=process_kwargs,
         )

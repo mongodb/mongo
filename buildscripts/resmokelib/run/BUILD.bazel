@@ -6,7 +6,6 @@ py_library(
         "__init__.py",
         "generate_multiversion_exclude_tags.py",
         "list_tags.py",
-        "runtime_recorder.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

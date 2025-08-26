@@ -251,11 +251,26 @@ class Job(object):
         self.report.logging_prefix = create_fixture_table(self.fixture)
 
         with TRACER.start_as_current_span("run_test", attributes=common_test_attributes):
+            if config.TEST_TIMEOUT:
+                timer = threading.Timer(config.TEST_TIMEOUT, test.on_timeout)
+                timer.start()
             test(self.report)
+            if config.TEST_TIMEOUT:
+                timer.cancel()
+                timer.join()
         try:
             if test.propagate_error is not None:
                 raise test.propagate_error
 
+            if test.timed_out.is_set():
+                # Restart the fixture, since it may have been killed by the test's timeout handler
+                if not self.fixture.is_running():
+                    self.logger.info(
+                        "Restarting the fixture since it is not running after a test timed out."
+                    )
+                    self.fixture.setup()
+                    self.fixture.await_ready()
+            
             # We are intentionally only checking the individual 'test' status and not calling
             # report.wasSuccessful() here. It is possible that a thread running in the background as
             # part of a hook has added a failed test case to 'self.report'. Checking the individual
