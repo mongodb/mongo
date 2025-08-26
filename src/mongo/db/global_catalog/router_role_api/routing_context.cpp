@@ -144,7 +144,8 @@ void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
     }
 }
 
-void RoutingContext::onStaleError(const NamespaceString& nss, const Status& status) {
+void RoutingContext::onStaleError(const Status& status,
+                                  boost::optional<const NamespaceString&> nss) {
     if (status.code() == ErrorCodes::StaleDbVersion) {
         auto si = status.extraInfo<StaleDbRoutingVersion>();
         // If the database version is stale, refresh its entry in the catalog cache.
@@ -156,8 +157,24 @@ void RoutingContext::onStaleError(const NamespaceString& nss, const Status& stat
         // 3. If no shard is provided, then the epoch is stale and we must refresh.
         if (auto si = status.extraInfo<StaleConfigInfo>()) {
             _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+        } else if (auto sei = status.extraInfo<StaleEpochInfo>()) {
+            const auto& versionWanted = sei->getVersionWanted();
+            if (versionWanted == ShardVersion{}) {
+                // The StaleEpochInfo does not always have a valid `wanted` version.
+                _catalogCache->onStaleCollectionVersion(sei->getNss(), boost::none);
+            } else {
+                _catalogCache->onStaleCollectionVersion(sei->getNss(), versionWanted);
+            }
+        } else if (nss.has_value()) {
+            _catalogCache->invalidateCollectionEntry_LINEARIZABLE(*nss);
         } else {
-            _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+            // Let's refresh all the namespaces assigned to this RoutingContext if there is no way
+            // to know what are the namespaces with stale routing info
+            // TODO: SERVER-109793 once StaleEpochInfo becomes non-optional, it won't be possible to
+            // reach this `else`. Therefore, we should replace the for below and add a tassert.
+            for (const auto& [nss, _] : _nssRoutingInfoMap) {
+                _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+            }
         }
     }
 }

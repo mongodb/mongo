@@ -236,13 +236,16 @@ error_codes:
   - {code: 149, name: NoConfigPrimary}
   # This error code is obsolete as of version 6.0 and no new places where it is thrown should be
   # added. Use StaleConfig.
+  # Note: StaleEpochInfo is currently optional, but will be required in v9.1. Always include a
+  # StaleEpochInfo when throwing a StaleEpoch to ensure forward compatibility.
   - {
       code: 150,
       name: StaleEpoch,
       categories: [StaleShardVersionError, NeedRetargettingError],
+      # TODO SERVER-109793: Make StaleEpochInfo non-optional once 9.0 becomes LTS
       extra: StaleEpochInfo,
       extraIsOptional: True,
-    } # TODO extra not optional once 6.0 becomes LTS
+    }
   - {code: 151, name: OperationCannotBeBatched}
   - {code: 152, name: OplogOutOfOrder}
   - {code: 153, name: ChunkTooBig}

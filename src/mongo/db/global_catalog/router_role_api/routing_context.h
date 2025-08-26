@@ -100,7 +100,8 @@ public:
      * Utility to trigger CatalogCache refreshes for staleness errors directly from the
      * RoutingContext.
      */
-    virtual void onStaleError(const NamespaceString& nss, const Status& status);
+    virtual void onStaleError(const Status& status,
+                              boost::optional<const NamespaceString&> nss = boost::none);
 
     /**
      * By default, the RoutingContext should be validated by running validateOnContextEnd() at the
@@ -176,8 +177,10 @@ public:
     MockRoutingContext& operator=(const RoutingContext&) = delete;
 
     void onRequestSentForNss(const NamespaceString& nss) override {}
-    void onStaleError(const NamespaceString& nss, const Status& status) override {
-        errors.emplace(nss, status);
+    void onStaleError(const Status& status, boost::optional<const NamespaceString&> nss) override {
+        if (nss.has_value()) {
+            errors.emplace(*nss, status);
+        }
     };
     stdx::unordered_map<NamespaceString, Status> errors;
 };

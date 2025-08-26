@@ -206,10 +206,15 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
     // Handle any top level errors.
     auto shardResponseStatus = getStatusFromCommandResult(shardResponse.data);
     if (!shardResponseStatus.isOK()) {
-        // If we are in a transaction, we stop processing and return the first error.
         auto status = shardResponseStatus.withContext(
             str::stream() << "cluster write results unavailable from " << shardResponse.target);
 
+        // Processing stale error returned as a top-level error.
+        if (status == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(status)) {
+            routingCtx.onStaleError(status);
+        }
+
+        // If we are in a transaction, we stop processing and return the first error.
         const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
         if (inTransaction) {
             auto errorReply = ErrorReply::parse(IDLParserContext("ErrorReply"), shardResponse.data);
@@ -314,7 +319,7 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
                 LOGV2_DEBUG(
                     10346900, 4, "Noting stale config response", "status"_attr = item.getStatus());
             }
-            routingCtx.onStaleError(op.getNss(), item.getStatus());
+            routingCtx.onStaleError(item.getStatus(), op.getNss());
             toRetry.push_back(op);
         } else if (itemCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
             LOGV2_DEBUG(10413104,
