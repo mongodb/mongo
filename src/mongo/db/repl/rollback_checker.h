@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -62,7 +63,7 @@ namespace repl {
  * 4) Repeat steps 2 and 3 as needed.
  *
  */
-class RollbackChecker {
+class MONGO_MOD_PUB RollbackChecker {
     RollbackChecker(const RollbackChecker&) = delete;
     RollbackChecker& operator=(const RollbackChecker&) = delete;
 

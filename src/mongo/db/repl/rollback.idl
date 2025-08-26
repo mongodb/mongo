@@ -30,6 +30,7 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/db/repl/optime.h"
 

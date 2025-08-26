@@ -42,6 +42,7 @@
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -53,7 +54,7 @@
 namespace mongo {
 namespace repl {
 
-class ReadConcernArgs {
+class MONGO_MOD_PUB ReadConcernArgs {
 public:
     static constexpr StringData kReadConcernFieldName = "readConcern"_sd;
     static constexpr StringData kAfterOpTimeFieldName = ReadConcernIdl::kAfterOpTimeFieldName;

@@ -38,6 +38,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
@@ -50,7 +51,7 @@ class PrimaryOnlyServiceRegistry;
 /**
  * OpObserver for PrimaryOnlyService.
  */
-class PrimaryOnlyServiceOpObserver final : public OpObserverNoop {
+class MONGO_MOD_PUB PrimaryOnlyServiceOpObserver final : public OpObserverNoop {
     PrimaryOnlyServiceOpObserver(const PrimaryOnlyServiceOpObserver&) = delete;
     PrimaryOnlyServiceOpObserver& operator=(const PrimaryOnlyServiceOpObserver&) = delete;
 

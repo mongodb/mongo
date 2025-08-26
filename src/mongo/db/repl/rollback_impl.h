@@ -48,6 +48,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -177,7 +178,7 @@ struct RollbackStats {
  * get closed and finding the common point should fail.
  *
  */
-class RollbackImpl : public Rollback {
+class MONGO_MOD_PUB RollbackImpl : public Rollback {
 public:
     /**
      * Used to indicate that the files we create with deleted documents are from rollback.

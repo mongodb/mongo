@@ -32,7 +32,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 // Helpers for IDL parsing
 LogicalTime deserializeReadConcernLogicalTime(BSONElement e);
@@ -40,4 +40,4 @@ void serializeReadConcernLogicalTime(const LogicalTime& w,
                                      StringData fieldName,
                                      BSONObjBuilder* builder);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

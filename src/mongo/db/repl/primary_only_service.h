@@ -54,6 +54,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/lockable_adapter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <memory>
@@ -67,7 +68,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 class ServiceContext;
@@ -85,7 +86,7 @@ extern FailPoint PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic;
  * will have a dedicated collection where state documents are stored containing the state of any
  * running instances, which are used to recreate the running instances after failover.
  */
-class PrimaryOnlyService {
+class MONGO_MOD_OPEN PrimaryOnlyService {
 public:
     /**
      * Client decoration used by Clients that are a part of a PrimaryOnlyService.
@@ -117,7 +118,7 @@ public:
      * implementations shouldn't have their Instance subclass extended this Instance class directly,
      * instead they should extend TypedInstance, defined below.
      */
-    class Instance {
+    class MONGO_MOD_OPEN Instance {
     public:
         virtual ~Instance() = default;
 
@@ -178,7 +179,8 @@ public:
      * proper derived Instance type.
      */
     template <class InstanceType>
-    class TypedInstance : public Instance, public std::enable_shared_from_this<InstanceType> {
+    class MONGO_MOD_OPEN TypedInstance : public Instance,
+                                         public std::enable_shared_from_this<InstanceType> {
     public:
         TypedInstance() = default;
         ~TypedInstance() override = default;
@@ -647,4 +649,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

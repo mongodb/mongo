@@ -30,12 +30,13 @@
 #pragma once
 
 #include "mongo/db/repl/replication_recovery.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class OperationContext;
 namespace repl {
 
-class ReplicationRecoveryMock : public ReplicationRecovery {
+class MONGO_MOD_PUB ReplicationRecoveryMock : public ReplicationRecovery {
     ReplicationRecoveryMock(const ReplicationRecoveryMock&) = delete;
     ReplicationRecoveryMock& operator=(const ReplicationRecoveryMock&) = delete;
 

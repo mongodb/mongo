@@ -34,6 +34,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -54,10 +55,10 @@ namespace repl {
 class PrimaryOnlyService;
 class PrimaryOnlyServiceRegistry;
 
-extern FailPoint primaryOnlyServiceTestStepUpWaitForRebuildComplete;
+MONGO_MOD_PUB extern FailPoint primaryOnlyServiceTestStepUpWaitForRebuildComplete;
 
-class PrimaryOnlyServiceMongoDTest : service_context_test::WithSetupTransportLayer,
-                                     public ServiceContextMongoDTest {
+class MONGO_MOD_OPEN PrimaryOnlyServiceMongoDTest : service_context_test::WithSetupTransportLayer,
+                                                    public ServiceContextMongoDTest {
 public:
     void setUp() override;
     void tearDown() override;

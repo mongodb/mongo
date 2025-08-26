@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -48,7 +49,7 @@ class ReplicationConsistencyMarkers;
  * This class is used by the replication system to recover after an unclean shutdown, a rollback or
  * during initial sync.
  */
-class ReplicationRecovery {
+class MONGO_MOD_OPEN ReplicationRecovery {
 public:
     ReplicationRecovery() = default;
     virtual ~ReplicationRecovery() = default;
@@ -91,7 +92,7 @@ public:
                                              Timestamp stableTimestamp) = 0;
 };
 
-class ReplicationRecoveryImpl : public ReplicationRecovery {
+class MONGO_MOD_PUB ReplicationRecoveryImpl : public ReplicationRecovery {
     ReplicationRecoveryImpl(const ReplicationRecoveryImpl&) = delete;
     ReplicationRecoveryImpl& operator=(const ReplicationRecoveryImpl&) = delete;
 

@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/repl_set_tag.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstdint>
@@ -43,7 +44,7 @@
 namespace mongo {
 namespace repl {
 
-class ReplSetWriteConcernModeDefinitions {
+class MONGO_MOD_PUB ReplSetWriteConcernModeDefinitions {
 public:
     // Default constructor for use as an IDL default.
     ReplSetWriteConcernModeDefinitions() {}

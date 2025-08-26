@@ -42,6 +42,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -55,7 +56,7 @@ namespace mongo {
  * 'stateDocumentNs'.
  */
 template <typename StateDocumentType>
-class PrimaryOnlyServiceStateStore {
+class MONGO_MOD_OPEN PrimaryOnlyServiceStateStore {
 public:
     explicit PrimaryOnlyServiceStateStore(const NamespaceString& stateDocumentNs)
         : _stateDocumentNs{stateDocumentNs} {}
@@ -108,7 +109,7 @@ private:
  * A helper that provides a default implementation for the set of methods to create the
  * 'PrimaryOnlyService::Instance'.
  */
-class DefaultPrimaryOnlyServiceInstance
+class MONGO_MOD_OPEN DefaultPrimaryOnlyServiceInstance
     : public repl::PrimaryOnlyService::TypedInstance<DefaultPrimaryOnlyServiceInstance> {
 public:
     ~DefaultPrimaryOnlyServiceInstance() override;

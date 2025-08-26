@@ -31,8 +31,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/read_concern_gen.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 using ReadConcernLevel = ReadConcernLevelEnum;
@@ -44,4 +45,4 @@ StringData toString(ReadConcernLevel level);
 }  // namespace readConcernLevels
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
