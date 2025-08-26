@@ -571,9 +571,20 @@ TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
 }
 
 TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
+    RAIIServerParameterControllerForTest enableDelinquentTracking(
+        "featureFlagRecordDelinquentMetrics", true);
+    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                               1);
+
     QueryTestServiceContext serviceContext;
+    auto tickSourcePtr = dynamic_cast<TickSourceMock<Nanoseconds>*>(
+        serviceContext.getServiceContext()->getTickSource());
+    tickSourcePtr->advance(Milliseconds{100});
+
     auto opCtx = serviceContext.makeOperationContext();
     auto curOp = CurOp::get(*opCtx);
+    curOp->setTickSource_forTest(tickSourcePtr);
+    curOp->ensureStarted();
 
     // If the delinquent stats are zero, they are *not* included in the state.
     {
@@ -581,6 +592,8 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
         ASSERT_FALSE(state.hasField("delinquencyInfo"));
+        // Field numInterruptChecks should be always shown.
+        ASSERT_TRUE(state.hasField("numInterruptChecks"));
     }
 
     // If the delinquent stats are not zero, they *are* included in the state.
@@ -596,6 +609,22 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
         ASSERT_EQ(state["delinquencyInfo"]["totalDelinquentAcquisitions"].Long(), 2);
         ASSERT_EQ(state["delinquencyInfo"]["totalAcquisitionDelinquencyMillis"].Long(), 30);
         ASSERT_EQ(state["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
+    }
+
+    {
+        tickSourcePtr->advance(Milliseconds{200});
+        opCtx->checkForInterrupt();
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("numInterruptChecks")) << state.toString();
+        ASSERT_EQ(state["numInterruptChecks"].Number(), 1);
+
+        ASSERT_TRUE(state.hasField("delinquencyInfo"));
+        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptChecks"].Number(), 1);
+        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptTotalMillis"].Number(), 100);
+        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(), 100);
     }
 }
 

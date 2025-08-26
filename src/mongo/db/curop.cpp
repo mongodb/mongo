@@ -130,19 +130,19 @@ void reportCheckForInterruptSampledOperation(
     totalInterruptChecksFromSampledOps.increment(numInterruptChecks);
     numSampledOps.increment();
 
-    if (stats.overdueInterruptChecks > 0) {
+    if (stats.overdueInterruptChecks.loadRelaxed() > 0) {
         opsWithOverdueInterruptCheck.increment();
 
-        overdueInterruptChecks.increment(stats.overdueInterruptChecks);
+        overdueInterruptChecks.increment(stats.overdueInterruptChecks.loadRelaxed());
         overdueInterruptTotalTimeMillis.increment(
-            durationCount<Milliseconds>(stats.overdueAccumulator));
+            durationCount<Milliseconds>(stats.overdueAccumulator.loadRelaxed()));
 
         // Note that if we wanted the exact maximum, we would use a CAS loop, since it's possible a
         // new maximum will be entered between the set() and get() here. The approximate maximum is
         // good enough though.
-        overdueInterruptApproxMaxTimeMillis.set(
-            std::max(overdueInterruptApproxMaxTimeMillis.get(),
-                     static_cast<int64_t>(durationCount<Milliseconds>(stats.overdueMaxTime))));
+        overdueInterruptApproxMaxTimeMillis.set(std::max(
+            overdueInterruptApproxMaxTimeMillis.get(),
+            static_cast<int64_t>(durationCount<Milliseconds>(stats.overdueMaxTime.loadRelaxed()))));
     }
 }
 
@@ -1097,10 +1097,15 @@ void CurOp::reportState(BSONObjBuilder* builder,
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
 
-    if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
-        admCtx.getDelinquentAcquisitions() > 0) {
-        BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
-        OpDebug::appendDelinquentInfo(opCtx, sub);
+    if (!parent()) {
+        builder->append("numInterruptChecks", opCtx->numInterruptChecks());
+        const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+        const auto* stats = opCtx->overdueInterruptCheckStats();
+        if (admCtx.getDelinquentAcquisitions() > 0 ||
+            (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {
+            BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
+            OpDebug::appendDelinquentInfo(opCtx, sub);
+        }
     }
 
 

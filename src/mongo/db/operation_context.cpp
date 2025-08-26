@@ -219,7 +219,7 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
-    ++_numInterruptChecks;
+    _numInterruptChecks.fetchAndAddRelaxed(1);
     if (_overdueInterruptCheckStats) {
         updateInterruptCheckCounters();
     }
@@ -290,9 +290,9 @@ void OperationContext::updateInterruptCheckCounters() {
     if (auto overdue = tickSource().ticksTo<Milliseconds>(now - prevStart) - interruptCheckPeriod();
         overdue > Milliseconds{0}) {
         auto& stats = *_overdueInterruptCheckStats;
-        ++stats.overdueInterruptChecks;
-        stats.overdueAccumulator += overdue;
-        stats.overdueMaxTime = std::max(stats.overdueMaxTime, overdue);
+        stats.overdueInterruptChecks.fetchAndAddRelaxed(1);
+        stats.overdueAccumulator.storeRelaxed(stats.overdueAccumulator.loadRelaxed() + overdue);
+        stats.overdueMaxTime.storeRelaxed(std::max(stats.overdueMaxTime.loadRelaxed(), overdue));
     }
 }
 

@@ -1181,9 +1181,9 @@ TEST_F(OperationTestWithMockClock, InterruptCheckOnTime) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 1);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 
     mockTickSource()->advance(Milliseconds(1));
@@ -1193,9 +1193,9 @@ TEST_F(OperationTestWithMockClock, InterruptCheckOnTime) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 2);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 }
 
@@ -1213,9 +1213,9 @@ TEST_F(OperationTestWithMockClock, InfrequentInterruptChecks) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 1);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 
     const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
@@ -1226,9 +1226,9 @@ TEST_F(OperationTestWithMockClock, InfrequentInterruptChecks) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 2);
-        ASSERT_EQ(stats->overdueInterruptChecks, 1);
-        ASSERT_EQ(stats->overdueAccumulator, 4 * interval);
-        ASSERT_EQ(stats->overdueMaxTime, 4 * interval);
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), 4 * interval);
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), 4 * interval);
     }
 }
 
@@ -1247,9 +1247,9 @@ TEST_F(OperationTestWithMockClock, FirstInterruptCheckOverdue) {
         ASSERT(stats);
 
         ASSERT_EQ(opCtx->numInterruptChecks(), 1);
-        ASSERT_EQ(stats->overdueInterruptChecks, 1);
-        ASSERT_EQ(stats->overdueAccumulator, 4 * interval);
-        ASSERT_EQ(stats->overdueMaxTime, 4 * interval);
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), 4 * interval);
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), 4 * interval);
     }
 }
 
@@ -1268,9 +1268,9 @@ TEST_F(OperationTestWithMockClock, NeverChecksForInterrupt) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 0);
-        ASSERT_EQ(stats->overdueInterruptChecks, 1);
-        ASSERT_EQ(stats->overdueAccumulator, 4 * interval);
-        ASSERT_EQ(stats->overdueMaxTime, 4 * interval);
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), 4 * interval);
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), 4 * interval);
     }
 }
 
@@ -1292,9 +1292,9 @@ TEST_F(OperationTestWithMockClock, KilledOperationWithOverdueInterruptCheck) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 1);
-        ASSERT_EQ(stats->overdueInterruptChecks, 1);
-        ASSERT_EQ(stats->overdueAccumulator, 4 * interval);
-        ASSERT_EQ(stats->overdueMaxTime, 4 * interval);
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), 4 * interval);
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), 4 * interval);
     }
 }
 
@@ -1314,9 +1314,9 @@ TEST_F(OperationTestWithMockClock, RunWithoutInterruptNotMarkedOverdue) {
             auto stats = opCtx->overdueInterruptCheckStats();
             ASSERT(stats);
             ASSERT_EQ(opCtx->numInterruptChecks(), 1);
-            ASSERT_EQ(stats->overdueInterruptChecks, 0);
-            ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-            ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+            ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+            ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+            ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
         }
     });
 
@@ -1324,9 +1324,9 @@ TEST_F(OperationTestWithMockClock, RunWithoutInterruptNotMarkedOverdue) {
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_EQ(opCtx->numInterruptChecks(), 1);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 }
 
@@ -1354,9 +1354,9 @@ TEST_F(OverdueInterruptTestWithInterruptibleWait, InterruptibleSleepNotMarkedOve
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_GTE(opCtx->numInterruptChecks(), 2);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 
     // After the thread wakes up from the sleep, the overdue "timer" resets. The thread should be
@@ -1368,9 +1368,9 @@ TEST_F(OverdueInterruptTestWithInterruptibleWait, InterruptibleSleepNotMarkedOve
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_GTE(opCtx->numInterruptChecks(), 2);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 }
 
@@ -1409,9 +1409,9 @@ TEST_F(OverdueInterruptTestWithInterruptibleWait, KillDuringInterruptibleSleepNo
         auto stats = opCtx->overdueInterruptCheckStats();
         ASSERT(stats);
         ASSERT_GT(opCtx->numInterruptChecks(), 0);
-        ASSERT_EQ(stats->overdueInterruptChecks, 0);
-        ASSERT_EQ(stats->overdueAccumulator, Milliseconds{0});
-        ASSERT_EQ(stats->overdueMaxTime, Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+        ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 }
 }  // namespace

@@ -573,7 +573,7 @@ TEST(CurOpTest, OpWhichNeverChecksForInterruptBumpsDelinquentCounter) {
     serviceContext.tickSource()->advance(interval * 2);
 
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
-    ASSERT_EQ(opCtx->overdueInterruptCheckStats()->overdueInterruptChecks, 1);
+    ASSERT_EQ(opCtx->overdueInterruptCheckStats()->overdueInterruptChecks.loadRelaxed(), 1);
 
     ASSERT_EQ(opsWithOverdueInterruptCheck.get() - overdueOpsAtStart, 1);
 }

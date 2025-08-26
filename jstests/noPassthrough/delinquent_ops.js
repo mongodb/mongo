@@ -90,6 +90,21 @@ function assertOverdueOps(operationMetrics, previousOperationMetrics) {
     );
 }
 
+function assertOverdueOpsSlowlogAndCurop(operationMetrics, count) {
+    assert.gte(operationMetrics.numInterruptChecks, count, operationMetrics);
+    assert.gte(operationMetrics.delinquencyInfo.overdueInterruptChecks, count, operationMetrics);
+    assert.gte(
+        operationMetrics.delinquencyInfo.overdueInterruptTotalMillis,
+        count * (waitPerIterationMs - delinquentIntervalMs),
+        operationMetrics,
+    );
+    assert.gte(
+        operationMetrics.delinquencyInfo.overdueInterruptApproxMaxMillis,
+        waitPerIterationMs - delinquentIntervalMs,
+        operationMetrics,
+    );
+}
+
 function testDelinquencyOnRouter(routerDb) {
     // Before running the operation, reduce our threshold so that an operation that hangs for
     // 200ms should get marked overdue.
@@ -173,6 +188,7 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             "Expected to find exactly one active find() command with the comment " + findComment,
         );
         assertDelinquentStats(curOp.inprog[0].delinquencyInfo, 2, curOp.inprog[0]);
+        assertOverdueOpsSlowlogAndCurop(curOp.inprog[0], 2);
     }
 
     // After the find() command, we check that the serverStatus has the delinquent stats
@@ -194,12 +210,13 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     // about the delinquent acquisitions checks.
     {
         const assertLine = (line, count) => {
-            jsTestLog("Found log line " + tojson(line));
+            jsTest.log.info("Found log line " + tojson(line));
             assert(line, globalLog);
 
             const parsedLine = JSON.parse(line);
             const delinquencyInfo = parsedLine.attr.delinquencyInfo;
             assertDelinquentStats(delinquencyInfo, count, line);
+            assertOverdueOpsSlowlogAndCurop(parsedLine.attr, count);
         };
 
         const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
@@ -324,8 +341,6 @@ function runTest(routerDb, shardDb) {
         const serverStatus = routerDb.serverStatus();
         assertNoOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
 
-        // TODO SERVER-104009: Once we have per-command information, we can also make an assertion
-        // about the ping command not being overdue.
         const pingMetrics = serverStatus.metrics.commands.ping;
         assert.gte(pingMetrics.total, 1);
     }
@@ -359,9 +374,9 @@ const startupParameters = {
     const conn = rst.getPrimary();
     const db = conn.getDB(jsTestName());
 
-    // Don't run this test on slow builds, as it can be racey.
-    if (isSlowBuild(db)) {
-        jsTestLog("Aborting test since it's running on a slow build");
+    // Don't run this test on slow builds, as it can be racy, except for local test.
+    if (jsTest.options.inEvergreen && isSlowBuild(db)) {
+        jsTest.log.info("Aborting test since it's running on a slow build");
         rst.stopSet();
         quit();
     }

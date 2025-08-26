@@ -148,11 +148,11 @@ public:
      * TODO: SERVER-105801 we should consider moving this information up to Interruptible.
      */
     struct OverdueInterruptCheckStats {
-        int64_t overdueInterruptChecks{0};
+        Atomic<int64_t> overdueInterruptChecks{0};
 
         // Sum and max time an operation was overdue in checking for interrupts.
-        Milliseconds overdueAccumulator{0};
-        Milliseconds overdueMaxTime{0};
+        Atomic<Milliseconds> overdueAccumulator{Milliseconds{0}};
+        Atomic<Milliseconds> overdueMaxTime{Milliseconds{0}};
 
         // We only collect interrupt check stats for a small fraction of operations. For this sample
         // we can afford to read the TickSource each checkForInterrupt() call.
@@ -784,7 +784,7 @@ public:
      * Returns number of checkForInterrupts() done on this OperationContext.
      */
     int64_t numInterruptChecks() const {
-        return _numInterruptChecks;
+        return _numInterruptChecks.loadRelaxed();
     }
 
     /**
@@ -1009,7 +1009,7 @@ private:
     AtomicWord<TickSource::Tick> _killTime{0};
 
     // Tracks total number of interrupt checks.
-    int64_t _numInterruptChecks{0};
+    Atomic<int64_t> _numInterruptChecks{0};
 
     // State for tracking overdue interrupt checks. This is only allocated for a small sample of
     // operations that are randomly selected.
