@@ -1851,6 +1851,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/current_op_stage* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/exec/agg/**/query_stats_stage* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/densify_stage* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/internal_set_window_fields_stage* @10gen/query-integration-extensions @svc-auto-approve-bot
 

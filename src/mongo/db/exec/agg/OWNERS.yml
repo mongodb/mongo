@@ -11,6 +11,9 @@ filters:
   - "current_op_stage*":
     approvers:
       - 10gen/query-integration-observability
+  - "query_stats_stage*":
+    approvers:
+      - 10gen/query-integration-observability
   - "densify_stage*":
     approvers:
       - 10gen/query-integration-extensions

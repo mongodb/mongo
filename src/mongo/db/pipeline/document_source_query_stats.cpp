@@ -33,26 +33,15 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source_query_stats_gen.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/buildinfo.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #include <cstddef>
-#include <list>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -61,16 +50,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
 namespace mongo {
-
-// Fail point to mimic re-parsing errors during execution.
-MONGO_FAIL_POINT_DEFINE(queryStatsFailToReparseQueryShape);
-
-// Fail point to mimic getting a ErrorCodes::QueryFeatureNotAllowed exception during re-parsing.
-MONGO_FAIL_POINT_DEFINE(queryStatsGenerateQueryFeatureNotAllowedError);
-namespace {
-auto& queryStatsHmacApplicationErrors =
-    *MetricBuilder<Counter64>{"queryStats.numHmacApplicationErrors"};
-}
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
                                            DocumentSourceQueryStats::LiteParsed::parse,
@@ -113,25 +92,6 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
 }
 
 }  // namespace
-
-BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
-    std::shared_ptr<const Key> key, const SerializationContext& serializationContext) const {
-    static const auto sha256HmacStringDataHasher = [](const std::string& key, StringData sd) {
-        auto hashed = SHA256Block::computeHmac(
-            (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.data(), sd.size());
-        return hashed.toString();
-    };
-
-    auto opts = SerializationOptions{};
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    if (_algorithm == TransformAlgorithmEnum::kHmacSha256) {
-        opts.transformIdentifiers = true;
-        opts.transformIdentifiersCallback = [&](StringData sd) {
-            return sha256HmacStringDataHasher(_hmacKey, sd);
-        };
-    }
-    return key->toBson(pExpCtx->getOperationContext(), opts, serializationContext);
-}
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
@@ -179,188 +139,4 @@ Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) cons
                       : Document{}}}};
 }
 
-DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
-    const auto shouldLog = _algorithm != TransformAlgorithmEnum::kNone;
-    /**
-     * When a CopiedPartition is present (loaded) and contains more elements (QueryStatsEntry), we
-     * can process and return the next element in the _currentCopiedPartition.
-     *
-     * When the current CopiedPartition is exhausted (emptied), we move on to the next
-     * partition. Once we have iterated to the end of the valid partitions, we are done iteratiing
-     * over all the queryStatsStore entries.
-     *
-     * We iterate over a copied container (CopiedParitition) containing the entries in
-     * the partition to reduce the time under which the partition lock is held.
-     */
-    auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
-
-    while (_currentCopiedPartition.isValidPartitionId(queryStatsStore.numPartitions())) {
-        if (!_currentCopiedPartition.isLoaded()) {
-            _currentCopiedPartition.load(queryStatsStore);
-        }
-        // CopiedPartition::load() will throw if any errors occur.
-        // Safe to assume _currentCopiedPartition is now loaded.
-
-        // Exhaust all elements in the current copied partition.
-        // Use a while loop here to handle cases where toDocument() may fail for a specific
-        // QueryStatsEntry, in which case we suppress the thrown exception and continue
-        // iterating to the next available entry.
-        while (!_currentCopiedPartition.empty()) {
-            auto& statsEntries = _currentCopiedPartition.statsEntries;
-            const auto& queryStatsEntry = statsEntries.front();
-            ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
-            if (auto doc =
-                    toDocument(_currentCopiedPartition.getReadTimestamp(), queryStatsEntry)) {
-                if (shouldLog) {
-                    LOGV2_DEBUG_OPTIONS(7808301,
-                                        3,
-                                        {logv2::LogTruncation::Disabled},
-                                        "Logging all outputs of $queryStats",
-                                        "thisOutput"_attr = *doc);
-                }
-                return std::move(*doc);
-            }
-        }
-        // Once we have exhausted entries in this partition, move on to the next partition.
-        _currentCopiedPartition.incrementPartitionId();
-    }
-
-    if (shouldLog) {
-        LOGV2_DEBUG_OPTIONS(
-            7808302, 3, {logv2::LogTruncation::Disabled}, "Finished logging output of $queryStats");
-    }
-    return DocumentSource::GetNextResult::makeEOF();
-}
-
-boost::optional<Document> DocumentSourceQueryStats::toDocument(
-    const Date_t& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
-    const auto& key = queryStatsEntry.key;
-    try {
-        auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
-        // We use the representative shape to generate the key and shape hashes. This avoids
-        // returning duplicate hashes if we have bugs that cause two different representative shapes
-        // to re-parse into the same debug shape.
-        auto representativeShapeKey =
-            key->toBson(pExpCtx->getOperationContext(),
-                        SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                        SerializationContext::stateDefault());
-        // This SHA256 version of the hash is output to aid in data analytics use cases. In these
-        // cases, we often care about comparing hashes from different hosts, potentially on
-        // different versions and platforms. The thinking here is that the SHA256 algorithm is more
-        // stable across these different environments than the quicker 'absl::HashOf'
-        // implementation.
-        auto keyHash = SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
-                                                representativeShapeKey.objsize())
-                           .toString();
-        auto queryShapeHash = key->getQueryShapeHash(pExpCtx->getOperationContext(),
-                                                     SerializationContext::stateDefault())
-                                  .toHexString();
-
-        if (MONGO_unlikely(queryStatsGenerateQueryFeatureNotAllowedError.shouldFail())) {
-            uasserted(ErrorCodes::QueryFeatureNotAllowed,
-                      "queryStatsGenerateQueryFeatureNotAllowedError fail point is enabled");
-        }
-
-        if (MONGO_unlikely(queryStatsFailToReparseQueryShape.shouldFail())) {
-            uasserted(ErrorCodes::FailPointEnabled,
-                      "queryStatsFailToReparseQueryShape fail point is enabled");
-        }
-
-        return Document{{"key", std::move(queryStatsKey)},
-                        {"keyHash", keyHash},
-                        {"queryShapeHash", queryShapeHash},
-                        {"metrics", queryStatsEntry.toBSON()},
-                        {"asOf", partitionReadTime}};
-    } catch (const DBException& ex) {
-        queryStatsHmacApplicationErrors.increment();
-        const auto& hash = absl::HashOf(key);
-        const auto queryShape = key->universalComponents()._queryShape->toBson(
-            pExpCtx->getOperationContext(),
-            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-            SerializationContext::stateDefault());
-        LOGV2_DEBUG(7349403,
-                    2,
-                    "Error encountered when applying hmac to query shape, will not publish "
-                    "queryStats for this entry.",
-                    "status"_attr = ex.toStatus(),
-                    "hash"_attr = hash,
-                    "debugQueryShape"_attr = queryShape);
-
-        // Normally, when we encounter and error when trying to pull out a query shape key
-        // and compute its document to return as a stage result, we skip over the key and log.
-        // However, when running in debug mode
-        // (or the internalQueryStatsErrorsAreCommandFatal option is set) we want to fail the query
-        // instead so that we can catch potential errors in query stats during testing / fuzzing
-        // to investigate and resolve them.
-        // Within this case however, we want to avoid failing on errors that are because the query
-        // feature is disallowed, as these errors do not suggest that anything needs to be
-        // investigated / fixed. The QueryFeatureNotAllowed error occurs when a query was run
-        // (and the query stats were recorded) that needed a higher FCV, but later the cluster
-        // FCV was dropped, and then the query stats were requested and the server can no longer
-        // parse that query that needed the higher FCV.
-        if ((kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) &&
-            (ex.code() != ErrorCodes::QueryFeatureNotAllowed)) {
-            auto keyString = std::to_string(hash);
-            BSONObj cmdObj = serialize().getDocument().toBson();
-            uasserted(Status{QueryStatsFailedToRecordInfo(
-                                 cmdObj, ex.toStatus(), getBuildInfoVersionOnly().getVersion()),
-                             str::stream()
-                                 << "Failed to re-parse query stats store key when reading. Hash: "
-                                 << keyString << ", Query Shape: " << queryShape.toString()});
-        }
-    }
-    return {};
-}
-
-/**
- * Loads the current CopiedPartition with copies of the QueryStatsEntries located in partition of
- * cache corresponding to the partitionId of the current CopiedPartition. This ensures that the
- * partition mutex is only held for the duration of copying.
- */
-void DocumentSourceQueryStats::CopiedPartition::load(QueryStatsStore& queryStatsStore) {
-    tassert(7932100,
-            "Attempted to load invalid partition.",
-            _partitionId < queryStatsStore.numPartitions());
-    tassert(7932101, "Partition was already loaded.", !isLoaded());
-    // 'statsEntries' should be empty, clear just in case.
-    statsEntries.clear();
-
-    // Capture the time at which reading the partition begins.
-    _readTimestamp = Date_t::now();
-    {
-        // We only keep the partition (which holds a lock)
-        // for the time needed to collect the metrics (QueryStatsEntry)
-        const auto partition = queryStatsStore.getPartition(_partitionId);
-
-        // Note the intentional copy of QueryStatsEntry.
-        // This will give us a snapshot of all the metrics we want to report.
-        for (auto&& [hash, metrics] : *partition) {
-            statsEntries.push_back(metrics);
-        }
-    }
-    _isLoaded = true;
-}
-
-bool DocumentSourceQueryStats::CopiedPartition::isLoaded() const {
-    return _isLoaded;
-}
-
-void DocumentSourceQueryStats::CopiedPartition::incrementPartitionId() {
-    // Ensure loaded state is reset when partitionId is incremented.
-    ++_partitionId;
-    _isLoaded = false;
-}
-
-bool DocumentSourceQueryStats::CopiedPartition::isValidPartitionId(
-    QueryStatsStore::PartitionId maxNumPartitions) const {
-    return _partitionId < maxNumPartitions;
-}
-
-const Date_t& DocumentSourceQueryStats::CopiedPartition::getReadTimestamp() const {
-    return _readTimestamp;
-}
-
-bool DocumentSourceQueryStats::CopiedPartition::empty() const {
-    return statsEntries.empty();
-}
 }  // namespace mongo

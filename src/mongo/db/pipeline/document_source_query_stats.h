@@ -38,21 +38,16 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_query_stats_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/producer_consumer_queue.h"
 
-#include <deque>
 #include <memory>
 #include <set>
 #include <string>
@@ -66,7 +61,7 @@ namespace mongo {
 
 using namespace query_stats;
 
-class DocumentSourceQueryStats final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceQueryStats final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$queryStats"_sd;
 
@@ -155,60 +150,16 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    /*
-     * CopiedPartition: This struct is representative of a copied ("materialized") partition
-     * which should be loaded from the QueryStatsStore. It is used to hold a copy of the
-     * QueryStatsEntries corresponding to the provided partitionId.
-     * Once a CopiedPartition has been loaded from QueryStatsStore, it provides access to the
-     * QueryStatsEntries of the partition without requiring holding the lock over the partition in
-     * the partitioned cache.
-     */
-    struct CopiedPartition {
-        CopiedPartition(QueryStatsStore::PartitionId partitionId)
-            : statsEntries(), _readTimestamp(), _partitionId(partitionId) {}
-
-        ~CopiedPartition() = default;
-
-        bool isLoaded() const;
-
-        void incrementPartitionId();
-
-        bool isValidPartitionId(QueryStatsStore::PartitionId maxNumPartitions) const;
-
-        const Date_t& getReadTimestamp() const;
-
-        bool empty() const;
-
-        void load(QueryStatsStore& queryStatsStore);
-
-        std::deque<QueryStatsEntry> statsEntries;
-
-    private:
-        Date_t _readTimestamp;
-        QueryStatsStore::PartitionId _partitionId;
-        bool _isLoaded{false};
-    };
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceQueryStatsToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
     DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone,
                              std::string hmacKey = {})
         : DocumentSource(kStageName, expCtx),
-          exec::agg::Stage(kStageName, expCtx),
-          _currentCopiedPartition(0),
           _transformIdentifiers(algorithm != TransformAlgorithmEnum::kNone),
           _algorithm(algorithm),
           _hmacKey(hmacKey) {}
-
-    BSONObj computeQueryStatsKey(std::shared_ptr<const Key> key,
-                                 const SerializationContext& serializationContext) const;
-
-    GetNextResult doGetNext() final;
-
-    boost::optional<Document> toDocument(const Date_t& partitionReadTime,
-                                         const QueryStatsEntry& queryStatsEntry) const;
-
-    // The current partition copied from query stats store to avoid holding lock during reads.
-    CopiedPartition _currentCopiedPartition;
 
     // When true, apply hmac to field names from returned query shapes.
     bool _transformIdentifiers;
