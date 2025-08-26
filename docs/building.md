@@ -7,10 +7,10 @@ way to get started, rather than building from source.
 To build MongoDB, you will need:
 
 - A modern C++ compiler capable of compiling C++20. One of the following is required:
-  - GCC 14.2 or newer
-  - Clang 19.1 or newer
-  - Apple XCode 16.4 or newer
-  - Visual Studio 2022 version 17.0 or newer (See Windows section below for details)
+  - GCC 14.2
+  - Clang 19.1
+  - Apple XCode 16.4
+  - Visual Studio 2022 version 17.0
 - On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
   - Fedora/RHEL - `dnf install libcurl-devel`
   - Ubuntu/Debian - `libcurl-dev` is provided by three packages. Install one of them:
@@ -22,6 +22,8 @@ To build MongoDB, you will need:
 - Python 3.10
 - About 13 GB of free disk space for the core binaries (`mongod`,
   `mongos`, and `mongo`) and about 600 GB for the install-all target.
+
+If using a newer version of a C++ compiler than listed above, it may work. However the versions listed above have been verified to work.
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x,
 and x86-64. More detailed platform instructions can be found below.
