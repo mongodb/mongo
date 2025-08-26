@@ -68,18 +68,18 @@ assert.eq(indexBulkBuilderSection.resumed, 0, tojson(indexBulkBuilderSection));
 // metrics are incremented when we use the Sorter, which isn't used in primary-driven index builds.
 assert.eq(
     indexBulkBuilderSection.filesOpenedForExternalSort,
-    1 - FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds"),
+    1 - FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds"),
     tojson(indexBulkBuilderSection),
 );
 assert.eq(
     indexBulkBuilderSection.filesClosedForExternalSort,
-    1 - FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds"),
+    1 - FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds"),
     tojson(indexBulkBuilderSection),
 );
 // Due to fragmentation in the allocator, which is counted towards mem usage, we can spill earlier
 // than we would expect.
 assert.between(
-    FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds") ? 0 : expectedSpilledRanges,
+    FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds") ? 0 : expectedSpilledRanges,
     indexBulkBuilderSection.spilledRanges,
     1 + expectedSpilledRanges,
     tojson(indexBulkBuilderSection),
@@ -102,7 +102,7 @@ assert.between(
 );
 // TODO(SERVER-107044) The numSorted and bytesSorted metric are incremented when we use the Sorter,
 // which isn't used in primary-driven index builds.
-if (!FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds")) {
     assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
     // Expect total bytes sorted to be greater than approxMemoryUsage because of the additional
     // field in the documents inserted which accounts for more bytes than in the rough calculation.
@@ -118,7 +118,7 @@ assert.between(
 
 // Only run this portion of the test if we don't have primary-driven index builds because we don't
 // support resumable index builds with this feature.
-if (FeatureFlagUtil.isEnabled(testDB, "featureFlagPrimaryDrivenIndexBuilds")) {
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds")) {
     replSet.stopSet();
     quit();
 }

@@ -82,7 +82,7 @@ function assertListIndexesOutputsMatch(
             );
             assert.eq(
                 withBuildInfo[i].indexBuildInfo.method,
-                FeatureFlagUtil.isEnabled(db, "featureFlagPrimaryDrivenIndexBuilds") ? "Primary driven" : "hybrid",
+                FeatureFlagUtil.isPresentAndEnabled(db, "PrimaryDrivenIndexBuilds") ? "Primary driven" : "hybrid",
                 "Index expected to be in-progress is building with an unexpected method: " + tojson(withBuildInfo[i]),
             );
 
