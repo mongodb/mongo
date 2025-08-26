@@ -43,6 +43,7 @@
 
 #include "palm_kv.h"
 #include "palm_verbose.h"
+#include "palm_utils.h"
 
 /*
  * This page log implementation is used for demonstration and testing. All objects are stored as
@@ -467,24 +468,6 @@ palm_get_dek(PALM *palm, WT_SESSION *session, const WT_PAGE_LOG_ENCRYPTION *encr
 }
 
 /*
- * palm_resize_item --
- *     Resize a buffer as needed.
- */
-static int
-palm_resize_item(WT_ITEM *item, size_t new_size)
-{
-    if (item->memsize < new_size) {
-        item->mem = realloc(item->mem, new_size);
-        if (item->mem == NULL)
-            return (errno);
-        item->memsize = new_size;
-    }
-    item->data = item->mem;
-    item->size = new_size;
-    return (0);
-}
-
-/*
  * palm_init_context --
  *     Initialize a context in a standard way.
  */
@@ -881,6 +864,26 @@ err:
 }
 
 static int
+palm_handle_get_page_ids(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t checkpoint_lsn,
+  uint64_t table_id, WT_ITEM *item, size_t *size)
+{
+    PALM_KV_CONTEXT context;
+    PALM_HANDLE *palm_handle = (PALM_HANDLE *)plh;
+    PALM *palm = palm_handle->palm;
+
+    palm_init_context(palm, &context);
+
+    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
+
+    int ret;
+    ret = palm_kv_get_page_ids(&context, item, checkpoint_lsn, table_id, size);
+
+    palm_kv_rollback_transaction(&context);
+
+    return (ret);
+}
+
+static int
 palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
   uint32_t *results_count)
@@ -1035,6 +1038,7 @@ palm_open_handle(
     palm_handle->iface.plh_discard = palm_handle_discard;
     palm_handle->iface.plh_put = palm_handle_put;
     palm_handle->iface.plh_get = palm_handle_get;
+    palm_handle->iface.plh_get_page_ids = palm_handle_get_page_ids;
     palm_handle->iface.plh_close = palm_handle_close;
     palm_handle->palm = palm;
     palm_handle->table_id = table_id;

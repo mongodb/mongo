@@ -38,7 +38,6 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare32(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare32'
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_committed_prepare(self):
         # Set initial timestamps - start with lower values
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))

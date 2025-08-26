@@ -50,6 +50,7 @@
 #include <swap.h>
 
 #include "palm_kv.h"
+#include "palm_utils.h"
 #define MEGABYTE (1024 * 1024)
 
 /*
@@ -370,6 +371,113 @@ palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, 
     vval.mv_data = (void *)buf->data;
 
     return (mdb_put(context->lmdb_txn, context->env->lmdb_pages_dbi, &kval, &vval, 0));
+}
+
+int
+palm_kv_get_page_ids(
+  PALM_KV_CONTEXT *context, WT_ITEM *item, uint64_t checkpoint_lsn, uint64_t table_id, size_t *size)
+{
+    MDB_cursor *cursor;
+    MDB_stat stat;
+    MDB_val kval;
+    MDB_val vval;
+    PAGE_KEY page_key;
+    size_t count = 0;
+    int ret;
+
+    cursor = NULL;
+
+    memset(&kval, 0, sizeof(kval));
+    memset(&vval, 0, sizeof(vval));
+    memset(&page_key, 0, sizeof(page_key));
+    page_key.table_id = table_id;
+    swap_page_key(&page_key, &page_key);
+    kval.mv_size = sizeof(page_key);
+    kval.mv_data = &page_key;
+
+    if ((ret = mdb_cursor_open(context->lmdb_txn, context->env->lmdb_pages_dbi, &cursor)) != 0)
+        return (ret);
+
+    /* Get the maximum count of page IDs */
+    if ((ret = mdb_stat(context->lmdb_txn, context->env->lmdb_pages_dbi, &stat)) != 0)
+        return (ret);
+
+    /* If no entries found, return an error.  */
+    if (stat.ms_entries == 0) {
+        item->size = 0;
+        item->data = NULL;
+        return (WT_NOTFOUND);
+    }
+
+    assert(item != NULL);
+    memset(item, 0, sizeof(*item));
+    if ((ret = palm_resize_item(item, stat.ms_entries * sizeof(uint64_t))) != 0)
+        return (ret);
+
+    if (item->data == NULL)
+        return (ENOMEM);
+
+    if ((ret = mdb_cursor_get(cursor, &kval, &vval, MDB_SET_RANGE)) != 0)
+        return (ret);
+
+    uint64_t prev_page_id = 0;
+    int prev_is_tombstone = 0;
+
+    /*
+     * Iterate through the pages table, looking for pages that have an LSN smaller than the given
+     * checkpoint LSN. Note that the pages are sorted by table_id, page_id, LSN in ascending order,
+     * so we are only interested in the last page of each page_id. If the last page is a tombstone,
+     * meaning we're discarding it, then we skip it. If the last page is a full page, we store the
+     * page ID in the item->data array.
+     */
+    while (ret == 0) {
+        if (kval.mv_size != sizeof(PAGE_KEY))
+            return (EINVAL);
+
+        PAGE_KEY *key = (PAGE_KEY *)kval.mv_data;
+        PAGE_KEY decoded_key;
+        swap_page_key(key, &decoded_key);
+
+        /* If we have gone past the table, stop. */
+        if (decoded_key.table_id > table_id)
+            break;
+
+        /*
+         * Skip pages that are not for the requested table and pages newer than the given checkpoint
+         * LSN. For deltas, skip those that are not tombstones, since only full pages and tombstones
+         * are relevant here.
+         */
+        if (decoded_key.table_id < table_id || decoded_key.lsn >= checkpoint_lsn ||
+          (decoded_key.is_delta && ((decoded_key.flags & WT_PALM_KV_TOMBSTONE) == 0))) {
+            ret = mdb_cursor_get(cursor, &kval, &vval, MDB_NEXT);
+            if (ret != 0 && ret != MDB_NOTFOUND)
+                return (ret);
+            continue;
+        }
+
+        /*  If the previous page was not a tombstone, store the previous page ID. */
+        if (prev_page_id != 0 && decoded_key.page_id != prev_page_id && !prev_is_tombstone) {
+            assert(count < stat.ms_entries);
+            ((uint64_t *)item->data)[count++] = prev_page_id;
+        }
+
+        prev_page_id = decoded_key.page_id;
+        prev_is_tombstone = ((decoded_key.flags & WT_PALM_KV_TOMBSTONE) != 0);
+
+        ret = mdb_cursor_get(cursor, &kval, &vval, MDB_NEXT);
+        if (ret != 0 && ret != MDB_NOTFOUND)
+            return (ret);
+    }
+
+    /* If the last tracked page was not a tombstone, store the page ID. */
+    if (prev_page_id != 0 && !prev_is_tombstone) {
+        assert(count < stat.ms_entries);
+        ((uint64_t *)item->data)[count++] = prev_page_id;
+    }
+
+    *size = count;
+
+    return (ret);
 }
 
 int

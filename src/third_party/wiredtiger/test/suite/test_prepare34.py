@@ -37,7 +37,6 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare34(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare34'
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
@@ -121,7 +120,6 @@ class test_prepare34(test_prepare_preserve_prepare_base):
             self.assertEqual(value, cursor[i])
         self.session.rollback_transaction()
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back

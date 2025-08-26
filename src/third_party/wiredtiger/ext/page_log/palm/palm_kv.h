@@ -99,6 +99,8 @@ typedef enum PALM_KV_GLOBAL_KEY {
 
 int palm_kv_put_global(PALM_KV_CONTEXT *context, PALM_KV_GLOBAL_KEY key, uint64_t value);
 int palm_kv_get_global(PALM_KV_CONTEXT *context, PALM_KV_GLOBAL_KEY key, uint64_t *valuep);
+int palm_kv_get_page_ids(PALM_KV_CONTEXT *context, WT_ITEM *item, uint64_t checkpoint_lsn,
+  uint64_t table_id, size_t *size);
 int palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, uint64_t lsn,
   bool is_delta, uint64_t backlink_lsn, uint64_t base_lsn, const WT_PAGE_LOG_ENCRYPTION *encryption,
   uint32_t flags, const WT_ITEM *buf);

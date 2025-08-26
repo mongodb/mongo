@@ -5723,6 +5723,21 @@ struct __wt_page_log_handle {
         WT_ITEM *results_array, uint32_t *results_count);
 
     /*!
+     * Get all live page IDs from the paging/logging service for a given checkpoint.
+     *
+     * @errors
+     *
+     * @param plh the WT_PAGE_LOG_HANDLE
+     * @param session the current WiredTiger session
+     * @param checkpoint_lsn the checkpoint to use
+     * @param table_id the table where we want to get the pages from
+     * @param item the WT_ITEM to hold the page ids
+     * @param size number of page IDs stored in the array
+     */
+    int (*plh_get_page_ids)(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session,
+        uint64_t checkpoint_lsn, uint64_t table_id, WT_ITEM *item, size_t *size);
+
+    /*!
      * Discard an object into the paging/logging service.
      *
      * @errors
