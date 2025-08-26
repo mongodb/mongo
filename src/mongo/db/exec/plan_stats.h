@@ -959,8 +959,6 @@ struct NearStats : public SpecificStats {
     // btree index version, not geo index version
     int indexVersion;
     BSONObj keyPattern;
-
-    SpillingStats spillingStats;
 };
 
 struct UpdateStats : public SpecificStats {

@@ -54,9 +54,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -163,7 +161,6 @@ public:
             const WorkingSetID id = workingSet->allocate();
             WorkingSetMember* member = workingSet->get(id);
             member->doc = {SnapshotId(), Document{interval.data[i]}};
-            member->recordId = RecordId{_pos, static_cast<int>(i)};
             workingSet->transitionToOwnedObj(id);
             queuedStage->pushBack(id);
         }
@@ -278,37 +275,6 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     std::vector<BSONObj> results = advanceStage(&nearStage, &workingSet);
     ASSERT_EQUALS(results.size(), 3u);
     assertAscendingAndValid(results);
-}
-
-TEST_F(QueryStageNearTest, Spilling) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtendedAutoSpilling", true};
-    RAIIServerParameterControllerForTest maxMemoryBytes{"internalNearStageMaxMemoryBytes", 128};
-
-    _expCtx->setTempDir(storageGlobalParams.dbpath + "/_tmp");
-    _expCtx->setAllowDiskUse(true);
-
-    WorkingSet workingSet;
-
-    MockNearStage nearStage(_expCtx.get(), &workingSet, *_coll, _mockGeoIndex);
-
-    static constexpr int kMaxDistance = 100;
-    size_t expectedResultCount = 0;
-    for (int minDistance = 0; minDistance < kMaxDistance; ++minDistance) {
-        std::vector<BSONObj> mockData;
-        mockData.reserve(kMaxDistance);
-        for (int distance = 0; distance <= kMaxDistance; ++distance) {
-            mockData.push_back(BSON("distance" << distance));
-            expectedResultCount += distance >= minDistance ? 1 : 0;
-        }
-        nearStage.addInterval(std::move(mockData), minDistance, minDistance + 1);
-    }
-
-    std::vector<BSONObj> results = advanceStage(&nearStage, &workingSet);
-    ASSERT_EQUALS(results.size(), expectedResultCount);
-    assertAscendingAndValid(results);
-
-    const auto* stats = static_cast<const NearStats*>(nearStage.getSpecificStats());
-    ASSERT_GT(stats->spillingStats.getSpills(), 0);
 }
 
 }  // namespace

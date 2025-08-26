@@ -76,14 +76,7 @@ void addSingleSpillingStats(PlanSummaryStats::SpillingStage stage,
             appendCallback("bucketAutoSpilledDataStorageSize",
                            static_cast<long long>(stats.getSpilledDataStorageSize()));
             return;
-        case PlanSummaryStats::SpillingStage::GEO_NEAR:
-            appendCallback("geoNearSpills", static_cast<long long>(stats.getSpills()));
-            appendCallback("geoNearSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
-            appendCallback("geoNearSpilledRecords",
-                           static_cast<long long>(stats.getSpilledRecords()));
-            appendCallback("geoNearSpilledDataStorageSize",
-                           static_cast<long long>(stats.getSpilledDataStorageSize()));
-            return;
+
         case PlanSummaryStats::SpillingStage::GRAPH_LOOKUP:
             appendCallback("graphLookupSpills", static_cast<long long>(stats.getSpills()));
             appendCallback("graphLookupSpilledBytes",

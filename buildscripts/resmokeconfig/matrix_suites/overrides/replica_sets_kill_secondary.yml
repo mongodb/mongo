@@ -90,7 +90,6 @@
       - jstests/core/query/partial_index_pbt.js
       - jstests/core/query/query_knob_correctness_pbt.js
       - jstests/core/query/or/subplanning_pbt.js
-      - jstests/core/**/geo_circle_spilling.js
       # The following tests also create large oplog entries due to the maximum blocking sort size being
       # 100 MB.
       - jstests/core/**/explain_execution_error.js

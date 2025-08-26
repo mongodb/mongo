@@ -450,15 +450,6 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 intervalBob.appendNumber("nReturned", it->numResultsReturned);
             }
             intervalsBob.doneFast();
-            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
-            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
-            bob->appendNumber("spilledRecords",
-                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
-            bob->appendNumber("spilledBytes",
-                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
-            bob->appendNumber(
-                "spilledDataStorageSize",
-                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
         }
     } else if (STAGE_IDHACK == stats.stageType) {
         IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());

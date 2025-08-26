@@ -30,16 +30,21 @@
 
 #include "mongo/db/exec/classic/near.h"
 
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 
 #include <limits>
 #include <memory>
 
 namespace mongo {
+
+namespace {
+
+SortOptions makeSortOptions() {
+    return SortOptions{}.MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
+}
+
+}  // namespace
 
 NearStage::NearStage(ExpressionContext* expCtx,
                      const char* typeName,
@@ -52,7 +57,6 @@ NearStage::NearStage(ExpressionContext* expCtx,
       _searchState(SearchState::Initializing),
       _seenDocuments(expCtx),
       _nextIntervalStats(nullptr),
-      _sorterFileStats(nullptr /*sorterTracker*/),
       _resultBuffer(makeSortOptions(), SorterKeyComparator{}, NoOpBound{}),
       _stageType(type),
       _nextInterval(nullptr) {}
@@ -192,10 +196,6 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     nextMember.makeObjOwnedIfNeeded();
     _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
 
-    if (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
-        spill(loadMemoryLimit(StageMemoryLimit::NearStageMaxMemoryBytes));
-    }
-
     return PlanStage::NEED_TIME;
 }
 
@@ -237,67 +237,12 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     return PlanStage::ADVANCED;
 }
 
-SortOptions NearStage::makeSortOptions() {
-    if (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
-        return SortOptions{}
-            .FileStats(&_sorterFileStats)
-            // Spilling will handled externally by NearStage::spill method
-            .MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max())
-            .TempDir(expCtx()->getTempDir());
-    } else {
-        return SortOptions{}.MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
-    }
-}
-
-void NearStage::updateSpillingStats() {
-    SpillingStats spillingStats = _seenDocumentsSpillingStats;
-    spillingStats.incrementSpills(_resultBuffer.stats().spilledRanges());
-    spillingStats.incrementSpilledRecords(_resultBuffer.stats().spilledKeyValuePairs());
-    spillingStats.incrementSpilledBytes(_sorterFileStats.bytesSpilledUncompressed());
-    spillingStats.incrementSpilledDataStorageSize(_sorterFileStats.bytesSpilled());
-
-    auto& previousSpillingStats = _specificStats.spillingStats;
-    geoNearCounters.incrementPerSpilling(
-        spillingStats.getSpills() - previousSpillingStats.getSpills(),
-        spillingStats.getSpilledBytes() - previousSpillingStats.getSpilledBytes(),
-        spillingStats.getSpilledRecords() - previousSpillingStats.getSpilledRecords(),
-        spillingStats.getSpilledDataStorageSize() -
-            previousSpillingStats.getSpilledDataStorageSize());
-    previousSpillingStats = spillingStats;
-}
-
-void NearStage::spill(uint64_t maxMemoryBytes) {
-    uint64_t resultBufferMemoryBytes = _resultBuffer.stats().memUsage();
-    uint64_t seenDocumentsMemoryBytes = _seenDocuments.getApproximateSize();
-
-    // If we need to spill, spill the larger structure first.
-    if (resultBufferMemoryBytes + seenDocumentsMemoryBytes > maxMemoryBytes) {
-        if (resultBufferMemoryBytes > seenDocumentsMemoryBytes) {
-            _resultBuffer.forceSpill();
-        } else {
-            _seenDocuments.spill(_seenDocumentsSpillingStats);
-        }
-    }
-
-    // After spilling, we assume that the size of spilled structure is 0. Spill the other structure
-    // if we still need to spill.
-    if (seenDocumentsMemoryBytes > maxMemoryBytes) {
-        _seenDocuments.spill(_seenDocumentsSpillingStats);
-    }
-    if (resultBufferMemoryBytes > maxMemoryBytes) {
-        _resultBuffer.forceSpill();
-    }
-
-    updateSpillingStats();
-}
-
 bool NearStage::isEOF() const {
     return SearchState::Finished == _searchState;
 }
 
 std::unique_ptr<PlanStageStats> NearStage::getStats() {
     auto ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
-    updateSpillingStats();
     ret->specific = _specificStats.clone();
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());

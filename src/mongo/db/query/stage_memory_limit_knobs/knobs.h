@@ -47,7 +47,6 @@ enum class StageMemoryLimit {
     QueryMaxSpoolMemoryUsageBytes,
     QueryMaxBlockingSortMemoryUsageBytes,
     OrStageMaxMemoryBytes,
-    NearStageMaxMemoryBytes,
 };
 
 /**
