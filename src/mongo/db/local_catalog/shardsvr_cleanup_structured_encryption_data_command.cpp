@@ -47,6 +47,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -111,7 +112,10 @@ public:
             auto cleanupCoordinator =
                 [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
-                auto cleanup = makeRequest(opCtx);
+                auto cleanup = writeConflictRetry(opCtx,
+                                                  Request::kCommandName,
+                                                  request().getNamespace(),
+                                                  [&]() { return makeRequest(opCtx); });
                 return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
                     opCtx, cleanup.toBSON(), fixedFcvRegion);
             }();
