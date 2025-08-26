@@ -172,6 +172,8 @@ public:
                          int64_t hintDataSizeIncrement = 0,
                          int64_t hintNumRecordsIncrement = 0);
 
+    std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall();
+
 protected:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;

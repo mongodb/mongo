@@ -217,6 +217,7 @@ void HashAggBaseStage<Derived>::spill() {
             1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
     groupCounters.incrementPerSpilling(
         1 /* spills */, spilledBytes, spilledRecords, spilledDataStorageIncrease);
+    _recordStore->updateSpillStorageStatsForOperation(_opCtx);
 }
 
 template <class Derived>

@@ -386,6 +386,14 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
         });
 }
 
+std::unique_ptr<StorageStats> SpillTable::computeOperationStatisticsSinceLastCall() {
+    // TODO (SERVER-106716): Remove this case.
+    if (!_ru) {
+        return nullptr;
+    }
+    return _ru->computeOperationStatisticsSinceLastCall();
+}
+
 Status SpillTable::_checkDiskSpace() const {
     return _diskState && _diskState->full()
         ? Status(ErrorCodes::OutOfDiskSpace,

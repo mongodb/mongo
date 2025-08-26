@@ -710,6 +710,8 @@ public:
 
     long long getPrepareReadConflicts() const;
 
+    void updateSpillStorageStats(std::unique_ptr<StorageStats> operationStorageStats);
+
 private:
     class CurOpStack;
 

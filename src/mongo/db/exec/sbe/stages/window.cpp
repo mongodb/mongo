@@ -208,6 +208,7 @@ void WindowStage::spill() {
         1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
     setWindowFieldsCounters.incrementPerSpilling(
         1 /* spills */, spilledBytes, _rows.size(), spilledDataStorageIncrease);
+    _recordStore->updateSpillStorageStatsForOperation(_opCtx);
 
     // Clear the in memory window buffer.
     _rows.clear();

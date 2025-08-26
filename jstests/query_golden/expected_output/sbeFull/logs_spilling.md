@@ -113,6 +113,10 @@
 	"usedDisk" : true
 }
 ```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
+```
 
 ## 7. TextOr and projection
 ### Pipeline
@@ -232,6 +236,10 @@
 	"usedDisk" : true
 }
 ```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
+```
 
 ## 11. Graph lookup
 ### Pipeline
@@ -261,6 +269,10 @@
 	"graphLookupSpills" : 2,
 	"usedDisk" : true
 }
+```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
 ```
 
 ## 12. Graph lookup with unwind and sort
@@ -300,6 +312,10 @@
 	"usedDisk" : true
 }
 ```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
+```
 
 ## 13. HashLookupUnwind
 ### Pipeline
@@ -336,6 +352,10 @@
 	"usedDisk" : true
 }
 ```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
+```
 
 ## 14. SetWindowFields
 ### Pipeline
@@ -369,6 +389,10 @@
 	"sortSpills" : 7,
 	"usedDisk" : true
 }
+```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
 ```
 
 ### Pipeline
@@ -405,5 +429,9 @@
 	"sortSpills" : 7,
 	"usedDisk" : true
 }
+```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
 ```
 
