@@ -5136,8 +5136,6 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100942 setDefaultRWConcern does not return WCE
-
         // TODO SERVER-100936 create does note return WCE, returns StaleConfig
 
         // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
@@ -5158,7 +5156,6 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100942 setDefaultRWConcern does not return WCE
         if (clusterType == "rs" &&
             (command == "dropRole" || command == "grantRolesToUser" || command == "updateRole" ||
              command == "updateUser" || command == "setDefaultRWConcern")) {

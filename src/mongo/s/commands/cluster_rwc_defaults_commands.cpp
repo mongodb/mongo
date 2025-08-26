@@ -67,8 +67,11 @@ public:
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kNotIdempotent));
 
-        uassertStatusOK(cmdResponse.commandStatus);
-        uassertStatusOK(cmdResponse.writeConcernStatus);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+
+        if (!cmdResponse.commandStatus.isOK() || !cmdResponse.writeConcernStatus.isOK()) {
+            return false;
+        }
 
         // Quickly pick up the new defaults by setting them in the cache.
         auto newDefaults = RWConcernDefault::parse(IDLParserContext("ClusterSetDefaultRWConcern"),
@@ -85,7 +88,6 @@ public:
         }
         ReadWriteConcernDefaults::get(opCtx).setDefault(opCtx, std::move(newDefaults));
 
-        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 
