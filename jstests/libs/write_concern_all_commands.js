@@ -733,11 +733,7 @@ const wcCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                if (clusterType == "sharded") {
-                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-                } else {
-                    assert.commandWorkedIgnoringWriteConcernErrors(res);
-                }
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
@@ -749,15 +745,20 @@ const wcCommandsTests = {
                 // Ensure DB exists, but create a different collection
                 assert.commandWorked(coll.getDB().coll2.insert({_id: 1}));
 
+                // Force installing the filtering metadata as the refresh will fail with StaleConfig
+                // instead of WCE (SERVER-84623).
+                if (clusterType == "sharded") {
+                    const nss = dbName + "." + collName;
+                    assert.commandWorked(cluster.rs0.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                    assert.commandWorked(cluster.rs1.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                }
+
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                if (clusterType == "sharded") {
-                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-                } else {
-                    assert.commandWorkedIgnoringWriteConcernErrors(res);
-                }
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -767,6 +768,17 @@ const wcCommandsTests = {
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.insert({a: 1}));
                 assert.commandWorked(coll.getDB().runCommand({drop: "nonexistentColl"}));
+
+                // Force installing the filtering metadata as the refresh will fail with StaleConfig
+                // instead of WCE (SERVER-84623).
+                if (clusterType == "sharded") {
+                    const nss = dbName + ".viewWithOut";
+                    assert.commandWorked(cluster.rs0.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                    assert.commandWorked(cluster.rs1.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                }
+
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -3418,34 +3430,27 @@ const wcTimeseriesViewsCommandsTests = {
     count: {skip: "does not accept write concern"},
     cpuload: {skip: "does not accept write concern"},
     create: {
-        noop: {
-            // Coll already exists
-            req: {create: collName, timeseries: {timeField: "time", metaField: "meta"}},
-            setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                coll.insert({meta: 1, time: ISODate()});
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
-                stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
-            },
-            confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandFailedWithCode(res, ErrorCodes.NamespaceExists);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
-                restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
-            },
-        },
+        // Do not test noop case, as creating a ts collection is not idempotent (SERVER-76547).
         success: {
             // Basic create coll
             req: {create: collName, timeseries: {timeField: "time", metaField: "meta"}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert(coll.drop());
+
+                // Force installing the filtering metadata as the refresh will fail with StaleConfig
+                // instead of WCE (SERVER-84623).
+                if (clusterType == "sharded") {
+                    const nss = dbName + "." + collName;
+                    assert.commandWorked(cluster.rs0.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                    assert.commandWorked(cluster.rs1.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                }
+
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                if (clusterType == "sharded") {
-                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-                } else {
-                    assert.commandWorkedIgnoringWriteConcernErrors(res);
-                }
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3456,6 +3461,17 @@ const wcTimeseriesViewsCommandsTests = {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
                 assert.eq(coll.find().itcount(), 1);
                 assert.commandWorked(coll.getDB().runCommand({drop: "nonexistentColl"}));
+
+                // Force installing the filtering metadata as the refresh will fail with StaleConfig
+                // instead of WCE (SERVER-84623).
+                if (clusterType == "sharded") {
+                    const nss = dbName + ".viewWithOut";
+                    assert.commandWorked(cluster.rs0.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                    assert.commandWorked(cluster.rs1.getPrimary().adminCommand(
+                        {_flushRoutingTableCacheUpdates: nss}));
+                }
+
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -3464,7 +3480,6 @@ const wcTimeseriesViewsCommandsTests = {
                 } else {
                     assert.commandFailedWithCode(res, ErrorCodes.OptionNotSupportedOnView);
                 }
-                assert.eq(coll.find().itcount(), 1);
                 assert(!coll.getDB().getCollectionNames().includes("nonexistentColl"));
 
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -5057,10 +5072,11 @@ function shouldSkipTestCase(clusterType,
         return true;
     }
 
-    // TODO SERVER-100936 create returns NamespaceExists without a WCE when collection already
-    // exists with different options
     if (clusteredColls && command == "create") {
-        jsTestLog("Skipping " + command + " until SERVER-100936 has been backported.");
+        // More information about this in SERVER-102058.
+        jsTestLog(
+            "Skipping " + command +
+            " because implicitly clustering collections through the failpoint 'clusterAllCollectionsByDefault' makes it not idempotent.");
         return true;
     }
 
@@ -5095,33 +5111,27 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100936 create returns NamespaceExists without a WCE
-
         // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
         // upgrade procedure will not proactively shard the sessions collection.
 
         // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
-                (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-                 command == "dropAllUsersFromDatabase" || command == "grantPrivilegesToRole" ||
-                 command == "grantRolesToRole" || command == "grantRolesToUser" ||
-                 command == "revokePrivilegesFromRole" || command == "revokeRolesFromRole" ||
-                 command == "revokeRolesFromUser" || command == "updateRole" ||
-                 command == "updateUser" || command == "setFeatureCompatibilityVersion" ||
-                 command == "enableSharding") ||
-            (isTimeseries && command == "create")) {
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
+             command == "dropAllUsersFromDatabase" || command == "grantPrivilegesToRole" ||
+             command == "grantRolesToRole" || command == "grantRolesToUser" ||
+             command == "revokePrivilegesFromRole" || command == "revokeRolesFromRole" ||
+             command == "revokeRolesFromUser" || command == "updateRole" ||
+             command == "updateUser" || command == "setFeatureCompatibilityVersion" ||
+             command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for no-op case.");
             return true;
         }
     }
 
     if (testCase == "success") {
-        // TODO SERVER-100936 For ts collection, create does note return WCE, returns StaleConfig
-
         if (clusterType == "sharded" &&
                 (shardedDDLCommandsRequiringMajorityCommit.includes(command)) ||
-            (TestData.configShard && command == "enableSharding") ||
-            (isTimeseries && command == "create")) {
+            (TestData.configShard && command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for success case.");
             return true;
         }
@@ -5136,17 +5146,15 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-100936 create does note return WCE, returns StaleConfig
-
         // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
         // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
         if (clusterType == "sharded" &&
                 shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-            command == "create" || command == "createRole" || command == "createUser" ||
-            command == "dropRole" || command == "dropUser" || command == "grantRolesToUser" ||
-            command == "updateRole" || command == "updateUser" ||
-            command == "setDefaultRWConcern" || (command == "findOneAndUpdate") ||
-            (command == "findAndModify") || (TestData.configShard && command == "enableSharding")) {
+            command == "createRole" || command == "createUser" || command == "dropRole" ||
+            command == "dropUser" || command == "grantRolesToUser" || command == "updateRole" ||
+            command == "updateUser" || command == "setDefaultRWConcern" ||
+            (command == "findOneAndUpdate") || (command == "findAndModify") ||
+            (TestData.configShard && command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }

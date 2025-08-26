@@ -100,10 +100,8 @@ public:
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kIdempotent)
                     .swResponse);
-
-            const auto createStatus = mongo::getStatusFromCommandResult(response.data);
-            uassertStatusOK(createStatus);
             uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
+            uassertStatusOK(getStatusFromCommandResult(response.data));
             return CreateCommandReply();
         }
     };

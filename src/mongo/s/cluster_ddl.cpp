@@ -137,6 +137,7 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
 
     const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
     uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse.data));
 
     auto createCollResp =
         CreateCollectionResponse::parse(IDLParserContext("createCollection"), remoteResponse.data);
