@@ -1397,6 +1397,8 @@ tasks:
       - func: "do setup"
       - func: "get mongot version"
       - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: search_ssl
