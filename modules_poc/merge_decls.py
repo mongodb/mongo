@@ -156,6 +156,21 @@ def get_paths(timer: Timer):
     timer.mark("queried bazel for mod_scanner outputs")
     return outputs
 
+def get_file_family_regex(path: str) -> re.Pattern:
+    # file_base is the portion of the file name that defines the family
+    # e.g. bazel-out/blah/src/mongo/db/foo_details.h -> src/mongo/db/foo
+    file_base = path.split(".")[0]
+    if index := file_base.index("src/mongo/"):
+        file_base = file_base[index:]
+    file_base = re.sub(r"_(internal|detail)s?$", "", file_base)
+    assert file_base.startswith("src/mongo/")
+
+    file_family_regex = re.compile(
+        rf"(?:.*/)?{file_base}(?:_(?:internals?|details?|test|bm|mock)(_.*)?)?\."
+    )
+    assert file_family_regex.match(path)  # sanity check
+
+    return file_family_regex
 
 def main(
     jobs: int = typer.Option(os.cpu_count(), "--jobs", "-j"),
@@ -232,18 +247,7 @@ def main(
             case "file_private":
                 err = f"Illegal use of {decl['display_name']} outside of its file family:"
 
-                # file_base is the portion of the file name that defines the family
-                # e.g. bazel-out/blah/src/mongo/db/foo_details.h -> src/mongo/db/foo
-                file_base = decl["loc"].split(".")[0]
-                if index := file_base.index("src/mongo/"):
-                    file_base = file_base[index:]
-                file_base = re.sub(r"_(internal|detail)s?$", "", file_base)
-                assert file_base.startswith("src/mongo/")
-
-                file_family_regex = re.compile(
-                    rf"(?:.*/)?{file_base}(?:_(?:internals?|details?|test|bm|mock)(_.*)?)?\."
-                )
-                assert file_family_regex.match(decl["loc"])  # sanity check
+                file_family_regex = get_file_family_regex(decl["loc"])
 
                 for mod, locs in decl["used_from"].items():
                     for loc in locs:

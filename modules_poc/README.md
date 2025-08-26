@@ -153,6 +153,24 @@ invokes the scanner automatically. Unsure if we want to support this use case ag
       ```
 -->
 
+### Automated marking visibility for private headers
+
+`private_headers.py` can be used to find all files where there are no currently detected external usages
+and automatically mark them as private. This does not necessarily mean that all automatically marked headers
+are intended to be private. A human should review to ensure that the marked headers match intent. Filters
+can be applied to adjust the files that are modified.
+
+For headers matching the filter, the script will also warn of usages of `_forTest` external to the file
+family.
+
+Example usage:
+
+```
+./modules_poc/private_headers.py --team=server_programmability --module=core --glob="src/mongo/executor/*"
+```
+
+`--dry-run` can be used to view all of the changes without applying them.
+
 ### Note for implementers
 
 You can also scan a single file which is useful when iterating on this. You can

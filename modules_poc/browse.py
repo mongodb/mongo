@@ -197,8 +197,8 @@ class File:
         return unknown_count(self.top_level_decls) + unknown_count(self.detached_decls)
 
 
-def is_submodule_usage(decl: Decl, mod: str) -> bool:
-    return decl.mod == mod or mod.startswith(decl.mod + ".")
+def is_submodule_usage(decl_or_file: Decl | File, mod: str) -> bool:
+    return decl_or_file.mod == mod or mod.startswith(decl_or_file.mod + ".")
 
 
 def is_modified_since_scan(path: str | Path) -> bool:
