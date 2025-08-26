@@ -132,7 +132,7 @@ void lookupPipeValidator(const Pipeline& pipeline) {
     }
 }
 
-// Parses $lookup 'from' field. The 'from' field must be a string object with the following syntax
+// Parses $lookup 'from' field. The 'from' field must be a string or an object with the following syntax
 // {from: {db: "dbName", coll: "collName"}, ...}
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
