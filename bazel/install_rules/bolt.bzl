@@ -11,8 +11,8 @@ SKIP_FUNCTIONS = [
     "_ZdlPvmSt11align_val_t*",
     "_ZdlPvm*",
     "_ZN8tcmalloc17tcmalloc_internal6subtle6percpu12TcmallocSlab16CacheCpuSlabSlowEv",
-    "TcmallocSlab_Internal_PushBatch",
-    "TcmallocSlab_Internal_PopBatch",
+    "TcmallocSlab_Internal_Push.*",
+    "TcmallocSlab_Internal_Pop.*",
 ]
 
 def _bolt_instrument_impl(ctx):
