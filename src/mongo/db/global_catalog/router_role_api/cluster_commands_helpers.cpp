@@ -60,6 +60,7 @@
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -1092,6 +1093,14 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
         ListIndexes listIndexesCmd(nss);
+        // For viewless timeseries collections, fetch the raw indexes instead of user-visible ones.
+        // (Note that for all other collection types, this parameter has no effect.)
+        // This is hardcoded, since all current callers of this function expect raw indexes.
+        if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            listIndexesCmd.setRawData(true);
+        }
         setReadWriteConcern(opCtx, listIndexesCmd, true, false);
         auto cmdNoVersion = listIndexesCmd.toBSON();
 

@@ -331,33 +331,34 @@ std::vector<DatabaseName> CommonProcessInterface::_getAllDatabasesOnAShardedClus
 std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnAShardedCluster(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    bool appendPrimaryShardToTheResponse,
-    bool runAgainstPrimary) {
+    const RunListCollectionsCommandOptions& opts) {
     tassert(9525809, "This method can only run on a sharded cluster", Grid::get(opCtx));
 
     const bool isCollectionless = nss.coll().empty();
 
-    const auto appendPrimaryShardIfRequested =
-        [&appendPrimaryShardToTheResponse](const std::vector<BSONObj>& collections,
-                                           const ShardId& primary) {
-            if (!appendPrimaryShardToTheResponse) {
-                return collections;
-            }
+    const auto appendPrimaryShardIfRequested = [&opts](const std::vector<BSONObj>& collections,
+                                                       const ShardId& primary) {
+        if (!opts.addPrimaryShard) {
+            return collections;
+        }
 
-            std::vector<BSONObj> collectionsWithPrimaryShard;
-            collectionsWithPrimaryShard.reserve(collections.size());
-            for (const BSONObj& bsonObj : collections) {
-                BSONObjBuilder bob(bsonObj.getOwned());
-                bob.append("primary", primary);
-                collectionsWithPrimaryShard.emplace_back(bob.obj());
-            }
-            return collectionsWithPrimaryShard;
-        };
+        std::vector<BSONObj> collectionsWithPrimaryShard;
+        collectionsWithPrimaryShard.reserve(collections.size());
+        for (const BSONObj& bsonObj : collections) {
+            BSONObjBuilder bob(bsonObj.getOwned());
+            bob.append("primary", primary);
+            collectionsWithPrimaryShard.emplace_back(bob.obj());
+        }
+        return collectionsWithPrimaryShard;
+    };
 
     const auto runListCollectionsFunc = [&](OperationContext* opCtx,
                                             const CachedDatabaseInfo& cdb) {
         ListCollections listCollectionsCmd;
         listCollectionsCmd.setDbName(nss.dbName());
+        if (opts.rawData) {
+            listCollectionsCmd.setRawData(true);
+        }
         if (!isCollectionless) {
             listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
         }
@@ -381,7 +382,7 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
 
         // Some collections (for example temp collections) only exist on the replica set primary so
         // we may need to change the read preference to locate these.
-        const ReadPreferenceSetting readPreference = runAgainstPrimary
+        const ReadPreferenceSetting readPreference = opts.runOnPrimary
             ? ReadPreferenceSetting(ReadPreference::PrimaryOnly)
             : ReadPreferenceSetting::get(opCtx);
 
@@ -392,20 +393,10 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
             listCollectionsCmd.toBSON(),
             opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));
 
-        // Make sure we return a single object if the request isn't collectionless.
-        if (!isCollectionless) {
-            for (BSONObj& bsonObj : resultCollections.docs) {
-                // Return the entire 'listCollections' response for the first element which matches
-                // on name.
-                const BSONElement nameElement = bsonObj["name"];
-                if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
-                    continue;
-                }
-                return appendPrimaryShardIfRequested(std::vector<BSONObj>{bsonObj.getOwned()},
-                                                     cdb->getPrimary());
-            }
-            return std::vector<BSONObj>();
-        }
+        tassert(10898400,
+                str::stream() << "Expected at most one collection with the name "
+                              << nss.toStringForErrorMsg() << ": " << resultCollections.docs.size(),
+                isCollectionless || resultCollections.docs.size() <= 1);
 
         return appendPrimaryShardIfRequested(resultCollections.docs, cdb->getPrimary());
     };

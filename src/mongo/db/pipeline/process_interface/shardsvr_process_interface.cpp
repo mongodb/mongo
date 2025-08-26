@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -301,10 +302,20 @@ BSONObj ShardServerProcessInterface::_getCollectionOptions(OperationContext* opC
         return getCollectionOptionsLocally(opCtx, nss);
     };
 
-    // Some collections (for example temp collections) only exist on the replica set primary so we
-    // may need to run on the primary to get the options.
-    const auto response =
-        _runListCollectionsCommandOnAShardedCluster(opCtx, nss, false, runOnPrimary);
+    const auto response = _runListCollectionsCommandOnAShardedCluster(
+        opCtx,
+        nss,
+
+        {// For viewless timeseries collections, fetch the raw collection options.
+         // This is consistent with the other implementations of this method, which fetch the
+         // collection options from the catalog without undergoing any timeseries translation.
+         // (Note that for all other collection types, this parameter has no effect.)
+         .rawData = gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+             VersionContext::getDecoration(opCtx),
+             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+         // Some collections (for example temp collections) only exist on the replica set primary so
+         // we may need to run on the primary to get the options.
+         .runOnPrimary = runOnPrimary});
     if (response.empty()) {
         return BSONObj{};
     }
@@ -340,7 +351,7 @@ query_shape::CollectionType ShardServerProcessInterface::getCollectionType(
         return getCollectionTypeLocally(opCtx, nss);
     };
 
-    const auto response = _runListCollectionsCommandOnAShardedCluster(opCtx, nss);
+    const auto response = _runListCollectionsCommandOnAShardedCluster(opCtx, nss, {});
     if (response.empty()) {
         return query_shape::CollectionType::kNonExistent;
     }
@@ -392,7 +403,7 @@ std::vector<BSONObj> ShardServerProcessInterface::runListCollections(OperationCo
                                                                      const DatabaseName& db,
                                                                      bool addPrimaryShard) {
     return _runListCollectionsCommandOnAShardedCluster(
-        opCtx, NamespaceStringUtil::deserialize(db, ""), addPrimaryShard);
+        opCtx, NamespaceStringUtil::deserialize(db, ""), {.addPrimaryShard = addPrimaryShard});
 }
 
 void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCtx,

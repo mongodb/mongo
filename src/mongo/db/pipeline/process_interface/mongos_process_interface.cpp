@@ -308,7 +308,7 @@ std::vector<BSONObj> MongosProcessInterface::runListCollections(OperationContext
                                                                 const DatabaseName& db,
                                                                 bool addPrimaryShard) {
     return _runListCollectionsCommandOnAShardedCluster(
-        opCtx, NamespaceStringUtil::deserialize(db, ""), addPrimaryShard);
+        opCtx, NamespaceStringUtil::deserialize(db, ""), {.addPrimaryShard = addPrimaryShard});
 }
 
 BSONObj MongosProcessInterface::_reportCurrentOpForClient(

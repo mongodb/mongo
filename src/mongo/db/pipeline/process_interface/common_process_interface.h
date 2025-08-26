@@ -237,16 +237,25 @@ protected:
     std::vector<DatabaseName> _getAllDatabasesOnAShardedCluster(OperationContext* opCtx,
                                                                 boost::optional<TenantId> tenantId);
 
+    struct RunListCollectionsCommandOptions {
+        // Get the raw collection options (for viewless timeseries collections).
+        bool rawData = false;
+        // Adds a "primary" field to each collection with the primary shard.
+        bool addPrimaryShard = false;
+        // Run the command with primary read preference.
+        bool runOnPrimary = false;
+    };
+
     /**
      * Utility to run a 'listCollections' command on the primary shard corresponding to the database
      * in 'nss'. If the namespace is collectionless, it will return all the collections for the
      * given database. Otherwise, it'll return just the requested collection.
      * This method can only run on a sharded cluster.
      */
-    std::vector<BSONObj> _runListCollectionsCommandOnAShardedCluster(OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     bool addPrimaryShard = false,
-                                                                     bool runOnPrimary = false);
+    std::vector<BSONObj> _runListCollectionsCommandOnAShardedCluster(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const RunListCollectionsCommandOptions& opts);
 };
 
 }  // namespace mongo
