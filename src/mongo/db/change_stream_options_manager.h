@@ -82,9 +82,7 @@ public:
     /**
      * Returns the clusterParameterTime of the current change stream options.
      */
-    const LogicalTime& getClusterParameterTime() const {
-        return _changeStreamOptions.getClusterParameterTime();
-    }
+    const LogicalTime& getClusterParameterTime() const;
 
 private:
     ChangeStreamOptions _changeStreamOptions;

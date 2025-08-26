@@ -91,6 +91,11 @@ StatusWith<ChangeStreamOptions> ChangeStreamOptionsManager::setOptions(
     return _changeStreamOptions;
 }
 
+const LogicalTime& ChangeStreamOptionsManager::getClusterParameterTime() const {
+    stdx::lock_guard<stdx::mutex> L(_mutex);
+    return _changeStreamOptions.getClusterParameterTime();
+}
+
 void ChangeStreamOptionsParameter::append(OperationContext* opCtx,
                                           BSONObjBuilder* bob,
                                           StringData name,
