@@ -216,6 +216,12 @@ A new truncate marker is created when the in-progress marker segment contains mo
 bytes needed to complete the segment; and the oldest truncate marker's oplog is deleted when the
 oplog size exceeds its cap size setting.
 
+Oplog sampling operates in two modes: asynchronous and synchronous. By default, it uses asynchronous mode, where oplog sampling and initial marker generation happen in the background as part of the OplogCapMaintainer thread. This setup ensures that startup is not blocked and oplog reads and writes are available during tartup. Until the initial marker generation is complete, no new truncate markers can be created for these new oplog writes.
+
+Asynchronous mode offers better performance, allowing faster startups and restarts while improving overall node availability. One potential trade-off to consider is the possible increased disk usage.
+
+You can switch between asynchronous and synchronous modes by adjusting the OplogSamplingAsyncEnabled server parameter.
+
 Oplog sampling and marker generation is skipped when using `--restore` or `--magicRestore`.
 
 ## Special Timestamps That Will Not Be Truncated
