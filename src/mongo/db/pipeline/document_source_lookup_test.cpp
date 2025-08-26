@@ -1462,7 +1462,7 @@ TEST_F(DocumentSourceLookUpTest,
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    // Prepare the mocked local source.
+    // Prepare the mocked local stage.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
 
@@ -1536,17 +1536,17 @@ TEST_F(DocumentSourceLookUpTest,
         expCtx,
         maxCacheSizeBytes);
 
-    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookup);
+    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookupStage);
 
     // Prepare the mocked local and foreign sources.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
-        {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
+        {Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
 
-    lookup->setSource(mockLocalStage.get());
+    lookupStage->setSource(mockLocalStage.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
-    auto subPipeline = lookup->getSubPipeline_forTest(DOC("_id" << 0));
+    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1557,7 +1557,7 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 
     // Get the first result from the stage, for local document {_id: 0}.
-    auto firstResult = lookup->getNext();
+    auto firstResult = lookupStage->getNext();
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{_id: 0, as: [{x: 0, varField: 0}, {x: 1, varField: 1}]}")},
         firstResult.getDocument());
@@ -1565,7 +1565,7 @@ TEST_F(DocumentSourceLookUpTest,
     // Preview the subpipeline that will be used to process the second local document {_id: 1}. The
     // sub-pipeline cache exceeded its max size on the first iteration, was abandoned, and is now
     // absent from the pipeline.
-    subPipeline = lookup->getSubPipeline_forTest(DOC("_id" << 1));
+    subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 1));
     ASSERT(subPipeline);
 
     expectedPipe = fromjson(
@@ -1575,7 +1575,7 @@ TEST_F(DocumentSourceLookUpTest,
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 
     // Verify that the second document is constructed correctly without the cache.
-    auto secondResult = lookup->getNext();
+    auto secondResult = lookupStage->getNext();
 
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{_id: 1, as: [{x: 0, varField: 1}, {x: 1, varField: 2}]}")},
