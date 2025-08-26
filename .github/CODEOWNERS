@@ -1850,10 +1850,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/exec/agg/OWNERS.yml
 /src/mongo/db/exec/agg/**/* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/exec/agg/**/coll_stats_stage* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/current_op_stage* @10gen/query-integration-observability @svc-auto-approve-bot
-/src/mongo/db/exec/agg/**/query_stats_stage* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/densify_stage* @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/exec/agg/**/internal_all_collection_stats_stage* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/src/mongo/db/exec/agg/**/internal_list_collections_stage* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/internal_set_window_fields_stage* @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/exec/agg/**/list_catalog_stage* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/src/mongo/db/exec/agg/**/query_stats_stage* @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/exec/express/OWNERS.yml
 /src/mongo/db/exec/express/**/* @10gen/query-execution-classic @svc-auto-approve-bot
@@ -2284,6 +2288,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_list_cluster_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*list_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*sharded_data_distribution* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/document_source_list_catalog* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/pipeline/search/OWNERS.yml
 /src/mongo/db/pipeline/search/**/* @10gen/query-integration-search @svc-auto-approve-bot

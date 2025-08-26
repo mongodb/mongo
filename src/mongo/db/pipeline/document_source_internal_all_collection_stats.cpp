@@ -29,29 +29,16 @@
 
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <iterator>
-#include <list>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -62,7 +49,6 @@ DocumentSourceInternalAllCollectionStats::DocumentSourceInternalAllCollectionSta
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceInternalAllCollectionStatsSpec spec)
     : DocumentSource(kStageNameInternal, pExpCtx),
-      exec::agg::Stage(kStageNameInternal, pExpCtx),
       _internalAllCollectionStatsSpec(std::move(spec)) {}
 
 REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
@@ -71,43 +57,6 @@ REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
                          AllowedWithApiStrict::kInternal);
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalAllCollectionStats,
                             DocumentSourceInternalAllCollectionStats::id)
-
-DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNext() {
-    if (!_catalogDocs) {
-        _catalogDocs =
-            pExpCtx->getMongoProcessInterface()->listCatalog(pExpCtx->getOperationContext());
-    }
-
-    while (!_catalogDocs->empty()) {
-        BSONObj obj(std::move(_catalogDocs->front()));
-        const auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
-            obj["ns"].String());
-
-        _catalogDocs->pop_front();
-
-        // Avoid computing stats for collections that do not match the absorbed filter on the 'ns'
-        // field.
-        if (_absorbedMatch &&
-            !exec::matcher::matchesBSON(_absorbedMatch->getMatchExpression(), obj)) {
-            continue;
-        }
-
-        if (const auto& stats = _internalAllCollectionStatsSpec.getStats()) {
-            try {
-                return {Document{DocumentSourceCollStats::makeStatsForNs(
-                    pExpCtx, nss, stats.get(), _projectFilter)}};
-            } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-                // We don't want to retrieve data for views, only for collections.
-                continue;
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // The collection no longer exists.
-                continue;
-            }
-        }
-    }
-
-    return GetNextResult::makeEOF();
-}
 
 DocumentSourceContainer::iterator DocumentSourceInternalAllCollectionStats::doOptimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {

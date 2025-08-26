@@ -38,27 +38,22 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <deque>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -76,8 +71,7 @@ namespace mongo {
  * Then, for each collection, we will call `makeStatsForNs` method from DocumentSourceCollStats that
  * will retrieve all storage stats for that particular collection.
  */
-class DocumentSourceInternalAllCollectionStats final : public DocumentSource,
-                                                       public exec::agg::Stage {
+class DocumentSourceInternalAllCollectionStats final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalAllCollectionStats"_sd;
 
@@ -155,12 +149,12 @@ public:
                           const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
-    GetNextResult doGetNext() final;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalAllCollectionStatsToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     // The specification object given to $_internalAllCollectionStats containing user specified
     // options.
     const DocumentSourceInternalAllCollectionStatsSpec _internalAllCollectionStatsSpec;
-    boost::optional<std::deque<BSONObj>> _catalogDocs;
 
     // A $match stage can be absorbed in order to avoid unnecessarily computing the stats for
     // collections that do not match that predicate.

@@ -31,26 +31,22 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/stdx/unordered_set.h"
 
-#include <deque>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -63,7 +59,7 @@ namespace mongo {
  * - a single collection with its indexes; or
  * - a view instance.
  */
-class DocumentSourceListCatalog final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceListCatalog final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listCatalog"_sd;
 
@@ -115,7 +111,7 @@ public:
                                      UnionRequirement::kAllowed);
 
         constraints.isIndependentOfAnyCollection =
-            pExpCtx->getNamespaceString().isCollectionlessAggregateNS();
+            getExpCtx()->getNamespaceString().isCollectionlessAggregateNS();
         constraints.setConstraintsForNoInputSources();
         return constraints;
     }
@@ -131,9 +127,6 @@ public:
 
 private:
     DocumentSourceListCatalog(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-    GetNextResult doGetNext() final;
-
-    boost::optional<std::deque<BSONObj>> _catalogDocs;
 };
 
 }  // namespace mongo

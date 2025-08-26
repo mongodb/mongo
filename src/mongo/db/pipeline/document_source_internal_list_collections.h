@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -40,22 +39,18 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <deque>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -67,7 +62,7 @@ namespace mongo {
  * `admin`, it will return all the collections of the cluster. Otherwise, it will return all the
  * collections of the targeted database.
  */
-class DocumentSourceInternalListCollections final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalListCollections final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalListCollections"_sd;
 
@@ -159,16 +154,11 @@ public:
                                                    DocumentSourceContainer* container) final;
 
 private:
-    GetNextResult doGetNext() final;
-
-    void _buildCollectionsToReplyForDb(const DatabaseName& db,
-                                       std::vector<BSONObj>& collectionsToReply);
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalListCollectionsToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     // A $match stage can be absorbed in order to avoid unnecessarily computing the databases
     // that do not match that predicate.
     boost::intrusive_ptr<DocumentSourceMatch> _absorbedMatch;
-
-    boost::optional<std::vector<DatabaseName>> _databases;
-    std::vector<BSONObj> _collectionsToReply;
 };
 }  // namespace mongo

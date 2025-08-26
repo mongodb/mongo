@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/local_catalog/document_source_list_catalog.h"
+#include "mongo/db/pipeline/document_source_list_catalog.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
@@ -38,17 +38,12 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 
 namespace mongo {
@@ -87,33 +82,9 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
     }
 }
 
-DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
-    if (!_catalogDocs) {
-        if (pExpCtx->getNamespaceString().isCollectionlessAggregateNS()) {
-            _catalogDocs =
-                pExpCtx->getMongoProcessInterface()->listCatalog(pExpCtx->getOperationContext());
-        } else if (auto catalogDoc = pExpCtx->getMongoProcessInterface()->getCatalogEntry(
-                       pExpCtx->getOperationContext(),
-                       pExpCtx->getNamespaceString(),
-                       pExpCtx->getUUID())) {
-            _catalogDocs = {{std::move(*catalogDoc)}};
-        } else {
-            _catalogDocs.emplace();
-        }
-    }
-
-    if (!_catalogDocs->empty()) {
-        Document doc{_catalogDocs->front()};
-        _catalogDocs->pop_front();
-        return doc;
-    }
-
-    return GetNextResult::makeEOF();
-}
-
 DocumentSourceListCatalog::DocumentSourceListCatalog(
     const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx) {}
+    : DocumentSource(kStageName, pExpCtx) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

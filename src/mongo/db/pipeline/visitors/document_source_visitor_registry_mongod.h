@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/local_catalog/document_source_list_catalog.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
@@ -65,6 +64,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_list_cached_and_active_users.h"
+#include "mongo/db/pipeline/document_source_list_catalog.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 #include "mongo/db/pipeline/document_source_list_sampled_queries.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
