@@ -1,0 +1,115 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # SERVER-14669 Multi-removes that use $where miscount removed documents
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+    - jstests/concurrency/fsm_workloads/query/update/update_where.js
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    # The test may spuriously fail when run against sharded clusters, due to limitations of the
+    # infrastructure. See SERVER-77039 for full details.
+
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+    # TODO SERVER-104120: Support write without shard key
+    - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/*.js
+
+    # Disabled because some features covered in these tests are not yet supported in the UWE.
+    # TODO SERVER-104139: Add timeseries support.
+    - jstests/concurrency/fsm_workloads/timeseries/*.js
+    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+    # TODO SERVER-107644: Support attaching sampleId.
+    - jstests/concurrency/fsm_workloads/analyze_shard_key.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_off
+    - requires_replication
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+      global_vars:
+        TestData:
+          runningWithBalancer: true
+          implicitlyShardOnCreateCollectionOnly: true
+  hooks:
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2
+    enable_balancer: true
+    random_migrations: true

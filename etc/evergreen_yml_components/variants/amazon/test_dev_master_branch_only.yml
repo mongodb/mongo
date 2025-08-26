@@ -476,6 +476,11 @@ buildvariants:
       - name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
       - name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
       - name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+      - name: unified_write_executor_concurrency_sharded_replication_gen
+      - name: unified_write_executor_concurrency_sharded_replication_with_balancer_gen
+      - name: unified_write_executor_sharded_collections_jscore_passthrough_gen
+      - name: unified_write_executor_sharding_jscore_passthrough_gen
+      - name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

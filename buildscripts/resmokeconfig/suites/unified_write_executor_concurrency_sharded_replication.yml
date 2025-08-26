@@ -1,0 +1,83 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # Disabled because some features covered in these tests are not yet supported in the UWE.
+    # TODO SERVER-104139: Add timeseries support.
+    - jstests/concurrency/fsm_workloads/timeseries/*.js
+    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+    # TODO SERVER-104138: Add FLE support to UWE.
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/fle*.js
+    # TODO: SERVER-107644 enable when sample id is supported.
+    - jstests/concurrency/fsm_workloads/analyze_shard_key.js
+    # TODO: SERVER-108068 Support passing expected collection uuid in UWE.
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid_sharded.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid.js
+    # TODO SERVER-109752: Test expects BulkWriteError, but doesn't get one.
+    - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
+    - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
+    - jstests/concurrency/fsm_workloads/query/globally_managed_cursors.js
+    # TODO: SERVER-104123 Support for 'multi: true' writes.
+    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_replication
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_on
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+      # - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          runningWithBalancer: false
+          implicitlyShardOnCreateCollectionOnly: true
+  hooks:
+    - class: CheckShardFilteringMetadata
+    # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+    # - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2

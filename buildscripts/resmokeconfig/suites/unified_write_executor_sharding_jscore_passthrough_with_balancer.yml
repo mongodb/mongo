@@ -1,0 +1,122 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests use chunk migration, and they expect the balancer to be disabled.
+    - jstests/core_sharding/chunk_migration/*.js
+    # These tests are run in sharded_jscore_txns.
+    - jstests/core/txns/**/*.js
+    # TODO SERVER-87108 re-enable all map reduce tests
+    - jstests/core/query/map_reduce/*.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # override library is not able to intercept createIndex commands executed inside benchRun
+    - jstests/core/**/bench_test1.js
+    # TODO SERVER-91073: Validate command does not check if a received shard version is stale before proceeding.
+    - jstests/core/index/index_partial_write_ops.js
+    # moveCollection will drop indexes which will reset index statistics this test asserts on.
+    - jstests/core/index/index_stats.js
+    # moveCollection and the many deleteMany commands in this test block each other and can easily cause the test to time out.
+    # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+    # TODO SERVER-91655: re-enable this test in this suite or potentially in a noPassthrough suite.
+    - jstests/core/timeseries/query/timeseries_predicates.js
+    # moveCollection and the many multi updates in this test block each other and can easily cause the test to time out.
+    # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+    # TODO SERVER-91722: re-enable this test in this suite or potentially in a noPassthrough suite.
+    - jstests/core/index/geo/geo_update_btree.js
+    # TODO SERVER-88275: A moveCollection command changes the UUID of the targeted collection.
+    # Any query using an auto yielding policy will likely return a QueryPlanKilled error if a moveCollection commit happens during the query execution.
+    - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
+    - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
+
+    # Disabled because some features covered in these tests are not yet supported in the UWE.
+    # TODO SERVER-104139: Add timeseries support.
+    - jstests/core/**/*timeseries*.js
+    - jstests/core_sharding/resharding/reshard_collection_timeseries.js
+    - jstests/core_sharding/global_catalog/sharded_data_distribution.js
+    # TODO SERVER-104138: Add FLE support to UWE.
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/query/queryable_encryption/query_settings_fle.js
+    - jstests/core/query/queryable_encryption/basic_crud.js
+    - jstests/fle2/upsert.js
+    # TODO: SERVER-108068 Support passing expected collection uuid in UWE.
+    - jstests/core/query/parsing/collection_uuid_write_commands.js
+    # TODO: SERVER-104535 support cursor with bulk write.
+    - jstests/core/write/bulk/bulk_write_insert_cursor.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    - assumes_balancer_off
+    # fsync lock is not compatible with migrations since it
+    # can't be executed while DDL lock is being held.
+    - requires_fsync
+    # This suite performs balancing of unsharded collection in background
+    # using moveCollection that changes collections UUID
+    - assumes_stable_collection_uuid
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          runningWithBalancer: true
+      eval: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+        reshardingMinimumOperationDurationMillis: 0
+        useBatchedDeletesForRangeDeletion: true
+    num_rs_nodes_per_shard: 1
+    num_shards: 2
+    enable_balancer: true
+    random_migrations: true
+    set_cluster_parameter:
+      parameter: pauseMigrationsDuringMultiUpdates
+      value:
+        enabled: True

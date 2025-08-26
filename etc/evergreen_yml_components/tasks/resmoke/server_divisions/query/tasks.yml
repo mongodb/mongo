@@ -1772,6 +1772,36 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_replication_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_replication_with_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_collections_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharding_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
   - <<: *task_template
     name: query_correctness_query_shape_hash_stability_generated_test_1
     tags:
