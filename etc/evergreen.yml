@@ -107,7 +107,7 @@ parameters:
 
 commit_queue_aliases:
   - variant: "commit-queue"
-    task: "^(bazel_.*|run_.*|unit_test_group.*|compile_.*|lint_.*|jsCore|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|jsCore|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
   - variant: "^(amazon-linux2023-arm64-static-compile|linux-x86-dynamic-compile-required)$"
@@ -119,7 +119,7 @@ commit_queue_aliases:
 
 github_pr_aliases:
   - variant: "commit-queue"
-    task: "^(bazel_.*|run_.*|unit_test_group.*|compile_.*|lint_.*|jsCore|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|jsCore|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
     variant_tags: []
     task_tags: []
   - variant: "^(amazon-linux2023-arm64-static-compile|linux-x86-dynamic-compile-required)$"

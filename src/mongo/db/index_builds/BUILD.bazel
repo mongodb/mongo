@@ -356,12 +356,16 @@ mongo_cc_unit_test(
         "index_builds_manager_test.cpp",
         "multi_index_block_test.cpp",
     ],
+    # TODO(SERVER-109867): Remove "incompatible_with_bazel_remote_test" tag once this is compatible with remote exec
     tags = [
+        "incompatible_with_bazel_remote_test",
         "mongo_unittest_seventh_group",
         "server-index-builds",
     ],
+    # TODO(SERVER-109867): Remove remote_test_enabled from select once this is compatible with remote exec
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [

@@ -55,7 +55,7 @@ common --nolegacy_external_runfiles
 common --remote_download_outputs=all
 
 # Files we always want to download for debugging and error checking
-common --remote_download_regex=.*\.(dwo|h|cpp)$
+common --remote_download_regex=.*\.(dwo|h|cpp|test.xml)$
 
 # Disable caching of test results by default since many of our tests are non-deterministic.
 common --cache_test_results=no
@@ -392,6 +392,7 @@ common:remote_test --strategy=TestRunner=remote
 common:remote_test --features=-thin_archive
 common:remote_test --remote_download_outputs=minimal
 common:remote_test --test_output=summary
+common:remote_test --modify_execution_info=^(CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=-no-remote-cache
 test:remote_test --test_timeout=600
 test:remote_test --test_tag_filters=-incompatible_with_bazel_remote_test
 

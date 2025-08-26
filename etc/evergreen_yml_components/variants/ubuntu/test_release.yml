@@ -625,7 +625,7 @@ buildvariants:
           - ubuntu2404-arm64-large
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-xlarge
       - name: test_packages
         distros:
           - ubuntu2404-arm64-large
@@ -671,7 +671,7 @@ buildvariants:
           - ubuntu2404-arm64-large
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-xlarge
       - name: test_packages
         distros:
           - ubuntu2404-arm64-large

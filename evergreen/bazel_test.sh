@@ -26,6 +26,8 @@ source ./evergreen/bazel_RBE_supported.sh
 LOCAL_ARG=""
 if [[ "${evergreen_remote_exec}" != "on" ]]; then
     LOCAL_ARG="$LOCAL_ARG --jobs=auto"
+elif [[ "${task_name}" == "unit_tests" ]]; then
+    LOCAL_ARG="$LOCAL_ARG --config=remote_test"
 fi
 
 BAZEL_BINARY=$(bazel_get_binary_path)

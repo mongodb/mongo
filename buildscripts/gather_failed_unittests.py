@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import xml.etree.ElementTree as ET
 from glob import glob
 from pathlib import Path
@@ -21,14 +22,13 @@ def _collect_failed_tests(testlog_dir: str) -> List[str]:
 
 
 def _relink_binaries_with_symbols(failed_tests: List[str]):
-    # Enable this when/if we want to strip debug symbols during linking unit tests
-    # print("Relinking unit tests without stripping debug symbols...")
+    print("Rebuilding unit tests with --remote_download_outputs=toplevel...")
     bazel_build_flags = ""
     if os.path.isfile(".bazel_build_flags"):
         with open(".bazel_build_flags", "r", encoding="utf-8") as f:
             bazel_build_flags = f.read().strip()
 
-    bazel_build_flags.replace("--config=strip-debug-during-link", "")
+    bazel_build_flags += " --remote_download_outputs=toplevel"
 
     # Remap //src/mongo/testabc to //src/mongo:testabc
     failed_test_labels = [
@@ -39,12 +39,11 @@ def _relink_binaries_with_symbols(failed_tests: List[str]):
         arg for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_test_labels] if arg
     ]
 
-    # Enable this when/if we want to strip debug symbols during linking unit tests
-    # print(f"Running command: {' '.join(relink_command)}")
-    # subprocess.run(
-    #     relink_command,
-    #     check=True,
-    # )
+    print(f"Running command: {' '.join(relink_command)}")
+    subprocess.run(
+        relink_command,
+        check=True,
+    )
 
     repro_test_command = " ".join(["test" if arg == "build" else arg for arg in relink_command])
     with open(".failed_unittest_repro.txt", "w", encoding="utf-8") as f:
