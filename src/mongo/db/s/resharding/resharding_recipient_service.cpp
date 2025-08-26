@@ -80,6 +80,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/user_write_block/write_block_bypass.h"
@@ -1199,7 +1200,15 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            auto opCtx = factory.makeOperationContext(&cc());
 
                            auto buildUUID = UUID::gen();
+                           const auto fcvSnapshot =
+                               serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
+                               .indexBuildMethod =
+                                   ((fcvSnapshot.isVersionInitialized() &&
+                                     feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                                         VersionContext::getDecoration(opCtx.get()), fcvSnapshot))
+                                        ? IndexBuildMethodEnum::kPrimaryDriven
+                                        : IndexBuildMethodEnum::kHybrid),
                                .commitQuorum =
                                    CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
 
