@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1027,10 +1028,34 @@ TEST_F(QueryPlannerTest, IntersectCanBeVeryBig) {
     assertNumSolutions(internalQueryEnumerationMaxOrSolutions.load());
 }
 
+// Ensure that disabling AND_SORTED intersection works properly.
+TEST_F(QueryPlannerTest, IntersectDisabledAndSort) {
+    // Disable sort-based intersection.
+    RAIIServerParameterControllerForTest disableSortIntersection(
+        "internalQueryPlannerEnableSortIndexIntersection", false);
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    runQuery(fromjson("{a:1, b:1}"));
+
+    assertNumSolutions(3U);
+
+    assertSolutionExists(
+        "{fetch: {filter: {b:1}, node: "
+        "{ixscan: {filter: null, pattern: {a:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1}, node: "
+        "{ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: 1, b: 1}, node: {andHash: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a:1}}},"
+        "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+}
+
 // Ensure that disabling AND_HASH intersection works properly.
 TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
-
     // Turn index intersection on but disable hash-based intersection.
     internalQueryPlannerEnableHashIntersection.store(false);
     params.mainCollectionInfo.options =
@@ -1057,9 +1082,30 @@ TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
         "{fetch: {filter: {a:{$gt:1}, b: 1, c: 1}, node: {andSorted: {nodes: ["
         "{ixscan: {filter: null, pattern: {b:1}}},"
         "{ixscan: {filter: null, pattern: {c:1}}}]}}}}");
+}
 
-    // Restore the old value of the has intersection switch.
-    internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
+// Ensure that disabling AND_SORTED and AND_HASHED intersection works properly.
+TEST_F(QueryPlannerTest, IntersectDisabledAndSortAndHash) {
+    // Disable sort and hash based intersection.
+    RAIIServerParameterControllerForTest disableSortIntersection(
+        "internalQueryPlannerEnableSortIndexIntersection", false);
+    RAIIServerParameterControllerForTest disableHashedIntersection(
+        "internalQueryPlannerEnableHashIntersection", false);
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    runQuery(fromjson("{a:1, b:1}"));
+
+    assertNumSolutions(2U);
+    // There should be no AND_HASH or AND_SORTED plans.
+    assertSolutionExists(
+        "{fetch: {filter: {b:1}, node: "
+        "{ixscan: {filter: null, pattern: {a:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1}, node: "
+        "{ixscan: {filter: null, pattern: {b:1}}}}}");
 }
 
 //

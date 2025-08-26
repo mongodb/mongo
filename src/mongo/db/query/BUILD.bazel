@@ -646,6 +646,7 @@ mongo_cc_library(
     deps = [
         ":query_planner_test_lib",
         "//src/mongo:base",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
     ],
 )

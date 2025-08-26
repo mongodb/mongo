@@ -116,6 +116,7 @@ function testAndSorted() {
     // CBR might not choose the AND_SORTED plan as the winning plan, so we check that this
     // plan is at least enumerated.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
     assert(coll.drop());
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
@@ -132,6 +133,7 @@ function testAndSorted() {
     assertPlanEnumerated({a: 1, b: 1}, "AND_SORTED");
     assertCorrectCardinality({a: 1, b: 1});
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
 }
 
 function testRootedOr() {
@@ -270,4 +272,5 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: false}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
 }

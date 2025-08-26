@@ -43,6 +43,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -353,6 +354,11 @@ protected:
     QueryTestServiceContext serviceContext;
     ServiceContext::UniqueOperationContext opCtx;
     boost::intrusive_ptr<ExpressionContext> expCtx;
+
+    RAIIServerParameterControllerForTest enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
+    RAIIServerParameterControllerForTest enableSortIntersection{
+        "internalQueryPlannerEnableSortIndexIntersection", true};
 
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;

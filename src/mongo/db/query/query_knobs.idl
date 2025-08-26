@@ -213,9 +213,18 @@ server_parameters:
         redact: false
 
     internalQueryPlannerEnableHashIntersection:
-        description: "Do we use hash-based intersection for rooted $and queries?"
+        description: "Controls whether we use hash-based intersection for rooted $and queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableHashIntersection"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
+    internalQueryPlannerEnableSortIndexIntersection:
+        description: "Controls whether we use sort-based intersection for rooted $and queries."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPlannerEnableSortIndexIntersection"
         cpp_vartype: AtomicWord<bool>
         default: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange

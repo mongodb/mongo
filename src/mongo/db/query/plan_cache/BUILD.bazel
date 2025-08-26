@@ -88,6 +88,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/local_catalog:collection_mock",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/s:sharding_router_api",
     ],
 )
@@ -120,5 +121,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:canonical_query_test_util",
         "//src/mongo/db/query:query_planner_test_lib",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )

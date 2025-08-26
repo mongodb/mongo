@@ -114,9 +114,6 @@ using unittest::assertGet;
 
 const std::unique_ptr<ClockSource> clockSource = std::make_unique<ClockSourceMock>();
 
-// How we access the external setParameter testing bool.
-extern AtomicWord<bool> internalQueryForceIntersectionPlans;
-
 namespace {
 
 using std::unique_ptr;
@@ -433,8 +430,8 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
 
 TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisabled) {
     // Set the global flag for disabling active entries.
-    internalQueryCacheDisableInactiveEntries.store(true);
-    ON_BLOCK_EXIT([] { internalQueryCacheDisableInactiveEntries.store(false); });
+    RAIIServerParameterControllerForTest disableInactivePlanCacheEntries{
+        "internalQueryCacheDisableInactiveEntries", true};
 
     const int N = 100;
     for (int i = 0; i < N; ++i) {
@@ -488,9 +485,11 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr());
 
-    // Force index intersection.
-    bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();
-    internalQueryForceIntersectionPlans.store(true);
+    // Force index intersection and enable AND_SORTED intersection.
+    RAIIServerParameterControllerForTest forceIntersectionPlans{
+        "internalQueryForceIntersectionPlans", true};
+    RAIIServerParameterControllerForTest enableSortIntersection{
+        "internalQueryPlannerEnableSortIndexIntersection", true};
 
     // Plan.
     auto plannerParams = makePlannerParams(collection, *cq);
@@ -556,9 +555,6 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
                                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
                                                 soln->root())
                .isOK());
-
-    // Restore index intersection force parameter.
-    internalQueryForceIntersectionPlans.store(forceIxisectOldValue);
 }
 
 /**

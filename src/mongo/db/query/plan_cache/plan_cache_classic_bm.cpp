@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <benchmark/benchmark.h>
@@ -317,7 +318,8 @@ std::unique_ptr<QueryPlannerParams> extractFromBmParams(
 template <typename Query>
 void BM_PlanCacheClassic(benchmark::State& state) {
     PlanCacheClassicBenchmarkParameters bmParams(state);
-
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "internalQueryPlannerEnableSortIndexIntersection", true};
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;

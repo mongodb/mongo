@@ -73,16 +73,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-// How we access the external setParameter testing bool.
-extern AtomicWord<bool> internalQueryForceIntersectionPlans;
-
-extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
-
-extern AtomicWord<int> internalQueryMaxBlockingSortMemoryUsageBytes;
-
-extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
-
 namespace PlanRankingTests {
 
 static const NamespaceString nss =
@@ -90,28 +80,15 @@ static const NamespaceString nss =
 
 class PlanRankingTestBase {
 public:
-    PlanRankingTestBase()
-        : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans.load()),
-          _enableHashIntersection(internalQueryPlannerEnableHashIntersection.load()),
-          _client(&_opCtx) {
-        // Run all tests with hash-based intersection enabled.
-        internalQueryPlannerEnableHashIntersection.store(true);
-
+    PlanRankingTestBase() : _client(&_opCtx) {
         // Ensure N is significantly larger then internalQueryPlanEvaluationWorks.
         ASSERT_GTE(N, internalQueryPlanEvaluationWorks.load() + 1000);
-
-        // Configure Sampling CE with a large sample
-        samplingMarginOfError.store(1.0);
 
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         _client.dropCollection(nss);
     }
 
-    virtual ~PlanRankingTestBase() {
-        // Restore external setParameter testing bools.
-        internalQueryForceIntersectionPlans.store(_internalQueryForceIntersectionPlans);
-        internalQueryPlannerEnableHashIntersection.store(_enableHashIntersection);
-    }
+    virtual ~PlanRankingTestBase() {}
 
     void insert(const BSONObj& obj) {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
@@ -168,16 +145,15 @@ protected:
         ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
-    // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
-    // Restored at end of test invocation regardless of test result.
-    bool _internalQueryForceIntersectionPlans;
-
-    // Holds the value of the global set parameter so it can be restored at the end
-    // of the test.
-    bool _enableHashIntersection;
-
     std::unique_ptr<MultiPlanStage> _mps;
     std::vector<std::unique_ptr<QuerySolution>> _bestCBRPlan;
+
+    // Run all tests with hash-based intersection enabled.
+    RAIIServerParameterControllerForTest _enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
+
+    // Configure Sampling CE with a large sample
+    RAIIServerParameterControllerForTest _samplingMarginOfError{"samplingMarginOfError", 1.0};
 
     DBDirectClient _client;
 };
@@ -303,8 +279,10 @@ public:
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrSoln->root()).isOK());
 
         // Turn on the "force intersect" option.
-        // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        internalQueryForceIntersectionPlans.store(true);
+        RAIIServerParameterControllerForTest forceIntersectionPlans{
+            "internalQueryForceIntersectionPlans", true};
+        RAIIServerParameterControllerForTest enableSortIntersection{
+            "internalQueryPlannerEnableSortIndexIntersection", true};
 
         // And run the same query again.
         findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -354,7 +332,8 @@ public:
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        internalQueryForceIntersectionPlans.store(true);
+        RAIIServerParameterControllerForTest forceIntersectionPlans{
+            "internalQueryForceIntersectionPlans", true};
 
         const std::string expectedMPPlan(
             "{fetch: {node: {andHash: {nodes: ["
