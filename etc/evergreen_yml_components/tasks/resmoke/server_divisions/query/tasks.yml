@@ -2193,6 +2193,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "requires_all_feature_flags",
       ]
     commands:
       - func: "do setup"
@@ -2221,6 +2222,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "requires_all_feature_flags",
       ]
     commands:
       - func: "do setup"
@@ -2249,6 +2251,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "requires_all_feature_flags",
       ]
     commands:
       - func: "do setup"
@@ -2277,6 +2280,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "requires_all_feature_flags",
       ]
     commands:
       - func: "do setup"
@@ -2305,6 +2309,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "requires_all_feature_flags",
       ]
     commands:
       - func: "do setup"
