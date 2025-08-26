@@ -388,7 +388,7 @@ mongo_cc_library(
         "jwks_fetcher_mock.h",
     ],
     deps = [
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

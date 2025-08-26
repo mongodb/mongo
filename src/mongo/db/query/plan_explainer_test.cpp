@@ -43,7 +43,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 
 namespace mongo {
 namespace {

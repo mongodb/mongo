@@ -41,7 +41,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/temp_dir.h"

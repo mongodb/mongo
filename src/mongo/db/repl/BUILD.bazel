@@ -1814,7 +1814,7 @@ mongo_cc_library(
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:thread_pool_task_executor",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
     ],
 )
@@ -1921,7 +1921,7 @@ mongo_cc_library(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 
@@ -2055,7 +2055,7 @@ mongo_cc_unit_test(
         ":idempotency_test_fixture",
         ":idempotency_test_util",
         "//src/mongo/db/update:update_test_helpers",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 
@@ -2332,7 +2332,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

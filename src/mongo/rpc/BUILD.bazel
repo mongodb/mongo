@@ -258,7 +258,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/wiredtiger:wiredtiger_checksum",
     ],

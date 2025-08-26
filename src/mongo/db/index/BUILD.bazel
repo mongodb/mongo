@@ -163,7 +163,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:storage_options",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/third_party/snappy",
     ],
 )

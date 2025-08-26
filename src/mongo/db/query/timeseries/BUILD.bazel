@@ -20,6 +20,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/timeseries:timeseries_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

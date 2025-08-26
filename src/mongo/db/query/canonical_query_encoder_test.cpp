@@ -47,7 +47,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/unittest.h"

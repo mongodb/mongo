@@ -59,7 +59,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"

@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

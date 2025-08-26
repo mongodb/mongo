@@ -42,8 +42,8 @@ structs:
                 type: safeInt64
                 default: 30
 
-    changeStreamOptionsClusterParam:
-        description: "Test struct storing change stream options"
+    testClusterParamStruct:
+        description: "Cluster server parameter struct with some test fields."
         inline_chained_structs: true
         chained_structs:
             ClusterServerParameter: ClusterServerParameter

@@ -94,6 +94,14 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
     return &*obj;
 }
 
+void ServerParameter::warnIfDeprecated(StringData action) {
+    if (_isDeprecated) {
+        std::call_once(_warnDeprecatedOnce, [&] {
+            LOGV2_WARNING(9260800, "Use of deprecated server parameter", "parameter"_attr = _name);
+        });
+    }
+}
+
 void ServerParameter::disable(bool permanent) {
     if (permanent) {
         _state.store(EnableState::prohibited);

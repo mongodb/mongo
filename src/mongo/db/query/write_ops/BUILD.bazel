@@ -278,7 +278,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/db/transaction",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

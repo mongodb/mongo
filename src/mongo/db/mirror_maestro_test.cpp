@@ -38,7 +38,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/basic.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

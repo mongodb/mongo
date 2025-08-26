@@ -218,6 +218,6 @@ mongo_cc_unit_test(
         ":initial_sync_cloners",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/storage:storage_options",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

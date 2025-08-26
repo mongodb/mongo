@@ -44,6 +44,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_specialized_test_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -124,6 +125,20 @@ TEST(SpecializedServerParameter, dummy) {
     ASSERT_OK(dsp->setFromString("new value", boost::none));
     ASSERT_NOT_OK(dsp->set(BSON("" << BSON_ARRAY("bar")).firstElement(), boost::none));
     ASSERT_OK(dsp->set(BSON("" << "bar").firstElement(), boost::none));
+}
+
+// specializedDummy
+
+void SpecializedDeprecatedServerParameter::append(OperationContext*,
+                                                  BSONObjBuilder* b,
+                                                  StringData name,
+                                                  const boost::optional<TenantId>&) {
+    *b << name << "Dummy Value";
+}
+
+Status SpecializedDeprecatedServerParameter::setFromString(StringData value,
+                                                           const boost::optional<TenantId>&) {
+    return Status::OK();
 }
 
 // specializedWithCtor
@@ -340,6 +355,7 @@ TEST(SpecializedServerParameter, withOptions) {
     ASSERT_OK(dswo->setFromString("third value", boost::none));
     ASSERT_EQ(gSWO, "third value");
     ASSERT_APPENDED_STRING(dswo, "###");
+    ASSERT(dswo->getIsDeprecated());
 }
 
 // specializedRuntimeOnly
@@ -578,6 +594,14 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), LogicalTime().asTimestamp());
     ASSERT_EQ(obj["strData"_sd].String(), "default");
     ASSERT_EQ(obj["intData"_sd].Int(), 30);
+}
+
+TEST_F(DeprecatedServerParameterTest, SpecializedIsDeprecated) {
+    testParameterIsDeprecated("specializedDeprecated");
+}
+
+TEST_F(DeprecatedServerParameterTest, SpecializedWarnsOnce) {
+    testSetParameterWarnsOnce("specializedDeprecated", "dummy");
 }
 
 }  // namespace test

@@ -33,7 +33,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/jwk_manager_test_framework.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 

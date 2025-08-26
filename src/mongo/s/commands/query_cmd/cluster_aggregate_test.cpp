@@ -49,7 +49,7 @@
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"

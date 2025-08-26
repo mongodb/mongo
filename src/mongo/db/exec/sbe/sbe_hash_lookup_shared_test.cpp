@@ -33,7 +33,7 @@
 
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 
 namespace mongo::sbe {
 void HashLookupSharedTest::prepareAndEvalStageWithReopen(

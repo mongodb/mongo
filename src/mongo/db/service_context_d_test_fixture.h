@@ -35,7 +35,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"

@@ -36,7 +36,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/task_executor_cursor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"

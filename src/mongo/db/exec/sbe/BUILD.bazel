@@ -458,7 +458,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/timeseries:bucket_compression",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
         "//src/mongo/util:pcre_wrapper",
     ],
@@ -477,7 +477,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/exec:expression_bm_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

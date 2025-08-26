@@ -681,6 +681,11 @@ properties:
                   type: string
                 minItems: 1
                 uniqueItems: true
+          is_deprecated:
+            type: boolean
+            description: >
+              Marks the server parameter as deprecated. Warns users if the server parameter
+              is ever used. Defaults to false.
           on_update:
             type: string
             description: >

@@ -155,7 +155,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/stats:transaction_stats",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/executor:inline_executor",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s:sharding_router_api",
     ],
 )

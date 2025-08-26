@@ -30,7 +30,7 @@
 #include "mongo/db/mirroring_sampler.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

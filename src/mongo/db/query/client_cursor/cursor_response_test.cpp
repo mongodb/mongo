@@ -36,7 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/unittest.h"

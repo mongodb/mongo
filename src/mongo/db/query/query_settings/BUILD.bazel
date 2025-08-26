@@ -126,7 +126,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/executor:mock_async_rpc",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/unittest",
     ],
@@ -145,7 +145,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:processinfo",
     ],
 )

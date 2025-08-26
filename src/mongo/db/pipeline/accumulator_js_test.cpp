@@ -43,7 +43,7 @@
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

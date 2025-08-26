@@ -35,7 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

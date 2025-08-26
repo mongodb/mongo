@@ -59,7 +59,7 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"

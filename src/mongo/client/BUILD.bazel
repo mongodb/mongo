@@ -626,7 +626,7 @@ mongo_cc_unit_test(
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:task_executor_test_fixture",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/unittest:task_executor_proxy",
@@ -646,7 +646,7 @@ mongo_cc_unit_test(
         ":replica_set_monitor_test_helper",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/dbtests:mocklib",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:clock_source_mock",
     ],
 )

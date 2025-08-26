@@ -62,7 +62,7 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/death_test.h"

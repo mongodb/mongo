@@ -38,7 +38,7 @@
 #include "mongo/db/s/query_analysis_op_observer_configsvr.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

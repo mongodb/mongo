@@ -1069,7 +1069,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/executor:async_rpc",
         "//src/mongo/idl:cluster_server_parameter",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:cluster_commands_common",
         "//src/mongo/util:periodic_runner_factory",

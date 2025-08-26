@@ -41,7 +41,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 

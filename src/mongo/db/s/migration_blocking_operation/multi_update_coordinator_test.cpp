@@ -39,7 +39,7 @@
 #include "mongo/db/s/primary_only_service_helpers/phase_transition_progress_gen.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
 #include "mongo/db/session/internal_session_pool.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"

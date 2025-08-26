@@ -294,7 +294,7 @@ public:
      * function does nothing. Implementations are expected to ensure
      * that such warnings are emitted only once per server parameter.
      */
-    virtual void warnIfDeprecated(StringData action) {}
+    virtual void warnIfDeprecated(StringData action);
 
     void disable(bool permanent);
 
@@ -381,6 +381,14 @@ public:
      */
     virtual void onRegistrationWithProcessGlobalParameterList() {}
 
+    void setIsDeprecated(bool isDeprecated) {
+        _isDeprecated = isDeprecated;
+    }
+
+    bool getIsDeprecated() const {
+        return _isDeprecated;
+    }
+
 protected:
     // Helper for translating setParameter values from BSON to string.
     StatusWith<std::string> _coerceToString(const BSONElement&);
@@ -399,6 +407,8 @@ private:
     std::string _name;
     ServerParameterType _type;
 
+    std::once_flag _warnDeprecatedOnce;
+    bool _isDeprecated = false;
     bool _testOnly = false;
     bool _redact = false;
     bool _isOmittedInFTDC = false;

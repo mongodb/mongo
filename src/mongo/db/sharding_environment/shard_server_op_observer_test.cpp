@@ -41,7 +41,7 @@
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

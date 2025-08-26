@@ -75,6 +75,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/index_builds:index_build_entry_helpers",
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
         "//src/mongo/db/repl:replmocks",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

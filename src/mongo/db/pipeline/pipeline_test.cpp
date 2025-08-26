@@ -76,7 +76,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"

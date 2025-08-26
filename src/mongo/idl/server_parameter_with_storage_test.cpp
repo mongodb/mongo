@@ -344,25 +344,24 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
  */
 TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     // Retrieve the cluster IDLServerParameterWithStorage.
-    auto* clusterParam =
-        dynamic_cast<ClusterParameterWithStorage<test::ChangeStreamOptionsClusterParam>*>(
-            getClusterServerParameter("changeStreamOptions"));
+    auto* clusterParam = dynamic_cast<ClusterParameterWithStorage<test::TestClusterParamStruct>*>(
+        getClusterServerParameter("testClusterServerParameter"));
 
     // Check that current value is the default value.
-    test::ChangeStreamOptionsClusterParam retrievedParam = clusterParam->getValue(boost::none);
+    test::TestClusterParamStruct retrievedParam = clusterParam->getValue(boost::none);
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
     ASSERT_EQ(retrievedParam.getTestStringField(), "");
     ASSERT_EQ(clusterParam->getClusterParameterTime(boost::none), LogicalTime::kUninitialized);
 
     // Set to new value and check that the updated value is seen on get.
-    test::ChangeStreamOptionsClusterParam updatedParam;
+    test::TestClusterParamStruct updatedParam;
     test::PreAndPostImagesStruct updatedPrePostImgs;
     ClusterServerParameter baseCSP;
 
     updatedPrePostImgs.setExpireAfterSeconds(40);
     LogicalTime updateTime = LogicalTime(Timestamp(Date_t::now()));
     baseCSP.setClusterParameterTime(updateTime);
-    baseCSP.set_id("changeStreamOptions"_sd);
+    baseCSP.set_id("testClusterServerParameter"_sd);
 
     updatedParam.setClusterServerParameter(baseCSP);
     updatedParam.setPreAndPostImages(updatedPrePostImgs);
@@ -382,7 +381,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
         clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);
         auto obj = b.obj();
         ASSERT_EQ(obj.nFields(), 4);
-        ASSERT_EQ(obj["_id"_sd].String(), "changeStreamOptions");
+        ASSERT_EQ(obj["_id"_sd].String(), "testClusterServerParameter");
         ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
         ASSERT_EQ(obj["testStringField"_sd].String(), "testString");
         ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
@@ -401,7 +400,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(test::count, 2);
 
     // Update the default value. The parameter should automatically reset to the new default value.
-    test::ChangeStreamOptionsClusterParam newDefaultParam;
+    test::TestClusterParamStruct newDefaultParam;
     test::PreAndPostImagesStruct newDefaultPrePostImgs;
 
     newDefaultPrePostImgs.setExpireAfterSeconds(35);
@@ -494,6 +493,14 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
         auto obj = b.obj();
         ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 45);
     }
+}
+
+TEST_F(DeprecatedServerParameterTest, StorageIntIsDeprecated) {
+    testParameterIsDeprecated("storageIntDeprecated");
+}
+
+TEST_F(DeprecatedServerParameterTest, StorageIntWarnsOnce) {
+    testSetParameterWarnsOnce("storageIntDeprecated", 50);
 }
 
 }  // namespace

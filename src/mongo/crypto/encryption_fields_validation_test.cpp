@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 

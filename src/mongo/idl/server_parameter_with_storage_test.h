@@ -70,7 +70,7 @@ inline Status validateOddSP(const std::int32_t& value, const boost::optional<Ten
 /**
  * Validates that the new expireAfterSeconds is non-negative.
  */
-inline Status validateNonNegativeExpireAfterSeconds(const ChangeStreamOptionsClusterParam& newVal,
+inline Status validateNonNegativeExpireAfterSeconds(const TestClusterParamStruct& newVal,
                                                     const boost::optional<TenantId>& tenantId) {
     if (newVal.getPreAndPostImages().getExpireAfterSeconds() < 0) {
         return Status(ErrorCodes::BadValue, "Should be non-negative value only");
@@ -88,9 +88,9 @@ inline Status onUpdateStdIntPreallocated(const std::int32_t&) {
 }
 
 /**
- * Bumps count in response to the successful update of changeStreamOptions.
+ * Bumps count in response to the successful update of testClusterServerParameter.
  */
-inline Status onUpdateChangeStreamOptions(const ChangeStreamOptionsClusterParam&) {
+inline Status onUpdateTestClusterServerParameter(const TestClusterParamStruct&) {
     ++count;
     return Status::OK();
 }

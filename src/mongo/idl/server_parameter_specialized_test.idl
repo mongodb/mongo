@@ -39,6 +39,13 @@ server_parameters:
         cpp_class: SpecializedDummyServerParameter
         redact: false
 
+    specializedDeprecated:
+        description: "Specialized server parameter marked deprecated."
+        set_at: [startup, runtime]
+        cpp_class: SpecializedDeprecatedServerParameter
+        redact: false
+        is_deprecated: true
+
     specializedWithCtor:
         description: "Provide a custom constructor implementation."
         set_at: startup

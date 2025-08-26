@@ -54,7 +54,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/vector_clock/vector_clock_mutable.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

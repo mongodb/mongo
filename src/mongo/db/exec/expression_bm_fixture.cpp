@@ -35,7 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/server_options.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/time_support.h"
 

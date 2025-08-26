@@ -37,7 +37,7 @@ mongo_cc_unit_test(
         ":sort_pattern",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:clock_source_mock",
     ],
 )

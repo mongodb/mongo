@@ -71,7 +71,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

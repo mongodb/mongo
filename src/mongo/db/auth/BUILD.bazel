@@ -897,7 +897,7 @@ mongo_cc_unit_test(
         ":user",
         ":user_request_x509",
         "//src/mongo:base",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:tick_source_mock",
         "//src/mongo/util/net:mock_http_client",
     ],

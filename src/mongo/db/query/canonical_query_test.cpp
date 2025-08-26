@@ -40,7 +40,7 @@
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 

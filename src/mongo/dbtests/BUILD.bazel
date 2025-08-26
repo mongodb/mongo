@@ -147,7 +147,7 @@ mongo_cc_binary(
         "//src/mongo/db/local_catalog:indexcatalogtests.cpp",
         "//src/mongo/dbtests/index_builds:index_access_method_test.cpp",
         "//src/mongo/dbtests/index_builds:multikey_paths_test.cpp",
-        "//src/mongo/idl:server_parameter_test_util.h",
+        "//src/mongo/idl:server_parameter_test_controller.h",
         "//src/mongo/util:embedded_builder.h",
     ] + select({
         "//bazel/config:js_engine_mozjs": [

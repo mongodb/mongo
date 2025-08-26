@@ -67,7 +67,7 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/mock_async_rpc.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"

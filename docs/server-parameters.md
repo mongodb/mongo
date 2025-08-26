@@ -72,6 +72,7 @@ server_parameters:
       override_ctor: # bool
       override_set: # bool
       override_validate: # bool
+      override_warn_if_deprecated: # bool
     redact: # bool
     omit_in_ftdc: # bool - required for cluster parameters, prohibited for all others
     test_only: # bool
@@ -90,6 +91,7 @@ server_parameters:
       lte: # string or expression map
       gte: # string or expression map
       callback: # string
+    is_deprecated: # bool
 ```
 
 Each entry in the `server_parameters` map represents one server parameter. The name of the parameter
@@ -157,6 +159,9 @@ must be unique across the server instance. More information on the specific fiel
   in any order. To perform an action after all validation rules have completed, `on_update` should be
   preferred instead. Callback prototype: `Status(const cpp_vartype&, const boost::optional<TenantId>&);`
 
+- `is_deprecated`: Mark the server parameter as deprecated. Warns users if the server parameter
+  is ever used. Defaults to false.
+
 Any symbols such as global variables or callbacks used by a server parameter must be imported using
 the usual IDL machinery via `globals.cpp_includes`. Similarly, all generated code will be nested
 inside the namespace defined by `globals.cpp_namespace`. Consider the following for example:
@@ -219,6 +224,8 @@ server_parameters:
             override_ctor: bool # True to allow defining a custom constructor, default: false
             override_set: bool # True to allow defining a custom set() method, default: false
             override_validate: bool # True to allow defining a custom validate() method, default: false
+            override_warn_if_deprecated: bool # True to allow defining a custom warnIfDeprecated()
+                                              # method, default: false
         ...
 ```
 
@@ -254,6 +261,9 @@ must be provided with the following signature:
 Status {name}::append(OperationContext*, BSONObjBuilder*, StringData, const boost::optional<TenantId>& tenantId);
 ```
 
+`override_warn_if_deprecated`: If `true`, allows a custom warnIfDeprecated() method to be defined, defaults
+to `false`.
+
 Lastly, a `setFromString` method must always be provided with the following signature:
 
 ```cpp
@@ -270,6 +280,7 @@ The following table summarizes `ServerParameter` method override rules.
 | `append() // redact=true`  | Optional | Replaces parameter value with '###'.                                 |
 | `append() // redact=false` | Required | None, won't compile without implementation.                          |
 | `validate()`               | Optional | Returns `Status::OK()` without any checks.                           |
+| `warnIfDeprecated()`       | Optional | If deprecated, warns on first use.                                   |
 
 Note that by default, server parameters are not tenant-aware and thus will always have `boost::none`
 provided as `tenantId`, unless defined as cluster server parameters (discussed

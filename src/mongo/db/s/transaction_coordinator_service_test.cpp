@@ -50,7 +50,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

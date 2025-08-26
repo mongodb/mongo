@@ -55,7 +55,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"

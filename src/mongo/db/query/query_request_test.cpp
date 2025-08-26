@@ -57,7 +57,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

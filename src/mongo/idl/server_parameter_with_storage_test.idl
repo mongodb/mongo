@@ -98,13 +98,25 @@ server_parameters:
         default: true
         redact: false
 
-    changeStreamOptions:
+    testClusterServerParameter:
         set_at: cluster
         description: "IDL-generated cluster server parameter"
-        cpp_vartype: ChangeStreamOptionsClusterParam
+        cpp_vartype: TestClusterParamStruct
         cpp_varname: clusterParamStorage
         validator:
             callback: "validateNonNegativeExpireAfterSeconds"
-        on_update: "onUpdateChangeStreamOptions"
+        on_update: "onUpdateTestClusterServerParameter"
         redact: false
         omit_in_ftdc: false
+
+    storageIntDeprecated:
+        set_at: [startup, runtime]
+        description: "Server parameter with storage marked deprecated."
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gIntDeprecated
+        default: 42
+        validator:
+            gte: 0
+            lt: 1000
+        redact: false
+        is_deprecated: true

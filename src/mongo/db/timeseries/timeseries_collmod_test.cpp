@@ -35,7 +35,7 @@
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

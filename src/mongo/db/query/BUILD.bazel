@@ -732,7 +732,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d",
         "//src/mongo/db/local_catalog:collection_mock",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 
@@ -758,7 +758,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 
@@ -794,7 +794,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/rpc",
         "//src/mongo/util:clock_source_mock",
     ],

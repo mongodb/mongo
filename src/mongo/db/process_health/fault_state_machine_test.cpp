@@ -43,7 +43,7 @@
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

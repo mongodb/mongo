@@ -1523,7 +1523,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/auth:authorization_manager_global",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
     ],
 )
@@ -1595,7 +1595,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s:shard_server_test_fixture",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/idl:idl_parser",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:version_impl",
     ],

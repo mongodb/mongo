@@ -41,7 +41,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {

@@ -469,11 +469,12 @@ class _CppFileWriterBase(object):
             self._writer, namespace_list, make_mod_tag(mod_visibility)
         )
 
-    def get_initializer_lambda(self, decl, unused=False, return_type=None):
+    def get_initializer_lambda(self, decl, unused=False, return_type=None, capture_ref=False):
         # type: (str, bool, str) -> writer.IndentedScopedBlock
         """Generate an indented block lambda initializing an outer scope variable."""
         prefix = "[[maybe_unused]] " if unused else ""
-        prefix = prefix + decl + " = ([]"
+        prefix = prefix + decl
+        prefix = prefix + " = ([]" if not capture_ref else prefix + " = ([&]"
         if return_type:
             prefix = prefix + "() -> " + return_type
         return writer.IndentedScopedBlock(self._writer, prefix + " {", "})();")
@@ -3131,6 +3132,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.omit_in_ftdc:
             self._writer.write_line("sp->setOmitInFTDC();")
 
+        if param.is_deprecated:
+            self._writer.write_line("sp->setIsDeprecated(true);")
+
         self._writer.write_line("return std::move(sp);")
 
     def _gen_server_parameter_class_definitions(self, param):
@@ -3202,6 +3206,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.omit_in_ftdc:
             self._writer.write_line("ret->setOmitInFTDC();")
 
+        if param.is_deprecated:
+            self._writer.write_line("ret->setIsDeprecated(true);")
+
         if param.default and not (param.cpp_vartype and param.cpp_varname):
             # Only need to call setDefault() if we haven't in-place initialized the declared var.
             self._writer.write_line(
@@ -3223,8 +3230,20 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate IDLServerParameterDeprecatedAlias instance."""
 
         for alias_no, alias in enumerate(param.deprecated_name):
+            varname = f"scp_{param_no}_deprecated_alias"
+            with self.get_initializer_lambda(
+                    f"auto {varname}",
+                    return_type="std::unique_ptr<ServerParameter>",
+                    capture_ref=True,
+                ):
+                self._writer.write_line(
+                    f"""\
+auto {varname} = std::make_unique<IDLServerParameterDeprecatedAlias>({_encaps(alias)}, scp_{param_no}.get());
+{varname}->setIsDeprecated(true);
+return std::move({varname});"""
+                )
             self._writer.write_line(
-                f"registerServerParameter(std::make_unique<IDLServerParameterDeprecatedAlias>({_encaps(alias)}, scp_{param_no}.get()));"
+                f"registerServerParameter(std::move({varname}));"
             )
 
     def gen_server_parameters(self, params, header_file_name):

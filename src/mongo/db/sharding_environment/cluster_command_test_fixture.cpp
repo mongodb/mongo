@@ -55,7 +55,7 @@
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/transport/service_executor.h"

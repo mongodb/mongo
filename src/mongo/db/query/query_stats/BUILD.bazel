@@ -87,7 +87,7 @@ mongo_cc_unit_test(
     ],
     header_deps = [
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [

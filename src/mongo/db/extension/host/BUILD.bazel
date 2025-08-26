@@ -84,7 +84,7 @@ mongo_cc_unit_test(
     deps = [
         ":extension_loader",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/unittest",
     ],
 )

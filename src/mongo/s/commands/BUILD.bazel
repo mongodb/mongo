@@ -361,7 +361,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:vector_clock",
         "//src/mongo/db/commands:profile_cmd_test_utils",
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/s/query/planner:cluster_aggregate",
         "//src/mongo/transport:service_executor",

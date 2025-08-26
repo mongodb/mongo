@@ -176,6 +176,7 @@ server_parameters:
             name: SSLModeServerParameter
             override_warn_if_deprecated: true
         redact: false
+        is_deprecated: true
 
     tlsMode:
         description: "Transition from allowTLS to preferTLS, or from preferTLS to requireTLS"

@@ -60,7 +60,7 @@
 #include "mongo/db/write_concern_idl.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 

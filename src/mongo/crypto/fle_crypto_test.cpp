@@ -53,7 +53,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep

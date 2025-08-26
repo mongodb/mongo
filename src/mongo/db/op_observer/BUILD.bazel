@@ -369,7 +369,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )
 

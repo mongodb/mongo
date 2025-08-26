@@ -51,7 +51,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"

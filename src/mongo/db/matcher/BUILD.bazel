@@ -115,6 +115,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
     ],
 )

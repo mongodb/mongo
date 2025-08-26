@@ -52,7 +52,7 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tailable_mode_gen.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 

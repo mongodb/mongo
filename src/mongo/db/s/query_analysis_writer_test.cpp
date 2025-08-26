@@ -50,7 +50,7 @@
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/query_analysis_sample_tracker.h"

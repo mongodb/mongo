@@ -60,7 +60,7 @@
 #include "mongo/db/write_concern_options_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/idl_test_types.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/idl/unittest_import_gen.h"
 #include "mongo/platform/decimal128.h"

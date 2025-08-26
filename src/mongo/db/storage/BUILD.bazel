@@ -771,7 +771,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_mock",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:periodic_runner_factory",
     ],
 )

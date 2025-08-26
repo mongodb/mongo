@@ -234,7 +234,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/dbtests:mocklib",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/mongo/util:clock_source_mock",
     ],
 )
@@ -252,7 +252,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/idl:server_parameter_test_controller",
         "//src/third_party/benchmark",
     ],
 )
