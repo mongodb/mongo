@@ -159,6 +159,18 @@ public:
     }
 
     /**
+     * Returns _interruptionContext if there is an active Replication state transition ongoing,
+     * boost::none otherwise.
+     */
+    boost::optional<OperationContext*> replicationStateTransitionInterruptionCtx() {
+        if (activeStateTransition()) {
+            return _interruptionCtx;
+        } else {
+            return boost::none;
+        }
+    }
+
+    /**
      * Provides a way for transition threads to kill operations with intents
      * which conflict with the state transition, and wait for all of those
      * operations to deregister. While active, it will also prevent operations
