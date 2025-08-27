@@ -511,6 +511,15 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalEnableJoinOptimization:
+        description: "Enable cost-based reordering of $lookup-$unwind pairs producing SBE plans."
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinOptimization"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
     #
     # Query execution
     #
