@@ -123,6 +123,7 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
                             getGlobalServiceContext()->getService(ClusterRole::ShardServer),
                             ClientOperationKillableByStepdown{false});
 
+            OperationContext* opCtx;
             {
                 stdx::lock_guard lk{_stateMutex};
                 if (const auto currentState = _state.load(); currentState != State::kPrimaryIdle) {
@@ -134,14 +135,13 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
                 }
                 _state.store(State::kInitializing);
                 _initOpCtxHolder = tc->makeOperationContext();
+                opCtx = _initOpCtxHolder.get();
             }
 
             ON_BLOCK_EXIT([this] {
                 stdx::lock_guard lk{_stateMutex};
                 _initOpCtxHolder.reset();
             });
-
-            auto opCtx{_initOpCtxHolder.get()};
 
             LOGV2_DEBUG(6419601, 2, "Initializing BalancerStatsRegistry");
             // TODO SERVER-107512 Remove this code when it is no longer necessary.
