@@ -56,6 +56,5 @@ buildvariants:
       bazel_compile_flags: >-
         --default_test_resources=cpu=1,2,4,8
     tasks:
-      - name: bazel_jscore
       - name: bazel_multiversion_sanity_check_gen
       - name: bazel_jstestfuzz_gen

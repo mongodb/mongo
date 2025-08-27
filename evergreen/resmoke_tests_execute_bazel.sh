@@ -56,7 +56,7 @@ done
 
 # If not explicitly specified on the target, pick a shard count that will fully utilize the current machine.
 BUILD_INFO=$(bazel query ${targets} --output build)
-if [[ "$BUILD_INFO" != *"shard_count ="* ]]; then
+if [[ "$BUILD_INFO" != *"shard_count ="* ]] && [[ "${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags}" != *"test_sharding_strategy"* ]]; then
     CPUS=$(nproc)
     SIZE=$(echo $BUILD_INFO | grep "size =" | cut -d '"' -f2)
     TEST_RESOURCES_CPU=$(echo ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} | awk -F'--default_test_resources=cpu=' '{print $2}')

@@ -360,9 +360,14 @@ tasks:
     commands:
       - func: "streams build and publish"
 
-  # Experimental task running the jscore suite bazel target. To be removed with SERVER-103537.
-  - name: bazel_jscore
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+  # Temporary task running the jscore suite as a bazel target. To be removed with SERVER-103537.
+  - name: bazel_test_jscore
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+        "requires_large_host",
+      ]
     depends_on:
       - name: archive_dist_test
     commands:
@@ -373,6 +378,12 @@ tasks:
           compiling_for_test: true
           bazel_args: >-
             --workspace_status_command="bazel/resmoke/workspace_status.sh"
+            --test_sharding_strategy=forced=16
+            --test_arg=--testTimeout=960
+            --test_timeout=1500
+          # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
+          # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute commit queue
+          # timeout, so that it will timeout before the task would.
 
   # Experimental task running the jstestfuzz suite bazel target. To be removed with SERVER-103537.
   - <<: *jstestfuzz_template

@@ -645,37 +645,6 @@ tasks:
           target: >-
             //:codeowners -- --check --expansions-file ../expansions.yml
 
-  # TODO(SERVER-97804): rename if display_name appears on the evergreen UI
-  - name: bazel_run_//buildscripts:resmoke
-    tags:
-      [
-        "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
-        "lint",
-        "bazel_check",
-      ]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - command: timeout.update
-        params:
-          # 10 minutes
-          exec_timeout_secs: 600
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - func: "get engflow creds"
-      - func: "bazel run"
-        vars:
-          target: >-
-            //buildscripts:resmoke -- --help
-
   - name: bazel_run_lint
     tags:
       [
