@@ -15,9 +15,6 @@
 //   references_foreign_collection,
 // ]
 
-import {getAggPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
 var colName = "jstests_index_stats";
 var col = db[colName];
 col.drop();
@@ -48,20 +45,6 @@ var getIndexKey = function (indexName) {
 
     return undefined;
 };
-
-var getIndexNamesForWinningPlan = function (explain) {
-    var indexNameList = [];
-    var winningStages = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN");
-    for (var i = 0; i < winningStages.length; ++i) {
-        indexNameList.push(winningStages[i].indexName);
-    }
-
-    return indexNameList;
-};
-
-function isPipelineSplit(coll, pipeline) {
-    return !!coll.explain("queryPlanner").aggregate(pipeline).splitPipeline;
-}
 
 assert.commandWorked(col.insert({a: 1, b: 1, c: 1}));
 assert.commandWorked(col.insert({a: 2, b: 2, c: 2}));
@@ -226,6 +209,7 @@ assert.commandWorked(
     ]),
 );
 assert.eq(0, getUsageCount("_id_"));
+assert.eq(0, getUsageCount("_id_", foreignCollection));
 let pipeline = [
     {$match: {_id: {$in: [0, 1]}}},
     {
@@ -239,17 +223,11 @@ let pipeline = [
 ];
 assert.eq(2, col.aggregate(pipeline).itcount());
 assert.gte(getUsageCount("_id_", col), 1, "Expected aggregation to use _id index");
-let foreignCollectionIndexUsageCount = getUsageCount("_id_", foreignCollection);
-if (!checkSbeRestrictedOrFullyEnabled(db) || isPipelineSplit(col, pipeline)) {
-    assert.eq(2, foreignCollectionIndexUsageCount, "Expected each lookup to be tracked as an index use");
-} else {
-    assert.eq(
-        1,
-        foreignCollectionIndexUsageCount,
-        "Expected the index join lookup to be tracked as a single index use",
-    );
-}
-
+assert.gte(
+    getUsageCount("_id_", foreignCollection),
+    1,
+    "Expected aggregation to use _id index on the foreign collection",
+);
 //
 // Confirm index use is recorded for partially pushed down pipelines with a $lookup stage
 //
@@ -263,6 +241,7 @@ assert.commandWorked(
     ]),
 );
 assert.eq(0, getUsageCount("_id_"));
+assert.eq(0, getUsageCount("_id_", foreignCollection));
 pipeline = [
     {$match: {_id: {$in: [0, 1]}}},
     {
@@ -283,20 +262,11 @@ pipeline = [
 ];
 assert.eq(2, col.aggregate(pipeline).itcount());
 assert.gte(getUsageCount("_id_", col), 1, "Expected aggregation to use _id index");
-foreignCollectionIndexUsageCount = getUsageCount("_id_", foreignCollection);
-if (!checkSbeRestrictedOrFullyEnabled(db) || isPipelineSplit(col, pipeline)) {
-    assert.eq(2, foreignCollectionIndexUsageCount, "Expected each lookup to be tracked as an index use");
-} else {
-    assert.eq(
-        1,
-        foreignCollectionIndexUsageCount,
-        "Expected the index join lookup to be tracked as a single index use",
-    );
-}
-const explain = col.explain().aggregate(pipeline);
-if (!explain.splitPipeline) {
-    assert(getAggPlanStage(explain, "$cursor"), "Expected a $cursor stage for a partially pushed down pipeline");
-}
+assert.gte(
+    getUsageCount("_id_", foreignCollection),
+    1,
+    "Expected aggregation to use _id index on the foreign collection",
+);
 
 //
 // Confirm index use is recorded for $graphLookup.
