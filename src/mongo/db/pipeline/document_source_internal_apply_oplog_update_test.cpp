@@ -104,6 +104,15 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldRejectMalformedSpecs) {
         DBException,
         4772600);
 
+    spec = fromjson(
+        R"({$_internalApplyOplogUpdate: {
+            oplogUpdate: {"$v": "2", diff: {u: {b: 3}}}
+           }})");
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
+        DBException,
+        4772600);
+
     spec = fromjson(R"({$_internalApplyOplogUpdate: {oplogUpdate: {"$v": NumberInt(2)}}})");
     ASSERT_THROWS_CODE(
         DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),

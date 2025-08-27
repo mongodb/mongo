@@ -18,7 +18,7 @@
  * ]
  */
 
-var t = db.apply_ops1;
+const t = db.apply_ops1;
 t.drop();
 
 //
@@ -420,53 +420,96 @@ res = assert.commandFailed(db.adminCommand({
 }));
 assert.eq(res.code, 4772600);
 
-// When we explicitly specify {$v: 1} it should fail because this version is no longer supported.
-assert.commandFailedWithCode(db.adminCommand({
+// When $v is missing, it should be treated it as a {$v:1} update. This means that we should get
+// 'UpdateNode' update semantics, and $set operations get performed in lexicographic order.
+assert.commandWorked(db.adminCommand({
     applyOps: [
         {"op": "i", "ns": t.getFullName(), "o": {_id: 10}},
+        {"op": "u", "ns": t.getFullName(), "o2": {_id: 10}, "o": {$set: {z: 1, a: 2}}}
+    ]
+}));
+assert.eq(t.findOne({_id: 10}), {_id: 10, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
+
+// When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
+// operations get performed in lexicographic order.
+assert.commandWorked(db.adminCommand({
+    applyOps: [
+        {"op": "i", "ns": t.getFullName(), "o": {_id: 11}},
         {
             "op": "u",
             "ns": t.getFullName(),
-            "o2": {_id: 10},
+            "o2": {_id: 11},
             "o": {$v: NumberInt(1), $set: {z: 1, a: 2}}
         }
     ]
-}),
-                             4772600);
+}));
+assert.eq(t.findOne({_id: 11}), {_id: 11, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
 
 // {$v: 2} entries encode diffs differently, and operations are applied in the order specified
 // rather than in lexicographic order.
 res = assert.commandWorked(db.adminCommand({
     applyOps: [
-        {"op": "i", "ns": t.getFullName(), "o": {_id: 11, deleteField: 1}},
+        {"op": "i", "ns": t.getFullName(), "o": {_id: 12, deleteField: 1}},
         {
             "op": "u",
             "ns": t.getFullName(),
-            "o2": {_id: 11},
+            "o2": {_id: 12},
             // The diff indicates that 'deleteField' will be removed and 'newField' will be added
             // with value "foo".
             "o": {$v: NumberInt(2), diff: {d: {deleteField: false}, i: {newField: "foo"}}}
         }
     ]
 }));
-assert.eq(t.findOne({_id: 11}), {_id: 11, newField: "foo"});
+assert.eq(t.findOne({_id: 12}), {_id: 12, newField: "foo"});
 
-// {$v: 3} does not exist yet, and we check that trying to use it throws an error.
-res = assert.commandFailed(db.adminCommand({
-    applyOps: [
-        {"op": "i", "ns": t.getFullName(), "o": {_id: 12}},
-        {
+// Test interesting $v field values
+{
+    assert.commandWorked(
+        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 13}}]}));
+
+    // {$v: 3} does not exist yet, and we check that trying to use it throws an error.
+    assert.commandFailedWithCode(db.adminCommand({
+        applyOps: [{
             "op": "u",
             "ns": t.getFullName(),
-            "o2": {_id: 12},
+            "o2": {_id: 13},
             "o": {$v: NumberInt(3), diff: {d: {deleteField: false}}}
-        }
-    ]
-}));
-assert.eq(res.code, 4772600);
+        }]
+    }),
+                                 4772600);
 
-var insert_op1 = {_id: 13, x: 'inserted apply ops1'};
-var insert_op2 = {_id: 14, x: 'inserted apply ops2'};
+    // Non-numeric values are interpreted as 0, which is no longer a valid oplog version.
+    assert.commandFailedWithCode(db.adminCommand({
+        applyOps: [{
+            "op": "u",
+            "ns": t.getFullName(),
+            "o2": {_id: 13},
+            "o": {$v: "2", diff: {d: {deleteField: false}}}
+        }]
+    }),
+                                 4772600);
+
+    // This is not behavior we rely on, it's just how it currently works.
+    assert.commandWorked(db.adminCommand({
+        applyOps: [{
+            "op": "u",
+            "ns": t.getFullName(),
+            "o2": {_id: 13},
+            "o": {$v: 2.34, diff: {d: {deleteField: false}}}
+        }]
+    }));
+    assert.commandWorked(db.adminCommand({
+        applyOps: [{
+            "op": "u",
+            "ns": t.getFullName(),
+            "o2": {_id: 13},
+            "o": {$v: NumberDecimal("2.357"), diff: {d: {deleteField: false}}}
+        }]
+    }));
+}
+
+var insert_op1 = {_id: 14, x: 'inserted apply ops1'};
+var insert_op2 = {_id: 15, x: 'inserted apply ops2'};
 assert.commandWorked(db.adminCommand({
     "applyOps": [{
         op: 'c',
@@ -486,8 +529,8 @@ assert.commandWorked(db.adminCommand({
     }]
 }),
                      "Nested apply ops was NOT successful");
-assert.eq(t.findOne({_id: 13}), insert_op1);
-assert.eq(t.findOne({_id: 14}), insert_op2);
+assert.eq(t.findOne({_id: 14}), insert_op1);
+assert.eq(t.findOne({_id: 15}), insert_op2);
 
 assert.commandWorked(db.adminCommand({
     "applyOps": [{
@@ -502,13 +545,13 @@ assert.commandWorked(db.adminCommand({
                         {
                             op: 'u',
                             ns: t.getFullName(),
-                            o2: {_id: 13},
+                            o2: {_id: 14},
                             o: {$v: 2, diff: {u: {x: 'nested apply op update1'}}},
                         },
                         {
                             op: 'u',
                             ns: t.getFullName(),
-                            o2: {_id: 14},
+                            o2: {_id: 15},
                             o: {$v: 2, diff: {u: {x: 'nested apply op update2'}}},
                         }
                     ]
@@ -518,8 +561,44 @@ assert.commandWorked(db.adminCommand({
     }]
 }),
                      "Nested apply ops was NOT successful");
-assert.eq(t.findOne({_id: 13}), {_id: 13, x: 'nested apply op update1'});
-assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update2'});
+assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update1'});
+assert.eq(t.findOne({_id: 15}), {_id: 15, x: 'nested apply op update2'});
+
+// Ensure that nested applyOps works with implicit and explicit {$v:1} oplog entries.
+assert.commandWorked(db.adminCommand({
+    "applyOps": [{
+        op: 'c',
+        ns: 'admin.$cmd',
+        o: {
+            "applyOps": [{
+                op: 'c',
+                ns: 'test.$cmd',
+                o: {
+                    "applyOps": [
+                        {
+                            op: 'u',
+                            ns: t.getFullName(),
+                            o2: {_id: 14},
+                            o: {"$set": {x: 'nested apply op update1 (implicit v1)'}},
+                        },
+                        {
+                            op: 'u',
+                            ns: t.getFullName(),
+                            o2: {_id: 15},
+                            o: {
+                                $v: NumberInt(1),
+                                "$set": {x: 'nested apply op update2 (explicit v1)'}
+                            },
+                        }
+                    ]
+                }
+            }],
+        }
+    }]
+}),
+                     "Nested apply ops was NOT successful");
+assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update1 (implicit v1)'});
+assert.eq(t.findOne({_id: 15}), {_id: 15, x: 'nested apply op update2 (explicit v1)'});
 
 // Operations without collection UUIDs should not crash (SERVER-82349)
 

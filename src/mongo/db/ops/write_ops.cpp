@@ -665,16 +665,18 @@ UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField
     BSONElement idField = oField["_id"];
 
     // If _id field is present, we're getting a replacement style update in which $v can be a user
-    // field. Otherwise, $v field has to be $v:2.
-    uassert(4772600,
-            str::stream() << "Expected _id field or $v:2, but got: " << vField,
-            idField.ok() ||
-                (vField.ok() &&
-                 vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)));
+    // field. Otherwise, the $v field has to be either missing or be one of $v:1 / $v:2.
+    uassert(
+        4772600,
+        str::stream() << "Expected _id field or $v field missing or $v:1/$v:2, but got: " << vField,
+        idField.ok() || !vField.ok() ||
+            vField.safeNumberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1) ||
+            vField.safeNumberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
 
     // It is important to check for '_id' field first, because a replacement style update can still
     // have a '$v' field in the object.
-    if (!idField.ok()) {
+    if (!idField.ok() && vField.ok() &&
+        vField.safeNumberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
         // Make sure there's a diff field.
         BSONElement diff = oField[update_oplog_entry::kDiffObjectFieldName];
         uassert(4772601,
@@ -684,8 +686,10 @@ UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField
 
         return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, DeltaTag{}, options);
     } else {
-        // Treat it as a a full replacement update.
-        return UpdateModification(oField, ReplacementTag{});
+        // Treat it as a full replacement update or modifier update depending on the presence of
+        // the "_id" field.
+        return idField.ok() ? UpdateModification(oField, ReplacementTag{})
+                            : UpdateModification(oField, ModifierUpdateTag{});
     }
 }
 

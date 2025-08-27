@@ -673,7 +673,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
     auto cancelToken = operationContext()->getCancellationToken();
     CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
-    ASSERT_EQ(future.getNoThrow(), ErrorCodes::duplicateCodeForTest(4772600));
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
@@ -718,7 +718,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     auto cancelToken = operationContext()->getCancellationToken();
     CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
-    ASSERT_EQ(future.getNoThrow(), ErrorCodes::duplicateCodeForTest(4772600));
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));

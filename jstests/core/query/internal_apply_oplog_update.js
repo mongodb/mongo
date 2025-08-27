@@ -1,7 +1,8 @@
 /**
  * Tests pipeline-style updates that use the $_internalApplyOplogUpdate aggregate stage.
  * @tags: [
- *   requires_fcv_60,
+ *   # This now tests applyOps with v1 oplog entries, which is only supported in FCV 8.0 onwards.
+ *   requires_fcv_80,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
  * ]
@@ -39,8 +40,8 @@ let documents2 = [{
 assert.commandWorked(db.t2.insert(documents2));
 
 //
-// Test $_internalApplyOplogUpdate with v2 oplog update descriptions. For each update description,
-// we execute $_internalApplyOplogUpdate twice to verify idempotency.
+// Test $_internalApplyOplogUpdate with v1 oplog and v2 oplog update descriptions. For each
+// update description, we execute $_internalApplyOplogUpdate twice to verify idempotency.
 //
 
 function testUpdate(expected, coll, filter, oplogUpdate, opts = {}) {
@@ -59,12 +60,35 @@ documents1[1].b = 3;
 testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
 
 oplogUpdate = {
+    "$v": NumberInt(1),
+    "$set": {b: 2}
+};
+documents1[2].b = 2;
+documents1[3].b = 2;
+testUpdate(documents1, db.t1, {a: 0}, oplogUpdate, {multi: true});
+
+oplogUpdate = {
+    "$v": NumberInt(1),
+    "$unset": {b: true}
+};
+delete documents1[1].b;
+testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
+
+// Add field back so we can test deleting it with $v:2 oplog.
+documents1[1].b = 3;
+oplogUpdate = {
     "$v": NumberInt(2),
     diff: {d: {b: false}}
 };
-
 delete documents1[1].b;
 testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
+
+oplogUpdate = {
+    "$v": NumberInt(1),
+    "$set": {"b.d": 2}
+};
+documents1[4].b.d = 2;
+testUpdate(documents1, db.t1, {_id: 8}, oplogUpdate);
 
 // Test an update with upsert=true where no documents match the filter prior to the update.
 oplogUpdate = {
