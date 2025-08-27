@@ -981,7 +981,11 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
     std::string existingMetadata;
     {
         auto session = sessionCache->getSession();
-        existingMetadata = getMetadataCreate(session->getSession(), uri).getValue();
+        auto metadata = getMetadataCreate(session->getSession(), uri);
+        if (!metadata.isOK()) {
+            return metadata.getStatus();
+        }
+        existingMetadata = std::move(metadata.getValue());
     }
     if (existingMetadata.find("log=(enabled=true)") != std::string::npos &&
         existingMetadata.find("log=(enabled=false)") != std::string::npos) {
