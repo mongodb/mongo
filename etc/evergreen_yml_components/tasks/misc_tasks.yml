@@ -1394,6 +1394,7 @@ tasks:
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get and apply version expansions"
+    - func: "f_expansions_write"
     - func: "gen supplementary data"
     - func: "upload supplementary data"
 
