@@ -25,6 +25,8 @@
  *   # because moveCollection change the collection UUID # by dropping and re-creating the
  *   # collection.
  *   assumes_balancer_off,
+ *   # Uses mapReduce
+ *   requires_scripting,
  * ]
  */
 
