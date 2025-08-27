@@ -37,18 +37,14 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -65,15 +61,20 @@ protected:
     virtual void createSample(long long size) {
         BSONObj spec = BSON("$sample" << BSON("size" << size));
         BSONElement specElement = spec.firstElement();
-        _sample =
-            exec::agg::buildStage(DocumentSourceSample::createFromBson(specElement, getExpCtx()));
-        sample()->setSource(source());
+        _sampleDocumentSource = DocumentSourceSample::createFromBson(specElement, getExpCtx());
+        _sampleStage = exec::agg::buildStage(_sampleDocumentSource);
+        sampleStage()->setSource(source());
         checkBsonRepresentation(spec);
     }
 
-    exec::agg::Stage* sample() {
-        return _sample.get();
+    exec::agg::Stage* sampleStage() const {
+        return _sampleStage.get();
     }
+
+    DocumentSource* sampleDocumentSource() const {
+        return _sampleDocumentSource.get();
+    }
+
 
     exec::agg::MockStage* source() {
         return _mock.get();
@@ -91,7 +92,7 @@ protected:
 
         boost::optional<Document> prevDoc;
         for (long long i = 0; i < nExpectedResults; i++) {
-            auto nextResult = sample()->getNext();
+            auto nextResult = sampleStage()->getNext();
             ASSERT_TRUE(nextResult.isAdvanced());
             auto thisDoc = nextResult.releaseDocument();
             ASSERT_TRUE(thisDoc.metadata().hasRandVal());
@@ -116,13 +117,14 @@ protected:
      * Assert that iterator state accessors consistently report the source is exhausted.
      */
     void assertEOF() const {
-        ASSERT(_sample->getNext().isEOF());
-        ASSERT(_sample->getNext().isEOF());
-        ASSERT(_sample->getNext().isEOF());
+        ASSERT(_sampleStage->getNext().isEOF());
+        ASSERT(_sampleStage->getNext().isEOF());
+        ASSERT(_sampleStage->getNext().isEOF());
     }
 
 protected:
-    intrusive_ptr<exec::agg::Stage> _sample;
+    intrusive_ptr<DocumentSource> _sampleDocumentSource;
+    intrusive_ptr<exec::agg::Stage> _sampleStage;
     intrusive_ptr<exec::agg::MockStage> _mock;
 
 private:
@@ -131,7 +133,7 @@ private:
      * created with.
      */
     void checkBsonRepresentation(const BSONObj& spec) {
-        Value serialized = static_cast<DocumentSourceSample*>(sample())->serialize();
+        Value serialized = static_cast<DocumentSourceSample*>(sampleStage())->serialize();
         auto generatedSpec = serialized.getDocument().toBson();
         ASSERT_BSONOBJ_EQ(spec, generatedSpec);
     }
@@ -167,7 +169,7 @@ TEST_F(SampleBasics, SampleEOFBeforeSource) {
 TEST_F(SampleBasics, DocsUnmodified) {
     createSample(1);
     source()->push_back(DOC("a" << 1 << "b" << DOC("c" << 2)));
-    auto next = sample()->getNext();
+    auto next = sampleStage()->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.releaseDocument();
     ASSERT_EQUALS(1, doc["a"].getInt());
@@ -187,11 +189,11 @@ TEST_F(SampleBasics, ShouldPropagatePauses) {
 
     // The $sample stage needs to populate itself, so should propagate all three pauses before
     // returning any results.
-    ASSERT_TRUE(sample()->getNext().isPaused());
-    ASSERT_TRUE(sample()->getNext().isPaused());
-    ASSERT_TRUE(sample()->getNext().isPaused());
-    ASSERT_TRUE(sample()->getNext().isAdvanced());
-    ASSERT_TRUE(sample()->getNext().isAdvanced());
+    ASSERT_TRUE(sampleStage()->getNext().isPaused());
+    ASSERT_TRUE(sampleStage()->getNext().isPaused());
+    ASSERT_TRUE(sampleStage()->getNext().isPaused());
+    ASSERT_TRUE(sampleStage()->getNext().isAdvanced());
+    ASSERT_TRUE(sampleStage()->getNext().isAdvanced());
     assertEOF();
 }
 
@@ -203,7 +205,7 @@ DEATH_TEST_REGEX_F(SampleBasics, CannotHandleControlEvent, "Tripwire assertion.*
     doc.metadata().setChangeStreamControlEvent();
     source()->push_back(DocumentSource::GetNextResult::makeAdvancedControlDocument(doc.freeze()));
 
-    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 10358901);
+    ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 10358901);
 }
 
 TEST_F(SampleBasics, RedactsCorrectly) {
@@ -214,7 +216,7 @@ TEST_F(SampleBasics, RedactsCorrectly) {
                 "size": "?number"
             }
         })",
-        redact(*dynamic_cast<DocumentSource*>(sample())));
+        redact(*sampleDocumentSource()));
 }
 
 /**
@@ -272,8 +274,10 @@ TEST_F(InvalidSampleSpec, MissingSize) {
 class SampleFromRandomCursorBasics : public SampleBasics {
 public:
     void createSample(long long size) override {
-        _sample = DocumentSourceSampleFromRandomCursor::create(getExpCtx(), size, "_id", 100);
-        sample()->setSource(_mock.get());
+        _sampleDocumentSource =
+            DocumentSourceSampleFromRandomCursor::create(getExpCtx(), size, "_id", 100);
+        _sampleStage = exec::agg::buildStage(_sampleDocumentSource);
+        sampleStage()->setSource(_mock.get());
     }
 };
 
@@ -309,7 +313,7 @@ TEST_F(SampleFromRandomCursorBasics, SampleEOFBeforeSource) {
 TEST_F(SampleFromRandomCursorBasics, DocsUnmodified) {
     createSample(1);
     source()->push_back(DOC("_id" << 1 << "b" << DOC("c" << 2)));
-    auto next = sample()->getNext();
+    auto next = sampleStage()->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.releaseDocument();
     ASSERT_EQUALS(1, doc["_id"].getInt());
@@ -327,7 +331,7 @@ TEST_F(SampleFromRandomCursorBasics, IgnoreDuplicates) {
     source()->push_back(DOC("_id" << 1));  // Duplicate, should ignore.
     source()->push_back(DOC("_id" << 2));
 
-    auto next = sample()->getNext();
+    auto next = sampleStage()->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.releaseDocument();
     ASSERT_EQUALS(1, doc["_id"].getInt());
@@ -335,7 +339,7 @@ TEST_F(SampleFromRandomCursorBasics, IgnoreDuplicates) {
     double doc1Meta = doc.metadata().getRandVal();
 
     // Should ignore the duplicate {_id: 1}, and return {_id: 2}.
-    next = sample()->getNext();
+    next = sampleStage()->getNext();
     ASSERT_TRUE(next.isAdvanced());
     doc = next.releaseDocument();
     ASSERT_EQUALS(2, doc["_id"].getInt());
@@ -358,10 +362,10 @@ TEST_F(SampleFromRandomCursorBasics, TooManyDups) {
     }
 
     // First should be successful, it's not a duplicate.
-    ASSERT_TRUE(sample()->getNext().isAdvanced());
+    ASSERT_TRUE(sampleStage()->getNext().isAdvanced());
 
     // The rest are duplicates, should error.
-    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28799);
+    ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 28799);
 }
 
 /**
@@ -371,7 +375,7 @@ TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
     // Once with only a bad document.
     createSample(2);  // _idField is '_id'.
     source()->push_back(DOC("non_id" << 2));
-    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28793);
+    ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 28793);
 
     // Again, with some regular documents before a bad one.
     createSample(2);  // _idField is '_id'.
@@ -380,9 +384,9 @@ TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
     source()->push_back(DOC("non_id" << 2));
 
     // First should be successful.
-    ASSERT_TRUE(sample()->getNext().isAdvanced());
+    ASSERT_TRUE(sampleStage()->getNext().isAdvanced());
 
-    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 28793);
+    ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 28793);
 }
 
 /**
@@ -396,18 +400,20 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
     int nTrials = 10000;
     for (int i = 0; i < nTrials; i++) {
         // Sample 2 out of 3 documents.
-        _sample = DocumentSourceSampleFromRandomCursor::create(getExpCtx(), 2, "_id", 3);
-        sample()->setSource(_mock.get());
+        auto documentSourceSampleFromRandomCursor =
+            DocumentSourceSampleFromRandomCursor::create(getExpCtx(), 2, "_id", 3);
+        _sampleStage = exec::agg::buildStage(documentSourceSampleFromRandomCursor);
+        sampleStage()->setSource(_mock.get());
 
         source()->push_back(DOC("_id" << 1));
         source()->push_back(DOC("_id" << 2));
 
-        auto doc = sample()->getNext();
+        auto doc = sampleStage()->getNext();
         ASSERT_TRUE(doc.isAdvanced());
         ASSERT_TRUE(doc.getDocument().metadata().hasRandVal());
         firstTotal += doc.getDocument().metadata().getRandVal();
 
-        doc = sample()->getNext();
+        doc = sampleStage()->getNext();
         ASSERT_TRUE(doc.isAdvanced());
         ASSERT_TRUE(doc.getDocument().metadata().hasRandVal());
         secondTotal += doc.getDocument().metadata().getRandVal();
@@ -431,8 +437,8 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
     source()->push_back(DocumentSource::GetNextResult::makePauseExecution());
 
     // Should see the first result, then see a pause and fail.
-    ASSERT_TRUE(sample()->getNext().isAdvanced());
-    sample()->getNext();
+    ASSERT_TRUE(sampleStage()->getNext().isAdvanced());
+    sampleStage()->getNext();
 }
 
 DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
@@ -445,14 +451,14 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
     doc.metadata().setChangeStreamControlEvent();
     source()->push_back(DocumentSource::GetNextResult::makeAdvancedControlDocument(doc.freeze()));
 
-    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 10358901);
+    ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 10358901);
 }
 
 TEST_F(SampleFromRandomCursorBasics, RedactsCorrectly) {
     createSample(2);
     ASSERT_VALUE_EQ_AUTO(  // NOLINT
         "{ $sampleFromRandomCursor: { size: \"?number\" } }",
-        redact(*dynamic_cast<DocumentSource*>(sample())));
+        redact(*sampleDocumentSource()));
 }
 
 }  // namespace

@@ -30,11 +30,11 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -44,6 +44,7 @@
 #include <string>
 
 #include <boost/none.hpp>
+#include <boost/none_t.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -53,7 +54,7 @@ namespace mongo {
  * This class is not a registered stage, it is only used as an optimized replacement for $sample
  * when the storage engine allows us to use a random cursor.
  */
-class DocumentSourceSampleFromRandomCursor final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
     const char* getSourceName() const final;
@@ -90,36 +91,21 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> sampleFromRandomCursorStageToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSourceSampleFromRandomCursor);
+
     DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          long long size,
                                          std::string idField,
                                          long long collectionSize);
-
-    GetNextResult doGetNext() final;
-
-    /**
-     * Keep asking for documents from the random cursor until it yields a new document. Errors if a
-     * a document is encountered without a value for '_idField', or if the random cursor keeps
-     * returning duplicate elements.
-     */
-    GetNextResult getNextNonDuplicateDocument();
 
     long long _size;
 
     // The field to use as the id of a document. Usually '_id', but 'ts' for the oplog.
     std::string _idField;
 
-    // Keeps track of the documents that have been returned, since a random cursor is allowed to
-    // return duplicates.
-    ValueFlatUnorderedSet _seenDocs;
-
     // The approximate number of documents in the collection (includes orphans).
     const long long _nDocsInColl;
-
-    // The value to be assigned to the randMetaField of outcoming documents. Each call to getNext()
-    // will decrement this value by an amount scaled by _nDocsInColl as an attempt to appear as if
-    // the documents were produced by a top-k random sort.
-    double _randMetaFieldVal = 1.0;
 };
 
 }  // namespace mongo
