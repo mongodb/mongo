@@ -47,8 +47,6 @@ class UserCacheAcquisitionStats {
 public:
     UserCacheAcquisitionStats() = default;
     ~UserCacheAcquisitionStats() = default;
-    UserCacheAcquisitionStats(const UserCacheAcquisitionStats&) = delete;
-    UserCacheAcquisitionStats& operator=(const UserCacheAcquisitionStats&) = delete;
 
     /**
      * Returns true if the cache has been accessed during the operation and has stats that should

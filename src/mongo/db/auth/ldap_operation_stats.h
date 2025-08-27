@@ -47,8 +47,7 @@ class LDAPOperationStats {
 public:
     LDAPOperationStats() = default;
     ~LDAPOperationStats() = default;
-    LDAPOperationStats(const LDAPOperationStats&) = delete;
-    LDAPOperationStats& operator=(const LDAPOperationStats&) = delete;
+
     /**
      * Marshals all statistics into BSON for reporting.
      */

@@ -2401,8 +2401,8 @@ void HandleRequest::completeOperation(DbResponse& response) {
 
     recordCurOpMetrics(opCtx);
 
-    const auto& stats =
-        CurOp::get(opCtx)->getReadOnlyUserAcquisitionStats()->getLdapOperationStats();
+    const auto stats =
+        CurOp::get(opCtx)->getReadOnlyUserAcquisitionStats()->getLdapOperationStatsSnapshot();
     if (stats.shouldReport()) {
         auto ldapCumulativeOperationsStats = LDAPCumulativeOperationStats::get();
         if (nullptr != ldapCumulativeOperationsStats) {

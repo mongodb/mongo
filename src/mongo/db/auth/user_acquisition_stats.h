@@ -67,10 +67,12 @@ public:
      * LDAPOperationStats object
      */
     bool shouldUserCacheAcquisitionStatsReport() const {
+        stdx::lock_guard<Latch> lk(_mutex);
         return _userCacheAcquisitionStats.shouldReport();
     }
 
     bool shouldLDAPOperationStatsReport() const {
+        stdx::lock_guard<Latch> lk(_mutex);
         return _ldapOperationStats.shouldReport();
     }
 
@@ -79,11 +81,11 @@ public:
      * to string and to BSON. Used for reporting to $currentOp, database profiling, and logging.
      */
     void userCacheAcquisitionStatsReport(BSONObjBuilder* builder, TickSource* tickSource) const {
-        _userCacheAcquisitionStats.report(builder, tickSource);
+        getUserCacheAccessStatsSnapshot().report(builder, tickSource);
     }
 
     void userCacheAcquisitionStatsToString(StringBuilder* sb, TickSource* tickSource) const {
-        _userCacheAcquisitionStats.toString(sb, tickSource);
+        getUserCacheAccessStatsSnapshot().toString(sb, tickSource);
     }
 
     /**
@@ -91,14 +93,26 @@ public:
      * to string and to BSON. Used for reporting to $currentOp, database profiling, and logging.
      */
     void ldapOperationStatsReport(BSONObjBuilder* builder, TickSource* tickSource) const {
-        _ldapOperationStats.report(builder, tickSource);
+        getLdapOperationStatsSnapshot().report(builder, tickSource);
     }
 
     void ldapOperationStatsToString(StringBuilder* sb, TickSource* tickSource) const {
-        _ldapOperationStats.toString(sb, tickSource);
+        getLdapOperationStatsSnapshot().toString(sb, tickSource);
     }
 
-    const LDAPOperationStats& getLdapOperationStats() const {
+    /**
+     * Returns a copy of the current _userCacheAcquisitionStats object.
+     */
+    UserCacheAcquisitionStats getUserCacheAccessStatsSnapshot() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _userCacheAcquisitionStats;
+    }
+
+    /**
+     * Returns a copy of the current _ldapOperationStats object.
+     */
+    LDAPOperationStats getLdapOperationStatsSnapshot() const {
+        stdx::lock_guard<Latch> lk(_mutex);
         return _ldapOperationStats;
     }
 
@@ -167,6 +181,7 @@ private:
      * feild of the LDAPOperationStats object
      */
     void _incrementReferrals() {
+        stdx::lock_guard<Latch> lk(_mutex);
         _ldapOperationStats.incrementReferrals();
     }
 
@@ -203,7 +218,7 @@ private:
     UserCacheAcquisitionStats _userCacheAcquisitionStats;
     LDAPOperationStats _ldapOperationStats;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("UserAcquisitionStats::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("UserAcquisitionStats::_mutex");
 };
 
 /**
