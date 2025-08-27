@@ -73,6 +73,14 @@ const std::string kIsElectableFieldName = "electable";
 void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kOkFieldName, 1.0);
     if (_electionTimeSet) {
+        // TODO: SERVER-108961
+        // We currently set the electionTime using Timestamp.toLL() which forms the 64b integer
+        // value with the seconds-since-unix-epoch value in the high 32b and the increment in the
+        // low 32b. this is notably *NOT* the number of milliseconds since the unix epoch, and is
+        // only correct on accident, since during `initialize` we reverse this same incorrect
+        // conversion. The only time this value is *wrong* is when stored in the BSON document as a
+        // Date - it is not an equivalent value when interpreted as msec since the epoch. However,
+        // we believe it is correct on both ends before/after performing the conversions.
         builder->appendDate(kElectionTimeFieldName,
                             Date_t::fromMillisSinceEpoch(_electionTime.asLL()));
     }
@@ -145,6 +153,10 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         _electionTimeSet = false;
     } else if (electionTimeElement.type() == BSONType::date) {
         _electionTimeSet = true;
+        // TODO: SERVER-108961
+        // This explicit conversion from date to Timestamp is not correct in general, and a longer
+        // explanation of why is in the `addToBSON` method. This needs to be changed to only
+        // serialize timestamps into BSON, not the `Date_t` type.
         _electionTime = Timestamp(electionTimeElement.date());
     } else {
         return Status(ErrorCodes::TypeMismatch,
