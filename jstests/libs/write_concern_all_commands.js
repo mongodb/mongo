@@ -52,18 +52,11 @@ function getShardKeyMinRanges(coll) {
     return a.toArray();
 }
 
-function getAllShards(cluster) {
-    let shards = [];
-    shards.push(cluster.rs0);
-    shards.push(cluster.rs1);
-    return shards;
-}
-
 // TODO SERVER-97754 Remove these 2 functions, and do not stop the remaining secondaries once these
 // commands no longer override user provided writeConcern
 let stopAdditionalSecondariesIfSharded = function(clusterType, cluster, secondariesRunning) {
     if (clusterType == "sharded") {
-        const shards = getAllShards(cluster);
+        const shards = cluster.getAllShards();
         for (let i = 0; i < shards.length; i++) {
             shards[i].stop(secondariesRunning[i]);
         }
@@ -71,7 +64,7 @@ let stopAdditionalSecondariesIfSharded = function(clusterType, cluster, secondar
 };
 let restartAdditionalSecondariesIfSharded = function(clusterType, cluster, secondariesRunning) {
     if (clusterType == "sharded") {
-        const shards = getAllShards(cluster);
+        const shards = cluster.getAllShards();
         for (let i = 0; i < shards.length; i++) {
             shards[i].restart(secondariesRunning[i]);
         }
@@ -4891,7 +4884,7 @@ let additionalCRUDOps = {
     },
 };
 
-function stopSecondaries(cluster, clusterType) {
+export function stopSecondaries(cluster, clusterType) {
     if (clusterType == "rs") {
         assert.eq(cluster.nodeList().length, 3);
 
@@ -4903,7 +4896,7 @@ function stopSecondaries(cluster, clusterType) {
         assert.eq(clusterType, "sharded");
 
         let secondariesRunning = [];
-        const shards = getAllShards(cluster);
+        const shards = cluster.getAllShards();
         shards.forEach((rs) => {
             assert.eq(rs.nodeList().length, 3);
 
@@ -4919,7 +4912,7 @@ function stopSecondaries(cluster, clusterType) {
     }
 }
 
-function restartSecondaries(cluster, clusterType) {
+export function restartSecondaries(cluster, clusterType) {
     if (clusterType == "rs") {
         // Restart the secondary
         cluster.restart(cluster.getSecondaries()[0]);
@@ -4927,7 +4920,7 @@ function restartSecondaries(cluster, clusterType) {
         cluster.awaitSecondaryNodes();
     } else {
         // Restart the secondaries
-        const shards = getAllShards(cluster);
+        const shards = cluster.getAllShards();
         shards.forEach((rs) => {
             const secondaries = rs.getSecondaries();
             rs.restart(secondaries[0]);
@@ -4954,7 +4947,7 @@ function awaitReplication(cluster, clusterType) {
  * reported in the WriteConcernErrors field, but some commands nest the WCE and other actually
  * return the error as a top-level command error.
  */
-function assertHasWCE(res, cmd) {
+export function assertHasWCE(res, cmd) {
     try {
         assertWriteConcernError(res);
     } catch (e) {
