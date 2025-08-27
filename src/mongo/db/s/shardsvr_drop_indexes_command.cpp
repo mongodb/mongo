@@ -170,6 +170,7 @@ MONGO_REGISTER_COMMAND(ShardsvrDropIndexesCommand).forShard();
 
 ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Invocation::typedRun(
     OperationContext* opCtx) {
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName, opCtx->getWriteConcern());
 

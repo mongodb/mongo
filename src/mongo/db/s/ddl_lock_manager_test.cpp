@@ -49,6 +49,12 @@ public:
         scopedDss->setDbInfo(operationContext(), {_dbName, kMyShardName, _dbVersion});
     }
 
+    OperationContext* operationContext() const {
+        auto opCtx = ShardServerTestFixture::operationContext();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+        return opCtx;
+    }
+
 protected:
     const DatabaseName _dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const DatabaseVersion _dbVersion{UUID::gen(), Timestamp(1, 0)};

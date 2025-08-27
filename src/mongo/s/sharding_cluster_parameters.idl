@@ -76,6 +76,21 @@ structs:
         type: bool
         default: false
 
+  DDLLockOptimisticRecoveryWaitTimeoutParam:
+    description: >-
+      Cluster parameter to define a time to wait to recover DDL coordinators during acquiring a DDL
+      lock before checking if the node is still a primary.
+    inline_chained_structs: true
+    chained_structs:
+      ClusterServerParameter: clusterServerParameter
+    fields:
+      timeInMs:
+        description: >-
+          Number of milliseconds to wait for recovery of the DDL coordinators before double checking
+          if the node is still a primary.
+        type: milliseconds
+        default: 100
+
 server_parameters:
     shardedClusterCardinalityForDirectConns:
         description: >-
@@ -110,3 +125,13 @@ server_parameters:
       redact: false
       condition:
         min_fcv: 8.0
+
+    ddlLockOptimisticRecoveryWaitTimeout:
+      description: >-
+        Cluster parameter to define a time to wait to recover DDL coordinators during acquiring a
+        DDL lock before checking if the node is still a primary.
+      set_at: cluster
+      omit_in_ftdc: false
+      cpp_vartype: DDLLockOptimisticRecoveryWaitTimeoutParam
+      cpp_varname: DDLLockOptimisticRecoveryWaitTimeout
+      redact: false

@@ -218,6 +218,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
 TEST_F(ShardingDDLCoordinatorServiceTest,
        DDLLocksCanOnlyBeAcquiredOnceShardingDDLCoordinatorServiceIsRecovered) {
     auto opCtx = makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Reaching a steady state to start the test
     ddlService()->waitForRecoveryCompletion(opCtx.get());
@@ -227,13 +228,13 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
 
     // 1- Stepping down
     // Only DDL coordinators can acquire DDL locks after stepping down, otherwise trying to acquire
-    // a DDL lock will throw a LockTimeout error
+    // a DDL lock will throw a "not writable primary" error
     stepDown();
 
     ASSERT_THROWS_CODE(
         acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
         DBException,
-        ErrorCodes::LockTimeout);
+        ErrorCodes::NotWritablePrimary);
 
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
         opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
@@ -247,10 +248,12 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     stepUp(opCtx.get());
     pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
 
+    const auto start = Date_t::now();
     ASSERT_THROWS_CODE(
         acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
         DBException,
         ErrorCodes::LockTimeout);
+    ASSERT_LT(durationCount<Milliseconds>(Date_t::now() - start), 10);
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
         opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 
@@ -267,6 +270,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
 
 TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
     auto opCtx = makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Reaching a steady state to start the test
     ddlService()->waitForRecoveryCompletion(opCtx.get());
@@ -279,7 +283,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     ASSERT_THROWS_CODE(
         acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
         DBException,
-        ErrorCodes::LockTimeout);
+        ErrorCodes::NotWritablePrimary);
 
     // Start an async task to step up
     auto stepUpFuture = ExecutorFuture<void>(_testExecutor).then([this]() {
@@ -289,6 +293,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
 
 
         auto opCtx = makeOperationContext();
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         stepUp(opCtx.get());
 
         // Stay on recovery state for some time to ensure the lock is acquired before transition to

@@ -159,6 +159,8 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::None) ||
                         isInternalClient(opCtx) || TestingProctor::instance().isEnabled());
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
             const auto& nss = ns();
             const auto mode = request().getMode();
             const auto samplesPerSec = request().getSamplesPerSecond();
