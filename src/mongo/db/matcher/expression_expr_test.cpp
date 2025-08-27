@@ -128,7 +128,7 @@ TEST_F(ExprMatchTest, FailGracefullyOnInvalidExpression) {
         17041);
 }
 
-TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
+TEST_F(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
     BSONObj expression =
         BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD"
                                                      << BSON("$multiply" << BSON_ARRAY(2 << 2)))));
@@ -157,7 +157,7 @@ TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
     ASSERT_FALSE(pipelineExpr->equivalent(&pipelineExprNotEquiv));
 }
 
-TEST(ExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
+TEST(SimpleExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("var");
     expCtx->variables.setConstantValue(varId, Value(4));
@@ -184,7 +184,7 @@ TEST(ExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
     ASSERT_FALSE(pipelineExpr.equivalent(&pipelineExprNotEquiv));
 }
 
-TEST(ExprMatchTest, OptimizingIsANoopWhenAlreadyOptimized) {
+TEST(SimpleExprMatchTest, OptimizingIsANoopWhenAlreadyOptimized) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj expression = fromjson("{$expr: {$eq: ['$a', 4]}}");
 
@@ -205,7 +205,7 @@ TEST(ExprMatchTest, OptimizingIsANoopWhenAlreadyOptimized) {
     ASSERT_TRUE(doublyOptimized->equivalent(singlyOptimized.get()));
 }
 
-TEST(ExprMatchTest, OptimizingAnAlreadyOptimizedCloneIsANoop) {
+TEST(SimpleExprMatchTest, OptimizingAnAlreadyOptimizedCloneIsANoop) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONObj expression = fromjson("{$expr: {$eq: ['$a', 4]}}");
 
@@ -224,7 +224,7 @@ TEST(ExprMatchTest, OptimizingAnAlreadyOptimizedCloneIsANoop) {
     ASSERT_TRUE(doublyOptimized->equivalent(singlyOptimized.get()));
 }
 
-TEST(ExprMatchTest, ShallowClonedExpressionIsEquivalentToOriginal) {
+TEST(SimpleExprMatchTest, ShallowClonedExpressionIsEquivalentToOriginal) {
     BSONObj expression = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a" << 5)));
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -233,7 +233,7 @@ TEST(ExprMatchTest, ShallowClonedExpressionIsEquivalentToOriginal) {
     ASSERT_TRUE(pipelineExpr.equivalent(clone.get()));
 }
 
-TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
+TEST(SimpleExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
     BSONObj exprBson = fromjson("{$expr: {$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 2]}]}}");
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -249,7 +249,7 @@ TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
     ASSERT_BSONOBJ_EQ(optimized->serialize(), expectedSerialization);
 }
 
-TEST(ExprMatchTest, OptimizingExprRemovesTrueConstantExpression) {
+TEST(SimpleExprMatchTest, OptimizingExprRemovesTrueConstantExpression) {
     auto exprBson = fromjson("{$expr: true}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
@@ -262,7 +262,7 @@ TEST(ExprMatchTest, OptimizingExprRemovesTrueConstantExpression) {
     ASSERT_BSONOBJ_EQ(serialization, expectedSerialization);
 }
 
-TEST(ExprMatchTest, OptimizingExprRemovesTruthyConstantExpression) {
+TEST(SimpleExprMatchTest, OptimizingExprRemovesTruthyConstantExpression) {
     auto exprBson = fromjson("{$expr: {$concat: ['a', 'b', 'c']}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
@@ -325,7 +325,9 @@ TEST_F(ExprMatchTest, ExprWithTruthyConstantExpressionsIsNotTriviallyFalse) {
     ASSERT_FALSE(getMatchExpression()->isTriviallyFalse());
 }
 
-DEATH_TEST_REGEX(ExprMatchTest, GetChildFailsIndexGreaterThanZero, "Tripwire assertion.*6400207") {
+DEATH_TEST_REGEX(ExprMatchDeathTest,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400207") {
     BSONObj exprBson = fromjson("{$expr: {$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 2]}]}}");
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

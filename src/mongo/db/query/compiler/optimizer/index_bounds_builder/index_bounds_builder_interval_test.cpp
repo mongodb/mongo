@@ -54,7 +54,7 @@ bool testSingleInterval(IndexBounds bounds) {
     return IndexBoundsBuilder::isSingleInterval(bounds, &startKey, &startKeyIn, &endKey, &endKeyIn);
 }
 
-TEST(IndexBoundsBuilderTest, SingleFieldEqualityInterval) {
+TEST(IndexBoundsBuilderIntervalTest, SingleFieldEqualityInterval) {
     // Equality on a single field is a single interval.
     OrderedIntervalList oil("a");
     IndexBounds bounds;
@@ -63,7 +63,7 @@ TEST(IndexBoundsBuilderTest, SingleFieldEqualityInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, SingleIntervalSingleFieldInterval) {
+TEST(IndexBoundsBuilderIntervalTest, SingleIntervalSingleFieldInterval) {
     // Single interval on a single field is a single interval.
     OrderedIntervalList oil("a");
     IndexBounds bounds;
@@ -72,7 +72,7 @@ TEST(IndexBoundsBuilderTest, SingleIntervalSingleFieldInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, MultipleIntervalsSingleFieldInterval) {
+TEST(IndexBoundsBuilderIntervalTest, MultipleIntervalsSingleFieldInterval) {
     // Multiple intervals on a single field is not a single interval.
     OrderedIntervalList oil("a");
     IndexBounds bounds;
@@ -82,7 +82,7 @@ TEST(IndexBoundsBuilderTest, MultipleIntervalsSingleFieldInterval) {
     ASSERT(!testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualityTwoFieldsInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualityTwoFieldsInterval) {
     // Equality on two fields is a compound single interval.
     OrderedIntervalList oil_a("a");
     OrderedIntervalList oil_b("b");
@@ -94,7 +94,7 @@ TEST(IndexBoundsBuilderTest, EqualityTwoFieldsInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualityFirstFieldSingleIntervalSecondFieldInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualityFirstFieldSingleIntervalSecondFieldInterval) {
     // Equality on first field and single interval on second field
     // is a compound single interval.
     OrderedIntervalList oil_a("a");
@@ -107,7 +107,7 @@ TEST(IndexBoundsBuilderTest, EqualityFirstFieldSingleIntervalSecondFieldInterval
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, SingleIntervalFirstAndSecondFieldsInterval) {
+TEST(IndexBoundsBuilderIntervalTest, SingleIntervalFirstAndSecondFieldsInterval) {
     // Single interval on first field and single interval on second field is
     // not a compound single interval.
     OrderedIntervalList oil_a("a");
@@ -120,7 +120,7 @@ TEST(IndexBoundsBuilderTest, SingleIntervalFirstAndSecondFieldsInterval) {
     ASSERT(!testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, MultipleIntervalsTwoFieldsInterval) {
+TEST(IndexBoundsBuilderIntervalTest, MultipleIntervalsTwoFieldsInterval) {
     // Multiple intervals on two fields is not a compound single interval.
     OrderedIntervalList oil_a("a");
     OrderedIntervalList oil_b("b");
@@ -134,7 +134,7 @@ TEST(IndexBoundsBuilderTest, MultipleIntervalsTwoFieldsInterval) {
     ASSERT(!testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, MissingSecondFieldInterval) {
+TEST(IndexBoundsBuilderIntervalTest, MissingSecondFieldInterval) {
     // when second field is not specified, still a compound single interval
     OrderedIntervalList oil_a("a");
     OrderedIntervalList oil_b("b");
@@ -146,7 +146,7 @@ TEST(IndexBoundsBuilderTest, MissingSecondFieldInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualityTwoFieldsIntervalThirdInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualityTwoFieldsIntervalThirdInterval) {
     // Equality on first two fields and single interval on third is a
     // compound single interval.
     OrderedIntervalList oil_a("a");
@@ -162,7 +162,7 @@ TEST(IndexBoundsBuilderTest, EqualityTwoFieldsIntervalThirdInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualitySingleIntervalMissingInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualitySingleIntervalMissingInterval) {
     // Equality, then Single Interval, then missing is a compound single interval
     OrderedIntervalList oil_a("a");
     OrderedIntervalList oil_b("b");
@@ -177,7 +177,7 @@ TEST(IndexBoundsBuilderTest, EqualitySingleIntervalMissingInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualitySingleMissingMissingInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualitySingleMissingMissingInterval) {
     // Equality, then single interval, then missing, then missing,
     // is a compound single interval
     OrderedIntervalList oil_a("a");
@@ -196,7 +196,7 @@ TEST(IndexBoundsBuilderTest, EqualitySingleMissingMissingInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualitySingleMissingMissingMixedInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualitySingleMissingMissingMixedInterval) {
     // Equality, then single interval, then missing, then missing, with mixed order
     // fields is a compound single interval.
     OrderedIntervalList oil_a("a");
@@ -217,7 +217,7 @@ TEST(IndexBoundsBuilderTest, EqualitySingleMissingMissingMixedInterval) {
     ASSERT(testSingleInterval(bounds));
 }
 
-TEST(IndexBoundsBuilderTest, EqualitySingleMissingSingleInterval) {
+TEST(IndexBoundsBuilderIntervalTest, EqualitySingleMissingSingleInterval) {
     // Equality, then single interval, then missing, then single interval is not
     // a compound single interval.
     OrderedIntervalList oil_a("a");

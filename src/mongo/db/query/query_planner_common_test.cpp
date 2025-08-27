@@ -102,7 +102,7 @@ TEST_F(QueryPlannerCommonTest, BackwardScanDirectionReversedIndexScan) {
     ASSERT_FALSE(QueryPlannerCommon::scanDirectionsEqual(&ixscan, 1));
 }
 
-TEST(QueryPlannerCommonTest, ScanDirectionCollScan) {
+TEST_F(QueryPlannerCommonTest, ScanDirectionCollScan) {
     CollectionScanNode node;  // Default direction is 1.
     ASSERT_TRUE(QueryPlannerCommon::scanDirectionsEqual(&node, 1));
     ASSERT_FALSE(QueryPlannerCommon::scanDirectionsEqual(&node, -1));

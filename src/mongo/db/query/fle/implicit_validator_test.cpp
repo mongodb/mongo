@@ -229,7 +229,7 @@ TEST_F(GenerateFLE2MatchExpression, NormalInputWithNestedFields) {
     ASSERT_BSONOBJ_EQ(expectedBSON, outputBSON);
 }
 
-DEATH_TEST(GenerateFLE2MatchExpression, EncryptedFieldsConflict, "tripwire assertions") {
+DEATH_TEST(GenerateFLE2MatchExpressionDeathTest, EncryptedFieldsConflict, "tripwire assertions") {
     EncryptedField a(UUID::gen(), "a");
     a.setBsonType("string"_sd);
     EncryptedField ab(UUID::gen(), "a.b");

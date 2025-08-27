@@ -107,7 +107,7 @@
     private:                                                                                   \
         void _doTest() override;                                                               \
         static inline const ::mongo::unittest::TestInfo _testInfo{                             \
-            #SUITE_NAME, #TEST_NAME, __FILE__, __LINE__};                                      \
+            #SUITE_NAME, #TEST_NAME, __FILE__, __LINE__, &typeid(TEST_BASE)};                  \
         static inline const RegistrationAgent<::mongo::unittest::DeathTest<TEST_TYPE>> _agent{ \
             &_testInfo};                                                                       \
     };                                                                                         \

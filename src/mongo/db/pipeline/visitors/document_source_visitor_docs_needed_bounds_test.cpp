@@ -53,9 +53,9 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-class DocsNeededBoundsTest : public AggregationContextFixture {
+class VisitorDocsNeededBoundsTest : public AggregationContextFixture {
 protected:
-    DocsNeededBoundsTest() {
+    VisitorDocsNeededBoundsTest() {
         // Need to intialize the sharding state so that any pipelines that use $lookup pass pipeline
         // validation.
         ShardingState::create(getServiceContext());
@@ -208,134 +208,134 @@ protected:
  * confirm that the constraints were computed properly.
  */
 
-TEST_F(DocsNeededBoundsTest, EmptyPipeline) {
+TEST_F(VisitorDocsNeededBoundsTest, EmptyPipeline) {
     auto bounds = buildPipelineAndExtractBounds({});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, Limit) {
+TEST_F(VisitorDocsNeededBoundsTest, Limit) {
     auto bounds = buildPipelineAndExtractBounds({limit(10)});
     assertDiscreteAndEq(bounds.getMinBounds(), 10);
     assertDiscreteAndEq(bounds.getMaxBounds(), 10);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({skip(15), limit(10)});
     assertDiscreteAndEq(bounds.getMinBounds(), 25);
     assertDiscreteAndEq(bounds.getMaxBounds(), 25);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipOverflow) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipOverflow) {
     // If the skip value causes the bounds to overflow 64 bits, NeedAll should be returned.
     auto bounds = buildPipelineAndExtractBounds({skip(LLONG_MAX), limit(10)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, Sort) {
+TEST_F(VisitorDocsNeededBoundsTest, Sort) {
     auto bounds = buildPipelineAndExtractBounds({sort()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, Search) {
+TEST_F(VisitorDocsNeededBoundsTest, Search) {
     auto bounds = buildPipelineAndExtractBounds({search()});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchSort) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchSort) {
     auto bounds = buildPipelineAndExtractBounds({search(), sort()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchLimit) {
     auto bounds = buildPipelineAndExtractBounds({search(), limit(15)});
     assertDiscreteAndEq(bounds.getMinBounds(), 15);
     assertDiscreteAndEq(bounds.getMaxBounds(), 15);
 }
 
-TEST_F(DocsNeededBoundsTest, SearchLimitLimitLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchLimitLimitLimit1) {
     auto bounds = buildPipelineAndExtractBounds({search(), limit(20), limit(30), limit(15)});
     assertDiscreteAndEq(bounds.getMinBounds(), 15);
     assertDiscreteAndEq(bounds.getMaxBounds(), 15);
 }
 
-TEST_F(DocsNeededBoundsTest, SearchLimitLimitLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchLimitLimitLimit2) {
     auto bounds = buildPipelineAndExtractBounds({search(), limit(15), limit(30), limit(20)});
     assertDiscreteAndEq(bounds.getMinBounds(), 15);
     assertDiscreteAndEq(bounds.getMaxBounds(), 15);
 }
 
-TEST_F(DocsNeededBoundsTest, LimitSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, LimitSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({limit(15), skip(7), limit(5)});
     assertDiscreteAndEq(bounds.getMinBounds(), 12);
     assertDiscreteAndEq(bounds.getMaxBounds(), 12);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({skip(15), skip(7), limit(5)});
     assertDiscreteAndEq(bounds.getMinBounds(), 27);
     assertDiscreteAndEq(bounds.getMaxBounds(), 27);
 }
 
-TEST_F(DocsNeededBoundsTest, LimitSkipSkip) {
+TEST_F(VisitorDocsNeededBoundsTest, LimitSkipSkip) {
     auto bounds = buildPipelineAndExtractBounds({limit(15), skip(2), skip(4)});
     assertDiscreteAndEq(bounds.getMinBounds(), 15);
     assertDiscreteAndEq(bounds.getMaxBounds(), 15);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipSkipSkip) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipSkipSkip) {
     auto bounds = buildPipelineAndExtractBounds({skip(15), skip(5), skip(7)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitSortSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitSortSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({skip(5), limit(25), sort(), skip(3), limit(7)});
     assertDiscreteAndEq(bounds.getMinBounds(), 30);
     assertDiscreteAndEq(bounds.getMaxBounds(), 30);
 }
 
-TEST_F(DocsNeededBoundsTest, SortSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SortSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({sort(), skip(5), limit(25)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, Match) {
+TEST_F(VisitorDocsNeededBoundsTest, Match) {
     auto bounds = buildPipelineAndExtractBounds({match()});
     assertUnknown(bounds.getMaxBounds());
     assertUnknown(bounds.getMinBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SkipMatchLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipMatchLimit) {
     auto bounds = buildPipelineAndExtractBounds({skip(8), match(), limit(25)});
     assertDiscreteAndEq(bounds.getMinBounds(), 33);
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitMatch) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitMatch) {
     auto bounds = buildPipelineAndExtractBounds({skip(8), limit(25), match()});
     assertDiscreteAndEq(bounds.getMinBounds(), 33);
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, MatchSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, MatchSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({match(), skip(8), limit(25)});
     assertDiscreteAndEq(bounds.getMinBounds(), 33);
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitMatchSkipLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitMatchSkipLimit1) {
     auto bounds = buildPipelineAndExtractBounds({skip(3), limit(4), match(), skip(8), limit(25)});
     assertDiscreteAndEq(bounds.getMinBounds(), 7);
     assertDiscreteAndEq(bounds.getMaxBounds(), 7);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitMatchSkipLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitMatchSkipLimit2) {
     // Walking the pipeline in reverse, the {$limit: 7}, {$skip: 3} sequence imposes upper and lower
     // bounds of 10, but the $match overrides the upper bound to Unknown. Then, {$limit: 150}
     // constrains the upper bounds, but not the lower bounds since the existing bounds of 10 is
@@ -345,56 +345,56 @@ TEST_F(DocsNeededBoundsTest, SkipLimitMatchSkipLimit2) {
     assertDiscreteAndEq(bounds.getMaxBounds(), 200);
 }
 
-TEST_F(DocsNeededBoundsTest, MatchSortSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, MatchSortSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({match(), sort(), skip(3), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, MatchSkipLimitSort) {
+TEST_F(VisitorDocsNeededBoundsTest, MatchSkipLimitSort) {
     auto bounds = buildPipelineAndExtractBounds({match(), skip(3), limit(7), sort()});
     assertDiscreteAndEq(bounds.getMinBounds(), 10);
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, MatchSkipSortLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, MatchSkipSortLimit) {
     auto bounds = buildPipelineAndExtractBounds({match(), skip(3), sort(), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchUnionWith) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchUnionWith) {
     auto bounds = buildPipelineAndExtractBounds({search(), unionWith()});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchSkipUnionWithLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchSkipUnionWithLimit) {
     auto bounds = buildPipelineAndExtractBounds({search(), skip(8), unionWith(), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, SearchSkipLimitUnionWith) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchSkipLimitUnionWith) {
     auto bounds = buildPipelineAndExtractBounds({search(), skip(8), limit(25), unionWith()});
     assertDiscreteAndEq(bounds.getMinBounds(), 33);
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, SearchUnionWithSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchUnionWithSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({search(), unionWith(), skip(8), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitUnionWithSkipLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnionWithSkipLimit1) {
     auto bounds =
         buildPipelineAndExtractBounds({skip(3), limit(4), unionWith(), skip(8), limit(25)});
     assertDiscreteAndEq(bounds.getMinBounds(), 7);
     assertDiscreteAndEq(bounds.getMaxBounds(), 7);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitUnionWithSkipLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnionWithSkipLimit2) {
     // Walking the pipeline in reverse, the {$limit: 7}, {$skip: 3} sequence imposes upper and lower
     // bounds of 10, but the $unionWith overrides the lower bound to Unknown (i.e., it's possible we
     // need even fewer than 10). Then, {$limit: 150} has no affect on the bounds since the existing
@@ -405,74 +405,74 @@ TEST_F(DocsNeededBoundsTest, SkipLimitUnionWithSkipLimit2) {
     assertDiscreteAndEq(bounds.getMaxBounds(), 60);
 }
 
-TEST_F(DocsNeededBoundsTest, UnionWithSortSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, UnionWithSortSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({unionWith(), sort(), skip(3), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, UnionWithSkipLimitSort) {
+TEST_F(VisitorDocsNeededBoundsTest, UnionWithSkipLimitSort) {
     auto bounds = buildPipelineAndExtractBounds({unionWith(), skip(3), limit(7), sort()});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 10);
 }
 
-TEST_F(DocsNeededBoundsTest, UnionWithSkipSortLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, UnionWithSkipSortLimit) {
     auto bounds = buildPipelineAndExtractBounds({unionWith(), skip(3), sort(), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchUnwind1) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchUnwind1) {
     auto bounds =
         buildPipelineAndExtractBounds({search(), unwind(/*includeNullIfEmptyOrMissing*/ false)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchUnwind2) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchUnwind2) {
     auto bounds =
         buildPipelineAndExtractBounds({search(), unwind(/*includeNullIfEmptyOrMissing*/ true)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SkipUnwindLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipUnwindLimit1) {
     auto bounds = buildPipelineAndExtractBounds(
         {skip(8), unwind(/*includeNullIfEmptyOrMissing*/ false), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SkipUnwindLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipUnwindLimit2) {
     auto bounds = buildPipelineAndExtractBounds(
         {skip(8), unwind(/*includeNullIfEmptyOrMissing*/ true), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, SearchSkipLimitUnwind) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchSkipLimitUnwind) {
     auto bounds = buildPipelineAndExtractBounds(
         {search(), skip(8), limit(25), unwind(/*includeNullIfEmptyOrMissing*/ false)});
     assertDiscreteAndEq(bounds.getMinBounds(), 33);
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, UnwindSkipLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipLimit1) {
     auto bounds = buildPipelineAndExtractBounds(
         {unwind(/*includeNullIfEmptyOrMissing*/ false), skip(8), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, UnwindSkipLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipLimit2) {
     auto bounds = buildPipelineAndExtractBounds(
         {unwind(/*includeNullIfEmptyOrMissing*/ true), skip(8), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitUnwindSkipLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnwindSkipLimit1) {
     // This is an odd pipeline. Technically, we can infer nothing because of the $unwind. However,
     // for the sake of algorithmic simplicity, we'll assume the pipeline is written well, such that
     // we can base the constraints on the earliest $skip+$limit.
@@ -482,7 +482,7 @@ TEST_F(DocsNeededBoundsTest, SkipLimitUnwindSkipLimit1) {
     assertDiscreteAndEq(bounds.getMaxBounds(), 8);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitUnwindSkipLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnwindSkipLimit2) {
     // Same note as SkipLimitUnwindSkipLimit1.
     auto bounds = buildPipelineAndExtractBounds(
         {skip(50), limit(150), unwind(/*includeNullIfEmptyOrMissing*/ false), skip(3), limit(7)});
@@ -490,46 +490,46 @@ TEST_F(DocsNeededBoundsTest, SkipLimitUnwindSkipLimit2) {
     assertDiscreteAndEq(bounds.getMaxBounds(), 200);
 }
 
-TEST_F(DocsNeededBoundsTest, UnwindSortSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, UnwindSortSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds(
         {unwind(/*includeNullIfEmptyOrMissing*/ false), sort(), skip(3), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, UnwindSkipLimitSort) {
+TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipLimitSort) {
     auto bounds = buildPipelineAndExtractBounds(
         {unwind(/*includeNullIfEmptyOrMissing*/ false), skip(3), limit(7), sort()});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, UnwindSkipSortLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipSortLimit) {
     auto bounds = buildPipelineAndExtractBounds(
         {unwind(/*includeNullIfEmptyOrMissing*/ false), skip(3), sort(), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, ProjectSkipLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, ProjectSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds({project(), skip(3), limit(7)});
     assertDiscreteAndEq(bounds.getMinBounds(), 10);
     assertDiscreteAndEq(bounds.getMaxBounds(), 10);
 }
 
-TEST_F(DocsNeededBoundsTest, SkipLimitProject) {
+TEST_F(VisitorDocsNeededBoundsTest, SkipLimitProject) {
     auto bounds = buildPipelineAndExtractBounds({skip(15), limit(35), project()});
     assertDiscreteAndEq(bounds.getMinBounds(), 50);
     assertDiscreteAndEq(bounds.getMaxBounds(), 50);
 }
 
-TEST_F(DocsNeededBoundsTest, ProjectMatchSort) {
+TEST_F(VisitorDocsNeededBoundsTest, ProjectMatchSort) {
     auto bounds = buildPipelineAndExtractBounds({project(), match(), sort()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, FacetsWithLimits) {
+TEST_F(VisitorDocsNeededBoundsTest, FacetsWithLimits) {
     DocumentSourceContainer pipeline1 = {limit(150), match(), limit(50)};
     DocumentSourceContainer pipeline2 = {limit(100), project()};
     auto bounds = buildPipelineAndExtractBounds({facet({pipeline1, pipeline2})});
@@ -537,7 +537,7 @@ TEST_F(DocsNeededBoundsTest, FacetsWithLimits) {
     assertDiscreteAndEq(bounds.getMaxBounds(), 150);
 }
 
-TEST_F(DocsNeededBoundsTest, FacetsWithUnknownAndLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, FacetsWithUnknownAndLimit) {
     DocumentSourceContainer pipeline1 = {limit(75), match()};
     DocumentSourceContainer pipeline2 = {project()};
     auto bounds = buildPipelineAndExtractBounds({facet({pipeline1, pipeline2})});
@@ -545,7 +545,7 @@ TEST_F(DocsNeededBoundsTest, FacetsWithUnknownAndLimit) {
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchFacet) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchFacet) {
     DocumentSourceContainer pipeline1 = {project()};
     DocumentSourceContainer pipeline2 = {match()};
     auto bounds = buildPipelineAndExtractBounds({search(), facet({pipeline1, pipeline2})});
@@ -553,7 +553,7 @@ TEST_F(DocsNeededBoundsTest, SearchFacet) {
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchFacetLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchFacetLimit) {
     DocumentSourceContainer pipeline1 = {project()};
     DocumentSourceContainer pipeline2 = {match()};
     auto bounds =
@@ -562,7 +562,7 @@ TEST_F(DocsNeededBoundsTest, SearchFacetLimit) {
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchFacetSort) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchFacetSort) {
     DocumentSourceContainer pipeline1 = {match(), project()};
     DocumentSourceContainer pipeline2 = {match(), project()};
     auto bounds = buildPipelineAndExtractBounds({search(), facet({pipeline1, pipeline2}), sort()});
@@ -570,7 +570,7 @@ TEST_F(DocsNeededBoundsTest, SearchFacetSort) {
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, NeedAllFacetLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, NeedAllFacetLimit) {
     // Having one $facet pipeline with a $sort will require the entire pipeline needing all
     // documents.
     DocumentSourceContainer pipeline1 = {match(), sort()};
@@ -580,7 +580,7 @@ TEST_F(DocsNeededBoundsTest, NeedAllFacetLimit) {
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, LimitProjectNeedAllFacet) {
+TEST_F(VisitorDocsNeededBoundsTest, LimitProjectNeedAllFacet) {
     // The $limit value should hold when putting a $facet pipeline that yields NeedAll after a
     // $limit stage.
     DocumentSourceContainer pipeline1 = {match(), sort()};
@@ -591,7 +591,7 @@ TEST_F(DocsNeededBoundsTest, LimitProjectNeedAllFacet) {
     assertDiscreteAndEq(bounds.getMaxBounds(), 70);
 }
 
-TEST_F(DocsNeededBoundsTest, MatchSortFacet) {
+TEST_F(VisitorDocsNeededBoundsTest, MatchSortFacet) {
     DocumentSourceContainer pipeline1 = {match(), limit(50)};
     DocumentSourceContainer pipeline2 = {match(), project()};
     auto bounds = buildPipelineAndExtractBounds({match(), sort(), facet({pipeline1, pipeline2})});
@@ -599,71 +599,71 @@ TEST_F(DocsNeededBoundsTest, MatchSortFacet) {
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, ProjectGroup) {
+TEST_F(VisitorDocsNeededBoundsTest, ProjectGroup) {
     auto bounds = buildPipelineAndExtractBounds({project(), group()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, ProjectSample) {
+TEST_F(VisitorDocsNeededBoundsTest, ProjectSample) {
     auto bounds = buildPipelineAndExtractBounds({project(), sample()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, ProjectBucketAuto) {
+TEST_F(VisitorDocsNeededBoundsTest, ProjectBucketAuto) {
     auto bounds = buildPipelineAndExtractBounds({project(), bucketAuto()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, ProjectLookup) {
+TEST_F(VisitorDocsNeededBoundsTest, ProjectLookup) {
     auto bounds = buildPipelineAndExtractBounds({project(), lookup()});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, LimitLookup) {
+TEST_F(VisitorDocsNeededBoundsTest, LimitLookup) {
     auto bounds = buildPipelineAndExtractBounds({limit(25), lookup()});
     assertDiscreteAndEq(bounds.getMinBounds(), 25);
     assertDiscreteAndEq(bounds.getMaxBounds(), 25);
 }
 
-TEST_F(DocsNeededBoundsTest, LookupWithUnwindLimit1) {
+TEST_F(VisitorDocsNeededBoundsTest, LookupWithUnwindLimit1) {
     auto bounds = buildPipelineAndExtractBounds(
         {lookupWithUnwind(/*includeNullIfEmptyOrMissing*/ true), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 25);
 }
 
-TEST_F(DocsNeededBoundsTest, LookupWithUnwindLimit2) {
+TEST_F(VisitorDocsNeededBoundsTest, LookupWithUnwindLimit2) {
     auto bounds = buildPipelineAndExtractBounds(
         {lookupWithUnwind(/*includeNullIfEmptyOrMissing*/ false), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchSetVariableFromSubPipelineLimit) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchSetVariableFromSubPipelineLimit) {
     auto bounds =
         buildPipelineAndExtractBounds({search(), setVariableFromSubPipeline(), limit(15)});
     assertDiscreteAndEq(bounds.getMinBounds(), 15);
     assertDiscreteAndEq(bounds.getMaxBounds(), 15);
 }
 
-TEST_F(DocsNeededBoundsTest, SearchSetVariableFromSubPipelineGroup) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchSetVariableFromSubPipelineGroup) {
     auto bounds = buildPipelineAndExtractBounds({search(), setVariableFromSubPipeline(), group()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, SearchBucketAutoSetVariableFromSubPipelineLookup) {
+TEST_F(VisitorDocsNeededBoundsTest, SearchBucketAutoSetVariableFromSubPipelineLookup) {
     auto bounds =
         buildPipelineAndExtractBounds({search(), bucketAuto(), setVariableFromSubPipeline()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(DocsNeededBoundsTest, InternalSearchIdLookup) {
+TEST_F(VisitorDocsNeededBoundsTest, InternalSearchIdLookup) {
     // In the context of using these bounds for mongot batchSize tuning, $_internalSearchIdLookUp
     // should never be encountered since this algorithm is run prior to desugaring $search.
     // For that reason, this stage does not have an implemented visitor and should fall into the

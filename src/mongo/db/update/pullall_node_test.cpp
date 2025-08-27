@@ -52,7 +52,7 @@ namespace {
 
 using PullAllNodeTest = UpdateTestFixture;
 
-TEST(PullAllNodeTest, InitWithIntFails) {
+TEST(SimplePullAllNodeTest, InitWithIntFails) {
     auto update = fromjson("{$pullAll: {a: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -61,7 +61,7 @@ TEST(PullAllNodeTest, InitWithIntFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, InitWithStringFails) {
+TEST(SimplePullAllNodeTest, InitWithStringFails) {
     auto update = fromjson("{$pullAll: {a: 'test'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -70,7 +70,7 @@ TEST(PullAllNodeTest, InitWithStringFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, InitWithObjectFails) {
+TEST(SimplePullAllNodeTest, InitWithObjectFails) {
     auto update = fromjson("{$pullAll: {a: {}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -79,7 +79,7 @@ TEST(PullAllNodeTest, InitWithObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, InitWithBoolFails) {
+TEST(SimplePullAllNodeTest, InitWithBoolFails) {
     auto update = fromjson("{$pullAll: {a: true}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;

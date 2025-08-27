@@ -87,7 +87,7 @@ protected:
     OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
-TEST(StatsCacheTest, StandaloneValueHandle) {
+TEST(SimpleStatsCacheTest, StandaloneValueHandle) {
     StatsCacheVal statsPtr(CEHistogram::make());
     StatsCache::ValueHandle standaloneHandle(std::move(statsPtr));
     ASSERT(standaloneHandle.isValid());

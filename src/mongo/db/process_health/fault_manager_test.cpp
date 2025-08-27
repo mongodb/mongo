@@ -41,7 +41,7 @@ using test::FaultManagerTest;
 
 namespace {
 
-TEST(FaultManagerTest, Registration) {
+TEST(SimpleFaultManagerTest, Registration) {
     auto serviceCtx = ServiceContext::make();
     ASSERT_TRUE(FaultManager::get(serviceCtx.get()));
 }

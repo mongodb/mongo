@@ -292,6 +292,7 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
 }
 
 class WiredTigerUtilTest : public ServiceContextTest {};
+using WiredTigerUtilDeathTest = WiredTigerUtilTest;
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
@@ -1196,7 +1197,7 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
     ASSERT(tryCount <= kRetryLimit);
 }
 
-TEST(WiredTigerUtilTest, WTMainCacheSizeCalculation) {
+TEST(SimpleWiredTigerUtilTest, WTMainCacheSizeCalculation) {
     ProcessInfo pi;
     const double memSizeMB = pi.getMemSizeMB();
     const auto tooLargeCacheMB = 100 * 1000 * 1000;
@@ -1218,11 +1219,11 @@ TEST(WiredTigerUtilTest, WTMainCacheSizeCalculation) {
                   std::floor(0.8 * memSizeMB));
 }
 
-DEATH_TEST_F(WiredTigerUtilTest, WTMainCacheSizeInvalidValues, "invariant") {
+DEATH_TEST_F(WiredTigerUtilDeathTest, WTMainCacheSizeInvalidValues, "invariant") {
     WiredTigerUtil::getMainCacheSizeMB(10, 0.1);
 }
 
-TEST(WiredTigerUtilTest, SpillCacheSize) {
+TEST(SimpleWiredTigerUtilTest, SpillCacheSize) {
     ASSERT_EQ(
         WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 5, 1, std::numeric_limits<int32_t>::max()),
         static_cast<int32_t>(1024 * 8 * 0.05));

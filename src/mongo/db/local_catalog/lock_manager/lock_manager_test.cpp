@@ -98,7 +98,7 @@ namespace lock_manager_test {
 
 class LockManagerTest : public ServiceContextTest {};
 
-TEST(LockManagerTest, IsModeCovered) {
+TEST(SimpleLockManagerTest, IsModeCovered) {
     ASSERT(isModeCovered(MODE_IS, MODE_IX));
 }
 

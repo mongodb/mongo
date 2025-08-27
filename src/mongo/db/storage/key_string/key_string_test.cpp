@@ -1458,7 +1458,7 @@ TEST_F(KeyStringBuilderTest, RandomizedInputsForToBsonSafe) {
     }
 }
 
-DEATH_TEST(KeyStringBuilderTest,
+DEATH_TEST(KeyStringBuilderDeathTest,
            ToBsonPromotesAssertionsToTerminate,
            "KeyString format error: Failed to find null terminator in string.") {
     const char invalidString[] = {

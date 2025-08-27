@@ -563,7 +563,7 @@ void CollectionRoutingInfoTargeterTest::testTargetDeleteWithHashedPrefixHashedSh
     ASSERT_EQUALS(resRangeQuery.size(), 4);
 }
 
-TEST(CollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
+TEST(SimpleCollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
     const StringData timeField = "tm";
     const StringData metaField = "mm";
 

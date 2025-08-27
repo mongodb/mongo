@@ -150,7 +150,7 @@ private:
 };
 
 // Confirm the highest minFetchTimestamp is properly computed.
-TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceeds) {
+TEST(SimpleReshardingUtilTest, HighestMinFetchTimestampSucceeds) {
     std::vector<DonorShardEntry> donorShards{
         makeDonorShard(ShardId("s0"), DonorStateEnum::kDonatingInitialData, Timestamp(10, 2)),
         makeDonorShard(ShardId("s1"), DonorStateEnum::kDonatingInitialData, Timestamp(10, 3)),
@@ -159,7 +159,7 @@ TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceeds) {
     ASSERT_EQ(Timestamp(10, 3), highestMinFetchTimestamp);
 }
 
-TEST(ReshardingUtilTest, HighestMinFetchTimestampThrowsWhenDonorMissingTimestamp) {
+TEST(SimpleReshardingUtilTest, HighestMinFetchTimestampThrowsWhenDonorMissingTimestamp) {
     std::vector<DonorShardEntry> donorShards{
         makeDonorShard(ShardId("s0"), DonorStateEnum::kDonatingInitialData, Timestamp(10, 3)),
         makeDonorShard(ShardId("s1"), DonorStateEnum::kDonatingInitialData),
@@ -167,7 +167,8 @@ TEST(ReshardingUtilTest, HighestMinFetchTimestampThrowsWhenDonorMissingTimestamp
     ASSERT_THROWS_CODE(getHighestMinFetchTimestamp(donorShards), DBException, 4957300);
 }
 
-TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceedsWithDonorStateGTkDonatingOplogEntries) {
+TEST(SimpleReshardingUtilTest,
+     HighestMinFetchTimestampSucceedsWithDonorStateGTkDonatingOplogEntries) {
     std::vector<DonorShardEntry> donorShards{
         makeDonorShard(ShardId("s0"), DonorStateEnum::kBlockingWrites, Timestamp(10, 2)),
         makeDonorShard(ShardId("s1"), DonorStateEnum::kDonatingOplogEntries, Timestamp(10, 3)),
@@ -255,7 +256,7 @@ TEST_F(ReshardingUtilTest, FailWhenOverlappingZones) {
     ASSERT_THROWS_CODE(checkForOverlappingZones(zones), DBException, ErrorCodes::BadValue);
 }
 
-TEST(ReshardingUtilTest, AssertDonorOplogIdSerialization) {
+TEST(SimpleReshardingUtilTest, AssertDonorOplogIdSerialization) {
     // It's a correctness requirement that `ReshardingDonorOplogId.toBSON` serializes as
     // `{clusterTime: <value>, ts: <value>}`, paying particular attention to the ordering of the
     // fields. The serialization order is defined as the ordering of the fields in the idl file.

@@ -44,7 +44,7 @@
 
 namespace mongo::sbe {
 
-class SbeValueTest : public SbeStageBuilderTestFixture {};
+class TsSbeValueTest : public SbeStageBuilderTestFixture {};
 
 // This is just a made up example, and is not actually a valid bucket. There's no min/max and
 // no time field.
@@ -108,7 +108,7 @@ std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, Str
                                             max);
 }
 
-TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
+TEST_F(TsSbeValueTest, CloneCreatesIndependentCopy) {
     // A TsCellBlockForTopLevelField can be created in an "unowned" state.
 
     auto tsBlock = makeTsBlockFromBucket(kSampleBucket, "_id");
@@ -192,7 +192,7 @@ const BSONObj kBucketWithMinMaxV1 = fromjson(R"(
         }
 })");
 
-TEST_F(SbeValueTest, TsBlockMinMaxV1Schema) {
+TEST_F(TsSbeValueTest, TsBlockMinMaxV1Schema) {
     {
         auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxV1, "_id");
         auto cellBlockId = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
@@ -268,7 +268,7 @@ TEST_F(SbeValueTest, TsBlockMinMaxV1Schema) {
     }
 }
 
-TEST_F(SbeValueTest, TsBlockMinMaxV2Schema) {
+TEST_F(TsSbeValueTest, TsBlockMinMaxV2Schema) {
     auto compressedBucketOpt =
         timeseries::compressBucket(kBucketWithMinMaxV1, "time"_sd, {}, false).compressedBucket;
     ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
@@ -352,7 +352,7 @@ TEST_F(SbeValueTest, TsBlockMinMaxV2Schema) {
     }
 }
 
-TEST_F(SbeValueTest, TsBlockMinMaxV3Schema) {
+TEST_F(TsSbeValueTest, TsBlockMinMaxV3Schema) {
     auto compressedBucketOpt =
         timeseries::compressBucket(kBucketWithMinMaxV1, "time"_sd, {}, false).compressedBucket;
     ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
@@ -467,7 +467,7 @@ const BSONObj kBucketWithMinMaxPre1970 = fromjson(R"(
         }
 })");
 
-TEST_F(SbeValueTest, TsBlockMaxTimePre1970) {
+TEST_F(TsSbeValueTest, TsBlockMaxTimePre1970) {
     auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxPre1970, "time");
     auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
 
@@ -534,7 +534,7 @@ const BSONObj kBucketWithMinMaxAndArrays = fromjson(R"(
         }
 })");
 
-TEST_F(SbeValueTest, TsBlockHasArray) {
+TEST_F(TsSbeValueTest, TsBlockHasArray) {
     {
         auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "_id");
         boost::optional<bool> hasArrayRes = tsBlock->tryHasArray();
@@ -550,7 +550,7 @@ TEST_F(SbeValueTest, TsBlockHasArray) {
     }
 }
 
-TEST_F(SbeValueTest, TsBlockFillEmpty) {
+TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
     {
         auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "_id");
         // Already dense fields should return nullptr when fillEmpty'd.
@@ -605,7 +605,7 @@ const BSONObj kBucketWithMixedNumbers = fromjson(R"(
     }
 })");
 
-TEST_F(SbeValueTest, FillType) {
+TEST_F(TsSbeValueTest, FillType) {
     {
         // Tests on the "time" field.
         auto timeBlock = makeTsBlockFromBucket(kBucketWithMixedNumbers, "time");
@@ -704,7 +704,7 @@ const BSONObj kBucketWithArrs = fromjson(R"(
     }
 })");
 
-TEST_F(SbeValueTest, TsBlockMiscTest) {
+TEST_F(TsSbeValueTest, TsBlockMiscTest) {
     {
         // Tests on the "time" field.
         auto timeBlock = makeTsBlockFromBucket(kBucketWithArrs, "time");
@@ -769,7 +769,7 @@ const BSONObj kBucketWithBigScalars = fromjson(R"(
 })");
 
 
-TEST_F(SbeValueTest, VerifyDecompressedBlockType) {
+TEST_F(TsSbeValueTest, VerifyDecompressedBlockType) {
     {
         // Extracting from an uncompressed bucket always does the copy.
         auto tsBlock = makeTsBlockFromBucket(kBucketWithBigScalars, "bigString");

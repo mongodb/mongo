@@ -168,7 +168,7 @@ protected:
     OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
-TEST(ReadThroughCacheTest, StandaloneValueHandle) {
+TEST(SimpleReadThroughCacheTest, StandaloneValueHandle) {
     Cache::ValueHandle standaloneHandle(CachedValue(100));
     ASSERT(standaloneHandle.isValid());
     ASSERT_EQ(100, standaloneHandle->counter);

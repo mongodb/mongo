@@ -52,14 +52,16 @@ namespace {
 using SetNodeTest = UpdateTestFixture;
 using mongo::mutablebson::Element;
 
-DEATH_TEST_REGEX(SetNodeTest, InitFailsForEmptyElement, R"#(Invariant failure.*modExpr.ok\(\))#") {
+DEATH_TEST_REGEX(SetNodeDeathTest,
+                 InitFailsForEmptyElement,
+                 R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$set: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
     node.init(update["$set"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
-TEST(SetNodeTest, InitSucceedsForNonemptyElement) {
+TEST(SimpleSetNodeTest, InitSucceedsForNonemptyElement) {
     auto update = fromjson("{$set: {a: 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;

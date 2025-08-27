@@ -56,7 +56,7 @@ void assertOplogEntryIsUpdateOfExpectedType(const BSONObj& obj,
 
 using CurrentDateNodeTest = UpdateTestFixture;
 
-DEATH_TEST_REGEX(CurrentDateNodeTest,
+DEATH_TEST_REGEX(CurrentDateNodeDeathTest,
                  InitFailsForEmptyElement,
                  R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$currentDate: {}}");
@@ -65,70 +65,70 @@ DEATH_TEST_REGEX(CurrentDateNodeTest,
     node.init(update["$currentDate"].embeddedObject().firstElement(), expCtx).ignore();
 }
 
-TEST(CurrentDateNodeTest, InitWithNonBoolNonObjectFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithNonBoolNonObjectFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: 0}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithTrueSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithTrueSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: true}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithFalseSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithFalseSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: false}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithoutTypeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithoutTypeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithNonStringTypeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithNonStringTypeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 1}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithBadValueTypeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithBadValueTypeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'bad'}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithTypeDateSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithTypeDateSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'date'}}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithTypeTimestampSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithTypeTimestampSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'timestamp'}}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithExtraFieldBeforeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithExtraFieldBeforeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$bad: 1, $type: 'date'}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithExtraFieldAfterFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithExtraFieldAfterFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'date', $bad: 1}}}");
     CurrentDateNode node;

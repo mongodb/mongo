@@ -211,7 +211,7 @@ TEST_F(SBEKeyStringTest, Basic) {
     ASSERT(keyStringQueue.empty());
 }
 
-TEST(SBEKeyStringTest, KeyComponentInclusion) {
+TEST(SimpleSBEKeyStringTest, KeyComponentInclusion) {
     key_string::Builder keyStringBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
     keyStringBuilder.appendNumberLong(12345);  // Included
     keyStringBuilder.appendString("I've information vegetable, animal, and mineral"_sd);

@@ -52,7 +52,7 @@ namespace {
 
 using ArithmeticNodeTest = UpdateTestFixture;
 
-DEATH_TEST_REGEX(ArithmeticNodeTest,
+DEATH_TEST_REGEX(ArithmeticNodeDeathTest,
                  InitFailsForEmptyElement,
                  R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$inc: {}}");
@@ -61,35 +61,35 @@ DEATH_TEST_REGEX(ArithmeticNodeTest,
     node.init(update["$inc"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
-TEST(ArithmeticNodeTest, InitSucceedsForNumberIntElement) {
+TEST(SimpleArithmeticNodeTest, InitSucceedsForNumberIntElement) {
     auto update = fromjson("{$inc: {a: NumberInt(5)}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
-TEST(ArithmeticNodeTest, InitSucceedsForNumberLongElement) {
+TEST(SimpleArithmeticNodeTest, InitSucceedsForNumberLongElement) {
     auto update = fromjson("{$inc: {a: NumberLong(5)}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
-TEST(ArithmeticNodeTest, InitSucceedsForDoubleElement) {
+TEST(SimpleArithmeticNodeTest, InitSucceedsForDoubleElement) {
     auto update = fromjson("{$inc: {a: 5.1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
-TEST(ArithmeticNodeTest, InitSucceedsForDecimalElement) {
+TEST(SimpleArithmeticNodeTest, InitSucceedsForDecimalElement) {
     auto update = fromjson("{$inc: {a: NumberDecimal(\"5.1\")}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$inc"]["a"], expCtx));
 }
 
-TEST(ArithmeticNodeTest, InitFailsForNonNumericElement) {
+TEST(SimpleArithmeticNodeTest, InitFailsForNonNumericElement) {
     auto update = fromjson("{$inc: {a: 'foo'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
@@ -99,7 +99,7 @@ TEST(ArithmeticNodeTest, InitFailsForNonNumericElement) {
     ASSERT_EQ(result.reason(), "Cannot increment with non-numeric argument: {a: \"foo\"}");
 }
 
-TEST(ArithmeticNodeTest, InitFailsForObjectElement) {
+TEST(SimpleArithmeticNodeTest, InitFailsForObjectElement) {
     auto update = fromjson("{$mul: {a: {b: 6}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
@@ -109,7 +109,7 @@ TEST(ArithmeticNodeTest, InitFailsForObjectElement) {
     ASSERT_EQ(result.reason(), "Cannot multiply with non-numeric argument: {a: { b: 6 }}");
 }
 
-TEST(ArithmeticNodeTest, InitFailsForArrayElement) {
+TEST(SimpleArithmeticNodeTest, InitFailsForArrayElement) {
     auto update = fromjson("{$mul: {a: []}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);

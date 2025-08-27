@@ -48,7 +48,7 @@ namespace {
 
 using RenameNodeTest = UpdateTestFixture;
 
-TEST(RenameNodeTest, PositionalNotAllowedInFromField) {
+TEST(SimpleRenameNodeTest, PositionalNotAllowedInFromField) {
     auto update = fromjson("{$rename: {'a.$': 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -57,7 +57,7 @@ TEST(RenameNodeTest, PositionalNotAllowedInFromField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(RenameNodeTest, PositionalNotAllowedInToField) {
+TEST(SimpleRenameNodeTest, PositionalNotAllowedInToField) {
     auto update = fromjson("{$rename: {'a': 'b.$'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -66,7 +66,7 @@ TEST(RenameNodeTest, PositionalNotAllowedInToField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(RenameNodeTest, ArrayFilterNotAllowedInFromField) {
+TEST(SimpleRenameNodeTest, ArrayFilterNotAllowedInFromField) {
     auto update = fromjson("{$rename: {'a.$[i]': 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -75,7 +75,7 @@ TEST(RenameNodeTest, ArrayFilterNotAllowedInFromField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(RenameNodeTest, ArrayFilterNotAllowedInToField) {
+TEST(SimpleRenameNodeTest, ArrayFilterNotAllowedInToField) {
     auto update = fromjson("{$rename: {'a': 'b.$[i]'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -85,7 +85,7 @@ TEST(RenameNodeTest, ArrayFilterNotAllowedInToField) {
 }
 
 
-TEST(RenameNodeTest, MoveUpNotAllowed) {
+TEST(SimpleRenameNodeTest, MoveUpNotAllowed) {
     auto update = fromjson("{$rename: {'b.a': 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -94,7 +94,7 @@ TEST(RenameNodeTest, MoveUpNotAllowed) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(RenameNodeTest, MoveDownNotAllowed) {
+TEST(SimpleRenameNodeTest, MoveDownNotAllowed) {
     auto update = fromjson("{$rename: {'b': 'b.a'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -103,7 +103,7 @@ TEST(RenameNodeTest, MoveDownNotAllowed) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(RenameNodeTest, MoveToSelfNotAllowed) {
+TEST(SimpleRenameNodeTest, MoveToSelfNotAllowed) {
     auto update = fromjson("{$rename: {'b.a': 'b.a'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;

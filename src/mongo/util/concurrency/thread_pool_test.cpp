@@ -195,7 +195,7 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
         << "Failed to reap excess threads after " << durationCount<Milliseconds>(reapTime) << "ms";
 }
 
-DEATH_TEST_REGEX(ThreadPoolTest,
+DEATH_TEST_REGEX(ThreadPoolDeathTest,
                  MaxThreadsTooFewDies,
                  "Cannot create pool.*with maximum number of threads.*less than 1") {
     ThreadPool::Options options;
@@ -204,7 +204,7 @@ DEATH_TEST_REGEX(ThreadPoolTest,
 }
 
 DEATH_TEST_REGEX(
-    ThreadPoolTest,
+    ThreadPoolDeathTest,
     MinThreadsTooManyDies,
     R"#(.*Cannot create pool.*with minimum number of threads.*larger than the configured maximum.*minThreads":6,"maxThreads":5)#") {
     ThreadPool::Options options;
@@ -213,7 +213,7 @@ DEATH_TEST_REGEX(
     ThreadPool pool(options);
 }
 
-TEST(ThreadPoolTest, LivePoolCleanedByDestructor) {
+TEST(SimpleThreadPoolTest, LivePoolCleanedByDestructor) {
     ThreadPool pool((ThreadPool::Options()));
     pool.startup();
     while (pool.getStats().numThreads == 0) {
@@ -222,7 +222,7 @@ TEST(ThreadPoolTest, LivePoolCleanedByDestructor) {
     // Destructor should reap leftover threads.
 }
 
-DEATH_TEST_REGEX(ThreadPoolTest,
+DEATH_TEST_REGEX(ThreadPoolDeathTest,
                  DestructionDuringJoinDies,
                  "Attempted to join pool.*more than once.*DoubleJoinPool") {
     // This test ensures that the ThreadPool destructor runs while some thread is blocked
@@ -291,7 +291,7 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
     ASSERT_EQUALS(journal, "[onCreate(mythread0)][Call(OK)]");
 }
 
-TEST(ThreadPoolTest, JoinAllRetiredThreads) {
+TEST(SimpleThreadPoolTest, JoinAllRetiredThreads) {
     AtomicWord<unsigned long> retiredThreads(0);
     ThreadPool::Options options;
     options.minThreads = 4;
@@ -325,7 +325,7 @@ TEST(ThreadPoolTest, JoinAllRetiredThreads) {
     ASSERT_EQ(pool.getStats().numIdleThreads, 0);
 }
 
-TEST(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
+TEST(SimpleThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
     ThreadPool::Options options;
     options.minThreads = 1;
     options.maxThreads = 1;

@@ -7819,7 +7819,7 @@ TEST_F(TransactionRouterSnapshotReadConcern,
 }
 
 // Test static 'parseParticipantResponseMetadata()' function with various inputs.
-TEST(TransactionRouterTest, ParseParticipantResponseMetadata) {
+TEST(SimpleTransactionRouterTest, ParseParticipantResponseMetadata) {
     {
         auto parsedMetadata =
             TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyFalseResponse);

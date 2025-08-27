@@ -2017,7 +2017,7 @@ public:
     }
 };
 
-TEST(StorageTimestampTest, KVDropDatabasePrimary) {
+TEST(SimpleStorageTimestampTest, KVDropDatabasePrimary) {
     {
         KVDropDatabase test;
         test.run(true);
@@ -2180,7 +2180,7 @@ public:
     }
 };
 
-TEST(StorageTimestampTest, TimestampIndexBuilds) {
+TEST(SimpleStorageTimestampTest, TimestampIndexBuilds) {
     {
         TimestampIndexBuilds test;
         test.run(false);

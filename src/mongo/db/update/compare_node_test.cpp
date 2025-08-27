@@ -51,7 +51,7 @@ namespace {
 
 using CompareNodeTest = UpdateTestFixture;
 
-DEATH_TEST_REGEX(CompareNodeTest,
+DEATH_TEST_REGEX(CompareNodeDeathTest,
                  InitFailsForEmptyElement,
                  R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$max: {}}");
@@ -377,7 +377,7 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     assertOplogEntry(fromjson("{$v:2, diff: {u: {a: 'abd'}}}"));
 }
 
-DEATH_TEST_REGEX(CompareNodeTest,
+DEATH_TEST_REGEX(CompareNodeDeathTest,
                  CannotSetCollatorIfCollatorIsNonNull,
                  "Invariant failure.*!_collator") {
     auto update = fromjson("{$max: {a: 1}}");
@@ -391,7 +391,7 @@ DEATH_TEST_REGEX(CompareNodeTest,
     node.setCollator(expCtx->getCollator());
 }
 
-DEATH_TEST_REGEX(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
+DEATH_TEST_REGEX(CompareNodeDeathTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
     auto update = fromjson("{$max: {a: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);

@@ -42,7 +42,7 @@ key_string::Value makeKeyString(key_string::Version version,
     return builder.getValueCopy();
 }
 
-TEST(SortedDataInterfaceTest, SortedDataKeyValueViewTest) {
+TEST(SortedDataInterfaceKeyValueViewTest, SortedDataKeyValueViewTest) {
     BSONObj key = BSON("a" << 1 << "b" << 2.0);
     const Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 

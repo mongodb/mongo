@@ -48,8 +48,9 @@ namespace mongo {
 namespace {
 
 using UnsetNodeTest = UpdateTestFixture;
+using UnsetNodeDeathTest = UnsetNodeTest;
 
-DEATH_TEST_REGEX(UnsetNodeTest,
+DEATH_TEST_REGEX(SimpleUnsetNodeDeathTest,
                  InitFailsForEmptyElement,
                  R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$unset: {}}");
@@ -58,7 +59,7 @@ DEATH_TEST_REGEX(UnsetNodeTest,
     node.init(update["$unset"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
-DEATH_TEST_REGEX_F(UnsetNodeTest,
+DEATH_TEST_REGEX_F(UnsetNodeDeathTest,
                    ApplyToRootFails,
                    R"#(Invariant failure.*!updateNodeApplyParams.pathTaken.*empty\(\))#") {
     auto update = fromjson("{$unset: {}}");
@@ -70,7 +71,7 @@ DEATH_TEST_REGEX_F(UnsetNodeTest,
     node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
 }
 
-TEST(UnsetNodeTest, InitSucceedsForNonemptyElement) {
+TEST(SimpleUnsetNodeTest, InitSucceedsForNonemptyElement) {
     auto update = fromjson("{$unset: {a: 5}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;

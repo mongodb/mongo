@@ -1699,9 +1699,9 @@ TEST(QueryRequestHelperTest, ParsedCursorRemainsValidAfterBSONDestroyed) {
     }
 }
 
-class QueryRequestTest : public ServiceContextTest {};
+class ServiceQueryRequestTest : public ServiceContextTest {};
 
-TEST_F(QueryRequestTest, ParseFromUUID) {
+TEST_F(ServiceQueryRequestTest, ParseFromUUID) {
     const UUID uuid = UUID::gen();
     NamespaceStringOrUUID nssOrUUID(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                                     uuid);

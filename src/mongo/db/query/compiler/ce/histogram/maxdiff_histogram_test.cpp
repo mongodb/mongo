@@ -427,7 +427,7 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
     });
 }
 
-TEST(HistogramTest, HistogramTopBucketsFreqDiffUniformInt) {
+TEST(SimpleHistogramTest, HistogramTopBucketsFreqDiffUniformInt) {
     constexpr size_t nBuckets = 10;
 
     std::vector<stats::SBEValue> data;

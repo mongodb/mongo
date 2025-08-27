@@ -159,7 +159,7 @@ TEST_F(CalculateHashedSplitPointsTest, HashedPrefixUnevenNumberShards) {
         expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), availableShardIds);
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedSuffix) {
+TEST(SimpleCalculateHashedSplitPointsTest, HashedSuffix) {
     auto shardKeyPattern = ShardKeyPattern(BSON("x.a" << 1 << "y.b" << 1 << "z.c"
                                                       << "hashed"));
     const auto preDefinedPrefix = fromjson("{'x.a': {p: 1}, 'y.b': 'val'}");
@@ -172,7 +172,7 @@ TEST(CalculateHashedSplitPointsTest, HashedSuffix) {
         InitialSplitPolicy::calculateHashedSplitPoints(shardKeyPattern, preDefinedPrefix, 4));
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedInfix) {
+TEST(SimpleCalculateHashedSplitPointsTest, HashedInfix) {
     auto shardKeyPattern = ShardKeyPattern(BSON("x.a" << 1 << "y.b"
                                                       << "hashed"
                                                       << "z.c" << 1 << "a" << 1));

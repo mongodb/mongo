@@ -108,8 +108,8 @@
     class TEST_TYPE : public TEST_BASE {                                                       \
     private:                                                                                   \
         void _doTest() override;                                                               \
-        static inline const ::mongo::unittest::TestInfo _testInfo{                             \
-            #FIXTURE_NAME, #TEST_NAME, __FILE__, __LINE__};                                    \
+        static constexpr ::mongo::unittest::TestInfo _testInfo{                                \
+            #FIXTURE_NAME, #TEST_NAME, __FILE__, __LINE__, &typeid(TEST_BASE)};                \
         static inline const RegistrationAgent<TEST_TYPE> _agent{&_testInfo};                   \
     };                                                                                         \
     void TEST_TYPE::_doTest()
@@ -351,6 +351,7 @@ protected:
                         UnitTest::TestRunScope trs(testInfo);
                         T{}.run();
                     });
+            _ensureSuiteHomogeneity(_testInfo);
         }
 
         StringData getSuiteName() const {
@@ -376,6 +377,8 @@ protected:
     class FixtureExceptionForTesting : public std::exception {};
 
 private:
+    static void _ensureSuiteHomogeneity(const TestInfo* testInfo);
+
     /**
      * The test itself.
      */

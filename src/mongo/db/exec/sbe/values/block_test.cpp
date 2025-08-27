@@ -50,7 +50,7 @@ using ColumnOpType = value::ColumnOpType;
 
 // Tests that copyValue() behaves correctly when given a TypeTags::valueBlock. Uses MonoBlock as
 // the concrete block type.
-TEST(SbeValueTest, SbeValueBlockTypeIsCopyable) {
+TEST(SbeBlockTest, SbeValueBlockTypeIsCopyable) {
     value::MonoBlock block(1, TypeTags::NumberInt32, value::bitcastFrom<int32_t>(123));
 
     auto [cpyTag, cpyValue] =
@@ -65,7 +65,7 @@ TEST(SbeValueTest, SbeValueBlockTypeIsCopyable) {
 
 // Tests that copyValue() behaves correctly when given a TypeTags::valueBlock. Uses MonoBlock as
 // the concrete block type.
-TEST(SbeValueTest, SbeCellBlockTypeIsCopyable) {
+TEST(SbeBlockTest, SbeCellBlockTypeIsCopyable) {
     value::ScalarMonoCellBlock block(1, TypeTags::NumberInt32, value::bitcastFrom<int32_t>(123));
 
     auto [cpyTag, cpyValue] = value::copyValue(

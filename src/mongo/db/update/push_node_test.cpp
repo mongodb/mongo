@@ -60,7 +60,7 @@ namespace {
 
 using PushNodeTest = UpdateTestFixture;
 
-TEST(PushNodeTest, EachClauseWithNonArrayObjectFails) {
+TEST(SimplePushNodeTest, EachClauseWithNonArrayObjectFails) {
     auto update = fromjson("{$push: {x: {$each: {'0': 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -69,7 +69,7 @@ TEST(PushNodeTest, EachClauseWithNonArrayObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, EachClauseWithPrimitiveFails) {
+TEST(SimplePushNodeTest, EachClauseWithPrimitiveFails) {
     auto update = fromjson("{$push: {x: {$each: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -78,7 +78,7 @@ TEST(PushNodeTest, EachClauseWithPrimitiveFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PositionClauseWithObjectFails) {
+TEST(SimplePushNodeTest, PositionClauseWithObjectFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $position: {a: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -87,7 +87,7 @@ TEST(PushNodeTest, PositionClauseWithObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PositionClauseWithNonIntegerFails) {
+TEST(SimplePushNodeTest, PositionClauseWithNonIntegerFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $position: -2.1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -96,7 +96,7 @@ TEST(PushNodeTest, PositionClauseWithNonIntegerFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PositionClauseWithIntegerDoubleSucceeds) {
+TEST(SimplePushNodeTest, PositionClauseWithIntegerDoubleSucceeds) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $position: -2.0}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -104,7 +104,7 @@ TEST(PushNodeTest, PositionClauseWithIntegerDoubleSucceeds) {
     ASSERT_OK(status);
 }
 
-TEST(PushNodeTest, SliceClauseWithObjectFails) {
+TEST(SimplePushNodeTest, SliceClauseWithObjectFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: {a: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -113,7 +113,7 @@ TEST(PushNodeTest, SliceClauseWithObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SliceClauseWithNonIntegerFails) {
+TEST(SimplePushNodeTest, SliceClauseWithNonIntegerFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: -2.1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -122,14 +122,14 @@ TEST(PushNodeTest, SliceClauseWithNonIntegerFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SliceClauseWithIntegerDoubleSucceeds) {
+TEST(SimplePushNodeTest, SliceClauseWithIntegerDoubleSucceeds) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: 2.0}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
     ASSERT_OK(node.init(update["$push"]["x"], expCtx));
 }
 
-TEST(PushNodeTest, SliceClauseWithArrayFails) {
+TEST(SimplePushNodeTest, SliceClauseWithArrayFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: [1, 2]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -138,7 +138,7 @@ TEST(PushNodeTest, SliceClauseWithArrayFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SliceClauseWithStringFails) {
+TEST(SimplePushNodeTest, SliceClauseWithStringFails) {
     auto update = fromjson("{$push: {x: {$each: [1, 2], $slice: '-1'}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -147,7 +147,7 @@ TEST(PushNodeTest, SliceClauseWithStringFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithArrayFails) {
+TEST(SimplePushNodeTest, SortClauseWithArrayFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: [{a: 1}]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -156,7 +156,7 @@ TEST(PushNodeTest, SortClauseWithArrayFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithInvalidSortPatternFails) {
+TEST(SimplePushNodeTest, SortClauseWithInvalidSortPatternFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {a: 100}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -165,7 +165,7 @@ TEST(PushNodeTest, SortClauseWithInvalidSortPatternFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithEmptyPathFails) {
+TEST(SimplePushNodeTest, SortClauseWithEmptyPathFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'': 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -174,7 +174,7 @@ TEST(PushNodeTest, SortClauseWithEmptyPathFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithEmptyFieldNamesFails) {
+TEST(SimplePushNodeTest, SortClauseWithEmptyFieldNamesFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'.': 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -183,7 +183,7 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldNamesFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithEmptyFieldSuffixFails) {
+TEST(SimplePushNodeTest, SortClauseWithEmptyFieldSuffixFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'a.': 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -193,7 +193,7 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldSuffixFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithEmptyFieldPrefixFails) {
+TEST(SimplePushNodeTest, SortClauseWithEmptyFieldPrefixFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'.b': 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -203,7 +203,7 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldPrefixFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithEmptyFieldInfixFails) {
+TEST(SimplePushNodeTest, SortClauseWithEmptyFieldInfixFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {'a..b': 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -213,7 +213,7 @@ TEST(PushNodeTest, SortClauseWithEmptyFieldInfixFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, SortClauseWithEmptyObjectFails) {
+TEST(SimplePushNodeTest, SortClauseWithEmptyObjectFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -222,7 +222,7 @@ TEST(PushNodeTest, SortClauseWithEmptyObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PushEachWithInvalidClauseFails) {
+TEST(SimplePushNodeTest, PushEachWithInvalidClauseFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1}, {a: 2}], $xxx: -1, $sort: {a: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;
@@ -231,7 +231,7 @@ TEST(PushNodeTest, PushEachWithInvalidClauseFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PushEachWithDuplicateSortClauseFails) {
+TEST(SimplePushNodeTest, PushEachWithDuplicateSortClauseFails) {
     auto update = fromjson(
         "{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $sort: {a: 1}, $sort: {a: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -241,7 +241,7 @@ TEST(PushNodeTest, PushEachWithDuplicateSortClauseFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PushEachWithDuplicateSliceClauseFails) {
+TEST(SimplePushNodeTest, PushEachWithDuplicateSliceClauseFails) {
     auto update =
         fromjson("{$push: {x: {$each: [{a: 1},{a: 2}], $slice: -2.0, $slice: -2, $sort: {a: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -251,7 +251,7 @@ TEST(PushNodeTest, PushEachWithDuplicateSliceClauseFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PushEachWithDuplicateEachClauseFails) {
+TEST(SimplePushNodeTest, PushEachWithDuplicateEachClauseFails) {
     auto update =
         fromjson("{$push: {x: {$each:[{a: 1}], $each:[{a: 2}], $slice: -3, $sort: {a: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -261,7 +261,7 @@ TEST(PushNodeTest, PushEachWithDuplicateEachClauseFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PushNodeTest, PushEachWithDuplicatePositionClauseFails) {
+TEST(SimplePushNodeTest, PushEachWithDuplicatePositionClauseFails) {
     auto update = fromjson("{$push: {x: {$each: [{a: 1}], $position: 1, $position: 2}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PushNode node;

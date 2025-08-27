@@ -3369,7 +3369,7 @@ TEST_F(AsyncResultsMergerTest, CanAccessParams) {
     ASSERT_TRUE(arm->remotesExhausted());
 }
 
-TEST(AsyncResultsMergerTest, CheckHighWaterMarkTokensAreMonotonicallyIncreasing) {
+TEST(SimpleAsyncResultsMergerTest, CheckHighWaterMarkTokensAreMonotonicallyIncreasing) {
     // Compare high water mark tokens against each other.
     ASSERT_FALSE(isMonotonicallyIncreasing(Timestamp(42, 1), Timestamp(42, 0)));
     ASSERT_FALSE(isMonotonicallyIncreasing(Timestamp(42, 1), Timestamp(41, 0)));
@@ -3389,7 +3389,7 @@ TEST(AsyncResultsMergerTest, CheckHighWaterMarkTokensAreMonotonicallyIncreasing)
     ASSERT_TRUE(isMonotonicallyIncreasing(Timestamp(42, 100), Timestamp(99, 0)));
 }
 
-TEST(AsyncResultsMergerTest, CheckHigResumeTokensAreMonotonicallyIncreasing) {
+TEST(SimpleAsyncResultsMergerTest, CheckHigResumeTokensAreMonotonicallyIncreasing) {
     // Compare resume tokens against high water mark tokens.
     UUID uuid = UUID::gen();
 

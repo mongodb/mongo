@@ -46,105 +46,105 @@ namespace {
 
 using BitNodeTest = UpdateTestFixture;
 
-TEST(BitNodeTest, InitWithDoubleFails) {
+TEST(SimpleBitNodeTest, InitWithDoubleFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: 0}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithStringFails) {
+TEST(SimpleBitNodeTest, InitWithStringFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: ''}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithArrayFails) {
+TEST(SimpleBitNodeTest, InitWithArrayFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: []}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithEmptyDocumentFails) {
+TEST(SimpleBitNodeTest, InitWithEmptyDocumentFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithUnknownOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithUnknownOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {foo: 4}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithArrayArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithArrayArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: []}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithStringArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithStringArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: 'foo'}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithDoubleArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithDoubleArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: 1.0}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithDecimalArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithDecimalArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: NumberDecimal(\"1.0\")}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesAndInt) {
+TEST(SimpleBitNodeTest, ParsesAndInt) {
     auto update = fromjson("{$bit: {a: {and: NumberInt(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesOrInt) {
+TEST(SimpleBitNodeTest, ParsesOrInt) {
     auto update = fromjson("{$bit: {a: {or: NumberInt(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesXorInt) {
+TEST(SimpleBitNodeTest, ParsesXorInt) {
     auto update = fromjson("{$bit: {a: {xor: NumberInt(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesAndLong) {
+TEST(SimpleBitNodeTest, ParsesAndLong) {
     auto update = fromjson("{$bit: {a: {and: NumberLong(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesOrLong) {
+TEST(SimpleBitNodeTest, ParsesOrLong) {
     auto update = fromjson("{$bit: {a: {or: NumberLong(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesXorLong) {
+TEST(SimpleBitNodeTest, ParsesXorLong) {
     auto update = fromjson("{$bit: {a: {xor: NumberLong(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;

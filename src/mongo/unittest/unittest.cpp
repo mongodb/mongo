@@ -70,6 +70,7 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version/releases.h"
 
@@ -202,6 +203,25 @@ struct UnitTestEnvironment {
 
 }  // namespace
 
+void Test::_ensureSuiteHomogeneity(const TestInfo* testInfo) {
+    // Keep the first seen TestInfo for each suite name.
+    static auto&& bySuite = *new std::map<StringData, const TestInfo*>{};
+    if (auto [at, ok] = bySuite.try_emplace(testInfo->suiteName(), testInfo); !ok) {
+        const TestInfo* otherInfo = at->second;
+        if (testInfo->baseTypeInfo() != otherInfo->baseTypeInfo()) {
+            LOGV2_FATAL_NOTRACE(10963900,
+                                "All tests in a suite must have the same base type. "
+                                "Cannot mix TEST and TEST_F in the same suite.",
+                                "suite"_attr = testInfo->suiteName(),
+                                "test"_attr = testInfo->testName(),
+                                "file"_attr = testInfo->file(),
+                                "line"_attr = testInfo->line(),
+                                "otherTest"_attr = otherInfo->testName(),
+                                "otherFile"_attr = otherInfo->file(),
+                                "otherLine"_attr = otherInfo->line());
+        }
+    }
+}
 
 Test::Test() = default;
 

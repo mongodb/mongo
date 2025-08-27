@@ -52,7 +52,7 @@ namespace {
 
 using AddToSetNodeTest = UpdateTestFixture;
 
-DEATH_TEST_REGEX(AddToSetNodeTest,
+DEATH_TEST_REGEX(AddToSetNodeDeathTest,
                  InitFailsForEmptyElement,
                  R"#(Invariant failure.*modExpr.ok())#") {
     auto update = fromjson("{$addToSet: {}}");
@@ -61,7 +61,7 @@ DEATH_TEST_REGEX(AddToSetNodeTest,
     node.init(update["$addToSet"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
-TEST(AddToSetNodeTest, InitFailsIfEachIsNotArray) {
+TEST(SimpleAddToSetNodeTest, InitFailsIfEachIsNotArray) {
     auto update = fromjson("{$addToSet: {fieldName: {$each: {}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
@@ -72,7 +72,7 @@ TEST(AddToSetNodeTest, InitFailsIfEachIsNotArray) {
               "The argument to $each in $addToSet must be an array but it was of type object");
 }
 
-TEST(AddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
+TEST(SimpleAddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
     auto update = fromjson("{$addToSet: {fieldName: {$each: [], bad: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
@@ -83,28 +83,28 @@ TEST(AddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
               "Found unexpected fields after $each in $addToSet: { $each: [], bad: 1 }");
 }
 
-TEST(AddToSetNodeTest, InitSucceedsWithFailsBeforeEach) {
+TEST(SimpleAddToSetNodeTest, InitSucceedsWithFailsBeforeEach) {
     auto update = fromjson("{$addToSet: {fieldName: {other: 1, $each: []}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
-TEST(AddToSetNodeTest, InitSucceedsWithObject) {
+TEST(SimpleAddToSetNodeTest, InitSucceedsWithObject) {
     auto update = fromjson("{$addToSet: {fieldName: {}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
-TEST(AddToSetNodeTest, InitSucceedsWithArray) {
+TEST(SimpleAddToSetNodeTest, InitSucceedsWithArray) {
     auto update = fromjson("{$addToSet: {fieldName: []}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
-TEST(AddToSetNodeTest, InitFailsWhenArgumentIsInvalidBSONArray) {
+TEST(SimpleAddToSetNodeTest, InitFailsWhenArgumentIsInvalidBSONArray) {
     // Create our invalid array by creating a BSONObj with non contiguous array indexes that is then
     // passed to the BSONArray ctor.
     BSONObj updateArrAsObj = BSON("0" << "foo"
@@ -120,7 +120,7 @@ TEST(AddToSetNodeTest, InitFailsWhenArgumentIsInvalidBSONArray) {
                   ExceptionFor<ErrorCodes::BadValue>);
 }
 
-TEST(AddToSetNodeTest, InitSucceedsWithScaler) {
+TEST(SimpleAddToSetNodeTest, InitSucceedsWithScaler) {
     auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
@@ -423,7 +423,7 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
-DEATH_TEST_REGEX(AddToSetNodeTest,
+DEATH_TEST_REGEX(AddToSetNodeDeathTest,
                  CannotSetCollatorIfCollatorIsNonNull,
                  "Invariant failure.*!_collator") {
     auto update = fromjson("{$addToSet: {fieldName: 1}}");
@@ -436,7 +436,7 @@ DEATH_TEST_REGEX(AddToSetNodeTest,
     node.setCollator(expCtx->getCollator());
 }
 
-DEATH_TEST_REGEX(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
+DEATH_TEST_REGEX(AddToSetNodeDeathTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
     auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;

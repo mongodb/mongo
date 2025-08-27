@@ -101,7 +101,7 @@ private:
     }
 };
 
-TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
+TEST(SimpleRollBackLocalOperationsTest, InvalidLocalOplogIterator) {
     class InvalidOplogInterface : public OplogInterface {
     public:
         std::string toString() const override {
@@ -124,7 +124,7 @@ TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
         ErrorCodes::BadValue);
 }
 
-TEST(RollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
+TEST(SimpleRollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
     ASSERT_THROWS_CODE(RollBackLocalOperations(OplogInterfaceMock({makeOpAndRecordId(1)}),
                                                RollBackLocalOperations::RollbackOperationFn()),
                        AssertionException,
