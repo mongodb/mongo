@@ -36,3 +36,6 @@ filters:
   - "generated_suites/*primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-storage-execution
+  - "generated_suites/*query_shape_hash_stability*":
+    approvers:
+      - 10gen/query-execution-query-settings

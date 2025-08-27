@@ -1,6 +1,6 @@
 // Test that the $sort stage properly errors on invalid $meta.
 // This test was adjusted as we start to allow sorting by "searchScore".
-// @tags: [featureFlagRankFusionFull, requires_fcv_82]
+// @tags: [featureFlagRankFusionFull, requires_fcv_83]
 
 const kUnavailableMetadataErrCode = 40218;
 var coll = db.sort_with_metadata;

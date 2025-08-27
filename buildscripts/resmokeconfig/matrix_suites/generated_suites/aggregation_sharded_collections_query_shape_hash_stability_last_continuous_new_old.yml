@@ -78,6 +78,8 @@ selector:
     - jstests/aggregation/exec/spill_to_disk.js
     - jstests/aggregation/parsing/aggregation_with_uuids.js
     - jstests/aggregation/sources/collection_uuid_coll_stats_index_stats.js
+    - jstests/aggregation/sources/graphLookup/spilling.js
+    - jstests/aggregation/sources/graphLookup/error.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - does_not_support_repeated_reads
