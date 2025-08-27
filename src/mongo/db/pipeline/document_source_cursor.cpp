@@ -79,13 +79,15 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
     BSONObjBuilder explainStatsBuilder;
     tassert(
         10769400, "Expected the plannerContext to be set for explain", _plannerContext.has_value());
+
+    BSONObj extraInfo = BSON("cursorType" << toString(_cursorType));
     Explain::explainStages(
         _sharedState->exec.get(),
         *_plannerContext,
         opts.verbosity.value(),
         _sharedState->execStatus,
         _winningPlanTrialStats,
-        BSONObj(),
+        extraInfo,
         SerializationContext::stateCommandReply(getExpCtx()->getSerializationContext()),
         BSONObj(),
         &explainStatsBuilder);

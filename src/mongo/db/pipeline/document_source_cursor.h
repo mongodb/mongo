@@ -203,6 +203,16 @@ private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceGeoNearCursorToStageFn(
         const boost::intrusive_ptr<DocumentSource>&);
 
+    static constexpr StringData toString(CursorType type) {
+        switch (type) {
+            case CursorType::kRegular:
+                return "regular"_sd;
+            case CursorType::kEmptyDocuments:
+                return "emptyDocuments"_sd;
+        }
+        MONGO_UNREACHABLE;
+    }
+
     // Handle to catalog state.
     boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
 

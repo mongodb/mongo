@@ -43,7 +43,11 @@ const mongosIgnoredFields = ["works", "needTime", "queryHash", "planCacheShapeHa
     stagesIgnoredFields,
 );
 
-const queryPlannerIgnoredFields = ["optimizedPipeline", "optimizationTimeMillis"].concat(stagesIgnoredFields);
+// We ignore `cursorType` because it's only set when there's a $cursor stage, which could be
+// the case for the union but not for the regular query or vice versa.
+const queryPlannerIgnoredFields = ["optimizedPipeline", "optimizationTimeMillis", "cursorType"].concat(
+    stagesIgnoredFields,
+);
 
 function buildErrorString(unionExplain, realExplain, field) {
     return (
