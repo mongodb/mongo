@@ -149,14 +149,12 @@ public:
                                                     std::ios_base::app | std::ios_base::out);
 
             // The calculator calculates the checksum of each recording for integrity check.
-            auto checksumCalculator =
-                std::make_unique<SorterChecksumCalculator>(SorterChecksumVersion::v2);
+            SorterChecksumCalculator checksumCalculator = {SorterChecksumVersion::v2};
             auto writeChecksum = [&checksumOut,
                                   &checksumCalculator](const std::string& recordingFile) {
-                size_t checkSumVal = checksumCalculator->checksum();
+                auto checkSumVal = checksumCalculator.hexdigest();
                 checksumOut << recordingFile << "\t" << checkSumVal << "\n";
-                checksumCalculator =
-                    std::make_unique<SorterChecksumCalculator>(SorterChecksumVersion::v2);
+                checksumCalculator.reset();
             };
 
             // This function guarantees to open a new recording file. Force the thread to sleep for
@@ -222,9 +220,9 @@ public:
                         }
 
                         out.write(db.getCursor().data(), db.size());
-                        checksumCalculator->addData(db.getCursor().data(), db.size());
+                        checksumCalculator.addData(db.getCursor().data(), db.size());
                         out.write(toWrite.buf(), toWrite.size());
-                        checksumCalculator->addData(toWrite.buf(), toWrite.size());
+                        checksumCalculator.addData(toWrite.buf(), toWrite.size());
                     }
                 }
             } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {

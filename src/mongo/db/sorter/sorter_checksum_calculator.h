@@ -31,6 +31,8 @@
 
 #include "mongo/db/sorter/sorter_gen.h"
 
+#include <fmt/format.h>
+
 namespace mongo {
 
 /**
@@ -45,8 +47,17 @@ public:
     size_t checksum() const {
         return _checksum;
     }
+
+    std::string hexdigest() const {
+        return fmt::format("{:x}", checksum());
+    }
+
     SorterChecksumVersion version() const {
         return _version;
+    }
+
+    void reset() {
+        _checksum = 0;
     }
 
 private:
