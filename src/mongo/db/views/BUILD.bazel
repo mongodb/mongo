@@ -41,6 +41,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:document_source_rank_fusion.h",
         "//src/mongo/db/pipeline:document_source_score_fusion.h",
         "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
+        "//src/mongo/db/pipeline:timeseries_index_conversion_options.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
         "//src/mongo/db/pipeline/search:document_source_list_search_indexes.h",

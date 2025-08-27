@@ -287,6 +287,9 @@ filters:
   - "tee_buffer*":
     approvers:
       - 10gen/query-execution-classic
+  - "timeseries_index_conversion_options.h":
+    approvers:
+      - 10gen/query-integration-timeseries
   - "value.idl":
     approvers:
       - 10gen/query-execution-classic

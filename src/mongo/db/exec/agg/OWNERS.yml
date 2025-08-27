@@ -20,6 +20,9 @@ filters:
   - "internal_all_collection_stats_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "internal_convert_bucket_index_stats_stage*":
+    approvers:
+      - 10gen/query-integration-timeseries
   - "internal_list_collections_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

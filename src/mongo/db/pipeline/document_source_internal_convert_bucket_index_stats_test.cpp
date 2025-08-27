@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/internal_convert_bucket_index_stats_stage.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -51,14 +52,14 @@ TEST_F(InternalConvertBucketIndexStatsTest, QueryShapeAndRedaction) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     auto stage = std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(
-        expCtx, TimeseriesConversionOptions{"timefield"});
+        expCtx, TimeseriesIndexConversionOptions{"timefield"});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalConvertBucketIndexStats":{"timeField":"HASH<timefield>"}})",
         redact(*stage));
 
     std::string metaField = "metafield";
     stage = std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(
-        expCtx, TimeseriesConversionOptions{"timefield", metaField});
+        expCtx, TimeseriesIndexConversionOptions{"timefield", metaField});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalConvertBucketIndexStats": {
@@ -107,9 +108,9 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestParseWithValidSpec) {
 
 TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithoutMetaField) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    const auto timeseriesOptions = TimeseriesConversionOptions{"t"};
-    auto convertIndexStatsStage =
-        std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
+    const auto timeseriesOptions = TimeseriesIndexConversionOptions{"t"};
+    auto convertIndexStatsStage = std::make_unique<exec::agg::InternalConvertBucketIndexStatsStage>(
+        DocumentSourceInternalConvertBucketIndexStats::kStageName, expCtx, timeseriesOptions);
 
     // Create a mock index spec on the buckets collection.
     auto stage = exec::agg::MockStage::createForTest(
@@ -127,9 +128,9 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithoutMetaField) {
 
 TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithMetaField) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    const auto timeseriesOptions = TimeseriesConversionOptions{"t", std::string("m")};
-    auto convertIndexStatsStage =
-        std::make_unique<DocumentSourceInternalConvertBucketIndexStats>(expCtx, timeseriesOptions);
+    const auto timeseriesOptions = TimeseriesIndexConversionOptions{"t", std::string("m")};
+    auto convertIndexStatsStage = std::make_unique<exec::agg::InternalConvertBucketIndexStatsStage>(
+        DocumentSourceInternalConvertBucketIndexStats::kStageName, expCtx, timeseriesOptions);
 
     // Create a mock index spec on the buckets collection.
     auto stage = exec::agg::MockStage::createForTest(

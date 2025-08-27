@@ -29,18 +29,12 @@
 
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/local_catalog/ddl/list_indexes_gen.h"
-#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -53,65 +47,6 @@
 
 namespace mongo {
 
-namespace {
-
-/**
- * Maps the buckets collection $indexStats result 'bucketsIndexSpecBSON' to the $indexStats format
- * of the time-series collection using the information provided in 'bucketSpec'.
- *
- * The top-level field 'key' for the key pattern is repeated once in the $indexStats format under
- * the 'spec' field:
- *
- * {
- *     name: 'myindex',
- *     key: <key pattern>,
- *     host: 'myhost:myport',
- *     accesses: {
- *         ops: NumberLong(...),
- *         since: ISODate(...),
- *     },
- *     spec: {
- *         v: 2,
- *         key: <key pattern>,
- *         name: 'myindex'
- *     }
- * }
- *
- * The duplication of the 'key' field is due to how CommonMongodProcessInterface::getIndexStats()
- * includes both CollectionIndexUsageTracker::IndexUsageStats::indexKey and the complete index spec
- * from IndexCatalog::getEntry().
- */
-BSONObj makeTimeseriesIndexStats(const TimeseriesConversionOptions& bucketSpec,
-                                 const BSONObj& bucketsIndexStatsBSON) {
-    TimeseriesOptions timeseriesOptions(bucketSpec.timeField);
-    if (bucketSpec.metaField) {
-        timeseriesOptions.setMetaField(*bucketSpec.metaField);
-    }
-    BSONObjBuilder builder;
-    for (const auto& elem : bucketsIndexStatsBSON) {
-        if (elem.fieldNameStringData() == ListIndexesReplyItem::kKeyFieldName) {
-            // This field is appended below.
-            continue;
-        }
-        if (elem.fieldNameStringData() == ListIndexesReplyItem::kSpecFieldName) {
-            auto timeseriesSpec =
-                timeseries::createTimeseriesIndexFromBucketsIndex(timeseriesOptions, elem.Obj());
-            if (!timeseriesSpec) {
-                return {};
-            }
-
-            builder.append(ListIndexesReplyItem::kSpecFieldName, *timeseriesSpec);
-            builder.append(ListIndexesReplyItem::kKeyFieldName,
-                           timeseriesSpec->getObjectField(IndexDescriptor::kKeyPatternFieldName));
-            continue;
-        }
-        builder.append(elem);
-    }
-    return builder.obj();
-}
-
-}  // namespace
-
 REGISTER_DOCUMENT_SOURCE(_internalConvertBucketIndexStats,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalConvertBucketIndexStats::createFromBson,
@@ -121,10 +56,8 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalConvertBucketIndexStats,
 
 DocumentSourceInternalConvertBucketIndexStats::DocumentSourceInternalConvertBucketIndexStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    TimeseriesConversionOptions timeseriesOptions)
-    : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
-      _timeseriesOptions(std::move(timeseriesOptions)) {}
+    TimeseriesIndexConversionOptions timeseriesOptions)
+    : DocumentSource(kStageName, expCtx), _timeseriesOptions(std::move(timeseriesOptions)) {}
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexStats::createFromBson(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -132,7 +65,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
             "$_internalConvertBucketIndexStats specification must be an object",
             specElem.type() == BSONType::object);
 
-    TimeseriesConversionOptions timeseriesOptions;
+    TimeseriesIndexConversionOptions timeseriesOptions;
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == timeseries::kTimeFieldName) {
@@ -172,20 +105,4 @@ Value DocumentSourceInternalConvertBucketIndexStats::serialize(
     return Value(DOC(getSourceName() << out.freeze()));
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalConvertBucketIndexStats::doGetNext() {
-    auto nextResult = pSource->getNext();
-    if (nextResult.isAdvanced()) {
-        auto bucketStats = nextResult.getDocument().toBson();
-
-        // Convert $indexStats results to the time-series schema.
-        auto timeseriesStats = makeTimeseriesIndexStats(_timeseriesOptions, bucketStats);
-        // Skip this index if the conversion failed.
-        if (timeseriesStats.isEmpty()) {
-            return GetNextResult::makePauseExecution();
-        }
-        return Document(timeseriesStats);
-    }
-
-    return nextResult;
-}
 }  // namespace mongo
