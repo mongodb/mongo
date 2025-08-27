@@ -1,7 +1,7 @@
 /**
  * Tests that, when the memory tracking feature flag is enabled, memory tracking statistics are
  * reported to the slow query log, system.profile, and explain("executionStats") for queries that
- * use OrStage for record deduplication.
+ * use record deduplication during index scan.
  *
  * @tags: [
  *   requires_profiling,
@@ -17,30 +17,27 @@
  */
 
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-if (checkSbeFullyEnabled(db)) {
-    // This test is specifically for the classic "or" stage, so don't run the test if the stage
-    // might be executed in SBE
-    jsTest.log.info("Skipping test for classic 'or' stage when SBE is fully enabled.");
-    quit();
-}
+const stageName = "IXSCAN";
+
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
 
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
 
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+
 for (let i = 0; i < 10; ++i) {
-    for (let j = 0; j < 10; ++j) {
-        assert.commandWorked(coll.insertOne({_id: i * 10 + j, a: i, b: j % 2}));
-    }
+    //'a' is an array to create a multikey index.
+    assert.commandWorked(coll.insertOne({_id: i, a: [1, 2, 3, 4, 5]}));
 }
 
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({b: 1}));
 
-// Create a query that can be solved by two index scans that need to be ORed together.
-const pipeline = [{$match: {$or: [{a: 5}, {b: 1}]}}];
+let pipeline = [{$match: {a: 5}}];
 
 runMemoryStatsTest({
     db,
@@ -48,12 +45,16 @@ runMemoryStatsTest({
     commandObj: {
         aggregate: collName,
         pipeline,
-        comment: "memory stats Or stage test",
+        comment: "memory stats index scan stage test",
         allowDiskUse: false,
-        cursor: {batchSize: 15},
+        cursor: {batchSize: 1},
     },
-    stageName: "OR",
-    expectedNumGetMores: 3,
+    stageName,
+    expectedNumGetMores: 10,
     // This stage does not release memory on EOF.
     checkInUseTrackedMemBytesResets: false,
 });
+
+// Clean up.
+db[collName].drop();
+MongoRunner.stopMongod(conn);

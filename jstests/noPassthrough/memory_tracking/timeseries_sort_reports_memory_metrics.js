@@ -1,8 +1,7 @@
 /**
  * Tests that, when the memory tracking feature flag is enabled, memory tracking statistics are
  * reported to the slow query log, system.profile, and explain("executionStats") for aggregations
- * with $sort on a timeseries collection. Due to requires_profiling, this test should not run with
- * sharded clusters.
+ * with $sort on a time-series collection.
  *
  * @tags: [
  * requires_profiling,
@@ -19,15 +18,13 @@
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
 const timeseriesCollName = jsTestName() + "_timeseries";
 const coll = db.getCollection(timeseriesCollName);
 db[timeseriesCollName].drop();
-
-// Get the current value of the query framework server parameter so we can restore it at the end of
-// the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-).internalQueryFrameworkControl;
 
 assert.commandWorked(
     db.createCollection(timeseriesCollName, {
@@ -88,7 +85,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
 
 {
     // Set maxMemory low to force spill to disk.
-    const originalMemoryLimit = assert.commandWorked(
+    assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}),
     );
     runMemoryStatsTest({
@@ -105,13 +102,8 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
         expectedNumGetMores: 5,
         skipInUseTrackedMemBytesCheck: true,
     });
-    // Restore memory limit.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was}),
-    );
 }
 
 // Clean up.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
-);
+db[timeseriesCollName].drop();
+MongoRunner.stopMongod(conn);

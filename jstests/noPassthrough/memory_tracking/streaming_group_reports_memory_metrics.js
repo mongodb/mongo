@@ -22,6 +22,10 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
 const stageName = "$_internalStreamingGroup";
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
 // Set up time-series collection.
 const collName = jsTestName();
 const ts = db[collName];
@@ -90,9 +94,7 @@ const pipeline = [
     {$addFields: {"average_price": {$divide: ["$average_price", "$average_amount"]}}},
     {$sort: {_id: 1}},
 ];
-const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-).internalQueryFrameworkControl;
+
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 {
@@ -156,7 +158,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
 {
     jsTest.log.info("Running basic pipeline test with spilling: " + tojson(pipeline));
     const lowMaxMemoryLimit = 100;
-    const originalMemoryLimit = assert.commandWorked(
+    assert.commandWorked(
         db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: lowMaxMemoryLimit}),
     );
 
@@ -173,13 +175,8 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
         stageName,
         expectedNumGetMores: 9,
     });
-
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: originalMemoryLimit.was}),
-    );
 }
 
+// Clean up.
 db[collName].drop();
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
-);
+MongoRunner.stopMongod(conn);

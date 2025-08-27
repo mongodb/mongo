@@ -17,6 +17,11 @@
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
 const stageName = "$bucketAuto";
+
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
@@ -110,9 +115,6 @@ assert.commandWorked(coll.insertMany(docs));
     jsTest.log.info("Running pipeline that will spill : " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
-    const originalMemoryLimit = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 1}),
-    ).internalDocumentSourceBucketAutoMaxMemoryBytes;
     assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 100}));
 
     runMemoryStatsTest({
@@ -128,11 +130,8 @@ assert.commandWorked(coll.insertMany(docs));
         stageName,
         expectedNumGetMores: 5,
     });
-
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: originalMemoryLimit}),
-    );
 }
 
 // Clean up.
 db[collName].drop();
+MongoRunner.stopMongod(conn);

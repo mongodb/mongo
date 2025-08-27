@@ -17,8 +17,11 @@
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
 const collName = jsTestName();
-db.dropDatabase();
 const coll = db[jsTestName()];
 
 // Set up.
@@ -95,9 +98,6 @@ const predicate = {
     jsTest.log.info("Running pipeline where we spill: " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
-    const originalMemoryLimit = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalTextOrStageMaxMemoryBytes: 1}),
-    ).internalTextOrStageMaxMemoryBytes;
     assert.commandWorked(db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: 100}));
 
     runMemoryStatsTest({
@@ -114,9 +114,8 @@ const predicate = {
         expectedNumGetMores: 2,
         skipInUseTrackedMemBytesCheck: true,
     });
-
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: originalMemoryLimit}));
 }
 
 // Clean up.
 db[collName].drop();
+MongoRunner.stopMongod(conn);

@@ -2,7 +2,7 @@
  * Tests that, when the memory tracking feature flag is enabled, memory tracking statistics are
  * reported to the slow query log, system.profile, and explain("executionStats") for pipelines
  * that sort across different sort implementations: DocumentSourceSort, SBE Sort, and PlanStage
- * Sort. Due to requires_profiling, this test should not run with sharded clusters.
+ * Sort.
  *
  * @tags: [
  * requires_profiling,
@@ -18,16 +18,15 @@
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
 
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
-
-// Get the current value of the query framework server parameter so we can restore it at the end of
-// the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-).internalQueryFrameworkControl;
 
 const bigStr = Array(1025).toString(); // 1KB of ','
 const lowMaxMemoryLimit = 5000;
@@ -39,41 +38,49 @@ for (let i = 1; i <= nDocs; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-const configs = [
-    {
-        name: "DocumentSourceSort",
-        framework: "forceClassicEngine",
-        pipelineFn: (pipeline) => {
-            // Add $_internalInhibitOptimization to prevent $sort pushdown to find, allowing to test
-            // DocumentSourceSort
-            pipeline.unshift({$_internalInhibitOptimization: {}});
+// Since this test is run against all execution engine variants, we can save compute by only
+// checking the relevant stages for the variant; for example, we will get test coverage for SBE Sort
+// on trySbeEngine evergreen variants, so there is no need to force SBE execution on variants where
+// SBE is not enabled by default.
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+let configs;
+if (checkSbeFullyEnabled(db)) {
+    jsTest.log.info("SBE is fully enabled.");
+    configs = [
+        {
+            name: "SBE Sort",
+            pipelineFn: (pipeline) => {
+                // Add $_internalInhibitOptimization to prevent $sort pushdown so the pipeline uses SBE.
+                pipeline.unshift({$_internalInhibitOptimization: {}});
+            },
+            stageName: "sort", // SBE sort stage appears without the dollar sign
         },
-        stageName: "$sort",
-    },
-    {
-        name: "SBE Sort",
-        framework: "trySbeEngine",
-        pipelineFn: (pipeline) => {
-            // Add $_internalInhibitOptimization to prevent $sort pushdown, keeping it in SBE
-            pipeline.unshift({$_internalInhibitOptimization: {}});
+    ];
+} else {
+    jsTest.log.info("Classic engine is enabled.");
+    configs = [
+        {
+            name: "DocumentSourceSort",
+            pipelineFn: (pipeline) => {
+                // Add $_internalInhibitOptimization to prevent $sort pushdown to find, allowing to
+                // test DocumentSourceSort
+                pipeline.unshift({$_internalInhibitOptimization: {}});
+            },
+            stageName: "$sort",
         },
-        stageName: "sort", // SBE sort stage appears without the dollar sign
-    },
-    {
-        name: "PlanStage Sort",
-        framework: "forceClassicEngine",
-        stageName: "SORT", // PlanStage sort appears as uppercase SORT in explain output
-    },
-];
+        {
+            name: "PlanStage Sort",
+            stageName: "SORT", // PlanStage sort appears as uppercase SORT in explain output
+        },
+    ];
+}
 
 for (const config of configs) {
     describe(config.name, () => {
         let pipeline, pipelineWithLimit;
 
-        // Setup for this configuration
+        // Setup for this configuration.
         before(() => {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: config.framework}));
-
             // Define base pipelines without inhibit optimization
             pipeline = [{$sort: {_id: 1, b: -1}}];
             pipelineWithLimit = [{$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
@@ -126,39 +133,36 @@ for (const config of configs) {
                 }),
             );
 
-            try {
-                runMemoryStatsTest({
-                    db: db,
-                    collName: collName,
-                    commandObj: {
-                        aggregate: collName,
-                        pipeline: pipeline,
-                        cursor: {batchSize: 10},
-                        comment: "memory stats sort spilling test",
-                        allowDiskUse: true,
-                    },
-                    stageName: config.stageName,
-                    expectedNumGetMores: 5,
-                    // Since we spill to disk when adding to the sorter, we don't expect to see
-                    // inUseTrackedMemBytes populated as it should be 0 on each operation.
-                    skipInUseTrackedMemBytesCheck: true,
-                });
-            } finally {
-                // Set maxMemory back to the original value.
-                assert.commandWorked(
-                    db.adminCommand({
-                        setParameter: 1,
-                        internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was,
-                    }),
-                );
-            }
+            runMemoryStatsTest({
+                db: db,
+                collName: collName,
+                commandObj: {
+                    aggregate: collName,
+                    pipeline: pipeline,
+                    cursor: {batchSize: 10},
+                    comment: "memory stats sort spilling test",
+                    allowDiskUse: true,
+                },
+                stageName: config.stageName,
+                expectedNumGetMores: 5,
+                // Since we spill to disk when adding to the sorter, we don't expect to see
+                // inUseTrackedMemBytes populated as it should be 0 on each operation.
+                skipInUseTrackedMemBytesCheck: true,
+            });
+
+            // Set maxMemory back to the original value.
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was,
+                }),
+            );
         });
     });
 }
 
 // Clean up.
 after(() => {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
-    );
+    db[collName].drop();
+    MongoRunner.stopMongod(conn);
 });

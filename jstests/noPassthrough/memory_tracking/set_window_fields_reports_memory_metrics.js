@@ -18,8 +18,13 @@
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-104607 Delete this block once SBE tests are implemented.
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
+// TODO SERVER-104607.
 if (checkSbeFullyEnabled(db)) {
+    MongoRunner.stopMongod(conn);
     jsTest.log.info("Skipping test for classic '$setWindowFields' stage when SBE is fully enabled.");
     quit();
 }
@@ -104,10 +109,6 @@ const pipeline = [
 }
 
 {
-    const originalMemoryLimit = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 1}),
-    ).internalDocumentSourceSetWindowFieldsMaxMemoryBytes;
-
     assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 5000}));
 
     jsTest.log.info("Running pipeline " + tojson(pipeline));
@@ -126,12 +127,8 @@ const pipeline = [
         expectedNumGetMores: 10,
         skipInUseTrackedMemBytesCheck: true,
     });
-
-    // Restore the original memory limit.
-    assert.commandWorked(
-        db.adminCommand({
-            setParameter: 1,
-            internalDocumentSourceSetWindowFieldsMaxMemoryBytes: originalMemoryLimit,
-        }),
-    );
 }
+
+// Clean up.
+db[collName].drop();
+MongoRunner.stopMongod(conn);

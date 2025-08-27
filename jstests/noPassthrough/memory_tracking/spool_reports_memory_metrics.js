@@ -19,20 +19,12 @@
  */
 import {runMemoryStatsTestForTimeseriesUpdateCommand} from "jstests/libs/query/memory_tracking_utils.js";
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
 const collName = jsTestName();
 const coll = db[collName];
-
-// Get the current value of the query framework server parameter so we can restore it at the end of
-// the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-).internalQueryFrameworkControl;
-const kOriginalInternalQueryMaxSpoolMemoryUsageBytes = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: 1}),
-).internalQueryMaxSpoolMemoryUsageBytes;
-const kOriginalInternalQueryMaxSpoolDiskUsageBytes = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryMaxSpoolDiskUsageBytes: 1}),
-).internalQueryMaxSpoolDiskUsageBytes;
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
@@ -93,18 +85,4 @@ function setUpCollectionForTest() {
 
 // Clean up.
 db[collName].drop();
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
-);
-assert.commandWorked(
-    db.adminCommand({
-        setParameter: 1,
-        internalQueryMaxSpoolMemoryUsageBytes: kOriginalInternalQueryMaxSpoolMemoryUsageBytes,
-    }),
-);
-assert.commandWorked(
-    db.adminCommand({
-        setParameter: 1,
-        internalQueryMaxSpoolDiskUsageBytes: kOriginalInternalQueryMaxSpoolDiskUsageBytes,
-    }),
-);
+MongoRunner.stopMongod(conn);

@@ -20,9 +20,14 @@
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
 if (checkSbeFullyEnabled(db)) {
     // This test is specifically for the classic SORT_MERGE stage, so don't run the test if the
-    // stage might be executed in SBE
+    // stage might be executed in SBE.
+    MongoRunner.stopMongod(conn);
     jsTest.log.info("Skipping test for classic 'SORT_MERGE' stage when SBE is fully enabled.");
     quit();
 }
@@ -77,3 +82,7 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         checkInUseTrackedMemBytesResets: false,
     });
 }
+
+// Clean up.
+db[collName].drop();
+MongoRunner.stopMongod(conn);
