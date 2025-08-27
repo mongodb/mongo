@@ -287,7 +287,7 @@ size_t ShardingDDLCoordinatorService::_countActiveCoordinators(
     return cnt;
 }
 
-size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* opCtx) {
+size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* opCtx) const {
     constexpr auto kNumCoordLabel = "numCoordinators"_sd;
     static const auto countStage = BSON("$count" << kNumCoordLabel);
 
