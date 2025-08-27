@@ -103,7 +103,7 @@ public:
 /**
  * OpObserver for OplogApplierImpl test fixture.
  */
-class OplogApplierImplOpObserver : public OpObserverNoop {
+class MONGO_MOD_PUB OplogApplierImplOpObserver : public OpObserverNoop {
 public:
     /**
      * This function is called whenever OplogApplierImpl inserts documents into a collection.

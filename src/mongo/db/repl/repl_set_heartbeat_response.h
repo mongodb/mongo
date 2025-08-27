@@ -135,14 +135,14 @@ public:
     /**
      * Sets _setName to "name".
      */
-    MONGO_MOD_PRIVATE void setSetName(StringData name) {
+    void setSetName(StringData name) {
         _setName = std::string{name};
     }
 
     /**
      * Sets _state to "state".
      */
-    MONGO_MOD_PRIVATE void setState(MemberState state) {
+    void setState(MemberState state) {
         _stateSet = true;
         _state = state;
     }
@@ -150,7 +150,7 @@ public:
     /**
      * Sets the optional "electionTime" field to the given Timestamp.
      */
-    MONGO_MOD_PRIVATE void setElectionTime(Timestamp time) {
+    void setElectionTime(Timestamp time) {
         _electionTimeSet = true;
         _electionTime = time;
     }
@@ -158,60 +158,60 @@ public:
     /**
      * Sets _syncingTo to "syncingTo".
      */
-    MONGO_MOD_PRIVATE void setSyncingTo(const HostAndPort& syncingTo) {
+    void setSyncingTo(const HostAndPort& syncingTo) {
         _syncingTo = syncingTo;
     }
 
     /**
      * Sets _configVersion to "configVersion".
      */
-    MONGO_MOD_PRIVATE void setConfigVersion(int configVersion) {
+    void setConfigVersion(int configVersion) {
         _configVersion = configVersion;
     }
 
     /**
      * Sets _configTerm to "configTerm".
      */
-    MONGO_MOD_PRIVATE void setConfigTerm(int configTerm) {
+    void setConfigTerm(int configTerm) {
         _configTerm = configTerm;
     }
 
     /**
      * Initializes _config with "config".
      */
-    MONGO_MOD_PRIVATE void setConfig(const ReplSetConfig& config) {
+    void setConfig(const ReplSetConfig& config) {
         _configSet = true;
         _config = config;
     }
 
-    MONGO_MOD_PRIVATE void setPrimaryId(long long primaryId) {
+    void setPrimaryId(long long primaryId) {
         _primaryIdSet = true;
         _primaryId = primaryId;
     }
-    MONGO_MOD_PRIVATE void setAppliedOpTimeAndWallTime(OpTimeAndWallTime time) {
+    void setAppliedOpTimeAndWallTime(OpTimeAndWallTime time) {
         _appliedOpTimeSet = true;
         _appliedOpTime = time.opTime;
         _appliedWallTime = time.wallTime;
     }
-    MONGO_MOD_PRIVATE void setWrittenOpTimeAndWallTime(OpTimeAndWallTime time) {
+    void setWrittenOpTimeAndWallTime(OpTimeAndWallTime time) {
         _writtenOpTimeSet = true;
         _writtenOpTime = time.opTime;
         _writtenWallTime = time.wallTime;
     }
-    MONGO_MOD_PRIVATE void setDurableOpTimeAndWallTime(OpTimeAndWallTime time) {
+    void setDurableOpTimeAndWallTime(OpTimeAndWallTime time) {
         _durableOpTimeSet = true;
         _durableOpTime = time.opTime;
         _durableWallTime = time.wallTime;
     }
-    MONGO_MOD_PRIVATE void unsetDurableOpTimeAndWallTime() {
+    void unsetDurableOpTimeAndWallTime() {
         _durableOpTimeSet = false;
         _durableOpTime = OpTime();
         _durableWallTime = Date_t();
     }
-    MONGO_MOD_PRIVATE void setTerm(long long term) {
+    void setTerm(long long term) {
         _term = term;
     }
-    MONGO_MOD_PRIVATE void setElectable(bool electable) {
+    void setElectable(bool electable) {
         _electableSet = true;
         _electable = electable;
     }
