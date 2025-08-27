@@ -17,13 +17,15 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
+const isWindowsInMem = jsTest.options().storageEngine == "inMemory" && _isWindows();
+
 export const $config = (function () {
     const data = {
         timeFieldName: "time",
         metaFieldName: "meta",
         measurementFieldNames: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
         numDevices: 2,
-        maxDocsPerBatch: 50,
+        maxDocsPerBatch: isWindowsInMem ? 20 : 50,
 
         // Used to generate unique _id's for measurements across multiple threads.
         nextIds: {},
