@@ -186,10 +186,6 @@ private:
     }
 
     void uassertSizeLimit() const {
-        if (_result.getApproximateSize() < static_cast<size_t>(_maxSize)) {
-            return;
-        }
-
         try {
             // Unfortunately there is no way to accurately check the size of the serialized value
             // without serializing it.
