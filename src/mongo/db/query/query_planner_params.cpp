@@ -715,6 +715,12 @@ bool QueryPlannerParams::requiresShardFiltering(const CanonicalQuery& canonicalQ
         return false;
     }
 
+    // Check whether the query is running over multiple shards and will require merging.
+    const auto expCtx = canonicalQuery.getExpCtx();
+    if (expCtx->needsUnsortedMerge() || expCtx->needsSortedMerge()) {
+        return true;
+    }
+
     const auto& shardKeyPattern = collection.getShardKeyPattern();
     // Shards cannot own orphans for the key ranges they own, so there is no need
     // to include a shard filtering stage. By omitting the shard filter, it may be

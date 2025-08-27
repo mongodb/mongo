@@ -1546,6 +1546,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/query/agg/**/agg_percentile.js @10gen/query-integration-extensions @svc-auto-approve-bot
 /jstests/sharding/query/agg/**/agg_explain_fmt.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/sharding/query/agg/**/*targeting* @10gen/query-optimization @svc-auto-approve-bot
+/jstests/sharding/query/agg/**/*orphan_filtering* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/query/api_version/OWNERS.yml
 /jstests/sharding/query/api_version/**/* @10gen/query-optimization @svc-auto-approve-bot
