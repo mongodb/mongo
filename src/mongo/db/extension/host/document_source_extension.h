@@ -73,6 +73,14 @@ public:
             return false;
         }
 
+        /**
+         * requiresAuthzChecks() is overriden to false because requiredPrivileges() returns an empty
+         * vector and has no authz checks by default.
+         */
+        bool requiresAuthzChecks() const override {
+            return false;
+        }
+
     protected:
         // Note that this BSON object must be an owned copy belonging to the LiteParsed document
         // source.
