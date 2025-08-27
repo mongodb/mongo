@@ -157,7 +157,10 @@ buildvariants:
     omit_generated_tasks: true
   tasks:
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.requires_large_host
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags .requires_large_host
+    distros:
+    - rhel8.8-large
   - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
 
 - &enterprise-rhel-8-64-bit-dynamic-dbcheck
@@ -278,7 +281,10 @@ buildvariants:
   - name: .encrypt
   - name: .jscore .common !jsCore !.sbe_only
   - name: .jstestfuzz !.feature_flag_guarded !.flow_control
-  - name: .misc_js
+  - name: .misc_js !.requires_large_host
+  - name: .misc_js .requires_large_host
+    distros:
+    - rhel8.8-large
   - name: .multi_shard
   - name: .query_fuzzer
   - name: query_golden_classic

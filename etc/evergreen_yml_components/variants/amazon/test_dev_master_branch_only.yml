@@ -107,7 +107,10 @@ buildvariants:
   # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
   - name: .mongot_e2e_tests
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_large_host #!.incompatible_all_feature_flags
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant .requires_large_host #!.incompatible_all_feature_flags
+    distros:
+    - amazon2-arm64-latest-large
   - name: .default !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
 
 - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
