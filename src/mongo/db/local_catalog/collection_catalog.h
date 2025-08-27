@@ -735,6 +735,19 @@ private:
                                                       bool withCommitPending) const;
 
     /**
+     * Checks if an instance of the given namespace or UUID has already been instantiated for the
+     * current snapshot, either in `OpenedCollections` or in `UncommittedCatalogUpdates`.
+     *
+     * A non-empty optional containing nullptr indicates the collection has been renamed or dropped.
+     */
+    boost::optional<std::shared_ptr<const Collection>> _findInstantiatedCollectionByNamespace(
+        OperationContext* opCtx, const NamespaceString& nss) const;
+    boost::optional<std::shared_ptr<const Collection>> _findInstantiatedCollectionByUUID(
+        OperationContext* opCtx, const UUID& uuid) const;
+    boost::optional<std::shared_ptr<const Collection>> _findInstantiatedCollectionByNamespaceOrUUID(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
+
+    /**
      * Register the collection.
      */
     void _registerCollection(OperationContext* opCtx,

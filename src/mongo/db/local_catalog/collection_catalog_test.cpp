@@ -909,6 +909,18 @@ public:
         _createCollection(opCtx, nss, uuid, false);
     }
 
+    void createCollectionWithUUIDAndCommitInNestedUnitOnly(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           Timestamp timestamp,
+                                                           UUID uuid,
+                                                           boost::optional<WriteUnitOfWork>& wuow) {
+        _setupDDLOperation(opCtx, timestamp);
+        wuow.emplace(opCtx);
+        WriteUnitOfWork nestedWuow(opCtx);
+        _createCollection(opCtx, nss, uuid, false);
+        nestedWuow.commit();
+    }
+
     void dropCollection(OperationContext* opCtx, const NamespaceString& nss, Timestamp timestamp) {
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
@@ -2168,6 +2180,77 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
         shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
         ASSERT(!OpenedCollections::get(opCtx.get()).lookupByNamespace(nss));
     }
+}
+
+TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrites) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const UUID expectedUUID = UUID::gen();
+
+    boost::optional<WriteUnitOfWork> wuow;
+    createCollectionWithUUIDAndLeaveUncommitted(
+        opCtx.get(), nss, createCollectionTs, expectedUUID, wuow);
+
+    auto coll =
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, boost::none /* readTimestamp */);
+    ASSERT(coll);
+    ASSERT_EQ(expectedUUID, coll->uuid());
+
+    wuow->commit();
+}
+
+TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWritesChildWUOW) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const UUID expectedUUID = UUID::gen();
+
+    boost::optional<WriteUnitOfWork> wuow;
+    createCollectionWithUUIDAndCommitInNestedUnitOnly(
+        opCtx.get(), nss, createCollectionTs, expectedUUID, wuow);
+
+    auto coll =
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, boost::none /* readTimestamp */);
+    ASSERT(coll);
+    ASSERT_EQ(expectedUUID, coll->uuid());
+
+    wuow->commit();
+}
+
+// Regression test for SERVER-108988:
+// (1) Operation 1 starts a WriteUnitOfWork.
+// (2) Operation 1 starts a nested WriteUnitOfWork, creates a collection and commits it.
+//     (Note that this does not really commit until the toplevel WriteUnitOfWork commits.)
+// (3) Concurrently, operation 2 is committing that same collection.
+// (4) Operation 1 tries to read the collection using EstablishConsistentCollection.
+//
+// In this scenario, (4) should read the instance of the collection created by (2), as we provide
+// "read your writes" consistency, even though Operation 1 ultimately fails to commit.
+TEST_F(CollectionCatalogTimestampTest,
+       EstablishConsistentCollectionReadYourWritesChildWUOWWithWriteConflict) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    concurrentCreateAndRunCatalogOperations(
+        opCtx.get(), nss, UUID::gen(), createCollectionTs, [&](OperationContext* opCtx) {
+            const UUID expectedUUID = UUID::gen();
+
+            // Create the collection in a nested WriteUnitOfWork, so it's not yet committed
+            boost::optional<WriteUnitOfWork> wuow;
+            createCollectionWithUUIDAndCommitInNestedUnitOnly(
+                opCtx, nss, createCollectionTs, expectedUUID, wuow);
+
+            // Establish the collection and assert we get the one we just created in the child
+            // WriteUnitOfWork (not the one which is being concurrently committed)
+            auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
+                opCtx, nss, boost::none /* readTimestamp */);
+            ASSERT(coll);
+            ASSERT_EQ(expectedUUID, coll->uuid());
+
+            // The concurrent operation is already committing that namespace, so we fail to commit.
+            ASSERT_THROWS(wuow->commit(), WriteConflictException);
+        });
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD

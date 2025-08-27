@@ -930,6 +930,11 @@ ConsistentCollection CollectionCatalog::establishConsistentCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByNamespaceOrUUID(opCtx, nssOrUUID)) {
+        return ConsistentCollection{opCtx, instantiatedColl->get()};
+    }
+
     if (_needsOpenCollection(opCtx, nssOrUUID, readTimestamp)) {
         auto coll = _openCollection(opCtx, nssOrUUID, readTimestamp);
         return ConsistentCollection{opCtx, coll};
@@ -978,17 +983,6 @@ bool CollectionCatalog::_collectionHasPendingCommits(const NamespaceStringOrUUID
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
-    // Don't need to open the collection if it was already previously instantiated.
-    if (nsOrUUID.isNamespaceString()) {
-        if (OpenedCollections::get(opCtx).lookupByNamespace(nsOrUUID.nss())) {
-            return false;
-        }
-    } else {
-        if (OpenedCollections::get(opCtx).lookupByUUID(nsOrUUID.uuid())) {
-            return false;
-        }
-    }
-
     if (readTimestamp) {
         auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
 
@@ -1541,19 +1535,9 @@ CollectionCatalog::Range CollectionCatalog::range(const DatabaseName& dbName) co
 
 std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByUUID(OperationContext* opCtx,
                                                                           const UUID& uuid) const {
-    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
-    // multi-document transaction it's permitted to perform a lookup on a non-existent
-    // collection followed by creating the collection. This lookup will store a nullptr in
-    // OpenedCollections.
-    auto [found, uncommittedColl, newColl] =
-        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
-    if (uncommittedColl) {
-        return uncommittedColl;
-    }
-
-    // Return any previously instantiated collection on this namespace for this snapshot
-    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
-        return openedColl.value();
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByUUID(opCtx, uuid)) {
+        return *instantiatedColl;
     }
 
     return _lookupCollectionByUUID(uuid);
@@ -1603,20 +1587,9 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 
 const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
                                                             UUID uuid) const {
-    // If UUID is managed by UncommittedCatalogUpdates (but not newly created) return the pointer
-    // which will be nullptr in case of a drop. It's important to look in UncommittedCatalogUpdates
-    // before OpenedCollections because in a multi-document transaction it's permitted to perform a
-    // lookup on a non-existent collection followed by creating the collection. This lookup will
-    // store a nullptr in OpenedCollections.
-    auto [found, uncommittedPtr, newColl] =
-        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
-    if (found) {
-        return uncommittedPtr.get();
-    }
-
-    // Return any previously instantiated collection on this namespace for this snapshot
-    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
-        return openedColl.value() ? openedColl->get() : nullptr;
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByUUID(opCtx, uuid)) {
+        return instantiatedColl->get();
     }
 
     return _lookupCollectionByUUID(uuid).get();
@@ -1638,24 +1611,9 @@ std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid
 
 std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByNamespace(
     OperationContext* opCtx, const NamespaceString& nss) const {
-    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
-    // multi-document transaction it's permitted to perform a lookup on a non-existent
-    // collection followed by creating the collection. This lookup will store a nullptr in
-    // OpenedCollections.
-    auto [found, uncommittedColl, newColl] =
-        UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
-    if (uncommittedColl) {
-        return uncommittedColl;
-    }
-
-    // Report the drop or rename as nothing new was created.
-    if (found) {
-        return nullptr;
-    }
-
-    // Return any previously instantiated collection on this namespace for this snapshot
-    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
-        return openedColl.value();
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByNamespace(opCtx, nss)) {
+        return *instantiatedColl;
     }
 
     const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
@@ -1710,24 +1668,9 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
 
 const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
                                                                  const NamespaceString& nss) const {
-    // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
-    // exists. It's important to look in UncommittedCatalogUpdates before OpenedCollections because
-    // in a multi-document transaction it's permitted to perform a lookup on a non-existent
-    // collection followed by creating the collection. This lookup will store a nullptr in
-    // OpenedCollections.
-    auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
-    if (uncommittedPtr) {
-        return uncommittedPtr.get();
-    }
-
-    // Report the drop or rename as nothing new was created.
-    if (found) {
-        return nullptr;
-    }
-
-    // Return any previously instantiated collection on this namespace for this snapshot
-    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
-        return openedColl->get();
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByNamespace(opCtx, nss)) {
+        return instantiatedColl->get();
     }
 
     const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
@@ -1742,27 +1685,12 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
 boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationContext* opCtx,
                                                                      const UUID& uuid,
                                                                      bool withCommitPending) const {
-    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
-    // multi-document transaction it's permitted to perform a lookup on a non-existent
-    // collection followed by creating the collection. This lookup will store a nullptr in
-    // OpenedCollections.
-    auto [found, uncommittedPtr, newColl] =
-        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
-    // If UUID is managed by uncommittedCatalogUpdates return its corresponding namespace if the
-    // Collection exists, boost::none otherwise.
-    if (found) {
-        if (uncommittedPtr)
-            return uncommittedPtr->ns();
-        return boost::none;
-    }
-
-    // Return any previously instantiated collection on this namespace for this snapshot
-    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
-        if (openedColl.value()) {
-            return openedColl.value()->ns();
-        } else {
-            return boost::none;
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByUUID(opCtx, uuid)) {
+        if (const auto collPtr = instantiatedColl->get()) {
+            return collPtr->ns();
         }
+        return boost::none;
     }
 
     if (withCommitPending) {
@@ -1790,26 +1718,12 @@ boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationCo
 
 boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx,
                                                          const NamespaceString& nss) const {
-    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
-    // multi-document transaction it's permitted to perform a lookup on a non-existent
-    // collection followed by creating the collection. This lookup will store a nullptr in
-    // OpenedCollections.
-    auto [found, uncommittedPtr, newColl] = UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
-    if (uncommittedPtr) {
-        return uncommittedPtr->uuid();
-    }
-
-    if (found) {
-        return boost::none;
-    }
-
-    // Return any previously instantiated collection on this namespace for this snapshot
-    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
-        if (openedColl.value()) {
-            return openedColl.value()->uuid();
-        } else {
-            return boost::none;
+    // Return any previously instantiated collection for this snapshot
+    if (auto instantiatedColl = _findInstantiatedCollectionByNamespace(opCtx, nss)) {
+        if (const auto collPtr = instantiatedColl->get()) {
+            return collPtr->uuid();
         }
+        return boost::none;
     }
 
     const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
@@ -1980,6 +1894,69 @@ NamespaceString CollectionCatalog::_resolveNamespaceStringFromDBNameAndUUID(
                           << (*resolvedNss).toStringForErrorMsg(),
             resolvedNss->dbName() == dbName);
     return std::move(*resolvedNss);
+}
+
+boost::optional<std::shared_ptr<const Collection>>
+CollectionCatalog::_findInstantiatedCollectionByNamespace(OperationContext* opCtx,
+                                                          const NamespaceString& nss) const {
+    // It's important to look in UncommittedCatalogUpdates before OpenedCollections because in a
+    // multi-document transaction it's permitted to perform a lookup on a non-existent
+    // collection followed by creating the collection. This lookup will store a nullptr in
+    // OpenedCollections.
+    auto [found, uncommittedColl, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
+    if (uncommittedColl) {
+        return std::shared_ptr<const Collection>(uncommittedColl);
+    }
+
+    // Report the drop or rename as nothing new was created.
+    if (found) {
+        return std::shared_ptr<const Collection>(nullptr);
+    }
+
+    // Return any previously instantiated collection for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
+        return openedColl.value();
+    }
+
+    return boost::none;
+}
+
+boost::optional<std::shared_ptr<const Collection>>
+CollectionCatalog::_findInstantiatedCollectionByUUID(OperationContext* opCtx,
+                                                     const UUID& uuid) const {
+    // If UUID is managed by UncommittedCatalogUpdates (but not newly created) return the pointer
+    // which will be nullptr in case of a drop. It's important to look in UncommittedCatalogUpdates
+    // before OpenedCollections because in a multi-document transaction it's permitted to perform a
+    // lookup on a non-existent collection followed by creating the collection. This lookup will
+    // store a nullptr in OpenedCollections.
+    auto [found, uncommittedColl, newColl] =
+        UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
+    if (uncommittedColl) {
+        return std::shared_ptr<const Collection>(uncommittedColl);
+    }
+
+    // Report the drop or rename as nothing new was created.
+    if (found) {
+        return std::shared_ptr<const Collection>(nullptr);
+    }
+
+    // Return any previously instantiated collection for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
+        return openedColl.value();
+    }
+
+    return boost::none;
+}
+
+boost::optional<std::shared_ptr<const Collection>>
+CollectionCatalog::_findInstantiatedCollectionByNamespaceOrUUID(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const {
+    if (nssOrUUID.isUUID()) {
+        return _findInstantiatedCollectionByUUID(opCtx, nssOrUUID.uuid());
+    }
+
+    return _findInstantiatedCollectionByNamespace(opCtx, nssOrUUID.nss());
 }
 
 bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid,
