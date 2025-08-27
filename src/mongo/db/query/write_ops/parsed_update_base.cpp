@@ -130,9 +130,20 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
     }
 }
 
+std::unique_ptr<MatchExpression> ParsedUpdateBase::getClosedBucketFilteredExpr() {
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+        MatchExpressionParser::kAllowAllSpecialFeatures;
+    if (_request->isUpsert()) {
+        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
+    }
+    auto buildingExpr = uassertStatusOK(MatchExpressionParser::parse(
+        _request->getQuery(), _expCtx, ExtensionsCallbackNoop(), allowedFeatures));
+    buildingExpr = normalizeMatchExpression(std::move(buildingExpr));
+    return timeseries::addClosedBucketExclusionExpr(std::move(buildingExpr));
+}
+
 void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     if (!_timeseriesUpdateQueryExprs) {
-        // Not a timeseries update, bail out.
         return;
     }
 
@@ -239,12 +250,15 @@ Status ParsedUpdateBase::parseQuery() {
 Status ParsedUpdateBase::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
+
     auto statusWithCQ = impl::parseWriteQueryToCQ(
         _expCtx->getOperationContext(),
         _expCtx.get(),
         *_extensionsCallback,
         *_request,
-        _timeseriesUpdateQueryExprs ? _timeseriesUpdateQueryExprs->_bucketExpr.get() : nullptr);
+        _timeseriesUpdateQueryExprs  ? _timeseriesUpdateQueryExprs->_bucketExpr.get()
+            : _isRequestToTimeseries ? getClosedBucketFilteredExpr().get()
+                                     : nullptr);
 
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());

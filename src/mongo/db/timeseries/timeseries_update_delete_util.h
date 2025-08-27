@@ -93,4 +93,10 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const BSONObj& writeQuery,
     bool fixedBuckets);
 
+/**
+ * Returns a basic match expression checking against closed buckets for meta-only updates/deletes
+ */
+std::unique_ptr<MatchExpression> addClosedBucketExclusionExpr(
+    std::unique_ptr<MatchExpression> base);
+
 }  // namespace mongo::timeseries

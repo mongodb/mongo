@@ -1,6 +1,9 @@
 /**
  * Tests that only measurements with a binary identical meta field are included in the same bucket
  * in a time-series collection.
+ *
+ * Also test that metadata only updates and deletes do not succeed against closed buckets.
+ *
  * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
@@ -12,7 +15,7 @@
  *   requires_fcv_71,
  * ]
  */
-import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -198,4 +201,42 @@ TimeseriesTest.run((insert) => {
             {_id: 3, time: t[3], meta: {a: [2, 1, 3]}, x: 30},
         ],
     );
+
+    /*
+     * Test update/delete do not change closed buckets
+     */
+    {
+        // create populated bucket
+        let coll = db.getCollection(collNamePrefix + collCount++);
+        coll.drop();
+        jsTestLog("Running metadata update/delete respects control.closed test");
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
+        let docs = [
+            {_id: 0, time: t[0], meta: "a", x: 0},
+            {_id: 1, time: t[1], meta: "a", x: 10},
+        ];
+        assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
+        assert.eq(2, coll.find({}).toArray().length);
+        assert.eq(2, coll.find({"meta": "a"}).toArray().length);
+        assert.eq(0, coll.find({"meta": "b"}).toArray().length);
+
+        // close bucket
+        getTimeseriesCollForRawOps(coll).findAndModify({
+            query: {"meta": "a"},
+            update: {$set: {"control.closed": true}},
+            ...kRawOperationSpec,
+        });
+
+        // should be a no-op
+        assert.commandWorked(coll.updateMany({"meta": {$eq: "a"}}, {$set: {"meta": "b"}}));
+        assert.eq(2, coll.find({"meta": "a"}).toArray().length);
+        assert.eq(0, coll.find({"meta": "b"}).toArray().length);
+
+        // should be a no-op
+        assert.commandWorked(coll.deleteMany({"meta": {$eq: "a"}}));
+        assert.eq(2, coll.find({"meta": "a"}).toArray().length);
+        assert.eq(0, coll.find({"meta": "b"}).toArray().length);
+    }
 });
