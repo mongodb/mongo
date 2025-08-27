@@ -12,3 +12,6 @@ filters:
   - "hello_response_validation.js":
     approvers:
       - 10gen/server-hello
+  - "getlog*":
+    approvers:
+      - 10gen/server-networking-and-observability

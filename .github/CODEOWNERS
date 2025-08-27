@@ -603,6 +603,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/administrative/**/list_all_sessions.js @10gen/server-replication @svc-auto-approve-bot
 /jstests/core/administrative/**/list_sessions.js @10gen/server-replication @svc-auto-approve-bot
 /jstests/core/administrative/**/hello_response_validation.js @10gen/server-hello @svc-auto-approve-bot
+/jstests/core/administrative/**/getlog* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/administrative/current_op/OWNERS.yml
 /jstests/core/administrative/current_op/**/* @10gen/query-integration-observability @svc-auto-approve-bot
@@ -1810,6 +1811,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/db/commands/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/db/commands/**/*read_write_concern_defaults_server_status* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/src/mongo/db/commands/**/generic_servers* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
 /src/mongo/db/commands/query_cmd/**/* @10gen/query-optimization @svc-auto-approve-bot

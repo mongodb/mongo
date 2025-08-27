@@ -172,3 +172,6 @@ filters:
   - "*read_write_concern_defaults_server_status*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "generic_servers*":
+    approvers:
+      - 10gen/server-networking-and-observability
