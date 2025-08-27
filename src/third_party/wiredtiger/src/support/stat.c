@@ -253,6 +253,7 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: VLCS pages explicitly reconciled as empty",
   "reconciliation: approximate byte size of timestamps in pages written",
   "reconciliation: approximate byte size of transaction IDs in pages written",
+  "reconciliation: cursor next/prev calls during HS wrapup search_near",
   "reconciliation: dictionary matches",
   "reconciliation: fast-path pages deleted",
   "reconciliation: internal page key bytes discarded using suffix compression",
@@ -589,6 +590,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_vlcs_emptied_pages = 0;
     stats->rec_time_window_bytes_ts = 0;
     stats->rec_time_window_bytes_txn = 0;
+    stats->rec_hs_wrapup_next_prev_calls = 0;
     stats->rec_dictionary = 0;
     stats->rec_page_delete_fast = 0;
     stats->rec_suffix_compression = 0;
@@ -916,6 +918,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_vlcs_emptied_pages += from->rec_vlcs_emptied_pages;
     to->rec_time_window_bytes_ts += from->rec_time_window_bytes_ts;
     to->rec_time_window_bytes_txn += from->rec_time_window_bytes_txn;
+    to->rec_hs_wrapup_next_prev_calls += from->rec_hs_wrapup_next_prev_calls;
     to->rec_dictionary += from->rec_dictionary;
     to->rec_page_delete_fast += from->rec_page_delete_fast;
     to->rec_suffix_compression += from->rec_suffix_compression;
@@ -1253,6 +1256,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_vlcs_emptied_pages += WT_STAT_READ(from, rec_vlcs_emptied_pages);
     to->rec_time_window_bytes_ts += WT_STAT_READ(from, rec_time_window_bytes_ts);
     to->rec_time_window_bytes_txn += WT_STAT_READ(from, rec_time_window_bytes_txn);
+    to->rec_hs_wrapup_next_prev_calls += WT_STAT_READ(from, rec_hs_wrapup_next_prev_calls);
     to->rec_dictionary += WT_STAT_READ(from, rec_dictionary);
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
     to->rec_suffix_compression += WT_STAT_READ(from, rec_suffix_compression);
@@ -1775,6 +1779,7 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: VLCS pages explicitly reconciled as empty",
   "reconciliation: approximate byte size of timestamps in pages written",
   "reconciliation: approximate byte size of transaction IDs in pages written",
+  "reconciliation: cursor next/prev calls during HS wrapup search_near",
   "reconciliation: fast-path pages deleted",
   "reconciliation: leaf-page overflow keys",
   "reconciliation: maximum milliseconds spent in a reconciliation call",
@@ -1868,6 +1873,8 @@ static const char *const __stats_connection_desc[] = {
   "thread-yield: page acquire time sleeping (usecs)",
   "thread-yield: page delete rollback time sleeping for state change (usecs)",
   "thread-yield: page reconciliation yielded due to child modification",
+  "thread-yield: page split and restart read",
+  "thread-yield: pages skipped during read due to deleted state",
   "transaction: Number of prepared updates",
   "transaction: Number of prepared updates committed",
   "transaction: Number of prepared updates repeated on the same key",
@@ -2432,6 +2439,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->rec_vlcs_emptied_pages = 0;
     stats->rec_time_window_bytes_ts = 0;
     stats->rec_time_window_bytes_txn = 0;
+    stats->rec_hs_wrapup_next_prev_calls = 0;
     stats->rec_page_delete_fast = 0;
     stats->rec_overflow_key_leaf = 0;
     /* not clearing rec_maximum_milliseconds */
@@ -2523,6 +2531,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->page_sleep = 0;
     stats->page_del_rollback_blocked = 0;
     stats->child_modify_blocked_page = 0;
+    stats->page_split_restart = 0;
+    stats->page_read_skip_deleted = 0;
     stats->txn_prepared_updates = 0;
     stats->txn_prepared_updates_committed = 0;
     stats->txn_prepared_updates_key_repeated = 0;
@@ -3118,6 +3128,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_vlcs_emptied_pages += WT_STAT_READ(from, rec_vlcs_emptied_pages);
     to->rec_time_window_bytes_ts += WT_STAT_READ(from, rec_time_window_bytes_ts);
     to->rec_time_window_bytes_txn += WT_STAT_READ(from, rec_time_window_bytes_txn);
+    to->rec_hs_wrapup_next_prev_calls += WT_STAT_READ(from, rec_hs_wrapup_next_prev_calls);
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
     to->rec_overflow_key_leaf += WT_STAT_READ(from, rec_overflow_key_leaf);
     to->rec_maximum_milliseconds += WT_STAT_READ(from, rec_maximum_milliseconds);
@@ -3220,6 +3231,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->page_sleep += WT_STAT_READ(from, page_sleep);
     to->page_del_rollback_blocked += WT_STAT_READ(from, page_del_rollback_blocked);
     to->child_modify_blocked_page += WT_STAT_READ(from, child_modify_blocked_page);
+    to->page_split_restart += WT_STAT_READ(from, page_split_restart);
+    to->page_read_skip_deleted += WT_STAT_READ(from, page_read_skip_deleted);
     to->txn_prepared_updates += WT_STAT_READ(from, txn_prepared_updates);
     to->txn_prepared_updates_committed += WT_STAT_READ(from, txn_prepared_updates_committed);
     to->txn_prepared_updates_key_repeated += WT_STAT_READ(from, txn_prepared_updates_key_repeated);

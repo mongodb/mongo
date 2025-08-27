@@ -311,6 +311,8 @@ struct __wt_rec_kv;
 typedef struct __wt_rec_kv WT_REC_KV;
 struct __wt_reconcile;
 typedef struct __wt_reconcile WT_RECONCILE;
+struct __wt_reconcile_stats;
+typedef struct __wt_reconcile_stats WT_RECONCILE_STATS;
 struct __wt_reconcile_timeline;
 typedef struct __wt_reconcile_timeline WT_RECONCILE_TIMELINE;
 struct __wt_recovery_timeline;
