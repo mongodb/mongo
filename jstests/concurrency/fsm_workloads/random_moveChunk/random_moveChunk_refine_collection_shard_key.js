@@ -69,14 +69,15 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             (err.message &&
                 (err.message.includes("CommandFailed") ||
                     err.message.includes("Documents in target range may still be in use") ||
-                    // This error will occur as a result of trying to move a chunk with a pre-refine
-                    // collection epoch.
+                    // This error will occur as a result of trying to move a chunk with a
+                    // pre-refine collection epoch.
                     err.message.includes("collection may have been dropped") ||
-                    // This error will occur if a moveChunk command has been sent with chunk boundaries
-                    // that represent the pre-refine chunks, but the collection has already been changed
-                    // to possess the post-refine chunk boundaries.
+                    // This error will occur if a moveChunk command has been sent with chunk
+                    // boundaries that represent the pre-refine chunks, but the collection has
+                    // already been changed to possess the post-refine chunk boundaries.
                     (err.message.includes("shard key bounds") &&
-                        err.message.includes("are not valid for shard key pattern"))))
+                        err.message.includes("are not valid for shard key pattern")) ||
+                    (err.message.includes("bound") && err.message.includes("is not valid for shard key pattern"))))
         );
     };
 

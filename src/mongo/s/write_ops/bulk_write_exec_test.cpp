@@ -1941,7 +1941,7 @@ TEST_F(BulkWriteOpTest, MultiAndTargetedOrderedOpsStaleConfig) {
     {
         auto error = Status{StaleConfigInfo(nss0, *endpointA.shardVersion, boost::none, shardIdA),
                             "Mock error: shard version mismatch"};
-        bulkWriteOp.noteChildBatchError(*targeted[shardIdA], error);
+        bulkWriteOp.noteChildBatchError(*targeted[shardIdA], error, boost::none);
     }
 
     // Simulate OK response from shardB.
@@ -2903,7 +2903,7 @@ TEST_F(BulkWriteOpTest, SuccessfulShardRepliesAreSavedAfterRetargeting) {
         Status{StaleConfigInfo(
                    nss0, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none, shardIdB),
                "Mock error: shard version mismatch"};
-    op.noteChildBatchError(*targeted[shardIdB], error);
+    op.noteChildBatchError(*targeted[shardIdB], error, boost::none);
 
     // We should have marked the write as ready so we can retarget as needed.
     ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
@@ -2958,7 +2958,7 @@ TEST_F(BulkWriteOpTest, ShardGetsSuccessfullyRetargetedOnCannotRefreshCacheError
     // Simulate a ShardCannotRefreshDueToLocksHeld error from the shard.
     auto error = Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
                         "Mock error: Catalog cache busy in refresh"};
-    op.noteChildBatchError(*targeted[shardId], error);
+    op.noteChildBatchError(*targeted[shardId], error, boost::none);
 
     // We should have marked the write as ready so we can retarget as needed.
     ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
@@ -3033,7 +3033,7 @@ TEST_F(BulkWriteOpTest, UnorderedBulkInsertGetsRepeatedOnCannotRefreshShardCache
     auto error = Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
                         "Mock error: Catalog cache busy in refresh"};
 
-    op.noteChildBatchError(*targeted[shardIdB], error);
+    op.noteChildBatchError(*targeted[shardIdB], error, boost::none);
 
     // We should have marked the remaining writes as ready so we can retarget as needed.
     ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Completed);

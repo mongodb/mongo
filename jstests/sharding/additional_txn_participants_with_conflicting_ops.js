@@ -63,7 +63,7 @@ const sessionDB = session.getDatabase(dbName);
         sessionDB
             .getCollection(localColl)
             .aggregate([{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
-    }, [ErrorCodes.MigrationConflict, ErrorCodes.ShardCannotRefreshDueToLocksHeld]);
+    }, [ErrorCodes.StaleConfig, ErrorCodes.MigrationConflict, ErrorCodes.ShardCannotRefreshDueToLocksHeld]);
     assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
     session.abortTransaction();
