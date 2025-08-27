@@ -335,5 +335,16 @@ BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+Milliseconds Shard::getConfiguredTimeoutForOperationOnNamespace(const NamespaceString& nss) {
+    if (nss == NamespaceString::kConfigsvrChunksNamespace) {
+        return Milliseconds(gFindChunksOnConfigTimeoutMS.load());
+    }
+    if (nss == NamespaceString::kConfigsvrShardsNamespace) {
+        return Milliseconds(gFindShardsOnConfigTimeoutMS.load());
+    }
+
+    return Milliseconds(defaultConfigCommandTimeoutMS.load());
+}
+
 
 }  // namespace mongo

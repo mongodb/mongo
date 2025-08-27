@@ -327,6 +327,11 @@ public:
     static bool shouldErrorBePropagated(ErrorCodes::Error code);
 
     /**
+     * Returns the namespace specific timeout values for operations
+     */
+    static Milliseconds getConfiguredTimeoutForOperationOnNamespace(const NamespaceString& nss);
+
+    /**
      * Called when the value of the server parameters 'ShardRetryTokenBucketCapacity' or
      * 'ShardRetryTokenReturnRate' changes.
      */

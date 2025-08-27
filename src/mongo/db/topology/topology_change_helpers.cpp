@@ -1405,7 +1405,7 @@ long long runCountCommandOnConfig(OperationContext* opCtx,
         kConfigReadSelector,
         nss.dbName(),
         countBuilder.done(),
-        Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::getConfiguredTimeoutForOperationOnNamespace(nss),
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(resultStatus));

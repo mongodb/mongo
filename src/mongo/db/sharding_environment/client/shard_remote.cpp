@@ -315,9 +315,7 @@ Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
     }
 
     return std::min(opCtx->getRemainingMaxTimeMillis(),
-                    nss == NamespaceString::kConfigsvrChunksNamespace
-                        ? Milliseconds(gFindChunksOnConfigTimeoutMS.load())
-                        : Milliseconds(defaultConfigCommandTimeoutMS.load()));
+                    Shard::getConfiguredTimeoutForOperationOnNamespace(nss));
 }
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(

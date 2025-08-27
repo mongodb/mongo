@@ -45,6 +45,19 @@ server_parameters:
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gFindChunksOnConfigTimeoutMS
         default: 900000
+        validator:
+            gte: 0
+        redact: false
+
+    findShardsOnConfigTimeoutMS:
+        description: >-
+            The timeout for find operations against config.shards.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gFindShardsOnConfigTimeoutMS
+        default: 5000
+        validator:
+            gte: 0
         redact: false
 
     defaultConfigCommandTimeoutMS:
