@@ -153,7 +153,7 @@ public:
             auto writeChecksum = [&checksumOut,
                                   &checksumCalculator](const std::string& recordingFile) {
                 auto checkSumVal = checksumCalculator.hexdigest();
-                checksumOut << recordingFile << "\t" << checkSumVal << "\n";
+                checksumOut << recordingFile << "\t" << checkSumVal << std::endl;
                 checksumCalculator.reset();
             };
 
