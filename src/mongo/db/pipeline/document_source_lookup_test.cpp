@@ -117,9 +117,9 @@ public:
 };
 
 auto makeLookUpFromBson(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto docSource = DocumentSourceLookUp::createFromBson(elem, expCtx);              
-    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.detach());                                      
-    return std::unique_ptr<DocumentSourceLookUp, DocumentSourceDeleter>(lookup,                                                                                                         
+    auto docSource = DocumentSourceLookUp::createFromBson(elem, expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.detach());
+    return std::unique_ptr<DocumentSourceLookUp, DocumentSourceDeleter>(lookup,
                                                                         DocumentSourceDeleter());
 }
 
