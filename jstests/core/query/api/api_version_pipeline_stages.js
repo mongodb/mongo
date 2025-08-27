@@ -10,8 +10,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_pipeline_stages";
 const coll = testDb[collName];
@@ -30,25 +28,8 @@ const unstablePipelines = [
     [{$unionWith: {coll: "coll2", pipeline: [{$collStats: {latencyStats: {}}}]}}],
     [{$lookup: {from: "coll2", pipeline: [{$indexStats: {}}]}}],
     [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
-];
-
-function is81orAbove(db) {
-    const res = db.getSiblingDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
-    return res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.1") >= 0;
-}
-
-// TODO (SERVER-98651) listClusterCatalog can always be included once backported.
-if (is81orAbove(db)) {
-    unstablePipelines.push([{$listClusterCatalog: {}}]);
-}
-
-// TODO SERVER-98591 Change RankFusionFull to RankFusionBasic.
-unstablePipelines.push([{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}]);
-
-let hybridSearchPipelines = [
-    // $score is not included in the strict api.
+    [{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}],
     [{$score: {score: 10}}],
-    // $minMaxScaler is not included in the strict api.
     [
         {
             $setWindowFields: {
@@ -64,7 +45,6 @@ let hybridSearchPipelines = [
             },
         },
     ],
-    // $scoreFusion is not included in the strict api.
     [
         {
             $scoreFusion: {
@@ -85,9 +65,19 @@ let hybridSearchPipelines = [
     ],
 ];
 
-unstablePipelines.concat(hybridSearchPipelines);
+function is81orAbove(db) {
+    const res = db.getSiblingDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
+    return res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.1") >= 0;
+}
+
+// TODO (SERVER-98651) listClusterCatalog can always be included once backported.
+if (is81orAbove(db)) {
+    unstablePipelines.push([{$listClusterCatalog: {}}]);
+}
 
 function assertAggregateFailsWithAPIStrict(pipeline) {
+    // The error code may also be an unrecognized pipeline stage, QueryFeatureNotAllowed, or parsing error, if the test is running in a
+    // multiversioned scenario where the stage does not exist or is not enabled on the older version.
     assert.commandFailedWithCode(
         testDb.runCommand({
             aggregate: collName,
@@ -96,7 +86,12 @@ function assertAggregateFailsWithAPIStrict(pipeline) {
             apiStrict: true,
             apiVersion: "1",
         }),
-        [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode],
+        [
+            ErrorCodes.APIStrictError,
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.FailedToParse,
+        ],
     );
 }
 
@@ -105,8 +100,8 @@ for (let pipeline of unstablePipelines) {
     assertAggregateFailsWithAPIStrict(pipeline);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    // The error code may also be an unrecognized pipeline stage, if the test is running in a
-    // multiversioned scenario.
+    // The error code may also be an unrecognized pipeline stage, QueryFeatureNotAllowed, or parsing error, if the test is running in a
+    // multiversioned scenario where the stage does not exist or is not enabled on the older version.
     assert.commandFailedWithCode(
         testDb.runCommand({
             create: "api_version_pipeline_stages_should_fail",
@@ -115,7 +110,12 @@ for (let pipeline of unstablePipelines) {
             apiStrict: true,
             apiVersion: "1",
         }),
-        [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode],
+        [
+            ErrorCodes.APIStrictError,
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.FailedToParse,
+        ],
     );
 }
 

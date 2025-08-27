@@ -68,6 +68,7 @@ function assertRankFusionCompletelyRejected(primaryConn) {
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
     assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}), [
         kUnrecognizedPipelineStageErrorCode,
+        ErrorCodes.QueryFeatureNotAllowed,
         ErrorCodes.OptionNotSupportedOnView,
     ]);
 }
