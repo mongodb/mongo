@@ -59,18 +59,22 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     Result result;
     for (const auto& [shardId, shardResponse] : response) {
         auto shardResult = onShardResponse(opCtx, routingCtx, shardId, shardResponse);
-        if (shardResult.errorType == ErrorType::kStopProcessing) {
-            return shardResult;
-        }
-        if (shardResult.errorType == ErrorType::kUnrecoverable) {
-            result.errorType = ErrorType::kUnrecoverable;
-        }
         result.opsToRetry.insert(result.opsToRetry.end(),
                                  std::make_move_iterator(shardResult.opsToRetry.begin()),
                                  std::make_move_iterator(shardResult.opsToRetry.end()));
         for (auto& [nss, info] : shardResult.collsToCreate) {
             if (auto it = result.collsToCreate.find(nss); it == result.collsToCreate.cend()) {
                 result.collsToCreate.emplace(nss, std::move(info));
+            }
+        }
+
+        if (shardResult.errorType != ErrorType::kNone) {
+            result.errorType = shardResult.errorType;
+
+            // If 'errorType' is kStopProcessing, stop processing immediately and return a Result
+            // for what we've processed so far.
+            if (shardResult.errorType == ErrorType::kStopProcessing) {
+                break;
             }
         }
     }
