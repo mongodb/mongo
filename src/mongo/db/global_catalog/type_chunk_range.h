@@ -58,8 +58,8 @@ public:
     /**
      * Factory function that parses a ChunkRange from a BSONObj.
      */
-    static ChunkRange parse(const IDLParserContext& ctxt,
-                            const BSONObj& bsonObject,
+    static ChunkRange parse(const BSONObj& bsonObject,
+                            const IDLParserContext& ctxt,
                             DeserializationContext* dctx = nullptr);
 
     static ChunkRange fromBSON(const BSONObj& obj);

@@ -419,7 +419,7 @@ bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const St
     // construct an invalid error reply.
     if (!status.isOK() && getTestCommandsEnabled()) {
         try {
-            ErrorReply::parse(IDLParserContext("appendCommandStatusNoThrow"), result.asTempObj());
+            ErrorReply::parse(result.asTempObj(), IDLParserContext("appendCommandStatusNoThrow"));
         } catch (const DBException&) {
             invariant(false,
                       "invalid error-response to a command constructed in "
@@ -974,11 +974,12 @@ public:
           _command(command),
           _request(request),
           _dbName(request.parseDbName()),
-          _genericArgs(GenericArguments::parse(IDLParserContext(_command->getName(),
-                                                                request.validatedTenancyScope,
-                                                                request.getValidatedTenantId(),
-                                                                request.getSerializationContext()),
-                                               _request.body)) {}
+          _genericArgs(
+              GenericArguments::parse(_request.body,
+                                      IDLParserContext(_command->getName(),
+                                                       request.validatedTenancyScope,
+                                                       request.getValidatedTenantId(),
+                                                       request.getSerializationContext()))) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {

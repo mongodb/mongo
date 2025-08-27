@@ -38,7 +38,7 @@
 namespace mongo {
 
 ShardVersion ShardVersion::parse(const BSONElement& element) {
-    auto parsedVersion = ShardVersionBase::parse(IDLParserContext("ShardVersion"), element.Obj());
+    auto parsedVersion = ShardVersionBase::parse(element.Obj(), IDLParserContext("ShardVersion"));
     auto version = parsedVersion.getVersion();
     ShardVersion sv(ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
                                  {version.getSecs(), version.getInc()}),

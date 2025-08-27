@@ -51,7 +51,7 @@ bool assertConnectionStatsBase(const AsyncClientFactory& factory,
                                std::function<bool(const GRPCConnectionStats&)> gRPCTest) {
     if (unittest::shouldUseGRPCEgress()) {
         factory.appendStats(bob);
-        return gRPCTest(GRPCConnectionStats::parse(IDLParserContext("GRPCStats"), bob.asTempObj()));
+        return gRPCTest(GRPCConnectionStats::parse(bob.asTempObj(), IDLParserContext("GRPCStats")));
     }
 
     ConnectionPoolStats stats;

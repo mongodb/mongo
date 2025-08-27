@@ -84,7 +84,7 @@ BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
     // construct an invalid error reply.
     if (getTestCommandsEnabled()) {
         try {
-            ErrorReply::parse(IDLParserContext("augmentReplyWithStatus"), bob.asTempObj());
+            ErrorReply::parse(bob.asTempObj(), IDLParserContext("augmentReplyWithStatus"));
         } catch (const DBException&) {
             invariant(false,
                       "invalid error-response to a command constructed in "

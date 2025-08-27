@@ -270,7 +270,7 @@ void RemoveShardCommitCoordinator::_finalizeShardRemoval(OperationContext* opCtx
 void RemoveShardCommitCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
     // Only one remove shard can run at any time, so all the user supplied parameters must match.
     const auto otherDoc = RemoveShardCommitCoordinatorDocument::parse(
-        IDLParserContext("RemoveShardCommitCoordinatorDocument"), stateDoc);
+        stateDoc, IDLParserContext("RemoveShardCommitCoordinatorDocument"));
 
     const auto optionsMatch = [&] {
         stdx::lock_guard lk(_docMutex);

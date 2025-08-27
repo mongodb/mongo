@@ -49,7 +49,7 @@ TEST(Validity, Empty) {
     //
 
     BSONObj emptyObj = BSONObj();
-    ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), emptyObj),
+    ASSERT_THROWS(VersionType::parse(emptyObj, IDLParserContext("VersionType")),
                   AssertionException);
 }
 
@@ -62,7 +62,7 @@ TEST(Validity, NewVersion) {
 
     auto versionDoc = BSON(VersionType::kClusterIdFieldName << clusterId);
 
-    auto versionResult = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+    auto versionResult = VersionType::parse(versionDoc, IDLParserContext("VersionType"));
 
     ASSERT_EQUALS(versionResult.getClusterId(), clusterId);
 }
@@ -76,13 +76,13 @@ TEST(Validity, NewVersionRoundTrip) {
 
     auto versionDoc = BSON(VersionType::kClusterIdFieldName << clusterId);
 
-    auto versionResult = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+    auto versionResult = VersionType::parse(versionDoc, IDLParserContext("VersionType"));
 
     ASSERT_EQUALS(versionResult.getClusterId(), clusterId);
 
     auto newVersionDoc = versionResult.toBSON();
 
-    auto newVersionResult = VersionType::parse(IDLParserContext("VersionType"), newVersionDoc);
+    auto newVersionResult = VersionType::parse(newVersionDoc, IDLParserContext("VersionType"));
 
     ASSERT_EQUALS(newVersionResult.getClusterId(), clusterId);
 }
@@ -94,7 +94,7 @@ TEST(Validity, NewVersionNoClusterId) {
 
     auto versionDoc = BSON("test" << "test_value");
 
-    ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), versionDoc),
+    ASSERT_THROWS(VersionType::parse(versionDoc, IDLParserContext("VersionType")),
                   AssertionException);
 }
 
@@ -105,7 +105,7 @@ TEST(Validity, NewVersionWrongClusterId) {
 
     auto versionDoc = BSON(VersionType::kClusterIdFieldName << "not really OID");
 
-    ASSERT_THROWS(VersionType::parse(IDLParserContext("VersionType"), versionDoc),
+    ASSERT_THROWS(VersionType::parse(versionDoc, IDLParserContext("VersionType")),
                   AssertionException);
 }
 
@@ -120,7 +120,7 @@ TEST(Validity, NewVersionWithId) {
     bob.append("clusterId", clusterId);
     bob.append("_id", 1);
     BSONObj versionDoc = bob.obj();
-    auto versionResult = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+    auto versionResult = VersionType::parse(versionDoc, IDLParserContext("VersionType"));
 
     ASSERT_EQUALS(versionResult.getClusterId(), clusterId);
 }

@@ -458,7 +458,7 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
 void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
     // Only one add shard can run at any time, so all the user supplied parameters must match.
     const auto otherDoc = AddShardCoordinatorDocument::parse(
-        IDLParserContext("AddShardCoordinatorDocument"), stateDoc);
+        stateDoc, IDLParserContext("AddShardCoordinatorDocument"));
 
     const auto optionsMatch = [&] {
         stdx::lock_guard lk(_docMutex);
@@ -781,7 +781,7 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(OperationContext* opCtx) 
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
                 const auto parsedDoc = UserWriteBlockingCriticalSectionDocument::parse(
-                    IDLParserContext("UserWriteBlockingCriticalSectionDocument"), doc);
+                    doc, IDLParserContext("UserWriteBlockingCriticalSectionDocument"));
                 if (parsedDoc.getBlockNewUserShardedDDL()) {
                     level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
                 }
@@ -814,7 +814,7 @@ void AddShardCoordinator::_dropSessionsCollection(OperationContext* opCtx) {
     uassertStatusOK(res.commandStatus);
 
     auto parsedResponse =
-        ListCollectionsReply::parse(IDLParserContext("ListCollectionReply"), res.response);
+        ListCollectionsReply::parse(res.response, IDLParserContext("ListCollectionReply"));
     tassert(10235201,
             "Found more than one system.session collection on the replica set being added",
             parsedResponse.getCursor().getFirstBatch().size() <= 1);

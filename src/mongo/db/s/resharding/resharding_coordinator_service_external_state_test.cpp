@@ -201,8 +201,8 @@ public:
                 }
 
                 auto aggRequest = AggregateCommandRequest::parse(
-                    IDLParserContext("mockRecipientCloningMetricsResponses"),
-                    req.cmdBSON.addFields(BSON("$db" << req.dbName)));
+                    req.cmdBSON.addFields(BSON("$db" << req.dbName)),
+                    IDLParserContext("mockRecipientCloningMetricsResponses"));
 
                 ASSERT_EQ(aggRequest.getNamespace(),
                           NamespaceString::kRecipientReshardingResumeDataNamespace);
@@ -278,8 +278,8 @@ public:
                 }
 
                 auto aggRequest = AggregateCommandRequest::parse(
-                    IDLParserContext("mockRecipientCloningMetricsResponses"),
-                    req.cmdBSON.addFields(BSON("$db" << req.dbName)));
+                    req.cmdBSON.addFields(BSON("$db" << req.dbName)),
+                    IDLParserContext("mockRecipientCloningMetricsResponses"));
 
                 ASSERT_EQUALS(aggRequest.getNamespace(), sourceNss);
 
@@ -329,8 +329,8 @@ public:
                 }
 
                 auto fetchCmd = ShardsvrReshardingDonorFetchFinalCollectionStats::parse(
-                    IDLParserContext("mockDonorDeltaMetricsResponses"),
-                    req.cmdBSON.addFields(BSON("$db" << req.dbName)));
+                    req.cmdBSON.addFields(BSON("$db" << req.dbName)),
+                    IDLParserContext("mockDonorDeltaMetricsResponses"));
 
                 ASSERT_EQ(fetchCmd.getCommandParameter(), sourceNss);
                 ASSERT_EQ(fetchCmd.getReshardingUUID(), reshardingUUID);

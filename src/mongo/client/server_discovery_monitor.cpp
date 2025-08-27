@@ -294,7 +294,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 auto responseTopologyVersion = result.response.data.getField("topologyVersion");
                 if (responseTopologyVersion) {
                     self->_topologyVersion = TopologyVersion::parse(
-                        IDLParserContext("TopologyVersion"), responseTopologyVersion.Obj());
+                        responseTopologyVersion.Obj(), IDLParserContext("TopologyVersion"));
                 } else {
                     self->_topologyVersion = boost::none;
                 }
@@ -350,7 +350,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 auto responseTopologyVersion = result.response.data.getField("topologyVersion");
                 if (responseTopologyVersion) {
                     self->_topologyVersion = TopologyVersion::parse(
-                        IDLParserContext("TopologyVersion"), responseTopologyVersion.Obj());
+                        responseTopologyVersion.Obj(), IDLParserContext("TopologyVersion"));
                 } else {
                     self->_topologyVersion = boost::none;
                 }

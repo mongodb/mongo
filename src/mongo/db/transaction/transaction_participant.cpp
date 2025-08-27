@@ -290,8 +290,8 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
             uassertStatusOK(swObj.getStatus());
         }
 
-        return SessionTxnRecord::parse(IDLParserContext("parse latest txn record for session"),
-                                       swObj.getValue());
+        return SessionTxnRecord::parse(swObj.getValue(),
+                                       IDLParserContext("parse latest txn record for session"));
     }();
 
     if (!result.lastTxnRecord) {
@@ -431,8 +431,8 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
 
             while (cursor->more()) {
                 const auto doc = cursor->next();
-                const auto childLsid = LogicalSessionId::parse(IDLParserContext("LogicalSessionId"),
-                                                               doc.getObjectField("_id"));
+                const auto childLsid = LogicalSessionId::parse(
+                    doc.getObjectField("_id"), IDLParserContext("LogicalSessionId"));
 
                 invariant(!cursor->more());
                 // All config.transactions entries with the parentLsid field should have a txnNumber
@@ -688,7 +688,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         boost::optional<Timestamp> oldestTxnTimestamp;
         while (exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED) {
             auto txnRecord =
-                SessionTxnRecord::parse(IDLParserContext("parse oldest active txn record"), doc);
+                SessionTxnRecord::parse(doc, IDLParserContext("parse oldest active txn record"));
             if (txnRecord.getState() != DurableTxnStateEnum::kPrepared &&
                 txnRecord.getState() != DurableTxnStateEnum::kInProgress) {
                 continue;
@@ -3367,7 +3367,7 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
                 while (cursor->more()) {
                     const auto doc = cursor->next();
                     const auto childLsid = LogicalSessionId::parse(
-                        IDLParserContext("LogicalSessionId"), doc.getObjectField("_id"));
+                        doc.getObjectField("_id"), IDLParserContext("LogicalSessionId"));
                     uassert(6202001,
                             str::stream()
                                 << "Refresh expected the highest transaction number in the session "

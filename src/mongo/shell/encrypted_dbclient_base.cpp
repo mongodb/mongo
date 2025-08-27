@@ -608,7 +608,7 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
     if (efc.eoo() || !efc.isABSONObj()) {
         return boost::none;
     }
-    return EncryptedFieldConfig::parse(IDLParserContext("encryptedFields"), efc.Obj());
+    return EncryptedFieldConfig::parse(efc.Obj(), IDLParserContext("encryptedFields"));
 }
 
 std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContext* cx,
@@ -893,7 +893,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
                               _conn->getServerAddress()));
     }
 
-    auto keyStoreRecord = KeyStoreRecord::parse(IDLParserContext("root"), dataKeyObj);
+    auto keyStoreRecord = KeyStoreRecord::parse(dataKeyObj, IDLParserContext("root"));
 
     BSONElement elem = dataKeyObj.getField("keyMaterial"_sd);
     uassert(ErrorCodes::BadValue,
@@ -915,7 +915,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
 
 SecureVector<uint8_t> EncryptedDBClientBase::getKeyMaterialFromDisk(const UUID& uuid) {
     auto rawKey = getEncryptedKey(uuid);
-    auto keyStoreRecord = KeyStoreRecord::parse(IDLParserContext("root"), rawKey);
+    auto keyStoreRecord = KeyStoreRecord::parse(rawKey, IDLParserContext("root"));
 
     auto dataKey = keyStoreRecord.getKeyMaterial();
 
@@ -1027,7 +1027,7 @@ std::shared_ptr<DBClientBase> createEncryptedDBClientBase(std::shared_ptr<DBClie
                 arg.isObject());
 
         const BSONObj obj = mozjs::ValueWriter(cx, arg).toBSON();
-        encryptionOptions = encryptionOptions.parse(IDLParserContext("root"), obj);
+        encryptionOptions = encryptionOptions.parse(obj, IDLParserContext("root"));
 
         // IDL does not perform a deep copy of BSONObjs when parsing, so we must get an
         // owned copy of the schemaMap.

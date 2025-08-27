@@ -43,8 +43,7 @@ VersionContext::VersionContext(const BSONObj& bsonObject) {
     if (!bsonObject.hasField(VersionContextMetadata::kOFCVFieldName)) {
         return;
     }
-    _metadataOrTag =
-        VersionContextMetadata::parse(IDLParserContext("VersionContextMetadata"), bsonObject);
+    _metadataOrTag = VersionContextMetadata::parse(bsonObject);
 }
 
 VersionContext& VersionContext::operator=(const VersionContext& other) {

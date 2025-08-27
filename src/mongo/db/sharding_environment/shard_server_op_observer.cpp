@@ -250,7 +250,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             }
 
             auto deletionTask =
-                RangeDeletionTask::parse(IDLParserContext("ShardServerOpObserver"), insertedDoc);
+                RangeDeletionTask::parse(insertedDoc, IDLParserContext("ShardServerOpObserver"));
 
             const auto numOrphanDocs = deletionTask.getNumOrphanDocs();
             BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskInsertion(
@@ -259,7 +259,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-                IDLParserContext("ShardServerOpObserver"), insertedDoc);
+                insertedDoc, IDLParserContext("ShardServerOpObserver"));
             invariant(!collCSDoc.getBlockReads());
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
@@ -411,7 +411,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
     if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
+            args.updateArgs->updatedDoc, IDLParserContext("ShardServerOpObserver"));
         invariant(collCSDoc.getBlockReads());
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
@@ -572,7 +572,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto& deletedDoc = documentId;
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserContext("ShardServerOpObserver"), deletedDoc);
+            deletedDoc, IDLParserContext("ShardServerOpObserver"));
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [deletedNss = collCSDoc.getNss(),
@@ -845,7 +845,7 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
     }
 
     auto entry = CreateDatabaseMetadataOplogEntry::parse(
-        IDLParserContext("OplogCreateDatabaseMetadataOplogEntryContext"), op.getObject());
+        op.getObject(), IDLParserContext("OplogCreateDatabaseMetadataOplogEntryContext"));
 
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
@@ -862,7 +862,7 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
     }
 
     auto entry = DropDatabaseMetadataOplogEntry::parse(
-        IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"), op.getObject());
+        op.getObject(), IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"));
 
     auto dbName = entry.getDbName();
 

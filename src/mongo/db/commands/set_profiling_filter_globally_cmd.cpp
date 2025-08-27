@@ -74,7 +74,7 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
             str::stream() << getName() << " command requires query knob to be enabled",
             internalQueryGlobalProfilingFilter.load());
 
-    auto request = SetProfilingFilterGloballyCmdRequest::parse(IDLParserContext(getName()), cmdObj);
+    auto request = SetProfilingFilterGloballyCmdRequest::parse(cmdObj, IDLParserContext(getName()));
 
     auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
 

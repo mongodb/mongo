@@ -446,7 +446,7 @@ StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
     keyDocs.reserve(objs.size());
     for (auto&& obj : objs) {
         try {
-            keyDocs.push_back(KeyDocumentType::parse(IDLParserContext("keyDoc"), obj));
+            keyDocs.push_back(KeyDocumentType::parse(obj, IDLParserContext("keyDoc")));
         } catch (...) {
             return exceptionToStatus();
         }
@@ -508,7 +508,7 @@ std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext*
     std::vector<DatabaseType> databases;
     databases.reserve(dbs.size());
     for (const BSONObj& doc : dbs) {
-        databases.emplace_back(DatabaseType::parse(IDLParserContext("DatabaseType"), doc));
+        databases.emplace_back(DatabaseType::parse(doc, IDLParserContext("DatabaseType")));
     }
 
     return databases;
@@ -544,7 +544,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
 
     try {
         auto db =
-            DatabaseType::parse(IDLParserContext("DatabaseType"), docsWithOpTime.value.front());
+            DatabaseType::parse(docsWithOpTime.value.front(), IDLParserContext("DatabaseType"));
         return repl::OpTimeWith<DatabaseType>(db, docsWithOpTime.opTime);
     } catch (const DBException& e) {
         return e.toStatus("Failed to parse DatabaseType");
@@ -564,7 +564,7 @@ HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
     uassertStatusOK(remoteResponse.commandStatus);
 
     auto placementDetails = ConfigsvrGetHistoricalPlacementResponse::parse(
-        IDLParserContext("ShardingCatalogClient"), remoteResponse.response);
+        remoteResponse.response, IDLParserContext("ShardingCatalogClient"));
 
     return placementDetails.getHistoricalPlacement();
 }
@@ -750,7 +750,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionName
     std::vector<NamespaceString> collections;
     collections.reserve(collDocs.size());
     for (const BSONObj& obj : collDocs) {
-        auto coll = CollectionTypeBase::parse(IDLParserContext("getShardedCollectionsForDb"), obj);
+        auto coll = CollectionTypeBase::parse(obj, IDLParserContext("getShardedCollectionsForDb"));
         collections.emplace_back(coll.getNss());
     }
 
@@ -797,7 +797,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     collections.reserve(collDocs.size());
     for (const BSONObj& obj : collDocs) {
         auto coll =
-            CollectionTypeBase::parse(IDLParserContext("getAllUnsplittableCollectionsForDb"), obj);
+            CollectionTypeBase::parse(obj, IDLParserContext("getAllUnsplittableCollectionsForDb"));
         collections.emplace_back(coll.getNss());
     }
 
@@ -877,8 +877,8 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     }
 
     try {
-        return VersionType::parseOwned(IDLParserContext("VersionType"),
-                                       std::move(queryResults.front()));
+        return VersionType::parseOwned(std::move(queryResults.front()),
+                                       IDLParserContext("VersionType"));
     } catch (const DBException& e) {
         return e.toStatus().withContext(str::stream() << "Unable to parse config.version document");
     }

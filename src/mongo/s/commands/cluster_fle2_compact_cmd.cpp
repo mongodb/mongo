@@ -148,8 +148,8 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
 
             auto reply = CommandHelpers::filterCommandReplyForPassthrough(response.data);
             uassertStatusOK(getStatusFromCommandResult(reply));
-            return Reply::parse(IDLParserContext{Request::kCommandName},
-                                reply.removeField("ok"_sd));
+            return Reply::parse(reply.removeField("ok"_sd),
+                                IDLParserContext{Request::kCommandName});
         });
 }
 

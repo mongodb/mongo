@@ -178,7 +178,7 @@ public:
                         uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
 
                         auto renameCollResp = RenameCollectionResponse::parse(
-                            IDLParserContext("renameCollection"), resultObj);
+                            resultObj, IDLParserContext("renameCollection"));
 
                         auto catalogCache = Grid::get(opCtx)->catalogCache();
                         catalogCache->onStaleCollectionVersion(

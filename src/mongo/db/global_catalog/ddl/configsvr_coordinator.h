@@ -117,7 +117,7 @@ class ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator {
 public:
     ConfigsvrCoordinatorImpl(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),
-          _doc(StateDoc::parse(IDLParserContext("CoordinatorDocument"), stateDoc)) {}
+          _doc(StateDoc::parse(stateDoc, IDLParserContext("CoordinatorDocument"))) {}
 
     ~ConfigsvrCoordinatorImpl() override {}
 

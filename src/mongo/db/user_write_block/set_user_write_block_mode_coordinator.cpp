@@ -107,7 +107,7 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
 
 bool SetUserWriteBlockModeCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc =
-        StateDoc::parse(IDLParserContext("SetUserWriteBlockModeCoordinatorDocument"), otherDocBSON);
+        StateDoc::parse(otherDocBSON, IDLParserContext("SetUserWriteBlockModeCoordinatorDocument"));
     return _evalStateDocumentThreadSafe(
         [&](const StateDoc& doc) { return doc.getBlock() == otherDoc.getBlock(); });
 }

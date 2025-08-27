@@ -120,7 +120,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         auto dbObj = client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilterExact);
         if (!dbObj.isEmpty()) {
             replClient.setLastOpToSystemLastOpTime(opCtx);
-            return DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
+            return DatabaseType::parse(dbObj, IDLParserContext("DatabaseType"));
         }
 
         if (dbLock) {
@@ -148,7 +148,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilterCaseInsensitive);
     auto returnDatabaseValue = [&] {
         if (!dbDoc.isEmpty()) {
-            auto actualDb = DatabaseType::parse(IDLParserContext("DatabaseType"), dbDoc);
+            auto actualDb = DatabaseType::parse(dbDoc, IDLParserContext("DatabaseType"));
             create_database_util::checkAgainstExistingDbDoc(
                 actualDb, dbName, optResolvedPrimaryShard);
 
@@ -268,7 +268,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 return SemiFuture<void>::makeReady();
             }
 
-            auto dbEntry = DatabaseType::parse(IDLParserContext("DatabaseType"), dbs.front());
+            auto dbEntry = DatabaseType::parse(dbs.front(), IDLParserContext("DatabaseType"));
 
             // Update the database entry and insert a placement history entry for the database.
             const auto updateDatabaseEntryOp = [&] {

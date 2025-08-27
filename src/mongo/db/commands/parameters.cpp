@@ -214,7 +214,7 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
 
 GetParameterOptions parseGetParameterOptions(BSONElement elem) {
     if (elem.type() == BSONType::object) {
-        return GetParameterOptions::parse(IDLParserContext{"getParameter"}, elem.Obj());
+        return GetParameterOptions::parse(elem.Obj(), IDLParserContext{"getParameter"});
     }
     if ((elem.type() == BSONType::string) && (elem.valueStringDataSafe() == "*"_sd)) {
         GetParameterOptions ret;

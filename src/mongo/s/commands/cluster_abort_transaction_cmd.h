@@ -57,7 +57,7 @@ public:
         auto ctx = IDLParserContext("AbortReply");
         if (!BaseType::checkIsErrorStatus(resultObj, ctx)) {
             // Will throw if the result doesn't match the abortReply.
-            Reply::parse(ctx, resultObj);
+            Reply::parse(resultObj, ctx);
         }
     }
 

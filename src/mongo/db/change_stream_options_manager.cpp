@@ -112,7 +112,7 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
         ChangeStreamOptionsManager& changeStreamOptionsManager =
             ChangeStreamOptionsManager::get(getGlobalServiceContext());
         ChangeStreamOptions newOptions = ChangeStreamOptions::parse(
-            IDLParserContext("changeStreamOptions"), newValueElement.Obj());
+            newValueElement.Obj(), IDLParserContext("changeStreamOptions"));
 
         return changeStreamOptionsManager
             .setOptions(Client::getCurrent()->getOperationContext(), newOptions)
@@ -142,7 +142,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
             ctxt.throwMissingField("preAndPostImages"_sd);
         }
 
-        ChangeStreamOptions newOptions = ChangeStreamOptions::parse(ctxt, changeStreamOptionsObj);
+        ChangeStreamOptions newOptions = ChangeStreamOptions::parse(changeStreamOptionsObj, ctxt);
         auto preAndPostImages = newOptions.getPreAndPostImages();
         visit(OverloadedVisitor{
                   [&](const std::string& expireAfterSeconds) {

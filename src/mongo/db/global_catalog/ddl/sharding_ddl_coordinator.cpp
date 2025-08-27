@@ -123,8 +123,8 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
 }
 
 ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc) {
-    return ShardingDDLCoordinatorMetadata::parse(IDLParserContext("ShardingDDLCoordinatorMetadata"),
-                                                 coorDoc);
+    return ShardingDDLCoordinatorMetadata::parse(
+        coorDoc, IDLParserContext("ShardingDDLCoordinatorMetadata"));
 }
 
 ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* service,

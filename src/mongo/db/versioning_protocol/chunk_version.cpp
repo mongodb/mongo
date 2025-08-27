@@ -59,7 +59,7 @@ std::string CollectionGeneration::toString() const {
 
 ChunkVersion ChunkVersion::parse(const BSONElement& element) {
     auto parsedVersion =
-        ChunkVersion60Format::parse(IDLParserContext("ChunkVersion"), element.Obj());
+        ChunkVersion60Format::parse(element.Obj(), IDLParserContext("ChunkVersion"));
     auto version = parsedVersion.getVersion();
     return ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
                         {version.getSecs(), version.getInc()});

@@ -52,7 +52,7 @@ void SbeHashAggIncreasedSpillingMode::append(OperationContext*,
 Status SbeHashAggIncreasedSpillingMode::setFromString(StringData value,
                                                       const boost::optional<TenantId>&) {
     _data = SbeHashAggIncreasedSpillingMode_parse(
-        IDLParserContext("internalQuerySlotBasedExecutionHashAggIncreasedSpilling"), value);
+        value, IDLParserContext("internalQuerySlotBasedExecutionHashAggIncreasedSpilling"));
     return Status::OK();
 }
 

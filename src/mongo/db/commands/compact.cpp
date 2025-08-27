@@ -120,7 +120,7 @@ public:
             : SerializationContext::stateCommandRequest();
 
         auto params =
-            CompactCommand::parse(IDLParserContext("compact", vts, dbName.tenantId(), sc), cmdObj);
+            CompactCommand::parse(cmdObj, IDLParserContext("compact", vts, dbName.tenantId(), sc));
 
         _assertCanRunCompact(opCtx, params);
 

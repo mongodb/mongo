@@ -68,7 +68,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::cre
             elem.type() == BSONType::object);
 
     auto spec =
-        InternalApplyOplogUpdateSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+        InternalApplyOplogUpdateSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
 
     return new DocumentSourceInternalApplyOplogUpdate(pExpCtx, spec.getOplogUpdate());
 }

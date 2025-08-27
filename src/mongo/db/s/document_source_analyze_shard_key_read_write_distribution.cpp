@@ -205,8 +205,8 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
         splitPointsShard,
         [&](const BSONObj& doc) {
             auto splitPointDoc = AnalyzeShardKeySplitPointDocument::parse(
-                IDLParserContext(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName),
-                doc);
+                doc,
+                IDLParserContext(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName));
             auto splitPoint = splitPointDoc.getSplitPoint();
             uassertShardKeyValueNotContainArrays(splitPoint);
             appendChunk(lastChunkMax, splitPoint);
@@ -256,7 +256,7 @@ void processSampledQueries(OperationContext* opCtx,
     while (cursor->more()) {
         const auto obj = cursor->next().getOwned();
         const auto doc = SampledQueryDocument::parse(
-            IDLParserContext(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName), obj);
+            obj, IDLParserContext(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName));
 
         switch (doc.getCmdName()) {
             case SampledCommandNameEnum::kFind:
@@ -357,7 +357,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
             specElem.type() == BSONType::object);
     auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(
-        IDLParserContext(kStageName), specElem.embeddedObject());
+        specElem.embeddedObject(), IDLParserContext(kStageName));
 
     return make_intrusive<DocumentSourceAnalyzeShardKeyReadWriteDistribution>(pExpCtx,
                                                                               std::move(spec));
@@ -426,7 +426,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse(
     uassertStatusOK(validateNamespace(nss));
 
     auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(
-        IDLParserContext(kStageName), specElem.embeddedObject());
+        specElem.embeddedObject(), IDLParserContext(kStageName));
     return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
 }
 

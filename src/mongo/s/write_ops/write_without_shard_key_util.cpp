@@ -181,7 +181,7 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
         reply = result.toBSON();
     } else {
         write_ops::UpdateCommandReply updateReply = write_ops::UpdateCommandReply::parse(
-            IDLParserContext("upsertWithoutShardKeyResult"), writeRes.toBSON());
+            writeRes.toBSON(), IDLParserContext("upsertWithoutShardKeyResult"));
         write_ops::Upserted upsertedType;
 
         // It is guaranteed that the index of this update is 0 since shards evaluate one
@@ -325,7 +325,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
 
             ClusterQueryWithoutShardKeyResponse queryResponse =
                 ClusterQueryWithoutShardKeyResponse::parseOwned(
-                    IDLParserContext("_clusterQueryWithoutShardKeyResponse"), std::move(queryRes));
+                    std::move(queryRes), IDLParserContext("_clusterQueryWithoutShardKeyResponse"));
 
             // The target document can contain the target document's _id or a generated upsert
             // document. If there's no targetDocument, then no modification needs to be made.
@@ -372,8 +372,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
                     sharedBlock->cmdObj.getBoolField("new"));
 
                 sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
-                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"),
-                    std::move(upsertResponse));
+                    std::move(upsertResponse),
+                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"));
             } else {
                 BSONObjBuilder bob(sharedBlock->cmdObj);
                 ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
@@ -386,7 +386,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
                 uassertStatusOK(getStatusFromCommandResult(writeRes));
 
                 sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
-                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
+                    std::move(writeRes), IDLParserContext("_clusterWriteWithoutShardKeyResponse"));
             }
             uassertStatusOK(
                 getStatusFromWriteCommandReply(sharedBlock->clusterWriteResponse.getResponse()));

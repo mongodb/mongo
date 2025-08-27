@@ -667,7 +667,7 @@ boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(OperationCon
         // we won't need the shard key pattern anyways.
         return boost::none;
     }
-    auto rdt = RangeDeletionTask::parse(IDLParserContext("MigrationRecovery"), cursor->next());
+    auto rdt = RangeDeletionTask::parse(cursor->next(), IDLParserContext("MigrationRecovery"));
     return rdt.getKeyPattern();
 }
 

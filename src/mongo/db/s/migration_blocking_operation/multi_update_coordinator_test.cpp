@@ -345,7 +345,7 @@ protected:
         auto doc = client.findOne(NamespaceString::kMultiUpdateCoordinatorsNamespace,
                                   BSON(MultiUpdateCoordinatorDocument::kIdFieldName << instanceId));
         IDLParserContext errCtx("MultiUpdateCoordinatorTest::getPhaseDocumentOnDisk()");
-        return MultiUpdateCoordinatorDocument::parse(errCtx, doc);
+        return MultiUpdateCoordinatorDocument::parse(doc, errCtx);
     }
 
     bool stateDocumentExistsOnDisk(OperationContext* opCtx, UUID instanceId) {
@@ -436,7 +436,7 @@ protected:
         auto phaseString = std::string{
             getMetrics(instance).getObjectField("mutableFields").getStringField("phase")};
         IDLParserContext errCtx("MultiUpdateCoordinatorTest::getPhase()");
-        return MultiUpdateCoordinatorPhase_parse(errCtx, phaseString);
+        return MultiUpdateCoordinatorPhase_parse(phaseString, errCtx);
     }
 
     enum ResultCategory { kSuccess, kFailure };

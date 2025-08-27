@@ -314,8 +314,8 @@ bool validateOplogId(const Timestamp& clusterTime,
                      const mongo::Document& sourceDoc,
                      const repl::OplogEntry& oplogEntry) {
     auto oplogIdExpected = ReshardingDonorOplogId{clusterTime, sourceDoc["ts"].getTimestamp()};
-    auto oplogId = ReshardingDonorOplogId::parse(IDLParserContext("ReshardingAggTest"),
-                                                 oplogEntry.get_id()->getDocument().toBson());
+    auto oplogId = ReshardingDonorOplogId::parse(oplogEntry.get_id()->getDocument().toBson(),
+                                                 IDLParserContext("ReshardingAggTest"));
     return oplogIdExpected == oplogId;
 }
 
@@ -409,8 +409,8 @@ protected:
 
 
     ReshardingDonorOplogId getOplogId(const repl::MutableOplogEntry& oplog) {
-        return ReshardingDonorOplogId::parse(IDLParserContext("ReshardingAggTest::getOplogId"),
-                                             oplog.get_id()->getDocument().toBson());
+        return ReshardingDonorOplogId::parse(oplog.get_id()->getDocument().toBson(),
+                                             IDLParserContext("ReshardingAggTest::getOplogId"));
     }
 
     std::unique_ptr<Pipeline> createPipeline(
@@ -1797,8 +1797,8 @@ TEST_F(ReshardingAggWithStorageTest,
     auto operationDocs = applyOpsInfo.getOperations();
     ASSERT_EQ(operationDocs.size(), 1U);
     auto outputInnerOp2 = repl::DurableReplOperation::parse(
-        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"},
-        operationDocs[0]);
+        operationDocs[0],
+        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"});
     ASSERT_TRUE(outputInnerOp2.getPreImageOpTime());
     ASSERT_FALSE(outputInnerOp2.getNeedsRetryImage());
     ASSERT_EQ(preImageOplog.getOpTime(), *outputInnerOp2.getPreImageOpTime());
@@ -1822,8 +1822,8 @@ TEST_F(ReshardingAggWithStorageTest,
     // Create another pipeline and start fetching from after the doc for the pre-image, and verify
     // that the pipeline does not re-output the applyOps doc that comes before the pre-image doc.
     const auto startAt = ReshardingDonorOplogId::parse(
-        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"},
-        preImageOplog.get_id()->getDocument().toBson());
+        preImageOplog.get_id()->getDocument().toBson(),
+        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"});
     auto newPipeline = createPipeline(startAt);
     auto newExecPipeline = exec::agg::buildPipeline(newPipeline->freeze());
 

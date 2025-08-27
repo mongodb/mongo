@@ -354,7 +354,7 @@ protected:
                                   BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns_forTest()));
 
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
-            IDLParserContext("ReshardingCoordinatorTest"), doc);
+            doc, IDLParserContext("ReshardingCoordinatorTest"));
 
         ASSERT_EQUALS(coordinatorDoc.getReshardingUUID(),
                       expectedCoordinatorDoc.getReshardingUUID());
@@ -660,7 +660,7 @@ protected:
         const auto placementDoc = client.findOne(reshardedCollPlacementReq);
         ASSERT(!placementDoc.isEmpty());
         const auto placement = NamespacePlacementType::parse(
-            IDLParserContext("writeDecisionPersistedStateExpectSuccess"), placementDoc);
+            placementDoc, IDLParserContext("writeDecisionPersistedStateExpectSuccess"));
         ASSERT_EQ(reshardingUUID, placement.getUuid());
         ASSERT_EQ(expectedCollPlacement.size(), placement.getShards().size());
         for (const auto& shardId : placement.getShards()) {

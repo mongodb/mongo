@@ -147,7 +147,7 @@ protected:
         uassertStatusOK(result.getStatus());
 
         IDLParserContext ctx("");
-        return T::parse(ctx, result.getValue());
+        return T::parse(result.getValue(), ctx);
     }
 
     /**

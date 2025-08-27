@@ -426,7 +426,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromB
                           << typeName(elem.type()),
             elem.type() == BSONType::object);
 
-    auto spec = ScoreSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+    auto spec = ScoreSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
     return constructDesugaredOutput(spec, pExpCtx);
 }
 

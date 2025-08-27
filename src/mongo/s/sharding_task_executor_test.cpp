@@ -102,7 +102,7 @@ protected:
         ASSERT(opCtxLsid);
 
         auto cmdObjLsid =
-            LogicalSessionFromClient::parse(IDLParserContext{"lsid"}, cmdObj["lsid"].Obj());
+            LogicalSessionFromClient::parse(cmdObj["lsid"].Obj(), IDLParserContext{"lsid"});
 
         ASSERT_EQ(opCtxLsid->getId(), cmdObjLsid.getId());
         ASSERT_EQ(opCtxLsid->getUid(), *cmdObjLsid.getUid());

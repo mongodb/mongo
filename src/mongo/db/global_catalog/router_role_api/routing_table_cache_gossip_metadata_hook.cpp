@@ -58,7 +58,7 @@ Status RoutingTableCacheGossipMetadataHook::readReplyMetadata(OperationContext* 
             const auto catalogCache = Grid::get(_serviceContext)->catalogCache();
             for (const auto& elem : routerCacheVersionsObj.Array()) {
                 const auto gossipedRoutingCache = GossipedRoutingCache::parse(
-                    IDLParserContext("RoutingTableCacheGossipMetadataHook"), elem.Obj());
+                    elem.Obj(), IDLParserContext("RoutingTableCacheGossipMetadataHook"));
 
                 catalogCache->advanceCollectionTimeInStore(
                     gossipedRoutingCache.getNss(), gossipedRoutingCache.getCollectionVersion());

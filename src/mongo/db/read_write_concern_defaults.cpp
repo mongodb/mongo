@@ -199,7 +199,7 @@ void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationConte
     // no new defaults document and the RWConcern will be default constructed, which matches the
     // behavior when lookup discovers a non-existent defaults document.
     auto newDefaultsDoc = newDoc
-        ? RWConcernDefault::parse(IDLParserContext("RWDefaultsWriteObserver"), newDoc->getOwned())
+        ? RWConcernDefault::parse(newDoc->getOwned(), IDLParserContext("RWDefaultsWriteObserver"))
         : RWConcernDefault();
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(

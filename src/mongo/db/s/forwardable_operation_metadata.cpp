@@ -57,7 +57,7 @@ namespace mongo {
 
 ForwardableOperationMetadata::ForwardableOperationMetadata(const BSONObj& obj) {
     ForwardableOperationMetadataBase::parseProtected(
-        IDLParserContext("ForwardableOperationMetadataBase"), obj);
+        obj, IDLParserContext("ForwardableOperationMetadataBase"));
 }
 
 ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opCtx) {

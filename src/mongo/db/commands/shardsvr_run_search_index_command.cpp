@@ -116,7 +116,7 @@ public:
                                               cmd.getView());
 
             auto searchIdxResp = SearchIndexManagerResponse::parse(
-                IDLParserContext("_shardsvrRunSearchIndexCommand"), manageSearchIndexResponse);
+                manageSearchIndexResponse, IDLParserContext("_shardsvrRunSearchIndexCommand"));
             res.setSearchIndexManagerResponse(searchIdxResp);
             res.setOk(1.0);
             return res;

@@ -1015,7 +1015,7 @@ NamespaceStringToShardDataSizeMap getStatsForBalancing(
 
             const ShardsvrGetStatsForBalancingReply reply =
                 ShardsvrGetStatsForBalancingReply::parse(
-                    IDLParserContext("ShardsvrGetStatsForBalancingReply"), responseValue.data);
+                    responseValue.data, IDLParserContext("ShardsvrGetStatsForBalancingReply"));
             const auto collStatsFromShard = reply.getStats();
 
             tassert(8245200,

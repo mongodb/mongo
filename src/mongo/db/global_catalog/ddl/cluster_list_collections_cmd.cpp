@@ -188,7 +188,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // testing because an error while parsing indicates an internal error, not something that should
     // surface to a user.
     if (getTestCommandsEnabled()) {
-        ListCollections::parse(IDLParserContext("ListCollectionsForOwnCollections"), rewrittenCmd);
+        ListCollections::parse(rewrittenCmd, IDLParserContext("ListCollectionsForOwnCollections"));
     }
 
     return rewrittenCmd;
@@ -230,7 +230,7 @@ public:
                               auth::ValidatedTenancyScope::get(opCtx),
                               dbName.tenantId(),
                               SerializationContext::stateDefault());
-        auto request = idl::parseCommandDocument<ListCollections>(ctxt, cmdObj);
+        auto request = idl::parseCommandDocument<ListCollections>(cmdObj, ctxt);
         return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }
 
@@ -296,8 +296,8 @@ public:
 
     void validateResult(const BSONObj& result) final {
         StringDataSet ignorableFields({ErrorReply::kOkFieldName});
-        ListCollectionsReply::parse(IDLParserContext("ListCollectionsReply"),
-                                    result.removeFields(ignorableFields));
+        ListCollectionsReply::parse(result.removeFields(ignorableFields),
+                                    IDLParserContext("ListCollectionsReply"));
     }
 
     const AuthorizationContract* getAuthorizationContract() const final {

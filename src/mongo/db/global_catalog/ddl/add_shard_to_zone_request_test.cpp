@@ -49,7 +49,7 @@ TEST(AddShardToZone, BasicValidMongosCommand) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("AddShardToZone");
-    auto parsedRequest = AddShardToZone::parse(ctx, cmdObj);
+    auto parsedRequest = AddShardToZone::parse(cmdObj, ctx);
     ASSERT_EQ("a", parsedRequest.getCommandParameter());
     ASSERT_EQ("z", parsedRequest.getZone());
 }
@@ -61,7 +61,7 @@ TEST(AddShardToZone, MissingShardNameErrors) {
     })BSON");
     IDLParserContext ctx("AddShardToZone");
     ASSERT_THROWS_CODE(
-        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
+        AddShardToZone::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(AddShardToZone, MissingZoneErrors) {
@@ -71,7 +71,7 @@ TEST(AddShardToZone, MissingZoneErrors) {
     })BSON");
     IDLParserContext ctx("AddShardToZone");
     ASSERT_THROWS_CODE(
-        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
+        AddShardToZone::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(AddShardToZone, WrongShardNameTypeErrors) {
@@ -82,7 +82,7 @@ TEST(AddShardToZone, WrongShardNameTypeErrors) {
     })BSON");
     IDLParserContext ctx("AddShardToZone");
     ASSERT_THROWS_CODE(
-        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        AddShardToZone::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(AddShardToZone, WrongZoneTypeErrors) {
@@ -93,7 +93,7 @@ TEST(AddShardToZone, WrongZoneTypeErrors) {
     })BSON");
     IDLParserContext ctx("AddShardToZone");
     ASSERT_THROWS_CODE(
-        AddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        AddShardToZone::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(ConfigsvrAddShardToZone, BasicValidConfigsvrCommand) {
@@ -103,7 +103,7 @@ TEST(ConfigsvrAddShardToZone, BasicValidConfigsvrCommand) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrAddShardToZone");
-    auto parsedRequest = ConfigsvrAddShardToZone::parse(ctx, cmdObj);
+    auto parsedRequest = ConfigsvrAddShardToZone::parse(cmdObj, ctx);
     ASSERT_EQ("a", parsedRequest.getCommandParameter());
     ASSERT_EQ("z", parsedRequest.getZone());
 }
@@ -114,7 +114,7 @@ TEST(ConfigsvrAddShardToZone, MissingShardNameErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrAddShardToZone");
-    ASSERT_THROWS_CODE(ConfigsvrAddShardToZone::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrAddShardToZone::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -125,7 +125,7 @@ TEST(ConfigsvrAddShardToZone, MissingZoneErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrAddShardToZone");
-    ASSERT_THROWS_CODE(ConfigsvrAddShardToZone::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrAddShardToZone::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -138,7 +138,7 @@ TEST(ConfigsvrAddShardToZone, WrongShardNameTypeErrors) {
     })BSON");
     IDLParserContext ctx("ConfigsvrAddShardToZone");
     ASSERT_THROWS_CODE(
-        ConfigsvrAddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        ConfigsvrAddShardToZone::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(ConfigsvrAddShardToZone, WrongZoneTypeErrors) {
@@ -149,7 +149,7 @@ TEST(ConfigsvrAddShardToZone, WrongZoneTypeErrors) {
     })BSON");
     IDLParserContext ctx("ConfigsvrAddShardToZone");
     ASSERT_THROWS_CODE(
-        ConfigsvrAddShardToZone::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        ConfigsvrAddShardToZone::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 }  // unnamed namespace

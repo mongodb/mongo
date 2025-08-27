@@ -255,9 +255,8 @@ BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
             }
         }
         if (response.isWriteConcernErrorSet()) {
-            auto bwWce = BulkWriteWriteConcernError::parseOwned(
-                IDLParserContext("BulkWriteWriteConcernError"),
-                response.getWriteConcernError()->toBSON());
+            auto bwWce =
+                BulkWriteWriteConcernError::parseOwned(response.getWriteConcernError()->toBSON());
             replyInfo.wcErrors = bwWce;
         }
     } else {
@@ -645,8 +644,8 @@ void executeWriteWithoutShardKey(
         } else {
             try {
                 bulkWriteResponse = BulkWriteCommandReply::parse(
-                    IDLParserContext("BulkWriteCommandReplyForWriteWithoutShardKey"),
-                    swRes.getValue().getResponse());
+                    swRes.getValue().getResponse(),
+                    IDLParserContext("BulkWriteCommandReplyForWriteWithoutShardKey"));
             } catch (const DBException& ex) {
                 responseStatus = ex.toStatus().withContext(
                     "Failed to parse response from writes without shard key");
@@ -1309,8 +1308,8 @@ std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
                 id = 0;
             } else {
                 auto getMoreReply =
-                    CursorGetMoreReply::parse(IDLParserContext("BulkWriteCommandGetMoreReply"),
-                                              response.swResponse.getValue().data);
+                    CursorGetMoreReply::parse(response.swResponse.getValue().data,
+                                              IDLParserContext("BulkWriteCommandGetMoreReply"));
 
                 id = getMoreReply.getCursor().getCursorId();
                 collection = getMoreReply.getCursor().getNs().coll();
@@ -1340,8 +1339,7 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
 
     auto childBatchStatus = getStatusFromCommandResult(childBatchResponse.data);
     if (childBatchStatus.isOK()) {
-        auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("BulkWriteCommandReply"),
-                                                    childBatchResponse.data);
+        auto bwReply = BulkWriteCommandReply::parse(childBatchResponse.data);
         if (bwReply.getWriteConcernError()) {
             saveWriteConcernError(
                 response.shardId, bwReply.getWriteConcernError().value(), writeBatch);
@@ -1362,8 +1360,7 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
             childBatchStatus != ErrorCodes::WouldChangeOwningShard) {
             _aborted = true;
 
-            auto errorReply =
-                ErrorReply::parse(IDLParserContext("ErrorReply"), childBatchResponse.data);
+            auto errorReply = ErrorReply::parse(childBatchResponse.data);
 
             // Transient transaction errors should be returned directly as top level errors to allow
             // the client to retry.

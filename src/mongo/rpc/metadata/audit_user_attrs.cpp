@@ -69,7 +69,7 @@ void AuditUserAttrs::set(OperationContext* opCtx, AuditUserAttrs attrs) {
 }
 
 AuditUserAttrs::AuditUserAttrs(const BSONObj& obj) {
-    AuditUserAttrsBase::parseProtected(IDLParserContext("AuditUserAttrsBase"), obj);
+    AuditUserAttrsBase::parseProtected(obj);
 }
 
 void AuditUserAttrs::resetToAuthenticatedUser(OperationContext* opCtx) {

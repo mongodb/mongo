@@ -172,7 +172,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
         : SerializationContext::stateStorageRequest();
     auto parsedMr = MapReduceCommandRequest::parse(
-        IDLParserContext("mapReduce", vts, dbName.tenantId(), sc), cmd);
+        cmd, IDLParserContext("mapReduce", vts, dbName.tenantId(), sc));
 
     // Start the query planning timer right after parsing.
     auto curop = CurOp::get(opCtx);

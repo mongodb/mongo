@@ -94,7 +94,7 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
         // mongos process. Parse out of the IDL spec format, rather than just expecting only the
         // mongot query (as a user would provide).
         auto params = InternalSearchMongotRemoteSpec::parseOwned(
-            IDLParserContext(DocumentSourceSearchMeta::kStageName), spec.getOwned());
+            spec.getOwned(), IDLParserContext(DocumentSourceSearchMeta::kStageName));
         LOGV2_DEBUG(8569405,
                     4,
                     "Parsing as $internalSearchMongotRemote",

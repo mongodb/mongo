@@ -90,8 +90,8 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
     boost::optional<TimeseriesOptions> timeseriesOptions = boost::none;
     if (auto tsOptionsElt = viewDef[kTimeseriesOptions]) {
         if (tsOptionsElt.isABSONObj()) {
-            timeseriesOptions = TimeseriesOptions::parse(IDLParserContext{"ResolvedView::fromBSON"},
-                                                         tsOptionsElt.Obj());
+            timeseriesOptions = TimeseriesOptions::parse(
+                tsOptionsElt.Obj(), IDLParserContext{"ResolvedView::fromBSON"});
         }
     }
 

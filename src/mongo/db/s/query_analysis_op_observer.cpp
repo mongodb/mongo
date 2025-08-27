@@ -55,7 +55,7 @@ void QueryAnalysisOpObserver::insertInConfigQueryAnalyzersNamespaceImpl(
     std::vector<InsertStatement>::const_iterator end) {
     for (auto it = begin; it != end; ++it) {
         auto parsedDoc = QueryAnalyzerDocument::parse(
-            IDLParserContext("QueryAnalysisOpObserver::onInserts"), it->doc);
+            it->doc, IDLParserContext("QueryAnalysisOpObserver::onInserts"));
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [parsedDoc = std::move(parsedDoc)](OperationContext* opCtx,
                                                boost::optional<Timestamp>) {
@@ -68,7 +68,7 @@ void QueryAnalysisOpObserver::insertInConfigQueryAnalyzersNamespaceImpl(
 void QueryAnalysisOpObserver::updateToConfigQueryAnalyzersNamespaceImpl(
     OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     auto parsedDoc = QueryAnalyzerDocument::parse(
-        IDLParserContext("QueryAnalysisOpObserver::onUpdate"), args.updateArgs->updatedDoc);
+        args.updateArgs->updatedDoc, IDLParserContext("QueryAnalysisOpObserver::onUpdate"));
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [parsedDoc = std::move(parsedDoc)](OperationContext* opCtx, boost::optional<Timestamp>) {
             analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
@@ -90,7 +90,7 @@ void QueryAnalysisOpObserver::updateWithSampleIdImpl(OperationContext* opCtx,
 void QueryAnalysisOpObserver::deleteFromConfigQueryAnalyzersNamespaceImpl(
     OperationContext* opCtx, const OplogDeleteEntryArgs& args, const BSONObj& doc) {
     auto parsedDoc =
-        QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisOpObserver::onDelete"), doc);
+        QueryAnalyzerDocument::parse(doc, IDLParserContext("QueryAnalysisOpObserver::onDelete"));
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [parsedDoc = std::move(parsedDoc)](OperationContext* opCtx, boost::optional<Timestamp>) {
             analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(

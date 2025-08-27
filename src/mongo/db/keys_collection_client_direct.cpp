@@ -135,7 +135,7 @@ StatusWith<std::vector<KeyDocumentType>> KeysCollectionClientDirect::_getNewKeys
     for (auto&& keyDoc : keyDocs) {
         KeyDocumentType key;
         try {
-            key = KeyDocumentType::parse(IDLParserContext("keyDoc"), keyDoc);
+            key = KeyDocumentType::parse(keyDoc, IDLParserContext("keyDoc"));
         } catch (...) {
             return exceptionToStatus();
         }

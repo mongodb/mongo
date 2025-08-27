@@ -133,8 +133,8 @@ ReshardingCoordinatorDocument TransactionalDaoStorageClientImpl::readState(
             str::stream() << "Could not find the coordinator document for the resharding operation "
                           << reshardingUUID.toString(),
             result.has_value() && !result->isEmpty());
-    return ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorDocument"),
-                                                *result);
+    return ReshardingCoordinatorDocument::parse(*result,
+                                                IDLParserContext("ReshardingCoordinatorDocument"));
 }
 
 CoordinatorStateEnum ReshardingCoordinatorDao::getPhase(OperationContext* opCtx,

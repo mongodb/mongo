@@ -484,7 +484,7 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
     }
 
     auto authCmdObj =
-        AuthenticateCommand::parse(IDLParserContext("speculative X509 Authenticate"), cmd.obj());
+        AuthenticateCommand::parse(cmd.obj(), IDLParserContext("speculative X509 Authenticate"));
 
     AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSpeculativeAuthenticate, [&](auto session) {

@@ -269,8 +269,8 @@ protected:
                          request.cmdObj[ShardsvrGetStatsForBalancing::kCollectionsFieldName]
                              .Array()) {
                         const auto nss = NamespaceWithOptionalUUID::parse(
-                                             IDLParserContext("BalancerDefragmentationPolicyTest"),
-                                             reqColl.Obj())
+                                             reqColl.Obj(),
+                                             IDLParserContext("BalancerDefragmentationPolicyTest"))
                                              .getNs();
 
                         statsArrayBuilder.append(
@@ -293,8 +293,8 @@ protected:
                              .getValue();
         if (expectedPhase.has_value()) {
             auto storedDefragmentationPhase = DefragmentationPhase_parse(
-                IDLParserContext("BalancerDefragmentationPolicyTest"),
-                configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
+                configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName),
+                IDLParserContext("BalancerDefragmentationPolicyTest"));
             ASSERT_TRUE(storedDefragmentationPhase == *expectedPhase);
             ASSERT_TRUE(configDoc[CollectionType::kDefragmentCollectionFieldName].Bool());
         } else {

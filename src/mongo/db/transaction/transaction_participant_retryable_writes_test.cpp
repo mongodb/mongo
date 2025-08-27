@@ -351,7 +351,7 @@ protected:
 
         auto txnRecordObj = cursor->next();
         auto txnRecord = SessionTxnRecord::parse(
-            IDLParserContext("SessionEntryWrittenAtFirstWrite"), txnRecordObj);
+            txnRecordObj, IDLParserContext("SessionEntryWrittenAtFirstWrite"));
         ASSERT(!cursor->more());
         ASSERT_EQ(session->getSessionId(), txnRecord.getSessionId());
         ASSERT_EQ(txnNum, txnRecord.getTxnNum());
@@ -428,8 +428,8 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrit
     ASSERT(cursor);
     ASSERT(cursor->more());
 
-    auto txnRecord = SessionTxnRecord::parse(IDLParserContext("SessionEntryWrittenAtFirstWrite"),
-                                             cursor->next());
+    auto txnRecord = SessionTxnRecord::parse(cursor->next(),
+                                             IDLParserContext("SessionEntryWrittenAtFirstWrite"));
     ASSERT(!cursor->more());
     ASSERT_EQ(sessionId, txnRecord.getSessionId());
     ASSERT_EQ(txnNum, txnRecord.getTxnNum());
@@ -455,8 +455,8 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     ASSERT(cursor);
     ASSERT(cursor->more());
 
-    auto txnRecord = SessionTxnRecord::parse(IDLParserContext("SessionEntryWrittenAtFirstWrite"),
-                                             cursor->next());
+    auto txnRecord = SessionTxnRecord::parse(cursor->next(),
+                                             IDLParserContext("SessionEntryWrittenAtFirstWrite"));
     ASSERT(!cursor->more());
     ASSERT_EQ(sessionId, txnRecord.getSessionId());
     ASSERT_EQ(200, txnRecord.getTxnNum());

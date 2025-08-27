@@ -155,11 +155,11 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
                                                      const QueryInstance& queryInstance,
                                                      const boost::optional<TenantId>& tenantId) {
     auto findCommandRequest = std::make_unique<FindCommandRequest>(
-        FindCommandRequest::parse(IDLParserContext("findCommandRequest",
+        FindCommandRequest::parse(queryInstance,
+                                  IDLParserContext("findCommandRequest",
                                                    auth::ValidatedTenancyScope::get(opCtx),
                                                    tenantId,
-                                                   kSerializationContext),
-                                  queryInstance));
+                                                   kSerializationContext)));
 
     // Add the '$recordId' meta-projection field if needed. The 'addShowRecordIdMetaProj()' helper
     // function modifies the request in-place, therefore affecting the query shape.
@@ -206,11 +206,11 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
     const QueryInstance& queryInstance,
     const boost::optional<TenantId>& tenantId) {
     auto distinctCommandRequest = std::make_unique<DistinctCommandRequest>(
-        DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+        DistinctCommandRequest::parse(queryInstance,
+                                      IDLParserContext("distinctCommandRequest",
                                                        auth::ValidatedTenancyScope::get(opCtx),
                                                        tenantId,
-                                                       kSerializationContext),
-                                      queryInstance));
+                                                       kSerializationContext)));
     // Extract namespace from distinct command.
     auto& nssOrUuid = distinctCommandRequest->getNamespaceOrUUID();
     uassert(7919501,
@@ -252,11 +252,11 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
                                                     const QueryInstance& queryInstance,
                                                     const boost::optional<TenantId>& tenantId) {
     auto aggregateCommandRequest =
-        AggregateCommandRequest::parse(IDLParserContext("aggregateCommandRequest",
+        AggregateCommandRequest::parse(queryInstance,
+                                       IDLParserContext("aggregateCommandRequest",
                                                         auth::ValidatedTenancyScope::get(opCtx),
                                                         tenantId,
-                                                        kSerializationContext),
-                                       queryInstance);
+                                                        kSerializationContext));
     // Populate foreign collection namespaces.
     auto parsedPipeline = LiteParsedPipeline(aggregateCommandRequest);
     auto involvedNamespaces = parsedPipeline.getInvolvedNamespaces();
@@ -715,7 +715,7 @@ public:
                 }
 
                 auto representativeQuery = QueryShapeRepresentativeQuery::parse(
-                    IDLParserContext{"QueryShapeRepresentativeQuery"}, obj);
+                    obj, IDLParserContext{"QueryShapeRepresentativeQuery"});
                 representativeQueryMapping.insert(
                     {representativeQuery.get_id(), representativeQuery.getRepresentativeQuery()});
                 newQuerySettingsClusterParameterEstimatedBsonSize += representativeQueryBsonSize;

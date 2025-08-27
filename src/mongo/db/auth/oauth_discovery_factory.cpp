@@ -59,8 +59,8 @@ OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issue
     DataBuilder results = _client->get(openIDConfiguationEndpoint);
     StringData textResult =
         uassertStatusOK(results.getCursor().readAndAdvanceNoThrow<StringData>());
-    return OAuthAuthorizationServerMetadata::parseOwned(IDLParserContext("metadata"),
-                                                        fromjson(textResult));
+    return OAuthAuthorizationServerMetadata::parseOwned(fromjson(textResult),
+                                                        IDLParserContext("metadata"));
 }
 
 }  // namespace mongo

@@ -66,17 +66,17 @@ ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
                           << getMax().toString());
 }
 
-ChunkRange ChunkRange::parse(const IDLParserContext& ctxt,
-                             const BSONObj& bsonObject,
+ChunkRange ChunkRange::parse(const BSONObj& bsonObject,
+                             const IDLParserContext& ctxt,
                              DeserializationContext* dctx) {
     auto object = mongo::idl::preparsedValue<ChunkRange>();
-    object.parseProtected(ctxt, bsonObject, dctx);
+    object.parseProtected(bsonObject, ctxt, dctx);
     uassertStatusOK(validate(object));
     return object;
 }
 
 ChunkRange ChunkRange::fromBSON(const BSONObj& obj) {
-    return parse(IDLParserContext("ChunkRange"), obj);
+    return parse(obj, IDLParserContext("ChunkRange"));
 }
 
 Status ChunkRange::validate(const ChunkRange& range) {

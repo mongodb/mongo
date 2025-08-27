@@ -169,8 +169,8 @@ void AsyncClientIntegrationTestFixture::testExhaustHelloShouldReceiveMultipleRep
         ASSERT(reply.moreToCome);
         assertOK(reply);
         prevTime = reply.data.getField("localTime").Date();
-        topologyVersion = TopologyVersion::parse(IDLParserContext("TopologyVersion"),
-                                                 reply.data.getField("topologyVersion").Obj());
+        topologyVersion = TopologyVersion::parse(reply.data.getField("topologyVersion").Obj(),
+                                                 IDLParserContext("TopologyVersion"));
     }
 
     Future<executor::RemoteCommandResponse> awaitExhaustFuture =
@@ -183,7 +183,7 @@ void AsyncClientIntegrationTestFixture::testExhaustHelloShouldReceiveMultipleRep
         ASSERT_GT(replyTime, prevTime);
 
         auto replyTopologyVersion = TopologyVersion::parse(
-            IDLParserContext("TopologyVersion"), reply.data.getField("topologyVersion").Obj());
+            reply.data.getField("topologyVersion").Obj(), IDLParserContext("TopologyVersion"));
         ASSERT_EQ(replyTopologyVersion.getProcessId(), topologyVersion.getProcessId());
         ASSERT_EQ(replyTopologyVersion.getCounter(), topologyVersion.getCounter());
     }

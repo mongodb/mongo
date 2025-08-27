@@ -50,7 +50,7 @@ void QueryFrameworkControl::append(OperationContext*,
 }
 
 Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
+    _data = QueryFrameworkControl_parse(value, IDLParserContext("internalQueryFrameworkControl"));
     return Status::OK();
 }
 

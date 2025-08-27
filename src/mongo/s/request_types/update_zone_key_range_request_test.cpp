@@ -48,7 +48,7 @@ TEST(UpdateZoneKeyRange, BasicValidMongosAssignCommand) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
-    auto parsedRequest = UpdateZoneKeyRange::parse(ctx, cmdObj);
+    auto parsedRequest = UpdateZoneKeyRange::parse(cmdObj, ctx);
     ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
@@ -64,7 +64,7 @@ TEST(UpdateZoneKeyRange, BasicValidMongosAssignCommandRemoveZone) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
-    auto parsedRequest = UpdateZoneKeyRange::parse(ctx, cmdObj);
+    auto parsedRequest = UpdateZoneKeyRange::parse(cmdObj, ctx);
     ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
@@ -80,7 +80,7 @@ TEST(UpdateZoneKeyRange, MissingMinErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(UpdateZoneKeyRange, MissingMaxErrors) {
@@ -92,7 +92,7 @@ TEST(UpdateZoneKeyRange, MissingMaxErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(UpdateZoneKeyRange, MissingZoneErrors) {
@@ -104,7 +104,7 @@ TEST(UpdateZoneKeyRange, MissingZoneErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(UpdateZoneKeyRange, MissingShardNameErrors) {
@@ -116,7 +116,7 @@ TEST(UpdateZoneKeyRange, MissingShardNameErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::IDLFailedToParse);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(UpdateZoneKeyRange, WrongShardNameTypeErrors) {
@@ -129,7 +129,7 @@ TEST(UpdateZoneKeyRange, WrongShardNameTypeErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(UpdateZoneKeyRange, WrongMinRangeTypeErrors) {
@@ -142,7 +142,7 @@ TEST(UpdateZoneKeyRange, WrongMinRangeTypeErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(UpdateZoneKeyRange, WrongMaxRangeTypeErrors) {
@@ -155,7 +155,7 @@ TEST(UpdateZoneKeyRange, WrongMaxRangeTypeErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(UpdateZoneKeyRange, WrongZoneNameTypeErrors) {
@@ -168,7 +168,7 @@ TEST(UpdateZoneKeyRange, WrongZoneNameTypeErrors) {
     })BSON");
     IDLParserContext ctx("UpdateZoneKeyRange");
     ASSERT_THROWS_CODE(
-        UpdateZoneKeyRange::parse(ctx, cmdObj), mongo::DBException, ErrorCodes::TypeMismatch);
+        UpdateZoneKeyRange::parse(cmdObj, ctx), mongo::DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST(ConfigsvrUpdateZoneKeyRange, BasicValidConfigsvrAssignCommand) {
@@ -180,7 +180,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, BasicValidConfigsvrAssignCommand) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    auto parsedRequest = ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj);
+    auto parsedRequest = ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx);
     ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
@@ -196,7 +196,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, BasicValidConfigsvrAssignCommandRemoveZone) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    auto parsedRequest = ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj);
+    auto parsedRequest = ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx);
     ASSERT_EQ("foo.bar", parsedRequest.getCommandParameter().toString_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), parsedRequest.getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), parsedRequest.getMax());
@@ -211,7 +211,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, MissingMinErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -224,7 +224,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, MissingMaxErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -237,7 +237,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, MissingZoneErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -250,7 +250,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, MissingShardNameErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -264,7 +264,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, WrongShardNameTypeErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -278,7 +278,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, WrongMinRangeTypeErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -292,7 +292,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, WrongMaxRangeTypeErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -306,7 +306,7 @@ TEST(ConfigsvrUpdateZoneKeyRange, WrongZoneNameTypeErrors) {
         $db: "admin"
     })BSON");
     IDLParserContext ctx("ConfigsvrUpdateZoneKeyRange");
-    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(ctx, cmdObj),
+    ASSERT_THROWS_CODE(ConfigsvrUpdateZoneKeyRange::parse(cmdObj, ctx),
                        mongo::DBException,
                        ErrorCodes::TypeMismatch);
 }

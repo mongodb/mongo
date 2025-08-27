@@ -253,8 +253,8 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToParseSerializedARMParams) {
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     auto newSpec = serializationArray[0].getDocument().toBson();
     ASSERT(newSpec["$mergeCursors"].type() == BSONType::object);
-    auto newParams = AsyncResultsMergerParams::parse(IDLParserContext("$mergeCursors test"),
-                                                     newSpec["$mergeCursors"].Obj());
+    auto newParams = AsyncResultsMergerParams::parse(newSpec["$mergeCursors"].Obj(),
+                                                     IDLParserContext("$mergeCursors test"));
     checkSerializedAsyncResultsMergerParams(params, newParams, getTenantIdNss());
 
     // Test that the $mergeCursors stage will accept the serialized format of
@@ -513,8 +513,9 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyTest, ShouldBeAbleToParseSerialized
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     const auto newParams = AsyncResultsMergerParams::parse(
-        IDLParserContext("$mergeCursors test", vts, tenantId, SerializationContext::stateDefault()),
-        newSpec["$mergeCursors"].Obj());
+        newSpec["$mergeCursors"].Obj(),
+        IDLParserContext(
+            "$mergeCursors test", vts, tenantId, SerializationContext::stateDefault()));
 
     // Check that the namespace contains the tenantid prefix.
     ASSERT_EQ(newParams.toBSON()["nss"].str(), expectedTenantNsStr);
@@ -572,8 +573,9 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     const auto newParams = AsyncResultsMergerParams::parse(
-        IDLParserContext("$mergeCursors test", vts, tenantId, SerializationContext::stateDefault()),
-        newSpec["$mergeCursors"].Obj());
+        newSpec["$mergeCursors"].Obj(),
+        IDLParserContext(
+            "$mergeCursors test", vts, tenantId, SerializationContext::stateDefault()));
 
     // Check that the namespace doesn't contain the tenantid prefix.
     ASSERT_EQ(newParams.toBSON()["nss"].str(), kMergeCursorNsStr);

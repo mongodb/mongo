@@ -1858,7 +1858,7 @@ void handleUmcTransactionFailpoint() {
     auto fp = umcTransaction.scoped();
     if (fp.isActive()) {
         IDLParserContext ctx("umcTransaction");
-        auto delay = UMCTransactionFailPoint::parse(ctx, fp.getData()).getCommitDelayMS();
+        auto delay = UMCTransactionFailPoint::parse(fp.getData(), ctx).getCommitDelayMS();
         LOGV2(4993100,
               "Sleeping prior to committing UMC transaction",
               "duration"_attr = Milliseconds(delay));

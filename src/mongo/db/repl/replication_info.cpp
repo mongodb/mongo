@@ -425,7 +425,7 @@ public:
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
         auto cmd = idl::parseCommandDocument<HelloCommand>(
-            IDLParserContext("hello", vts, dbName.tenantId(), sc), cmdObj);
+            cmdObj, IDLParserContext("hello", vts, dbName.tenantId(), sc));
 
         if (cmd.getLoadBalanced().value_or(false)) {
             LOGV2(10107800,
@@ -642,11 +642,11 @@ public:
         auto ret = result->asTempObj();
         if (ret[ErrorReply::kErrmsgFieldName].eoo()) {
             // Nominal success case, parse the object as-is.
-            HelloCommandReply::parse(IDLParserContext{"hello.reply"}, ret);
+            HelloCommandReply::parse(ret, IDLParserContext{"hello.reply"});
         } else {
             // Something went wrong, still try to parse, but accept a few ignorable fields.
             StringDataSet ignorable({ErrorReply::kCodeFieldName, ErrorReply::kErrmsgFieldName});
-            HelloCommandReply::parse(IDLParserContext{"hello.reply"}, ret.removeFields(ignorable));
+            HelloCommandReply::parse(ret.removeFields(ignorable), IDLParserContext{"hello.reply"});
         }
     }
 

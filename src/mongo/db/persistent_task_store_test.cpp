@@ -58,7 +58,7 @@ struct TestTask {
           min(bson.getField("min").Int()),
           max(bson.getField("max").Int()) {}
 
-    static TestTask parse(IDLParserContext, BSONObj bson) {
+    static TestTask parse(BSONObj bson, IDLParserContext) {
         return TestTask{bson};
     }
 

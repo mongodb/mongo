@@ -154,7 +154,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                                  << " could not be created");
 
         auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
-            IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
+            response.response, IDLParserContext("configsvrCreateDatabaseResponse"));
         catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
 
         dbStatus = catalogCache->getDatabase(opCtx, dbName);
@@ -300,7 +300,7 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
             });
     }
     auto createCollResp =
-        CreateCollectionResponse::parse(IDLParserContext("createCollection"), remoteResponse->data);
+        CreateCollectionResponse::parse(remoteResponse->data, IDLParserContext("createCollection"));
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->onStaleCollectionVersion(nss, createCollResp.getCollectionVersion());

@@ -114,7 +114,7 @@ public:
             uassertStatusOK(response.writeConcernStatus);
 
             auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
-                IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
+                response.response, IDLParserContext("configsvrCreateDatabaseResponse"));
             catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
             purgeDatabaseOnExit.dismiss();
         }

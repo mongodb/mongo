@@ -138,8 +138,8 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         : SerializationContext::stateCommandRequest();
 
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-        IDLParserContext("distinctCommandRequest", vts, nss.tenantId(), serializationContext),
-        cmdObj));
+        cmdObj,
+        IDLParserContext("distinctCommandRequest", vts, nss.tenantId(), serializationContext)));
 
     // Start the query planning timer right after parsing.
     CurOp::get(opCtx)->beginQueryPlanningTimer();
@@ -307,8 +307,8 @@ BSONObj translateCmdObjForRawData(OperationContext* opCtx,
         auto [isTimeseriesViewRequest, translatedNs] = timeseries::isTimeseriesViewRequest(
             opCtx,
             DistinctCommandRequest::parse(
-                IDLParserContext{"rawData", vts, ns.dbName().tenantId(), serializationContext},
-                cmdObj));
+                cmdObj,
+                IDLParserContext{"rawData", vts, ns.dbName().tenantId(), serializationContext}));
         if (isTimeseriesViewRequest) {
             ns = translatedNs;
             collectionOrView = acquire();

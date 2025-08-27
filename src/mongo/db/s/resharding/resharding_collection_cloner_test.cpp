@@ -332,7 +332,7 @@ protected:
 
             auto doc = getResumeDataDocument(opCtx);
             auto parsedDoc = ReshardingRecipientResumeData::parse(
-                IDLParserContext("ReshardingCollectionClonerTest"), doc);
+                doc, IDLParserContext("ReshardingCollectionClonerTest"));
             ASSERT_BSONOBJ_EQ(parsedDoc.getId().toBSON(), getSourceId().toBSON());
             ASSERT_EQ(parsedDoc.getDonorHost(), _myHostAndPort);
             ASSERT_BSONOBJ_EQ(*parsedDoc.getResumeToken(), _getResumeToken());

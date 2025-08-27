@@ -112,8 +112,8 @@ public:
                 CommandHelpers::filterCommandRequestForPassthrough(request().toBSON()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-            auto reply = SetQuerySettingsCommandReply::parse(IDLParserContext("setQuerySettings"),
-                                                             cmdResponse.response);
+            auto reply = SetQuerySettingsCommandReply::parse(cmdResponse.response,
+                                                             IDLParserContext("setQuerySettings"));
 
             // Force the cluster paramaters refresh to ensure the router now observes the latest
             // QuerySettings.

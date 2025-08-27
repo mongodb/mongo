@@ -98,7 +98,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         ListCollectionResult result;
         try {
             result = ListCollectionResult::parse(
-                IDLParserContext("DatabaseCloner::listCollectionsStage"), info);
+                info, IDLParserContext("DatabaseCloner::listCollectionsStage"));
         } catch (const DBException& e) {
             uasserted(
                 ErrorCodes::FailedToParse,

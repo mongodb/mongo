@@ -278,7 +278,7 @@ public:
                         Shard::RetryPolicy::kIdempotent);
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
                     return write_ops::FindAndModifyCommandReply::parse(
-                        IDLParserContext("configureQueryAnalyzer"), swResponse.getValue().response);
+                        swResponse.getValue().response, IDLParserContext("configureQueryAnalyzer"));
                 }
 
                 DBDirectClient client(opCtx);
@@ -298,7 +298,7 @@ public:
             response.setNewConfiguration(newConfig);
             if (writeResult.getValue()) {
                 auto preImageDoc =
-                    doc::parse(IDLParserContext("configureQueryAnalyzer"), *writeResult.getValue());
+                    doc::parse(*writeResult.getValue(), IDLParserContext("configureQueryAnalyzer"));
                 if (preImageDoc.getCollectionUuid() == collUuid) {
                     response.setOldConfiguration(preImageDoc.getConfiguration());
                 }

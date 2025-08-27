@@ -578,7 +578,7 @@ TEST_F(TaskExecutorFixture, FastExhaustResponses) {
             executor()->scheduleRemoteCommand(findReq, CancellationToken::uncancelable()).get();
         ASSERT_OK(resp.status);
         ASSERT_OK(getStatusFromCommandResult(resp.data));
-        return CursorInitialReply::parseOwned(IDLParserContext("findReply"), std::move(resp.data));
+        return CursorInitialReply::parseOwned(std::move(resp.data), IDLParserContext("findReply"));
     }();
 
     Notification<void> cursorOpened;
@@ -618,7 +618,7 @@ TEST_F(TaskExecutorFixture, FastExhaustResponses) {
         agg.setPipeline({BSON("$currentOp" << BSON("idleCursors" << true)),
                          BSON("$match" << BSON("cursor.cursorId" << cursorId))});
         auto out = runSetupCommandSync(DatabaseName::kAdmin, agg.toBSON());
-        auto aggReply = CursorInitialReply::parse(IDLParserContext("aggReply"), out);
+        auto aggReply = CursorInitialReply::parse(out, IDLParserContext("aggReply"));
 
         // Once cursor is exhausted, signal to handler thread it can start processing responses.
         if (!aggReply.getCursor() || aggReply.getCursor()->getFirstBatch().empty()) {
@@ -634,7 +634,7 @@ TEST_F(TaskExecutorFixture, FastExhaustResponses) {
         auto resp = queue.pop();
         ASSERT_OK(resp.status);
 
-        auto parsed = CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply"), resp.data);
+        auto parsed = CursorGetMoreReply::parse(resp.data, IDLParserContext("CursorGetMoreReply"));
         auto batch = parsed.getCursor().getNextBatch();
 
         ASSERT_LTE(batch.size(), 1);

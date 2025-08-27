@@ -451,7 +451,7 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
         // internal command will skip the apiVersionCheck. However in case of view, the create
         // command might run an aggregation. Having those fields propagated guarantees the api
         // version check will keep working within the aggregation framework.
-        auto request = ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), cmdObj);
+        auto request = ShardsvrCreateCollectionRequest::parse(cmdObj, IDLParserContext("create"));
 
         ShardsvrCreateCollection shardsvrCollCommand(nss);
         request.setUnsplittable(true);
@@ -611,8 +611,8 @@ boost::optional<TimeseriesOptions> ShardServerProcessInterface::_getTimeseriesOp
     if (!timeseries || !timeseries.isABSONObj()) {
         return boost::none;
     }
-    return TimeseriesOptions::parseOwned(IDLParserContext("TimeseriesOptions"),
-                                         timeseries.Obj().getOwned());
+    return TimeseriesOptions::parseOwned(timeseries.Obj().getOwned(),
+                                         IDLParserContext("TimeseriesOptions"));
 }
 
 Status ShardServerProcessInterface::insertTimeseries(

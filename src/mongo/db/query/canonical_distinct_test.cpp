@@ -85,11 +85,11 @@ protected:
 std::unique_ptr<ParsedDistinctCommand> bsonToParsedDistinct(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& cmd) {
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        cmd,
         IDLParserContext("distinctCommandRequest",
                          auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
-                         SerializationContext::stateDefault()),
-        cmd));
+                         SerializationContext::stateDefault())));
     return parsed_distinct_command::parse(expCtx,
                                           std::move(distinctCommand),
                                           ExtensionsCallbackNoop(),

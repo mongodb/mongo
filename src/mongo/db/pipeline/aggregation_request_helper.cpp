@@ -85,7 +85,7 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
                                       const SerializationContext& serializationContext) {
     auto tenantId = vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none;
     auto request = idl::parseCommandDocument<AggregateCommandRequest>(
-        IDLParserContext("aggregate", vts, std::move(tenantId), serializationContext), cmdObj);
+        cmdObj, IDLParserContext("aggregate", vts, std::move(tenantId), serializationContext));
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The '" << AggregateCommandRequest::kExplainFieldName
@@ -271,7 +271,7 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
             cursorElem.type() == BSONType::object);
 
     SimpleCursorOptions cursor = SimpleCursorOptions::parse(
-        IDLParserContext(AggregateCommandRequest::kCursorFieldName), cursorElem.embeddedObject());
+        cursorElem.embeddedObject(), IDLParserContext(AggregateCommandRequest::kCursorFieldName));
     if (!cursor.getBatchSize())
         cursor.setBatchSize(aggregation_request_helper::kDefaultBatchSize);
 

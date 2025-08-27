@@ -177,8 +177,8 @@ std::vector<OplogInsertBatch> getOplogInsertBatches(OperationContext* opCtx,
             ++currentIndex;
 
             insertBatch.lastOplogId = ReshardingDonorOplogId::parse(
-                IDLParserContext{"OplogFetcherParsing"},
-                currentMutableOplogEntry.get_id()->getDocument().toBson());
+                currentMutableOplogEntry.get_id()->getDocument().toBson(),
+                IDLParserContext{"OplogFetcherParsing"});
             if (resharding::isFinalOplog({currentMutableOplogBson})) {
                 insertBatch.moreToCome = false;
                 break;

@@ -450,7 +450,7 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
             continue;
         }
 
-        auto pp = auth::ParsedPrivilege::parse(IDLParserContext("userPrivilegeDoc"), element.Obj());
+        auto pp = auth::ParsedPrivilege::parse(element.Obj(), IDLParserContext("userPrivilegeDoc"));
         std::vector<std::string> unrecognizedActions;
         auto privilege = Privilege::resolvePrivilegeWithTenant(
             user->getName().tenantId(), pp, &unrecognizedActions);

@@ -144,7 +144,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
 
     // Simulate end user login via user verification URI.
     auto deviceAuthorizationResponse = OIDCDeviceAuthorizationResponse::parse(
-        IDLParserContext{"oidcDeviceAuthorizationResponse"}, deviceAuthorizationResponseObj);
+        deviceAuthorizationResponseObj, IDLParserContext{"oidcDeviceAuthorizationResponse"});
 
     // IDP's use different names to refer to the verification url.
     const auto& optURI = deviceAuthorizationResponse.getVerificationUri();
@@ -171,7 +171,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
         BSONObj tokenResponseObj =
             doPostRequest(httpClient.get(), discoveryReply.getTokenEndpoint().get(), tokenRequest);
         auto tokenResponse =
-            OIDCTokenResponse::parse(IDLParserContext{"oidcTokenResponse"}, tokenResponseObj);
+            OIDCTokenResponse::parse(tokenResponseObj, IDLParserContext{"oidcTokenResponse"});
 
         // The token endpoint will either respond with the tokens or {"error":
         // "authorization pending"}.
@@ -248,7 +248,7 @@ StatusWith<std::string> SaslOIDCClientConversation::doRefreshFlow() try {
     BSONObj refreshFlowResponseObj = doPostRequest(
         httpClient.get(), oidcClientGlobalParams.oidcTokenEndpoint, refreshFlowRequestBody);
     auto refreshResponse =
-        OIDCTokenResponse::parse(IDLParserContext{"oidcRefreshResponse"}, refreshFlowResponseObj);
+        OIDCTokenResponse::parse(refreshFlowResponseObj, IDLParserContext{"oidcRefreshResponse"});
 
     // New tokens should be supplied immediately.
     uassert(ErrorCodes::UnknownError,
@@ -299,7 +299,7 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
         ConstDataRange inputCdr(input.data(), input.size());
         auto payload = inputCdr.read<Validated<BSONObj>>().val;
         auto serverReply = auth::OIDCMechanismServerStep1::parse(
-            IDLParserContext{"oidcServerStep1Reply"}, payload);
+            payload, IDLParserContext{"oidcServerStep1Reply"});
 
         auto issuer = serverReply.getIssuer();
 

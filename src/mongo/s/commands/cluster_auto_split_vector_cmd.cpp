@@ -94,8 +94,8 @@ public:
 
                     auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
                     uassertStatusOK(status);
-                    return AutoSplitVectorResponse::parse(IDLParserContext(""),
-                                                          response.swResponse.getValue().data);
+                    return AutoSplitVectorResponse::parse(response.swResponse.getValue().data,
+                                                          IDLParserContext(""));
                 });
         }
 

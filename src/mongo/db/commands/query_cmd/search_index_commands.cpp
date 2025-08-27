@@ -124,7 +124,7 @@ public:
             BSONObj manageSearchIndexResponse =
                 retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
 
-            return CreateSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
+            return CreateSearchIndexesReply::parseOwned(std::move(manageSearchIndexResponse), ctx);
         }
 
     private:
@@ -199,7 +199,7 @@ public:
             BSONObj manageSearchIndexResponse =
                 retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
 
-            return DropSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
+            return DropSearchIndexReply::parseOwned(std::move(manageSearchIndexResponse), ctx);
         }
 
     private:
@@ -279,7 +279,7 @@ public:
             IDLParserContext ctx("UpdateSearchIndexReply Parser");
             BSONObj manageSearchIndexResponse =
                 retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
-            return UpdateSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
+            return UpdateSearchIndexReply::parseOwned(std::move(manageSearchIndexResponse), ctx);
         }
 
     private:
@@ -399,7 +399,7 @@ public:
                 retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
 
             IDLParserContext ctx("ListSearchIndexesReply Parser");
-            return ListSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
+            return ListSearchIndexesReply::parseOwned(std::move(manageSearchIndexResponse), ctx);
         }
 
     private:

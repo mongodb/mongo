@@ -58,13 +58,13 @@ IDLParserContext ctx("_configsvrCommitChunksMerge");
 TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
     auto collUUID = UUID::gen();
     auto request = ConfigSvrMergeChunks::parse(
-        ctx,
         BSON("_configsvrCommitChunksMerge" << "TestDB.TestColl"
                                            << "collUUID" << collUUID.toBSON() << "chunkRange"
                                            << chunkRange.toBSON() << "shard"
                                            << "shard0000"
                                            << "$db"
-                                           << "admin"));
+                                           << "admin"),
+        ctx);
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
               request.getCommandParameter());
     ASSERT_TRUE(collUUID == request.getCollectionUUID());
@@ -95,7 +95,7 @@ TEST(ConfigSvrMergeChunks, ConfigCommandtoBSON) {
         return builder.obj();
     };
 
-    auto request = ConfigSvrMergeChunks::parse(ctx, appendDB(serializedRequest));
+    auto request = ConfigSvrMergeChunks::parse(appendDB(serializedRequest), ctx);
     request.setWriteConcern(writeConcern);
     auto requestToBSON = request.toBSON();
 
@@ -105,25 +105,25 @@ TEST(ConfigSvrMergeChunks, ConfigCommandtoBSON) {
 TEST(ConfigSvrMergeChunks, MissingNameSpaceErrors) {
     auto collUUID = UUID::gen();
     ASSERT_THROWS_CODE(
-        ConfigSvrMergeChunks::parse(ctx,
-                                    BSON("collUUID" << collUUID.toBSON() << "chunkRange"
+        ConfigSvrMergeChunks::parse(BSON("collUUID" << collUUID.toBSON() << "chunkRange"
                                                     << chunkRange.toBSON() << "shard"
                                                     << "shard0000"
                                                     << "$db"
-                                                    << "admin")),
+                                                    << "admin"),
+                                    ctx),
         mongo::DBException,
         ErrorCodes::IDLFailedToParse);
 }
 
 TEST(ConfigSvrMergeChunks, MissingCollUUIDErrors) {
     ASSERT_THROWS_CODE(
-        ConfigSvrMergeChunks::parse(ctx,
-                                    BSON("_configsvrCommitChunksMerge"
+        ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                          << "TestDB.TestColl"
                                          << "chunkRange" << chunkRange.toBSON() << "shard"
                                          << "shard0000"
                                          << "$db"
-                                         << "admin")),
+                                         << "admin"),
+                                    ctx),
         mongo::DBException,
         ErrorCodes::IDLFailedToParse);
     // ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
@@ -132,13 +132,13 @@ TEST(ConfigSvrMergeChunks, MissingCollUUIDErrors) {
 TEST(ConfigSvrMergeChunks, MissingChunkRangeErrors) {
     auto collUUID = UUID::gen();
     ASSERT_THROWS_CODE(
-        ConfigSvrMergeChunks::parse(ctx,
-                                    BSON("_configsvrCommitChunksMerge"
+        ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                          << "TestDB.TestColl"
                                          << "collUUID" << collUUID.toBSON() << "shard"
                                          << "shard0000"
                                          << "$db"
-                                         << "admin")),
+                                         << "admin"),
+                                    ctx),
         DBException,
         ErrorCodes::IDLFailedToParse);
 }
@@ -146,12 +146,12 @@ TEST(ConfigSvrMergeChunks, MissingChunkRangeErrors) {
 TEST(ConfigSvrMergeChunks, MissingShardIdErrors) {
     auto collUUID = UUID::gen();
     ASSERT_THROWS_CODE(
-        ConfigSvrMergeChunks::parse(ctx,
-                                    BSON("_configsvrCommitChunksMerge"
+        ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                          << "TestDB.TestColl"
                                          << "collUUID" << collUUID.toBSON() << "chunkRange"
                                          << chunkRange.toBSON() << "$db"
-                                         << "admin")),
+                                         << "admin"),
+                                    ctx),
         DBException,
         ErrorCodes::IDLFailedToParse);
 }
@@ -159,26 +159,26 @@ TEST(ConfigSvrMergeChunks, MissingShardIdErrors) {
 TEST(ConfigSvrMergeChunks, WrongNamespaceTypeErrors) {
     auto collUUID = UUID::gen();
     ASSERT_THROWS_CODE(
-        ConfigSvrMergeChunks::parse(ctx,
-                                    BSON("_configsvrCommitChunksMerge"
+        ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                          << 1234 << "collUUID" << collUUID.toBSON() << "chunkRange"
                                          << chunkRange.toBSON() << "shard"
                                          << "shard0000"
                                          << "$db"
-                                         << "admin")),
+                                         << "admin"),
+                                    ctx),
         DBException,
         ErrorCodes::TypeMismatch);
 }
 
 TEST(ConfigSvrMergeChunks, WrongCollUUIDTypeErrors) {
-    ASSERT_THROWS_CODE(ConfigSvrMergeChunks::parse(ctx,
-                                                   BSON("_configsvrCommitChunksMerge"
+    ASSERT_THROWS_CODE(ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                                         << "TestDB.TestColl"
                                                         << "collUUID" << 1234 << "chunkRange"
                                                         << chunkRange.toBSON() << "shard"
                                                         << "shard0000"
                                                         << "$db"
-                                                        << "admin")),
+                                                        << "admin"),
+                                                   ctx),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -186,14 +186,14 @@ TEST(ConfigSvrMergeChunks, WrongCollUUIDTypeErrors) {
 
 TEST(ConfigSvrMergeChunks, WrongChunkRangeTypeErrors) {
     auto collUUID = UUID::gen();
-    ASSERT_THROWS_CODE(ConfigSvrMergeChunks::parse(ctx,
-                                                   BSON("_configsvrCommitChunksMerge"
+    ASSERT_THROWS_CODE(ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                                         << "TestDB.TestColl"
                                                         << "collUUID" << collUUID.toBSON()
                                                         << "chunkRange" << 1234 << "shard"
                                                         << "shard0000"
                                                         << "$db"
-                                                        << "admin")),
+                                                        << "admin"),
+                                                   ctx),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -201,12 +201,12 @@ TEST(ConfigSvrMergeChunks, WrongChunkRangeTypeErrors) {
 TEST(ConfigSvrMergeChunks, WrongShardIdTypeErrors) {
     auto collUUID = UUID::gen();
     ASSERT_THROWS_CODE(
-        ConfigSvrMergeChunks::parse(ctx,
-                                    BSON("_configsvrCommitChunksMerge"
+        ConfigSvrMergeChunks::parse(BSON("_configsvrCommitChunksMerge"
                                          << "TestDB.TestColl"
                                          << "collUUID" << collUUID.toBSON() << "chunkRange"
                                          << chunkRange.toBSON() << "shard" << 1234 << "$db"
-                                         << "admin")),
+                                         << "admin"),
+                                    ctx),
         DBException,
         ErrorCodes::TypeMismatch);
 }
@@ -217,11 +217,11 @@ TEST(ShardsvrMergeChunks, BasicValidConfigCommand) {
     bounds.push_back(max);
 
     OID epoch = OID::gen();
-    auto request = ShardsvrMergeChunks::parse(ctx,
-                                              BSON("mergeChunks" << "TestDB.TestColl"
+    auto request = ShardsvrMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                  << "bounds" << bounds << "epoch"
                                                                  << epoch << "$db"
-                                                                 << "admin"));
+                                                                 << "admin"),
+                                              ctx);
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
               request.getCommandParameter());
 
@@ -237,9 +237,9 @@ TEST(ShardsvrMergeChunks, MissingNameSpaceErrors) {
 
     OID epoch = OID::gen();
     ASSERT_THROWS_CODE(
-        ShardsvrMergeChunks::parse(ctx,
-                                   BSON("bounds" << bounds << "epoch" << epoch << "$db"
-                                                 << "admin")),
+        ShardsvrMergeChunks::parse(BSON("bounds" << bounds << "epoch" << epoch << "$db"
+                                                 << "admin"),
+                                   ctx),
         mongo::DBException,
         ErrorCodes::IDLFailedToParse);
 }
@@ -250,10 +250,10 @@ TEST(ShardsvrMergeChunks, MissingBoundErrors) {
     bounds.push_back(max);
 
     OID epoch = OID::gen();
-    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
-                                                  BSON("mergeChunks" << "TestDB.TestColl"
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                      << "epoch" << epoch << "$db"
-                                                                     << "admin")),
+                                                                     << "admin"),
+                                                  ctx),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -263,10 +263,10 @@ TEST(ShardsvrMergeChunks, MissingEpochErrors) {
     bounds.push_back(min);
     bounds.push_back(max);
 
-    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
-                                                  BSON("mergeChunks" << "TestDB.TestColl"
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                      << "bounds" << bounds << "$db"
-                                                                     << "admin")),
+                                                                     << "admin"),
+                                                  ctx),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -277,10 +277,10 @@ TEST(ShardsvrMergeChunks, WrongNamespaceTypeErrors) {
     bounds.push_back(max);
 
     OID epoch = OID::gen();
-    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
-                                                  BSON("mergeChunks" << 12345 << "bounds" << bounds
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(BSON("mergeChunks" << 12345 << "bounds" << bounds
                                                                      << "epoch" << epoch << "$db"
-                                                                     << "admin")),
+                                                                     << "admin"),
+                                                  ctx),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -291,11 +291,11 @@ TEST(ShardsvrMergeChunks, WrongBoundTypeErrors) {
     bounds.push_back(max);
 
     OID epoch = OID::gen();
-    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(ctx,
-                                                  BSON("mergeChunks" << "TestDB.TestColl"
+    ASSERT_THROWS_CODE(ShardsvrMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                      << "bounds" << 1234 << "epoch"
                                                                      << epoch << "$db"
-                                                                     << "admin")),
+                                                                     << "admin"),
+                                                  ctx),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -305,10 +305,10 @@ TEST(ClusterMergeChunks, BasicValidConfigCommand) {
     bounds.push_back(min);
     bounds.push_back(max);
 
-    auto request = ClusterMergeChunks::parse(ctx,
-                                             BSON("mergeChunks" << "TestDB.TestColl"
+    auto request = ClusterMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                 << "bounds" << bounds << "$db"
-                                                                << "admin"));
+                                                                << "admin"),
+                                             ctx);
 
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
               request.getCommandParameter());
@@ -324,9 +324,9 @@ TEST(ClusterMergeChunks, MissingNameSpaceErrors) {
     bounds.push_back(min);
     bounds.push_back(max);
 
-    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
-                                                 BSON("bounds" << bounds << "$db"
-                                                               << "admin")),
+    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(BSON("bounds" << bounds << "$db"
+                                                               << "admin"),
+                                                 ctx),
                        mongo::DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -337,10 +337,10 @@ TEST(ClusterMergeChunks, MissingBoundErrors) {
     bounds.push_back(min);
     bounds.push_back(max);
 
-    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
-                                                 BSON("mergeChunks" << "TestDB.TestColl"
+    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                     << "$db"
-                                                                    << "admin")),
+                                                                    << "admin"),
+                                                 ctx),
                        DBException,
                        ErrorCodes::IDLFailedToParse);
 }
@@ -351,9 +351,9 @@ TEST(ClusterMergeChunks, WrongNamespaceTypeErrors) {
     bounds.push_back(max);
 
     ASSERT_THROWS_CODE(
-        ClusterMergeChunks::parse(ctx,
-                                  BSON("mergeChunks" << 12345 << "bounds" << bounds << "$db"
-                                                     << "admin")),
+        ClusterMergeChunks::parse(BSON("mergeChunks" << 12345 << "bounds" << bounds << "$db"
+                                                     << "admin"),
+                                  ctx),
         DBException,
         ErrorCodes::TypeMismatch);
 }
@@ -363,10 +363,10 @@ TEST(ClusterMergeChunks, WrongBoundTypeErrors) {
     bounds.push_back(min);
     bounds.push_back(max);
 
-    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(ctx,
-                                                 BSON("mergeChunks" << "TestDB.TestColl"
+    ASSERT_THROWS_CODE(ClusterMergeChunks::parse(BSON("mergeChunks" << "TestDB.TestColl"
                                                                     << "bounds" << 1234 << "$db"
-                                                                    << "admin")),
+                                                                    << "admin"),
+                                                 ctx),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }

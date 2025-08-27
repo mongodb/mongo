@@ -80,7 +80,7 @@ Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
     }
 
     auto receivedComponents = GossipedVectorClockComponents::parse(
-        IDLParserContext("VectorClockComponents"), metadataObj);
+        metadataObj, IDLParserContext("VectorClockComponents"));
     VectorClock::get(_service)->gossipIn(opCtx,
                                          receivedComponents,
                                          false /* couldBeUnauthorized */,

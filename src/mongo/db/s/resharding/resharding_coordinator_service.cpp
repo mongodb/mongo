@@ -61,8 +61,8 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
     BSONObj initialState,
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
     auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
-        IDLParserContext("ReshardingCoordinatorService::checkIfConflictsWithOtherInstances"),
-        initialState);
+        initialState,
+        IDLParserContext("ReshardingCoordinatorService::checkIfConflictsWithOtherInstances"));
 
     for (const auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const ReshardingCoordinator*>(instance);
@@ -121,8 +121,8 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
     BSONObj initialState) {
     return std::make_shared<ReshardingCoordinator>(
         this,
-        ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
-                                             initialState),
+        ReshardingCoordinatorDocument::parse(initialState,
+                                             IDLParserContext("ReshardingCoordinatorStateDoc")),
         std::make_shared<ReshardingCoordinatorExternalStateImpl>(),
         _serviceContext);
 }

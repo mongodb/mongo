@@ -194,8 +194,8 @@ TEST_F(OAuthDiscoveryFactoryFixture, IssuerAndJWKSUriMustBeSecure) {
             // All other endpoints are permitted to not be https since the server will not directly
             // use them.
             OAuthAuthorizationServerMetadata precomputedMetadata =
-                OAuthAuthorizationServerMetadata::parse(IDLParserContext("metadata"),
-                                                        splicedMetadata);
+                OAuthAuthorizationServerMetadata::parse(splicedMetadata,
+                                                        IDLParserContext("metadata"));
             ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
         }
     }
@@ -214,7 +214,7 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {
             return builder.obj();
         }();
         OAuthAuthorizationServerMetadata precomputedMetadata =
-            OAuthAuthorizationServerMetadata::parse(IDLParserContext("metadata"), splicedMetadata);
+            OAuthAuthorizationServerMetadata::parse(splicedMetadata, IDLParserContext("metadata"));
 
         std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
         client->expect(

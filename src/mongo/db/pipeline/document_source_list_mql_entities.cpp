@@ -55,7 +55,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListMqlEntities::createFromBs
     uassert(ErrorCodes::InvalidNamespace,
             "$listMqlEntities must be run against the 'admin' database with {aggregate: 1}",
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());
-    auto spec = ListMqlEntitiesSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+    auto spec = ListMqlEntitiesSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
     return new DocumentSourceListMqlEntities(expCtx, spec.getEntityType(), parserMap);
 }
 

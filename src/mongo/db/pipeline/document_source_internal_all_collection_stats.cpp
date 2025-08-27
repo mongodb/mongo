@@ -140,7 +140,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
                 pExpCtx->getNamespaceString().isCollectionlessAggregateNS());
 
     auto spec = DocumentSourceInternalAllCollectionStatsSpec::parse(
-        IDLParserContext(kStageNameInternal), elem.embeddedObject());
+        elem.embeddedObject(), IDLParserContext(kStageNameInternal));
 
     return make_intrusive<DocumentSourceInternalAllCollectionStats>(pExpCtx, std::move(spec));
 }

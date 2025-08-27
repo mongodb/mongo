@@ -186,7 +186,7 @@ Status TLSCATrustsSetParameter::set(const BSONElement& element,
         }
 
         IDLParserContext ctx("tlsCATrusts");
-        auto trust = TLSCATrust::parse(ctx, trustElement.Obj());
+        auto trust = TLSCATrust::parse(trustElement.Obj(), ctx);
 
         if (trusts.find(trust.getSha256()) != trusts.end()) {
             return {ErrorCodes::BadValue,
@@ -234,7 +234,7 @@ Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
     }
 
     IDLParserContext ctx("tlsClusterAuthX509Override");
-    auto overrideParam = ClusterAuthX509Override::parse(ctx, element.Obj());
+    auto overrideParam = ClusterAuthX509Override::parse(element.Obj(), ctx);
 
     // Valid override object can contain at most one of attributes or extensionValue.
     uassert(ErrorCodes::BadValue,

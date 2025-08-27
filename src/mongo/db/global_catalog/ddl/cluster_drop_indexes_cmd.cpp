@@ -103,14 +103,14 @@ public:
     void validateResult(const BSONObj& resultObj) final {
         auto ctx = IDLParserContext("DropIndexesReply");
         if (!checkIsErrorStatus(resultObj, ctx)) {
-            Reply::parse(ctx, resultObj.removeField(kRawFieldName));
+            Reply::parse(resultObj.removeField(kRawFieldName), ctx);
             if (resultObj.hasField(kRawFieldName)) {
                 const auto& rawData = resultObj[kRawFieldName];
                 if (ctx.checkAndAssertType(rawData, BSONType::object)) {
                     for (const auto& element : rawData.Obj()) {
                         const auto& shardReply = element.Obj();
                         if (!checkIsErrorStatus(shardReply, ctx)) {
-                            Reply::parse(ctx, shardReply);
+                            Reply::parse(shardReply, ctx);
                         }
                     }
                 }

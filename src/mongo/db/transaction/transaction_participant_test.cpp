@@ -468,13 +468,13 @@ protected:
 
     void assertSessionState(BSONObj obj, DurableTxnStateEnum expectedState) {
         SessionTxnRecord txnRecord =
-            SessionTxnRecord::parse(IDLParserContext("test sessn txn parser"), obj);
+            SessionTxnRecord::parse(obj, IDLParserContext("test sessn txn parser"));
         ASSERT_EQ(expectedState, txnRecord.getState().get());
     }
 
     void assertNotInSessionState(BSONObj obj, DurableTxnStateEnum expectedState) {
         SessionTxnRecord txnRecord =
-            SessionTxnRecord::parse(IDLParserContext("test sessn txn parser"), obj);
+            SessionTxnRecord::parse(obj, IDLParserContext("test sessn txn parser"));
         ASSERT_NE(expectedState, txnRecord.getState().get());
     }
 

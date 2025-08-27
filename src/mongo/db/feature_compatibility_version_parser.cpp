@@ -185,8 +185,7 @@ Status FeatureCompatibilityVersionParser::validatePreviousVersionField(FCV versi
 StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
     try {
-        auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-            IDLParserContext("FeatureCompatibilityVersionParser"), featureCompatibilityVersionDoc);
+        auto fcvDoc = FeatureCompatibilityVersionDocument::parse(featureCompatibilityVersionDoc);
         auto version = fcvDoc.getVersion();
         auto targetVersion = fcvDoc.getTargetVersion();
         auto previousVersion = fcvDoc.getPreviousVersion();

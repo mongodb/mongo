@@ -50,7 +50,7 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
             auto val = placeholder->getValue().getElement();
             uassert(6720200, "Range Find placeholder value must be an object.", val.isABSONObj());
             auto obj = val.Obj();
-            FLE2RangeFindSpec::parse(IDLParserContext("v"), obj);
+            FLE2RangeFindSpec::parse(obj, IDLParserContext("v"));
             uassert(6832501,
                     "Sparsity must be defined for range placeholders.",
                     placeholder->getSparsity());
@@ -58,7 +58,7 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
             auto val = placeholder->getValue().getElement();
             uassert(6775321, "Range Insert placeholder value must be an object.", val.isABSONObj());
             auto obj = val.Obj();
-            FLE2RangeInsertSpec::parse(IDLParserContext("v"), obj);
+            FLE2RangeInsertSpec::parse(obj, IDLParserContext("v"));
             uassert(6775322,
                     "Sparsity must be defined for range placeholders.",
                     placeholder->getSparsity());
@@ -66,7 +66,7 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
     } else if (placeholder->getAlgorithm() == Fle2AlgorithmInt::kTextSearch) {
         auto val = placeholder->getValue().getElement();
         uassert(9783505, "Text Search placeholder value must be an object.", val.isABSONObj());
-        FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"), val.Obj());
+        FLE2TextSearchInsertSpec::parse(val.Obj(), IDLParserContext("FLE2TextSearchInsertSpec"));
     }
 
     uassert(6832500,

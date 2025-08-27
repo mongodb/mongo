@@ -134,7 +134,7 @@ GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
 
 bool ChangeStreamUnwindTransactionStage::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
-    auto opType = repl::OpType_parse(IDLParserContext("ChangeStreamEntry.op"), op.getStringData());
+    auto opType = repl::OpType_parse(op.getStringData(), IDLParserContext("ChangeStreamEntry.op"));
     auto commandVal = doc["o"];
 
     if (opType != repl::OpTypeEnum::kCommand ||
@@ -441,7 +441,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::_createEndOfTransacti
     _endOfTransactionReturned = true;
 
     std::vector<NamespaceString> namespaces{_affectedNamespaces.begin(), _affectedNamespaces.end()};
-    auto lsid = LogicalSessionId::parse(IDLParserContext("LogicalSessionId"), _lsid->toBson());
+    auto lsid = LogicalSessionId::parse(_lsid->toBson(), IDLParserContext("LogicalSessionId"));
     repl::MutableOplogEntry oplogEntry = change_stream::createEndOfTransactionOplogEntry(
         lsid, *_txnNumber, namespaces, _clusterTime, _wallTime);
 

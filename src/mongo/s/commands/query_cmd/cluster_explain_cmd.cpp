@@ -119,11 +119,12 @@ public:
           _ns{CommandHelpers::parseNsFromCommand(_outerRequest->parseDbName(),
                                                  _outerRequest->body)},
           _verbosity{std::move(verbosity)},
-          _genericArgs(GenericArguments::parse(IDLParserContext("explain",
-                                                                request.validatedTenancyScope,
-                                                                request.getValidatedTenantId(),
-                                                                request.getSerializationContext()),
-                                               _outerRequest->body)),
+          _genericArgs(
+              GenericArguments::parse(_outerRequest->body,
+                                      IDLParserContext("explain",
+                                                       request.validatedTenancyScope,
+                                                       request.getValidatedTenantId(),
+                                                       request.getSerializationContext()))),
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
 
@@ -225,11 +226,11 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
 
     // To enforce API versioning
     auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
+        request,
         IDLParserContext(ExplainCommandRequest::kCommandName,
                          request.validatedTenancyScope,
                          request.getValidatedTenantId(),
-                         request.getSerializationContext()),
-        request);
+                         request.getSerializationContext()));
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual

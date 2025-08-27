@@ -99,8 +99,8 @@ DocumentSource::GetNextResult DocumentSourceQuerySettings::doGetNext() {
 
                 if (status == DocumentSource::GetNextResult::ReturnStatus::kAdvanced) {
                     auto representativeQuery = QueryShapeRepresentativeQuery::parse(
-                        IDLParserContext{"QueryShapeRepresentativeQuery"},
-                        result.getDocument().toBson());
+                        result.getDocument().toBson(),
+                        IDLParserContext{"QueryShapeRepresentativeQuery"});
 
                     // We ignore the "orphaned" representative queries that have no corresponding
                     // entry in the '_queryShapeConfigsMap'.
@@ -222,7 +222,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
 
     // Resolve whether to include the debug query shape or not.
     bool showDebugQueryShape = DocumentSourceQuerySettingsSpec::parse(
-                                   IDLParserContext("$querySettings"), elem.embeddedObject())
+                                   elem.embeddedObject(), IDLParserContext("$querySettings"))
                                    .getShowDebugQueryShape();
     return make_intrusive<DocumentSourceQuerySettings>(expCtx, showDebugQueryShape);
 }

@@ -156,7 +156,7 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseUnsignedToken(Client* c
     IDLParserContext ctxt("securityToken");
     const auto parsed = parseSignedToken(securityToken);
 
-    auto header = crypto::JWSHeader::parse(ctxt, decodeJSON(parsed.header));
+    auto header = crypto::JWSHeader::parse(decodeJSON(parsed.header), ctxt);
     uassert(
         ErrorCodes::InvalidJWT,
         fmt::format("Unexpected algorithm '{}' for unsigned security token", header.getAlgorithm()),
@@ -177,7 +177,7 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseUnsignedToken(Client* c
                     client->isFromSystemConnection());
     }
 
-    auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
+    auto jwt = crypto::JWT::parse(decodeJSON(parsed.body), ctxt);
     uassert(ErrorCodes::Unauthorized,
             "Unsigned security token must contain a tenantId",
             jwt.getTenantId() != boost::none);
@@ -204,7 +204,7 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseToken(Client* client,
             !gTestOnlyValidatedTenancyScopeKey.empty());
 
     StringData secret(gTestOnlyValidatedTenancyScopeKey);
-    auto header = crypto::JWSHeader::parse(ctxt, decodeJSON(parsed.header));
+    auto header = crypto::JWSHeader::parse(decodeJSON(parsed.header), ctxt);
     uassert(ErrorCodes::BadValue,
             "Security token must be signed using 'HS256' algorithm",
             header.getAlgorithm() == "HS256"_sd);
@@ -219,7 +219,7 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseToken(Client* client,
                                              sigraw.size());
     uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == signature);
 
-    auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
+    auto jwt = crypto::JWT::parse(decodeJSON(parsed.body), ctxt);
 
     // Expected hard-coded values for kid/iss/aud.
     // These signed tokens are used exclusively by internal testing,

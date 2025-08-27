@@ -44,7 +44,7 @@ MONGO_FAIL_POINT_DEFINE(waitForUserCacheInvalidation);
 void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandle& user) {
     auto fp = waitForUserCacheInvalidation.scopedIf([&](const auto& bsonData) {
         IDLParserContext ctx("waitForUserCacheInvalidation");
-        auto data = WaitForUserCacheInvalidationFailPoint::parse(ctx, bsonData);
+        auto data = WaitForUserCacheInvalidationFailPoint::parse(bsonData, ctx);
 
         const auto& blockedUserName = data.getUserName();
         return blockedUserName == user->getName();

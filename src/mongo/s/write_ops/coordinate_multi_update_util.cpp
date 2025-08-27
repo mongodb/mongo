@@ -149,8 +149,8 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
 
             uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
             auto parsed = ShardsvrCoordinateMultiUpdateResponse::parse(
-                IDLParserContext{"coordinate_multi_update_util::executeCoordinateMultiUpdate"},
-                response.swResponse.getValue().data);
+                response.swResponse.getValue().data,
+                IDLParserContext{"coordinate_multi_update_util::executeCoordinateMultiUpdate"});
             invariant(parsed.getResult());
             return *parsed.getResult();
         });
@@ -166,7 +166,7 @@ BatchedCommandResponse parseBatchedResponse(const BSONObj& response) {
 
 BulkWriteCommandReply parseBulkResponse(const BSONObj& response) {
     return BulkWriteCommandReply::parse(
-        IDLParserContext{"coordinate_multi_update_util::parseBulkResponse"}, response);
+        response, IDLParserContext{"coordinate_multi_update_util::parseBulkResponse"});
 }
 
 }  // namespace

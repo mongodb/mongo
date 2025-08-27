@@ -2382,7 +2382,7 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
 
     IDLParserContext ctx(kInternalFleEq);
 
-    auto fleEq = InternalFleEqStructV2::parse(ctx, expr.Obj());
+    auto fleEq = InternalFleEqStructV2::parse(expr.Obj(), ctx);
 
     auto fieldExpr = Expression::parseOperand(expCtx, fleEq.getField().getElement(), vps);
 
@@ -2436,7 +2436,7 @@ intrusive_ptr<Expression> ExpressionInternalFLEBetween::parse(ExpressionContext*
                                                               const VariablesParseState& vps) {
     IDLParserContext ctx(kInternalFleBetween);
 
-    auto fleBetween = InternalFleBetweenStructV2::parse(ctx, expr.Obj());
+    auto fleBetween = InternalFleBetweenStructV2::parse(expr.Obj(), ctx);
 
     auto fieldExpr = Expression::parseOperand(expCtx, fleBetween.getField().getElement(), vps);
 
@@ -5032,7 +5032,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionCon
                                                                    const VariablesParseState& vps) {
     IDLParserContext ctx(kEncStrStartsWith);
 
-    auto fleEncStartsWith = EncStrStartsWithStruct::parse(ctx, expr.Obj());
+    auto fleEncStartsWith = EncStrStartsWithStruct::parse(expr.Obj(), ctx);
 
     auto inputExpr =
         ExpressionFieldPath::parse(expCtx, std::string{fleEncStartsWith.getInput()}, vps);
@@ -5078,7 +5078,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrEndsWith::parse(ExpressionConte
                                                                  const VariablesParseState& vps) {
     IDLParserContext ctx(kEncStrEndsWith);
 
-    auto fleEncEndsWith = EncStrEndsWithStruct::parse(ctx, expr.Obj());
+    auto fleEncEndsWith = EncStrEndsWithStruct::parse(expr.Obj(), ctx);
 
     auto inputExpr =
         ExpressionFieldPath::parse(expCtx, std::string{fleEncEndsWith.getInput()}, vps);
@@ -5124,7 +5124,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrContains::parse(ExpressionConte
                                                                  const VariablesParseState& vps) {
     IDLParserContext ctx(kEncStrContains);
 
-    auto fleEncStrContains = EncStrContainsStruct::parse(ctx, expr.Obj());
+    auto fleEncStrContains = EncStrContainsStruct::parse(expr.Obj(), ctx);
 
     auto inputExpr =
         ExpressionFieldPath::parse(expCtx, std::string{fleEncStrContains.getInput()}, vps);
@@ -5171,7 +5171,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrNormalizedEq::parse(
     ExpressionContext* const expCtx, BSONElement expr, const VariablesParseState& vps) {
     IDLParserContext ctx(kEncStrNormalizedEq);
 
-    auto fleEncStrNormalizedEq = EncStrNormalizedEqStruct::parse(ctx, expr.Obj());
+    auto fleEncStrNormalizedEq = EncStrNormalizedEqStruct::parse(expr.Obj(), ctx);
 
     auto inputExpr =
         ExpressionFieldPath::parse(expCtx, std::string{fleEncStrNormalizedEq.getInput()}, vps);

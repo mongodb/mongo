@@ -297,7 +297,7 @@ StrippedFields stripReadConcernAndShardAndDbVersions(const BSONObj& cmdObj,
             for (auto&& nsInfoEntry : elem.embeddedObject()) {
                 IDLParserContext context(BulkWriteCommandRequest::kNsInfoFieldName);
                 strippedFields.nsInfoEntries.emplace_back(
-                    NamespaceInfoEntry::parse(context, nsInfoEntry.embeddedObject()));
+                    NamespaceInfoEntry::parse(nsInfoEntry.embeddedObject(), context));
             }
             continue;
         }
@@ -585,8 +585,8 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
         newCmd.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
                       sharedOptions.txnNumberAndRetryCounter.getTxnNumber());
     } else {
-        auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
-                                                         newCmd.asTempObj());
+        auto osi = OperationSessionInfoFromClient::parse(newCmd.asTempObj(),
+                                                         IDLParserContext{"OperationSessionInfo"});
         invariant(sharedOptions.txnNumberAndRetryCounter.getTxnNumber() == *osi.getTxnNumber());
     }
 
@@ -640,7 +640,7 @@ TransactionRouter::ParsedParticipantResponseMetadata
 TransactionRouter::Router::parseParticipantResponseMetadata(const BSONObj& responseObj) {
     return {.status = getStatusFromCommandResult(responseObj),
             .txnResponseMetadata = TxnResponseMetadata::parse(
-                IDLParserContext{"processParticipantResponse"}, responseObj)};
+                responseObj, IDLParserContext{"processParticipantResponse"})};
 }
 
 void TransactionRouter::Router::processParticipantResponse(

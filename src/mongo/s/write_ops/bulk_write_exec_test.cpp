@@ -297,7 +297,7 @@ TEST_F(BulkWriteOpTest, TargetSucceedsNsInfoOver16MB) {
     Message req = msgBuilder.finishWithoutSizeChecking();
 
     auto request = OpMsgRequest::parse(req);
-    auto op = BulkWriteCommandRequest::parse(IDLParserContext{"testBulkWriteParse"}, request);
+    auto op = BulkWriteCommandRequest::parse(request, IDLParserContext{"testBulkWriteParse"});
 
     BulkWriteOp bulkWriteOp(_opCtx, op);
 

@@ -389,7 +389,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
 
     try {
         IDLParserContext ctx("IndexBuildsEntry Parser");
-        IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
+        IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(obj, ctx);
         return indexBuildEntry;
     } catch (DBException& ex) {
         str::stream ss;

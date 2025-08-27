@@ -72,7 +72,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBs
             elem.type() == BSONType::object);
 
     auto searchIdLookupSpec =
-        DocumentSourceIdLookupSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+        DocumentSourceIdLookupSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
 
     if (searchIdLookupSpec.getLimit()) {
         return make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx,

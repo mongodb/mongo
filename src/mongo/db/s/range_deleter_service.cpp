@@ -441,8 +441,8 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
 
                     while (cursor->more()) {
                         auto completionFuture = this->registerTask(
-                            RangeDeletionTask::parse(IDLParserContext("rangeDeletionRecovery"),
-                                                     cursor->next()),
+                            RangeDeletionTask::parse(cursor->next(),
+                                                     IDLParserContext("rangeDeletionRecovery")),
                             SemiFuture<void>::makeReady(),
                             true /* fromResubmitOnStepUp */);
                         nRescheduledTasks++;
@@ -473,8 +473,8 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
                     auto cursor = client.find(std::move(findCommand));
                     while (cursor->more()) {
                         (void)this->registerTask(
-                            RangeDeletionTask::parse(IDLParserContext("rangeDeletionRecovery"),
-                                                     cursor->next()),
+                            RangeDeletionTask::parse(cursor->next(),
+                                                     IDLParserContext("rangeDeletionRecovery")),
                             processingTasksCompletionFuture.thenRunOn(_executor).semi(),
                             true /* fromResubmitOnStepUp */);
                     }

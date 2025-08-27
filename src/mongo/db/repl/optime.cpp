@@ -65,7 +65,7 @@ void OpTime::append(StringData fieldName, BSONObjBuilder* builder) const {
 
 StatusWith<OpTime> OpTime::parseFromOplogEntry(const BSONObj& obj) {
     try {
-        OpTimeBase base = OpTimeBase::parse(IDLParserContext("OpTimeBase"), obj);
+        OpTimeBase base = OpTimeBase::parse(obj);
         long long term = base.getTerm().value_or(kUninitializedTerm);
         return OpTime(base.getTimestamp(), term);
     } catch (...) {
@@ -119,7 +119,7 @@ StatusWith<OpTimeAndWallTime> OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplog
     const BSONObj& obj) {
 
     try {
-        auto base = OpTimeAndWallTimeBase::parse(IDLParserContext("OpTimeAndWallTimeBase"), obj);
+        auto base = OpTimeAndWallTimeBase::parse(obj);
 
         auto opTime =
             OpTime(base.getTimestamp(), base.getTerm().value_or(OpTime::kUninitializedTerm));

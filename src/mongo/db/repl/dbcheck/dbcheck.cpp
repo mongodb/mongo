@@ -1267,7 +1267,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     if (!opCtx->writesAreReplicated()) {
         opTime = entry.getOpTime();
     }
-    const auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
+    const auto type = OplogEntries_parse(cmd.getStringField("type"), IDLParserContext("type"));
     const IDLParserContext ctx("o",
                                auth::ValidatedTenancyScope::get(opCtx),
                                entry.getTid(),
@@ -1287,7 +1287,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     }
     switch (type) {
         case OplogEntriesEnum::Batch: {
-            const auto invocation = DbCheckOplogBatch::parse(ctx, cmd);
+            const auto invocation = DbCheckOplogBatch::parse(cmd, ctx);
 
             // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
             // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
@@ -1359,7 +1359,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         case OplogEntriesEnum::Start:
             [[fallthrough]];
         case OplogEntriesEnum::Stop:
-            const auto invocation = DbCheckOplogStartStop::parse(ctx, cmd);
+            const auto invocation = DbCheckOplogStartStop::parse(cmd, ctx);
             auto healthLogEntry = mongo::dbCheckHealthLogEntry(
                 invocation.getSecondaryIndexCheckParameters(),
                 invocation.getNss(),

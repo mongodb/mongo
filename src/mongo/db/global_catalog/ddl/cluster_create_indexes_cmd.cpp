@@ -255,7 +255,7 @@ public:
                                        ErrorReply::kOkFieldName,
                                        kTopologyVersionFieldName,
                                        kRawFieldName});
-        Reply::parse(ctx, result.removeFields(ignorableFields));
+        Reply::parse(result.removeFields(ignorableFields), ctx);
         if (!result.hasField(kRawFieldName)) {
             return;
         }
@@ -273,7 +273,7 @@ public:
 
             const auto& shardReply = element.Obj();
             if (!checkIsErrorStatus(shardReply, ctx)) {
-                Reply::parse(ctx, shardReply.removeFields(ignorableFields));
+                Reply::parse(shardReply.removeFields(ignorableFields), ctx);
             }
         }
     }

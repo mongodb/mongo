@@ -72,11 +72,11 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     auto* serviceContext = getGlobalServiceContext();
     auto& querySettingsService = QuerySettingsService::get(serviceContext);
     auto newSettings = QuerySettingsClusterParameterValue::parse(
+        newValueElement.Obj(),
         IDLParserContext("querySettingsParameterValue",
                          boost::none /* vts */,
                          tenantId,
-                         SerializationContext::stateDefault()),
-        newValueElement.Obj());
+                         SerializationContext::stateDefault()));
 
     // Skip installing the new settings if the incoming 'clusterParameterTime' did not change.
     // The cluster parameter time acts as the version of the configuration, meaning if it hasn't

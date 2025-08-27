@@ -141,7 +141,7 @@ TEST_F(AuditMetadataTest, ReadAuditMetadata) {
                                  << BSON("hosts"
                                          << BSON_ARRAY(kRemoteAddr << kLocalAddr << kProxyAddr)));
     AuditMetadata parsedDollarAudit =
-        AuditMetadata::parse(IDLParserContext{kImpersonationMetadataSectionName}, dollarAudit);
+        AuditMetadata::parse(dollarAudit, IDLParserContext{kImpersonationMetadataSectionName});
     GenericArguments requestArgs;
     requestArgs.setDollarAudit(parsedDollarAudit);
 
@@ -187,7 +187,7 @@ TEST_F(AuditMetadataTest, ReadAuditMetadataUserOnly) {
     BSONObj dollarAudit = BSON("$impersonatedUser" << BSON("user" << kUserName << "db" << kDBName)
                                                    << "$impersonatedRoles" << BSONArray());
     AuditMetadata parsedDollarAudit =
-        AuditMetadata::parse(IDLParserContext{kImpersonationMetadataSectionName}, dollarAudit);
+        AuditMetadata::parse(dollarAudit, IDLParserContext{kImpersonationMetadataSectionName});
     GenericArguments requestArgs;
     requestArgs.setDollarAudit(parsedDollarAudit);
 
@@ -230,7 +230,7 @@ TEST_F(AuditMetadataTest, ReadAuditMetadataClientOnly) {
                                   << BSON("hosts"
                                           << BSON_ARRAY(kRemoteAddr << kLocalAddr << kProxyAddr)));
     AuditMetadata parsedDollarAudit =
-        AuditMetadata::parse(IDLParserContext{kImpersonationMetadataSectionName}, dollarAudit);
+        AuditMetadata::parse(dollarAudit, IDLParserContext{kImpersonationMetadataSectionName});
     GenericArguments requestArgs;
     requestArgs.setDollarAudit(parsedDollarAudit);
 

@@ -549,7 +549,7 @@ void warnMirrorReadsSetOnStandalone() {
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
     IDLParserContext ctx("mirrorReads");
-    return MirroredReadsParameters::parse(ctx, obj);
+    return MirroredReadsParameters::parse(obj, ctx);
 }
 
 Status setMirrorReadsParameter(const BSONObj& param) try {

@@ -346,8 +346,8 @@ OperationSessionInfoFromClient initializeOpSessionInfoWithRequestBody(
 
         requestBody,
         BSONObj());
-    auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
-                                                     opMsgRequest.body);
+    auto osi = OperationSessionInfoFromClient::parse(opMsgRequest.body,
+                                                     IDLParserContext{"OperationSessionInfo"});
     return initializeOperationSessionInfo(opCtx,
                                           opMsgRequest.getValidatedTenantId(),
                                           osi,

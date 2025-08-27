@@ -156,7 +156,7 @@ public:
         while (cursor->more()) {
             auto bson = cursor->next();
             auto t = T::parse(
-                IDLParserContext("PersistentTaskStore:" + _storageNss.toStringForErrorMsg()), bson);
+                bson, IDLParserContext("PersistentTaskStore:" + _storageNss.toStringForErrorMsg()));
 
             if (bool shouldContinue = handler(t); !shouldContinue)
                 return;

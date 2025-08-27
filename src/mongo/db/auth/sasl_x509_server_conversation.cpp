@@ -63,7 +63,7 @@ std::string unpackName(StringData inputData) {
     auto payload = cdr.read<Validated<BSONObj>>().val;
 
     auto request =
-        X509MechanismClientStep1::parse(IDLParserContext{"x509-authentication"}, payload);
+        X509MechanismClientStep1::parse(payload, IDLParserContext{"x509-authentication"});
     const auto& user = request.getPrincipalName();
 
     return std::string{user.value_or("")};

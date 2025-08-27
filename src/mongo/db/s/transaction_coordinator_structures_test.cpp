@@ -71,7 +71,7 @@ TEST(CoordinatorCommitDecisionTest, SerializeAbortHasNoTimestampAndAbortStatus) 
     ASSERT_BSONOBJ_EQ(expectedObj, obj);
 
     auto deserializedDecision =
-        CoordinatorCommitDecision::parse(IDLParserContext("AbortTest"), expectedObj);
+        CoordinatorCommitDecision::parse(expectedObj, IDLParserContext("AbortTest"));
     ASSERT_BSONOBJ_EQ(obj, deserializedDecision.toBSON());
 }
 

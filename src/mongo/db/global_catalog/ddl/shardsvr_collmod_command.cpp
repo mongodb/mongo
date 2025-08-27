@@ -139,8 +139,8 @@ public:
 
     void validateResult(const BSONObj& resultObj) final {
         StringDataSet ignorableFields({"raw", "ok", "errmsg"});
-        auto reply = Response::parse(IDLParserContext("CollModReply"),
-                                     resultObj.removeFields(ignorableFields));
+        auto reply = Response::parse(resultObj.removeFields(ignorableFields),
+                                     IDLParserContext("CollModReply"));
         coll_mod_reply_validation::validateReply(reply);
     }
 };

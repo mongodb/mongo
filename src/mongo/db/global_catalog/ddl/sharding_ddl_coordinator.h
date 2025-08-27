@@ -295,9 +295,9 @@ protected:
            * _initialState is a full deep copy of the received parameter.
            */
           _initialState(
-              StateDoc::parse(IDLParserContext("CoordinatorInitialState"), initialStateDoc)
+              StateDoc::parse(initialStateDoc, IDLParserContext("CoordinatorInitialState"))
                   .toBSON()),
-          _doc(StateDoc::parse(IDLParserContext("CoordinatorDocument"), _initialState)) {}
+          _doc(StateDoc::parse(_initialState, IDLParserContext("CoordinatorDocument"))) {}
 
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();

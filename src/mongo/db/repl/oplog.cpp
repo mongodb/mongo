@@ -1053,9 +1053,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               : auth::ValidatedTenancyScope::kNotRequired;
           auto opMsg = OpMsgRequestBuilder::create(vts, entry.getNss().dbName(), cmd);
           auto collModCmd = CollMod::parse(
+              opMsg.body,
               IDLParserContext(
-                  "collModOplogEntry", vts, tenantId, SerializationContext::stateStorageRequest()),
-              opMsg.body);
+                  "collModOplogEntry", vts, tenantId, SerializationContext::stateStorageRequest()));
           const auto nssOrUUID([&collModCmd, &entry, mode]() -> NamespaceStringOrUUID {
               // Oplog entries from secondary oplog application will allways have the Uuid set and
               // it is only invocations of applyOps directly that may omit it
@@ -1138,11 +1138,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                     auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
               : boost::none;
           auto importEntry = mongo::ImportCollectionOplogEntry::parse(
+              entry.getObject(),
               IDLParserContext("importCollectionOplogEntry",
                                vts,
                                tenantId,
-                               SerializationContext::stateDefault()),
-              entry.getObject());
+                               SerializationContext::stateDefault()));
           applyImportCollection(opCtx,
                                 importEntry.getImportUUID(),
                                 importEntry.getImportCollection(),

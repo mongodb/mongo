@@ -462,9 +462,9 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
     })";
 
     if (alg == Fle2AlgorithmInt::kEquality) {
-        return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schemaV2));
+        return EncryptedFieldConfig::parse(fromjson(schemaV2), IDLParserContext("root"));
     }
-    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(rangeSchemaV2));
+    return EncryptedFieldConfig::parse(fromjson(rangeSchemaV2), IDLParserContext("root"));
 }
 
 void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecoc) {
@@ -488,7 +488,7 @@ void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecoc) {
         ]
     })";
 
-    EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(invalidCollectionNameSchema));
+    EncryptedFieldConfig::parse(fromjson(invalidCollectionNameSchema), IDLParserContext("root"));
 }
 
 void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecoc) {
@@ -626,7 +626,7 @@ BSONObj FleCrudTest::transformElementForInsertUpdate(BSONElement element,
                                                &_keyVault,
                                                _edcNs.db_forTest())
             .addField(BSON("$db" << _edcNs.db_forTest()).firstElement());
-    return write_ops::InsertCommandRequest::parse(IDLParserContext("finalCmd"), finalCmd)
+    return write_ops::InsertCommandRequest::parse(finalCmd, IDLParserContext("finalCmd"))
         .getDocuments()
         .front()
         .getOwned();
@@ -712,7 +712,7 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
 
     auto doc = EncryptionInformationHelpers::encryptionInformationSerialize(_edcNs, efc);
 
-    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
+    auto ei = EncryptionInformation::parse(doc, IDLParserContext("test"));
 
     write_ops::UpdateOpEntry entry;
     entry.setQ(BSON("_id" << id));
@@ -737,7 +737,7 @@ void FleCrudTest::doSingleDelete(int id, Fle2AlgorithmInt alg) {
 
     auto doc = EncryptionInformationHelpers::encryptionInformationSerialize(_edcNs, efc);
 
-    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
+    auto ei = EncryptionInformation::parse(doc, IDLParserContext("test"));
 
     write_ops::DeleteOpEntry entry;
     entry.setQ(BSON("_id" << id));
@@ -762,7 +762,7 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
 
     auto doc = EncryptionInformationHelpers::encryptionInformationSerialize(_edcNs, efc);
 
-    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
+    auto ei = EncryptionInformation::parse(doc, IDLParserContext("test"));
 
     request.setEncryptionInformation(ei);
     auto expCtx = ExpressionContextBuilder{}
@@ -1581,7 +1581,7 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
 }
 
 TEST_F(FleTagsTest, ContentionFactor) {
-    auto efc = EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(R"({
+    auto efc = EncryptedFieldConfig::parse(fromjson(R"({
         "escCollection": "enxcol_.coll.esc",
         "ecocCollection": "enxcol_.coll.ecoc",
         "fields": [{
@@ -1590,7 +1590,8 @@ TEST_F(FleTagsTest, ContentionFactor) {
             "bsonType": "string",
             "queries": {"queryType": "equality", "contention": NumberLong(4)}
         }]
-    })"));
+    })"),
+                                           IDLParserContext("root"));
 
     auto doc1 = BSON("encrypted" << "a");
     auto doc2 = BSON("encrypted" << "b");

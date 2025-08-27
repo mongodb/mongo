@@ -38,7 +38,7 @@ const auto getAuditClientAttrs =
 }  // namespace
 
 AuditClientAttrs::AuditClientAttrs(const BSONObj& obj) {
-    AuditClientAttrsBase::parseProtected(IDLParserContext("AuditClientAttrsBase"), obj);
+    AuditClientAttrsBase::parseProtected(obj);
 }
 
 boost::optional<AuditClientAttrs> AuditClientAttrs::get(Client* client) {

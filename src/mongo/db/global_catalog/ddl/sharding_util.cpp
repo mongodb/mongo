@@ -378,7 +378,7 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
         const auto responseValue =
             uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
         const ListDatabasesReply reply =
-            ListDatabasesReply::parse(IDLParserContext("ListDatabasesReply"), responseValue.data);
+            ListDatabasesReply::parse(responseValue.data, IDLParserContext("ListDatabasesReply"));
         const auto currentSize = reply.getTotalSize();
         uassert(ErrorCodes::UnknownError,
                 fmt::format("Received unrecognized reply for ListDatabasesCommand : {}",

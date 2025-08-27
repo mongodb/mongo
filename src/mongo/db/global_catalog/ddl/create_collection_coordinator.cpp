@@ -233,7 +233,7 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     createRequest.setSize(request.getSize());
     createRequest.setClusteredIndex(request.getClusteredIndex());
     if (request.getCollation() && !request.getCollation()->isEmpty()) {
-        auto collation = Collation::parse(IDLParserContext("collation"), *request.getCollation());
+        auto collation = Collation::parse(*request.getCollation(), IDLParserContext("collation"));
         createRequest.setCollation(collation);
     }
     createRequest.setEncryptedFields(request.getEncryptedFields());
@@ -1409,7 +1409,7 @@ void commit(OperationContext* opCtx,
 void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.
     const auto otherDoc = CreateCollectionCoordinatorDocument::parse(
-        IDLParserContext("CreateCollectionCoordinatorDocument"), doc);
+        doc, IDLParserContext("CreateCollectionCoordinatorDocument"));
 
     const auto& selfReq = _request.toBSON();
     const auto& otherReq = otherDoc.getShardsvrCreateCollectionRequest().toBSON();

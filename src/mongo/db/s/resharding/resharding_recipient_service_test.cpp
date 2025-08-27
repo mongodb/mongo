@@ -131,7 +131,7 @@ DocumentType getPersistedStateDocument(OperationContext* opCtx,
                                 : BSONObj{};
     auto doc = client.findOne(nss, query);
     return DocumentType::parse(
-        IDLParserContext("reshardingRecipientServiceTest::getPersistedStateDocument"), doc);
+        doc, IDLParserContext("reshardingRecipientServiceTest::getPersistedStateDocument"));
 }
 
 ReshardingRecipientDocument getPersistedRecipientDocument(
@@ -494,7 +494,7 @@ public:
         return std::make_shared<RecipientStateMachine>(
             this,
             ReshardingRecipientDocument::parse(
-                IDLParserContext{"ReshardingRecipientServiceForTest"}, initialState),
+                initialState, IDLParserContext{"ReshardingRecipientServiceForTest"}),
             std::make_unique<ExternalStateForTest>(_externalStateImpl),
             _serviceContext);
     }
@@ -990,8 +990,8 @@ protected:
 
         // Set up the applier progress collection.
         auto donorOplogId =
-            ReshardingDonorOplogId::parse(IDLParserContext("ReshardingRecipientServiceTest"),
-                                          fetchedOplogEntries.back()["_id"].Obj());
+            ReshardingDonorOplogId::parse(fetchedOplogEntries.back()["_id"].Obj(),
+                                          IDLParserContext("ReshardingRecipientServiceTest"));
         ReshardingOplogApplierProgress applierProgressDoc(
             {metadata.getReshardingUUID(), testRecipientMetricsForDonor.shardId},
             donorOplogId,
@@ -1917,7 +1917,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
         ReshardDoneCatchUpChangeEventO2Field expectedChangeEvent{sourceNss,
                                                                  doc.getReshardingUUID()};
         auto receivedChangeEvent = ReshardDoneCatchUpChangeEventO2Field::parse(
-            IDLParserContext("ReshardDoneCatchUpChangeEventO2Field"), *op.getObject2());
+            *op.getObject2(), IDLParserContext("ReshardDoneCatchUpChangeEventO2Field"));
 
         ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
             << op.getEntry();

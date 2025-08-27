@@ -98,7 +98,7 @@ public:
                     }
                     if (types) {
                         return std::ranges::any_of(*types, [&](StringData type) {
-                            return DDLCoordinatorType_parse(parserContext, type) == opType;
+                            return DDLCoordinatorType_parse(type, parserContext) == opType;
                         });
                     }
                     return true;

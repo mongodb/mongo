@@ -273,7 +273,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
     find.setBatchSize(0);
     auto findResp = assertOK(
         client.runCommandRequest(makeTestRequest(nss.dbName(), find.toBSON())).getNoThrow());
-    auto cursorReply = CursorInitialReply::parse(IDLParserContext("findReply"), findResp.data);
+    auto cursorReply = CursorInitialReply::parse(findResp.data, IDLParserContext("findReply"));
 
     GetMoreCommandRequest getMore(cursorReply.getCursor()->getCursorId(), std::string{nss.coll()});
     getMore.setDbName(nss.dbName());
@@ -290,7 +290,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
         auto& expected = documents[i];
 
         auto resp = assertReadOK(*rdr);
-        auto parsed = CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply"), resp.data);
+        auto parsed = CursorGetMoreReply::parse(resp.data, IDLParserContext("CursorGetMoreReply"));
         auto batch = parsed.getCursor().getNextBatch();
         ASSERT_EQ(batch.size(), 1);
         ASSERT_BSONOBJ_EQ(batch[0], expected);
@@ -300,7 +300,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
 
     // We should have exhausted all documents and received a final empty batch.
     auto last = assertReadOK(*rdr);
-    auto parsed = CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply"), last.data);
+    auto parsed = CursorGetMoreReply::parse(last.data, IDLParserContext("CursorGetMoreReply"));
     auto batch = parsed.getCursor().getNextBatch();
     ASSERT_EQ(batch.size(), 0);
     ASSERT_FALSE(last.moreToCome);

@@ -82,8 +82,8 @@ public:
 
             uassertStatusOK(cmdResponse.commandStatus);
 
-            return Response::parse(IDLParserContext("BalancerCollectionStatusResponse"),
-                                   cmdResponse.response);
+            return Response::parse(cmdResponse.response,
+                                   IDLParserContext("BalancerCollectionStatusResponse"));
         }
 
     private:

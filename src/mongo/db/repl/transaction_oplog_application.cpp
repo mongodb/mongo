@@ -396,7 +396,7 @@ Status applyCommitTransaction(OperationContext* opCtx,
                               const ApplierOperation& op,
                               repl::OplogApplication::Mode mode) {
     IDLParserContext ctx("commitTransaction");
-    auto commitCommand = CommitTransactionOplogObject::parse(ctx, op->getObject());
+    auto commitCommand = CommitTransactionOplogObject::parse(op->getObject(), ctx);
     auto commitTimestamp = *commitCommand.getCommitTimestamp();
 
     switch (mode) {
@@ -836,7 +836,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
     while (cursor->more()) {
         const auto txnRecordObj = cursor->next();
         const auto txnRecord = SessionTxnRecord::parse(
-            IDLParserContext("recovering prepared transaction"), txnRecordObj);
+            txnRecordObj, IDLParserContext("recovering prepared transaction"));
 
         invariant(txnRecord.getState() == DurableTxnStateEnum::kPrepared);
 

@@ -845,7 +845,7 @@ BSONObj WriteError::serialize() const {
 }  // namespace write_ops
 
 InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
-    auto insertOp = InsertCommandRequest::parse(IDLParserContext("insert"), request);
+    auto insertOp = InsertCommandRequest::parse(request, IDLParserContext("insert"));
 
     validate(insertOp);
     return insertOp;
@@ -882,7 +882,7 @@ InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
 
 InsertCommandReply InsertOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
-    return InsertCommandReply::parse(IDLParserContext("insertReply"), obj);
+    return InsertCommandReply::parse(obj, IDLParserContext("insertReply"));
 }
 
 void InsertOp::validate(const InsertCommandRequest& insertOp) {
@@ -891,7 +891,7 @@ void InsertOp::validate(const InsertCommandRequest& insertOp) {
 }
 
 UpdateCommandRequest UpdateOp::parse(const OpMsgRequest& request) {
-    auto updateOp = UpdateCommandRequest::parse(IDLParserContext("update"), request);
+    auto updateOp = UpdateCommandRequest::parse(request, IDLParserContext("update"));
 
     checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
     return updateOp;
@@ -900,7 +900,7 @@ UpdateCommandRequest UpdateOp::parse(const OpMsgRequest& request) {
 UpdateCommandReply UpdateOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
 
-    return UpdateCommandReply::parse(IDLParserContext("updateReply"), obj);
+    return UpdateCommandReply::parse(obj, IDLParserContext("updateReply"));
 }
 
 void UpdateOp::validate(const UpdateCommandRequest& updateOp) {
@@ -910,11 +910,11 @@ void UpdateOp::validate(const UpdateCommandRequest& updateOp) {
 FindAndModifyCommandReply FindAndModifyOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
 
-    return FindAndModifyCommandReply::parse(IDLParserContext("findAndModifyReply"), obj);
+    return FindAndModifyCommandReply::parse(obj, IDLParserContext("findAndModifyReply"));
 }
 
 DeleteCommandRequest DeleteOp::parse(const OpMsgRequest& request) {
-    auto deleteOp = DeleteCommandRequest::parse(IDLParserContext("delete"), request);
+    auto deleteOp = DeleteCommandRequest::parse(request, IDLParserContext("delete"));
 
     checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
     return deleteOp;
@@ -922,7 +922,7 @@ DeleteCommandRequest DeleteOp::parse(const OpMsgRequest& request) {
 
 DeleteCommandReply DeleteOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
-    return DeleteCommandReply::parse(IDLParserContext("deleteReply"), obj);
+    return DeleteCommandReply::parse(obj, IDLParserContext("deleteReply"));
 }
 
 void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {

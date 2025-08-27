@@ -192,7 +192,7 @@ public:
             uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
                 opCtx, ns(), cmd, performViewChange, &builder));
             auto collmodReply =
-                CollModReply::parse(IDLParserContext("CollModReply"), builder.obj());
+                CollModReply::parse(builder.obj(), IDLParserContext("CollModReply"));
 
             // Since no write that generated a retryable write oplog entry with this sessionId
             // and txnNumber happened, we need to make a dummy write so that the session gets

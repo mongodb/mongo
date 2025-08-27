@@ -70,15 +70,15 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSearchIndexes::createFrom
             str::stream() << "The $listSearchIndexes stage specification must be an object. Found: "
                           << typeName(elem.type()),
             elem.type() == BSONType::object);
-    auto spec = DocumentSourceListSearchIndexesSpec::parse(IDLParserContext(kStageName),
-                                                           elem.embeddedObject());
+    auto spec = DocumentSourceListSearchIndexesSpec::parse(elem.embeddedObject(),
+                                                           IDLParserContext(kStageName));
 
     return new DocumentSourceListSearchIndexes(pExpCtx, elem.Obj());
 }
 
 Value DocumentSourceListSearchIndexes::serialize(const SerializationOptions& opts) const {
     BSONObjBuilder bob;
-    auto spec = DocumentSourceListSearchIndexesSpec::parse(IDLParserContext(kStageName), _cmdObj);
+    auto spec = DocumentSourceListSearchIndexesSpec::parse(_cmdObj, IDLParserContext(kStageName));
     spec.serialize(&bob, opts);
     return Value(Document{{kStageName, bob.done()}});
 }

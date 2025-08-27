@@ -119,7 +119,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
         return boost::none;
     }
 
-    auto image = repl::ImageEntry::parse(IDLParserContext("image entry"), imageDoc->toBson());
+    auto image = repl::ImageEntry::parse(imageDoc->toBson(), IDLParserContext("image entry"));
 
     if (image.getTxnNumber() != oplogEntry.getTxnNumber()) {
         // In our snapshot, fetch the current transaction number for a session. If that
@@ -332,9 +332,9 @@ Document DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage(D
 
         for (size_t i = 0; i < operationDocs.size(); i++) {
             auto op = repl::DurableReplOperation::parse(
+                operationDocs[i],
                 IDLParserContext{
-                    "DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage"},
-                operationDocs[i]);
+                    "DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage"});
 
             const auto imageType = op.getNeedsRetryImage();
             if (!imageType) {

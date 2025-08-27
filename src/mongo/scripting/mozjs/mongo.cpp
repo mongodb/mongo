@@ -469,7 +469,7 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     const bool isExhaust = ValueWriter(cx, args.get(2)).toBoolean();
 
     FindCommandRequest findCmdRequest =
-        FindCommandRequest::parse(IDLParserContext("FindCommandRequest"), cmdObj);
+        FindCommandRequest::parse(cmdObj, IDLParserContext("FindCommandRequest"));
     ReadPreferenceSetting readPref;
     if (!readPreference.isEmpty()) {
         readPref = uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreference));
@@ -746,8 +746,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         uassert(4938000,
                 str::stream() << "the 'options' parameter to Mongo() must be an object",
                 args.get(2).isObject());
-        mongoShellOptions = MongoShellOptions::parse(IDLParserContext("MongoShellOptions"_sd),
-                                                     ValueWriter(cx, args.get(2)).toBSON());
+        mongoShellOptions = MongoShellOptions::parse(ValueWriter(cx, args.get(2)).toBSON());
     }
 
     ClientAPIVersionParameters apiParameters;

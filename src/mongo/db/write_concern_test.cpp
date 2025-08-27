@@ -96,7 +96,7 @@ TEST_F(WriteConcernTest, ParseFailsOnNullBytes) {
     s[s.length() - 1] = '\0';
     auto testDoc = BSON("w" << s);
     ASSERT_THROWS_CODE_AND_WHAT(
-        WriteConcernIdl::parse(IDLParserContext("writeConcernTest"), testDoc),
+        WriteConcernIdl::parse(testDoc, IDLParserContext("writeConcernTest")),
         DBException,
         ErrorCodes::FailedToParse,
         "w has illegal embedded NUL byte, w: wcWithNullBytes");

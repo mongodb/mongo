@@ -214,7 +214,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTime() const {
         uassertStatusOKWithContext(status, errorContext);
 
         auto parsedShardResponse = ShardsvrReshardingOperationTimeResponse::parse(
-            IDLParserContext("CoordinatorCommitMonitor"), shardResponse.data);
+            shardResponse.data, IDLParserContext("CoordinatorCommitMonitor"));
         // If the replication lag info is not available which is expected in a mixed version
         // cluster, assume that it is zero.
         auto replicationLag =

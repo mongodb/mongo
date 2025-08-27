@@ -331,7 +331,7 @@ void doSpeculativeSaslStart(OperationContext* opCtx,
     AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSpeculativeSaslStart, [&](auto session) {
             auto request =
-                auth::SaslStartCommand::parse(IDLParserContext("speculative saslStart"), cmdObj);
+                auth::SaslStartCommand::parse(cmdObj, IDLParserContext("speculative saslStart"));
             auto reply = auth::runSaslStart(opCtx, session, request);
             result->append(auth::kSpeculativeAuthenticate, reply.toBSON());
         });

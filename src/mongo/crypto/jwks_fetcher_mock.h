@@ -53,7 +53,7 @@ public:
                       "Mock JWKS fetcher configured to simulate timeout");
         }
 
-        auto jwkSet = JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+        auto jwkSet = JWKSet::parse(_keys, IDLParserContext("JWKSet"));
         _lastFetchQuiesceTime = _clock->now();
         return jwkSet;
     }

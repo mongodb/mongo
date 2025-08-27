@@ -435,14 +435,14 @@ protected:
         const boost::optional<BSONObj>& letParameters = boost::none) {
         auto doc = _getConfigDocument(NamespaceString::kConfigSampledQueriesNamespace, sampleId);
         auto parsedQueryDoc =
-            SampledQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+            SampledQueryDocument::parse(doc, IDLParserContext("QueryAnalysisWriterTest"));
 
         ASSERT_EQ(parsedQueryDoc.getNs(), nss);
         ASSERT_EQ(parsedQueryDoc.getCollectionUuid(), getCollectionUUID(nss));
         ASSERT_EQ(parsedQueryDoc.getSampleId(), sampleId);
         ASSERT(parsedQueryDoc.getCmdName() == cmdName);
-        auto parsedCmd = SampledReadCommand::parse(IDLParserContext("QueryAnalysisWriterTest"),
-                                                   parsedQueryDoc.getCmd());
+        auto parsedCmd = SampledReadCommand::parse(parsedQueryDoc.getCmd(),
+                                                   IDLParserContext("QueryAnalysisWriterTest"));
         ASSERT_BSONOBJ_EQ(parsedCmd.getFilter(), filter);
         ASSERT_BSONOBJ_EQ(parsedCmd.getCollation(), collation);
         if (letParameters) {
@@ -464,14 +464,14 @@ protected:
                                          const CommandRequestType& expectedCmd) {
         auto doc = _getConfigDocument(NamespaceString::kConfigSampledQueriesNamespace, sampleId);
         auto parsedQueryDoc =
-            SampledQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+            SampledQueryDocument::parse(doc, IDLParserContext("QueryAnalysisWriterTest"));
 
         ASSERT_EQ(parsedQueryDoc.getNs(), nss);
         ASSERT_EQ(parsedQueryDoc.getCollectionUuid(), getCollectionUUID(nss));
         ASSERT_EQ(parsedQueryDoc.getSampleId(), sampleId);
         ASSERT(parsedQueryDoc.getCmdName() == cmdName);
-        auto parsedCmd = CommandRequestType::parse(IDLParserContext("QueryAnalysisWriterTest"),
-                                                   parsedQueryDoc.getCmd());
+        auto parsedCmd = CommandRequestType::parse(parsedQueryDoc.getCmd(),
+                                                   IDLParserContext("QueryAnalysisWriterTest"));
         ASSERT_BSONOBJ_EQ(parsedCmd.toBSON(), expectedCmd.toBSON());
     }
 
@@ -497,7 +497,7 @@ protected:
         auto doc =
             _getConfigDocument(NamespaceString::kConfigSampledQueriesDiffNamespace, sampleId);
         auto parsedDiffDoc =
-            SampledQueryDiffDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+            SampledQueryDiffDocument::parse(doc, IDLParserContext("QueryAnalysisWriterTest"));
 
         ASSERT_EQ(parsedDiffDoc.getNs(), nss);
         ASSERT_EQ(parsedDiffDoc.getCollectionUuid(), getCollectionUUID(nss));
@@ -1086,7 +1086,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicateQueriesAfterOtherWriteError) {
         ASSERT_GT(docs.size(), 0);
         for (const auto& doc : docs) {
             auto queryDoc = SampledQueryDocument::parse(
-                IDLParserContext("RemoveDuplicateQueriesOtherWriteError"), doc);
+                doc, IDLParserContext("RemoveDuplicateQueriesOtherWriteError"));
             ASSERT_NE(queryDoc.getSampleId(), sampleId0);
         }
 
@@ -1699,7 +1699,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicateDiffsAfterOtherWriteError) {
         ASSERT_GT(docs.size(), 0);
         for (const auto& doc : docs) {
             auto diffDoc = SampledQueryDiffDocument::parse(
-                IDLParserContext("RemoveDuplicateDiffsAfterOtherWriteError"), doc);
+                doc, IDLParserContext("RemoveDuplicateDiffsAfterOtherWriteError"));
             ASSERT_NE(diffDoc.getSampleId(), sampleId0);
         }
 

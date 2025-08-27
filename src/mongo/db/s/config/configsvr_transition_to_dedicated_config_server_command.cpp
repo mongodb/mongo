@@ -146,8 +146,8 @@ public:
                     .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
             }
 
-            return Response::parse(IDLParserContext("ConfigsvrTransitionToDedicatedConfigCommand"),
-                                   result.obj());
+            return Response::parse(result.obj(),
+                                   IDLParserContext("ConfigsvrTransitionToDedicatedConfigCommand"));
         }
 
     private:

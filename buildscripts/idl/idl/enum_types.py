@@ -200,19 +200,20 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
         deserializer = self._get_enum_deserializer_name()
-        return f"{cpp_type} {deserializer}(const IDLParserContext& ctxt, std::int32_t value)"
+        return f"{cpp_type} {deserializer}(std::int32_t value, const IDLParserContext& ctxt = IDLParserContext(\"{self.get_cpp_type_name()}\"))"
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         enum_values = sorted(cast(ast.Enum, self._enum).values, key=lambda ev: int(ev.value))
 
         enum_name = self.get_cpp_type_name()
-        function_decl = self.get_deserializer_declaration()
         min_value = enum_values[0].name
         max_value = enum_values[-1].name
 
+        cpp_type = self.get_cpp_type_name()
+        func = self._get_enum_deserializer_name()
         indented_writer._stream.write(f"""
-{function_decl} {{
+{cpp_type} {func}(std::int32_t value, const IDLParserContext& ctxt) {{
     if (!(value >= static_cast<std::underlying_type<{enum_name}>::type>(
         {enum_name}::{min_value}) &&
         value <= static_cast<std::underlying_type<{enum_name}>::type>(
@@ -263,7 +264,7 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
         func = self._get_enum_deserializer_name()
-        return f"{cpp_type} {func}(const IDLParserContext& ctxt, StringData value)"
+        return f"{cpp_type} {func}(StringData value, const IDLParserContext& ctxt = IDLParserContext(\"{cpp_type}\"))"
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -284,7 +285,7 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
 
         with writer.IndentedScopedBlock(
             indented_writer,
-            f"{cpp_type} {func}(const IDLParserContext& ctxt, StringData value) {{",
+            f"{cpp_type} {func}(StringData value, const IDLParserContext& ctxt) {{",
             "}",
         ):
             indented_writer.write_line(

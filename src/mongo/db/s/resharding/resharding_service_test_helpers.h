@@ -161,7 +161,7 @@ public:
         }
 
         auto doc = StateDocument::parse(
-            IDLParserContext{"StateTransitionControllerOpObserver::onInserts"}, begin->doc);
+            begin->doc, IDLParserContext{"StateTransitionControllerOpObserver::onInserts"});
         _controller->_notifyNewStateAndWaitUntilUnpaused(opCtx, _getState(doc));
         invariant(++begin == end);  // No support for inserting more than one state document yet.
     }
@@ -174,8 +174,8 @@ public:
         }
 
         auto doc =
-            StateDocument::parse(IDLParserContext{"StateTransitionControllerOpObserver::onUpdate"},
-                                 args.updateArgs->updatedDoc);
+            StateDocument::parse(args.updateArgs->updatedDoc,
+                                 IDLParserContext{"StateTransitionControllerOpObserver::onUpdate"});
         _controller->_notifyNewStateAndWaitUntilUnpaused(opCtx, _getState(doc));
     }
 

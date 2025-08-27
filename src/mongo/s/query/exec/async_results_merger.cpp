@@ -101,8 +101,8 @@ Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Resp
                              << response.shardId;
     };
 
-    auto reply = ReleaseMemoryCommandReply::parse(IDLParserContext("ReleaseMemoryCommandReply"),
-                                                  response.swResponse.getValue().data);
+    auto reply = ReleaseMemoryCommandReply::parse(response.swResponse.getValue().data,
+                                                  IDLParserContext("ReleaseMemoryCommandReply"));
 
     tassert(10247600,
             str::stream() << "Release memory command reply from shard contains more than 1 cursor: "

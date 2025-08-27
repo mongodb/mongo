@@ -495,12 +495,12 @@ TEST_F(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     // OpTimeBase should be successfully created from an OplogEntry, even though it has
     // extraneous fields.
     UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
-        OpTimeBase::parse(IDLParserContext("OpTimeBase"), oplogEntryExtraField));
+        OpTimeBase::parse(oplogEntryExtraField, IDLParserContext("OpTimeBase")));
 
     // OplogEntryBase should still use strict parsing and throw an error when it has extraneous
     // fields.
     ASSERT_THROWS_CODE(
-        OplogEntryBase::parse(IDLParserContext("OplogEntryBase"), oplogEntryExtraField),
+        OplogEntryBase::parse(oplogEntryExtraField, IDLParserContext("OplogEntryBase")),
         AssertionException,
         40415);
 
@@ -512,7 +512,7 @@ TEST_F(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     // When an OplogEntryBase is created with a missing required field in a chained struct, it
     // should throw an exception.
     ASSERT_THROWS_CODE(
-        OplogEntryBase::parse(IDLParserContext("OplogEntryBase"), oplogEntryMissingTimestamp),
+        OplogEntryBase::parse(oplogEntryMissingTimestamp, IDLParserContext("OplogEntryBase")),
         AssertionException,
         ErrorCodes::IDLFailedToParse);
 }
@@ -607,8 +607,8 @@ TEST_F(OplogEntryTest, ParseReplOperationIncludesTidField) {
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     auto replOp = ReplOperation::parse(
-        IDLParserContext("ReplOperation", vts, tid, SerializationContext::stateDefault()),
-        oplogBson);
+        oplogBson,
+        IDLParserContext("ReplOperation", vts, tid, SerializationContext::stateDefault()));
     ASSERT(replOp.getTid());
     ASSERT_EQ(replOp.getTid(), tid);
     ASSERT_EQ(replOp.getNss(), nssWithTid);
@@ -680,7 +680,7 @@ TEST_F(OplogEntryTest, StatementIDParseAndSerialization) {
                   << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t());
 
     auto oplogEntryBaseNoStmtId =
-        OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithNoStmtId);
+        OplogEntryBase::parse(oplogEntryWithNoStmtId, IDLParserContext("OplogEntry"));
     ASSERT_TRUE(oplogEntryBaseNoStmtId.getStatementIds().empty());
     auto rtOplogEntryWithNoStmtId = oplogEntryBaseNoStmtId.toBSON();
     ASSERT_EQ(bsonCompare.compare(oplogEntryWithNoStmtId, rtOplogEntryWithNoStmtId), 0)
@@ -692,7 +692,7 @@ TEST_F(OplogEntryTest, StatementIDParseAndSerialization) {
                   << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "v" << 2 << "ts"
                   << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId" << 99);
     auto oplogEntryBaseOneStmtId =
-        OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithOneStmtId);
+        OplogEntryBase::parse(oplogEntryWithOneStmtId, IDLParserContext("OplogEntry"));
     ASSERT_EQ(oplogEntryBaseOneStmtId.getStatementIds(), std::vector<StmtId>{99});
     auto rtOplogEntryWithOneStmtId = oplogEntryBaseOneStmtId.toBSON();
     ASSERT_EQ(bsonCompare.compare(oplogEntryWithOneStmtId, rtOplogEntryWithOneStmtId), 0)
@@ -707,7 +707,7 @@ TEST_F(OplogEntryTest, StatementIDParseAndSerialization) {
                   << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId"
                   << BSON_ARRAY(101 << 102 << 103));
     auto oplogEntryBaseMultiStmtId =
-        OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithMultiStmtId);
+        OplogEntryBase::parse(oplogEntryWithMultiStmtId, IDLParserContext("OplogEntry"));
     ASSERT_EQ(oplogEntryBaseMultiStmtId.getStatementIds(), (std::vector<StmtId>{101, 102, 103}));
     auto rtOplogEntryWithMultiStmtId = oplogEntryBaseMultiStmtId.toBSON();
     ASSERT_EQ(bsonCompare.compare(oplogEntryWithMultiStmtId, rtOplogEntryWithMultiStmtId), 0)
@@ -723,7 +723,7 @@ TEST_F(OplogEntryTest, StatementIDParseAndSerialization) {
              << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId" << BSONArray());
 
     auto oplogEntryBaseEmptyStmtId =
-        OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithEmptyStmtId);
+        OplogEntryBase::parse(oplogEntryWithEmptyStmtId, IDLParserContext("OplogEntry"));
     ASSERT_TRUE(oplogEntryBaseEmptyStmtId.getStatementIds().empty());
     auto rtOplogEntryWithEmptyStmtId = oplogEntryBaseEmptyStmtId.toBSON();
     // This round-trips to the canonical version with no statement ID.
@@ -738,7 +738,7 @@ TEST_F(OplogEntryTest, StatementIDParseAndSerialization) {
              << Timestamp(0, 0) << "t" << 0LL << "wall" << Date_t() << "stmtId" << BSON_ARRAY(99));
 
     auto oplogEntryBaseSingletonStmtId =
-        OplogEntryBase::parse(IDLParserContext("OplogEntry"), oplogEntryWithSingletonStmtId);
+        OplogEntryBase::parse(oplogEntryWithSingletonStmtId, IDLParserContext("OplogEntry"));
     ASSERT_EQ(oplogEntryBaseSingletonStmtId.getStatementIds(), std::vector<StmtId>{99});
     auto rtOplogEntryWithSingletonStmtId = oplogEntryBaseSingletonStmtId.toBSON();
     // This round-trips to the canonical version with a non-array statement ID.

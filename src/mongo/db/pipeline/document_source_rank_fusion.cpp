@@ -603,7 +603,7 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
             str::stream() << kStageName << " must take a nested object but found: " << spec,
             spec.type() == BSONType::object);
 
-    auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+    auto parsedSpec = RankFusionSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
 
     // Ensure that all pipelines are valid ranked selection pipelines.
@@ -656,7 +656,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
                           << typeName(elem.type()),
             elem.type() == BSONType::object);
 
-    auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+    auto spec = RankFusionSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
 
     auto inputPipelines = parseAndValidateRankedSelectionPipelines(spec, pExpCtx);
 

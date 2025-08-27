@@ -662,7 +662,7 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
             str::stream() << kStageName << " must take a nested object but found: " << spec,
             spec.type() == BSONType::object);
 
-    auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+    auto parsedSpec = ScoreFusionSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
 
     // Parse each pipeline.
@@ -831,7 +831,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
                           << typeName(elem.type()),
             elem.type() == BSONType::object);
 
-    auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+    auto spec = ScoreFusionSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
 
     const auto& inputPipelines = parseAndValidateScoredSelectionPipelines(spec, pExpCtx);
 

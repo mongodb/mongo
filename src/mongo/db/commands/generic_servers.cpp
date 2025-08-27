@@ -331,7 +331,7 @@ public:
             hangInGetLog.pauseWhileSet();
         }
 
-        auto request = GetLogCommand::parse(IDLParserContext{"getLog"}, cmdObj);
+        auto request = GetLogCommand::parse(cmdObj, IDLParserContext{"getLog"});
         auto logName = request.getCommandParameter();
         if (logName == "*") {
             std::vector<std::string> names;

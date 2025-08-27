@@ -66,7 +66,7 @@ public:
     DatabaseVersion() = default;
 
     explicit DatabaseVersion(const BSONObj& obj) {
-        DatabaseVersionBase::parseProtected(IDLParserContext("DatabaseVersion"), obj);
+        DatabaseVersionBase::parseProtected(obj, IDLParserContext("DatabaseVersion"));
     }
 
     explicit DatabaseVersion(const DatabaseVersionBase& dbv) : DatabaseVersionBase(dbv) {}

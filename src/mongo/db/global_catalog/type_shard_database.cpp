@@ -34,7 +34,7 @@
 namespace mongo {
 
 ShardDatabaseType::ShardDatabaseType(const BSONObj& obj) {
-    ShardDatabaseTypeBase::parseProtected(IDLParserContext("ShardDatabaseTypeBase"), obj);
+    ShardDatabaseTypeBase::parseProtected(obj, IDLParserContext("ShardDatabaseTypeBase"));
 }
 
 }  // namespace mongo

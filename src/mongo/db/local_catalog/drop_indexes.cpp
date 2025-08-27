@@ -780,11 +780,11 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
     BSONObjBuilder bob(cmdObj);
     bob.append("$db", nss.dbName().serializeWithoutTenantPrefix_UNSAFE());
     auto cmdObjWithDb = bob.obj();
-    auto parsed = DropIndexes::parse(IDLParserContext{"dropIndexes",
+    auto parsed = DropIndexes::parse(cmdObjWithDb,
+                                     IDLParserContext{"dropIndexes",
                                                       auth::ValidatedTenancyScope::get(opCtx),
                                                       nss.tenantId(),
-                                                      SerializationContext::stateStorageRequest()},
-                                     cmdObjWithDb);
+                                                      SerializationContext::stateStorageRequest()});
 
     return writeConflictRetry(opCtx, "dropIndexes", nss, [opCtx, &nss, &cmdObj, &parsed] {
         auto collAcq =

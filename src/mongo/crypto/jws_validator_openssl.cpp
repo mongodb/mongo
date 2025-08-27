@@ -144,7 +144,7 @@ public:
     JWSValidatorOpenSSLRSA(StringData algorithm, const BSONObj& key) : _key(EVP_PKEY_new()) {
         uassert(7095402, "Unknown hashing algorithm", algorithm == "RSA");
 
-        auto RSAKey = JWKRSA::parse(IDLParserContext("JWKRSA"), key);
+        auto RSAKey = JWKRSA::parse(key, IDLParserContext("JWKRSA"));
 
         const auto* pubKeyNData =
             reinterpret_cast<const unsigned char*>(RSAKey.getModulus().data());
@@ -236,7 +236,7 @@ public:
     JWSValidatorOpenSSLEC(StringData algorithm, const BSONObj& key) : _key(EVP_PKEY_new()) {
         uassert(10858400, "Unknown EC hashing algorithm", algorithm == "EC");
 
-        auto ECKey = JWKEC::parse(IDLParserContext("JWKEC"), key);
+        auto ECKey = JWKEC::parse(key, IDLParserContext("JWKEC"));
 
         // The X-coordinate of the private key
         const auto* xCoordinateData =

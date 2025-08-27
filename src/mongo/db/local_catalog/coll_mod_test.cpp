@@ -74,46 +74,46 @@ namespace {
 TEST(CollModOptionTest, isConvertingIndexToUnique) {
     IDLParserContext ctx("collMod");
     auto requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true}}");
-    auto request = CollModRequest::parse(ctx, requestObj);
+    auto request = CollModRequest::parse(requestObj, ctx);
     ASSERT_TRUE(isCollModIndexUniqueConversion(request));
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true, hidden: true}}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     ASSERT_TRUE(isCollModIndexUniqueConversion(request));
 
     requestObj = fromjson(
         "{index: {keyPattern: {a: 1}, unique: true, hidden: true}, validationAction: 'warn'}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     ASSERT_TRUE(isCollModIndexUniqueConversion(request));
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true}, dryRun: true}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     ASSERT_FALSE(isCollModIndexUniqueConversion(request));
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true}, dryRun: false}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     ASSERT_TRUE(isCollModIndexUniqueConversion(request));
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, prepareUnique: true}}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     ASSERT_FALSE(isCollModIndexUniqueConversion(request));
 
     requestObj = fromjson("{validationAction: 'warn'}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     ASSERT_FALSE(isCollModIndexUniqueConversion(request));
 }
 
 TEST(CollModOptionTest, makeDryRunRequest) {
     IDLParserContext ctx("collMod");
     auto requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true}}");
-    auto request = CollModRequest::parse(ctx, requestObj);
+    auto request = CollModRequest::parse(requestObj, ctx);
     auto dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
     ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
     ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true, hidden: true}}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
     ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
@@ -122,7 +122,7 @@ TEST(CollModOptionTest, makeDryRunRequest) {
 
     requestObj = fromjson(
         "{index: {keyPattern: {a: 1}, unique: true, hidden: true}, validationAction: 'warn'}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
     ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
@@ -131,7 +131,7 @@ TEST(CollModOptionTest, makeDryRunRequest) {
     ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 
     requestObj = fromjson("{index: {keyPattern: {a: 1}, unique: true}, dryRun: false}");
-    request = CollModRequest::parse(ctx, requestObj);
+    request = CollModRequest::parse(requestObj, ctx);
     dryRunRequest = makeCollModDryRunRequest(request);
     ASSERT_TRUE(dryRunRequest.getIndex()->getKeyPattern()->binaryEqual(fromjson("{a: 1}")));
     ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());

@@ -73,7 +73,7 @@ primary_only_service_helpers::PauseDuringPhaseTransitionFailPoint<MultiUpdateCoo
         [](StringData phase) {
             IDLParserContext ectx(
                 "pauseDuringMultiUpdateCoordinatorPhaseTransition::readPhaseArgument");
-            return MultiUpdateCoordinatorPhase_parse(ectx, phase);
+            return MultiUpdateCoordinatorPhase_parse(phase, ectx);
         }};
 
 AggregateCommandRequest makeAggregationToCheckForPendingUpdates(const NamespaceString& nss,
@@ -161,7 +161,7 @@ void MultiUpdateCoordinatorService::checkIfConflictsWithOtherInstances(
 std::shared_ptr<repl::PrimaryOnlyService::Instance>
 MultiUpdateCoordinatorService::constructInstance(BSONObj initialState) {
     auto initialDocument = MultiUpdateCoordinatorDocument::parse(
-        IDLParserContext("MultiUpdateCoordinatorServiceConstructInstance"), initialState);
+        initialState, IDLParserContext("MultiUpdateCoordinatorServiceConstructInstance"));
     return std::make_shared<MultiUpdateCoordinatorInstance>(this, std::move(initialDocument));
 }
 

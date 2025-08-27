@@ -202,7 +202,7 @@ public:
                         });
 
                     auto countRequest =
-                        CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+                        CountCommandRequest::parse(cmdObj, IDLParserContext("count"));
 
                     {
                         // This scope is used to end the use of the builder whether or not we
@@ -309,7 +309,7 @@ public:
                             ex) {
                         // Rewrite the count command as an aggregation.
                         auto countRequest =
-                            CountCommandRequest::parse(IDLParserContext("count"), originalCmdObj);
+                            CountCommandRequest::parse(originalCmdObj, IDLParserContext("count"));
                         auto aggRequestOnView =
                             query_request_conversion::asAggregateCommandRequest(countRequest);
                         auto resolvedAggRequest = ex->asExpandedViewAggregation(
@@ -351,7 +351,7 @@ public:
                                 BSONElement shardMetrics = data["metrics"];
                                 if (allShardMetricsReturned &= shardMetrics.isABSONObj()) {
                                     const auto metrics = CursorMetrics::parse(
-                                        IDLParserContext("CursorMetrics"), shardMetrics.Obj());
+                                        shardMetrics.Obj(), IDLParserContext("CursorMetrics"));
                                     CurOp::get(opCtx)
                                         ->debug()
                                         .additiveMetrics.aggregateCursorMetrics(metrics);
@@ -444,7 +444,7 @@ public:
 
                 CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
                 try {
-                    countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+                    countRequest = CountCommandRequest::parse(cmdObj, IDLParserContext("count"));
                 } catch (...) {
                     routingCtx.skipValidation();
                     return exceptionToStatus();
@@ -519,7 +519,7 @@ public:
                     CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
                     try {
                         countRequest =
-                            CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+                            CountCommandRequest::parse(cmdObj, IDLParserContext("count"));
                     } catch (...) {
                         return exceptionToStatus();
                     }

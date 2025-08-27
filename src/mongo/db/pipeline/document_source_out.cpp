@@ -86,8 +86,8 @@ DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
         outSpec.setDb(defaultDB.serializeWithoutTenantPrefix_UNSAFE());
     } else if (spec.type() == BSONType::object) {
         // TODO SERVER-77000: access a SerializationContext object to pass into the IDLParserContext
-        outSpec = mongo::DocumentSourceOutSpec::parse(IDLParserContext(kStageName),
-                                                      spec.embeddedObject());
+        outSpec = mongo::DocumentSourceOutSpec::parse(spec.embeddedObject(),
+                                                      IDLParserContext(kStageName));
     } else {
         uassert(16990,
                 fmt::format("{} only supports a string or object argument, but found {}",

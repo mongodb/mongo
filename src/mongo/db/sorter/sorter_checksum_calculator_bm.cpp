@@ -64,8 +64,8 @@ private:
 BENCHMARK_DEFINE_F(SorterChecksumCalculatorBenchmark, BM_SorterChecksumCalculator)
 (benchmark::State& state) {
     benchmarkSorterChecksumCalculator(
-        SorterChecksumVersion_parse(IDLParserContext("SorterChecksumCalculatorBenchmark"),
-                                    state.range(0)),
+        SorterChecksumVersion_parse(state.range(0),
+                                    IDLParserContext("SorterChecksumCalculatorBenchmark")),
         state.range(1),
         state);
 }

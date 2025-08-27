@@ -88,8 +88,8 @@ NamespacePlacementChangedControlEvent NamespacePlacementChangedControlEvent::cre
     Timestamp committedAt =
         assertFieldType(event, kCommittedAtField, BSONType::timestamp).getTimestamp();
     auto nsField = assertFieldType(event, kNamespaceField, BSONType::object).getDocument();
-    auto nssSpec = NamespaceSpec::parse(IDLParserContext("NamespacePlacementChangedControlEvent"),
-                                        nsField.toBson());
+    auto nssSpec = NamespaceSpec::parse(nsField.toBson(),
+                                        IDLParserContext("NamespacePlacementChangedControlEvent"));
     NamespaceString nss = NamespaceStringUtil::deserialize(*nssSpec.getDb(), *nssSpec.getColl());
     return NamespacePlacementChangedControlEvent{clusterTime, committedAt, nss};
 }

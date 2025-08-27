@@ -99,7 +99,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         IDLParserContext ctx("KillAllSessionsCmd");
-        auto ksc = KillAllSessionsCmd::parse(ctx, cmdObj);
+        auto ksc = KillAllSessionsCmd::parse(cmdObj, ctx);
 
         KillAllSessionsByPatternSet patterns;
 

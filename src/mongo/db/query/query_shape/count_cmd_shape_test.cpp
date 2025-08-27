@@ -58,11 +58,11 @@ public:
     QueryShapeHash makeShapeHash(const char* json) {
         const auto count = fromjson(json);
         const auto countCommand = std::make_unique<CountCommandRequest>(CountCommandRequest::parse(
+            count,
             IDLParserContext("countCommandRequest",
                              auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                              boost::none,
-                             SerializationContext::stateDefault()),
-            count));
+                             SerializationContext::stateDefault())));
         const auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
             expCtx, *countCommand, extensionsCallback, testNss));
         const auto shape = std::make_unique<CountCmdShape>(

@@ -638,8 +638,8 @@ boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
 
 boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec) {
     if (spec.hasField(kViewFieldName) && spec[kViewFieldName].type() == BSONType::object) {
-        return SearchQueryViewSpec::parse(IDLParserContext("unpack SearchQueryViewSpec"),
-                                          spec[kViewFieldName].embeddedObject());
+        return SearchQueryViewSpec::parse(spec[kViewFieldName].embeddedObject(),
+                                          IDLParserContext("unpack SearchQueryViewSpec"));
     }
 
     return boost::none;

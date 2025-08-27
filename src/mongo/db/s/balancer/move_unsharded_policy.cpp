@@ -103,7 +103,7 @@ std::map<NamespaceString, ListCollectionsReplyItem> getCollectionsFromShard(
     std::map<NamespaceString, ListCollectionsReplyItem> localColls;
     for (auto&& replyItemBson : listCollResponse.docs) {
         auto replyItem =
-            ListCollectionsReplyItem::parse(IDLParserContext("ListCollectionReply"), replyItemBson);
+            ListCollectionsReplyItem::parse(replyItemBson, IDLParserContext("ListCollectionReply"));
         if (replyItem.getType() != "collection") {
             // This entry is not a collection (e.g. view)
             continue;

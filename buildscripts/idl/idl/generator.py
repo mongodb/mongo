@@ -1550,7 +1550,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 )
             )
             self._writer.write_line("const auto localObject = %s.Obj();" % (element_name))
-            return "%s::parse(tempContext, localObject, dctx)" % (ast_type.cpp_type,)
+            return "%s::parse(localObject, tempContext, dctx)" % (ast_type.cpp_type,)
         elif ast_type.deserializer and "BSONElement::" in ast_type.deserializer:
             method_name = writer.get_method_name(ast_type.deserializer)
             return "%s.%s()" % (element_name, method_name)
@@ -1585,7 +1585,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             tenant,
                         )
                     )
-                    return f"{method_name}(tempContext, {expression})"
+                    return f"{method_name}({expression}, tempContext)"
 
                 if not ast_type.deserialize_with_tenant:
                     return f"{method_name}({expression})"
@@ -1797,10 +1797,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 )
             )
             if from_doc_seq:
-                value_expr = f"{variant_type.cpp_type}::parse(tempContext, {bson_element}, dctx)"
+                value_expr = f"{variant_type.cpp_type}::parse({bson_element}, tempContext, dctx)"
             else:
                 self._writer.write_line("const auto localObject = %s.Obj();" % (bson_element))
-                value_expr = f"{variant_type.cpp_type}::parse(tempContext, localObject, dctx)"
+                value_expr = f"{variant_type.cpp_type}::parse(localObject, tempContext, dctx)"
             if field.optional:
                 cpp_type_info = cpp_types.get_cpp_type(field)
                 value_expr = f"{cpp_type_info.get_getter_setter_type()}({value_expr})"
@@ -1904,7 +1904,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field_type.is_struct:
                 # Do not generate a new parser context, reuse the current one since we are not
                 # entering a nested document.
-                expression = "%s::parse(ctxt, %s, dctx)" % (field_type.cpp_type, bson_object)
+                expression = "%s::parse(%s, ctxt, dctx)" % (field_type.cpp_type, bson_object)
             else:
                 method_name = writer.get_method_name_from_qualified_method_name(
                     field_type.deserializer
@@ -1987,7 +1987,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         tenant,
                     )
                 )
-                array_value = "%s::parse(tempContext, sequenceObject, dctx)" % (
+                array_value = "%s::parse(sequenceObject, tempContext, dctx)" % (
                     field.type.cpp_type,
                 )
             elif field.type.is_variant:
@@ -2453,7 +2453,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the C++ deserializer method definitions."""
         struct_type_info = struct_types.get_struct_info(struct)
         method = struct_type_info.get_deserializer_method()
-
         self.get_bson_deserializer_static_common(
             struct,
             struct_type_info.get_deserializer_static_method(),

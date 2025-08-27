@@ -145,7 +145,7 @@ public:
                         uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
 
                         // Ensure our reply conforms to the IDL-defined reply structure.
-                        return DropReply::parse(IDLParserContext{"drop"}, resultObj);
+                        return DropReply::parse(resultObj, IDLParserContext{"drop"});
                     });
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uassert(CollectionUUIDMismatchInfo(request().getDbName(),

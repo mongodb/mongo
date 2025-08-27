@@ -1312,7 +1312,7 @@ protected:
             auto status = getStatusFromCommandResult(resultObj);
             if (!status.isOK()) {
                 // Will throw if the result doesn't match the ErrorReply.
-                ErrorReply::parse(IDLParserContext("ErrorType", &ctx), resultObj);
+                ErrorReply::parse(resultObj, IDLParserContext("ErrorType", &ctx));
                 return true;
             }
         }
@@ -1338,11 +1338,11 @@ private:
                                      const DatabaseName& dbName,
                                      const BSONObj& cmdObj) {
         return idl::parseCommandDocument<RequestType>(
+            cmdObj,
             IDLParserContext(RequestType::kCommandName,
                              auth::ValidatedTenancyScope::get(opCtx),
                              dbName.tenantId(),
-                             SerializationContext::stateDefault()),
-            cmdObj);
+                             SerializationContext::stateDefault()));
     }
 
     RequestType _request;
@@ -1455,7 +1455,7 @@ private:
                                     opMsgRequest.validatedTenancyScope,
                                     opMsgRequest.getValidatedTenantId(),
                                     opMsgRequest.getSerializationContext());
-        auto parsed = idl::parseCommandRequest<RequestType>(ctx, opMsgRequest);
+        auto parsed = idl::parseCommandRequest<RequestType>(opMsgRequest, ctx);
 
         auto apiStrict = parsed.getGenericArguments().getApiStrict().value_or(false);
 
@@ -1506,7 +1506,7 @@ private:
                              req.validatedTenancyScope,
                              req.getValidatedTenantId(),
                              req.getSerializationContext());
-        return GenericArguments::parse(ctx, req.body);
+        return GenericArguments::parse(req.body, ctx);
     }
 
     GenericArguments _args;

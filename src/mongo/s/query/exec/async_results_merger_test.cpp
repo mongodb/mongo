@@ -74,7 +74,7 @@ using AsyncResultsMergerTest = ResultsMergerTestFixture;
 namespace {
 
 LogicalSessionId parseSessionIdFromCmd(BSONObj cmdObj) {
-    return LogicalSessionId::parse(IDLParserContext("lsid"), cmdObj["lsid"].Obj());
+    return LogicalSessionId::parse(cmdObj["lsid"].Obj(), IDLParserContext("lsid"));
 }
 
 BSONObj makeResumeToken(Timestamp clusterTime, UUID uuid, BSONObj docKey) {
@@ -1962,8 +1962,8 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
 
     BSONObj scheduledCmd = getNthPendingRequest(0).cmdObj;
     auto cmd = GetMoreCommandRequest::parse(
-        IDLParserContext{"getMore"},
-        scheduledCmd.addField(BSON("$db" << "anydbname").firstElement()));
+        scheduledCmd.addField(BSON("$db" << "anydbname").firstElement()),
+        IDLParserContext{"getMore"});
     ASSERT_EQ(*cmd.getBatchSize(), 3LL);
     ASSERT_EQ(cmd.getCommandParameter(), 1LL);
     scheduleNetworkResponses(std::move(responses));

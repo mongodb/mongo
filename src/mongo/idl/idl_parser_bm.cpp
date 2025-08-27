@@ -80,7 +80,7 @@ void BM_FIND_ONE_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        FindCommandRequestBase::parse(IDLParserContext("foo"), doc);
+        FindCommandRequestBase::parse(doc, IDLParserContext("foo"));
     }
 }
 
@@ -102,7 +102,7 @@ void BM_FIND_ONE_OP_MSG(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        FindCommandRequestBase::parse(IDLParserContext("foo"), request);
+        FindCommandRequestBase::parse(request, IDLParserContext("foo"));
     }
 }
 
@@ -146,7 +146,7 @@ void BM_INSERT_ONE_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        write_ops::InsertCommandRequest::parse(IDLParserContext("foo"), doc);
+        write_ops::InsertCommandRequest::parse(doc, IDLParserContext("foo"));
     }
 }
 
@@ -169,7 +169,7 @@ void BM_INSERT_ONE_OP_MSG(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        write_ops::InsertCommandRequest::parse(IDLParserContext("foo"), request);
+        write_ops::InsertCommandRequest::parse(request, IDLParserContext("foo"));
     }
 }
 
@@ -195,7 +195,7 @@ void BM_UPDATE_ONE_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        write_ops::UpdateCommandRequest::parse(IDLParserContext("foo"), doc);
+        write_ops::UpdateCommandRequest::parse(doc, IDLParserContext("foo"));
     }
 }
 
@@ -220,7 +220,7 @@ void BM_UPDATE_ONE_OP_MSG(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        write_ops::UpdateCommandRequest::parse(IDLParserContext("foo"), request);
+        write_ops::UpdateCommandRequest::parse(request, IDLParserContext("foo"));
     }
 }
 
@@ -248,7 +248,7 @@ void BM_API_VERSION_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        APIParametersFromClient::parse(IDLParserContext("foo"), doc);
+        APIParametersFromClient::parse(doc, IDLParserContext("foo"));
     }
 }
 
@@ -263,7 +263,7 @@ void BM_LSID_SIMPLE_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        OperationSessionInfoFromClient::parse(IDLParserContext("foo"), doc);
+        OperationSessionInfoFromClient::parse(doc, IDLParserContext("foo"));
     }
 }
 
@@ -285,7 +285,7 @@ void BM_LSID_TXN_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        OperationSessionInfoFromClient::parse(IDLParserContext("foo"), doc);
+        OperationSessionInfoFromClient::parse(doc, IDLParserContext("foo"));
     }
 }
 
@@ -305,7 +305,7 @@ void BM_ARRAY_BSON(benchmark::State& state) {
 
     for (auto _ : state) {
         // This code gets timed
-        benchmark::DoNotOptimize(idl::test::OneArray::parse(IDLParserContext("test"), doc));
+        benchmark::DoNotOptimize(idl::test::OneArray::parse(doc, IDLParserContext("test")));
         totalBytes += doc.objsize();
     }
     state.SetBytesProcessed(totalBytes);
@@ -323,7 +323,7 @@ void BM_CHECK_AND_ASSERT_TYPES(benchmark::State& state) {
     for (auto _ : state) {
         // This code gets timed
         benchmark::DoNotOptimize(
-            write_ops::WriteCommandRequestBase::parse(IDLParserContext("test"), request));
+            write_ops::WriteCommandRequestBase::parse(request, IDLParserContext("test")));
     }
 }
 
@@ -349,7 +349,7 @@ void BM_ArrayOfStringEnum10(benchmark::State& state) {
 
     size_t totalBytes = 0;
     for (auto _ : state) {
-        benchmark::DoNotOptimize(t::ArrayOfHasStringEnum10::parse(IDLParserContext("test"), doc));
+        benchmark::DoNotOptimize(t::ArrayOfHasStringEnum10::parse(doc, IDLParserContext("test")));
         totalBytes += doc.objsize();
     }
     state.SetBytesProcessed(totalBytes);

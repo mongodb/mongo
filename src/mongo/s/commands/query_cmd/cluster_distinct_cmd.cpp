@@ -129,8 +129,8 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         : SerializationContext::stateCommandRequest();
 
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-        IDLParserContext("distinctCommandRequest", vts, nss.tenantId(), serializationContext),
-        cmdObj));
+        cmdObj,
+        IDLParserContext("distinctCommandRequest", vts, nss.tenantId(), serializationContext)));
 
     // Forbid users from passing 'querySettings' explicitly.
     uassert(7923001,
@@ -518,7 +518,7 @@ public:
                             BSONElement shardMetrics = res["metrics"];
                             if (shardMetrics.isABSONObj()) {
                                 auto metrics = CursorMetrics::parse(
-                                    IDLParserContext("CursorMetrics"), shardMetrics.Obj());
+                                    shardMetrics.Obj(), IDLParserContext("CursorMetrics"));
                                 CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(
                                     metrics);
                             }

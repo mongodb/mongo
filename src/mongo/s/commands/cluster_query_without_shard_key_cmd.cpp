@@ -276,7 +276,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
 
     if (commandName == BulkWriteCommandRequest::kCommandName) {
         auto bulkWriteRequest = BulkWriteCommandRequest::parse(
-            IDLParserContext("_clusterQueryWithoutShardKeyForBulkWrite"), writeCmdObj);
+            writeCmdObj, IDLParserContext("_clusterQueryWithoutShardKeyForBulkWrite"));
         tassert(7298303,
                 "Only bulkWrite with a single op is allowed in _clusterQueryWithoutShardKey",
                 bulkWriteRequest.getOps().size() == 1);
@@ -321,7 +321,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
         }
     } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
-            IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"), writeCmdObj);
+            writeCmdObj, IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"));
         parsedInfo.query = updateRequest.getUpdates().front().getQ();
         parsedInfo.hint = updateRequest.getUpdates().front().getHint();
         parsedInfo.sort = updateRequest.getUpdates().front().getSort() &&
@@ -347,7 +347,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
         }
     } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
         auto deleteRequest = write_ops::DeleteCommandRequest::parse(
-            IDLParserContext("_clusterQueryWithoutShardKeyForDelete"), writeCmdObj);
+            writeCmdObj, IDLParserContext("_clusterQueryWithoutShardKeyForDelete"));
         parsedInfo.query = deleteRequest.getDeletes().front().getQ();
         parsedInfo.hint = deleteRequest.getDeletes().front().getHint();
         parsedInfo.let = deleteRequest.getLet();
@@ -365,7 +365,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
     } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-            IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"), writeCmdObj);
+            writeCmdObj, IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"));
         validateFindAndModifyCommand(findAndModifyRequest);
 
         parsedInfo.query = findAndModifyRequest.getQuery();
@@ -581,8 +581,8 @@ public:
                 const auto opMsgRequestExplainCmd =
                     OpMsgRequestBuilder::create(vts, ns().dbName(), explainCmdObj);
                 auto explainRequest = ExplainCommandRequest::parse(
-                    IDLParserContext("_clusterQueryWithoutShardKeyExplain"),
-                    opMsgRequestExplainCmd.body);
+                    opMsgRequestExplainCmd.body,
+                    IDLParserContext("_clusterQueryWithoutShardKeyExplain"));
                 return explainRequest.getCommandParameter().getOwned();
             }();
 

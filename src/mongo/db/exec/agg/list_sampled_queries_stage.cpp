@@ -113,7 +113,7 @@ GetNextResult ListSampledQueriesStage::doGetNext() {
 
     if (auto doc = _sharedState->execPipeline->getNext()) {
         auto queryDoc = SampledQueryDocument::parse(
-            IDLParserContext(DocumentSourceListSampledQueries::kStageName), doc->toBson());
+            doc->toBson(), IDLParserContext(DocumentSourceListSampledQueries::kStageName));
         DocumentSourceListSampledQueriesResponse response;
         response.setSampledQueryDocument(std::move(queryDoc));
         return {Document(response.toBSON())};

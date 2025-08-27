@@ -279,7 +279,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveCollectionRequest) {
         ASSERT_EQ(1, shardDistributionArray.size());
 
         const auto shardKeyRange = ShardKeyRange::parse(
-            IDLParserContext("BalancerCommandsSchedulerTest"), shardDistributionArray.at(0).Obj());
+            shardDistributionArray.at(0).Obj(), IDLParserContext("BalancerCommandsSchedulerTest"));
         ASSERT_EQ(kShardId0, shardKeyRange.getShard());
 
         ASSERT_EQ(

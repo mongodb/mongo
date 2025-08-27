@@ -60,7 +60,7 @@ CollectionType::CollectionType(NamespaceString nss,
 }
 
 CollectionType::CollectionType(const BSONObj& obj) {
-    CollectionType::parseProtected(IDLParserContext("CollectionType"), obj);
+    CollectionType::parseProtected(obj, IDLParserContext("CollectionType"));
     invariant(getTimestamp() != Timestamp(0, 0));
     uassert(ErrorCodes::BadValue,
             str::stream() << "Invalid namespace " << getNss().toStringForErrorMsg(),

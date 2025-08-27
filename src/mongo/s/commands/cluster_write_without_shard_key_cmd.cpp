@@ -172,7 +172,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
     auto nss = [&] {
         if (commandName == BulkWriteCommandRequest::kCommandName) {
             bulkWriteRequest = BulkWriteCommandRequest::parse(
-                IDLParserContext("_clusterWriteWithoutShardKeyForBulkWrite"), opMsgRequest.body);
+                opMsgRequest.body, IDLParserContext("_clusterWriteWithoutShardKeyForBulkWrite"));
             tassert(7298305,
                     "Only bulkWrite with a single op is allowed in _clusterWriteWithoutShardKey",
                     bulkWriteRequest->getOps().size() == 1);
@@ -287,7 +287,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                         opMsgRequest.body, nss.coll());
             }
             auto updateRequest = write_ops::UpdateCommandRequest::parse(
-                IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
+                opMsgRequest.body, IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"));
 
             // The original query and collation are sent along with the modified command for the
             // purposes of query sampling.
@@ -332,7 +332,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                         opMsgRequest.body, nss.coll());
             }
             auto deleteRequest = write_ops::DeleteCommandRequest::parse(
-                IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
+                opMsgRequest.body, IDLParserContext("_clusterWriteWithoutShardKeyForDelete"));
 
             // The original query and collation are sent along with the modified command for the
             // purposes of query sampling.
@@ -369,8 +369,8 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                         opMsgRequest.body, nss.coll());
             }
             auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-                IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"),
-                opMsgRequest.body);
+                opMsgRequest.body,
+                IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"));
 
             // The original query and collation are sent along with the modified command for the
             // purposes of query sampling.
@@ -490,8 +490,8 @@ public:
                         // It was a bulkWrite, extract the first and only reply item and uassert on
                         // error so that we can fail the internal transaction correctly.
                         auto bulkWriteResponse = BulkWriteCommandReply::parse(
-                            IDLParserContext("BulkWriteCommandReply_clusterWriteWithoutShardKey"),
-                            response.data);
+                            response.data,
+                            IDLParserContext("BulkWriteCommandReply_clusterWriteWithoutShardKey"));
                         const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
                         tassert(7298309,
                                 "unexpected bulkWrite reply for writes without shard key",
@@ -519,8 +519,8 @@ public:
                 const auto opMsgRequestExplainCmd =
                     OpMsgRequestBuilder::create(vts, ns().dbName(), explainCmdObj);
                 auto explainRequest = ExplainCommandRequest::parse(
-                    IDLParserContext("_clusterWriteWithoutShardKeyExplain"),
-                    opMsgRequestExplainCmd.body);
+                    opMsgRequestExplainCmd.body,
+                    IDLParserContext("_clusterWriteWithoutShardKeyExplain"));
                 return explainRequest.getCommandParameter().getOwned();
             }();
 

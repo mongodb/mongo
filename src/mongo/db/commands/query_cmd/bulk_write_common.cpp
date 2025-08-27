@@ -156,7 +156,7 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx) 
 
 NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite) {
     BulkWriteCommandRequest bulk =
-        BulkWriteCommandRequest::parse(IDLParserContext("bulkWrite"), bulkWrite);
+        BulkWriteCommandRequest::parse(bulkWrite, IDLParserContext("bulkWrite"));
     const std::vector<NamespaceInfoEntry>& nss = bulk.getNsInfo();
     uassert(ErrorCodes::BadValue,
             "BulkWrite with Queryable Encryption supports only a single namespace",

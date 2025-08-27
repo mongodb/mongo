@@ -167,7 +167,7 @@ bool MovePrimaryCoordinator::_mustAlwaysMakeProgress() {
 
 void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = MovePrimaryCoordinatorDocument::parse(
-        IDLParserContext("MovePrimaryCoordinatorDocument"), doc);
+        doc, IDLParserContext("MovePrimaryCoordinatorDocument"));
 
     const auto toShardIdAreEqual = [&] {
         stdx::lock_guard lk(_docMutex);
@@ -684,7 +684,7 @@ DatabaseType MovePrimaryCoordinator::getPostCommitDatabaseMetadata(OperationCont
                         _dbName.toStringForErrorMsg()),
             !databases.empty());
 
-    return DatabaseType::parse(IDLParserContext("DatabaseType"), databases.front());
+    return DatabaseType::parse(databases.front(), IDLParserContext("DatabaseType"));
 }
 
 void MovePrimaryCoordinator::assertChangedMetadataOnConfig(

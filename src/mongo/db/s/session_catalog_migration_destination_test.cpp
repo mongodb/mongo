@@ -410,7 +410,7 @@ public:
                 insertBuilder.obj(),
                 BSONObj());
             auto osi = OperationSessionInfoFromClient::parse(
-                IDLParserContext{"OperationSessionInfo"}, opMsgRequest.body);
+                opMsgRequest.body, IDLParserContext{"OperationSessionInfo"});
             initializeOperationSessionInfo(innerOpCtx.get(),
                                            opMsgRequest.getValidatedTenantId(),
                                            osi,
@@ -2286,7 +2286,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 
         auto durableOp1 = oplog1.getDurableReplOperation().toBSON();
         auto replOp1 = repl::ReplOperation::parse(
-            IDLParserContext("PreparedRetryableInternalTransaction"), durableOp1);
+            durableOp1, IDLParserContext("PreparedRetryableInternalTransaction"));
 
         setUpTxn(newOpCtx.get(), internalTxnSessionId, internalTxnTxnNumber, replOp1);
         prepareOpTime = prepareTxn(newOpCtx.get(), internalTxnSessionId, internalTxnTxnNumber);
@@ -2387,7 +2387,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 
         auto durableOp1 = oplog1.getDurableReplOperation().toBSON();
         auto replOp1 = repl::ReplOperation::parse(
-            IDLParserContext("PreparedRetryableInternalTransaction"), durableOp1);
+            durableOp1, IDLParserContext("PreparedRetryableInternalTransaction"));
 
         setUpTxn(newOpCtx.get(), internalTxnSessionId, internalTxnTxnNumber, replOp1);
     }

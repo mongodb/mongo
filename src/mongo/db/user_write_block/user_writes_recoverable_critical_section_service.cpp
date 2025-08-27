@@ -132,7 +132,7 @@ void acquireRecoverableCriticalSection(
         const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, nss);
         if (!bsonObj.isEmpty()) {
             const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-                IDLParserContext("AcquireUserWritesCS"), bsonObj);
+                bsonObj, IDLParserContext("AcquireUserWritesCS"));
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "Cannot acquire user writes critical section with different "
@@ -260,7 +260,7 @@ void UserWritesRecoverableCriticalSectionService::
                 !bsonObj.isEmpty());
 
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-            IDLParserContext("PromoteUserWritesCS"), bsonObj);
+            bsonObj, IDLParserContext("PromoteUserWritesCS"));
 
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot promote user writes critical section to block user writes if sharded DDL "
@@ -325,7 +325,7 @@ void UserWritesRecoverableCriticalSectionService::
         }
 
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-            IDLParserContext("DemoteUserWritesCS"), bsonObj);
+            bsonObj, IDLParserContext("DemoteUserWritesCS"));
 
         // If we are not currently blocking user writes, then we are done.
         if (!collCSDoc.getBlockUserWrites()) {
@@ -384,7 +384,7 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
         }
 
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-            IDLParserContext("ReleaseUserWritesCS"), bsonObj);
+            bsonObj, IDLParserContext("ReleaseUserWritesCS"));
 
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "Cannot release user writes critical section with different "

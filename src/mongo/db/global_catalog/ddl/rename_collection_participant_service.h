@@ -110,7 +110,7 @@ public:
 
     explicit RenameParticipantInstance(const BSONObj& participantDoc)
         : _doc(RenameCollectionParticipantDocument::parseOwned(
-              IDLParserContext("RenameCollectionParticipantDocument"), participantDoc.getOwned())),
+              participantDoc.getOwned(), IDLParserContext("RenameCollectionParticipantDocument"))),
           _request(_doc.getRenameCollectionRequest()) {}
 
     ~RenameParticipantInstance() override;

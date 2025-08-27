@@ -63,7 +63,7 @@ MemberConfig MemberConfig::parseFromBSON(const BSONObj& mcfg) {
 }
 
 MemberConfig::MemberConfig(const BSONObj& mcfg) {
-    parseProtected(IDLParserContext("MemberConfig"), mcfg);
+    parseProtected(mcfg, IDLParserContext("MemberConfig"));
 
     std::string hostAndPortString = std::string{getHost()};
     boost::trim(hostAndPortString);

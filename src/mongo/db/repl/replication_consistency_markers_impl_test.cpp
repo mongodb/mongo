@@ -249,7 +249,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
     auto firstInitialSyncIdBson = consistencyMarkers.getInitialSyncId(opCtx);
     ASSERT_FALSE(firstInitialSyncIdBson.isEmpty());
     InitialSyncIdDocument firstInitialSyncIdDoc =
-        InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), firstInitialSyncIdBson);
+        InitialSyncIdDocument::parse(firstInitialSyncIdBson, IDLParserContext("initialSyncId"));
 
     // Setting it twice should change nothing.
     consistencyMarkers.setInitialSyncIdIfNotSet(opCtx);
@@ -265,7 +265,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
     auto secondInitialSyncIdBson = consistencyMarkers.getInitialSyncId(opCtx);
     ASSERT_FALSE(secondInitialSyncIdBson.isEmpty());
     InitialSyncIdDocument secondInitialSyncIdDoc =
-        InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), secondInitialSyncIdBson);
+        InitialSyncIdDocument::parse(secondInitialSyncIdBson, IDLParserContext("initialSyncId"));
     ASSERT_NE(firstInitialSyncIdDoc.get_id(), secondInitialSyncIdDoc.get_id());
 }
 

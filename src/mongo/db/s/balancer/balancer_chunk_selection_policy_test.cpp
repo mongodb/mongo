@@ -178,7 +178,7 @@ protected:
                              .Array()) {
                         const auto nss =
                             NamespaceWithOptionalUUID::parse(
-                                IDLParserContext("BalancerChunkSelectionPolicyTest"), reqColl.Obj())
+                                reqColl.Obj(), IDLParserContext("BalancerChunkSelectionPolicyTest"))
                                 .getNs();
 
                         statsArrayBuilder.append(CollStatsForBalancing(nss, collSize).toBSON());
@@ -225,7 +225,7 @@ protected:
                              .Array()) {
                         const auto nss =
                             NamespaceWithOptionalUUID::parse(
-                                IDLParserContext("BalancerChunkSelectionPolicyTest"), reqColl.Obj())
+                                reqColl.Obj(), IDLParserContext("BalancerChunkSelectionPolicyTest"))
                                 .getNs();
 
                         const auto collSize = [&]() {

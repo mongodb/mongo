@@ -82,14 +82,15 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
                 if (const auto& additionalParticipants = gens.getAdditionalParticipants()) {
                     if (!additionalParticipants->empty()) {
                         std::vector<AdditionalParticipantInfo> converted;
-                        std::transform(additionalParticipants->begin(),
-                                       additionalParticipants->end(),
-                                       std::back_inserter(converted),
-                                       [](const BSONObj& participantBSON) {
-                                           return AdditionalParticipantInfo::parse(
-                                               IDLParserContext("AdditionalTransactionParticipant"),
-                                               participantBSON);
-                                       });
+                        std::transform(
+                            additionalParticipants->begin(),
+                            additionalParticipants->end(),
+                            std::back_inserter(converted),
+                            [](const BSONObj& participantBSON) {
+                                return AdditionalParticipantInfo::parse(
+                                    participantBSON,
+                                    IDLParserContext("AdditionalTransactionParticipant"));
+                            });
                         txnResponseMetadata.setAdditionalParticipants(std::move(converted));
                     }
                 }

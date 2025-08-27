@@ -50,7 +50,7 @@ void QueryPlanRankerMode::append(OperationContext*,
 }
 
 Status QueryPlanRankerMode::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = QueryPlanRankerMode_parse(IDLParserContext("planRankerMode"), value);
+    _data = QueryPlanRankerMode_parse(value, IDLParserContext("planRankerMode"));
     return Status::OK();
 }
 

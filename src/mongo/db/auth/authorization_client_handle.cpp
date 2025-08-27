@@ -39,8 +39,8 @@ StatusWith<UsersInfoReply> AuthorizationClientHandle::sendUsersInfoRequest(
         return swObj.getStatus();
     }
 
-    return UsersInfoReply::parse(IDLParserContext("AuthzClientHandle::UsersInfoRequest"),
-                                 swObj.getValue());
+    return UsersInfoReply::parse(swObj.getValue(),
+                                 IDLParserContext("AuthzClientHandle::UsersInfoRequest"));
 }
 
 StatusWith<RolesInfoReply> AuthorizationClientHandle::sendRolesInfoRequest(
@@ -51,8 +51,8 @@ StatusWith<RolesInfoReply> AuthorizationClientHandle::sendRolesInfoRequest(
         return swObj.getStatus();
     }
 
-    return RolesInfoReply::parse(IDLParserContext("AuthzClientHandle::RolesInfoRequest"),
-                                 swObj.getValue());
+    return RolesInfoReply::parse(swObj.getValue(),
+                                 IDLParserContext("AuthzClientHandle::RolesInfoRequest"));
 }
 
 }  // namespace mongo

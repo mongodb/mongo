@@ -58,7 +58,7 @@ boost::intrusive_ptr<DocumentSource> createFromBson(
     auto executor = executor::getMongotTaskExecutor(serviceContext);
     // The serialization for unsharded search does not contain a 'mongotQuery' field.
     InternalSearchMongotRemoteSpec spec = InternalSearchMongotRemoteSpec::parse(
-        IDLParserContext(DocumentSourceInternalSearchMongotRemote::kStageName), specObj);
+        specObj, IDLParserContext(DocumentSourceInternalSearchMongotRemote::kStageName));
     return new DocumentSourceInternalSearchMongotRemote(std::move(spec), expCtx, executor);
 }
 

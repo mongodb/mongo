@@ -85,8 +85,8 @@ std::pair<int, int> getCreatedAndOpenConnectionStats(std::shared_ptr<TaskExecuto
     if (collectGRPCStats) {
         BSONObjBuilder bob;
         executor->appendNetworkInterfaceStats(bob);
-        auto stats = GRPCConnectionStats::parse(IDLParserContext("GRPCStats"),
-                                                bob.obj().getObjectField(subObjName));
+        auto stats = GRPCConnectionStats::parse(bob.obj().getObjectField(subObjName),
+                                                IDLParserContext("GRPCStats"));
         open = stats.getTotalOpenChannels();
     } else {
         ConnectionPoolStats stats;

@@ -582,9 +582,9 @@ namespace idl {
  * encountered.
  */
 template <typename T>
-T parseApiStrict(const IDLParserContext& ctx, const BSONObj& cmdObj) {
+T parseApiStrict(const BSONObj& cmdObj, const IDLParserContext& ctx) {
     DeserializationContext dctx;
-    auto cmd = T::parse(ctx, cmdObj, &dctx);
+    auto cmd = T::parse(cmdObj, ctx, &dctx);
     dctx.validateApiStrict();
     return cmd;
 }
@@ -595,9 +595,9 @@ T parseApiStrict(const IDLParserContext& ctx, const BSONObj& cmdObj) {
  * thrown.
  */
 template <typename T>
-T parseCommandDocument(const IDLParserContext& ctx, const BSONObj& cmdObj) {
+T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
     DeserializationContext dctx;
-    auto cmd = T::parse(ctx, cmdObj, &dctx);
+    auto cmd = T::parse(cmdObj, ctx, &dctx);
     if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
         dctx.validateApiStrict();
     }
@@ -610,9 +610,9 @@ T parseCommandDocument(const IDLParserContext& ctx, const BSONObj& cmdObj) {
  * thrown.
  */
 template <typename T>
-T parseCommandRequest(const IDLParserContext& ctx, const OpMsgRequest& req) {
+T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
     DeserializationContext dctx;
-    auto cmd = T::parse(ctx, req, &dctx);
+    auto cmd = T::parse(req, ctx, &dctx);
     if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
         dctx.validateApiStrict();
     }

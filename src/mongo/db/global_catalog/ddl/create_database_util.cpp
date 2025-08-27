@@ -104,7 +104,7 @@ boost::optional<DatabaseType> findDatabaseExactMatch(
     auto dbObj = client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilterExact);
     if (!dbObj.isEmpty()) {
         replClient.setLastOpToSystemLastOpTime(opCtx);
-        return DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
+        return DatabaseType::parse(dbObj, IDLParserContext("DatabaseType"));
     }
     return boost::none;
 }
@@ -146,7 +146,7 @@ boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
     if (auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace,
                                     dbMatchFilterCaseInsensitive);
         !dbDoc.isEmpty()) {
-        auto existingDb = DatabaseType::parse(IDLParserContext("DatabaseType"), dbDoc);
+        auto existingDb = DatabaseType::parse(dbDoc, IDLParserContext("DatabaseType"));
         checkAgainstExistingDbDoc(existingDb, dbName, optResolvedPrimaryShard);
 
         // We did a local read of the database entry above and found that the database already

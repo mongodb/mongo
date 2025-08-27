@@ -135,8 +135,8 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
 }  // namespace
 
 CommandTypeEnum parseCommandType(const BSONObj& objectField) {
-    return CommandType_parse(IDLParserContext("commandString"),
-                             objectField.firstElementFieldNameStringData());
+    return CommandType_parse(objectField.firstElementFieldNameStringData(),
+                             IDLParserContext("commandString"));
 }
 
 void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundle>* image) const {
@@ -276,8 +276,8 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
                   *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
         oplogEntry.parseProtected(
-            IDLParserContext("OplogEntryBase", vts, tid, SerializationContext::stateDefault()),
-            object);
+            object,
+            IDLParserContext("OplogEntryBase", vts, tid, SerializationContext::stateDefault()));
         return oplogEntry;
     } catch (...) {
         return exceptionToStatus();
@@ -337,7 +337,7 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
               *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     parseProtected(
-        IDLParserContext("OplogEntryBase", vts, tid, SerializationContext::stateDefault()), _raw);
+        _raw, IDLParserContext("OplogEntryBase", vts, tid, SerializationContext::stateDefault()));
 
     // Parse command type from 'o' and 'o2' fields.
     if (isCommand()) {
@@ -919,8 +919,8 @@ repl::OpTypeEnum OplogEntryParserNonStrict::getOpType() const {
             str::stream() << "Invalid '" << repl::OplogEntry::kOpTypeFieldName
                           << "' field type (expected String)",
             opTypeElement.type() == BSONType::string);
-    return repl::OpType_parse(IDLParserContext("ChangeStreamEntry.op"),
-                              opTypeElement.checkAndGetStringData());
+    return repl::OpType_parse(opTypeElement.checkAndGetStringData(),
+                              IDLParserContext("ChangeStreamEntry.op"));
 }
 
 BSONObj OplogEntryParserNonStrict::getObject() const {

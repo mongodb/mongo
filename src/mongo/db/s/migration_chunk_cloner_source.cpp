@@ -162,8 +162,8 @@ std::vector<repl::ReplOperation> convertVector(const std::vector<repl::OplogEntr
             auto durableReplOp = op.getDurableReplOperation();
             if (!durableReplOp.isOwned()) {
                 durableReplOp = repl::DurableReplOperation::parseOwned(
-                    IDLParserContext{"MigrationChunkClonerSource_toOwnedDurableReplOperation"},
-                    durableReplOp.toBSON());
+                    durableReplOp.toBSON(),
+                    IDLParserContext{"MigrationChunkClonerSource_toOwnedDurableReplOperation"});
             }
 
             return repl::ReplOperation(std::move(durableReplOp));

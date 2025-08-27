@@ -158,7 +158,7 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
     }
 
     const auto stateDoc = SetClusterParameterCoordinatorDocument::parse(
-        IDLParserContext("CoordinatorDocument"), initialState);
+        initialState, IDLParserContext("CoordinatorDocument"));
     if (stateDoc.getCompatibleWithTopologyChange()) {
         return;
     }

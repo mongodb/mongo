@@ -131,7 +131,7 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     std::vector<DatabaseType> databases;
     databases.reserve(rawDatabases.size());
     for (auto&& rawDb : rawDatabases) {
-        auto db = DatabaseType::parseOwned(IDLParserContext("DatabaseType"), std::move(rawDb));
+        auto db = DatabaseType::parseOwned(std::move(rawDb), IDLParserContext("DatabaseType"));
         if (db.getDbName() == DatabaseName::kAdmin) {
             // TODO (SERVER-101175): Convert this into a new metadata inconsistency.
             // The 'admin' database should not be explicitly assigned a primary shard. It may exist

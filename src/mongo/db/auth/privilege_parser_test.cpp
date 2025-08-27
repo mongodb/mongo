@@ -74,7 +74,7 @@ TEST(PrivilegeParserTest, IsNotValidTest) {
     const BSONObj noRsrc = BSON(kActions << kFindActions);
     constexpr auto noRsrcExpect =
         "BSON field 'IsNotValidTest.resource' is missing but a required field"_sd;
-    ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(ctx, noRsrc),
+    ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(noRsrc, ctx),
                                 DBException,
                                 ErrorCodes::IDLFailedToParse,
                                 noRsrcExpect);
@@ -83,7 +83,7 @@ TEST(PrivilegeParserTest, IsNotValidTest) {
     const BSONObj noActions = BSON(kResource << kClusterResource);
     constexpr auto noActionsExpect =
         "BSON field 'IsNotValidTest.actions' is missing but a required field"_sd;
-    ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(ctx, noActions),
+    ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(noActions, ctx),
                                 DBException,
                                 ErrorCodes::IDLFailedToParse,
                                 noActionsExpect);
@@ -91,7 +91,7 @@ TEST(PrivilegeParserTest, IsNotValidTest) {
 
 Privilege resolvePrivilege(BSONObj obj, std::vector<std::string>* unrecognized = nullptr) {
     IDLParserContext ctx("resolvePrivilege");
-    auto pp = ParsedPrivilege::parse(ctx, obj);
+    auto pp = ParsedPrivilege::parse(obj, ctx);
     return Privilege::resolvePrivilegeWithTenant(boost::none /* tenantId */, pp, unrecognized);
 }
 

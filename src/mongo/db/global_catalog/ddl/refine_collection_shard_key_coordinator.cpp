@@ -145,7 +145,7 @@ RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
 void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two refine collections on the same namespace, then the arguments must be the same.
     const auto otherDoc = RefineCollectionShardKeyCoordinatorDocument::parse(
-        IDLParserContext("RefineCollectionShardKeyCoordinatorDocument"), doc);
+        doc, IDLParserContext("RefineCollectionShardKeyCoordinatorDocument"));
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another refine collection with different arguments is already running for the same "

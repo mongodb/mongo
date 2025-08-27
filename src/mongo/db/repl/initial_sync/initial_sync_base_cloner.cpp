@@ -170,7 +170,7 @@ Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
             "Cannot retrieve sync source initial sync ID",
             !initialSyncId.isEmpty());
     InitialSyncIdDocument initialSyncIdDoc =
-        InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), initialSyncId);
+        InitialSyncIdDocument::parse(initialSyncId, IDLParserContext("initialSyncId"));
 
     stdx::lock_guard<ReplSyncSharedData> lk(*getSharedData());
     uassert(ErrorCodes::InitialSyncFailure,

@@ -165,7 +165,7 @@ public:
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        auto cmd = idl::parseCommandDocument<HelloCommand>(IDLParserContext("hello"), cmdObj);
+        auto cmd = idl::parseCommandDocument<HelloCommand>(cmdObj, IDLParserContext("hello"));
 
         routerWaitInHello.execute([&](const BSONObj& args) {
             if (args.hasElement("delayMillis")) {
@@ -330,11 +330,11 @@ public:
         auto ret = result->asTempObj();
         if (ret[ErrorReply::kErrmsgFieldName].eoo()) {
             // Nominal success case, parse the object as-is.
-            HelloCommandReply::parse(IDLParserContext{"hello.reply"}, ret);
+            HelloCommandReply::parse(ret, IDLParserContext{"hello.reply"});
         } else {
             // Something went wrong, still try to parse, but accept a few ignorable fields.
             StringDataSet ignorable({ErrorReply::kCodeFieldName, ErrorReply::kErrmsgFieldName});
-            HelloCommandReply::parse(IDLParserContext{"hello.reply"}, ret.removeFields(ignorable));
+            HelloCommandReply::parse(ret.removeFields(ignorable), IDLParserContext{"hello.reply"});
         }
     }
 

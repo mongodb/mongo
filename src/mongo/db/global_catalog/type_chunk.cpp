@@ -98,7 +98,7 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
     for (const auto& arrayElement : source) {
         if (arrayElement.type() == BSONType::object) {
             IDLParserContext tempContext("chunk history array");
-            values.emplace_back(ChunkHistoryBase::parse(tempContext, arrayElement.Obj()));
+            values.emplace_back(ChunkHistoryBase::parse(arrayElement.Obj(), tempContext));
         } else {
             return {ErrorCodes::BadValue,
                     str::stream() << "array element does not have the object type: "

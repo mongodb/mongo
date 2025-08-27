@@ -46,11 +46,11 @@ BSONObj distinctJsonToShapeBSON(const char* json,
 
     auto distinct = fromjson(json);
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        distinct,
         IDLParserContext("distinctCommandRequest",
                          auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
-                         SerializationContext::stateDefault()),
-        distinct));
+                         SerializationContext::stateDefault())));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
@@ -63,11 +63,11 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
 
     auto distinct = fromjson(json);
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        distinct,
         IDLParserContext("distinctCommandRequest",
                          auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
-                         SerializationContext::stateDefault()),
-        distinct));
+                         SerializationContext::stateDefault())));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
@@ -254,11 +254,11 @@ TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {
     auto distinct = fromjson(R"({ distinct: "testcoll", $db: "testdb", key: "name" })");
 
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        distinct,
         IDLParserContext("distinctCommandRequest",
                          auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          boost::none,
-                         SerializationContext::stateDefault()),
-        distinct));
+                         SerializationContext::stateDefault())));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto components = std::make_unique<DistinctCmdShapeComponents>(*pd, expCtx);

@@ -248,8 +248,8 @@ protected:
         TransactionCoordinatorDocument doc;
         do {
             doc = TransactionCoordinatorDocument::parse(
-                IDLParserContext("dummy"),
-                dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace, BSONObj{}));
+                dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace, BSONObj{}),
+                IDLParserContext("dummy"));
         } while (!doc.getDecision());
     }
 

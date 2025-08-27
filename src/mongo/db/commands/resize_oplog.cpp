@@ -105,7 +105,7 @@ public:
         uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());
 
         auto params =
-            ReplSetResizeOplogRequest::parse(IDLParserContext("replSetResizeOplog"), jsobj);
+            ReplSetResizeOplogRequest::parse(jsobj, IDLParserContext("replSetResizeOplog"));
 
         return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns(), [&] {
             WriteUnitOfWork wunit(opCtx);

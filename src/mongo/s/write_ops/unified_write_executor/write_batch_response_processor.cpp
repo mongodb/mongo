@@ -99,8 +99,8 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     BulkWriteReplyItem replyItem = [&] {
         if (swRes.isOK() && !swRes.getValue().getResponse().isEmpty()) {
             auto parsedReply = BulkWriteCommandReply::parse(
-                IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"),
-                swRes.getValue().getResponse());
+                swRes.getValue().getResponse(),
+                IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
 
             // Update the counters.
             _nInserted += parsedReply.getNInserted();
@@ -221,7 +221,7 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         // If we are in a transaction, we stop processing and return the first error.
         const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
         if (inTransaction) {
-            auto errorReply = ErrorReply::parse(IDLParserContext("ErrorReply"), shardResponse.data);
+            auto errorReply = ErrorReply::parse(shardResponse.data, IDLParserContext("ErrorReply"));
             // Transient transaction errors should be returned directly as top level errors to allow
             // the client to retry.
             if (hasTransientTransactionErrorLabel(errorReply)) {
@@ -254,7 +254,7 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
 
     // Parse and handle inner ok and error responses.
     auto parsedReply = BulkWriteCommandReply::parse(
-        IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"), shardResponse.data);
+        shardResponse.data, IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
 
     // Process write concern error
     auto wcError = parsedReply.getWriteConcernError();

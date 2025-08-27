@@ -51,7 +51,7 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     uassertStatusOK(remoteResponse.commandStatus);
 
     return ConfigsvrGetHistoricalPlacementResponse::parse(
-               IDLParserContext("HistoricalPlacementFetcherImpl"), remoteResponse.response)
+               remoteResponse.response, IDLParserContext("HistoricalPlacementFetcherImpl"))
         .getHistoricalPlacement();
 }
 

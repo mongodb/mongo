@@ -104,15 +104,15 @@ public:
         kPreImagesCollection,
     };
 
-    static ReplOperation parse(const IDLParserContext& ctxt, const BSONObj& bsonObject) {
+    static ReplOperation parse(const BSONObj& bsonObject, const IDLParserContext& ctxt) {
         ReplOperation o;
-        o.parseProtected(ctxt, bsonObject);
+        o.parseProtected(bsonObject, ctxt);
         return o;
     }
 
-    static ReplOperation parseOwned(const IDLParserContext& ctxt, const BSONObj&& bsonObject) {
+    static ReplOperation parseOwned(const BSONObj&& bsonObject, const IDLParserContext& ctxt) {
         ReplOperation o;
-        o.parseProtected(ctxt, bsonObject);
+        o.parseProtected(bsonObject, ctxt);
         o.setAnchor(bsonObject);
         return o;
     }

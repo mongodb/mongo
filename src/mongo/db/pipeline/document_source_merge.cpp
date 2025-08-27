@@ -115,8 +115,8 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(
             ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
                   *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
-        mergeSpec = DocumentSourceMergeSpec::parse(IDLParserContext(kStageName, vts, tenantId, sc),
-                                                   spec.embeddedObject());
+        mergeSpec = DocumentSourceMergeSpec::parse(spec.embeddedObject(),
+                                                   IDLParserContext(kStageName, vts, tenantId, sc));
         targetNss = mergeSpec.getTargetNss();
         if (targetNss.coll().empty()) {
             // If the $merge spec is an object, the target namespace can be specified as a

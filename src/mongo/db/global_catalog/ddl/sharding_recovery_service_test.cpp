@@ -103,7 +103,7 @@ public:
 
         auto bsonObj = cursor->next();
         auto doc = CollectionCriticalSectionDocument::parse(
-            IDLParserContext("AcquireRecoverableCSBW"), bsonObj);
+            bsonObj, IDLParserContext("AcquireRecoverableCSBW"));
 
         // The document exists, so the reason must match.
         ASSERT(!doc.getReason().woCompare(reason));

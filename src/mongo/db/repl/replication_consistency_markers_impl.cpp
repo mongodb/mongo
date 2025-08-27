@@ -107,8 +107,7 @@ boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinVali
         fassertFailedWithStatus(40466, result.getStatus());
     }
 
-    auto minValid =
-        MinValidDocument::parse(IDLParserContext("MinValidDocument"), result.getValue());
+    auto minValid = MinValidDocument::parse(result.getValue());
     return minValid;
 }
 
@@ -387,8 +386,7 @@ ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
         }
     }
 
-    auto oplogTruncateAfterPoint = OplogTruncateAfterPointDocument::parse(
-        IDLParserContext("OplogTruncateAfterPointDocument"), doc.getValue());
+    auto oplogTruncateAfterPoint = OplogTruncateAfterPointDocument::parse(doc.getValue());
     return oplogTruncateAfterPoint;
 }
 

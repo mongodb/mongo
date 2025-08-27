@@ -67,7 +67,7 @@ DocumentSourceChangeStreamTransform::createFromBson(
             "the '$_internalChangeStreamTransform' object spec must be an object",
             rawSpec.type() == BSONType::object);
     auto spec =
-        DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"), rawSpec.Obj());
+        DocumentSourceChangeStreamSpec::parse(rawSpec.Obj(), IDLParserContext("$changeStream"));
 
     // Set the change stream spec on the expression context.
     expCtx->setChangeStreamSpec(spec);

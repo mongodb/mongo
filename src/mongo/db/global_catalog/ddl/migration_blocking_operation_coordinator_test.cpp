@@ -110,7 +110,7 @@ protected:
                                   BSON("_id" << getCoordinatorId().toBSON()));
         IDLParserContext errCtx(
             "MigrationBlockingOperationCoordinatorTest::getStateDocumentOnDisk()");
-        return MigrationBlockingOperationCoordinatorDocument::parse(errCtx, doc);
+        return MigrationBlockingOperationCoordinatorDocument::parse(doc, errCtx);
     }
 
     void assertOperationCountOnDisk(int expectedCount) {

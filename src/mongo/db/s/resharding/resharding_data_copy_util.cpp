@@ -555,7 +555,7 @@ std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationConte
     while (cursor->more()) {
         auto obj = cursor->nextSafe();
         results.emplace_back(ReshardingRecipientResumeData::parseOwned(
-            IDLParserContext("resharding::data_copy::getRecipientResumeData"), std::move(obj)));
+            std::move(obj), IDLParserContext("resharding::data_copy::getRecipientResumeData")));
     }
     return results;
 }

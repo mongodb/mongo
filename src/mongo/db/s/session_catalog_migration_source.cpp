@@ -110,7 +110,7 @@ boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
         return boost::none;
     }
 
-    auto image = repl::ImageEntry::parse(IDLParserContext("image entry"), imageObj);
+    auto image = repl::ImageEntry::parse(imageObj, IDLParserContext("image entry"));
     if (image.getTxnNumber() != retryableFindAndModifyOplogEntry.getTxnNumber()) {
         // In our snapshot, fetch the current transaction number for a session. If that transaction
         // number doesn't match what's found on the image lookup, it implies that the image is not
@@ -307,7 +307,7 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
     boost::optional<LastTxnSession> lastTxnSession;
     while (cursor->more()) {
         auto txnRecord =
-            SessionTxnRecord::parse(IDLParserContext("Session migration cloning"), cursor->next());
+            SessionTxnRecord::parse(cursor->next(), IDLParserContext("Session migration cloning"));
 
         const auto sessionId = txnRecord.getSessionId();
 
@@ -549,9 +549,9 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForRetryableApplyOps(
 
     for (const auto& innerOp : applyOpsInfo.getOperations()) {
         auto replOp = repl::ReplOperation::parse(
+            innerOp,
             IDLParserContext{"SessionOplogIterator::_"
-                             "extractOplogEntriesForInternalTransactionForRetryableWrite"},
-            innerOp);
+                             "extractOplogEntriesForInternalTransactionForRetryableWrite"});
 
         ScopeGuard skippedEntryTracker(
             [this] { _sessionOplogEntriesSkippedSoFarLowerBound.addAndFetch(1); });

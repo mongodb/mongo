@@ -95,7 +95,7 @@ public:
      */
     void process(OperationContext* opCtx) {
         const auto setChangeStreamParameter = ChangeStreamStateParameters::parse(
-            IDLParserContext("ChangeStreamStateParameters"), _stateDoc.getCommand());
+            _stateDoc.getCommand(), IDLParserContext("ChangeStreamStateParameters"));
 
         // A tenant's change collection and the pre-images collection are always associated with a
         // tenant id.
@@ -150,7 +150,7 @@ StringData SetChangeStreamStateCoordinator::getInstanceName() {
 
 SetChangeStreamStateCoordinator::SetChangeStreamStateCoordinator(const BSONObj& stateDoc)
     : _stateDoc{SetChangeStreamStateCoordinatorDocument::parse(
-          IDLParserContext("SetChangeStreamStateCoordinatorDocument"), stateDoc)},
+          stateDoc, IDLParserContext("SetChangeStreamStateCoordinatorDocument"))},
       _stateDocStore{NamespaceString::kSetChangeStreamStateCoordinatorNamespace} {}
 
 boost::optional<BSONObj> SetChangeStreamStateCoordinator::reportForCurrentOp(
@@ -167,7 +167,7 @@ boost::optional<BSONObj> SetChangeStreamStateCoordinator::reportForCurrentOp(
 
 void SetChangeStreamStateCoordinator::checkIfOptionsConflict(const BSONObj& otherDocBSON) const {
     const auto otherDoc = SetChangeStreamStateCoordinatorDocument::parse(
-        IDLParserContext("SetChangeStreamStateCoordinatorDocument"), otherDocBSON);
+        otherDocBSON, IDLParserContext("SetChangeStreamStateCoordinatorDocument"));
 
     // The '_id' field of the state document corresponds to the tenant id and hence if we are here
     // then the current and the new request belongs to the same tenant. Reject the new request if it

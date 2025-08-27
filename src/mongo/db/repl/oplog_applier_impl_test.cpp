@@ -596,8 +596,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
             ASSERT_OK(preImageLoadResult) << testDesc;
 
             // Verify that the pre-image document is correct.
-            const auto preImageDocument = ChangeStreamPreImage::parse(
-                IDLParserContext{"test"}, preImageLoadResult.getValue());
+            const auto preImageDocument = ChangeStreamPreImage::parse(preImageLoadResult.getValue(),
+                                                                      IDLParserContext{"test"});
             ASSERT_BSONOBJ_EQ(preImageDocument.getPreImage(), document);
             ASSERT_EQUALS(preImageDocument.getOperationTime(), op.getWallClockTime()) << testDesc;
 
@@ -949,9 +949,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
         auto imageEntry =
-            ImageEntry::parse(IDLParserContext("test"),
-                              Helpers::findOneForTesting(
-                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+            ImageEntry::parse(Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+                              IDLParserContext("test"));
         ASSERT_FALSE(imageEntry.getInvalidated());
     }
 
@@ -976,10 +976,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
-    imageEntry =
-        ImageEntry::parse(IDLParserContext("test"),
-                          Helpers::findOneForTesting(
-                              _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+    imageEntry = ImageEntry::parse(
+        Helpers::findOneForTesting(_opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+        IDLParserContext("test"));
     ASSERT(imageEntry.getInvalidated());
 }
 
@@ -1019,9 +1018,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
         auto imageEntry =
-            ImageEntry::parse(IDLParserContext("test"),
-                              Helpers::findOneForTesting(
-                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+            ImageEntry::parse(Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+                              IDLParserContext("test"));
         ASSERT_FALSE(imageEntry.getInvalidated());
     }
     OpTime updateOpTime{{2, 1}, 1};
@@ -1053,10 +1052,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
-    imageEntry =
-        ImageEntry::parse(IDLParserContext("test"),
-                          Helpers::findOneForTesting(
-                              _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+    imageEntry = ImageEntry::parse(
+        Helpers::findOneForTesting(_opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+        IDLParserContext("test"));
 
     ASSERT(imageEntry.getInvalidated());
 }
@@ -1100,9 +1098,9 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
         auto imageEntry =
-            ImageEntry::parse(IDLParserContext("test"),
-                              Helpers::findOneForTesting(
-                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+            ImageEntry::parse(Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+                              IDLParserContext("test"));
         ASSERT_FALSE(imageEntry.getInvalidated());
     }
 
@@ -1131,9 +1129,9 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
         imageEntry =
-            ImageEntry::parse(IDLParserContext("test"),
-                              Helpers::findOneForTesting(
-                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+            ImageEntry::parse(Helpers::findOneForTesting(
+                                  _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+                              IDLParserContext("test"));
         ASSERT(imageEntry.getInvalidated());
         ASSERT_EQ(imageEntry.getTs(), invalidateOpTime.getTimestamp());
     }
@@ -1163,10 +1161,9 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
                                      repl::ReadConcernArgs::get(_opCtx.get()),
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
-    imageEntry =
-        ImageEntry::parse(IDLParserContext("test"),
-                          Helpers::findOneForTesting(
-                              _opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())));
+    imageEntry = ImageEntry::parse(
+        Helpers::findOneForTesting(_opCtx.get(), sideCollection, BSON("_id" << sessionId.toBSON())),
+        IDLParserContext("test"));
     ASSERT(imageEntry.getInvalidated());
 }
 
@@ -5200,7 +5197,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT_TRUE(!resultSingleDoc.isEmpty());
 
     auto resultSingle =
-        SessionTxnRecord::parse(IDLParserContext("resultSingleDoc test"), resultSingleDoc);
+        SessionTxnRecord::parse(resultSingleDoc, IDLParserContext("resultSingleDoc test"));
 
     ASSERT_EQ(resultSingle.getTxnNum(), 5LL);
     ASSERT_EQ(resultSingle.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(1), 0), 1));
@@ -5212,7 +5209,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT_TRUE(!resultDiffTxnDoc.isEmpty());
 
     auto resultDiffTxn =
-        SessionTxnRecord::parse(IDLParserContext("resultDiffTxnDoc test"), resultDiffTxnDoc);
+        SessionTxnRecord::parse(resultDiffTxnDoc, IDLParserContext("resultDiffTxnDoc test"));
 
     ASSERT_EQ(resultDiffTxn.getTxnNum(), 20LL);
     ASSERT_EQ(resultDiffTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(3), 0), 1));
@@ -5224,7 +5221,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT_TRUE(!resultSameTxnDoc.isEmpty());
 
     auto resultSameTxn =
-        SessionTxnRecord::parse(IDLParserContext("resultSameTxnDoc test"), resultSameTxnDoc);
+        SessionTxnRecord::parse(resultSameTxnDoc, IDLParserContext("resultSameTxnDoc test"));
 
     ASSERT_EQ(resultSameTxn.getTxnNum(), 30LL);
     ASSERT_EQ(resultSameTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(6), 0), 1));

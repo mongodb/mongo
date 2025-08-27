@@ -192,7 +192,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::object);
 
-    auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
+    auto spec = AccumulatorPercentileSpec::parse(elem.Obj(), IDLParserContext(kName));
 
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
@@ -216,7 +216,7 @@ std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
 AccumulatorPercentile::parsePercentileAndMethod(ExpressionContext* expCtx,
                                                 BSONElement elem,
                                                 VariablesParseState vps) {
-    auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
+    auto spec = AccumulatorPercentileSpec::parse(elem.Obj(), IDLParserContext(kName));
     return std::make_pair(
         parseP(expCtx, spec.getP().getElement(), vps),
         methodNameToEnum(VersionContext::getDecoration(expCtx->getOperationContext()),
@@ -230,7 +230,7 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::object);
 
-    auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
+    auto spec = AccumulatorPercentileSpec::parse(elem.Obj(), IDLParserContext(kName));
 
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
@@ -353,7 +353,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::object);
 
-    auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
+    auto spec = AccumulatorMedianSpec::parse(elem.Obj(), IDLParserContext(kName));
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
 
@@ -375,7 +375,7 @@ std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
 AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* expCtx,
                                             BSONElement elem,
                                             VariablesParseState /*vps*/) {
-    auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
+    auto spec = AccumulatorMedianSpec::parse(elem.Obj(), IDLParserContext(kName));
     return std::make_pair(
         std::vector<double>({0.5}),
         methodNameToEnum(VersionContext::getDecoration(expCtx->getOperationContext()),
@@ -390,7 +390,7 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::object);
 
-    auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
+    auto spec = AccumulatorMedianSpec::parse(elem.Obj(), IDLParserContext(kName));
 
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);

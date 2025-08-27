@@ -211,8 +211,8 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
         findRequest.setFilter(BSON(QueryAnalyzerDocument::kModeFieldName << BSON("$ne" << "off")));
         auto cursor = client.find(std::move(findRequest));
         while (cursor->more()) {
-            auto doc = QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"),
-                                                    cursor->next());
+            auto doc = QueryAnalyzerDocument::parse(cursor->next(),
+                                                    IDLParserContext("QueryAnalysisCoordinator"));
             invariant(doc.getMode() != QueryAnalyzerModeEnum::kOff);
             auto configuration = CollectionQueryAnalyzerConfiguration{doc.getNs(),
                                                                       doc.getCollectionUuid(),

@@ -1146,26 +1146,26 @@ protected:
     NamespaceString _primaryNss = NamespaceString::createNamespaceString_forTest("test.coll_a"_sd);
 };
 
-#define TEST_FLE_REWRITE_PIPELINE(name,                                                        \
-                                  input,                                                       \
-                                  expected,                                                    \
-                                  additionalNamespaces,                                        \
-                                  encryptionInformation,                                       \
-                                  enableMultiSchemaFeatureFlag)                                \
-    TEST_F(FLEServerRewritePipelineTest, name##_PipelineRewrite) {                             \
-        RAIIServerParameterControllerForTest _scopedFeature{                                   \
-            "featureFlagLookupEncryptionSchemasFLE", enableMultiSchemaFeatureFlag};            \
-        setResolvedNamespacesForTest(additionalNamespaces);                                    \
-        auto pipeline = jsonToPipeline(_expCtx, _primaryNss, input);                           \
-        auto pipelineRewrite =                                                                 \
-            MockPipelineRewrite(_primaryNss,                                                   \
-                                EncryptionInformation::parse(IDLParserContext("root"),         \
-                                                             fromjson(encryptionInformation)), \
-                                std::move(pipeline));                                          \
-        pipelineRewrite.doRewrite(nullptr);                                                    \
-        auto rewrittenPipeline = pipelineRewrite.getPipeline();                                \
-        ASSERT(rewrittenPipeline);                                                             \
-        assertExpectedPipeline(*rewrittenPipeline, _expCtx, _primaryNss, expected);            \
+#define TEST_FLE_REWRITE_PIPELINE(name,                                                       \
+                                  input,                                                      \
+                                  expected,                                                   \
+                                  additionalNamespaces,                                       \
+                                  encryptionInformation,                                      \
+                                  enableMultiSchemaFeatureFlag)                               \
+    TEST_F(FLEServerRewritePipelineTest, name##_PipelineRewrite) {                            \
+        RAIIServerParameterControllerForTest _scopedFeature{                                  \
+            "featureFlagLookupEncryptionSchemasFLE", enableMultiSchemaFeatureFlag};           \
+        setResolvedNamespacesForTest(additionalNamespaces);                                   \
+        auto pipeline = jsonToPipeline(_expCtx, _primaryNss, input);                          \
+        auto pipelineRewrite =                                                                \
+            MockPipelineRewrite(_primaryNss,                                                  \
+                                EncryptionInformation::parse(fromjson(encryptionInformation), \
+                                                             IDLParserContext("root")),       \
+                                std::move(pipeline));                                         \
+        pipelineRewrite.doRewrite(nullptr);                                                   \
+        auto rewrittenPipeline = pipelineRewrite.getPipeline();                               \
+        ASSERT(rewrittenPipeline);                                                            \
+        assertExpectedPipeline(*rewrittenPipeline, _expCtx, _primaryNss, expected);           \
     }
 
 TEST_FLE_REWRITE_PIPELINE(Match,
@@ -1391,8 +1391,8 @@ TEST_F(FLEServerRewritePipelineTest, MissingEscPrimaryCollectionFails_PipelineRe
         _expCtx, _primaryNss, "[{$match: {$and: [{ssn: {encrypt: 2}}, {age: {encrypt: 4}}]}}]");
     auto pipelineRewrite = MockPipelineRewrite(
         _primaryNss,
-        EncryptionInformation::parse(IDLParserContext("root"),
-                                     fromjson(kSingleEncryptionSchemaEncryptionCollD)),
+        EncryptionInformation::parse(fromjson(kSingleEncryptionSchemaEncryptionCollD),
+                                     IDLParserContext("root")),
         std::move(pipeline));
     ASSERT_THROWS_CODE(pipelineRewrite.doRewrite(nullptr), AssertionException, 10026006);
 }
@@ -1415,8 +1415,8 @@ TEST_F(FLEServerRewritePipelineTest, MissingEscForeignCollectionFails_PipelineRe
                                                                                 }]}}])");
     auto pipelineRewrite = MockPipelineRewrite(
         _primaryNss,
-        EncryptionInformation::parse(IDLParserContext("root"),
-                                     fromjson(kSingleEncryptionSchemaEncryptionInfo)),
+        EncryptionInformation::parse(fromjson(kSingleEncryptionSchemaEncryptionInfo),
+                                     IDLParserContext("root")),
         std::move(pipeline));
     ASSERT_THROWS_CODE(pipelineRewrite.doRewrite(nullptr), AssertionException, 10026006);
 }

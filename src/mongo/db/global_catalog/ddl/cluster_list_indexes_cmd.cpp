@@ -102,7 +102,7 @@ ListIndexesReply cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* 
     const auto& resultObj = out.obj();
     uassertStatusOK(getStatusFromCommandResult(resultObj));
     // The reply syntax must conform to its IDL definition.
-    return ListIndexesReply::parse(IDLParserContext{"listIndexes"}, resultObj);
+    return ListIndexesReply::parse(resultObj, IDLParserContext{"listIndexes"});
 }
 
 class CmdListIndexes final : public ListIndexesCmdVersion1Gen<CmdListIndexes> {

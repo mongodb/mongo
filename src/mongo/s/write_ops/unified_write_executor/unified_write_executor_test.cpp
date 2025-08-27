@@ -113,7 +113,7 @@ public:
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             auto opMsg = static_cast<OpMsgRequest>(request);
             BulkWriteCommandRequest bulkWrite =
-                BulkWriteCommandRequest::parse(IDLParserContext("bulkWrite"), opMsg.body);
+                BulkWriteCommandRequest::parse(opMsg.body, IDLParserContext("bulkWrite"));
             ASSERT_EQ(opList.size(), bulkWrite.getOps().size());
             for (size_t i = 0; i < opList.size(); i++) {
                 ASSERT_BSONOBJ_EQ(BulkWriteCRUDOp(bulkWrite.getOps()[i]).toBSON(), opList[i]);

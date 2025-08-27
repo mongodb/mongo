@@ -200,7 +200,7 @@ public:
         } else if (_isSkippableDelete(op)) {
             try {
                 retryImageKey = LogicalSessionId::parse(
-                    IDLParserContext("RectifyConfigImagesWrites"), op->getIdElement().Obj());
+                    op->getIdElement().Obj(), IDLParserContext("RectifyConfigImagesWrites"));
             } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
                 LOGV2_WARNING(6796201,
                               "Found a delete oplog entry for the config.image_collection which "

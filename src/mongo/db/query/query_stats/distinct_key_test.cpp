@@ -54,11 +54,11 @@ public:
         const BSONObj& distinct, boost::intrusive_ptr<ExpressionContext> expCtx) {
 
         auto dcr = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+            distinct,
             IDLParserContext("distinctCommandRequest",
                              auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                              boost::none,
-                             SerializationContext::stateDefault()),
-            distinct));
+                             SerializationContext::stateDefault())));
 
         auto parsedDistinct =
             parsed_distinct_command::parse(expCtx, std::move(dcr), ExtensionsCallbackNoop(), {});

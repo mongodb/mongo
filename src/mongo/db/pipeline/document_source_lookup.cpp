@@ -158,9 +158,9 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
               *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     auto spec = NamespaceSpec::parse(
+        elem.embeddedObject(),
         IDLParserContext{
-            elem.fieldNameStringData(), vts, tenantId, SerializationContext::stateDefault()},
-        elem.embeddedObject());
+            elem.fieldNameStringData(), vts, tenantId, SerializationContext::stateDefault()});
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
     // In the cases nss == config.collections and nss == config.chunks we can proceed with the
@@ -1589,7 +1589,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See helper
     // hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
 
-    auto lookupSpec = DocumentSourceLookupSpec::parse(IDLParserContext(kStageName), elem.Obj());
+    auto lookupSpec = DocumentSourceLookupSpec::parse(elem.Obj(), IDLParserContext(kStageName));
 
     if (lookupSpec.getFrom().has_value()) {
         fromNs = parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),

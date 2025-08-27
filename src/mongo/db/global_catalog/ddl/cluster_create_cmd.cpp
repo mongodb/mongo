@@ -118,7 +118,7 @@ public:
             // fields propagated guaratees the api version check will keep working within the
             // aggregation framework
             auto request =
-                ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), cmdObj);
+                ShardsvrCreateCollectionRequest::parse(cmdObj, IDLParserContext("create"));
 
             request.setUnsplittable(true);
             request.setShardKey(BSON("_id" << 1));

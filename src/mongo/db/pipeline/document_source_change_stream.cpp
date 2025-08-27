@@ -268,8 +268,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
             "$changeStream stage expects a document as argument",
             elem.type() == BSONType::object);
 
-    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"),
-                                                      elem.embeddedObject());
+    auto spec = DocumentSourceChangeStreamSpec::parse(elem.embeddedObject(),
+                                                      IDLParserContext("$changeStream"));
 
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);

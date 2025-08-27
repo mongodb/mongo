@@ -101,7 +101,7 @@ public:
             const auto cmdResponse = uassertStatusOK(cmdResponseWithStatus);
             uassertStatusOK(cmdResponseWithStatus.getValue().commandStatus);
 
-            return Response::parse(IDLParserContext("addShardResponse"), cmdResponse.response);
+            return Response::parse(cmdResponse.response, IDLParserContext("addShardResponse"));
         }
 
     private:

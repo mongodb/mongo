@@ -114,7 +114,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         IDLParserContext ctx("ClusterMulticast");
-        auto args = ClusterMulticast::parse(ctx, cmdObj);
+        auto args = ClusterMulticast::parse(cmdObj, ctx);
 
         // Grab an arbitrary executor.
         auto executor = Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor();

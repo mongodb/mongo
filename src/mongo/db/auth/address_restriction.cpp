@@ -52,7 +52,7 @@ constexpr mongo::StringData mongo::address_restriction_detail::ServerAddress::fi
 mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
     const BSONObj& obj) try {
     IDLParserContext ctx("address restriction");
-    const auto ar = Address_restriction::parse(ctx, obj);
+    const auto ar = Address_restriction::parse(obj, ctx);
     std::vector<std::unique_ptr<NamedRestriction>> vec;
 
     const boost::optional<std::vector<StringData>>& client = ar.getClientSource();
@@ -114,7 +114,7 @@ mongo::StatusWith<mongo::BSONArray> mongo::getRawAuthenticationRestrictions(
                           "restriction objects");
         }
         IDLParserContext ctx("address restriction");
-        auto const ar = Address_restriction::parse(ctx, elem.Obj());
+        auto const ar = Address_restriction::parse(elem.Obj(), ctx);
         if (auto const&& client = ar.getClientSource()) {
             // Validate
             ClientSourceRestriction(client.value());

@@ -49,7 +49,7 @@ IDLParserContext ctx("StatsPath");
 TEST(StatsPath, BasicValidStatsBucketDouble) {
     // Create & parse StatsBucket.
     auto serializedBucket = Bucket{3.0, 4.0, 15.0, 2.0, 6.0}.serialize();
-    auto parsedBucket = StatsBucket::parse(ctx, serializedBucket);
+    auto parsedBucket = StatsBucket::parse(serializedBucket, ctx);
 
     // Round-trip conversion.
     auto bucketToBSON = parsedBucket.toBSON();
@@ -92,7 +92,7 @@ TEST(StatsPath, BasicValidStatsPath) {
     auto serializedPath = stats::makeStatsPath("somePath", numDocs, sampleRate, cehist);
 
     // Parse StatsPath via IDL & serialize to BSON.
-    auto parsedPath = StatsPath::parse(ctx, serializedPath);
+    auto parsedPath = StatsPath::parse(serializedPath, ctx);
     auto parsedPathToBSON = parsedPath.toBSON();
 
     // We should end up with the same serialized BSON in the end.
@@ -115,7 +115,7 @@ TEST(StatsPath, BasicValidEmptyStatsPath) {
     auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, sampleRate, cehist);
 
     // Parse StatsPath via IDL & serialize to BSON.
-    auto parsedPath = StatsPath::parse(ctx, serializedPath);
+    auto parsedPath = StatsPath::parse(serializedPath, ctx);
     auto parsedPathToBSON = parsedPath.toBSON();
 
     // We should end up with the same serialized BSON in the end.

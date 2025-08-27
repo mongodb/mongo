@@ -70,7 +70,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
               *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     auto spec = NamespaceSpec::parse(
-        IDLParserContext(elem.fieldNameStringData(), vts, tenantId, sc), elem.embeddedObject());
+        elem.embeddedObject(), IDLParserContext(elem.fieldNameStringData(), vts, tenantId, sc));
     auto coll = spec.getColl();
     uassert(
         5786801,
@@ -155,7 +155,7 @@ MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
 
     IDLParserContext ctx{DocumentSourceMergeSpec::kWhenMatchedFieldName};
     auto value = elem.valueStringData();
-    auto mode = MergeWhenMatchedMode_parse(ctx, value);
+    auto mode = MergeWhenMatchedMode_parse(value, ctx);
 
     // The 'kPipeline' mode cannot be specified explicitly, a custom pipeline definition must be
     // used instead.

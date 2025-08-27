@@ -265,7 +265,7 @@ std::vector<OplogEntry> SessionUpdateTracker::flushAll() {
 std::vector<OplogEntry> SessionUpdateTracker::_flushForQueryPredicate(
     const BSONObj& queryPredicate) {
     auto idField = queryPredicate["_id"].Obj();
-    auto lsid = LogicalSessionId::parse(IDLParserContext("lsidInOplogQuery"), idField);
+    auto lsid = LogicalSessionId::parse(idField, IDLParserContext("lsidInOplogQuery"));
     auto iter = _sessionsToUpdate.find(lsid);
 
     if (iter == _sessionsToUpdate.end()) {

@@ -238,7 +238,7 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
         unionNss = NamespaceStringUtil::deserialize(nss.dbName(), spec.valueStringData());
     } else {
         auto unionWithSpec =
-            UnionWithSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+            UnionWithSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
             unionNss = NamespaceStringUtil::deserialize(nss.dbName(), *unionWithSpec.getColl());
         } else {
@@ -298,7 +298,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See
         // helper hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
         auto unionWithSpec =
-            UnionWithSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+            UnionWithSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
         if (unionWithSpec.getColl()) {
             unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                         *unionWithSpec.getColl());

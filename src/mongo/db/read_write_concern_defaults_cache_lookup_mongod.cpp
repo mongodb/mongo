@@ -72,8 +72,8 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
     // Note that a default constructed RWConcern is returned if no document is found instead of
     // boost::none. This is to avoid excessive lookups when there is no defaults document, because
     // otherwise every attempt to get the defaults from the RWC cache would trigger a lookup.
-    return RWConcernDefault::parse(IDLParserContext("ReadWriteConcernDefaultsCacheLookupMongoD"),
-                                   getPersistedDefaultRWConcernDocument(opCtx));
+    return RWConcernDefault::parse(getPersistedDefaultRWConcernDocument(opCtx),
+                                   IDLParserContext("ReadWriteConcernDefaultsCacheLookupMongoD"));
 }
 
 void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx, bool isReplicaSet) {

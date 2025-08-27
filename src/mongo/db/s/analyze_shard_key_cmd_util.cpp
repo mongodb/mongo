@@ -1231,7 +1231,7 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         const auto response = DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse::parse(
-            IDLParserContext("calculateReadWriteDistributionMetrics"), doc);
+            doc, IDLParserContext("calculateReadWriteDistributionMetrics"));
         readDistributionMetrics = readDistributionMetrics + response.getReadDistribution();
         writeDistributionMetrics = writeDistributionMetrics + response.getWriteDistribution();
     });

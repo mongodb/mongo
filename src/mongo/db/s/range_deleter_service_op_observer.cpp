@@ -128,7 +128,7 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         for (auto it = begin; it != end; ++it) {
             auto deletionTask = RangeDeletionTask::parse(
-                IDLParserContext("RangeDeleterServiceOpObserver"), it->doc);
+                it->doc, IDLParserContext("RangeDeleterServiceOpObserver"));
             if (!deletionTask.getPending() || !*(deletionTask.getPending())) {
                 registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
             }
@@ -160,7 +160,7 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
 
         if (processingFieldUpdatedToTrue || pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
             auto deletionTask = RangeDeletionTask::parse(
-                IDLParserContext("RangeDeleterServiceOpObserver"), args.updateArgs->updatedDoc);
+                args.updateArgs->updatedDoc, IDLParserContext("RangeDeleterServiceOpObserver"));
             if (processingFieldUpdatedToTrue) {
                 // Invalidates all RangePreservers when shardPlacementVersion is lower than or
                 // equal to the preMigrationShardVersion. This ensures that reads on secondaries are

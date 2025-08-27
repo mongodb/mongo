@@ -178,7 +178,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         if (cursor->more()) {
             const auto bsonObj = cursor->next();
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-                IDLParserContext("AcquireRecoverableCSBW"), bsonObj);
+                bsonObj, IDLParserContext("AcquireRecoverableCSBW"));
 
             tassert(7032368,
                     fmt::format("Trying to acquire a  critical section blocking writes for "
@@ -296,7 +296,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                 cursor->more());
         BSONObj bsonObj = cursor->next();
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserContext("AcquireRecoverableCSBR"), bsonObj);
+            bsonObj, IDLParserContext("AcquireRecoverableCSBR"));
 
         tassert(7032362,
                 fmt::format(
@@ -431,7 +431,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
 
         BSONObj bsonObj = cursor->next();
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserContext("ReleaseRecoverableCS"), bsonObj);
+            bsonObj, IDLParserContext("ReleaseRecoverableCS"));
 
         const bool isDifferentReason = collCSDoc.getReason().woCompare(reason) != 0;
         if (MONGO_unlikely(!throwIfReasonDiffers && isDifferentReason)) {

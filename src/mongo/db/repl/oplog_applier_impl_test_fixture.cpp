@@ -432,7 +432,7 @@ void checkTxnTable(OperationContext* opCtx,
                                  BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()));
     ASSERT_FALSE(result.isEmpty());
 
-    auto txnRecord = SessionTxnRecord::parse(IDLParserContext("parse txn record for test"), result);
+    auto txnRecord = SessionTxnRecord::parse(result, IDLParserContext("parse txn record for test"));
 
     ASSERT_EQ(txnNum, txnRecord.getTxnNum());
     ASSERT_EQ(expectedOpTime, txnRecord.getLastWriteOpTime());

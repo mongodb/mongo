@@ -115,8 +115,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
     // the owned is owned, which is why we call specObj.getOwned().
     InternalSearchMongotRemoteSpec spec =
         specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)
-        ? InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
-                                                     specObj.getOwned())
+        ? InternalSearchMongotRemoteSpec::parseOwned(specObj.getOwned(),
+                                                     IDLParserContext(kStageName))
         : InternalSearchMongotRemoteSpec(specObj.getOwned());
 
     // If there is no view on the spec, check the expression context for one. getViewFromExpCtx will
@@ -141,7 +141,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     bool storedSource = _spec.getMongotQuery().getBoolField(mongot_cursor::kReturnStoredSourceArg);
 
     auto spec =
-        InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName), _spec.toBSON());
+        InternalSearchMongotRemoteSpec::parseOwned(_spec.toBSON(), IDLParserContext(kStageName));
     // Pass the limit in when there is no idLookup stage, and use the limit for mongotDocsRequested.
     // TODO: SERVER-76591 Remove special limit in favor of regular sharded limit optimization.
     spec.setMongotDocsRequested(spec.getLimit());

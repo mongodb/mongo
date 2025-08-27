@@ -313,7 +313,7 @@ ExecutorFuture<BulkWriteCommandReply> SEPTransactionClient::_runCRUDOp(
             uassertStatusOK(getStatusFromCommandResult(reply));
 
             IDLParserContext ctx("BulkWriteCommandReply");
-            auto response = BulkWriteCommandReply::parse(ctx, reply);
+            auto response = BulkWriteCommandReply::parse(reply, ctx);
 
             // TODO (SERVER-80794): Support iterating through the cursor for internal transactions.
             uassert(7934200,

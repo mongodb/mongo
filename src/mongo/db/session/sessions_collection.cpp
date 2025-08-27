@@ -252,7 +252,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
         auto swBatchResult = send(batchWithReadConcernLocal.obj());
 
         auto result = SessionsCollectionFetchResult::parse(
-            IDLParserContext{"SessionsCollectionFetchResult"}, swBatchResult);
+            swBatchResult, IDLParserContext{"SessionsCollectionFetchResult"});
 
         for (const auto& lsid : result.getCursor().getFirstBatch()) {
             removed.erase(lsid.get_id());

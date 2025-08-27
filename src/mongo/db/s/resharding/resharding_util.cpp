@@ -638,7 +638,7 @@ boost::optional<ReshardingCoordinatorDocument> tryGetCoordinatorDoc(OperationCon
     if (doc.isEmpty()) {
         return boost::none;
     }
-    return ReshardingCoordinatorDocument::parse(IDLParserContext("getCoordinatorDoc"), doc);
+    return ReshardingCoordinatorDocument::parse(doc, IDLParserContext("getCoordinatorDoc"));
 }
 
 ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,

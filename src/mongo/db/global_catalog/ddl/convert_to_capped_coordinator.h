@@ -51,7 +51,7 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {
         const auto otherDoc = ConvertToCappedCoordinatorDocument::parse(
-            IDLParserContext("ConvertToCappedCoordinatorDocument"), doc);
+            doc, IDLParserContext("ConvertToCappedCoordinatorDocument"));
 
         const auto& selfReq = _request.toBSON();
         const auto& otherReq = otherDoc.getShardsvrConvertToCappedRequest().toBSON();

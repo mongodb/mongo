@@ -131,7 +131,7 @@ TEST(IndexBuildEntryTest, SerializeAndDeserialize) {
     ASSERT_TRUE(validateBSON(obj).isOK());
 
     IDLParserContext ctx("IndexBuildsEntry Parser");
-    IndexBuildEntry rebuiltEntry = IndexBuildEntry::parse(ctx, obj);
+    IndexBuildEntry rebuiltEntry = IndexBuildEntry::parse(obj, ctx);
 
     checkIfEqual(entry, rebuiltEntry);
 }

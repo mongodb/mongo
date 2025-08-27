@@ -113,8 +113,8 @@ public:
     class Request : public BasicTypedRequest {
     public:
         static constexpr auto kCommandName = "echo"_sd;
-        static Request parse(const IDLParserContext&,
-                             const OpMsgRequest& opMsgRequest,
+        static Request parse(const OpMsgRequest& opMsgRequest,
+                             const IDLParserContext&,
                              DeserializationContext*) {
             return Request{opMsgRequest};
         }
@@ -178,8 +178,8 @@ public:
     class Request : public BasicTypedRequest {
     public:
         static constexpr StringData kCommandName = "listCommands";
-        static Request parse(const IDLParserContext&,
-                             const OpMsgRequest& opMsgRequest,
+        static Request parse(const OpMsgRequest& opMsgRequest,
+                             const IDLParserContext&,
                              DeserializationContext*) {
             return Request{opMsgRequest};
         }

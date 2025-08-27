@@ -310,69 +310,69 @@ TEST(FLEValidationUtils, ValidateTrimFactorRangeDecimal128) {
 TEST(FLEValidationUtils, parseQueryTypeConfig) {
     // Equality
     BSONObj invalidContentionFactor = BSON("queryType" << "equality" << "contention" << -1);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              invalidContentionFactor),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(invalidContentionFactor,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validEqualityConfig = BSON("queryType" << "equality" << "contention" << 2);
     ASSERT_DOES_NOT_THROW(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, validEqualityConfig));
+        QueryTypeConfig::parse(validEqualityConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 
     // Range
     BSONObj tooLowSparsity = BSON("queryType" << "range" << "min" << 1 << "max" << 10 << "sparsity"
                                               << -1 << "precision" << 2 << "trimFactor" << 3);
     ASSERT_THROWS_CODE(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, tooLowSparsity),
+        QueryTypeConfig::parse(tooLowSparsity, IDLParserContext{"parseQueryTypeConfigTest"}),
         DBException,
         ErrorCodes::BadValue);
     BSONObj tooHighSparsity = BSON("queryType" << "range" << "min" << 1 << "max" << 10 << "sparsity"
                                                << 9 << "precision" << 2 << "trimFactor" << 3);
     ASSERT_THROWS_CODE(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, tooHighSparsity),
+        QueryTypeConfig::parse(tooHighSparsity, IDLParserContext{"parseQueryTypeConfigTest"}),
         DBException,
         ErrorCodes::BadValue);
     BSONObj tooLowPrecision = BSON("queryType" << "range" << "min" << 1 << "max" << 10 << "sparsity"
                                                << 4 << "precision" << -1 << "trimFactor" << 3);
     ASSERT_THROWS_CODE(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, tooLowPrecision),
+        QueryTypeConfig::parse(tooLowPrecision, IDLParserContext{"parseQueryTypeConfigTest"}),
         DBException,
         ErrorCodes::BadValue);
     BSONObj tooLowTrimFactor =
         BSON("queryType" << "range" << "min" << 1 << "max" << 10 << "sparsity" << 4 << "precision"
                          << 2 << "trimFactor" << -1);
     ASSERT_THROWS_CODE(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, tooLowTrimFactor),
+        QueryTypeConfig::parse(tooLowTrimFactor, IDLParserContext{"parseQueryTypeConfigTest"}),
         DBException,
         ErrorCodes::BadValue);
     BSONObj validRangeConfig =
         BSON("queryType" << "range" << "min" << 1 << "max" << 10 << "sparsity" << 4 << "precision"
                          << 2 << "trimFactor" << 3);
     ASSERT_DOES_NOT_THROW(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, validRangeConfig));
+        QueryTypeConfig::parse(validRangeConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 
     // Substring
     BSONObj tooLowStrMaxLengthSubstr =
         BSON("queryType" << "substringPreview" << "strMaxLength" << -1 << "strMinQueryLength" << 2
                          << "strMaxQueryLength" << 10 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMaxLengthSubstr),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxLengthSubstr,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMinQueryLengthSubstr =
         BSON("queryType" << "substringPreview" << "strMaxLength" << 250 << "strMinQueryLength" << -1
                          << "strMaxQueryLength" << 10 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMinQueryLengthSubstr),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMinQueryLengthSubstr,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMaxQueryLengthSubstr =
         BSON("queryType" << "substringPreview" << "strMaxLength" << 250 << "strMinQueryLength" << 2
                          << "strMaxQueryLength" << -1 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMaxQueryLengthSubstr),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxQueryLengthSubstr,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validSubstringConfig =
@@ -380,49 +380,49 @@ TEST(FLEValidationUtils, parseQueryTypeConfig) {
                          << "strMaxQueryLength" << 10 << "caseSensitive" << true
                          << "diacriticSensitive" << false);
     ASSERT_DOES_NOT_THROW(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, validSubstringConfig));
+        QueryTypeConfig::parse(validSubstringConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 
     // Prefix
     BSONObj tooLowStrMinQueryLengthPrefix =
         BSON("queryType" << "prefixPreview" << "strMinQueryLength" << -1 << "strMaxQueryLength"
                          << 10 << "caseSensitive" << true << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMinQueryLengthPrefix),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMinQueryLengthPrefix,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMaxQueryLengthPrefix =
         BSON("queryType" << "prefixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << -1
                          << "caseSensitive" << true << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMaxQueryLengthPrefix),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxQueryLengthPrefix,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validPrefixConfig =
         BSON("queryType" << "prefixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
                          << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_DOES_NOT_THROW(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, validPrefixConfig));
+        QueryTypeConfig::parse(validPrefixConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 
     // Suffix
     BSONObj tooLowStrMinQueryLengthSuffix =
         BSON("queryType" << "suffixPreview" << "strMinQueryLength" << -1 << "strMaxQueryLength"
                          << 10 << "caseSensitive" << true << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMinQueryLengthSuffix),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMinQueryLengthSuffix,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMaxQueryLengthSuffix =
         BSON("queryType" << "suffixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << -1
                          << "caseSensitive" << true << "diacriticSensitive" << false);
-    ASSERT_THROWS_CODE(QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"},
-                                              tooLowStrMaxQueryLengthSuffix),
+    ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxQueryLengthSuffix,
+                                              IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validSuffixConfig =
         BSON("queryType" << "suffixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
                          << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_DOES_NOT_THROW(
-        QueryTypeConfig::parse(IDLParserContext{"parseQueryTypeConfigTest"}, validSuffixConfig));
+        QueryTypeConfig::parse(validSuffixConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 }
 
 QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {

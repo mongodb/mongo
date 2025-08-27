@@ -124,7 +124,7 @@ TEST(EncryptSchemaTypesParserTest, ParseFullEncryptObjectFromBSON) {
                                               << "keyId"
                                               << "/pointer");
     IDLParserContext ctxt("encrypt");
-    auto encryptInfo = EncryptionInfo::parse(ctxt, encryptInfoBSON);
+    auto encryptInfo = EncryptionInfo::parse(encryptInfoBSON, ctxt);
     MatcherTypeSet resultMatcherSet;
     resultMatcherSet.bsonTypes.insert(BSONType::numberInt);
     ASSERT_TRUE(encryptInfo.getBsonType() == BSONTypeSet(resultMatcherSet));
@@ -137,10 +137,10 @@ TEST(EncryptSchemaTypesParserTest, ParseFullEncryptObjectFromBSON) {
 TEST(EncryptSchemaTypesParserTest, WrongTypeFailsParse) {
     BSONObj encryptInfoBSON = BSON("keyId" << 2);
     IDLParserContext ctxt("encrypt");
-    ASSERT_THROWS_CODE(EncryptionInfo::parse(ctxt, encryptInfoBSON), DBException, 51085);
+    ASSERT_THROWS_CODE(EncryptionInfo::parse(encryptInfoBSON, ctxt), DBException, 51085);
     encryptInfoBSON = BSON("algorithm" << "garbage");
     ASSERT_THROWS_CODE(
-        EncryptionInfo::parse(ctxt, encryptInfoBSON), DBException, ErrorCodes::BadValue);
+        EncryptionInfo::parse(encryptInfoBSON, ctxt), DBException, ErrorCodes::BadValue);
 }
 
 }  // namespace

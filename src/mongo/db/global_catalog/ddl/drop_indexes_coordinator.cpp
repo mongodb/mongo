@@ -48,7 +48,7 @@ DropIndexesCoordinator::DropIndexesCoordinator(ShardingDDLCoordinatorService* se
 
 void DropIndexesCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = DropIndexesCoordinatorDocument::parse(
-        IDLParserContext("DropIndexesCoordinatorDocument"), doc);
+        doc, IDLParserContext("DropIndexesCoordinatorDocument"));
 
     const auto& selfReq = _request;
     const auto& otherReq = otherDoc.getDropIndexesRequest();

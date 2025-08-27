@@ -349,7 +349,7 @@ public:
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse(IDLParserContext{"getMore"}, request)) {
+              _cmd(GetMoreCommandRequest::parse(request, IDLParserContext{"getMore"})) {
             NamespaceString nss(
                 NamespaceStringUtil::deserialize(_cmd.getDbName(), _cmd.getCollection()));
             uassert(ErrorCodes::InvalidNamespace,
@@ -862,12 +862,12 @@ public:
             auto ret = reply->getBodyBuilder().asTempObj();
 
             // We need to copy the serialization context from the request to the reply object
-            CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply",
+            CursorGetMoreReply::parse(ret.removeField("ok"),
+                                      IDLParserContext("CursorGetMoreReply",
                                                        auth::ValidatedTenancyScope::get(opCtx),
                                                        tenantId,
                                                        SerializationContext::stateCommandReply(
-                                                           _cmd.getSerializationContext())),
-                                      ret.removeField("ok"));
+                                                           _cmd.getSerializationContext())));
         }
 
         const GetMoreCommandRequest _cmd;

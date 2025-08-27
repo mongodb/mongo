@@ -722,7 +722,7 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
 
     try {
         auto dbInShardCatalog =
-            DatabaseType::parse(IDLParserContext("DatabaseType"), cursor->nextSafe().getOwned());
+            DatabaseType::parse(cursor->nextSafe().getOwned(), IDLParserContext("DatabaseType"));
 
         auto shardInLocalCatalog = dbInShardCatalog.getPrimary();
         if (shardInLocalCatalog != primaryShard) {

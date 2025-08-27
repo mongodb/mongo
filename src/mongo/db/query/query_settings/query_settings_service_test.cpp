@@ -472,11 +472,11 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForAgg) {
 TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForDistinct) {
     auto distinctCmdBSON = fromjson("{distinct: 'exampleColl', key: 'x', $db: 'foo'}");
     auto distinctCmd = std::make_unique<DistinctCommandRequest>(
-        DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+        DistinctCommandRequest::parse(distinctCmdBSON,
+                                      IDLParserContext("distinctCommandRequest",
                                                        auth::ValidatedTenancyScope::get(opCtx()),
                                                        boost::none,
-                                                       SerializationContext::stateDefault()),
-                                      distinctCmdBSON));
+                                                       SerializationContext::stateDefault())));
     auto parsedDistinct =
         parsed_distinct_command::parse(expCtx(),
                                        std::move(distinctCmd),

@@ -163,8 +163,8 @@ public:
                             uassertStatusOK(
                                 AsyncRequestsSender::Response::getEffectiveStatus(response));
                             return AnalyzeShardKeyResponse::parse(
-                                IDLParserContext("clusterAnalyzeShardKey"),
-                                response.swResponse.getValue().data);
+                                response.swResponse.getValue().data,
+                                IDLParserContext("clusterAnalyzeShardKey"));
                         } catch (const ExceptionFor<ErrorCodes::CollectionIsEmptyLocally>& ex) {
                             uassert(ErrorCodes::IllegalOperation,
                                     str::stream()

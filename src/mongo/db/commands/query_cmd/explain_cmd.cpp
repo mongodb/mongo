@@ -136,11 +136,12 @@ public:
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)},
           _genericArgs(
-              GenericArguments::parse(IDLParserContext("explain",
+              GenericArguments::parse(_outerRequest->body,
+                                      IDLParserContext("explain",
                                                        _outerRequest->validatedTenancyScope,
                                                        _outerRequest->getValidatedTenantId(),
-                                                       _outerRequest->getSerializationContext()),
-                                      _outerRequest->body)) {}
+                                                       _outerRequest->getSerializationContext()))) {
+    }
 
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         // Explain is never allowed in multi-document transactions.
@@ -215,11 +216,11 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
 
     // To enforce API versioning
     auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
+        request,
         IDLParserContext(ExplainCommandRequest::kCommandName,
                          request.validatedTenancyScope,
                          request.getValidatedTenantId(),
-                         request.getSerializationContext()),
-        request);
+                         request.getSerializationContext()));
     auto const dbName = cmdObj.getDbName();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     auto explainedObj = cmdObj.getCommandParameter();

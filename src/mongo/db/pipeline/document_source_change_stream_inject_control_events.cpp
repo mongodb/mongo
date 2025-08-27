@@ -132,8 +132,8 @@ DocumentSourceChangeStreamInjectControlEvents::createFromBson(
             spec.type() == BSONType::object);
 
     auto parsed = DocumentSourceChangeStreamInjectControlEventsSpec::parse(
-        IDLParserContext("DocumentSourceChangeStreamInjectControlEventsSpec"),
-        spec.embeddedObject());
+        spec.embeddedObject(),
+        IDLParserContext("DocumentSourceChangeStreamInjectControlEventsSpec"));
 
     return new DocumentSourceChangeStreamInjectControlEvents(
         expCtx, ActionsHelper::parseFromBSON(parsed.getActions()));

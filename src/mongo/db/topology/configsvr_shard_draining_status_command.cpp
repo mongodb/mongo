@@ -109,7 +109,7 @@ public:
             shardingCatalogManager->appendShardDrainingStatus(
                 opCtx, result, shardDrainingState, shardId ? *shardId : requestShardId);
 
-            Response res = Response::parse(IDLParserContext("removeShardResponse"), result.obj());
+            Response res = Response::parse(result.obj(), IDLParserContext("removeShardResponse"));
             return res;
         }
 

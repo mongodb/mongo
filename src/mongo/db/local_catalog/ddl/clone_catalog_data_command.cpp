@@ -158,7 +158,7 @@ public:
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         const auto cloneCatalogDataRequest =
-            CloneCatalogData::parse(IDLParserContext("_shardsvrCloneCatalogData"), cmdObj);
+            CloneCatalogData::parse(cmdObj, IDLParserContext("_shardsvrCloneCatalogData"));
         const auto dbName = cloneCatalogDataRequest.getCommandParameter().dbName();
 
         uassert(ErrorCodes::InvalidNamespace,

@@ -60,8 +60,8 @@ void initializeExecutionControl(ServiceContext* svcCtx) {
 
     auto usingThroughputProbing =
         StorageEngineConcurrencyAdjustmentAlgorithm_parse(
-            IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
-            gStorageEngineConcurrencyAdjustmentAlgorithm) ==
+            gStorageEngineConcurrencyAdjustmentAlgorithm,
+            IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"}) ==
         StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing;
 
     // If the user manually set concurrency limits, then disable execution control implicitly.

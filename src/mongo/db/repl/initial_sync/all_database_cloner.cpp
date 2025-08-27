@@ -151,7 +151,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
             "Cannot retrieve sync source initial sync ID",
             !initialSyncId.isEmpty());
     InitialSyncIdDocument initialSyncIdDoc =
-        InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), initialSyncId);
+        InitialSyncIdDocument::parse(initialSyncId, IDLParserContext("initialSyncId"));
     {
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         getSharedData()->setInitialSyncSourceId(lk, initialSyncIdDoc.get_id());

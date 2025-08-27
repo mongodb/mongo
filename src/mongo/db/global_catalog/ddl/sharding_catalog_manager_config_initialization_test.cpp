@@ -237,7 +237,7 @@ TEST_F(ConfigInitializationTest, InitNoVersionDocEmptyConfig) {
     auto versionDoc = assertGet(findOneOnConfigCollection(
         operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType foundVersion = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+    VersionType foundVersion = VersionType::parse(versionDoc, IDLParserContext("VersionType"));
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
 }
@@ -249,7 +249,7 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     auto versionDoc = assertGet(findOneOnConfigCollection(
         operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType foundVersion = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+    VersionType foundVersion = VersionType::parse(versionDoc, IDLParserContext("VersionType"));
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
 
@@ -265,7 +265,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     auto versionDoc = assertGet(findOneOnConfigCollection(
         operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
-    VersionType foundVersion = VersionType::parse(IDLParserContext("VersionType"), versionDoc);
+    VersionType foundVersion = VersionType::parse(versionDoc, IDLParserContext("VersionType"));
 
     ASSERT_TRUE(foundVersion.getClusterId().isSet());
 
@@ -314,7 +314,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         operationContext(), NamespaceString::kConfigVersionNamespace, BSONObj()));
 
     VersionType newFoundVersion =
-        VersionType::parse(IDLParserContext("VersionType"), newVersionDoc);
+        VersionType::parse(newVersionDoc, IDLParserContext("VersionType"));
 
     ASSERT_TRUE(newFoundVersion.getClusterId().isSet());
     ASSERT_NOT_EQUALS(newFoundVersion.getClusterId(), foundVersion.getClusterId());

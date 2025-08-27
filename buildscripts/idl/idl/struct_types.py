@@ -295,8 +295,8 @@ class _StructTypeInfo(StructTypeInfoBase):
             class_name,
             "parseSharingOwnership",
             [
-                "const IDLParserContext& ctxt",
                 "const BSONObj& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -314,8 +314,8 @@ class _StructTypeInfo(StructTypeInfoBase):
             class_name,
             "parseOwned",
             [
-                "const IDLParserContext& ctxt",
                 "BSONObj&& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -336,8 +336,8 @@ class _StructTypeInfo(StructTypeInfoBase):
             class_name,
             "parse",
             [
-                "const IDLParserContext& ctxt",
                 "const BSONObj& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -347,12 +347,13 @@ class _StructTypeInfo(StructTypeInfoBase):
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
+            class_name,
             "parseProtected",
             [
-                "const IDLParserContext& ctxt",
                 "const BSONObj& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -428,8 +429,8 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
             class_name,
             "parse",
             [
-                "const IDLParserContext& ctxt",
                 "const OpMsgRequest& request",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -438,12 +439,13 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
 
     def get_op_msg_request_deserializer_method(self):
         # type: () -> Optional[MethodInfo]
+        class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
+            class_name,
             "parseProtected",
             [
-                "const IDLParserContext& ctxt",
                 "const OpMsgRequest& request",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -543,12 +545,13 @@ class _CommandFromType(_CommandBaseTypeInfo):
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
+            class_name,
             "parseProtected",
             [
-                "const IDLParserContext& ctxt",
                 "const BSONObj& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -624,12 +627,13 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
+            class_name,
             "parseProtected",
             [
-                "const IDLParserContext& ctxt",
                 "const BSONObj& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -728,12 +732,13 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
+            class_name,
             "parseProtected",
             [
-                "const IDLParserContext& ctxt",
                 "const BSONObj& bsonObject",
+                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",

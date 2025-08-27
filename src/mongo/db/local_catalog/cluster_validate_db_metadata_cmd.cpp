@@ -124,7 +124,7 @@ public:
                             "The array element in 'apiVersionErrors' should be object",
                             error.type() == BSONType::object);
                     ErrorReplyElement apiVersionError = ErrorReplyElement::parse(
-                        IDLParserContext("ErrorReplyElement"), error.Obj());
+                        error.Obj(), IDLParserContext("ErrorReplyElement"));
 
                     // Ensure that the final output doesn't exceed max BSON size.
                     apiVersionError.setShard(shardRes.shardId.toString());

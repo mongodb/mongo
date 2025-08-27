@@ -162,7 +162,7 @@ boost::optional<BSONObj> getLet(const BSONObj& cmdObj) {
 boost::optional<LegacyRuntimeConstants> getLegacyRuntimeConstants(const BSONObj& cmdObj) {
     if (auto rcElem = cmdObj.getField("runtimeConstants"_sd); rcElem.type() == BSONType::object) {
         IDLParserContext ctx("internalLegacyRuntimeConstants");
-        return LegacyRuntimeConstants::parse(ctx, rcElem.embeddedObject());
+        return LegacyRuntimeConstants::parse(rcElem.embeddedObject(), ctx);
     }
     return boost::none;
 }
@@ -641,7 +641,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const BSONObj originalCmdObj = [&]() {
         // Check whether the query portion needs to be rewritten for FLE.
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-            IDLParserContext("ClusterFindAndModify"), request.body);
+            request.body, IDLParserContext("ClusterFindAndModify"));
         if (prepareForFLERewrite(opCtx, findAndModifyRequest.getEncryptionInformation())) {
             auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
             return newRequest.first.toBSON();
@@ -975,7 +975,7 @@ bool FindAndModifyCmd::getCrudProcessedFromCmd(const BSONObj& cmdObj) {
     const BSONObj& realCmdObj =
         cmdObj.getField("explain").ok() ? cmdObj.getObjectField("explain") : cmdObj;
     auto req = write_ops::FindAndModifyCommandRequest::parse(
-        IDLParserContext("ClusterFindAndModify"), realCmdObj);
+        realCmdObj, IDLParserContext("ClusterFindAndModify"));
 
     return req.getEncryptionInformation().has_value() &&
         req.getEncryptionInformation()->getCrudProcessed().get_value_or(false);
@@ -1304,7 +1304,7 @@ void FindAndModifyCmd::handleWouldChangeOwningShardError(OperationContext* opCtx
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
     auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
-        IDLParserContext("ClusterFindAndModify"), cmdObj);
+        cmdObj, IDLParserContext("ClusterFindAndModify"));
 
     if (txnRouter) {
         handleWouldChangeOwningShardErrorTransaction(opCtx,

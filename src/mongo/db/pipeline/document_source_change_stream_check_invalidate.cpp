@@ -72,7 +72,7 @@ DocumentSourceChangeStreamCheckInvalidate::createFromBson(
             spec.type() == BSONType::object);
 
     auto parsed = DocumentSourceChangeStreamCheckInvalidateSpec::parse(
-        IDLParserContext("DocumentSourceChangeStreamCheckInvalidateSpec"), spec.embeddedObject());
+        spec.embeddedObject(), IDLParserContext("DocumentSourceChangeStreamCheckInvalidateSpec"));
     return new DocumentSourceChangeStreamCheckInvalidate(
         expCtx,
         parsed.getStartAfterInvalidate() ? parsed.getStartAfterInvalidate()->getData()

@@ -107,8 +107,8 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : getExpCtx();
-        auto spec = InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
-                                                               _spec.toBSON());
+        auto spec = InternalSearchMongotRemoteSpec::parseOwned(_spec.toBSON(),
+                                                               IDLParserContext(kStageName));
         return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
             std::move(spec), expCtx, _taskExecutor);
     }

@@ -699,8 +699,8 @@ class TestGenerator(testcase.IDLTestcase):
         """)
         )
 
-        expectedParserContext = "IDLParserContext tempContext\(kVariantFieldFieldName.*\)"
-        expectedCastedObject = "NestedStruct::parse\(tempContext.*\)"
+        expectedParserContext = "IDLParserContext tempContext\(.*kVariantFieldFieldName.*\)"
+        expectedCastedObject = "NestedStruct::parse\(localObject, tempContext.*\)"
 
         self.assertRegex(source, expectedParserContext)
         self.assertRegex(source, expectedCastedObject)
@@ -1189,7 +1189,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "for (auto&& sequence : request.sequences)",
-                "values.emplace_back(mongo::BasicStruct::parse(tempContext, sequenceObject, dctx));",
+                "values.emplace_back(mongo::BasicStruct::parse(sequenceObject, tempContext, dctx));",
             ],
         )
 

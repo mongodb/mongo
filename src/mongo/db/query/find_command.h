@@ -53,12 +53,12 @@ public:
         _overrideNssOrUUID = NamespaceStringOrUUID{nss};
     }
 
-    static FindCommandRequest parse(const IDLParserContext& ctxt,
-                                    const BSONObj& bsonObject,
+    static FindCommandRequest parse(const BSONObj& bsonObject,
+                                    const IDLParserContext& ctxt,
                                     DeserializationContext* dctx = nullptr) {
         NamespaceString localNS;
         FindCommandRequest object(localNS);
-        object.parseProtected(ctxt, bsonObject, dctx);
+        object.parseProtected(bsonObject, ctxt, dctx);
         return object;
     }
 

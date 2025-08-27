@@ -4903,8 +4903,8 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
         if (!initialSyncSourceReadPreference.empty()) {
             try {
                 readPreference =
-                    ReadPreference_parse(IDLParserContext("initialSyncSourceReadPreference"),
-                                         initialSyncSourceReadPreference);
+                    ReadPreference_parse(initialSyncSourceReadPreference,
+                                         IDLParserContext("initialSyncSourceReadPreference"));
                 parsedSyncSourceFromInitialSync = true;
             } catch (const DBException& e) {
                 fassertFailedWithStatus(3873100, e.toStatus());
@@ -5930,7 +5930,7 @@ boost::optional<UUID> ReplicationCoordinatorImpl::getInitialSyncId(OperationCont
     BSONObj initialSyncId = _replicationProcess->getConsistencyMarkers()->getInitialSyncId(opCtx);
     if (initialSyncId.hasField(InitialSyncIdDocument::k_idFieldName)) {
         InitialSyncIdDocument initialSyncIdDoc =
-            InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), initialSyncId);
+            InitialSyncIdDocument::parse(initialSyncId, IDLParserContext("initialSyncId"));
         return initialSyncIdDoc.get_id();
     }
     return boost::none;

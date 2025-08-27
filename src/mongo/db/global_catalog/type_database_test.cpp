@@ -50,7 +50,7 @@ using std::string;
 
 TEST(DatabaseType, Empty) {
     // Constructing from empty BSON must fails
-    ASSERT_THROWS(DatabaseType::parse(IDLParserContext("DatabaseType"), BSONObj()),
+    ASSERT_THROWS(DatabaseType::parse(BSONObj(), IDLParserContext("DatabaseType")),
                   AssertionException);
 }
 
@@ -62,7 +62,7 @@ TEST(DatabaseType, Basic) {
                             << DatabaseType::kVersionFieldName
                             << BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp));
 
-    const auto db = DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
+    const auto db = DatabaseType::parse(dbObj, IDLParserContext("DatabaseType"));
     ASSERT_EQUALS(db.getDbName(), DatabaseName::createDatabaseName_forTest(boost::none, "mydb"));
     ASSERT_EQUALS(db.getPrimary(), "shard");
     ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
@@ -72,13 +72,13 @@ TEST(DatabaseType, Basic) {
 TEST(DatabaseType, BadType) {
     // Cosntructing from an BSON object with a malformed database must fails
     const auto dbObj = BSON(DatabaseType::kDbNameFieldName << 0);
-    ASSERT_THROWS(DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj), AssertionException);
+    ASSERT_THROWS(DatabaseType::parse(dbObj, IDLParserContext("DatabaseType")), AssertionException);
 }
 
 TEST(DatabaseType, MissingRequired) {
     // Cosntructing from an BSON object without all the required fields must fails
     const auto dbObj = BSON(DatabaseType::kDbNameFieldName << "mydb");
-    ASSERT_THROWS(DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj), AssertionException);
+    ASSERT_THROWS(DatabaseType::parse(dbObj, IDLParserContext("DatabaseType")), AssertionException);
 }
 
 }  // unnamed namespace

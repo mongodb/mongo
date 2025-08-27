@@ -405,7 +405,7 @@ protected:
         ASSERT_FALSE(doc.isEmpty())
             << "Change stream pre-image not found: " << sessionId.toBSON()
             << " (pre-images collection: " << sideCollection.nss().toStringForErrorMsg() << ")";
-        return repl::ImageEntry::parse(IDLParserContext("image entry"), doc);
+        return repl::ImageEntry::parse(doc, IDLParserContext("image entry"));
     }
 
     SessionTxnRecord getTxnRecord(OperationContext* opCtx, const LogicalSessionId& sessionId) {
@@ -424,7 +424,7 @@ protected:
             << "Transaction not found for session: " << sessionId.toBSON()
             << "(transactions collection: " << configTransactions.nss().toStringForErrorMsg()
             << ")";
-        return SessionTxnRecord::parse(IDLParserContext("txn record"), doc);
+        return SessionTxnRecord::parse(doc, IDLParserContext("txn record"));
     }
 
     /**
@@ -451,7 +451,7 @@ protected:
             << "Change stream pre-image not found: " << preImageId.toBSON()
             << " (pre-images collection: " << preImagesCollection.nss().toStringForErrorMsg()
             << ")";
-        return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
+        return ChangeStreamPreImage::parse(*container, IDLParserContext("pre-image"));
     }
 
     std::vector<IndexBuildInfo> makeSpecs(OperationContext* opCtx,
@@ -1775,7 +1775,7 @@ protected:
 
         auto txnRecordObj = cursor->next();
         auto txnRecord =
-            SessionTxnRecord::parse(IDLParserContext("SessionEntryWritten"), txnRecordObj);
+            SessionTxnRecord::parse(txnRecordObj, IDLParserContext("SessionEntryWritten"));
         ASSERT(!cursor->more());
         ASSERT_EQ(session()->getSessionId(), txnRecord.getSessionId());
         ASSERT_EQ(txnNum, txnRecord.getTxnNum());
@@ -1811,7 +1811,7 @@ protected:
 
         auto txnRecordObj = cursor->next();
         auto txnRecord =
-            SessionTxnRecord::parse(IDLParserContext("SessionEntryWritten"), txnRecordObj);
+            SessionTxnRecord::parse(txnRecordObj, IDLParserContext("SessionEntryWritten"));
         ASSERT(!cursor->more());
         ASSERT_EQ(session()->getSessionId(), txnRecord.getSessionId());
         if (!startOpTime) {

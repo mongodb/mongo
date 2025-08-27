@@ -57,7 +57,7 @@ DocumentSourceChangeStreamAddPostImage::createFromBson(
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::object);
     auto parsedSpec = DocumentSourceChangeStreamAddPostImageSpec::parse(
-        IDLParserContext("DocumentSourceChangeStreamAddPostImageSpec"), elem.Obj());
+        elem.Obj(), IDLParserContext("DocumentSourceChangeStreamAddPostImageSpec"));
     return new DocumentSourceChangeStreamAddPostImage(expCtx, parsedSpec.getFullDocument());
 }
 

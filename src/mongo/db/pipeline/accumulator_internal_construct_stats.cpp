@@ -66,7 +66,7 @@ AccumulationExpression parseInternalConstructStats(ExpressionContext* const expC
     tassert(7261401,
             "expected $_internalConstructStats in the analyze pipeline to an object",
             elem.isABSONObj());
-    auto params = InternalConstructStatsAccumulatorParams::parse(parser, elem.Obj());
+    auto params = InternalConstructStatsAccumulatorParams::parse(elem.Obj(), parser);
 
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);

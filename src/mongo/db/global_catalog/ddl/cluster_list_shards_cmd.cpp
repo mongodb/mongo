@@ -93,7 +93,7 @@ public:
              BSONObjBuilder& result) override {
 
         const auto request =
-            ListShardsRequest::parse(IDLParserContext("listShardsRequest"), cmdObj);
+            ListShardsRequest::parse(cmdObj, IDLParserContext("listShardsRequest"));
 
         const BSONObj filter = [&] {
             const auto request_filter = request.getFilter();

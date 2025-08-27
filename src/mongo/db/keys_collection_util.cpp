@@ -58,7 +58,7 @@ namespace keys_collection_util {
 
 ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(BSONObj keyDoc,
                                                              boost::optional<Date_t> expireAt) {
-    auto originalKeyDoc = KeysCollectionDocument::parse(IDLParserContext("keyDoc"), keyDoc);
+    auto originalKeyDoc = KeysCollectionDocument::parse(keyDoc, IDLParserContext("keyDoc"));
 
     ExternalKeysCollectionDocument externalKeyDoc(OID::gen(), originalKeyDoc.getKeyId());
     externalKeyDoc.setKeysCollectionDocumentBase(originalKeyDoc.getKeysCollectionDocumentBase());

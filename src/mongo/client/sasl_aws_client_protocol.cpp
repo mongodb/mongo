@@ -111,7 +111,7 @@ template <typename T>
 AWSCredentials parseCredentials(StringData data) {
     BSONObj obj = fromjson(std::string{data});
 
-    auto creds = T::parse(IDLParserContext("security-credentials"), obj);
+    auto creds = T::parse(obj, IDLParserContext("security-credentials"));
 
     return AWSCredentials(std::string{creds.getAccessKeyId()},
                           std::string{creds.getSecretAccessKey()},

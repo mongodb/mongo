@@ -214,7 +214,7 @@ void TestLoopback(TestT test_value) {
     auto element = testDoc.firstElement();
     ASSERT_EQUALS(element.type(), Test_bson_type);
 
-    auto testStruct = ParserT::parse(IDLParserContext{"test"}, testDoc);
+    auto testStruct = ParserT::parse(testDoc);
     assert_same_types<decltype(testStruct.getValue()), TestT>();
 
     // We need to use a different unittest macro for comparing obj/array.
@@ -284,15 +284,13 @@ TEST(IDLOneTypeTests, TestLoopbackTest) {
 
 // Test we compare an object with optional BSONObjs correctly
 TEST(IDLOneTypeTests, TestOptionalObjectTest) {
-    IDLParserContext ctxt("root");
-
     auto testValue = BSON("Hello" << "World");
     auto testDoc = BSON("value" << testValue << "value2" << testValue << "opt_value" << testValue);
 
     auto element = testDoc.firstElement();
     ASSERT_EQUALS(element.type(), BSONType::object);
 
-    auto testStruct = One_plain_optional_object::parse(ctxt, testDoc);
+    auto testStruct = One_plain_optional_object::parse(testDoc);
     assert_same_types<decltype(testStruct.getValue()), const BSONObj&>();
 
     ASSERT_BSONOBJ_EQ(testStruct.getValue(), testValue);
@@ -319,17 +317,15 @@ TEST(IDLOneTypeTests, TestOptionalObjectTest) {
 // mismatch.
 template <typename ParserT, BSONType Parser_bson_type, typename TestT, BSONType Test_bson_type>
 void TestParse(TestT test_value) {
-    IDLParserContext ctxt("root");
-
     auto testDoc = BSON("value" << test_value);
 
     auto element = testDoc.firstElement();
     ASSERT_EQUALS(element.type(), Test_bson_type);
 
     if (Parser_bson_type != Test_bson_type) {
-        ASSERT_THROWS(ParserT::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(ParserT::parse(testDoc), AssertionException);
     } else {
-        (void)ParserT::parse(ctxt, testDoc);
+        (void)ParserT::parse(testDoc);
     }
 }
 
@@ -399,14 +395,12 @@ TEST(IDLOneTypeTests, TestSafeInt64) {
 
 // Mixed: test a type that accepts NamespaceString
 TEST(IDLOneTypeTests, TestNamespaceString) {
-    IDLParserContext ctxt("root");
-
     auto testDoc = BSON(One_namespacestring::kValueFieldName << "foo.bar");
 
     auto element = testDoc.firstElement();
     ASSERT_EQUALS(element.type(), BSONType::string);
 
-    auto testStruct = One_namespacestring::parse(ctxt, testDoc);
+    auto testStruct = One_namespacestring::parse(testDoc);
     assert_same_types<decltype(testStruct.getValue()), const NamespaceString&>();
 
     ASSERT_EQUALS(testStruct.getValue(), NamespaceString::createNamespaceString_forTest("foo.bar"));
@@ -435,7 +429,7 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
     {
         auto testBadDoc = BSON("value" << StringData("foo\0bar", 7));
 
-        ASSERT_THROWS(One_namespacestring::parse(ctxt, testBadDoc), AssertionException);
+        ASSERT_THROWS(One_namespacestring::parse(testBadDoc), AssertionException);
     }
 }
 
@@ -444,7 +438,7 @@ TEST(IDLOneTypeTests, TestBase64StringPositive) {
     auto doc = BSON("basic" << "ABCD+/0="
                             << "url"
                             << "1234-_0");
-    auto parsed = Two_base64string::parse(IDLParserContext{"base64"}, doc);
+    auto parsed = Two_base64string::parse(doc);
     ASSERT_EQ(parsed.getBasic(), "\x00\x10\x83\xFB\xFD"_sd);
     ASSERT_EQ(parsed.getUrl(), "\xD7m\xF8\xFB\xFD"_sd);
 
@@ -460,10 +454,8 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
         auto doc = BSON("basic" << "ABCD+/0"
                                 << "url"
                                 << "1234-_0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
-                                    AssertionException,
-                                    10270,
-                                    "invalid base64");
+        ASSERT_THROWS_CODE_AND_WHAT(
+            Two_base64string::parse(doc), AssertionException, 10270, "invalid base64");
     }
 
     {
@@ -471,10 +463,8 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
         auto doc = BSON("basic" << "ABCD+_0="
                                 << "url"
                                 << "1234-_0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
-                                    AssertionException,
-                                    40537,
-                                    "Invalid base64 character");
+        ASSERT_THROWS_CODE_AND_WHAT(
+            Two_base64string::parse(doc), AssertionException, 40537, "Invalid base64 character");
     }
 
     {
@@ -482,49 +472,57 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
         auto doc = BSON("basic" << "ABCD+/0="
                                 << "url"
                                 << "1234-/0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
-                                    AssertionException,
-                                    40537,
-                                    "Invalid base64 character");
+        ASSERT_THROWS_CODE_AND_WHAT(
+            Two_base64string::parse(doc), AssertionException, 40537, "Invalid base64 character");
     }
 }
 
+// Negative: Test base64 encoded strings.
+TEST(IDLParserContext, SpecifiedRoot) {
+    const auto expected = "BSON field 'root.field1' is missing but a required field";
+
+    IDLParserContext ctxt("root");
+
+    ASSERT_THROWS_CODE_AND_WHAT(
+        RequiredStrictField3::parse(BSON("field2" << 123 << "field3" << 1234), ctxt),
+        AssertionException,
+        ErrorCodes::IDLFailedToParse,
+        expected);
+}
 
 constexpr auto kNANRepr = "nan"_sd;
 
 TEST(IDLStructTests, DurationParse) {
-    IDLParserContext ctxt("duration");
-
     auto justAMinuteDoc = BSON("secs" << 60);
-    auto justAMinute = Struct_with_durations::parse(ctxt, justAMinuteDoc);
+    auto justAMinute = Struct_with_durations::parse(justAMinuteDoc);
     ASSERT_EQ(justAMinute.getSecs().get(), Seconds{60});
     ASSERT_EQ(justAMinute.getSecs().get(), Minutes{1});
 
     auto floatDurationDoc = BSON("secs" << 123.0);
-    auto floatDuration = Struct_with_durations::parse(ctxt, floatDurationDoc);
+    auto floatDuration = Struct_with_durations::parse(floatDurationDoc);
     ASSERT_EQ(floatDuration.getSecs().get(), Seconds{123});
 
     auto halfSecondDoc = BSON("secs" << 234.5);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, halfSecondDoc),
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(halfSecondDoc),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "Expected an integer: secs: 234.5");
 
     auto invalidDurationDoc = BSON("secs" << "bob");
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, invalidDurationDoc),
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(invalidDurationDoc),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "Duration value must be numeric, got: string");
 
     auto notADurationDoc = BSON("secs" << NAN);
     ASSERT_THROWS_CODE_AND_WHAT(
-        Struct_with_durations::parse(ctxt, notADurationDoc),
+        Struct_with_durations::parse(notADurationDoc),
         AssertionException,
         ErrorCodes::FailedToParse,
         fmt::format("Expected an integer, but found NaN in: secs: {}", kNANRepr));
 
     auto endOfTimeDoc = BSON("secs" << std::numeric_limits<double>::infinity());
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, endOfTimeDoc),
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(endOfTimeDoc),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "Cannot represent as a 64-bit integer: secs: inf");
@@ -543,41 +541,39 @@ TEST(IDLStructTests, DurationSerialize) {
 }
 
 TEST(IDLStructTests, EpochsParse) {
-    IDLParserContext ctxt("epoch");
-
     auto sameTimeDoc = BSON("unix" << 1234567890LL << "ecma" << 1234567890000LL);
-    auto sameTime = Struct_with_epochs::parse(ctxt, sameTimeDoc);
+    auto sameTime = Struct_with_epochs::parse(sameTimeDoc);
     ASSERT_EQ(sameTime.getUnix(), sameTime.getEcma());
     ASSERT_EQ(sameTime.getUnix().toDurationSinceEpoch(), Seconds{1234567890});
     ASSERT_EQ(sameTime.getEcma().toDurationSinceEpoch(), Seconds{1234567890});
 
     auto floatTimeDoc = BSON("unix" << 123.0 << "ecma" << 234000.0);
-    auto floatTime = Struct_with_epochs::parse(ctxt, floatTimeDoc);
+    auto floatTime = Struct_with_epochs::parse(floatTimeDoc);
     ASSERT_EQ(floatTime.getUnix().toDurationSinceEpoch(), Seconds{123});
     ASSERT_EQ(floatTime.getEcma().toDurationSinceEpoch(), Seconds{234});
 
     auto halfTimeDoc = BSON("unix" << 345.6 << "ecma" << 0);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, halfTimeDoc),
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(halfTimeDoc),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "Expected an integer: unix: 345.6");
 
     auto invalidTimeDoc = BSON("unix" << "bob"
                                       << "ecma" << 1234567890000LL);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, invalidTimeDoc),
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(invalidTimeDoc),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "Epoch value must be numeric, got: string");
 
     auto notATimeDoc = BSON("unix" << 0 << "ecma" << NAN);
     ASSERT_THROWS_CODE_AND_WHAT(
-        Struct_with_epochs::parse(ctxt, notATimeDoc),
+        Struct_with_epochs::parse(notATimeDoc),
         AssertionException,
         ErrorCodes::FailedToParse,
         fmt::format("Expected an integer, but found NaN in: ecma: {}", kNANRepr));
 
     auto endOfTimeDoc = BSON("unix" << std::numeric_limits<double>::infinity() << "ecma" << 0);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, endOfTimeDoc),
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(endOfTimeDoc),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "Cannot represent as a 64-bit integer: unix: inf");
@@ -601,12 +597,10 @@ TEST(IDLStructTests, EpochSerialize) {
 
 // Postive: Test any type
 TEST(IDLOneTypeTests, TestAnyType) {
-    IDLParserContext ctxt("root");
-
     // Positive: string field
     {
         auto testDoc = BSON("value" << "Foo");
-        auto testStruct = One_any_basic_type::parse(ctxt, testDoc);
+        auto testStruct = One_any_basic_type::parse(testDoc);
 
         BSONObjBuilder builder;
         testStruct.serialize(&builder);
@@ -618,7 +612,7 @@ TEST(IDLOneTypeTests, TestAnyType) {
     // Positive: int field
     {
         auto testDoc = BSON("value" << 12);
-        auto testStruct = One_any_basic_type::parse(ctxt, testDoc);
+        auto testStruct = One_any_basic_type::parse(testDoc);
 
         BSONObjBuilder builder;
         testStruct.serialize(&builder);
@@ -630,12 +624,10 @@ TEST(IDLOneTypeTests, TestAnyType) {
 
 // Postive: Test object type
 TEST(IDLOneTypeTests, TestObjectType) {
-    IDLParserContext ctxt("root");
-
     // Positive: object
     {
         auto testDoc = BSON("value" << BSON("value" << "foo"));
-        auto testStruct = One_any_basic_type::parse(ctxt, testDoc);
+        auto testStruct = One_any_basic_type::parse(testDoc);
 
         BSONObjBuilder builder;
         testStruct.serialize(&builder);
@@ -648,25 +640,23 @@ TEST(IDLOneTypeTests, TestObjectType) {
 
 // Negative: Test object type
 TEST(IDLOneTypeTests, TestObjectTypeNegative) {
-    IDLParserContext ctxt("root");
 
     // Negative: string field
     {
         auto testDoc = BSON("value" << "Foo");
-        One_any_basic_type::parse(ctxt, testDoc);
+        One_any_basic_type::parse(testDoc);
     }
 
     // Negative: int field
     {
         auto testDoc = BSON("value" << 12);
-        One_any_basic_type::parse(ctxt, testDoc);
+        One_any_basic_type::parse(testDoc);
     }
 }
 
 TEST(IDLStatusType, ParseAndSerialize) {
     ErrorExtraInfoExample::EnableParserForTest scoped;
 
-    IDLParserContext ctxt("");
 
     const auto testErrorCode = ErrorCodes::ForTestingErrorExtraInfo;
     const auto testErrMsg = "Test errmsg for IDL parsed Status";
@@ -674,7 +664,7 @@ TEST(IDLStatusType, ParseAndSerialize) {
                                             << "ForTestingErrorExtraInfo"
                                             << "errmsg" << testErrMsg << "data" << 1234);
     const auto testDoc = BSON("value" << testStatusBSON);
-    const auto testStruct = One_status_type::parse(ctxt, testDoc);
+    const auto testStruct = One_status_type::parse(testDoc);
 
     const auto testStatus = Status(testErrorCode, testErrMsg, testStatusBSON);
 
@@ -691,12 +681,11 @@ TEST(IDLStatusType, ParseAndSerialize) {
 TEST(IDLStatusType, OKNotAllowed) {
     ErrorExtraInfoExample::EnableParserForTest scoped;
 
-    IDLParserContext ctxt("");
 
     // Test that serialization of an OK status is not allowed.
     const auto testDoc = BSON("value" << BSON("ok" << 1 << "code" << ErrorCodes::OK << "codeName"
                                                    << "OK"));
-    ASSERT_THROWS_CODE(One_status_type::parse(ctxt, testDoc), DBException, 7418501);
+    ASSERT_THROWS_CODE(One_status_type::parse(testDoc), DBException, 7418501);
 
     // Test that deserialization of an OK status is not allowed.
     One_status_type statusStruct;
@@ -716,7 +705,6 @@ constexpr bool isVector = IsVector<T>::value;
 // We don't generate comparison operators like "==" for variants, so test only for BSON equality.
 template <typename ParserT, typename TestT, BSONType Test_bson_type>
 void TestLoopbackVariant(TestT test_value) {
-    IDLParserContext ctxt("root");
 
     BSONObjBuilder bob;
     if constexpr (idl::hasBSONSerialize<TestT>) {
@@ -743,7 +731,7 @@ void TestLoopbackVariant(TestT test_value) {
     auto element = obj.firstElement();
     ASSERT_EQUALS(element.type(), Test_bson_type);
 
-    auto parsed = ParserT::parse(ctxt, obj);
+    auto parsed = ParserT::parse(obj);
     if constexpr (std::is_same_v<TestT, BSONObj>) {
         ASSERT_BSONOBJ_EQ(get<TestT>(parsed.getValue()), test_value);
     } else {
@@ -798,14 +786,11 @@ TEST(IDLVariantTests, TestVariantSafeInt) {
     TestLoopbackVariant<One_variant_safeInt, int, BSONType::numberInt>(1);
 
     // safeInt accepts all numbers, but always deserializes and serializes as int32.
-    IDLParserContext ctxt("root");
-    ASSERT_EQ(get<std::int32_t>(
-                  One_variant_safeInt::parse(ctxt, BSON("value" << Decimal128(1))).getValue()),
-              1);
-    ASSERT_EQ(get<std::int32_t>(One_variant_safeInt::parse(ctxt, BSON("value" << 1LL)).getValue()),
-              1);
-    ASSERT_EQ(get<std::int32_t>(One_variant_safeInt::parse(ctxt, BSON("value" << 1.0)).getValue()),
-              1);
+    ASSERT_EQ(
+        get<std::int32_t>(One_variant_safeInt::parse(BSON("value" << Decimal128(1))).getValue()),
+        1);
+    ASSERT_EQ(get<std::int32_t>(One_variant_safeInt::parse(BSON("value" << 1LL)).getValue()), 1);
+    ASSERT_EQ(get<std::int32_t>(One_variant_safeInt::parse(BSON("value" << 1.0)).getValue()), 1);
 }
 
 TEST(IDLVariantTests, TestVariantSafeIntArray) {
@@ -817,27 +802,28 @@ TEST(IDLVariantTests, TestVariantSafeIntArray) {
     TestLoopbackVariant<One_variant_safeInt_array, int32vec, BSONType::array>({1, 2});
 
     // Use ASSERT instead of ASSERT_EQ to avoid operator<<
-    IDLParserContext ctxt("root");
+    ASSERT(
+        get<int32vec>(One_variant_safeInt_array::parse(BSON("value" << BSON_ARRAY(Decimal128(1))))
+                          .getValue()) == int32vec{1});
     ASSERT(get<int32vec>(
-               One_variant_safeInt_array::parse(ctxt, BSON("value" << BSON_ARRAY(Decimal128(1))))
-                   .getValue()) == int32vec{1});
-    ASSERT(get<int32vec>(One_variant_safeInt_array::parse(ctxt, BSON("value" << BSON_ARRAY(1LL)))
-                             .getValue()) == int32vec{1});
-    ASSERT(get<int32vec>(One_variant_safeInt_array::parse(ctxt, BSON("value" << BSON_ARRAY(1.0)))
-                             .getValue()) == int32vec{1});
+               One_variant_safeInt_array::parse(BSON("value" << BSON_ARRAY(1LL))).getValue()) ==
+           int32vec{1});
+    ASSERT(get<int32vec>(
+               One_variant_safeInt_array::parse(BSON("value" << BSON_ARRAY(1.0))).getValue()) ==
+           int32vec{1});
     ASSERT(get<int32vec>(One_variant_safeInt_array::parse(
-                             ctxt, BSON("value" << BSON_ARRAY(1.0 << 2LL << 3 << Decimal128(4))))
+                             BSON("value" << BSON_ARRAY(1.0 << 2LL << 3 << Decimal128(4))))
                              .getValue()) == (int32vec{1, 2, 3, 4}));
 }
 
 TEST(IDLVariantTests, TestVariantTwoStructs) {
     auto obj = BSON("value" << BSON("insert" << 1));
-    auto parsed = One_variant_two_structs::parse(IDLParserContext{"root"}, obj);
+    auto parsed = One_variant_two_structs::parse(obj);
     ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
     ASSERT_EQ(get<Insert_variant_struct>(parsed.getValue()).getInsert(), 1);
 
     obj = BSON("value" << BSON("update" << "foo"));
-    parsed = One_variant_two_structs::parse(IDLParserContext{"root"}, obj);
+    parsed = One_variant_two_structs::parse(obj);
     ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
     ASSERT_EQ(get<Update_variant_struct>(parsed.getValue()).getUpdate(), "foo");
 }
@@ -853,7 +839,7 @@ TEST(IDLVariantTests, TestVariantTwoArrays) {
     // This variant can be array<int> or array<string>. It assumes an empty array is array<int>
     // because that type is declared first in the IDL.
     auto obj = BSON("value" << BSONArray());
-    auto parsed = One_variant_two_arrays::parse(IDLParserContext{"root"}, obj);
+    auto parsed = One_variant_two_arrays::parse(obj);
     ASSERT(get<std::vector<int>>(parsed.getValue()) == std::vector<int>());
     ASSERT_THROWS(get<std::vector<std::string>>(parsed.getValue()), std::bad_variant_access);
 
@@ -864,28 +850,27 @@ TEST(IDLVariantTests, TestVariantTwoArrays) {
         arrayBob.append("1", "test_value");
     }
 
-    ASSERT_THROWS_CODE(One_variant_two_arrays::parse(IDLParserContext{"root"}, bob.obj()),
-                       AssertionException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        One_variant_two_arrays::parse(bob.obj()), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST(IDLVariantTests, TestVariantOptional) {
     {
         auto obj = BSON("value" << 1);
-        auto parsed = One_variant_optional::parse(IDLParserContext{"root"}, obj);
+        auto parsed = One_variant_optional::parse(obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(get<int>(*parsed.getValue()), 1);
     }
 
     {
         auto obj = BSON("value" << "test_value");
-        auto parsed = One_variant_optional::parse(IDLParserContext{"root"}, obj);
+        auto parsed = One_variant_optional::parse(obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(get<std::string>(*parsed.getValue()), "test_value");
     }
 
     // The optional key is absent.
-    auto parsed = One_variant_optional::parse(IDLParserContext{"root"}, BSONObj());
+    auto parsed = One_variant_optional::parse(BSONObj());
     ASSERT_FALSE(parsed.getValue().has_value());
     ASSERT_BSONOBJ_EQ(BSONObj(), parsed.toBSON());
 }
@@ -895,7 +880,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
     // parse(), toBSON(), getValue0(), getValue1(), and the constructor.
     {
         auto obj = BSON("value0" << 1 << "value1" << BSONObj());
-        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
+        auto parsed = Two_variants::parse(obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(get<int>(parsed.getValue0()), 1);
         ASSERT_BSONOBJ_EQ(get<BSONObj>(parsed.getValue1()), BSONObj());
@@ -905,7 +890,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
     {
         auto obj = BSON("value0" << "test_value"
                                  << "value1" << BSONObj());
-        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
+        auto parsed = Two_variants::parse(obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(get<std::string>(parsed.getValue0()), "test_value");
         ASSERT_BSONOBJ_EQ(get<BSONObj>(parsed.getValue1()), BSONObj());
@@ -914,7 +899,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
 
     {
         auto obj = BSON("value0" << 1 << "value1" << BSON_ARRAY("x" << "y"));
-        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
+        auto parsed = Two_variants::parse(obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(get<int>(parsed.getValue0()), 1);
         ASSERT(get<std::vector<std::string>>(parsed.getValue1()) ==
@@ -925,7 +910,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
     {
         auto obj = BSON("value0" << "test_value"
                                  << "value1" << BSON_ARRAY("x" << "y"));
-        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
+        auto parsed = Two_variants::parse(obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(get<std::string>(parsed.getValue0()), "test_value");
         ASSERT(get<std::vector<std::string>>(parsed.getValue1()) ==
@@ -936,12 +921,11 @@ TEST(IDLVariantTests, TestTwoVariants) {
 }
 
 TEST(IDLVariantTests, TestChainedStructVariant) {
-    IDLParserContext ctxt("root");
     {
         auto obj = BSON("value" << "x"
                                 << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant::parse(obj);
         ASSERT_EQ(get<std::string>(parsed.getOne_variant_compound().getValue()), "x");
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -961,7 +945,7 @@ TEST(IDLVariantTests, TestChainedStructVariant) {
     {
         auto obj = BSON("value" << BSON_ARRAY("x" << "y") << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant::parse(obj);
         ASSERT(get<std::vector<std::string>>(parsed.getOne_variant_compound().getValue()) ==
                (std::vector<std::string>{"x", "y"}));
         ASSERT_EQ(parsed.getField1(), "y");
@@ -984,7 +968,7 @@ TEST(IDLVariantTests, TestChainedStructVariant) {
     {
         auto obj = BSON("value" << BSONObj() << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant::parse(obj);
         ASSERT_BSONOBJ_EQ(get<BSONObj>(parsed.getOne_variant_compound().getValue()), BSONObj());
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1005,12 +989,11 @@ TEST(IDLVariantTests, TestChainedStructVariant) {
 }
 
 TEST(IDLVariantTests, TestChainedStructVariantInline) {
-    IDLParserContext ctxt("root");
     {
         auto obj = BSON("value" << "x"
                                 << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_inline::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_inline::parse(obj);
         ASSERT_EQ(get<std::string>(parsed.getValue()), "x");
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1030,7 +1013,7 @@ TEST(IDLVariantTests, TestChainedStructVariantInline) {
     {
         auto obj = BSON("value" << BSON_ARRAY("x" << "y") << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_inline::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_inline::parse(obj);
         ASSERT(get<std::vector<std::string>>(parsed.getValue()) ==
                (std::vector<std::string>{"x", "y"}));
         ASSERT_EQ(parsed.getField1(), "y");
@@ -1053,7 +1036,7 @@ TEST(IDLVariantTests, TestChainedStructVariantInline) {
     {
         auto obj = BSON("value" << BSONObj() << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_inline::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_inline::parse(obj);
         ASSERT_BSONOBJ_EQ(get<BSONObj>(parsed.getValue()), BSONObj());
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1073,11 +1056,10 @@ TEST(IDLVariantTests, TestChainedStructVariantInline) {
 }
 
 TEST(IDLVariantTests, TestChainedStructVariantStruct) {
-    IDLParserContext ctxt("root");
     {
         auto obj = BSON("value" << 1 << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_struct::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_struct::parse(obj);
         ASSERT_EQ(get<int>(parsed.getOne_variant_struct().getValue()), 1);
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1097,7 +1079,7 @@ TEST(IDLVariantTests, TestChainedStructVariantStruct) {
     {
         auto obj = BSON("value" << BSON("value" << "x") << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_struct::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_struct::parse(obj);
         ASSERT_EQ(get<One_string>(parsed.getOne_variant_struct().getValue()).getValue(), "x");
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1117,11 +1099,10 @@ TEST(IDLVariantTests, TestChainedStructVariantStruct) {
 }
 
 TEST(IDLVariantTests, TestChainedStructVariantStructInline) {
-    IDLParserContext ctxt("root");
     {
         auto obj = BSON("value" << 1 << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_struct_inline::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_struct_inline::parse(obj);
         ASSERT_EQ(get<int>(parsed.getValue()), 1);
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1141,7 +1122,7 @@ TEST(IDLVariantTests, TestChainedStructVariantStructInline) {
     {
         auto obj = BSON("value" << BSON("value" << "x") << "field1"
                                 << "y");
-        auto parsed = Chained_struct_variant_struct_inline::parse(ctxt, obj);
+        auto parsed = Chained_struct_variant_struct_inline::parse(obj);
         ASSERT_EQ(get<One_string>(parsed.getValue()).getValue(), "x");
         ASSERT_EQ(parsed.getField1(), "y");
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
@@ -1162,54 +1143,52 @@ TEST(IDLVariantTests, TestChainedStructVariantStructInline) {
 
 TEST(IDLVariantTests, TestOneVariantTypeMismatch) {
     const auto expected =
-        "BSON field 'root.value' is the wrong type "
+        "BSON field 'one_variant.value' is the wrong type "
         "'object', expected types '[int, string]'";
 
-    ASSERT_THROWS_CODE_AND_WHAT(
-        One_variant::parse(IDLParserContext("root"), BSON("value" << BSONObj())),
-        AssertionException,
-        ErrorCodes::TypeMismatch,
-        expected);
+    ASSERT_THROWS_CODE_AND_WHAT(One_variant::parse(BSON("value" << BSONObj())),
+                                AssertionException,
+                                ErrorCodes::TypeMismatch,
+                                expected);
 }
 /// Struct tests:
 // Positive: strict, 3 required fields
 // Negative: strict, ensure extra fields fail
 // Negative: strict, duplicate fields
 TEST(IDLStructTests, TestStrictStruct) {
-    IDLParserContext ctxt("root");
 
     // Positive: Just 3 required fields
     {
         auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        RequiredStrictField3::parse(ctxt, testDoc);
+        RequiredStrictField3::parse(testDoc);
     }
 
     // Negative: Missing 1 required field
     {
         auto testDoc = BSON("field2" << 123 << "field3" << 1234);
-        ASSERT_THROWS(RequiredStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredStrictField3::parse(testDoc), AssertionException);
     }
     {
         auto testDoc = BSON("field1" << 12 << "field3" << 1234);
-        ASSERT_THROWS(RequiredStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredStrictField3::parse(testDoc), AssertionException);
     }
     {
         auto testDoc = BSON("field1" << 12 << "field2" << 123);
-        ASSERT_THROWS(RequiredStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredStrictField3::parse(testDoc), AssertionException);
     }
 
     // Negative: Extra field
     {
         auto testDoc =
             BSON("field1" << 12 << "field2" << 123 << "field3" << 1234 << "field4" << 1234);
-        ASSERT_THROWS(RequiredStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredStrictField3::parse(testDoc), AssertionException);
     }
 
     // Negative: Duplicate field
     {
         auto testDoc =
             BSON("field1" << 12 << "field2" << 123 << "field3" << 1234 << "field2" << 12345);
-        ASSERT_THROWS_CODE(RequiredStrictField3::parse(ctxt, testDoc),
+        ASSERT_THROWS_CODE(RequiredStrictField3::parse(testDoc),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -1217,13 +1196,12 @@ TEST(IDLStructTests, TestStrictStruct) {
 // Positive: non-strict, ensure extra fields work
 // Negative: non-strict, duplicate fields
 TEST(IDLStructTests, TestNonStrictStruct) {
-    IDLParserContext ctxt("root");
 
     // Positive: Just 3 required fields
     {
         auto testDoc =
             BSON(RequiredNonStrictField3::kCppField1FieldName << 12 << "2" << 123 << "3" << 1234);
-        auto testStruct = RequiredNonStrictField3::parse(ctxt, testDoc);
+        auto testStruct = RequiredNonStrictField3::parse(testDoc);
 
         assert_same_types<decltype(testStruct.getCppField1()), std::int32_t>();
         assert_same_types<decltype(testStruct.getCppField2()), std::int32_t>();
@@ -1233,27 +1211,27 @@ TEST(IDLStructTests, TestNonStrictStruct) {
     // Negative: Missing 1 required field
     {
         auto testDoc = BSON("2" << 123 << "3" << 1234);
-        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredNonStrictField3::parse(testDoc), AssertionException);
     }
     {
         auto testDoc = BSON("1" << 12 << "3" << 1234);
-        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredNonStrictField3::parse(testDoc), AssertionException);
     }
     {
         auto testDoc = BSON("1" << 12 << "2" << 123);
-        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredNonStrictField3::parse(testDoc), AssertionException);
     }
 
     // Positive: Extra field
     {
         auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
-        RequiredNonStrictField3::parse(ctxt, testDoc);
+        RequiredNonStrictField3::parse(testDoc);
     }
 
     // Negative: Duplicate field
     {
         auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234 << "2" << 12345);
-        ASSERT_THROWS_CODE(RequiredNonStrictField3::parse(ctxt, testDoc),
+        ASSERT_THROWS_CODE(RequiredNonStrictField3::parse(testDoc),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -1262,7 +1240,7 @@ TEST(IDLStructTests, TestNonStrictStruct) {
     {
         auto testDoc =
             BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
-        ASSERT_THROWS_CODE(RequiredNonStrictField3::parse(ctxt, testDoc),
+        ASSERT_THROWS_CODE(RequiredNonStrictField3::parse(testDoc),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -1271,16 +1249,15 @@ TEST(IDLStructTests, TestNonStrictStruct) {
     {
         auto testDoc = BSON(RequiredNonStrictField3::kCppField1FieldName << 12 << "2" << 123 << "3"
                                                                          << BSONNULL);
-        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(RequiredNonStrictField3::parse(testDoc), AssertionException);
     }
 }
 
 TEST(IDLStructTests, WriteConcernTest) {
-    IDLParserContext ctxt("root");
     // Numeric w value
     {
         auto writeConcernDoc = BSON("w" << 1 << "j" << true << "wtimeout" << 5000);
-        auto writeConcernStruct = WriteConcernIdl::parse(ctxt, writeConcernDoc);
+        auto writeConcernStruct = WriteConcernIdl::parse(writeConcernDoc);
         BSONObjBuilder builder;
         writeConcernStruct.serialize(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDoc);
@@ -1289,7 +1266,7 @@ TEST(IDLStructTests, WriteConcernTest) {
     {
         auto writeConcernDoc = BSON("w" << "majority"
                                         << "j" << true << "wtimeout" << 5000);
-        auto writeConcernStruct = WriteConcernIdl::parse(ctxt, writeConcernDoc);
+        auto writeConcernStruct = WriteConcernIdl::parse(writeConcernDoc);
         BSONObjBuilder builder;
         writeConcernStruct.serialize(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDoc);
@@ -1301,7 +1278,7 @@ TEST(IDLStructTests, WriteConcernTest) {
                                         << 12345 << "wOpTime" << 98765 << "getLastError" << true);
         auto writeConcernDocWithoutIgnoredFields = BSON("w" << "majority"
                                                             << "j" << true << "wtimeout" << 5000);
-        auto writeConcernStruct = WriteConcernIdl::parse(ctxt, writeConcernDoc);
+        auto writeConcernStruct = WriteConcernIdl::parse(writeConcernDoc);
         BSONObjBuilder builder;
         writeConcernStruct.serialize(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDocWithoutIgnoredFields);
@@ -1310,18 +1287,16 @@ TEST(IDLStructTests, WriteConcernTest) {
 
 TEST(IDLStructTests, TestValidator) {
     // Parser should assert that the values are equal.
-    IDLParserContext ctxt("root");
     auto objToParse = BSON("first" << 1 << "second" << 2);
 
-    ASSERT_THROWS_CODE(StructWithValidator::parse(ctxt, objToParse), AssertionException, 6253512);
+    ASSERT_THROWS_CODE(StructWithValidator::parse(objToParse), AssertionException, 6253512);
 
     objToParse = BSON("first" << 1 << "second" << 1);
-    StructWithValidator::parse(ctxt, objToParse);
+    StructWithValidator::parse(objToParse);
 }
 
 /// Struct default comparison tests
 TEST(IDLCompareTests, TestAllFields) {
-    IDLParserContext ctxt("root");
 
     // Positive: equality works
     {
@@ -1331,7 +1306,7 @@ TEST(IDLCompareTests, TestAllFields) {
         origStruct.setField3(1234);
 
         auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        auto parsedStruct = CompareAllField3::parse(ctxt, testDoc);
+        auto parsedStruct = CompareAllField3::parse(testDoc);
 
         // Avoid ASSET_<RelOp> to avoid operator <<
         ASSERT_TRUE(origStruct == parsedStruct);
@@ -1348,7 +1323,7 @@ TEST(IDLCompareTests, TestAllFields) {
         origStruct.setField3(12345);
 
         auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        auto parsedStruct = CompareAllField3::parse(ctxt, testDoc);
+        auto parsedStruct = CompareAllField3::parse(testDoc);
 
         // Avoid ASSET_<RelOp> to avoid operator <<
         ASSERT_FALSE(origStruct == parsedStruct);
@@ -1361,7 +1336,6 @@ TEST(IDLCompareTests, TestAllFields) {
 
 /// Struct partial comparison tests
 TEST(IDLCompareTests, TestSomeFields) {
-    IDLParserContext ctxt("root");
 
     // Positive: partial equality works when field 2 is different
     {
@@ -1371,7 +1345,7 @@ TEST(IDLCompareTests, TestSomeFields) {
         origStruct.setField3(1234);
 
         auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+        auto parsedStruct = CompareSomeField3::parse(testDoc);
 
         // Avoid ASSET_<RelOp> to avoid operator <<
         ASSERT_TRUE(origStruct == parsedStruct);
@@ -1388,7 +1362,7 @@ TEST(IDLCompareTests, TestSomeFields) {
         origStruct.setField3(12345);
 
         auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+        auto parsedStruct = CompareSomeField3::parse(testDoc);
 
         // Avoid ASSET_<RelOp> to avoid operator <<
         ASSERT_FALSE(origStruct == parsedStruct);
@@ -1405,7 +1379,7 @@ TEST(IDLCompareTests, TestSomeFields) {
         origStruct.setField3(1234);
 
         auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+        auto parsedStruct = CompareSomeField3::parse(testDoc);
 
         // Avoid ASSET_<RelOp> to avoid operator <<
         ASSERT_FALSE(origStruct == parsedStruct);
@@ -1418,42 +1392,39 @@ TEST(IDLCompareTests, TestSomeFields) {
 /// Field tests
 // Positive: check ignored field is ignored
 TEST(IDLFieldTests, TestStrictStructIgnoredField) {
-    IDLParserContext ctxt("root");
 
     // Positive: Test ignored field is ignored
     {
         auto testDoc = BSON("required_field" << 12 << "ignored_field" << 123);
-        IgnoredField::parse(ctxt, testDoc);
+        IgnoredField::parse(testDoc);
     }
 
     // Positive: Test ignored field is not required
     {
         auto testDoc = BSON("required_field" << 12);
-        IgnoredField::parse(ctxt, testDoc);
+        IgnoredField::parse(testDoc);
     }
 }
 
 // Negative: check duplicate ignored fields fail
 TEST(IDLFieldTests, TestStrictDuplicateIgnoredFields) {
-    IDLParserContext ctxt("root");
 
     // Negative: Test duplicate ignored fields fail
     {
         auto testDoc =
             BSON("required_field" << 12 << "ignored_field" << 123 << "ignored_field" << 456);
         ASSERT_THROWS_CODE(
-            IgnoredField::parse(ctxt, testDoc), AssertionException, ErrorCodes::IDLDuplicateField);
+            IgnoredField::parse(testDoc), AssertionException, ErrorCodes::IDLDuplicateField);
     }
 }
 
 TEST(IDLFieldTests, TestNonStrictDuplicateIgnoredFields) {
-    IDLParserContext ctxt("root");
 
     // Negative: Test duplicate ignored fields fail for a non-strict struct.
     {
         auto testDoc =
             BSON("required_field" << 12 << "ignored_field" << 123 << "ignored_field" << 456);
-        ASSERT_THROWS_CODE(IgnoredFieldNonStrict::parse(ctxt, testDoc),
+        ASSERT_THROWS_CODE(IgnoredFieldNonStrict::parse(testDoc),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -1465,32 +1436,31 @@ TEST(IDLFieldTests, TestNonStrictDuplicateIgnoredFields) {
 #define TEST_DEFAULT_VALUES(field_name, default_value, new_value)   \
     {                                                               \
         auto testDoc = BSONObj();                                   \
-        auto testStruct = Default_values::parse(ctxt, testDoc);     \
+        auto testStruct = Default_values::parse(testDoc);           \
         ASSERT_EQUALS(testStruct.get##field_name(), default_value); \
     }                                                               \
     {                                                               \
         auto testDoc = BSON(#field_name << new_value);              \
-        auto testStruct = Default_values::parse(ctxt, testDoc);     \
+        auto testStruct = Default_values::parse(testDoc);           \
         ASSERT_EQUALS(testStruct.get##field_name(), new_value);     \
     }
 
 #define TEST_DEFAULT_VALUES_VARIANT(field_name, default_type, default_value, new_type, new_value) \
     {                                                                                             \
         auto testDoc = BSONObj();                                                                 \
-        auto testStruct = Default_values::parse(ctxt, testDoc);                                   \
+        auto testStruct = Default_values::parse(testDoc);                                         \
         ASSERT_TRUE(holds_alternative<default_type>(testStruct.get##field_name()));               \
         ASSERT_EQUALS(get<default_type>(testStruct.get##field_name()), default_value);            \
     }                                                                                             \
     {                                                                                             \
         auto testDoc = BSON(#field_name << new_value);                                            \
-        auto testStruct = Default_values::parse(ctxt, testDoc);                                   \
+        auto testStruct = Default_values::parse(testDoc);                                         \
         ASSERT_TRUE(holds_alternative<new_type>(testStruct.get##field_name()));                   \
         ASSERT_EQUALS(get<new_type>(testStruct.get##field_name()), new_value);                    \
     }
 
 // Mixed: struct strict, and ignored field works
 TEST(IDLFieldTests, TestDefaultFields) {
-    IDLParserContext ctxt("root");
 
     TEST_DEFAULT_VALUES(V_string, "a default", "foo");
     TEST_DEFAULT_VALUES(V_int, 42, 3);
@@ -1503,12 +1473,11 @@ TEST(IDLFieldTests, TestDefaultFields) {
 
 // Positive: struct strict, and optional field works
 TEST(IDLFieldTests, TestOptionalFields) {
-    IDLParserContext ctxt("root");
 
     // Positive: Test document with only string field
     {
         auto testDoc = BSON("field1" << "Foo");
-        auto testStruct = Optional_field::parse(ctxt, testDoc);
+        auto testStruct = Optional_field::parse(testDoc);
         assert_same_types<decltype(testStruct.getField1()), boost::optional<StringData>>();
         assert_same_types<decltype(testStruct.getField2()), boost::optional<int>>();
         assert_same_types<decltype(testStruct.getField3()), const boost::optional<BSONObj>&>();
@@ -1536,7 +1505,7 @@ TEST(IDLFieldTests, TestOptionalFields) {
     // Positive: Test document with only int field
     {
         auto testDoc = BSON("field2" << 123);
-        auto testStruct = Optional_field::parse(ctxt, testDoc);
+        auto testStruct = Optional_field::parse(testDoc);
         ASSERT_FALSE(testStruct.getField1().has_value());
         ASSERT_EQUALS(123, testStruct.getField2().value());
     }
@@ -1555,11 +1524,10 @@ TEST(IDLFieldTests, TestOptionalFields) {
 }
 
 TEST(IDLFieldTests, TestAlwaysSerializeFields) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON("field1" << "Foo"
                                  << "field3" << BSON("a" << 1234));
-    auto testStruct = Always_serialize_field::parse(ctxt, testDoc);
+    auto testStruct = Always_serialize_field::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getField1()), boost::optional<mongo::StringData>>();
     assert_same_types<decltype(testStruct.getField2()), boost::optional<std::int32_t>>();
@@ -1584,10 +1552,9 @@ TEST(IDLFieldTests, TestAlwaysSerializeFields) {
 
 template <typename TestT>
 void TestWeakType(TestT test_value) {
-    IDLParserContext ctxt("root");
     auto testDoc = BSON("field1" << test_value << "field2" << test_value << "field3" << test_value
                                  << "field4" << test_value << "field5" << test_value);
-    auto testStruct = Optional_field::parse(ctxt, testDoc);
+    auto testStruct = Optional_field::parse(testDoc);
 
     ASSERT_FALSE(testStruct.getField1().has_value());
     ASSERT_FALSE(testStruct.getField2().has_value());
@@ -1651,7 +1618,6 @@ struct ImplicitlyConvertsToOptionalVectorString {
 
 template <typename T>
 T makeSetterOverloadTestStruct() {
-    IDLParserContext ctxt("root");
     using StrArr = std::vector<std::string>;
     auto testDoc = BSONObjBuilder{}
                        .append("fieldString", "foo")
@@ -1663,7 +1629,7 @@ T makeSetterOverloadTestStruct() {
                        .append("fieldOptionalArrayString", StrArr{"baz", "qux"})
                        .append("fieldOptionalArrayStringWithValidator", StrArr{"BAZ", "QUX"})
                        .obj();
-    return T::parse(ctxt, testDoc);
+    return T::parse(testDoc);
 }
 
 template <typename T>
@@ -2041,7 +2007,6 @@ TEST(SetterOverloadTest, InlineChainedOptionalArrayOfStringFieldWithValidator) {
 
 // Positive: Test a nested struct
 TEST(IDLNestedStruct, TestDuplicateTypes) {
-    IDLParserContext ctxt("root");
 
 
     // Positive: Test document
@@ -2050,7 +2015,7 @@ TEST(IDLNestedStruct, TestDuplicateTypes) {
         "field1" << BSON("field1" << 1 << "field2" << 2 << "field3" << 3) <<
 
         "field3" << BSON("field1" << 4 << "field2" << 5 << "field3" << 6));
-    auto testStruct = NestedWithDuplicateTypes::parse(ctxt, testDoc);
+    auto testStruct = NestedWithDuplicateTypes::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getField1()), RequiredStrictField3&>();
     assert_same_types<decltype(testStruct.getField2()),
@@ -2098,14 +2063,13 @@ TEST(IDLNestedStruct, TestDuplicateTypes) {
 }
 
 TEST(IDLNestedStruct, RejectDuplicateFieldWithinNestedStruct) {
-    IDLParserContext ctxt("root");
 
     // Positive example.
     {
         auto testDoc =
             BSON("field1" << BSON("field1" << 1 << "field2" << 2 << "field3" << 3) << "field3"
                           << BSON("field1" << 4 << "field2" << 5 << "field3" << 6));
-        NestedWithDuplicateTypes::parse(ctxt, testDoc);
+        NestedWithDuplicateTypes::parse(testDoc);
     }
 
     // Add a duplicate nested field at path "field2.field2".
@@ -2114,7 +2078,7 @@ TEST(IDLNestedStruct, RejectDuplicateFieldWithinNestedStruct) {
             BSON("field1" << BSON("field1" << 1 << "field2" << 2 << "field3" << 3) << "field2"
                           << BSON("field1" << 7 << "field2" << 8 << "field3" << 9 << "field2" << 10)
                           << "field3" << BSON("field1" << 4 << "field2" << 5 << "field3" << 6));
-        ASSERT_THROWS_CODE(NestedWithDuplicateTypes::parse(ctxt, testDoc),
+        ASSERT_THROWS_CODE(NestedWithDuplicateTypes::parse(testDoc),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -2143,7 +2107,6 @@ TEST(IDLSerializeTests, TestUninitializedRequiredFieldsOk) {
 
 // Positive: Arrays of simple types
 TEST(IDLArrayTests, TestSimpleArrays) {
-    IDLParserContext ctxt("root");
 
     // Positive: Test document
     uint8_t array1[] = {1, 2, 3};
@@ -2161,7 +2124,7 @@ TEST(IDLArrayTests, TestSimpleArrays) {
                                  << "field5"
                                  << BSON_ARRAY(BSONBinData(array15, 16, newUUID)
                                                << BSONBinData(array16, 16, newUUID)));
-    auto testStruct = Simple_array_fields::parse(ctxt, testDoc);
+    auto testStruct = Simple_array_fields::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getField1()), std::vector<StringData>>();
     assert_same_types<decltype(testStruct.getField2()), const std::vector<std::int32_t>&>();
@@ -2212,10 +2175,9 @@ TEST(IDLArrayTests, TestSimpleArrays) {
 
 // Positive: Array of variant
 TEST(IDLArrayTests, TestArrayOfVariant) {
-    IDLParserContext ctxt("root");
     auto testDoc =
         BSON("value" << BSON_ARRAY(BSON("insert" << 13) << BSON("update" << "some word")));
-    auto parsed = One_array_variant::parse(ctxt, testDoc);
+    auto parsed = One_array_variant::parse(testDoc);
     ASSERT_BSONOBJ_EQ(testDoc, parsed.toBSON());
 
     ASSERT_EQ(get<Insert_variant_struct>(parsed.getValue()[0]).getInsert(), 13);
@@ -2232,7 +2194,6 @@ TEST(IDLArrayTests, TestArrayOfVariant) {
 
 // Positive: Optional Arrays
 TEST(IDLArrayTests, TestSimpleOptionalArrays) {
-    IDLParserContext ctxt("root");
 
     // Positive: Test document
     auto testDoc = BSON("field1" << BSON_ARRAY("Foo" << "Bar"
@@ -2241,7 +2202,7 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
                                  << BSON_ARRAY(1.2 << 3.4 << 5.6)
 
     );
-    auto testStruct = Optional_array_fields::parse(ctxt, testDoc);
+    auto testStruct = Optional_array_fields::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getField1()), boost::optional<std::vector<StringData>>>();
     assert_same_types<decltype(testStruct.getField2()),
@@ -2285,26 +2246,24 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
 
 // Negative: Test mixed type arrays
 TEST(IDLArrayTests, TestBadArrays) {
-    IDLParserContext ctxt("root");
 
     // Negative: Test not an array
     {
         auto testDoc = BSON("field1" << 123);
 
-        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(Simple_int_array::parse(testDoc), AssertionException);
     }
 
     // Negative: Test array with mixed types
     {
         auto testDoc = BSON("field1" << BSON_ARRAY(1.2 << 3.4 << 5.6));
 
-        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(Simple_int_array::parse(testDoc), AssertionException);
     }
 }
 
 // Negative: Test arrays with good field names but made with BSONObjBuilder::subobjStart
 TEST(IDLArrayTests, TestGoodArraysWithObjectType) {
-    IDLParserContext ctxt("root");
 
     {
         BSONObjBuilder builder;
@@ -2315,13 +2274,12 @@ TEST(IDLArrayTests, TestGoodArraysWithObjectType) {
         }
 
         auto testDoc = builder.obj();
-        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(Simple_int_array::parse(testDoc), AssertionException);
     }
 }
 
 // Positive: Test arrays with good field names but made with BSONObjBuilder::subarrayStart
 TEST(IDLArrayTests, TestGoodArraysWithArrayType) {
-    IDLParserContext ctxt("root");
 
     {
         BSONObjBuilder builder;
@@ -2333,13 +2291,12 @@ TEST(IDLArrayTests, TestGoodArraysWithArrayType) {
 
         auto testDoc = builder.obj();
 
-        Simple_int_array::parse(ctxt, testDoc);
+        Simple_int_array::parse(testDoc);
     }
 }
 
 // Negative: Test arrays with bad field names
 TEST(IDLArrayTests, TestBadArrayFieldNames) {
-    IDLParserContext ctxt("root");
 
     // Negative: string fields
     {
@@ -2351,7 +2308,7 @@ TEST(IDLArrayTests, TestBadArrayFieldNames) {
         }
         auto testDoc = builder.obj();
 
-        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(Simple_int_array::parse(testDoc), AssertionException);
     }
 
     // Negative: bad start
@@ -2364,7 +2321,7 @@ TEST(IDLArrayTests, TestBadArrayFieldNames) {
         }
         auto testDoc = builder.obj();
 
-        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(Simple_int_array::parse(testDoc), AssertionException);
     }
 
     // Negative: non-sequentially increasing
@@ -2377,13 +2334,12 @@ TEST(IDLArrayTests, TestBadArrayFieldNames) {
         }
         auto testDoc = builder.obj();
 
-        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(Simple_int_array::parse(testDoc), AssertionException);
     }
 }
 
 // Postitive: Test arrays with complex types
 TEST(IDLArrayTests, TestArraysOfComplexTypes) {
-    IDLParserContext ctxt("root");
 
     // Positive: Test document
     auto testDoc = BSON(
@@ -2396,7 +2352,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                  << "field6o" << BSON_ARRAY(BSON("value" << "goodbye") << BSON("value" << "world"))
 
     );
-    auto testStruct = Complex_array_fields::parse(ctxt, testDoc);
+    auto testStruct = Complex_array_fields::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int64_t>&>();
     assert_same_types<decltype(testStruct.getField2()),
@@ -2436,12 +2392,11 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
 
 template <typename ParserT, BinDataType bindata_type>
 void TestBinDataVector() {
-    IDLParserContext ctxt("root");
 
     // Positive: Test document with only a generic bindata field
     uint8_t testData[] = {1, 2, 3};
     auto testDoc = BSON("value" << BSONBinData(testData, 3, bindata_type));
-    auto testStruct = ParserT::parse(ctxt, testDoc);
+    auto testStruct = ParserT::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getValue()), ConstDataRange>();
 
@@ -2484,12 +2439,11 @@ TEST(IDLBinData, TestFunction) {
 
 template <typename ParserT, BinDataType bindata_type>
 void TestBinDataArray() {
-    IDLParserContext ctxt("root");
 
     // Positive: Test document with only a generic bindata field
     uint8_t testData[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     auto testDoc = BSON("value" << BSONBinData(testData, 16, bindata_type));
-    auto testStruct = ParserT::parse(ctxt, testDoc);
+    auto testStruct = ParserT::parse(testDoc);
 
     assert_same_types<decltype(testStruct.getValue()), std::array<uint8_t, 16>>();
 
@@ -2527,11 +2481,10 @@ TEST(IDLBinData, TestMD5) {
 
     // Negative: Test document with a incorrectly size md5 field
     {
-        IDLParserContext ctxt("root");
 
         uint8_t testData[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
         auto testDoc = BSON("value" << BSONBinData(testData, 15, MD5Type));
-        ASSERT_THROWS(One_md5::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(One_md5::parse(testDoc), AssertionException);
     }
 }
 
@@ -2539,7 +2492,6 @@ TEST(IDLBinData, TestMD5) {
 // mismatch.
 template <typename ParserT, BinDataType Parser_bindata_type, BinDataType Test_bindata_type>
 void TestBinDataParse() {
-    IDLParserContext ctxt("root");
 
     uint8_t testData[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     auto testDoc = BSON("value" << BSONBinData(testData, 16, Test_bindata_type));
@@ -2549,9 +2501,9 @@ void TestBinDataParse() {
     ASSERT_EQUALS(element.binDataType(), Test_bindata_type);
 
     if (Parser_bindata_type != Test_bindata_type) {
-        ASSERT_THROWS(ParserT::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(ParserT::parse(testDoc), AssertionException);
     } else {
-        (void)ParserT::parse(ctxt, testDoc);
+        (void)ParserT::parse(testDoc);
     }
 }
 
@@ -2573,7 +2525,6 @@ TEST(IDLBinData, TestParse) {
 
 // Mixed: test a type that accepts a custom bindata type
 TEST(IDLBinData, TestCustomType) {
-    IDLParserContext ctxt("root");
 
     uint8_t testData[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
     auto testDoc = BSON("value" << BSONBinData(testData, 14, BinDataGeneral));
@@ -2582,7 +2533,7 @@ TEST(IDLBinData, TestCustomType) {
     ASSERT_EQUALS(element.type(), BSONType::binData);
     ASSERT_EQUALS(element.binDataType(), BinDataGeneral);
 
-    auto testStruct = One_bindata_custom::parse(ctxt, testDoc);
+    auto testStruct = One_bindata_custom::parse(testDoc);
     std::vector<std::uint8_t> testVector = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
     ASSERT_TRUE(testStruct.getValue().getVector() == testVector);
 
@@ -2609,7 +2560,6 @@ TEST(IDLBinData, TestCustomType) {
 
 // Positive: test a type that accepts a custom UUID type
 TEST(IDLBinData, TestUUIDclass) {
-    IDLParserContext ctxt("root");
 
     auto uuid = UUID::gen();
     auto testDoc = BSON("value" << uuid);
@@ -2618,7 +2568,7 @@ TEST(IDLBinData, TestUUIDclass) {
     ASSERT_EQUALS(element.type(), BSONType::binData);
     ASSERT_EQUALS(element.binDataType(), newUUID);
 
-    auto testStruct = One_UUID::parse(ctxt, testDoc);
+    auto testStruct = One_UUID::parse(testDoc);
     ASSERT_TRUE(testStruct.getValue() == uuid);
 
     // Positive: Test we can roundtrip from the just parsed document
@@ -2647,10 +2597,11 @@ TEST(IDLBinData, TestUUIDclass) {
  */
 class ClassDerivedFromStruct : public DerivedBaseStruct {
 public:
-    static ClassDerivedFromStruct parseFromBSON(const IDLParserContext& ctxt,
-                                                const BSONObj& bsonObject) {
+    static ClassDerivedFromStruct parseFromBSON(
+        const BSONObj& bsonObject,
+        const IDLParserContext& ctxt = IDLParserContext("ClassDerivedFromStruct")) {
         ClassDerivedFromStruct o;
-        o.parseProtected(ctxt, bsonObject);
+        o.parseProtected(bsonObject);
         o._done = true;
         return o;
     }
@@ -2669,11 +2620,10 @@ private:
 
 // Positive: demonstrate a class derived from an IDL parser.
 TEST(IDLCustomType, TestDerivedParser) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON("field1" << 3 << "field2" << 5);
 
-    auto testStruct = ClassDerivedFromStruct::parseFromBSON(ctxt, testDoc);
+    auto testStruct = ClassDerivedFromStruct::parseFromBSON(testDoc);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), 5);
 
@@ -2704,11 +2654,10 @@ TEST(IDLCustomType, TestDerivedParser) {
 // Positive: demonstrate a class derived from an IDL parser.
 TEST(IDLEnum, TestEnum) {
 
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON("field1" << 2 << "field2"
                                  << "zero");
-    auto testStruct = StructWithEnum::parse(ctxt, testDoc);
+    auto testStruct = StructWithEnum::parse(testDoc);
     ASSERT_TRUE(testStruct.getField1() == IntEnum::c2);
     ASSERT_TRUE(testStruct.getField2() == StringEnumEnum::s0);
     ASSERT_TRUE(testStruct.getFieldDefault() == StringEnumEnum::s1);
@@ -2750,40 +2699,38 @@ TEST(IDLEnum, TestEnum) {
 
 // Negative: test bad values
 TEST(IDLEnum, TestIntEnumNegative) {
-    IDLParserContext ctxt("root");
 
     //  Test string
     {
         auto testDoc = BSON("value" << "2");
-        ASSERT_THROWS(One_int_enum::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(One_int_enum::parse(testDoc), AssertionException);
     }
 
     // Test a value out of range
     {
         auto testDoc = BSON("value" << 4);
-        ASSERT_THROWS(One_int_enum::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(One_int_enum::parse(testDoc), AssertionException);
     }
 
     // Test a negative number
     {
         auto testDoc = BSON("value" << -1);
-        ASSERT_THROWS(One_int_enum::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(One_int_enum::parse(testDoc), AssertionException);
     }
 }
 
 TEST(IDLEnum, TestStringEnumNegative) {
-    IDLParserContext ctxt("root");
 
     //  Test int
     {
         auto testDoc = BSON("value" << 2);
-        ASSERT_THROWS(One_string_enum::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(One_string_enum::parse(testDoc), AssertionException);
     }
 
     // Test a value out of range
     {
         auto testDoc = BSON("value" << "foo");
-        ASSERT_THROWS(One_string_enum::parse(ctxt, testDoc), AssertionException);
+        ASSERT_THROWS(One_string_enum::parse(testDoc), AssertionException);
     }
 }
 
@@ -2825,7 +2772,6 @@ OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant, VTS::TenantProtocol
 
 // Positive: demonstrate a command with concatenate with db
 TEST(IDLCommand, TestConcatenateWithDb) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
                                                                     << "field1" << 3 << "field2"
@@ -2833,7 +2779,7 @@ TEST(IDLCommand, TestConcatenateWithDb) {
                                                                     << "$db"
                                                                     << "db");
 
-    auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = BasicConcatenateWithDbCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
     ASSERT_EQUALS(testStruct.getNamespace(),
@@ -2873,20 +2819,18 @@ TEST(IDLCommand, TestConcatenateWithDb) {
 }
 
 TEST(IDLCommand, ConcatenateWithDbCommandRejectsDuplicateField) {
-    IDLParserContext ctxt("root");
     auto testDoc = BSON(BasicConcatenateWithDbCommand::kCommandName << "coll1"
                                                                     << "field1" << 3 << "field2"
                                                                     << "five"
                                                                     << "$db"
                                                                     << "db"
                                                                     << "field1" << 4);
-    ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+    ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)),
                        AssertionException,
                        ErrorCodes::IDLDuplicateField);
 }
 
 TEST(IDLCommand, ConcatenateWithDbCommandRejectsDuplicateGenericArg) {
-    IDLParserContext ctxt("root");
 
     {
         auto withGenericArgValid =
@@ -2897,7 +2841,7 @@ TEST(IDLCommand, ConcatenateWithDbCommandRejectsDuplicateGenericArg) {
                                                              << "foo"
                                                              << "$db"
                                                              << "db");
-        BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(withGenericArgValid));
+        BasicConcatenateWithDbCommand::parse(makeOMR(withGenericArgValid));
     }
 
     {
@@ -2911,15 +2855,13 @@ TEST(IDLCommand, ConcatenateWithDbCommandRejectsDuplicateGenericArg) {
                                                              << "bar"
                                                              << "$db"
                                                              << "db");
-        ASSERT_THROWS_CODE(
-            BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(withDuplicateGenericArg)),
-            AssertionException,
-            ErrorCodes::IDLDuplicateField);
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(makeOMR(withDuplicateGenericArg)),
+                           AssertionException,
+                           ErrorCodes::IDLDuplicateField);
     }
 }
 
 TEST(IDLCommand, NonStrictCommandRejectsDuplicateFields) {
-    IDLParserContext ctxt("root");
 
     // Test that a duplicate required command parameter is rejected for a non-strict command.
     {
@@ -2930,7 +2872,7 @@ TEST(IDLCommand, NonStrictCommandRejectsDuplicateFields) {
                                                                  << "$db"
                                                                  << "db"
                                                                  << "field1" << 4);
-        ASSERT_THROWS_CODE(NonStrictConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(NonStrictConcatenateWithDbCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -2945,7 +2887,7 @@ TEST(IDLCommand, NonStrictCommandRejectsDuplicateFields) {
                                                                  << "five"
                                                                  << "$db"
                                                                  << "db");
-        NonStrictConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc));
+        NonStrictConcatenateWithDbCommand::parse(makeOMR(testDoc));
     }
 
     // Test that an unknown duplicate field is rejected.
@@ -2960,7 +2902,7 @@ TEST(IDLCommand, NonStrictCommandRejectsDuplicateFields) {
                                                                  << "db"
                                                                  << "unknownField"
                                                                  << "bar");
-        ASSERT_THROWS_CODE(NonStrictConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(NonStrictConcatenateWithDbCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }
@@ -2986,10 +2928,8 @@ TEST(IDLCommand, TestConcatenateWithDb_WithTenant) {
                          .obj();
 
     auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
-    IDLParserContext ctxt(
-        "root", opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
 
-    auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, opMsg);
+    auto testStruct = BasicConcatenateWithDbCommand::parse(opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespace(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
@@ -3011,7 +2951,6 @@ TEST(IDLCommand, TestConcatenateWithDb_TestConstructor) {
 }
 
 TEST(IDLCommand, TestConcatenateWithDbSymbol) {
-    IDLParserContext ctxt("root");
 
     // Postive - symbol???
     {
@@ -3020,7 +2959,7 @@ TEST(IDLCommand, TestConcatenateWithDbSymbol) {
                                                  << "five"
                                                  << "$db"
                                                  << "db");
-        auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc));
+        auto testStruct = BasicConcatenateWithDbCommand::parse(makeOMR(testDoc));
         ASSERT_EQUALS(testStruct.getNamespace(),
                       NamespaceString::createNamespaceString_forTest("db.coll1"));
     }
@@ -3028,7 +2967,6 @@ TEST(IDLCommand, TestConcatenateWithDbSymbol) {
 
 
 TEST(IDLCommand, TestConcatenateWithDbNegative) {
-    IDLParserContext ctxt("root");
 
     // Negative - duplicate namespace field
     {
@@ -3041,7 +2979,7 @@ TEST(IDLCommand, TestConcatenateWithDbNegative) {
         // the parser expects the namespace field to be first. Therefore, the loop which traverses
         // the remainder of the document does not consider the namespace field as one of the valid
         // expected field names.
-        ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLUnknownField);
     }
@@ -3050,24 +2988,21 @@ TEST(IDLCommand, TestConcatenateWithDbNegative) {
     {
         auto testDoc = BSON("field1" << 3 << "BasicConcatenateWithDbCommand" << 1 << "field2"
                                      << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)), AssertionException);
     }
 
     // Negative -  namespace missing
     {
         auto testDoc = BSON("field1" << 3 << "field2"
                                      << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)), AssertionException);
     }
 
     // Negative - wrong type
     {
         auto testDoc = BSON("BasicConcatenateWithDbCommand" << 1 << "field1" << 3 << "field2"
                                                             << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)), AssertionException);
     }
 
     // Negative - bad ns with embedded null
@@ -3075,14 +3010,12 @@ TEST(IDLCommand, TestConcatenateWithDbNegative) {
         StringData sd1("db\0foo", 6);
         auto testDoc = BSON("BasicConcatenateWithDbCommand" << sd1 << "field1" << 3 << "field2"
                                                             << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, makeOMR(testDoc)),
-                      AssertionException);
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(makeOMR(testDoc)), AssertionException);
     }
 }
 
 // Positive: demonstrate a command with concatenate with db or uuid - test NSS
 TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS) {
-    IDLParserContext ctxt("root");
 
     auto testDoc =
         BSON(BasicConcatenateWithDbOrUUIDCommand::kCommandName << "coll1"
@@ -3091,7 +3024,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS) {
                                                                << "$db"
                                                                << "db");
 
-    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
@@ -3150,10 +3083,8 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS_WithTenant) {
                          .obj();
 
     const auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
-    IDLParserContext ctxt(
-        "root", opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
 
-    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, opMsg);
+    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
@@ -3166,7 +3097,6 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS_WithTenant) {
 
 // Positive: demonstrate a command with concatenate with db or uuid - test UUID
 TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID) {
-    IDLParserContext ctxt("root");
 
     UUID uuid = UUID::gen();
 
@@ -3176,7 +3106,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID) {
                                                                << "$db"
                                                                << "db");
 
-    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
@@ -3237,10 +3167,8 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID_WithTenant) {
             .obj();
 
     const auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
-    IDLParserContext ctxt(
-        "root", opMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
 
-    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, opMsg);
+    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName(),
                   DatabaseName::createDatabaseName_forTest(tenantId, "db"));
@@ -3269,7 +3197,6 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestConstructor) {
 }
 
 TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
-    IDLParserContext ctxt("root");
 
     // Negative - duplicate namespace field
     {
@@ -3282,7 +3209,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
         // the parser expects the namespace field to be first. Therefore, the loop which traverses
         // the remainder of the document does not consider the namespace field as one of the valid
         // expected field names.
-        ASSERT_THROWS_CODE(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLUnknownField);
     }
@@ -3291,7 +3218,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
     {
         auto testDoc = BSON("field1" << 3 << "BasicConcatenateWithDbOrUUIDCommand" << 1 << "field2"
                                      << "five");
-        ASSERT_THROWS_CODE(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLUnknownField);
     }
@@ -3300,7 +3227,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
     {
         auto testDoc = BSON("field1" << 3 << "field2"
                                      << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc)),
                       AssertionException);
     }
 
@@ -3308,7 +3235,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
     {
         auto testDoc = BSON("BasicConcatenateWithDbOrUUIDCommand" << 1 << "field1" << 3 << "field2"
                                                                   << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc)),
                       AssertionException);
     }
 
@@ -3318,7 +3245,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
         auto testDoc =
             BSON("BasicConcatenateWithDbOrUUIDCommand" << sd1 << "field1" << 3 << "field2"
                                                        << "five");
-        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS(BasicConcatenateWithDbOrUUIDCommand::parse(makeOMR(testDoc)),
                       AssertionException);
     }
 }
@@ -3326,14 +3253,13 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUIDNegative) {
 
 // Positive: demonstrate a command with concatenate with db
 TEST(IDLCommand, TestIgnore) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON("BasicIgnoredCommand" << 1 << "field1" << 3 << "field2"
                                               << "five");
 
     auto testDocWithDB = appendDB(testDoc, "admin");
 
-    auto testStruct = BasicIgnoredCommand::parse(ctxt, makeOMR(testDocWithDB));
+    auto testStruct = BasicIgnoredCommand::parse(makeOMR(testDocWithDB));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
 
@@ -3358,7 +3284,6 @@ TEST(IDLCommand, TestIgnore) {
 
 
 TEST(IDLCommand, TestIgnoredNegative) {
-    IDLParserContext ctxt("root");
 
     // Negative - duplicate namespace field
     {
@@ -3370,7 +3295,7 @@ TEST(IDLCommand, TestIgnoredNegative) {
         // the parser expects the namespace field to be first. Therefore, the loop which traverses
         // the remainder of the document does not consider the namespace field as one of the valid
         // expected field names.
-        ASSERT_THROWS_CODE(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(BasicIgnoredCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLUnknownField);
     }
@@ -3379,7 +3304,7 @@ TEST(IDLCommand, TestIgnoredNegative) {
     {
         auto testDoc = BSON("field1" << 3 << "BasicIgnoredCommand" << 1 << "field2"
                                      << "five");
-        ASSERT_THROWS_CODE(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)),
+        ASSERT_THROWS_CODE(BasicIgnoredCommand::parse(makeOMR(testDoc)),
                            AssertionException,
                            ErrorCodes::IDLUnknownField);
     }
@@ -3388,14 +3313,13 @@ TEST(IDLCommand, TestIgnoredNegative) {
     {
         auto testDoc = BSON("field1" << 3 << "field2"
                                      << "five");
-        ASSERT_THROWS(BasicIgnoredCommand::parse(ctxt, makeOMR(testDoc)), AssertionException);
+        ASSERT_THROWS(BasicIgnoredCommand::parse(makeOMR(testDoc)), AssertionException);
     }
 }
 
 // We don't generate comparison operators like "==" for variants, so test only for BSON equality.
 template <typename CommandT, typename TestT, BSONType Test_bson_type>
 void TestLoopbackCommandTypeVariant(TestT test_value) {
-    IDLParserContext ctxt("root");
 
     BSONObjBuilder bob;
     if constexpr (idl::hasBSONSerialize<TestT>) {
@@ -3413,7 +3337,7 @@ void TestLoopbackCommandTypeVariant(TestT test_value) {
     auto element = obj.firstElement();
     ASSERT_EQUALS(element.type(), Test_bson_type);
 
-    auto parsed = CommandT::parse(ctxt, obj);
+    auto parsed = CommandT::parse(obj);
     if constexpr (std::is_same_v<TestT, BSONObj>) {
         ASSERT_BSONOBJ_EQ(get<TestT>(parsed.getValue()), test_value);
     } else {
@@ -3451,7 +3375,6 @@ TEST(IDLCommand, TestCommandTypeVariant) {
 }
 
 TEST(IDLDocSequence, TestBasic) {
-    IDLParserContext ctxt("root");
 
     auto testTempDoc = BSON("DocSequenceCommand"
                             << "coll1"
@@ -3466,7 +3389,7 @@ TEST(IDLDocSequence, TestBasic) {
     OpMsgRequest request;
     request.body = testTempDoc;
 
-    auto testStruct = DocSequenceCommand::parse(ctxt, request);
+    auto testStruct = DocSequenceCommand::parse(request);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
     ASSERT_EQUALS(testStruct.getNamespace(),
@@ -3524,7 +3447,6 @@ TEST(IDLDocSequence, TestBasic) {
 
 // Negative: Test a OpMsgRequest read without $db
 TEST(IDLDocSequence, TestMissingDB) {
-    IDLParserContext ctxt("root");
 
     auto testTempDoc =
         BSON("DocSequenceCommand" << "coll1"
@@ -3536,13 +3458,12 @@ TEST(IDLDocSequence, TestMissingDB) {
     OpMsgRequest request;
     request.body = testTempDoc;
 
-    ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), AssertionException);
+    ASSERT_THROWS(DocSequenceCommand::parse(request), AssertionException);
 }
 
 // Positive: Test a command read and written to OpMsgRequest with content in DocumentSequence works
 template <typename TestT>
 void TestDocSequence(StringData name) {
-    IDLParserContext ctxt("root");
 
     auto testTempDoc = BSON(name << "coll1"
                                  << "field1" << 3 << "field2"
@@ -3555,7 +3476,7 @@ void TestDocSequence(StringData name) {
     request.sequences.push_back({"structs", {BSON("value" << "hello"), BSON("value" << "world")}});
     request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-    auto testStruct = TestT::parse(ctxt, request);
+    auto testStruct = TestT::parse(request);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
     ASSERT_EQUALS(testStruct.getNamespace(),
@@ -3581,7 +3502,6 @@ TEST(IDLDocSequence, TestDocSequence) {
 // Negative: Bad Doc Sequences
 template <typename TestT>
 void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
-    IDLParserContext ctxt("root");
 
     auto testTempDoc = BSON(name << "coll1"
                                  << "field1" << 3 << "field2"
@@ -3598,7 +3518,7 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
         request.sequences.push_back({"structs", {BSON("foo" << 1)}});
 
         ASSERT_THROWS_CODE(
-            TestT::parse(ctxt, request), AssertionException, ErrorCodes::IDLDuplicateField);
+            TestT::parse(request), AssertionException, ErrorCodes::IDLDuplicateField);
     }
 
     // Negative: Extra field in document sequence
@@ -3613,9 +3533,9 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
         request.sequences.push_back({"extra", {BSON("foo" << 1)}});
 
         if (!extraFieldAllowed) {
-            ASSERT_THROWS(TestT::parse(ctxt, request), AssertionException);
+            ASSERT_THROWS(TestT::parse(request), AssertionException);
         } else {
-            /*void*/ TestT::parse(ctxt, request);
+            /*void*/ TestT::parse(request);
         }
     }
 
@@ -3627,7 +3547,7 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
                                         testTempDoc);
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS(TestT::parse(ctxt, request), AssertionException);
+        ASSERT_THROWS(TestT::parse(request), AssertionException);
     }
 
     // Negative: Missing field in both document sequence and body
@@ -3639,7 +3559,7 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
         request.sequences.push_back(
             {"structs", {BSON("value" << "hello"), BSON("value" << "world")}});
 
-        ASSERT_THROWS(TestT::parse(ctxt, request), AssertionException);
+        ASSERT_THROWS(TestT::parse(request), AssertionException);
     }
 }
 
@@ -3652,7 +3572,6 @@ TEST(IDLDocSequence, TestBadDocSequences) {
 // Negative: Duplicate field across body and document sequence
 template <typename TestT>
 void TestDuplicateDocSequences(StringData name) {
-    IDLParserContext ctxt("root");
 
     // Negative: Duplicate fields in doc sequence and body
     {
@@ -3670,9 +3589,8 @@ void TestDuplicateDocSequences(StringData name) {
         request.sequences.push_back(
             {"structs", {BSON("value" << "hello"), BSON("value" << "world")}});
 
-        ASSERT_THROWS_CODE(DocSequenceCommand::parse(ctxt, request),
-                           AssertionException,
-                           ErrorCodes::IDLDuplicateField);
+        ASSERT_THROWS_CODE(
+            DocSequenceCommand::parse(request), AssertionException, ErrorCodes::IDLDuplicateField);
     }
 
     // Negative: Duplicate fields in doc sequence and body
@@ -3690,9 +3608,8 @@ void TestDuplicateDocSequences(StringData name) {
                                         testTempDoc);
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-        ASSERT_THROWS_CODE(DocSequenceCommand::parse(ctxt, request),
-                           AssertionException,
-                           ErrorCodes::IDLDuplicateField);
+        ASSERT_THROWS_CODE(
+            DocSequenceCommand::parse(request), AssertionException, ErrorCodes::IDLDuplicateField);
     }
 }
 
@@ -3704,7 +3621,6 @@ TEST(IDLDocSequence, TestDuplicateDocSequences) {
 
 // Positive: Test empty document sequence
 TEST(IDLDocSequence, TestEmptySequence) {
-    IDLParserContext ctxt("root");
 
     // Negative: Duplicate fields in doc sequence and body
     {
@@ -3722,9 +3638,8 @@ TEST(IDLDocSequence, TestEmptySequence) {
                                         testTempDoc);
         request.sequences.push_back({"structs", {}});
 
-        ASSERT_THROWS_CODE(DocSequenceCommand::parse(ctxt, request),
-                           AssertionException,
-                           ErrorCodes::IDLDuplicateField);
+        ASSERT_THROWS_CODE(
+            DocSequenceCommand::parse(request), AssertionException, ErrorCodes::IDLDuplicateField);
     }
 
     // Positive: Empty document sequence
@@ -3740,7 +3655,7 @@ TEST(IDLDocSequence, TestEmptySequence) {
                                         testTempDoc);
         request.sequences.push_back({"structs", {}});
 
-        auto testStruct = DocSequenceCommand::parse(ctxt, request);
+        auto testStruct = DocSequenceCommand::parse(request);
 
         ASSERT_EQUALS(0UL, testStruct.getStructs().size());
     }
@@ -3748,7 +3663,6 @@ TEST(IDLDocSequence, TestEmptySequence) {
 
 // Postive: Extra Fields in non-strict parser
 TEST(IDLDocSequence, TestNonStrict) {
-    IDLParserContext ctxt("root");
 
     // Positive: Extra field in document sequence
     {
@@ -3765,7 +3679,7 @@ TEST(IDLDocSequence, TestNonStrict) {
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
         request.sequences.push_back({"extra", {BSON("foo" << 1)}});
 
-        auto testStruct = DocSequenceCommandNonStrict::parse(ctxt, request);
+        auto testStruct = DocSequenceCommandNonStrict::parse(request);
         ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     }
 
@@ -3784,13 +3698,12 @@ TEST(IDLDocSequence, TestNonStrict) {
             {"structs", {BSON("value" << "hello"), BSON("value" << "world")}});
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
-        auto testStruct = DocSequenceCommandNonStrict::parse(ctxt, request);
+        auto testStruct = DocSequenceCommandNonStrict::parse(request);
         ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     }
 }
 
 TEST(IDLDocSequence, TestArrayVariant) {
-    IDLParserContext ctxt("root");
 
     auto testTempDoc =
         BSON("DocSequenceCommandArrayVariant"
@@ -3802,7 +3715,7 @@ TEST(IDLDocSequence, TestArrayVariant) {
     OpMsgRequest request;
     request.body = testTempDoc;
 
-    auto testStruct = DocSequenceCommandArrayVariant::parse(ctxt, request);
+    auto testStruct = DocSequenceCommandArrayVariant::parse(request);
     ASSERT_EQUALS(2UL, testStruct.getStructs().size());
     ASSERT_EQ(get<Update_variant_struct>(testStruct.getStructs()[0]).getUpdate(), "foo");
     ASSERT_EQ(get<Insert_variant_struct>(testStruct.getStructs()[1]).getInsert(), 12);
@@ -3819,7 +3732,7 @@ TEST(IDLDocSequence, TestArrayVariant) {
         ASSERT_EQUALS(loopbackRequest.sequences[0].objs.size(), 2);
 
         // Verify doc sequence part of DocSequenceCommandArrayVariant::parseProtected too.
-        testStruct = DocSequenceCommandArrayVariant::parse(ctxt, loopbackRequest);
+        testStruct = DocSequenceCommandArrayVariant::parse(loopbackRequest);
         ASSERT_EQUALS(2UL, testStruct.getStructs().size());
         ASSERT_EQ(get<Update_variant_struct>(testStruct.getStructs()[0]).getUpdate(), "foo");
         ASSERT_EQ(get<Insert_variant_struct>(testStruct.getStructs()[1]).getInsert(), 12);
@@ -3828,13 +3741,11 @@ TEST(IDLDocSequence, TestArrayVariant) {
 
 // Positive: Test an inline nested chain struct works
 TEST(IDLChainedStruct, TestInline) {
-    IDLParserContext ctxt("root");
-
     auto testDoc = BSON("stringField" << "bar"
                                       << "field3"
                                       << "foo");
 
-    auto testStruct = Chained_struct_inline::parse(ctxt, testDoc);
+    auto testStruct = Chained_struct_inline::parse(testDoc);
     ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "bar");
     ASSERT_EQUALS(testStruct.getField3(), "foo");
 
@@ -3866,24 +3777,23 @@ TEST(IDLChainedStruct, TestInline) {
 
     // Positive: Test that comparison operators work with inline chained structs
     {
-        auto testStruct2 = Chained_struct_inline::parse(ctxt, testDoc);
+        auto testStruct2 = Chained_struct_inline::parse(testDoc);
         ASSERT_EQUALS(testStruct, testStruct2);
         auto testDoc3 = BSON("stringField" << "axe"
                                            << "field3"
                                            << "foo");
-        auto testStruct3 = Chained_struct_inline::parse(ctxt, testDoc3);
+        auto testStruct3 = Chained_struct_inline::parse(testDoc3);
         ASSERT_GT(testStruct, testStruct3);
     }
 }
 
 TEST(IDLChainedStruct, TestInlinedGettersAndSetters) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON("stringField" << "bar"
                                       << "field3"
                                       << "foo");
 
-    auto testStruct = Chained_struct_inline::parse(ctxt, testDoc);
+    auto testStruct = Chained_struct_inline::parse(testDoc);
     ASSERT_EQUALS(testStruct.getStringField(), "bar");
     ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "bar");
 
@@ -3936,11 +3846,10 @@ TEST(IDLValidatedField, Int_basic_ranges) {
                             std::int32_t nonpos,
                             std::int32_t byte_range,
                             std::int32_t int_range) {
-        IDLParserContext ctxt("root");
         auto doc = BSON("positive_int" << pos << "negative_int" << neg << "non_negative_int"
                                        << nonneg << "non_positive_int" << nonpos << "byte_range_int"
                                        << byte_range << "range_int" << int_range);
-        auto obj = Int_basic_ranges::parse(ctxt, doc);
+        auto obj = Int_basic_ranges::parse(doc);
         ASSERT_EQUALS(obj.getPositive_int(), pos);
         ASSERT_EQUALS(obj.getNegative_int(), neg);
         ASSERT_EQUALS(obj.getNon_negative_int(), nonneg);
@@ -3956,11 +3865,10 @@ TEST(IDLValidatedField, Int_basic_ranges) {
                             std::int32_t nonpos,
                             std::int32_t byte_range,
                             std::int32_t int_range) {
-        IDLParserContext ctxt("root");
         auto doc = BSON("positive_int" << pos << "negative_int" << neg << "non_negative_int"
                                        << nonneg << "non_positive_int" << nonpos << "byte_range_int"
                                        << byte_range << "range_int" << int_range);
-        ASSERT_THROWS(Int_basic_ranges::parse(ctxt, doc), AssertionException);
+        ASSERT_THROWS(Int_basic_ranges::parse(doc), AssertionException);
     };
 
     tryPass(1, -1, 0, 0, 128, 65537);
@@ -4006,11 +3914,10 @@ TEST(IDLValidatedField, Double_basic_ranges) {
     // Positive case parsing.
     const auto tryPass =
         [](double pos, double neg, double nonneg, double nonpos, double double_range) {
-            IDLParserContext ctxt("root");
             auto doc = BSON("positive_double"
                             << pos << "negative_double" << neg << "non_negative_double" << nonneg
                             << "non_positive_double" << nonpos << "range_double" << double_range);
-            auto obj = Double_basic_ranges::parse(ctxt, doc);
+            auto obj = Double_basic_ranges::parse(doc);
             ASSERT_EQUALS(obj.getPositive_double(), pos);
             ASSERT_EQUALS(obj.getNegative_double(), neg);
             ASSERT_EQUALS(obj.getNon_negative_double(), nonneg);
@@ -4021,11 +3928,10 @@ TEST(IDLValidatedField, Double_basic_ranges) {
     // Negative case parsing.
     const auto tryFail =
         [](double pos, double neg, double nonneg, double nonpos, double double_range) {
-            IDLParserContext ctxt("root");
             auto doc = BSON("positive_double"
                             << pos << "negative_double" << neg << "non_negative_double" << nonneg
                             << "non_positive_double" << nonpos << "range_double" << double_range);
-            ASSERT_THROWS(Double_basic_ranges::parse(ctxt, doc), AssertionException);
+            ASSERT_THROWS(Double_basic_ranges::parse(doc), AssertionException);
         };
 
     tryPass(1, -1, 0, 0, 123456789012345);
@@ -4060,10 +3966,9 @@ TEST(IDLValidatedField, Callback_validators) {
     // Positive case parsing.
     const auto tryPass =
         [](std::int32_t int_even, double double_nearly_int, StringData string_starts_with_x) {
-            IDLParserContext ctxt("root");
             auto doc = BSON("int_even" << int_even << "double_nearly_int" << double_nearly_int
                                        << "string_starts_with_x" << string_starts_with_x);
-            auto obj = Callback_validators::parse(ctxt, doc);
+            auto obj = Callback_validators::parse(doc);
             ASSERT_EQUALS(obj.getInt_even(), int_even);
             ASSERT_EQUALS(obj.getDouble_nearly_int(), double_nearly_int);
             ASSERT_EQUALS(obj.getString_starts_with_x(), string_starts_with_x);
@@ -4072,10 +3977,9 @@ TEST(IDLValidatedField, Callback_validators) {
     // Negative case parsing.
     const auto tryFail =
         [](std::int32_t int_even, double double_nearly_int, StringData string_starts_with_x) {
-            IDLParserContext ctxt("root");
             auto doc = BSON("int_even" << int_even << "double_nearly_int" << double_nearly_int
                                        << "string_starts_with_x" << string_starts_with_x);
-            ASSERT_THROWS(Callback_validators::parse(ctxt, doc), AssertionException);
+            ASSERT_THROWS(Callback_validators::parse(doc), AssertionException);
         };
 
     tryPass(42, 123456789.01, "x-ray");
@@ -4096,9 +4000,8 @@ TEST(IDLValidatedField, Callback_validators) {
 TEST(IDLValidatedArray, IntArrayValidation) {
 
     const auto tryPass = [](std::vector<std::int32_t> int_even) {
-        IDLParserContext ctxt("root");
         auto doc = BSON("int_even" << int_even);
-        auto obj = Int_array_validators::parse(ctxt, doc);
+        auto obj = Int_array_validators::parse(doc);
 
         ASSERT_EQUALS(obj.getInt_even().size(), int_even.size());
         for (size_t i = 0; i < int_even.size(); ++i) {
@@ -4111,9 +4014,8 @@ TEST(IDLValidatedArray, IntArrayValidation) {
     tryPass({344});
 
     const auto tryFail = [](std::vector<std::int32_t> int_uneven) {
-        IDLParserContext ctxt("root");
         auto doc = BSON("int_even" << int_uneven);
-        ASSERT_THROWS(Int_array_validators::parse(ctxt, doc), AssertionException);
+        ASSERT_THROWS(Int_array_validators::parse(doc), AssertionException);
     };
 
     tryFail({1, 3, 5, 7});
@@ -4126,9 +4028,8 @@ TEST(IDLValidatedArray, IntArrayValidation) {
 TEST(IDLValidatedArray, StringArrayValidation) {
 
     const auto tryPass = [](std::vector<std::string> valid) {
-        IDLParserContext ctxt("root");
         auto doc = BSON("caps_strings" << valid);
-        auto obj = String_array_validators::parse(ctxt, doc);
+        auto obj = String_array_validators::parse(doc);
 
         ASSERT_EQUALS(obj.getCaps_strings().size(), valid.size());
         for (size_t i = 0; i < valid.size(); ++i) {
@@ -4141,9 +4042,8 @@ TEST(IDLValidatedArray, StringArrayValidation) {
     tryPass({"ABC", "DEF", "XYZ"});
 
     const auto tryFail = [](std::vector<std::string> invalid) {
-        IDLParserContext ctxt("root");
         auto doc = BSON("caps_strings" << invalid);
-        ASSERT_THROWS(String_array_validators::parse(ctxt, doc), AssertionException);
+        ASSERT_THROWS(String_array_validators::parse(doc), AssertionException);
     };
 
     tryFail({"hello"});
@@ -4155,13 +4055,12 @@ TEST(IDLValidatedArray, StringArrayValidation) {
 
 // Positive: verify a command a string arg
 TEST(IDLTypeCommand, TestString) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(CommandTypeStringCommand::kCommandName << "foo"
                                                                << "field1" << 3 << "$db"
                                                                << "db");
 
-    auto testStruct = CommandTypeStringCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = CommandTypeStringCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
 
@@ -4197,13 +4096,12 @@ TEST(IDLTypeCommand, TestString) {
 
 // Positive: verify a command can take an array of object
 TEST(IDLTypeCommand, TestArrayObject) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(CommandTypeArrayObjectCommand::kCommandName
                         << BSON_ARRAY(BSON("sample" << "doc")) << "$db"
                         << "db");
 
-    auto testStruct = CommandTypeArrayObjectCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = CommandTypeArrayObjectCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
 
     assert_same_types<decltype(testStruct.getCommandParameter()),
@@ -4224,12 +4122,11 @@ TEST(IDLTypeCommand, TestArrayObject) {
 
 // Positive: verify a command can take a struct
 TEST(IDLTypeCommand, TestStruct) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(CommandTypeStructCommand::kCommandName << BSON("value" << "sample") << "$db"
                                                                << "db");
 
-    auto testStruct = CommandTypeStructCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = CommandTypeStructCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getCommandParameter().getValue(), "sample");
 
     assert_same_types<decltype(testStruct.getCommandParameter()),
@@ -4239,8 +4136,7 @@ TEST(IDLTypeCommand, TestStruct) {
     {
         auto invalidDoc = BSON(CommandTypeStructCommand::kCommandName << BSONUndefined << "$db"
                                                                       << "db");
-        ASSERT_THROWS(CommandTypeStructCommand::parse(ctxt, makeOMR(invalidDoc)),
-                      AssertionException);
+        ASSERT_THROWS(CommandTypeStructCommand::parse(makeOMR(invalidDoc)), AssertionException);
     }
 
     // Positive: Test we can roundtrip from the just parsed document
@@ -4258,13 +4154,12 @@ TEST(IDLTypeCommand, TestStruct) {
 
 // Positive: verify a command can take an array of structs
 TEST(IDLTypeCommand, TestStructArray) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(CommandTypeArrayStructCommand::kCommandName
                         << BSON_ARRAY(BSON("value" << "sample")) << "$db"
                         << "db");
 
-    auto testStruct = CommandTypeArrayStructCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = CommandTypeArrayStructCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
 
     assert_same_types<decltype(testStruct.getCommandParameter()),
@@ -4287,13 +4182,12 @@ TEST(IDLTypeCommand, TestStructArray) {
 
 // Positive: verify a command a string arg and alternate C++ name
 TEST(IDLTypeCommand, TestUnderscoreCommand) {
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(WellNamedCommand::kCommandName << "foo"
                                                        << "field1" << 3 << "$db"
                                                        << "db");
 
-    auto testStruct = WellNamedCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = WellNamedCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
 
@@ -4329,26 +4223,24 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
 TEST(IDLTypeCommand, TestErrorReplyStruct) {
     // Correctly parse all required fields.
     {
-        IDLParserContext ctxt("root");
 
         auto errorDoc = BSON("ok" << 0.0 << "code" << 123456 << "codeName"
                                   << "blah blah"
                                   << "errmsg"
                                   << "This is an error Message"
                                   << "errorLabels" << BSON_ARRAY("label1" << "label2"));
-        auto errorReply = ErrorReply::parse(ctxt, errorDoc);
+        auto errorReply = ErrorReply::parse(errorDoc);
         ASSERT_BSONOBJ_EQ(errorReply.toBSON(), errorDoc);
     }
     // Non-strictness: ensure we parse even if input has extra fields.
     {
-        IDLParserContext ctxt("root");
 
         auto errorDoc = BSON("a" << "b"
                                  << "ok" << 0.0 << "code" << 123456 << "codeName"
                                  << "blah blah"
                                  << "errmsg"
                                  << "This is an error Message");
-        auto errorReply = ErrorReply::parse(ctxt, errorDoc);
+        auto errorReply = ErrorReply::parse(errorDoc);
         ASSERT_BSONOBJ_EQ(errorReply.toBSON(),
                           BSON("ok" << 0.0 << "code" << 123456 << "codeName"
                                     << "blah blah"
@@ -4357,7 +4249,6 @@ TEST(IDLTypeCommand, TestErrorReplyStruct) {
     }
     // Ensure that we fail to parse if any required fields are missing.
     {
-        IDLParserContext ctxt("root");
 
         auto missingOk = BSON("code" << 123456 << "codeName"
                                      << "blah blah"
@@ -4371,15 +4262,14 @@ TEST(IDLTypeCommand, TestErrorReplyStruct) {
                                          << "This is an error Message");
         auto missingErrmsg = BSON("ok" << 0.0 << "code" << 123456 << "codeName"
                                        << "blah blah");
-        ASSERT_THROWS(ErrorReply::parse(ctxt, missingOk), AssertionException);
-        ASSERT_THROWS(ErrorReply::parse(ctxt, missingCode), AssertionException);
-        ASSERT_THROWS(ErrorReply::parse(ctxt, missingCodeName), AssertionException);
-        ASSERT_THROWS(ErrorReply::parse(ctxt, missingErrmsg), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(missingOk), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(missingCode), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(missingCodeName), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(missingErrmsg), AssertionException);
     }
 }
 
 TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeField) {
-    IDLParserContext ctxt("root");
     std::vector<BSONObj> differentTypeObjs = {
         BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField"
                                                     << "string literal"
@@ -4403,19 +4293,18 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeField) {
                                                     << "$db"
                                                     << "db")};
     for (auto&& obj : differentTypeObjs) {
-        auto parsed = CommandWithAnyTypeMember::parse(ctxt, obj);
+        auto parsed = CommandWithAnyTypeMember::parse(obj);
         ASSERT_BSONELT_EQ(parsed.getAnyTypeField().getElement(), obj["anyTypeField"]);
     }
 }
 
 TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) {
-    IDLParserContext ctxt("root");
     const auto uuid = UUID::gen();
     auto testDoc =
         BSON(BasicNamespaceConstGetterCommand::kCommandName << uuid << "field1" << 3 << "$db"
                                                             << "db");
 
-    auto testStruct = BasicNamespaceConstGetterCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = BasicNamespaceConstGetterCommand::parse(makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
@@ -4432,10 +4321,8 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
 }
 
 TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
-    IDLParserContext ctxt("root");
 
     auto parsed = CommandWithAnyTypeOwnedMember::parse(
-        ctxt,
         BSON(CommandWithAnyTypeOwnedMember::kCommandName << 1 << "anyTypeField"
                                                          << "string literal"
                                                          << "$db"
@@ -4443,37 +4330,32 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
     ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::string);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().str(), "string literal");
 
-    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
-                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+    parsed = CommandWithAnyTypeOwnedMember::parse(BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << 1234 << "$db"
                                                        << "db"));
     ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::numberInt);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().numberInt(), 1234);
 
-    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
-                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+    parsed = CommandWithAnyTypeOwnedMember::parse(BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << 1234.5 << "$db"
                                                        << "db"));
     ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::numberDouble);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().numberDouble(), 1234.5);
 
-    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
-                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+    parsed = CommandWithAnyTypeOwnedMember::parse(BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << OID::max() << "$db"
                                                        << "db"));
     ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::oid);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().OID(), OID::max());
 
-    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
-                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+    parsed = CommandWithAnyTypeOwnedMember::parse(BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << BSON("a" << "b")
                                                        << "$db"
                                                        << "db"));
     ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(parsed.getAnyTypeField().getElement().Obj(), BSON("a" << "b"));
 
-    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
-                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+    parsed = CommandWithAnyTypeOwnedMember::parse(BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField"
                                                        << BSON_ARRAY("a" << "b") << "$db"
                                                        << "db"));
@@ -4496,16 +4378,15 @@ TEST(IDLTypeCommand, ReplyTypeCanParseWithGenericFields) {
     // This field is not part of Reply_type_struct and is also
     // not a generic field.
     StringData nonGenericField = "xyz123"_sd;
-    IDLParserContext ctxt("root");
     // This contains only fields part of Reply_type_struct and generic fields
     auto bsonValidReply = BSON("reply_field" << 42 << genericField << 1);
-    auto parsed = CommandWithReplyType::Reply::parse(ctxt, bsonValidReply);
+    auto parsed = CommandWithReplyType::Reply::parse(bsonValidReply);
     ASSERT(parsed.getIsCommandReply());
     ASSERT_EQ(parsed.getReply_field(), 42);
 
     // This contains a field not part of Reply_type struct, so shouldn't parse
     auto bsonInvalidReply = BSON("reply_field" << 42 << nonGenericField << 1);
-    ASSERT_THROWS(CommandWithReplyType::Reply::parse(ctxt, bsonInvalidReply), DBException);
+    ASSERT_THROWS(CommandWithReplyType::Reply::parse(bsonInvalidReply), DBException);
 }
 
 TEST(IDLCommand,
@@ -4513,7 +4394,6 @@ TEST(IDLCommand,
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
-    IDLParserContext ctxt("root");
 
     auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName << "db.coll1"
                                                                   << "field1" << 3 << "$db"
@@ -4521,7 +4401,7 @@ TEST(IDLCommand,
 
     const auto tenantId = TenantId(OID::gen());
     auto testStruct = CommandTypeNamespaceCommand::parse(
-        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
+        makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
     ASSERT_EQUALS(testStruct.getDbName(),
                   DatabaseName::createDatabaseName_forTest(tenantId, "admin"));
     ASSERT_EQUALS(testStruct.getCommandParameter(),
@@ -4535,7 +4415,6 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
 
-    IDLParserContext ctxt("root");
 
     const auto tenantId = TenantId(OID::gen());
     const auto nssWithPrefixedTenantId =
@@ -4546,7 +4425,7 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
                         << nssWithPrefixedTenantId << "field1" << 3 << "$db" << prefixedAdminDb);
 
     auto testStruct = CommandTypeNamespaceCommand::parse(
-        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy));
+        makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy));
 
     ASSERT_EQUALS(testStruct.getDbName(),
                   DatabaseName::createDatabaseName_forTest(tenantId, "admin"));
@@ -4573,7 +4452,7 @@ TEST(IDLCommand, TestCommandGenericArguments) {
                             << "db");
 
         DeserializationContext dctx;
-        auto testStruct = CommandTypeStringCommand::parse(ctxt, testDoc, &dctx);
+        auto testStruct = CommandTypeStringCommand::parse(testDoc, ctxt, &dctx);
 
         // Verify that the command struct is properly identified as a view due to the chained
         // generic arguments even though the command's own fields are not views.
@@ -4596,7 +4475,7 @@ TEST(IDLCommand, TestCommandGenericArguments) {
         ASSERT_THROWS_CODE(dctx.validateApiStrict(), DBException, ErrorCodes::APIStrictError);
 
         // Verify that serializing the command back to BSON does not omit the generic arguments.
-        ASSERT_BSONOBJ_EQ(serializeCmd(CommandTypeStringCommand::parse(ctxt, testDoc)), testDoc);
+        ASSERT_BSONOBJ_EQ(serializeCmd(CommandTypeStringCommand::parse(testDoc)), testDoc);
     }
 
     // Verify that apiStrict validation succeeds when no unstable generic arguments are present.
@@ -4608,7 +4487,7 @@ TEST(IDLCommand, TestCommandGenericArguments) {
                                                         << "$db"
                                                         << "db");
         DeserializationContext dctx;
-        auto testStruct = CommandTypeStringCommand::parse(ctxt, stableDoc, &dctx);
+        auto testStruct = CommandTypeStringCommand::parse(stableDoc, ctxt, &dctx);
         ASSERT_DOES_NOT_THROW(dctx.validateApiStrict());
     }
 }
@@ -4616,7 +4495,6 @@ TEST(IDLCommand, TestCommandGenericArguments) {
 TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    IDLParserContext ctxt("root");
     const char* ns1 = "db.coll1";
     const char* ns2 = "a.b";
     const char* ns3 = "c.d";
@@ -4630,7 +4508,7 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
 
     const auto tenantId = TenantId(OID::gen());
     auto testStruct = CommandWithNamespaceMember::parse(
-        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
+        makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
 
     assert_same_types<decltype(testStruct.getField1()), const NamespaceString&>();
     assert_same_types<decltype(testStruct.getField2()),
@@ -4650,7 +4528,6 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
 TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    IDLParserContext ctxt("root");
     const char* ns1 = "db.coll1";
     const char* ns2 = "a.b";
     const char* ns3 = "c.d";
@@ -4669,7 +4546,7 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
 
     const auto tenantId = TenantId(OID::gen());
     auto testStruct = CommandWithNamespaceStruct::parse(
-        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
+        makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
 
     assert_same_types<decltype(testStruct.getField1()), NamespaceInfoStruct&>();
     assert_same_types<decltype(testStruct.getField2()), std::vector<NamespaceInfoStruct>&>();
@@ -4719,7 +4596,7 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
         makeOMRWithTenant(testDoc, otherTenantId, VTS::TenantProtocol::kDefault);
     auto ctxt = IDLParserContext(
         "root", otherOpMsg.validatedTenancyScope, tenantId, SerializationContext::stateDefault());
-    ASSERT_THROWS_CODE(CommandWithNamespaceStruct::parse(ctxt, otherOpMsg), DBException, 8423379);
+    ASSERT_THROWS_CODE(CommandWithNamespaceStruct::parse(otherOpMsg, ctxt), DBException, 8423379);
 }
 
 TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
@@ -4729,7 +4606,6 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
         for (bool featureFlag : {false, true}) {
             RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
                                                                        featureFlag);
-            IDLParserContext ctxt("root");
 
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
@@ -4760,7 +4636,7 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
             } else
                 request.body = testDoc;
 
-            auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
+            auto testStruct = CommandWithBypassAndNamespaceStruct::parse(request);
 
             auto serializationContextCommand = testStruct.getSerializationContext();
             ASSERT_EQUALS(serializationContextCommand.getSource(),
@@ -4832,7 +4708,7 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
             };
 
             auto testDoc = bypassStructBSON();
-            auto testStruct = BypassStruct::parse(ctxt, testDoc);
+            auto testStruct = BypassStruct::parse(testDoc, ctxt);
 
             auto serializationContextBypass = testStruct.getSerializationContext();
             ASSERT_EQUALS(serializationContextBypass.getSource(),
@@ -4895,7 +4771,7 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
             };
 
             auto testDoc = bypassReplyStructBSON();
-            auto testStruct = BypassReplyStruct::parse(ctxt, testDoc);
+            auto testStruct = BypassReplyStruct::parse(testDoc, ctxt);
 
             auto serializationContextBypass = testStruct.getSerializationContext();
             ASSERT_EQUALS(serializationContextBypass.getSource(),
@@ -5185,7 +5061,6 @@ TEST(IDLAccessCheck, TestComplexAccessCheck) {
 }
 
 TEST(IDLFieldTests, TestOptionalBoolField) {
-    IDLParserContext ctxt("root");
 
     {
         auto testDoc = BSON("optBoolField" << true);
@@ -5234,11 +5109,10 @@ TEST(IDLFieldTests, TestOptionalBoolField) {
 }
 
 TEST(IDLOwnershipTests, ParseOwnAssumesOwnership) {
-    IDLParserContext ctxt("root");
     One_plain_object idlStruct;
     {
         auto tmp = BSON("value" << BSON("x" << 42));
-        idlStruct = One_plain_object::parseOwned(ctxt, std::move(tmp));
+        idlStruct = One_plain_object::parseOwned(std::move(tmp));
         ASSERT_TRUE(idlStruct.isOwned());
     }
     // Now that tmp is out of scope, if idlStruct didn't retain ownership, it would be accessing
@@ -5249,11 +5123,10 @@ TEST(IDLOwnershipTests, ParseOwnAssumesOwnership) {
 }
 
 TEST(IDLOwnershipTests, ParseSharingOwnershipTmpBSON) {
-    IDLParserContext ctxt("root");
     One_plain_object idlStruct;
     {
         auto tmp = BSON("value" << BSON("x" << 42));
-        idlStruct = One_plain_object::parseSharingOwnership(ctxt, tmp);
+        idlStruct = One_plain_object::parseSharingOwnership(tmp);
         ASSERT_TRUE(idlStruct.isOwned());
     }
     // Now that tmp is out of scope, if idlStruct didn't particpate in ownership, it would be
@@ -5264,10 +5137,9 @@ TEST(IDLOwnershipTests, ParseSharingOwnershipTmpBSON) {
 }
 
 TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
-    IDLParserContext ctxt("root");
     auto bson = BSON("value" << BSON("x" << 42));
     {
-        auto idlStruct = One_plain_object::parseSharingOwnership(ctxt, bson);
+        auto idlStruct = One_plain_object::parseSharingOwnership(bson);
     }
     // Now that idlStruct is out of scope, if bson didn't particpate in ownership, it would be
     // accessing free'd memory which should error on ASAN and debug builds.
@@ -5275,30 +5147,28 @@ TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
 }
 
 TEST(IDLOwnershipTests, ParseViewStructIsNotOwned) {
-    IDLParserContext ctxt("root");
 
     {
         ViewStructChainedStruct view_struct_chained_struct;
         auto tmp = BSON("view_type" << BSON("a" << "b"));
-        view_struct_chained_struct = ViewStructChainedStruct::parse(ctxt, tmp);
+        view_struct_chained_struct = ViewStructChainedStruct::parse(tmp);
         ASSERT_FALSE(view_struct_chained_struct.isOwned());
     }
 
     {
         ViewStructWithViewStructMember view_struct_member;
         auto tmp = BSON("view_struct" << BSON("view_type" << BSON("a" << "b")));
-        view_struct_member = ViewStructWithViewStructMember::parse(ctxt, tmp);
+        view_struct_member = ViewStructWithViewStructMember::parse(tmp);
         ASSERT_FALSE(view_struct_member.isOwned());
     }
 }
 
 TEST(IDLOwnershipTests, ChainedParseSharingOwnershipTmpBSON) {
-    IDLParserContext ctxt("root");
 
     ViewStructChainedStruct view_struct_chained_struct;
     {
         auto tmp = BSON("view_type" << BSON("a" << "b"));
-        view_struct_chained_struct = ViewStructChainedStruct::parseSharingOwnership(ctxt, tmp);
+        view_struct_chained_struct = ViewStructChainedStruct::parseSharingOwnership(tmp);
         ASSERT_TRUE(view_struct_chained_struct.isOwned());
     }
     // Now that tmp is out of scope, if idlStruct didn't particpate in ownership, it would be
@@ -5309,7 +5179,7 @@ TEST(IDLOwnershipTests, ChainedParseSharingOwnershipTmpBSON) {
     ViewStructWithViewStructMember view_struct_member;
     {
         auto tmp = BSON("view_struct" << BSON("view_type" << BSON("a" << "b")));
-        view_struct_member = ViewStructWithViewStructMember::parseSharingOwnership(ctxt, tmp);
+        view_struct_member = ViewStructWithViewStructMember::parseSharingOwnership(tmp);
         ASSERT_TRUE(view_struct_member.isOwned());
     }
     ASSERT_BSONOBJ_EQ(view_struct_member.getView_struct().getView_type(), BSON("a" << "b"));
@@ -5321,7 +5191,6 @@ TEST(IDLOwnershipTests, ChainedParseSharingOwnershipTmpBSON) {
  * of its members. The IDL types tested are the types defined in `basic_types.idl`.
  */
 TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
-    IDLParserContext ctxt("root");
     NonViewStruct idlStruct;
     BSONObj ownedBSON = BSON("a" << "b");
     ASSERT_TRUE(ownedBSON.isOwned());
@@ -5394,7 +5263,7 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
         auto tmp = bob.obj();
         // We want to test that idlStruct is internally a non view type, and that the struct
         // inherently owns all its members.
-        idlStruct = NonViewStruct::parse(ctxt, std::move(tmp));
+        idlStruct = NonViewStruct::parse(std::move(tmp));
 
         ASSERT_TRUE(idlStruct.isOwned());
     }
@@ -5443,7 +5312,6 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
 
 
 TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
-    IDLParserContext ctxt("root");
 
     // Positive: non-strict
     {
@@ -5451,7 +5319,7 @@ TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
                                      << "field0"
                                      << "def"
                                      << "extra" << 1);
-        Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc);
+        Struct_with_ignore_extra_duplicates::parse(testDoc);
     }
 
     // Positive: duplicate extra
@@ -5461,7 +5329,7 @@ TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
                                     << "field0"
                                     << "def"
                                     << "extra" << 1);
-        Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc);
+        Struct_with_ignore_extra_duplicates::parse(testDoc);
     }
 
     // Negative: duplicate required field
@@ -5472,7 +5340,7 @@ TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
                                      << "field0"
                                      << "def"
                                      << "extra" << 1);
-        ASSERT_THROWS_CODE(Struct_with_ignore_extra_duplicates::parse(ctxt, testDoc),
+        ASSERT_THROWS_CODE(Struct_with_ignore_extra_duplicates::parse(testDoc),
                            AssertionException,
                            ErrorCodes::IDLDuplicateField);
     }

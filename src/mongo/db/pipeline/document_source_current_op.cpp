@@ -143,7 +143,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     boost::optional<CursorMode> idleCursors;
     boost::optional<bool> targetAllNodes;
 
-    auto currentOpSpec = CurrentOpSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+    auto currentOpSpec = CurrentOpSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
 
     // Populate the values, if present.
     if (currentOpSpec.getAllUsers().has_value()) {

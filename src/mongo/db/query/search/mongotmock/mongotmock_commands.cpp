@@ -209,8 +209,8 @@ public:
         // an unknown field. Therefore, we remove that field (if it exists) from the command object
         // we actually parse.
         auto cmdObjStrippedOfCursorOptions = cmdObj.removeField(mongot_cursor::kCursorOptionsField);
-        auto cmd = GetMoreCommandRequest::parse(IDLParserContext{"getMore"},
-                                                cmdObjStrippedOfCursorOptions);
+        auto cmd = GetMoreCommandRequest::parse(cmdObjStrippedOfCursorOptions,
+                                                IDLParserContext{"getMore"});
         const auto cursorId = cmd.getCommandParameter();
         MongotMockStateGuard stateGuard = getMongotMockState(opCtx->getServiceContext());
 
@@ -247,7 +247,7 @@ public:
                         const DatabaseName&,
                         const BSONObj& cmdObj,
                         BSONObjBuilder* result) const final {
-        auto request = KillCursorsCommandRequest::parse(IDLParserContext("killCursors"), cmdObj);
+        auto request = KillCursorsCommandRequest::parse(cmdObj, IDLParserContext("killCursors"));
 
         const auto& cursorList = request.getCursorIds();
         MongotMockStateGuard stateGuard = getMongotMockState(opCtx->getServiceContext());
@@ -529,7 +529,7 @@ public:
         {
             // Verify that the command request is valid.
             IDLParserContext ctx("ManageSearchIndexRequest Parser");
-            ManageSearchIndexRequest request = ManageSearchIndexRequest::parse(ctx, cmdObj);
+            ManageSearchIndexRequest request = ManageSearchIndexRequest::parse(cmdObj, ctx);
         }
 
         MongotMockStateGuard stateGuard = getMongotMockState(opCtx->getServiceContext());

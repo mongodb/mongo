@@ -39,7 +39,7 @@ namespace {
 
 CIDRList parseCIDRRangeListParameters(const BSONObj& obj) {
     IDLParserContext ctx("CIDRRangeListParameters");
-    const auto params = CIDRRangeListParameter::parse(ctx, obj);
+    const auto params = CIDRRangeListParameter::parse(obj, ctx);
     CIDRList output;
     for (const auto& range : params.getRanges()) {
         auto swr = CIDR::parse(range);

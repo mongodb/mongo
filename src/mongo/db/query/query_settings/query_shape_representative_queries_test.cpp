@@ -102,7 +102,7 @@ public:
             // Check that the request is aimed at the representative queries collection.
             auto reqWithDb = req.cmdBSON.addFields(BSON("$db" << req.dbName));
             auto insertOp = write_ops::InsertCommandRequest::parse(
-                IDLParserContext("representativeQueryTestFixture"), reqWithDb);
+                reqWithDb, IDLParserContext("representativeQueryTestFixture"));
             if (insertOp.getNamespace() !=
                 NamespaceString::kQueryShapeRepresentativeQueriesNamespace) {
                 return false;

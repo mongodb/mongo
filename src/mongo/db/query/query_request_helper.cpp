@@ -230,8 +230,8 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(
 
     auto findCommand =
         std::make_unique<FindCommandRequest>(idl::parseCommandDocument<FindCommandRequest>(
-            IDLParserContext("FindCommandRequest", vts, tenantId ? tenantId : boost::none, sc),
-            cmdObj));
+            cmdObj,
+            IDLParserContext("FindCommandRequest", vts, tenantId ? tenantId : boost::none, sc)));
 
     addMetaProjection(findCommand.get());
 
@@ -302,11 +302,11 @@ void validateCursorResponse(const BSONObj& outputAsBson,
                             const SerializationContext& serializationContext) {
     if (getTestCommandsEnabled()) {
         CursorInitialReply::parse(
+            outputAsBson,
             IDLParserContext("CursorInitialReply",
                              vts,
                              tenantId,
-                             SerializationContext::stateCommandReply(serializationContext)),
-            outputAsBson);
+                             SerializationContext::stateCommandReply(serializationContext)));
     }
 }
 

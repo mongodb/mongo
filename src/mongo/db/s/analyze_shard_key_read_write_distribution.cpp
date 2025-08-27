@@ -179,8 +179,8 @@ void ReadDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
             MONGO_UNREACHABLE;
     }
 
-    auto cmd = SampledReadCommand::parse(IDLParserContext("ReadDistributionMetricsCalculator"),
-                                         doc.getCmd());
+    auto cmd = SampledReadCommand::parse(doc.getCmd(),
+                                         IDLParserContext("ReadDistributionMetricsCalculator"));
     auto info = _getTargetingInfoForQuery(opCtx, cmd.getFilter(), cmd.getCollation(), cmd.getLet());
     _incrementMetricsForQuery(info);
 }
@@ -216,25 +216,25 @@ void WriteDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
     switch (doc.getCmdName()) {
         case SampledCommandNameEnum::kUpdate: {
             auto cmd = write_ops::UpdateCommandRequest::parse(
-                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+                doc.getCmd(), IDLParserContext("WriteDistributionMetricsCalculator"));
             _addUpdateQuery(opCtx, cmd);
             break;
         }
         case SampledCommandNameEnum::kDelete: {
             auto cmd = write_ops::DeleteCommandRequest::parse(
-                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+                doc.getCmd(), IDLParserContext("WriteDistributionMetricsCalculator"));
             _addDeleteQuery(opCtx, cmd);
             break;
         }
         case SampledCommandNameEnum::kFindAndModify: {
             auto cmd = write_ops::FindAndModifyCommandRequest::parse(
-                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+                doc.getCmd(), IDLParserContext("WriteDistributionMetricsCalculator"));
             _addFindAndModifyQuery(opCtx, cmd);
             break;
         }
         case SampledCommandNameEnum::kBulkWrite: {
             auto cmd = BulkWriteCommandRequest::parse(
-                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+                doc.getCmd(), IDLParserContext("WriteDistributionMetricsCalculator"));
             _addBulkWriteQuery(opCtx, cmd);
             break;
         }

@@ -417,7 +417,7 @@ void logDropCollectionCommitOnConfigPlacementHistory(
                 const auto& collUuidToLog = placementChangeToLog.getUuid();
                 if (match.size() == 1) {
                     const auto latestEntry = NamespacePlacementType::parse(
-                        IDLParserContext("dropCollectionLocally"), match[0]);
+                        match[0], IDLParserContext("dropCollectionLocally"));
                     if (collUuidToLog && latestEntry.getUuid() == collUuidToLog.value() &&
                         latestEntry.getShards().empty()) {
                         BatchedCommandResponse noOpResponse;

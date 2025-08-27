@@ -124,7 +124,7 @@ DocumentSourceChangeStreamUnwindTransaction::createFromBson(
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::object);
     auto parsedSpec = DocumentSourceChangeStreamUnwindTransactionSpec::parse(
-        IDLParserContext("DocumentSourceChangeStreamUnwindTransactionSpec"), elem.Obj());
+        elem.Obj(), IDLParserContext("DocumentSourceChangeStreamUnwindTransactionSpec"));
     return new DocumentSourceChangeStreamUnwindTransaction(parsedSpec.getFilter(), expCtx);
 }
 

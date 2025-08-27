@@ -321,7 +321,7 @@ public:
 
                           for (const auto& innerOp : applyOpsInfo.getOperations()) {
                               operations.emplace_back(repl::DurableReplOperation::parse(
-                                  IDLParserContext{"findApplyOpsNewerThan"}, innerOp));
+                                  innerOp, IDLParserContext{"findApplyOpsNewerThan"}));
                           }
 
                           result.emplace_back(

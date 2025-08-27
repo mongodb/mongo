@@ -216,7 +216,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
                   *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
         IDLParserContext idlCtx("CursorResponse", vts, tenantId, serializationContext);
-        response = AnyCursorResponse::parse(idlCtx, cmdResponse);
+        response = AnyCursorResponse::parse(cmdResponse, idlCtx);
     } catch (const DBException& e) {
         return e.toStatus();
     }

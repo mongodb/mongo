@@ -212,11 +212,11 @@ DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetN
 bool DocumentSourceReshardingIterateTransaction::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
     auto ctx = IDLParserContext("ReshardingEntry.op");
-    auto opType = repl::OpType_parse(ctx, op.getStringData());
+    auto opType = repl::OpType_parse(op.getStringData(), ctx);
     auto commandVal = doc["o"];
     repl::MultiOplogEntryType multiOpType = repl::MultiOplogEntryType::kLegacyMultiOpType;
     if (doc["multiOpType"].getType() == BSONType::numberInt)
-        multiOpType = repl::MultiOplogEntryType_parse(ctx, doc["multiOpType"].getInt());
+        multiOpType = repl::MultiOplogEntryType_parse(doc["multiOpType"].getInt(), ctx);
 
     if (opType != repl::OpTypeEnum::kCommand || doc["txnNumber"].missing() ||
         multiOpType == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately ||

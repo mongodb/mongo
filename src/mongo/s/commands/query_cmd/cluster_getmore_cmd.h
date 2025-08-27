@@ -81,7 +81,7 @@ public:
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse(IDLParserContext{Impl::kName}, request.body)) {}
+              _cmd(GetMoreCommandRequest::parse(request.body, IDLParserContext{Impl::kName})) {}
 
     private:
         NamespaceString ns() const override {
@@ -131,8 +131,8 @@ public:
         }
 
         void validateResult(const BSONObj& replyObj) {
-            CursorGetMoreReply::parse(IDLParserContext{"CursorGetMoreReply"},
-                                      replyObj.removeField("ok"));
+            CursorGetMoreReply::parse(replyObj.removeField("ok"),
+                                      IDLParserContext{"CursorGetMoreReply"});
         }
 
         const GetMoreCommandRequest _cmd;

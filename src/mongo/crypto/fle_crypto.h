@@ -1349,7 +1349,7 @@ T parseFromCDR(ConstDataRange cdr) {
     auto obj = cdc.readAndAdvance<Validated<BSONObj>>();
 
     IDLParserContext ctx("root");
-    return T::parse(ctx, obj);
+    return T::parse(obj, ctx);
 }
 
 std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, const PrfBlock& block);

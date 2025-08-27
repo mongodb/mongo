@@ -228,7 +228,7 @@ protected:
                 ASSERT_EQ(cmdName, "abortTransaction");
 
                 auto osi = OperationSessionInfoFromClient::parse(
-                    IDLParserContext{"expectAbortTransaction"}, request.cmdObj);
+                    request.cmdObj, IDLParserContext{"expectAbortTransaction"});
 
                 ASSERT(osi.getSessionId());
                 ASSERT_EQ(lsid.getId(), osi.getSessionId()->getId());
@@ -2053,7 +2053,7 @@ void checkSessionDetails(const BSONObj& cmdObj,
                          const LogicalSessionId& lsid,
                          const TxnNumber txnNum,
                          boost::optional<bool> isCoordinator) {
-    auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"testTxnRouter"}, cmdObj);
+    auto osi = OperationSessionInfoFromClient::parse(cmdObj, IDLParserContext{"testTxnRouter"});
 
     ASSERT(osi.getSessionId());
     ASSERT_EQ(lsid.getId(), osi.getSessionId()->getId());
@@ -2842,7 +2842,7 @@ TEST_F(TransactionRouterTest,
         auto opMsgRequest = OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, resultObj);
         auto resultRequest =
-            BulkWriteCommandRequest::parse(IDLParserContext{"bulkWrite"}, opMsgRequest);
+            BulkWriteCommandRequest::parse(opMsgRequest, IDLParserContext{"bulkWrite"});
 
         // Asserts the placementConflictTime is attached
         ASSERT_EQ(resultRequest.getNsInfo()[0].getShardVersion()->placementConflictTime(),
@@ -2895,7 +2895,7 @@ TEST_F(TransactionRouterTest,
         auto opMsgRequest = OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, resultObj);
         auto resultRequest =
-            BulkWriteCommandRequest::parse(IDLParserContext{"bulkWrite"}, opMsgRequest);
+            BulkWriteCommandRequest::parse(opMsgRequest, IDLParserContext{"bulkWrite"});
 
         // Asserts the placementConflictTime is attached
         ASSERT_EQ(resultRequest.getNsInfo()[0].getShardVersion()->placementConflictTime(),

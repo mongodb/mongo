@@ -106,7 +106,7 @@ public:
 
                     auto remoteResponse = uassertStatusOK(swResponse.swResponse).data;
                     auto response = ConfigureQueryAnalyzerResponse::parse(
-                        IDLParserContext("clusterConfigureQueryAnalyzer"), remoteResponse);
+                        remoteResponse, IDLParserContext("clusterConfigureQueryAnalyzer"));
                     return response;
                 });
         }

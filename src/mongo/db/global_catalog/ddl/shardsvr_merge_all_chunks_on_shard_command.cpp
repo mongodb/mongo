@@ -120,8 +120,8 @@ public:
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
 
-            return MergeAllChunksOnShardResponse::parse(IDL_PARSER_CONTEXT,
-                                                        swCommandResponse.getValue().response);
+            return MergeAllChunksOnShardResponse::parse(swCommandResponse.getValue().response,
+                                                        IDL_PARSER_CONTEXT);
         }
 
     private:

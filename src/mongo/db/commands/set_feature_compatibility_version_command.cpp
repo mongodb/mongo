@@ -464,7 +464,7 @@ public:
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         auto request = SetFeatureCompatibilityVersion::parse(
-            IDLParserContext("setFeatureCompatibilityVersion"), cmdObj);
+            cmdObj, IDLParserContext("setFeatureCompatibilityVersion"));
 
         auto isDryRun = request.getDryRun().value_or(false);
 

@@ -185,7 +185,7 @@ public:
         }
 
         void validateResult(const BSONObj& resultObj) {
-            auto reply = Reply::parse(IDLParserContext("CollModReply"), resultObj);
+            auto reply = Reply::parse(resultObj, IDLParserContext("CollModReply"));
             coll_mod_reply_validation::validateReply(reply);
         }
     };

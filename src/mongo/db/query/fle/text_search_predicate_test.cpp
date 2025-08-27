@@ -292,7 +292,7 @@ BSONObj generateFFP(StringData path, Value value, EncryptionPlaceholderContext c
     }
 
     BSONObjBuilder builder;
-    FLE2FindTextPayload::parse(IDLParserContext{"FLE2FindTextPayload"}, payload.toBSON());
+    FLE2FindTextPayload::parse(payload.toBSON(), IDLParserContext{"FLE2FindTextPayload"});
     toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindTextPayload, payload, &builder);
     return builder.obj();
 }

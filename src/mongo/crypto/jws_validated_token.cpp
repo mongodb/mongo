@@ -119,12 +119,12 @@ JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
 
     auto headerString = base64url::decode(tokenSplit.header);
     _headerBSON = fromjson(headerString);
-    _header = JWSHeader::parse(IDLParserContext("JWSHeader"), _headerBSON);
+    _header = JWSHeader::parse(_headerBSON, IDLParserContext("JWSHeader"));
     uassert(7095401, "Unknown type of token", !_header.getType() || _header.getType() == "JWT"_sd);
 
     auto bodyString = base64url::decode(tokenSplit.body);
     _bodyBSON = fromjson(bodyString);
-    _body = JWT::parse(IDLParserContext("JWT"), _bodyBSON);
+    _body = JWT::parse(_bodyBSON, IDLParserContext("JWT"));
 
     uassertStatusOK(validate(keyMgr));
 };
@@ -133,7 +133,7 @@ StatusWith<IssuerAudiencePair> JWSValidatedToken::extractIssuerAndAudienceFromCo
     StringData token) try {
     auto tokenSplit = parseSignedToken(token);
     auto payload = fromjson(base64url::decode(tokenSplit.body));
-    auto jwt = JWT::parse(IDLParserContext{"JWT"}, payload);
+    auto jwt = JWT::parse(payload, IDLParserContext{"JWT"});
 
     IssuerAudiencePair pair;
     pair.issuer = std::string{jwt.getIssuer()};

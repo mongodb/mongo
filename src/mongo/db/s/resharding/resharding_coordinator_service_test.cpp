@@ -265,7 +265,7 @@ private:
 
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace, BSONObj{});
         IDLParserContext errCtx("reshardingCoordFromTest");
-        auto parseDoc = ReshardingCoordinatorDocument::parse(errCtx, doc);
+        auto parseDoc = ReshardingCoordinatorDocument::parse(doc, errCtx);
         return parseDoc.getState();
     }
 
@@ -292,8 +292,8 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<ReshardingCoordinator>(
             this,
-            ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
-                                                 initialState),
+            ReshardingCoordinatorDocument::parse(initialState,
+                                                 IDLParserContext("ReshardingCoordinatorStateDoc")),
             _externalState,
             _serviceContext);
     }
@@ -467,7 +467,7 @@ public:
 
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace, BSONObj{});
         IDLParserContext errCtx("reshardingCoordFromTest");
-        return ReshardingCoordinatorDocument::parse(errCtx, doc);
+        return ReshardingCoordinatorDocument::parse(doc, errCtx);
     }
 
     void checkCoordinatorDocumentRemoved(OperationContext* opCtx) {

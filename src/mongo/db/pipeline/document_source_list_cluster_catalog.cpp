@@ -177,8 +177,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
         } })");
 
 
-    auto specs = mongo::DocumentSourceListClusterCatalogSpec::parse(IDLParserContext(kStageName),
-                                                                    elem.embeddedObject());
+    auto specs = mongo::DocumentSourceListClusterCatalogSpec::parse(elem.embeddedObject(),
+                                                                    IDLParserContext(kStageName));
     if (specs.getShards()) {
         // Add a lookup stage to join with config.chunks
         pipeline.addStage<DocumentSourceLookUp>(R"({

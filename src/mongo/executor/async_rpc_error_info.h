@@ -82,7 +82,7 @@ public:
                 _errLabels = errLabelsElem.Array();
             }
             _genericReplyFields = GenericReplyFields::parseSharingOwnership(
-                IDLParserContext("AsyncRPCRunner"), _error);
+                _error, IDLParserContext("AsyncRPCRunner"));
         }
 
         Status getRemoteCommandResult() const {

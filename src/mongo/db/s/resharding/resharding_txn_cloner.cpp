@@ -186,8 +186,8 @@ boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
     auto doc = execPipeline.getNext();
-    return doc ? SessionTxnRecord::parse(IDLParserContext{"resharding config.transactions cloning"},
-                                         doc->toBson())
+    return doc ? SessionTxnRecord::parse(doc->toBson(),
+                                         IDLParserContext{"resharding config.transactions cloning"})
                : boost::optional<SessionTxnRecord>{};
 }
 

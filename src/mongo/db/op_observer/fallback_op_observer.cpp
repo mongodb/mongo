@@ -122,7 +122,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
     } else if (nss == NamespaceString::kExternalKeysCollectionNamespace) {
         for (auto it = first; it != last; it++) {
             auto externalKey =
-                ExternalKeysCollectionDocument::parse(IDLParserContext("externalKey"), it->doc);
+                ExternalKeysCollectionDocument::parse(it->doc, IDLParserContext("externalKey"));
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [this, externalKey = std::move(externalKey)](OperationContext* opCtx,
                                                              boost::optional<Timestamp>) mutable {

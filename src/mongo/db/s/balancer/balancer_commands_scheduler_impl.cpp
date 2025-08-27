@@ -255,7 +255,7 @@ SemiFuture<NumMergedChunks> BalancerCommandsSchedulerImpl::requestMergeAllChunks
             }
 
             return MergeAllChunksOnShardResponse::parse(
-                       IDLParserContext{"MergeAllChunksOnShardResponse"}, remoteResponse.data)
+                       remoteResponse.data, IDLParserContext{"MergeAllChunksOnShardResponse"})
                 .getNumMergedChunks();
         })
         .semi();

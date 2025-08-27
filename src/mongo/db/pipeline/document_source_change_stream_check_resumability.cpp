@@ -78,7 +78,7 @@ DocumentSourceChangeStreamCheckResumability::createFromBson(
             spec.type() == BSONType::object);
 
     auto parsed = DocumentSourceChangeStreamCheckResumabilitySpec::parse(
-        IDLParserContext("DocumentSourceChangeStreamCheckResumabilitySpec"), spec.embeddedObject());
+        spec.embeddedObject(), IDLParserContext("DocumentSourceChangeStreamCheckResumabilitySpec"));
     return new DocumentSourceChangeStreamCheckResumability(expCtx,
                                                            parsed.getResumeToken().getData());
 }

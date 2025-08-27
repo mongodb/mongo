@@ -108,7 +108,7 @@ public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
         auto parsedRequest =
-            BulkWriteCommandRequest::parse(IDLParserContext{"clusterBulkWriteParse"}, request);
+            BulkWriteCommandRequest::parse(request, IDLParserContext{"clusterBulkWriteParse"});
         bulk_write_exec::addIdsForInserts(parsedRequest);
         return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
@@ -530,7 +530,7 @@ public:
                         // ProcessWCEFn:
                         [&](std::unique_ptr<WriteConcernErrorDetail> wce) {
                             auto bwWce = BulkWriteWriteConcernError::parseOwned(
-                                IDLParserContext("BulkWriteWriteConcernError"), wce->toBSON());
+                                wce->toBSON(), IDLParserContext("BulkWriteWriteConcernError"));
                             response.wcErrors = bwWce;
                         },
                         // ProcessWriteErrorFn:

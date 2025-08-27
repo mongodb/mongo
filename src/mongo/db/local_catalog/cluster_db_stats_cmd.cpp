@@ -80,7 +80,7 @@ void aggregateResults(const DBStatsCommand& cmd,
     for (const auto& response : responses) {
         invariant(response.swResponse.getStatus());
         const BSONObj& b = response.swResponse.getValue().data;
-        auto resp = DBStats::parse(IDLParserContext{"dbstats"}, b);
+        auto resp = DBStats::parse(b, IDLParserContext{"dbstats"});
 
         collections += resp.getCollections();
         views += resp.getViews();
@@ -183,7 +183,7 @@ public:
     }
 
     void validateResult(const BSONObj& resultObj) final {
-        DBStats::parse(IDLParserContext{"dbstats.reply"}, resultObj);
+        DBStats::parse(resultObj, IDLParserContext{"dbstats.reply"});
     }
 };
 MONGO_REGISTER_COMMAND(CmdDBStats).forRouter();

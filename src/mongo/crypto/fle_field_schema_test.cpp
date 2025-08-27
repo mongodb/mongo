@@ -49,12 +49,12 @@ TEST(FLE2EncryptionPlaceholder, RangeScalarAsValueFails) {
 
     p.setType(Fle2PlaceholderType::kInsert);
     ASSERT_THROWS_CODE(
-        FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+        FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
         DBException,
         6775321);
     p.setType(Fle2PlaceholderType::kFind);
     ASSERT_THROWS_CODE(
-        FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+        FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
         DBException,
         6720200);
 }
@@ -71,7 +71,7 @@ TEST(FLE2EncryptionPlaceholder, RangeBadObjectAsValueFails) {
     for (auto type : {Fle2PlaceholderType::kInsert, Fle2PlaceholderType::kFind}) {
         p.setType(type);
         ASSERT_THROWS_CODE(
-            FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+            FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
             DBException,
             ErrorCodes::IDLUnknownField);
     }
@@ -90,14 +90,14 @@ TEST(FLE2EncryptionPlaceholder, RangeMissingSparsity) {
     p.setType(Fle2PlaceholderType::kInsert);
     p.setValue(insertSpecBackingBSON.firstElement());
     ASSERT_THROWS_CODE(
-        FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+        FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
         DBException,
         6775322);
 
     p.setType(Fle2PlaceholderType::kFind);
     p.setValue(findSpecBackingBSON.firstElement());
     ASSERT_THROWS_CODE(
-        FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+        FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
         DBException,
         6832501);
 }
@@ -115,7 +115,7 @@ TEST(FLE2EncryptionPlaceholder, NonRangeAlgorithmWithSparsity) {
     for (auto alg : {Fle2AlgorithmInt::kUnindexed, Fle2AlgorithmInt::kEquality}) {
         p.setAlgorithm(alg);
         ASSERT_THROWS_CODE(
-            FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+            FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
             DBException,
             6832500);
     }
@@ -128,7 +128,7 @@ TEST(FLE2EncryptionPlaceholder, NonRangeAlgorithmWithSparsity) {
         auto backingBSON = BSON("" << spec.toBSON());
         p.setValue(backingBSON.firstElement());
         ASSERT_THROWS_CODE(
-            FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+            FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
             DBException,
             6832500);
     }
@@ -151,9 +151,9 @@ TEST(FLE2EncryptionPlaceholder, TextSearchRoundTrip) {
     auto serialized = p.toBSON();
 
     auto parsedPlaceholder =
-        FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), serialized);
+        FLE2EncryptionPlaceholder::parse(serialized, IDLParserContext("placeholder"));
     auto parsedSpec = FLE2TextSearchInsertSpec::parse(
-        IDLParserContext("text"), parsedPlaceholder.getValue().getElement().Obj());
+        parsedPlaceholder.getValue().getElement().Obj(), IDLParserContext("text"));
 
     ASSERT_TRUE(parsedSpec.getSubstringSpec());
     ASSERT_TRUE(parsedSpec.getSuffixSpec());
@@ -185,7 +185,7 @@ TEST(FLE2EncryptionPlaceholder, TextSearchScalarAsValueFails) {
     for (auto type : {Fle2PlaceholderType::kInsert, Fle2PlaceholderType::kFind}) {
         p.setType(type);
         ASSERT_THROWS_CODE(
-            FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+            FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
             DBException,
             9783505);
     }
@@ -202,7 +202,7 @@ TEST(FLE2EncryptionPlaceholder, TextSearchBadObjectAsValueFails) {
     for (auto type : {Fle2PlaceholderType::kInsert, Fle2PlaceholderType::kFind}) {
         p.setType(type);
         ASSERT_THROWS_CODE(
-            FLE2EncryptionPlaceholder::parse(IDLParserContext("placeholder"), p.toBSON()),
+            FLE2EncryptionPlaceholder::parse(p.toBSON(), IDLParserContext("placeholder")),
             DBException,
             ErrorCodes::IDLUnknownField);
     }
@@ -233,7 +233,7 @@ TEST(FLE2RangeFindSpec, UpperAndLowerBoundTypeMismatches) {
         ei.setIndexMin(value);
         spec.setEdgesInfo(std::move(ei));
 
-        return FLE2RangeFindSpec::parse(IDLParserContext("FLE2RangeFindSpec"), spec.toBSON());
+        return FLE2RangeFindSpec::parse(spec.toBSON(), IDLParserContext("FLE2RangeFindSpec"));
     };
 
     for (auto& badValue : {intValue, largeLongValue, dateValue, doubleValue, decimalValue}) {
@@ -290,7 +290,7 @@ TEST(FLE2RangeFindSpec, MinMaxTypeMismatch) {
     bob.append("payloadId", int32_t(1));
     bob.append("firstOperator", int32_t(1));
     ASSERT_THROWS_CODE(
-        FLE2RangeFindSpec::parse(IDLParserContext("FLE2RangeFindSpec"), bob.asTempObj()),
+        FLE2RangeFindSpec::parse(bob.asTempObj(), IDLParserContext("FLE2RangeFindSpec")),
         DBException,
         6901304);
 }
@@ -310,7 +310,7 @@ TEST(FLE2RangeFindSpec, InvalidTrimFactor) {
     bob.append("payloadId", int32_t(1));
     bob.append("firstOperator", int32_t(1));
     ASSERT_THROWS_CODE(
-        FLE2RangeFindSpec::parse(IDLParserContext("FLE2RangeFindSpec"), bob.asTempObj()),
+        FLE2RangeFindSpec::parse(bob.asTempObj(), IDLParserContext("FLE2RangeFindSpec")),
         DBException,
         8574100);
 }
@@ -336,7 +336,7 @@ TEST(FLE2RangeFindSpec, PrecisionApplicability) {
     for (auto& type : {"int", "long", "date"}) {
         auto spec = buildTestSpec(values.getField(type));
         ASSERT_THROWS_CODE(
-            FLE2RangeFindSpec::parse(IDLParserContext("FLE2RangeFindSpec"), spec.toBSON()),
+            FLE2RangeFindSpec::parse(spec.toBSON(), IDLParserContext("FLE2RangeFindSpec")),
             DBException,
             6967102);
     }
@@ -344,7 +344,7 @@ TEST(FLE2RangeFindSpec, PrecisionApplicability) {
     for (auto& type : {"double", "decimal"}) {
         auto spec = buildTestSpec(values.getField(type));
         ASSERT_DOES_NOT_THROW(
-            FLE2RangeFindSpec::parse(IDLParserContext("FLE2RangeFindSpec"), spec.toBSON()));
+            FLE2RangeFindSpec::parse(spec.toBSON(), IDLParserContext("FLE2RangeFindSpec")));
     }
 }
 
@@ -354,7 +354,7 @@ TEST(FLE2RangeInsertSpec, ValueNotNumeric) {
     bob.append("min", int32_t(1));
     bob.append("max", int32_t(4));
     ASSERT_THROWS_CODE(
-        FLE2RangeInsertSpec::parse(IDLParserContext("FLE2RangeInsertSpec"), bob.asTempObj()),
+        FLE2RangeInsertSpec::parse(bob.asTempObj(), IDLParserContext("FLE2RangeInsertSpec")),
         DBException,
         ErrorCodes::TypeMismatch);
 }
@@ -365,7 +365,7 @@ TEST(FLE2RangeInsertSpec, MinMaxTypeMismatch) {
     bob.append("min", int32_t(23));
     bob.append("max", int64_t(64));
     ASSERT_THROWS_CODE(
-        FLE2RangeInsertSpec::parse(IDLParserContext("FLE2RangeInsertSpec"), bob.asTempObj()),
+        FLE2RangeInsertSpec::parse(bob.asTempObj(), IDLParserContext("FLE2RangeInsertSpec")),
         DBException,
         8574101);
 }
@@ -376,7 +376,7 @@ TEST(FLE2RangeInsertSpec, ValueMinTypeMismatch) {
     bob.append("min", int32_t(23));
     bob.append("max", int32_t(64));
     ASSERT_THROWS_CODE(
-        FLE2RangeInsertSpec::parse(IDLParserContext("FLE2RangeInsertSpec"), bob.asTempObj()),
+        FLE2RangeInsertSpec::parse(bob.asTempObj(), IDLParserContext("FLE2RangeInsertSpec")),
         DBException,
         8574109);
 }
@@ -388,7 +388,7 @@ TEST(FLE2RangeInsertSpec, InvalidTrimFactor) {
     bob.append("max", int32_t(4));
     bob.append("trimFactor", 1000);
     ASSERT_THROWS_CODE(
-        FLE2RangeInsertSpec::parse(IDLParserContext("FLE2RangeInsertSpec"), bob.asTempObj()),
+        FLE2RangeInsertSpec::parse(bob.asTempObj(), IDLParserContext("FLE2RangeInsertSpec")),
         DBException,
         8574103);
 }
@@ -403,7 +403,7 @@ TEST(FLE2RangeInsertSpec, PrecisionApplicability) {
         spec.setValue(values.getField(type));
         spec.setPrecision(5);
         ASSERT_THROWS_CODE(
-            FLE2RangeInsertSpec::parse(IDLParserContext("FLE2RangeInsertSpec"), spec.toBSON()),
+            FLE2RangeInsertSpec::parse(spec.toBSON(), IDLParserContext("FLE2RangeInsertSpec")),
             DBException,
             8574102);
     }
@@ -413,14 +413,14 @@ TEST(FLE2RangeInsertSpec, PrecisionApplicability) {
         spec.setValue(values.getField(type));
         spec.setPrecision(5);
         ASSERT_DOES_NOT_THROW(
-            FLE2RangeInsertSpec::parse(IDLParserContext("FLE2RangeInsertSpec"), spec.toBSON()));
+            FLE2RangeInsertSpec::parse(spec.toBSON(), IDLParserContext("FLE2RangeInsertSpec")));
     }
 }
 
 TEST(FLE2TextSearchInsertSpec, MissingSubspec) {
     FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
-    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"),
-                                                       spec.toBSON()),
+    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
+                           spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
                        9783500);
 }
@@ -428,8 +428,8 @@ TEST(FLE2TextSearchInsertSpec, MissingSubspec) {
 TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundLessThanLowerBound) {
     FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
     spec.setSubstringSpec(FLE2SubstringInsertSpec(100, 1 /*ub*/, 10 /*lb*/));
-    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"),
-                                                       spec.toBSON()),
+    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
+                           spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
                        9783501);
 }
@@ -437,8 +437,8 @@ TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundLessThanLowerBound) {
 TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundGreaterThanMaxLen) {
     FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
     spec.setSubstringSpec(FLE2SubstringInsertSpec(10 /*mlen*/, 100 /*ub*/, 1 /*lb*/));
-    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"),
-                                                       spec.toBSON()),
+    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
+                           spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
                        9783502);
 }
@@ -446,8 +446,8 @@ TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundGreaterThanMaxLen) {
 TEST(FLE2TextSearchInsertSpec, SuffixSpecUpperBoundLessThanLowerBound) {
     FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
     spec.setSuffixSpec(FLE2SuffixInsertSpec(1 /*ub*/, 10 /*lb*/));
-    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"),
-                                                       spec.toBSON()),
+    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
+                           spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
                        9783503);
 }
@@ -455,8 +455,8 @@ TEST(FLE2TextSearchInsertSpec, SuffixSpecUpperBoundLessThanLowerBound) {
 TEST(FLE2TextSearchInsertSpec, PrefixSpecUpperBoundLessThanLowerBound) {
     FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
     spec.setPrefixSpec(FLE2PrefixInsertSpec(1 /*ub*/, 10 /*lb*/));
-    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(IDLParserContext("FLE2TextSearchInsertSpec"),
-                                                       spec.toBSON()),
+    ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
+                           spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
                        9783504);
 }
@@ -468,7 +468,7 @@ TEST(FLE2FindTextPayload, EmptyTokenSetsObject) {
     payload.setMaxCounter(22);
     payload.setTokenSets(mongo::TextSearchFindTokenSets{});
     ASSERT_THROWS_CODE(
-        FLE2FindTextPayload::parse(IDLParserContext{"FLE2FindTextPayload"}, payload.toBSON()),
+        FLE2FindTextPayload::parse(payload.toBSON(), IDLParserContext{"FLE2FindTextPayload"}),
         DBException,
         10163701);
 }
@@ -490,7 +490,7 @@ TEST(FLE2FindTextPayload, MultipleTokenSets) {
                                ESCTextPrefixDerivedFromDataToken{tokenData},
                                ServerTextPrefixDerivedFromDataToken{tokenData}});
     ASSERT_THROWS_CODE(
-        FLE2FindTextPayload::parse(IDLParserContext{"FLE2FindTextPayload"}, payload.toBSON()),
+        FLE2FindTextPayload::parse(payload.toBSON(), IDLParserContext{"FLE2FindTextPayload"}),
         DBException,
         10163701);
 }

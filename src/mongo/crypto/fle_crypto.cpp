@@ -1027,7 +1027,7 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
             if (ep.getType() == Fle2PlaceholderType::kInsert) {
                 IDLParserContext ctx("root");
                 auto rangeInsertSpec =
-                    FLE2RangeInsertSpec::parse(ctx, ep.getValue().getElement().Obj());
+                    FLE2RangeInsertSpec::parse(ep.getValue().getElement().Obj(), ctx);
 
                 auto elRange = rangeInsertSpec.getValue().getElement();
 
@@ -1050,7 +1050,7 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
             } else if (ep.getType() == Fle2PlaceholderType::kFind) {
                 IDLParserContext ctx("root");
                 auto rangeFindSpec =
-                    FLE2RangeFindSpec::parse(ctx, ep.getValue().getElement().Obj());
+                    FLE2RangeFindSpec::parse(ep.getValue().getElement().Obj(), ctx);
 
                 auto findPayload = [&]() {
                     if (rangeFindSpec.getEdgesInfo().has_value()) {
@@ -2728,7 +2728,7 @@ FLE2FindRangePayloadV2 FLEClientCrypto::serializeFindRangeStubV2(const FLE2Range
 ECOCCompactionDocumentV2 ECOCCompactionDocumentV2::parseAndDecrypt(const BSONObj& doc,
                                                                    const ECOCToken& token) {
     IDLParserContext ctx("root");
-    auto ecocDoc = EcocDocument::parse(ctx, doc);
+    auto ecocDoc = EcocDocument::parse(doc, ctx);
 
     // The ecocDoc from EcocDocument::parse is const, so make a copy when decrypting.
     auto keys = StateCollectionTokensV2::Encrypted(ecocDoc.getValue()).decrypt(token);
@@ -3788,7 +3788,7 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
             "Expected an object for schema in EncryptionInformation",
             !element.eoo() && element.type() == BSONType::object);
 
-    auto efc = EncryptedFieldConfig::parse(IDLParserContext("schema"), element.Obj());
+    auto efc = EncryptedFieldConfig::parse(element.Obj(), IDLParserContext("schema"));
 
     uassert(6371207, "Expected a value for escCollection", efc.getEscCollection().has_value());
     uassert(6371208, "Expected a value for ecocCollection", efc.getEcocCollection().has_value());
@@ -3946,7 +3946,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 
     uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
 
-    auto subType = EncryptedBinDataType_parse(IDLParserContext("subtype"), subTypeByte);
+    auto subType = EncryptedBinDataType_parse(subTypeByte, IDLParserContext("subtype"));
     return {subType, cdrc};
 }
 
@@ -4080,7 +4080,7 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
 
             if (token.type() == BSONType::object) {
                 auto doc =
-                    CompactionTokenDoc::parse(IDLParserContext{"compactionToken"}, token.Obj());
+                    CompactionTokenDoc::parse(token.Obj(), IDLParserContext{"compactionToken"});
                 return CompactionToken{
                     std::move(fieldName), doc.getECOCToken(), doc.getAnchorPaddingToken()};
             }

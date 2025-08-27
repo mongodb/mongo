@@ -103,7 +103,7 @@ const int kNumberOfSystemFieldsInParameterDocument = 2;
 
 bool SetClusterParameterCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc =
-        StateDoc::parse(IDLParserContext("SetClusterParameterCoordinatorDocument"), otherDocBSON);
+        StateDoc::parse(otherDocBSON, IDLParserContext("SetClusterParameterCoordinatorDocument"));
 
     return _evalStateDocumentThreadSafe([&](const StateDoc& doc) -> bool {
         return SimpleBSONObjComparator::kInstance.evaluate(doc.getParameter() ==

@@ -1328,17 +1328,17 @@ TEST_F(AuthorizationSessionTestWithoutAuth,
 const auto listTestCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
                                                                   << "test"_sd);
 const auto listTestCollectionsCmd =
-    ListCollections::parse(IDLParserContext("listTestCollectionsCmd"), listTestCollectionsPayload);
+    ListCollections::parse(listTestCollectionsPayload, IDLParserContext("listTestCollectionsCmd"));
 const auto listOtherCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
                                                                    << "other"_sd);
 const auto listOtherCollectionsCmd = ListCollections::parse(
-    IDLParserContext("listOtherCollectionsCmd"), listOtherCollectionsPayload);
+    listOtherCollectionsPayload, IDLParserContext("listOtherCollectionsCmd"));
 const auto listOwnTestCollectionsPayload =
     BSON("listCollections"_sd << 1 << "$db"
                               << "test"_sd
                               << "nameOnly"_sd << true << "authorizedCollections"_sd << true);
 const auto listOwnTestCollectionsCmd = ListCollections::parse(
-    IDLParserContext("listOwnTestCollectionsCmd"), listOwnTestCollectionsPayload);
+    listOwnTestCollectionsPayload, IDLParserContext("listOwnTestCollectionsCmd"));
 
 TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPrivilege) {
     // With no privileges, there is no authorization to list collections
@@ -1880,7 +1880,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryAuthorizedUse
     const IDLParserContext ctxt("releaseMemory");
     auto bsonObj = BSON("releaseMemory" << BSON_ARRAY(cursorId) << "$db"
                                         << "test");
-    ReleaseMemoryCommandRequest request = ReleaseMemoryCommandRequest::parse(ctxt, bsonObj);
+    ReleaseMemoryCommandRequest request = ReleaseMemoryCommandRequest::parse(bsonObj, ctxt);
     ReleaseMemoryCmd commandInstance;
     ReleaseMemoryCmd::Invocation invocation(_opCtx.get(), &commandInstance, request.serialize());
     ReleaseMemoryCommandReply reply = invocation.typedRun(_opCtx.get());
@@ -1923,7 +1923,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryUnauthorizedU
     const IDLParserContext ctxt("releaseMemory");
     auto bsonObj = BSON("releaseMemory" << BSON_ARRAY(cursorId) << "$db"
                                         << "test");
-    ReleaseMemoryCommandRequest request = ReleaseMemoryCommandRequest::parse(ctxt, bsonObj);
+    ReleaseMemoryCommandRequest request = ReleaseMemoryCommandRequest::parse(bsonObj, ctxt);
     ReleaseMemoryCmd commandInstance;
     ReleaseMemoryCmd::Invocation invocation(_opCtx.get(), &commandInstance, request.serialize());
     ASSERT_THROWS_CODE(invocation.typedRun(_opCtx.get()), DBException, ErrorCodes::Unauthorized);

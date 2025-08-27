@@ -342,7 +342,7 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
     }
 
     auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-        IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.getValue());
+        fcvObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
 
     auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
     auto downgradeInProgress = fcvDoc.getPreviousVersion().has_value();
@@ -482,7 +482,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         }
 
         auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(
-            IDLParserContext("featureCompatibilityVersionDocument"), currentFCVObj.getValue());
+            currentFCVObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
 
         auto currentIsCleaningServerMetadata = currentFCVDoc.getIsCleaningServerMetadata();
         if (currentIsCleaningServerMetadata.is_initialized() && *currentIsCleaningServerMetadata) {

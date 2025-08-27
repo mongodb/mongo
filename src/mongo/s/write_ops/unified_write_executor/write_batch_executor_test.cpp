@@ -110,7 +110,7 @@ public:
         // Keep our serialized command in scope.
         BSONObj cmdObjWithDb = builder.obj();
         BulkWriteCommandRequest bulkWrite =
-            BulkWriteCommandRequest::parse(IDLParserContext("bulkWrite"), cmdObjWithDb);
+            BulkWriteCommandRequest::parse(cmdObjWithDb, IDLParserContext("bulkWrite"));
 
         ASSERT_EQ(bulkWrite.getOps().size(), expectedOps.size());
         for (size_t i = 0; i < bulkWrite.getOps().size(); i++) {

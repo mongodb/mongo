@@ -394,7 +394,7 @@ std::shared_ptr<TimeseriesOptions> OutStage::validateTimeseries() {
         tassert(
             9072001, "Invalid time-series options received", targetTimeseriesElement.isABSONObj());
         targetTSOpts = std::make_shared<TimeseriesOptions>(TimeseriesOptions::parseOwned(
-            IDLParserContext("TimeseriesOptions"), targetTimeseriesElement.Obj()));
+            targetTimeseriesElement.Obj(), IDLParserContext("TimeseriesOptions")));
     }
 
     // If the user did not specify the 'timeseries' option in the input, but the target

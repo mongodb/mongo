@@ -273,7 +273,7 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
         "$clusterTime" << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
                        << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto timepoints = GossipedVectorClockComponents::parse(
-        IDLParserContext("VectorClockComponents"), timepointsObj);
+        timepointsObj, IDLParserContext("VectorClockComponents"));
     vc->gossipIn(operationContext(), timepoints, false, true);
 
     // On config servers, gossip in from internal clients should update $clusterTime, $configTime,
@@ -286,8 +286,8 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
     // Can gossip in from an internal client without a dummy signature.
     timepointsObj = BSON("$clusterTime" << BSON("clusterTime" << Timestamp(1, 2)) << "$configTime"
                                         << Timestamp(1, 2) << "$topologyTime" << Timestamp(1, 2)),
-    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
-                                                      timepointsObj);
+    timepoints = GossipedVectorClockComponents::parse(timepointsObj,
+                                                      IDLParserContext("VectorClockComponents"));
     vc->gossipIn(operationContext(), timepoints, false, true);
 
     auto afterTime2 = vc->getTime();
@@ -298,8 +298,8 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
     // Can gossip in from an internal client with a dummy signature.
     timepointsObj = BSON("$clusterTime" << BSON("clusterTime" << Timestamp(3, 3)) << "$configTime"
                                         << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
-    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
-                                                      timepointsObj);
+    timepoints = GossipedVectorClockComponents::parse(timepointsObj,
+                                                      IDLParserContext("VectorClockComponents"));
     vc->gossipIn(operationContext(), timepoints, false, true);
 
     auto afterTime3 = vc->getTime();
@@ -325,7 +325,7 @@ TEST_F(VectorClockConfigServerTest, GossipInExternal) {
         "$clusterTime" << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
                        << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto timepoints = GossipedVectorClockComponents::parse(
-        IDLParserContext("VectorClockComponents"), timepointsObj);
+        timepointsObj, IDLParserContext("VectorClockComponents"));
     vc->gossipIn(operationContext(), timepoints, false);
 
     // On config servers, gossip in from external clients should update $clusterTime, but not
@@ -339,8 +339,8 @@ TEST_F(VectorClockConfigServerTest, GossipInExternal) {
     // client is authorized to advance the clock.
     timepointsObj = BSON("$clusterTime" << BSON("clusterTime" << Timestamp(3, 3)) << "$configTime"
                                         << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1)),
-    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
-                                                      timepointsObj);
+    timepoints = GossipedVectorClockComponents::parse(timepointsObj,
+                                                      IDLParserContext("VectorClockComponents"));
     vc->gossipIn(nullptr, timepoints, false);
 
     auto afterTime2 = vc->getTime();

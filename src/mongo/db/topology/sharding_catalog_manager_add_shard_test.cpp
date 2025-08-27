@@ -367,7 +367,7 @@ protected:
 
             const auto addShardOpMsgRequest = static_cast<OpMsgRequest>(request);
             const auto addShardCmd = ShardsvrAddShard::parse(
-                IDLParserContext(ShardsvrAddShard::kCommandName), addShardOpMsgRequest);
+                addShardOpMsgRequest, IDLParserContext(ShardsvrAddShard::kCommandName));
 
             ASSERT_EQ(
                 0,

@@ -54,7 +54,7 @@ void UntrackUnsplittableCollectionCoordinator::checkIfOptionsConflict(
     const BSONObj& coorDoc) const {
     stdx::lock_guard lk{_docMutex};
     const auto otherDoc = UntrackUnsplittableCollectionCoordinatorDocument::parse(
-        IDLParserContext("UntrackUnsplittableCollectionCoordinatorDocument"), coorDoc);
+        coorDoc, IDLParserContext("UntrackUnsplittableCollectionCoordinatorDocument"));
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Namespace mismatch while running untrack, running coordinator nss: "
                           << _doc.getId().getNss().toStringForErrorMsg()

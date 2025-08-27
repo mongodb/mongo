@@ -85,7 +85,7 @@ void SetAllowMigrationsCoordinator::checkIfOptionsConflict(const BSONObj& doc) c
     // If we have two set allow migrations on the same namespace, then the arguments must be the
     // same.
     const auto otherDoc = SetAllowMigrationsCoordinatorDocument::parse(
-        IDLParserContext("SetAllowMigrationsCoordinatorDocument"), doc);
+        doc, IDLParserContext("SetAllowMigrationsCoordinatorDocument"));
 
     stdx::lock_guard lk{_docMutex};
     uassert(ErrorCodes::ConflictingOperationInProgress,

@@ -130,7 +130,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
     }
 
     auto response = RefreshQueryAnalyzerConfigurationResponse::parse(
-        IDLParserContext("configurationRefresher"), resObj);
+        resObj, IDLParserContext("configurationRefresher"));
     return response.getConfigurations();
 }
 

@@ -396,7 +396,7 @@ StatusWith<ResolvedRoleData> AuthorizationBackendLocal::resolveRoles(
                                 fmt::format("Expected privilege document as object, got {}",
                                             typeName(privElem.type()))};
                     }
-                    auto pp = auth::ParsedPrivilege::parse(idlctx, privElem.Obj());
+                    auto pp = auth::ParsedPrivilege::parse(privElem.Obj(), idlctx);
                     Privilege::addPrivilegeToPrivilegeVector(
                         &inheritedPrivileges,
                         Privilege::resolvePrivilegeWithTenant(role.tenantId(), pp));
@@ -442,7 +442,7 @@ void handleAuthLocalGetSubRolesFailPoint(const std::vector<RoleName>& directRole
     }
 
     IDLParserContext ctx("authLocalGetSubRoles");
-    auto delay = AuthLocalGetSubRolesFailPoint::parse(ctx, sfp.getData()).getResolveRolesDelayMS();
+    auto delay = AuthLocalGetSubRolesFailPoint::parse(sfp.getData(), ctx).getResolveRolesDelayMS();
 
     if (delay <= 0) {
         return;

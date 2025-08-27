@@ -353,7 +353,7 @@ int removeExpiredTransactionSessionsFromDisk(
     int numReaped = 0;
     while (cursor->more()) {
         auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(
-            IDLParserContext{"TransactionSession"}, cursor->next());
+            cursor->next(), IDLParserContext{"TransactionSession"});
         const auto transactionSessionId = transactionSession.get_id();
 
         if (expiredTransactionSessionIdsStillInUse.find(transactionSessionId) !=
@@ -476,8 +476,8 @@ void abortInProgressTransactions(OperationContext* opCtx,
         LOGV2_DEBUG(21977, 3, "Aborting in-progress transactions on stepup.");
     }
     while (cursor->more()) {
-        auto txnRecord = SessionTxnRecord::parse(IDLParserContext("abort-in-progress-transactions"),
-                                                 cursor->next());
+        auto txnRecord = SessionTxnRecord::parse(
+            cursor->next(), IDLParserContext("abort-in-progress-transactions"));
 
         // Synchronize with killOps to make this unkillable.
         {
@@ -649,7 +649,7 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
     const auto catalog = SessionCatalog::get(opCtx);
 
     const auto lsid =
-        LogicalSessionId::parse(IDLParserContext("lsid"), singleSessionDoc["_id"].Obj());
+        LogicalSessionId::parse(singleSessionDoc["_id"].Obj(), IDLParserContext("lsid"));
     catalog->scanSession(lsid, [&, ti = _ti.get()](const ObservableSession& session) {
         uassert(ErrorCodes::PreparedTransactionInProgress,
                 str::stream() << "Cannot modify the entry for session " << lsid.getId()

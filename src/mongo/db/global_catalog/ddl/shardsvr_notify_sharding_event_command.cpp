@@ -101,21 +101,21 @@ public:
 
             if (request().getEventType() == notify_sharding_event::kCollectionSharded) {
                 const auto event = CollectionSharded::parse(
-                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                    request().getDetails(), IDLParserContext("_shardsvrNotifyShardingEvent"));
                 notifyChangeStreamsOnShardCollection(opCtx, event);
                 return;
             }
 
             if (request().getEventType() == notify_sharding_event::kCollectionResharded) {
                 const auto event = CollectionResharded::parse(
-                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                    request().getDetails(), IDLParserContext("_shardsvrNotifyShardingEvent"));
                 notifyChangeStreamsOnReshardCollectionComplete(opCtx, event);
                 return;
             }
 
             if (request().getEventType() == notify_sharding_event::kNamespacePlacementChanged) {
                 const auto event = NamespacePlacementChanged::parse(
-                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                    request().getDetails(), IDLParserContext("_shardsvrNotifyShardingEvent"));
                 notifyChangeStreamsOnNamespacePlacementChanged(opCtx, event);
                 return;
             }

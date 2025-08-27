@@ -155,7 +155,7 @@ public:
             uassertStatusOK(getStatusFromCommandResult(response));
 
             Response dropIndexesResponse =
-                DropIndexesReply::parse(IDLParserContext("DropIndexesReply"), response);
+                DropIndexesReply::parse(response, IDLParserContext("DropIndexesReply"));
 
             return dropIndexesResponse;
         }

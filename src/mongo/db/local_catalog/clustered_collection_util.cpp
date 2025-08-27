@@ -97,7 +97,7 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
     }
 
     auto indexSpec = ClusteredIndexSpec::parse(
-        IDLParserContext{"ClusteredUtil::parseClusteredInfo"}, elem.Obj());
+        elem.Obj(), IDLParserContext{"ClusteredUtil::parseClusteredInfo"});
     ensureClusteredIndexName(indexSpec);
     return makeCanonicalClusteredInfo(std::move(indexSpec));
 }

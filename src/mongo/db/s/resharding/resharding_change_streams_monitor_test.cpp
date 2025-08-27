@@ -1182,8 +1182,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
     BSONObj donorFirstStage = donorRequest.getPipeline().front();
 
     auto donorChangeStreamSpec = DocumentSourceChangeStreamSpec::parse(
-        IDLParserContext("TestChangeStreamMonitorSettingsForDonor"),
-        donorFirstStage.getObjectField(DocumentSourceChangeStream::kStageName));
+        donorFirstStage.getObjectField(DocumentSourceChangeStream::kStageName),
+        IDLParserContext("TestChangeStreamMonitorSettingsForDonor"));
 
     ASSERT_FALSE(donorChangeStreamSpec.getShowMigrationEvents());
     ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
@@ -1209,8 +1209,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
     BSONObj donorFirstStage = donorRequest.getPipeline().front();
 
     auto donorChangeStreamSpec = DocumentSourceChangeStreamSpec::parse(
-        IDLParserContext("TestChangeStreamMonitorSettingsForDonorTimeseries"),
-        donorFirstStage.getObjectField(DocumentSourceChangeStream::kStageName));
+        donorFirstStage.getObjectField(DocumentSourceChangeStream::kStageName),
+        IDLParserContext("TestChangeStreamMonitorSettingsForDonorTimeseries"));
 
     ASSERT_FALSE(donorChangeStreamSpec.getShowMigrationEvents());
     ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
@@ -1232,8 +1232,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForRec
     BSONObj recipientFirstStage = recipientRequest.getPipeline().front();
 
     auto recipientChangeStreamSpec = DocumentSourceChangeStreamSpec::parse(
-        IDLParserContext("TestChangeStreamMonitorSettingsForRecipient"),
-        recipientFirstStage.getObjectField(DocumentSourceChangeStream::kStageName));
+        recipientFirstStage.getObjectField(DocumentSourceChangeStream::kStageName),
+        IDLParserContext("TestChangeStreamMonitorSettingsForRecipient"));
 
     ASSERT_TRUE(recipientChangeStreamSpec.getShowMigrationEvents());
     ASSERT_FALSE(recipientChangeStreamSpec.getShowSystemEvents());

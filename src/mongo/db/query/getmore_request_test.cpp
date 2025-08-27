@@ -66,7 +66,7 @@ GetMoreCommandRequest createGetMoreCommandRequest(
 
 std::unique_ptr<GetMoreCommandRequest> parseFromBSON(const BSONObj& cmdObj) {
     return std::make_unique<GetMoreCommandRequest>(
-        GetMoreCommandRequest::parse(IDLParserContext("GetMoreCommandRequest"), cmdObj));
+        GetMoreCommandRequest::parse(cmdObj, IDLParserContext("GetMoreCommandRequest")));
 }
 
 TEST(GetMoreRequestTest, ShouldParseAllKnownOptions) {

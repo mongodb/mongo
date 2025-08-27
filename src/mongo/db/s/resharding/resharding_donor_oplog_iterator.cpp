@@ -82,8 +82,8 @@ namespace {
  */
 ReshardingDonorOplogId getId(const repl::OplogEntry& oplog) {
     return ReshardingDonorOplogId::parse(
-        IDLParserContext("ReshardingDonorOplogIterator::getOplogId"),
-        oplog.get_id()->getDocument().toBson());
+        oplog.get_id()->getDocument().toBson(),
+        IDLParserContext("ReshardingDonorOplogIterator::getOplogId"));
 }
 
 }  // anonymous namespace

@@ -1012,7 +1012,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
         ]
     })";
 
-    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
+    return EncryptedFieldConfig::parse(fromjson(schema), IDLParserContext("root"));
 }
 
 std::vector<char> generatePlaceholder(
@@ -1186,7 +1186,7 @@ BSONObj transformElementForInsertUpdate(BSONElement element,
                                                kv,
                                                edcNs.db_forTest())
             .addField(BSON("$db" << edcNs.db_forTest()).firstElement());
-    return write_ops::InsertCommandRequest::parse(IDLParserContext("finalCmd"), finalCmd)
+    return write_ops::InsertCommandRequest::parse(finalCmd, IDLParserContext("finalCmd"))
         .getDocuments()
         .front()
         .getOwned();
@@ -2620,7 +2620,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_RoundTrip) {
 
 
     EncryptedFieldConfig efc2 = EncryptionInformationHelpers::getAndValidateSchema(
-        ns, EncryptionInformation::parse(IDLParserContext("foo"), obj));
+        ns, EncryptionInformation::parse(obj, IDLParserContext("foo")));
 
     ASSERT_BSONOBJ_EQ(efc.toBSON(), efc2.toBSON());
 }
@@ -2635,7 +2635,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_BadSchema) {
 
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
     ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
-                           ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
+                           ns, EncryptionInformation::parse(obj, IDLParserContext("foo"))),
                        DBException,
                        6371205);
 }
@@ -2648,7 +2648,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_MissingStateCollection) {
         efc.setEscCollection(boost::none);
         auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
         ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
-                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
+                               ns, EncryptionInformation::parse(obj, IDLParserContext("foo"))),
                            DBException,
                            6371207);
     }
@@ -2657,7 +2657,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_MissingStateCollection) {
         efc.setEcocCollection(boost::none);
         auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
         ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
-                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
+                               ns, EncryptionInformation::parse(obj, IDLParserContext("foo"))),
                            DBException,
                            6371208);
     }

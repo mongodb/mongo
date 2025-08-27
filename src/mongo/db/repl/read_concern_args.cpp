@@ -207,7 +207,7 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
     invariant(isEmpty());  // only legal to call on uninitialized object.
 
     try {
-        auto inner = ReadConcernIdl::parse(IDLParserContext("readConcern"), readConcernObj);
+        auto inner = ReadConcernIdl::parse(readConcernObj, IDLParserContext("readConcern"));
         return parse(std::move(inner));
     } catch (const DBException& ex) {
         return ex.toStatus();

@@ -117,7 +117,7 @@ MONGO_INITIALIZER(ServerlessPrivilegePermittedMap)(InitializerContext*) try {
         auto matchType = static_cast<MatchTypeEnum>(i);
         auto matchTypeName = MatchType_serializer(matchType);
         auto dataObj = MatchType_get_extra_data(matchType);
-        auto data = MatchTypeExtraData::parse(IDLParserContext{matchTypeName}, dataObj);
+        auto data = MatchTypeExtraData::parse(dataObj, IDLParserContext{matchTypeName});
 
         std::vector<std::string> unknownActions;
         auto actions =

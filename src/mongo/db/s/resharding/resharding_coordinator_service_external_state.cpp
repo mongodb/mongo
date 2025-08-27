@@ -338,7 +338,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
 
         uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
         auto cursorReply = CursorInitialReply::parse(
-            IDLParserContext("getDocumentsToCopyFromDonors"), response.swResponse.getValue().data);
+            response.swResponse.getValue().data, IDLParserContext("getDocumentsToCopyFromDonors"));
         auto firstBatch = cursorReply.getCursor()->getFirstBatch();
 
         uassert(9858102,
@@ -438,8 +438,8 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
 
         uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
         auto cursorReply =
-            CursorInitialReply::parse(IDLParserContext("_getDocumentsCopiedFromRecipients"),
-                                      response.swResponse.getValue().data);
+            CursorInitialReply::parse(response.swResponse.getValue().data,
+                                      IDLParserContext("_getDocumentsCopiedFromRecipients"));
         auto firstBatch = cursorReply.getCursor()->getFirstBatch();
 
         uassert(1003561,
@@ -515,7 +515,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
 
         uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
         auto collStatsResponse = ShardsvrReshardingDonorFetchFinalCollectionStatsResponse::parse(
-            IDLParserContext("getDocumentsDeltaFromDonors"), response.swResponse.getValue().data);
+            response.swResponse.getValue().data, IDLParserContext("getDocumentsDeltaFromDonors"));
 
         docsDelta.emplace(donorShardId, collStatsResponse.getDocumentsDelta());
     }

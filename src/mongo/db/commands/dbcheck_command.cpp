@@ -505,21 +505,21 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
         return singleCollectionRun(
             opCtx,
             dbName,
-            DbCheckSingleInvocation::parse(IDLParserContext("",
+            DbCheckSingleInvocation::parse(toParse,
+                                           IDLParserContext("",
                                                             auth::ValidatedTenancyScope::get(opCtx),
                                                             dbName.tenantId(),
-                                                            SerializationContext::stateDefault()),
-                                           toParse));
+                                                            SerializationContext::stateDefault())));
     } else {
         // Otherwise, it's the database-wide form.
         return fullDatabaseRun(
             opCtx,
             dbName,
-            DbCheckAllInvocation::parse(IDLParserContext("",
+            DbCheckAllInvocation::parse(toParse,
+                                        IDLParserContext("",
                                                          auth::ValidatedTenancyScope::get(opCtx),
                                                          dbName.tenantId(),
-                                                         SerializationContext::stateDefault()),
-                                        toParse));
+                                                         SerializationContext::stateDefault())));
     }
 }
 

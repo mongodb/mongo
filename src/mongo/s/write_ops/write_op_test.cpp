@@ -452,7 +452,7 @@ TEST_F(WriteOpTest, CombineBulkWriteReplyItems) {
 
     // We should correctly propagate the upserted value.
     const auto dummyUpserted = write_ops::Upserted::parse(
-        IDLParserContext("CombineBulkWriteReplyItems"), BSON("index" << 0 << "_id" << 5));
+        BSON("index" << 0 << "_id" << 5), IDLParserContext("CombineBulkWriteReplyItems"));
     const auto replyWithUpsert = makeBulkWriteReplyItem(5, 1, 0, dummyUpserted);
     combined = op.combineBulkWriteReplyItems({&basicReply, &replyWithUpsert});
     ASSERT_EQ(combined->getN(), 2);

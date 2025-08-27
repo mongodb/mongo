@@ -74,12 +74,12 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
               *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     auto spec = DocumentSourceCollStatsSpec::parse(
+        specElem.embeddedObject(),
         IDLParserContext(
             kStageName,
             vts,
             tenantId,
-            SerializationContext::stateCommandReply(pExpCtx->getSerializationContext())),
-        specElem.embeddedObject());
+            SerializationContext::stateCommandReply(pExpCtx->getSerializationContext())));
 
     // targetAllNodes is not allowed on mongod instance.
     if (spec.getTargetAllNodes().value_or(false)) {

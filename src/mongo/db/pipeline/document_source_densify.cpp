@@ -163,7 +163,7 @@ list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
                           << typeName(elem.type()),
             elem.type() == BSONType::object);
 
-    auto spec = DensifySpec::parse(IDLParserContext(stageName), elem.embeddedObject());
+    auto spec = DensifySpec::parse(elem.embeddedObject(), IDLParserContext(stageName));
     auto rangeStatement = RangeStatement::parse(spec.getRange());
 
     list<FieldPath> partitions;

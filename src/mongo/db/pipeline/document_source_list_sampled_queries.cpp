@@ -56,8 +56,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
     uassert(6876001,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
             specElem.type() == BSONType::object);
-    auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
-                                                            specElem.embeddedObject());
+    auto spec = DocumentSourceListSampledQueriesSpec::parse(specElem.embeddedObject(),
+                                                            IDLParserContext(kStageName));
 
     return make_intrusive<DocumentSourceListSampledQueries>(pExpCtx, std::move(spec));
 }
@@ -103,8 +103,8 @@ DocumentSourceListSampledQueries::LiteParsed::parse(const NamespaceString& nss,
             str::stream() << kStageName << " is not supported on a multitenant replica set",
             !gMultitenancySupport);
 
-    auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
-                                                            specElem.embeddedObject());
+    auto spec = DocumentSourceListSampledQueriesSpec::parse(specElem.embeddedObject(),
+                                                            IDLParserContext(kStageName));
     if (spec.getNamespace()) {
         uassertStatusOK(validateNamespace(*spec.getNamespace()));
     }

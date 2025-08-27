@@ -160,7 +160,7 @@ Status JWKManager::loadKeys() try {
 
     const auto& parsedKeys = _fetcher->fetch();
     for (const auto& key : parsedKeys.getKeys()) {
-        auto JWK = JWK::parse(IDLParserContext("JWK"), key);
+        auto JWK = JWK::parse(key, IDLParserContext("JWK"));
 
         if ((JWK.getType() != "RSA"_sd) && (JWK.getType() != "EC")) {
             LOGV2_WARNING(
@@ -171,9 +171,9 @@ Status JWKManager::loadKeys() try {
 
         std::string keyId;
         if (JWK.getType() == "RSA") {
-            keyId = _loadAndValidateRSAKey(JWKRSA::parse(IDLParserContext("JWKRSA"), key));
+            keyId = _loadAndValidateRSAKey(JWKRSA::parse(key, IDLParserContext("JWKRSA")));
         } else if (JWK.getType() == "EC") {
-            keyId = _loadAndValidateECKey(JWKEC::parse(IDLParserContext("JWKEC"), key));
+            keyId = _loadAndValidateECKey(JWKEC::parse(key, IDLParserContext("JWKEC")));
         }
         uassert(ErrorCodes::DuplicateKeyId,
                 str::stream() << "Key IDs must be unique, duplicate '" << keyId << "'",

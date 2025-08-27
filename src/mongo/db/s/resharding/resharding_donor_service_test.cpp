@@ -136,8 +136,8 @@ private:
 
         auto doc = client.findOne(NamespaceString::kDonorReshardingOperationsNamespace, BSONObj{});
         auto mutableState = doc.getObjectField("mutableState");
-        return DonorState_parse(IDLParserContext{"reshardingDonorServiceTest"},
-                                mutableState.getStringField("state"));
+        return DonorState_parse(mutableState.getStringField("state"),
+                                IDLParserContext{"reshardingDonorServiceTest"});
     }
 
     void _maybeThrowErrorForFunction(OperationContext* opCtx, ExternalFunction func) {
@@ -225,8 +225,8 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<DonorStateMachine>(
             this,
-            ReshardingDonorDocument::parse(IDLParserContext{"ReshardingDonorServiceForTest"},
-                                           initialState),
+            ReshardingDonorDocument::parse(initialState,
+                                           IDLParserContext{"ReshardingDonorServiceForTest"}),
             std::make_unique<ExternalStateForTest>(_externalStateImpl),
             _serviceContext);
     }
@@ -592,7 +592,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
 
     ReshardBeginChangeEventO2Field expectedChangeEvent{sourceNss, doc.getReshardingUUID()};
     auto receivedChangeEvent = ReshardBeginChangeEventO2Field::parse(
-        IDLParserContext("ReshardBeginChangeEventO2Field"), *op.getObject2());
+        *op.getObject2(), IDLParserContext("ReshardBeginChangeEventO2Field"));
 
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();
@@ -676,7 +676,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
         repl::OplogEntry op(cursor->next());
 
         auto receivedChangeEvent = ReshardBlockingWritesChangeEventO2Field::parse(
-            IDLParserContext("ReshardBlockingWritesChangeEventO2Field"), *op.getObject2());
+            *op.getObject2(), IDLParserContext("ReshardBlockingWritesChangeEventO2Field"));
 
         ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
             << op.getEntry();
@@ -1441,8 +1441,8 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<DonorStateMachine>(
             this,
-            ReshardingDonorDocument::parse(IDLParserContext{"ReshardingDonorServiceForTest"},
-                                           initialState),
+            ReshardingDonorDocument::parse(initialState,
+                                           IDLParserContext{"ReshardingDonorServiceForTest"}),
             std::make_unique<ExternalStateForTestWCEOnRefresh>(),
             _serviceContext);
     }

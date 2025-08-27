@@ -509,7 +509,7 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithMetrics) {
     BSONObj testDoc = BSON("_id" << 1);
     BSONObj metricsDoc = basicMetricsObj;
 
-    auto metrics = CursorMetrics::parse(IDLParserContext("CursorMetrics"), metricsDoc);
+    auto metrics = CursorMetrics::parse(metricsDoc, IDLParserContext("CursorMetrics"));
 
     BSONObj expectedBody =
         BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "id" << CursorId(123) << "ns"

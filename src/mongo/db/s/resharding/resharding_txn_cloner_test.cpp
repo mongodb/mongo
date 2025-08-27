@@ -254,7 +254,7 @@ protected:
     }
 
     LogicalSessionId getTxnRecordLsid(BSONObj txnRecord) {
-        return SessionTxnRecord::parse(IDLParserContext("ReshardingTxnClonerTest"), txnRecord)
+        return SessionTxnRecord::parse(txnRecord, IDLParserContext("ReshardingTxnClonerTest"))
             .getSessionId();
     }
 
@@ -367,7 +367,7 @@ protected:
                            BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON()));
         ASSERT(!bsonTxn.isEmpty());
         auto txn = SessionTxnRecord::parse(
-            IDLParserContext("resharding config transactions cloning test"), bsonTxn);
+            bsonTxn, IDLParserContext("resharding config transactions cloning test"));
         ASSERT_EQ(txn.getTxnNum(), txnNum);
         ASSERT_EQ(txn.getLastWriteOpTime(), oplogEntry.getOpTime());
     }
@@ -399,8 +399,8 @@ protected:
             return boost::none;
         }
 
-        return ReshardingTxnClonerProgress::parse(IDLParserContext("ReshardingTxnClonerProgress"),
-                                                  progressDoc);
+        return ReshardingTxnClonerProgress::parse(progressDoc,
+                                                  IDLParserContext("ReshardingTxnClonerProgress"));
     }
 
     boost::optional<LogicalSessionId> getProgressLsid(const ReshardingSourceId& sourceId) {
@@ -1240,7 +1240,7 @@ TEST_F(ReshardingTxnClonerTest, DoNotAddDeadEndSentinelTwice) {
     auto opCtx = operationContext();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto txnRecord = SessionTxnRecord::parse(
-        IDLParserContext{"ReshardingTxnClonerTest::DoNotAddDeadEndSentinelTwice"}, makeTxn());
+        makeTxn(), IDLParserContext{"ReshardingTxnClonerTest::DoNotAddDeadEndSentinelTwice"});
 
     DBDirectClient client(opCtx);
     auto filter = fromjson(fmt::format(

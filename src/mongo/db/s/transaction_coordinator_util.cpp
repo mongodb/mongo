@@ -715,8 +715,8 @@ std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationCont
     while (coordinatorDocsCursor->more()) {
         // TODO (SERVER-38307): Try/catch around parsing the document and skip the document if it
         // fails to parse.
-        auto nextDecision = TransactionCoordinatorDocument::parse(IDLParserContext(""),
-                                                                  coordinatorDocsCursor->next());
+        auto nextDecision = TransactionCoordinatorDocument::parse(coordinatorDocsCursor->next(),
+                                                                  IDLParserContext(""));
         allCoordinatorDocs.push_back(nextDecision);
     }
 
@@ -773,7 +773,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
 
                     if (status.isOK()) {
                         auto reply =
-                            PrepareReply::parse(IDLParserContext("PrepareReply"), response.data);
+                            PrepareReply::parse(response.data, IDLParserContext("PrepareReply"));
                         if (!reply.getPrepareTimestamp()) {
                             Status abortStatus(ErrorCodes::Error(50993),
                                                str::stream()

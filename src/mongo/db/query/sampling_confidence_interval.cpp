@@ -51,7 +51,7 @@ void SamplingConfidenceInterval::append(OperationContext*,
 
 Status SamplingConfidenceInterval::setFromString(StringData value,
                                                  const boost::optional<TenantId>&) {
-    _data = SamplingConfidenceInterval_parse(IDLParserContext("samplingConfidenceInterval"), value);
+    _data = SamplingConfidenceInterval_parse(value, IDLParserContext("samplingConfidenceInterval"));
     return Status::OK();
 }
 

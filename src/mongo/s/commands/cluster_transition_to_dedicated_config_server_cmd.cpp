@@ -106,8 +106,8 @@ public:
             CommandHelpers::filterCommandReplyForPassthrough(
                 cmdResponseWithStatus.getValue().response, &filteredResponse);
 
-            return Response::parse(IDLParserContext("TransitionToDedicatedConfigServerCmd"),
-                                   filteredResponse.obj());
+            return Response::parse(filteredResponse.obj(),
+                                   IDLParserContext("TransitionToDedicatedConfigServerCmd"));
         }
 
     private:

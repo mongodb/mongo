@@ -155,7 +155,7 @@ protected:
 
     auto parseSpec(const BSONObj& spec) {
         IDLParserContext ctx("internalExchange");
-        return ExchangeSpec::parse(ctx, spec);
+        return ExchangeSpec::parse(spec, ctx);
     }
 
     auto createNProducers(size_t nConsumers, boost::intrusive_ptr<exec::agg::Exchange> ex) {

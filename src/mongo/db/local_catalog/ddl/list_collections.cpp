@@ -594,11 +594,11 @@ public:
 
                     try {
                         firstBatch.push_back(ListCollectionsReplyItem::parse(
+                            nextDoc,
                             IDLParserContext("ListCollectionsReplyItem",
                                              auth::ValidatedTenancyScope::get(opCtx),
                                              cursorNss.tenantId(),
-                                             respSerializationContext),
-                            nextDoc));
+                                             respSerializationContext)));
                     } catch (const DBException& exc) {
                         LOGV2_ERROR(
                             5254300,

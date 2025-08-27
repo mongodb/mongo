@@ -159,7 +159,7 @@ Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
         }
 
         auto parsedPrivilege =
-            auth::ParsedPrivilege::parse(IDLParserContext("privilege"), element.Obj());
+            auth::ParsedPrivilege::parse(element.Obj(), IDLParserContext("privilege"));
         std::vector<std::string> unrecognizedActions;
         auto privilege = Privilege::resolvePrivilegeWithTenant(
             boost::none /* tenantId */, parsedPrivilege, &unrecognizedActions);

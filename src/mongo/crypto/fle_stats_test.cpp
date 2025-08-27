@@ -72,19 +72,19 @@ public:
     OperationContext* opCtx;
 
     CompactStats zeroStats = CompactStats::parse(
-        IDLParserContext("compactStats"),
         BSON("ecoc" << BSON("deleted" << 0 << "read" << 0) << "esc"
-                    << BSON("deleted" << 0 << "inserted" << 0 << "read" << 0 << "updated" << 0)));
+                    << BSON("deleted" << 0 << "inserted" << 0 << "read" << 0 << "updated" << 0)),
+        IDLParserContext("compactStats"));
 
     CompactStats compactStats = CompactStats::parse(
-        IDLParserContext("compactStats"),
         BSON("ecoc" << BSON("deleted" << 1 << "read" << 1) << "esc"
-                    << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)));
+                    << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)),
+        IDLParserContext("compactStats"));
 
     CleanupStats cleanupStats = CleanupStats::parse(
-        IDLParserContext("cleanupStats"),
         BSON("ecoc" << BSON("deleted" << 1 << "read" << 1) << "esc"
-                    << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)));
+                    << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)),
+        IDLParserContext("cleanupStats"));
 
     std::unique_ptr<TickSourceMock<Milliseconds>> tickSource;
     std::unique_ptr<FLEStatusSection> instance;

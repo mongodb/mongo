@@ -44,7 +44,7 @@ void RemoveShardDrainingInfo::serialize(BSONObjBuilder* bob) const {
 
 std::shared_ptr<const ErrorExtraInfo> RemoveShardDrainingInfo::parse(const BSONObj& obj) {
     return std::make_shared<RemoveShardDrainingInfo>(
-        RemoveShardProgress::parse(IDLParserContext("RemoveShardDrainingInfo"), obj));
+        RemoveShardProgress::parse(obj, IDLParserContext("RemoveShardDrainingInfo")));
 }
 
 }  // namespace mongo

@@ -300,14 +300,14 @@ void validateTokenFromKeys(JWKManagerTest* instance,
 
     auto headerString = base64url::decode(validTokenHeader);
     BSONObj headerBSON = fromjson(headerString);
-    auto header = JWSHeader::parse(IDLParserContext("JWTHeader"), headerBSON);
+    auto header = JWSHeader::parse(headerBSON, IDLParserContext("JWTHeader"));
 
     ASSERT_BSONOBJ_EQ(validatedToken.getHeaderBSON(), headerBSON);
     ASSERT_BSONOBJ_EQ(validatedToken.getHeader().toBSON(), header.toBSON());
 
     auto bodyString = base64url::decode(validTokenBody);
     BSONObj bodyBSON = fromjson(bodyString);
-    auto body = JWT::parse(IDLParserContext("JWT"), bodyBSON);
+    auto body = JWT::parse(bodyBSON, IDLParserContext("JWT"));
 
     ASSERT_BSONOBJ_EQ(validatedToken.getBodyBSON(), bodyBSON);
     ASSERT_BSONOBJ_EQ(validatedToken.getBody().toBSON(), body.toBSON());
@@ -417,7 +417,7 @@ TEST_F(JWKManagerTest, testTenancyExpectPrefix) {
 
     auto bodyString = base64url::decode(kTenancyTokenBody);
     BSONObj bodyBSON = fromjson(bodyString);
-    JWT body = JWT::parse(IDLParserContext("JWT"), bodyBSON);
+    JWT body = JWT::parse(bodyBSON, IDLParserContext("JWT"));
 
     ASSERT_TRUE(body.getTenantId() != boost::none);
     ASSERT_TRUE(*body.getExpectPrefix());

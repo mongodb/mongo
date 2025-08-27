@@ -435,7 +435,7 @@ boost::intrusive_ptr<Expression> ExpressionMinMaxScaler::parse(
     //   window: {...} // optional, default ['unbounded', 'unbounded']
     // }
 
-    auto minMaxScalerSpec = MinMaxScalerSpec::parse(IDLParserContext("root"), obj);
+    auto minMaxScalerSpec = MinMaxScalerSpec::parse(obj, IDLParserContext("root"));
     auto bounds = getMinMaxScalerWindowBoundsFromSpec(minMaxScalerSpec, sortBy, expCtx);
     auto minMaxArgs = getMinMaxScalerArgumentsFromSpec(minMaxScalerSpec, expCtx);
 

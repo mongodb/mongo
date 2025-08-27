@@ -124,7 +124,7 @@ inline std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
 inline bool indexIsReady(const BSONObj& cmdResponseBson,
                          boost::optional<BSONObj> indexDefinitionFromUserCmd) {
     auto reply = ShardsvrRunSearchIndexCommandReply::parse(
-        IDLParserContext("ShardsvrRunSearchIndexCommandReply"), cmdResponseBson);
+        cmdResponseBson, IDLParserContext("ShardsvrRunSearchIndexCommandReply"));
     auto searchIndexManagerResponse = reply.getSearchIndexManagerResponse();
     tassert(9638405,
             "We should have a cursor field in "
@@ -302,8 +302,8 @@ inline BSONObj createWrappedListSearchIndexesCmd(const NamespaceString& nss,
     if (idxCmdType.compare(std::string{kCreateCommand}) == 0) {
 
         IndexDefinition indexDefinition =
-            CreateSearchIndexesCommand::parse(IDLParserContext("createWrappedListSearchIndexesCmd"),
-                                              newCmdObj)
+            CreateSearchIndexesCommand::parse(newCmdObj,
+                                              IDLParserContext("createWrappedListSearchIndexesCmd"))
                 .getIndexes()
                 .front();
 
@@ -316,7 +316,7 @@ inline BSONObj createWrappedListSearchIndexesCmd(const NamespaceString& nss,
 
     } else if (idxCmdType.compare(std::string{kUpdateCommand}) == 0) {
         auto updateCmd = UpdateSearchIndexCommand::parse(
-            IDLParserContext("createWrappedListSearchIndexesCmd"), newCmdObj);
+            newCmdObj, IDLParserContext("createWrappedListSearchIndexesCmd"));
         if (updateCmd.getName()) {
             listSearchIndexes = BSON("$listSearchIndexes" << BSON("name" << *updateCmd.getName()));
         } else {

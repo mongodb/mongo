@@ -50,7 +50,7 @@ void SamplingCEMethod::append(OperationContext*,
 }
 
 Status SamplingCEMethod::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = SamplingCEMethod_parse(IDLParserContext("internalQuerySamplingCEMethod"), value);
+    _data = SamplingCEMethod_parse(value, IDLParserContext("internalQuerySamplingCEMethod"));
     return Status::OK();
 }
 

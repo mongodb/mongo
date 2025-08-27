@@ -599,7 +599,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     }
 
     auto ownedDeleteRequest =
-        write_ops::DeleteCommandRequest::parse(IDLParserContext("delete"), ownedRequest);
+        write_ops::DeleteCommandRequest::parse(ownedRequest, IDLParserContext("delete"));
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
     ownedDeleteRequest.setGenericArguments({});
 
@@ -719,7 +719,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     }
 
     auto ownedUpdateRequest =
-        write_ops::UpdateCommandRequest::parse(IDLParserContext("update"), ownedRequest);
+        write_ops::UpdateCommandRequest::parse(ownedRequest, IDLParserContext("update"));
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
     ownedUpdateRequest.setGenericArguments({});
     auto ownedUpdateOpEntry = ownedUpdateRequest.getUpdates()[0];
@@ -1060,7 +1060,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     }
 
     auto ownedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-        IDLParserContext("findAndModify"), ownedRequest);
+        ownedRequest, IDLParserContext("findAndModify"));
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
     auto wc = ownedFindAndModifyRequest.getWriteConcern();
     ownedFindAndModifyRequest.setGenericArguments({});
@@ -1664,7 +1664,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
     // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for
     // FLE2
     auto request =
-        write_ops::FindAndModifyCommandRequest::parse(IDLParserContext("findAndModify"), cmdObj);
+        write_ops::FindAndModifyCommandRequest::parse(cmdObj, IDLParserContext("findAndModify"));
 
     if (!request.getEncryptionInformation().has_value()) {
         return FLEBatchResult::kNotProcessed;
@@ -1765,7 +1765,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
-    auto reply = QECountInfosReply::parse(IDLParserContext("reply"), response);
+    auto reply = QECountInfosReply::parse(response, IDLParserContext("reply"));
 
     return toEdgeCounts(reply.getCounts());
 }
@@ -1842,7 +1842,7 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
         deleteReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
     } else {
         auto reply =
-            write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
+            write_ops::FindAndModifyCommandReply::parse(response, IDLParserContext("reply"));
         if (reply.getLastErrorObject().getNumDocs() > 0) {
             deleteReply.getWriteCommandReplyBase().setN(1);
         }
@@ -1904,7 +1904,7 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
-    auto reply = write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
+    auto reply = write_ops::FindAndModifyCommandReply::parse(response, IDLParserContext("reply"));
 
     write_ops::UpdateCommandReply updateReply;
 
@@ -1977,7 +1977,7 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
-    return write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
+    return write_ops::FindAndModifyCommandReply::parse(response, IDLParserContext("reply"));
 }
 
 std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString& nss,
@@ -2064,7 +2064,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
-    auto reply = QECountInfosReply::parse(IDLParserContext("reply"), response);
+    auto reply = QECountInfosReply::parse(response, IDLParserContext("reply"));
 
     return toEdgeCounts(reply.getCounts());
 }

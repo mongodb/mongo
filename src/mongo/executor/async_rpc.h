@@ -262,10 +262,10 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
 
     return std::move(resFuture)
         .then([](detail::AsyncRPCInternalResponse r) -> ReplyType {
-            auto res = CommandType::Reply::parseSharingOwnership(IDLParserContext("AsyncRPCRunner"),
-                                                                 r.response);
+            auto res = CommandType::Reply::parseSharingOwnership(
+                r.response, IDLParserContext("AsyncRPCRunner"));
             auto genericReplyFields = GenericReplyFields::parseSharingOwnership(
-                IDLParserContext("AsyncRPCRunner"), r.response);
+                r.response, IDLParserContext("AsyncRPCRunner"));
             return {res, r.targetUsed, r.elapsed, std::move(genericReplyFields)};
         })
         .unsafeToInlineFuture()

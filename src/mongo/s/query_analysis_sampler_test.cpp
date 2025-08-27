@@ -484,7 +484,7 @@ protected:
         onCommand([&](const executor::RemoteCommandRequest& request) {
             auto opMsg = static_cast<OpMsgRequest>(request);
             auto refreshRequest = RefreshQueryAnalyzerConfiguration::parse(
-                IDLParserContext("QueryAnalysisSamplerTest"), opMsg.body);
+                opMsg.body, IDLParserContext("QueryAnalysisSamplerTest"));
             ASSERT_EQ(refreshRequest.getNumQueriesExecutedPerSecond(),
                       expectedNumQueriesExecutedPerSecond);
 

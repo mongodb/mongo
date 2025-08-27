@@ -659,8 +659,8 @@ protected:
     void assertAggregateReadPreference(const executor::RemoteCommandRequest& request,
                                        const ReadPreferenceSetting& expectedReadPref) {
         auto parsedRequest = AggregateCommandRequest::parse(
-            IDLParserContext("ReshardingOplogFetcherTest"),
-            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
+            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())),
+            IDLParserContext("ReshardingOplogFetcherTest"));
         ASSERT_BSONOBJ_EQ(*parsedRequest.getUnwrappedReadPref(),
                           BSON("$readPreference" << expectedReadPref.toInnerBSON()));
     }
@@ -668,8 +668,8 @@ protected:
     void assertGetMoreCursorId(const executor::RemoteCommandRequest& request,
                                CursorId expectedCursorId) {
         auto parsedRequest = GetMoreCommandRequest::parse(
-            IDLParserContext("ReshardingOplogFetcherTest"),
-            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
+            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())),
+            IDLParserContext("ReshardingOplogFetcherTest"));
         ASSERT_EQ(parsedRequest.getCommandParameter(), expectedCursorId);
     }
 
@@ -1441,8 +1441,8 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
     // the cancellation. In that case, schedule a response for the killCursor command.
     auto makeKillCursorResponse = [&](const executor::RemoteCommandRequest& request) {
         auto parsedRequest = KillCursorsCommandRequest::parse(
-            IDLParserContext(unittest::getTestName()),
-            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
+            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())),
+            IDLParserContext(unittest::getTestName()));
 
         ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
                   NamespaceString::kRsOplogNamespace.toString_forTest());
@@ -1542,8 +1542,8 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
     // The fetcher should kill the cursor after exhausting it.
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto parsedRequest = KillCursorsCommandRequest::parse(
-            IDLParserContext(unittest::getTestName()),
-            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
+            request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())),
+            IDLParserContext(unittest::getTestName()));
 
         ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
                   NamespaceString::kRsOplogNamespace.toString_forTest());
@@ -1750,8 +1750,8 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
         // with the next test case.
         onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
             auto parsedRequest = KillCursorsCommandRequest::parse(
-                IDLParserContext(unittest::getTestName()),
-                request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())));
+                request.cmdObj.addFields(BSON("$db" << request.dbname.toString_forTest())),
+                IDLParserContext(unittest::getTestName()));
 
             ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
                       NamespaceString::kRsOplogNamespace.toString_forTest());
