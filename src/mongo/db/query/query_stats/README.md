@@ -46,6 +46,47 @@ db.example.find({x: 55}).batchSize(3);
 There are two distinct query stats store entries here - both the examples which include the batch
 size will be treated separately from the example which does not specify a batch size.
 
+### Query Stats vs. Query Shape: Which Options Go Where?
+
+There are two main things to keep in mind when deciding this question:
+
+1. The Query Stats Store Key is generally meant to be the most discriminating way to collect metrics.
+   It is always possible for consumers of the metrics to perform their own grouping operation to
+   collapse two or more groups back into one, but it is impossible to undo a grouping. That being said,
+   we also cannot afford to have infinite entries, so there is a balance. As an example, we do not want
+   to track each and every 'comment' separately, since we know of cases where customers may use the
+   comment field as a sort of request ID with very high cardinality.
+
+2. The Query Shape is the key used for query settings application. Any two queries with the same
+   shape will have the same settings applied. It would then logically follow that any two queries with
+   the same query stats store key also have the same query settings applied, since the query shape
+   is part of the query stats store key.
+
+3. The Query Shape is generally meant to capture anything semantically important to the query. If an
+   option may change the results, it should probably go here. If the option might only impact
+   performance or isolation, it should not go here. A couple examples:
+
+- The 'maxTimeMs' is not part of the query shape since it does not matter for the semantics of the
+  query - it's purely an operational concern.
+- As a trickier example, 'readConcern' was also excluded from the query shape since it only impacts
+  isolation guarantees. A shapified version is included in the query stats store key. From a query
+  language perspective, it does not really dictate which documents will semantically match the query -
+  it's purely a matter of timing. It was deemed more of an operational option/concern. This is a close
+  call, because - considering shard filtering and the readConcern level 'available', which does not
+  apply shard filtering - a different readConcern level may actually impact which query plan is
+  appropriate, and so it probably should play a discriminating role in a plan cache key. A key thought
+  experiment here was that a query setting for two identical queries which differ only by readConcern
+  should probably apply to both.
+
+- Finally, another borderline example, the 'hint' option is **not** part of the query shape because
+  it should only impact performance. The 'hint' is part of the query stats store key. Further, the
+  team decided that a query setting should likely impact all queries which differ only by hint (and it
+  should override that hint). If an operator sees that a particular query shape should prefer one
+  index type, it should logically apply to all queries of that shape. One day we may add the ability
+  to override a query setting via a hint, but this is the intended behavior for now.
+
+#### Engineering Considerations
+
 The dimensions considered will depend on the command, but can generally be found in the
 [`KeyGenerator`](key_generator.h) interface, which will generate the query stats store keys by which
 we accumulate statistics. As one example, you can find the
