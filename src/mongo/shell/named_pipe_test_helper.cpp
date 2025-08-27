@@ -225,9 +225,10 @@ void NamedPipeHelper::writeToPipeObjects(std::string pipeDir,
     try {
         const int kNumBsonObjs = bsonObjs.size();
         NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath, persistPipe);  // producer
+        LOGV2_INFO(8206002, "The pipe writer thread: pipe cleanup complete");
 
         pipeWriter.open();
-        LOGV2_INFO(8206002, "The pipe writer thread: pipe opened", "pipe"_attr = pipeRelativePath);
+        LOGV2_INFO(9211500, "The pipe writer thread: pipe opened", "pipe"_attr = pipeRelativePath);
         for (long i = 0; i < objects; ++i) {
             BSONObj bsonObj{bsonObjs[i % kNumBsonObjs]};
             pipeWriter.write(bsonObj.objdata(), bsonObj.objsize());
