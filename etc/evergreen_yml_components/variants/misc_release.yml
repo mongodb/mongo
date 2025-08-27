@@ -1050,7 +1050,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian11-large
-  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: .aggfuzzer .common !.feature_flag_guarded !.multiversion
   - name: aggregation !.feature_flag_guarded
   - name: aggregation_auth
   - name: .auth !.audit !.multiversion
@@ -1063,11 +1063,10 @@ buildvariants:
   - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs !.encrypt
+  - name: .sharding .common !.csrs !.encrypt !.multiversion
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   # TODO SERVER-89541 Remove ocsp tag once oscrypto gets updated
   - name: .ssl !.ocsp
@@ -1115,7 +1114,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian11-large
-  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: .aggfuzzer .common !.feature_flag_guarded !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   # TODO SERVER-89541 Remove ocsp tag once oscrypto gets updated
