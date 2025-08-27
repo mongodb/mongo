@@ -29,18 +29,55 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
-#include "mongo/executor/task_executor_cursor.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 /**
+ * Interface used to retrieve the execution stats of explain().
+ *
+ * Used to decouple the execution code from the optimization one (so the optimization code does not
+ * need a TaskExecutorCursor for example).
+ * TODO SERVER-107930: It can go away once VectorSearchStage::getExplainOutput() is implemented.
+ */
+class DSVectorSearchExecStatsWrapper {
+public:
+    class StatsProvider {
+    public:
+        virtual boost::optional<BSONObj> getStats() = 0;
+        virtual ~StatsProvider() = default;
+    };
+
+    /**
+     * Retrieves the execution statistics.
+     */
+    boost::optional<BSONObj> getExecStats() {
+        if (!_provider) {
+            return boost::none;
+        }
+        return _provider->getStats();
+    }
+
+    void setStatsProvider(std::unique_ptr<StatsProvider> provider) {
+        _provider = std::move(provider);
+    }
+
+private:
+    std::unique_ptr<StatsProvider> _provider{nullptr};
+};
+
+/**
  * A class to retrieve vector search results from a mongot process.
  */
-class DocumentSourceVectorSearch : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceVectorSearch : public DocumentSource {
 public:
     const BSONObj kSortSpec = BSON("$vectorSearchScore" << -1);
     static constexpr StringData kStageName = "$vectorSearch"_sd;
@@ -71,7 +108,7 @@ public:
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<InternalVectorSearchStoredSource>>(
                     "internalVectorSearchStoredSource")
-                ->getValue(pExpCtx->getNamespaceString().tenantId())
+                ->getValue(getExpCtx()->getNamespaceString().tenantId())
                 .getEnabled();
         return isVectorSearchStoredSourceEnabled
             ? _originalSpec.getBoolField(kReturnStoredSourceFieldName)
@@ -88,7 +125,7 @@ public:
         DistributedPlanLogic logic;
         logic.shardsStage = this;
         if (_limit) {
-            logic.mergingStages = {DocumentSourceLimit::create(pExpCtx, *_limit)};
+            logic.mergingStages = {DocumentSourceLimit::create(getExpCtx(), *_limit)};
         }
         logic.mergeSortPattern = kSortSpec;
         return logic;
@@ -109,7 +146,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
-        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        auto expCtx = newExpCtx ? newExpCtx : getExpCtx();
         return make_intrusive<DocumentSourceVectorSearch>(
             expCtx, _taskExecutor, _originalSpec.copy());
     }
@@ -141,12 +178,8 @@ protected:
                                                    DocumentSourceContainer* container) override;
 
 private:
-    // Get the next record from mongot. This will establish the mongot cursor on the first call.
-    GetNextResult doGetNext() final;
-
-    boost::optional<BSONObj> getNext();
-
-    DocumentSource::GetNextResult getNextAfterSetup();
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
     // Initialize metrics related to the $vectorSearch stage on the OpDebug object.
     void initializeOpDebugVectorSearchMetrics();
@@ -172,12 +205,10 @@ private:
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
 
-    std::unique_ptr<executor::TaskExecutorCursor> _cursor;
-
-    // Store the cursorId. We need to store it on the document source because the id on the
-    // TaskExecutorCursor will be set to zero after the final getMore after the cursor is
-    // exhausted.
-    boost::optional<CursorId> _cursorId{boost::none};
+    // Set when the execution stage is created.
+    // TODO SERVER-107930: Remove it when SourceVectorSearch::getExplainOutput() is
+    // implemented.
+    std::weak_ptr<DSVectorSearchExecStatsWrapper> _execStatsWrapper;
 
     // Limit value for the pipeline as a whole. This is not the limit that we send to mongot,
     // rather, it is used when adding the $limit stage to the merging pipeline in a sharded cluster.

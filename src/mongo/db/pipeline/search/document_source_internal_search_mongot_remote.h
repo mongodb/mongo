@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -46,10 +45,21 @@
 
 namespace mongo {
 
+struct InternalSearchMongotRemoteSharedState {
+    // TODO SERVER-94874: This does not need to be shared anymore when the ticket is done.
+    std::unique_ptr<executor::TaskExecutorCursor> _cursor;
+
+    /**
+     * Track whether either the stage or an earlier caller issues a mongot remote request. This
+     * can be true even if '_cursor' is nullptr, which can happen if no documents are returned.
+     */
+    bool _dispatchedQuery = false;
+};
+
 /**
  * A class to retrieve $search results from a mongot process.
  */
-class DocumentSourceInternalSearchMongotRemote : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalSearchMongotRemote : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSearchMongotRemote"_sd;
 
@@ -96,7 +106,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
-        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        auto expCtx = newExpCtx ? newExpCtx : getExpCtx();
         auto spec = InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
                                                                _spec.toBSON());
         return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
@@ -116,8 +126,8 @@ public:
     }
 
     void setCursor(std::unique_ptr<executor::TaskExecutorCursor> cursor) {
-        _cursor = std::move(cursor);
-        _dispatchedQuery = true;
+        _sharedState->_cursor = std::move(cursor);
+        _sharedState->_dispatchedQuery = true;
     }
 
     /**
@@ -125,7 +135,7 @@ public:
      * repeat the query to mongot.
      */
     void markCollectionEmpty() {
-        _dispatchedQuery = true;
+        _sharedState->_dispatchedQuery = true;
     }
 
     /**
@@ -146,7 +156,7 @@ public:
         // If it turns out that this stage is not running on a sharded collection, we don't want
         // to send the protocol version to mongot. If the protocol version is sent, mongot will
         // generate unmerged metadata documents that we won't be set up to merge.
-        if (!pExpCtx->getNeedsMerge()) {
+        if (!getExpCtx()->getNeedsMerge()) {
             return boost::none;
         }
         return _spec.getMetadataMergeProtocolVersion();
@@ -197,10 +207,6 @@ public:
         return _searchIdLookupMetrics;
     }
 
-    boost::optional<SearchQueryViewSpec> getView() {
-        return _spec.getView();
-    }
-
 protected:
     /**
      * Helper serialize method that avoids making mongot call during explain from mongos.
@@ -215,55 +221,23 @@ protected:
     Value serialize(const SerializationOptions& opts) const override;
 
     /**
-     * Inspects the cursor to see if it set any vars, and propogates their definitions to the
-     * ExpressionContext. For now, we only expect SEARCH_META to be defined.
-     */
-    void tryToSetSearchMetaVar();
-
-    virtual std::unique_ptr<executor::TaskExecutorCursor> establishCursor();
-
-    virtual GetNextResult getNextAfterSetup();
-
-    bool shouldReturnEOF();
-
-    /**
      * This stage may need to merge the metadata it generates on the merging half of the pipeline.
      * Until we know if the merge needs to be done, we hold the pipeline containing the merging
      * logic here.
      */
     std::unique_ptr<Pipeline> _mergingPipeline;
 
-    std::unique_ptr<executor::TaskExecutorCursor> _cursor;
+    std::shared_ptr<InternalSearchMongotRemoteSharedState> _sharedState;
 
 private:
-    /**
-     * Does some common setup and checks, then calls 'getNextAfterSetup()' if appropriate.
-     */
-    GetNextResult doGetNext() final;
-
-    boost::optional<BSONObj> _getNext();
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchMongotRemoteToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSearchMetaToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
     InternalSearchMongotRemoteSpec _spec;
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
-
-    /**
-     * Track whether either the stage or an earlier caller issues a mongot remote request. This
-     * can be true even if '_cursor' is nullptr, which can happen if no documents are returned.
-     */
-    bool _dispatchedQuery = false;
-
-    // Store the cursorId. We need to store it on the document source because the id on the
-    // TaskExecutorCursor will be set to zero after the final getMore after the cursor is
-    // exhausted.
-    boost::optional<CursorId> _cursorId{boost::none};
-
-    long long _docsReturned = 0;
-
-    /**
-     * Sort key generator used to populate $sortKey. Has a value iff '_sortSpec' has a value.
-     */
-    boost::optional<SortKeyGenerator> _sortKeyGen;
 
     /**
      * SearchIdLookupMetrics between MongotRemote & SearchIdLookup DocumentSources.

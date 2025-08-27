@@ -48,7 +48,7 @@ namespace mongo {
  * We only ever make a DocumentSourceSearch for a pipeline to store it in the view catalog.
  * Desugaring must be done every time the view is called.
  */
-class DocumentSourceSearch final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceSearch final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$search"_sd;
 
@@ -70,9 +70,7 @@ public:
 
     DocumentSourceSearch(const boost::intrusive_ptr<ExpressionContext> expCtx,
                          InternalSearchMongotRemoteSpec spec)
-        : DocumentSource(kStageName, expCtx),
-          exec::agg::Stage(kStageName, expCtx),
-          _spec(std::move(spec)) {}
+        : DocumentSource(kStageName, expCtx), _spec(std::move(spec)) {}
 
     const char* getSourceName() const override;
     StageConstraints constraints(PipelineSplitState pipeState) const override;
@@ -88,7 +86,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
-        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        auto expCtx = newExpCtx ? newExpCtx : getExpCtx();
         return make_intrusive<DocumentSourceSearch>(expCtx, _spec);
     }
 
@@ -134,7 +132,7 @@ public:
         // If it turns out that this stage is not running on a sharded collection, we don't want
         // to send the protocol version to mongot. If the protocol version is sent, mongot will
         // generate unmerged metadata documents that we won't be set up to merge.
-        if (!pExpCtx->getNeedsMerge()) {
+        if (!getExpCtx()->getNeedsMerge()) {
             return boost::none;
         }
         return _spec.getMetadataMergeProtocolVersion();
@@ -180,11 +178,6 @@ public:
 
 private:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-
-    GetNextResult doGetNext() override {
-        // We should never execute a DocumentSourceSearch.
-        MONGO_UNREACHABLE_TASSERT(6253716);
-    }
 
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) override;

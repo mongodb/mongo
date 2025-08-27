@@ -537,6 +537,108 @@ TEST(ShredDocument, HandlesMetadata) {
     ASSERT_EQ(6, shredded.metadata().getSearchScore());
 }
 
+TEST(DocumentMerge, Sanity) {
+    /**
+     * doc1
+     * { "a": 1, "b": 2.2, "c": null }
+     *
+     * doc2
+     * { "a": 42, "d": false }
+     *
+     * result
+     * {  "a": 42, "b": 2.2, "c": null, "d": false }
+     */
+    Document doc1 = fromBson(BSON("a" << 1 << "b" << 2.2 << "c" << BSONNULL));
+    Document doc2 = fromBson(BSON("a" << 42 << "d" << false));
+
+    auto mergedDoc = Document::deepMerge(doc1, doc2);
+    // Value in 'doc2' prevails over value in 'doc1'.
+    ASSERT_EQUALS(42, mergedDoc["a"].getInt());
+    ASSERT_EQUALS(2.2, mergedDoc["b"].getDouble());
+    ASSERT_EQUALS(BSONType::null, mergedDoc["c"].getType());
+    ASSERT_EQUALS(false, mergedDoc["d"].getBool());
+}
+
+TEST(DocumentMerge, ArraysValueInRightDocumentPrevails) {
+    /**
+     * doc1
+     * {
+     *      "key": [ { "a": 1 }, { "b": 2 } ]
+     * }
+     *
+     * doc2
+     * {
+     *      "key": [ { "c": 3 }, { "d": 4 } ]
+     * }
+     *
+     * result
+     * {
+     *      "key": [ { "c": 3 }, { "c": 4 } ]
+     * }
+     */
+    Document doc1 = fromBson(BSON("key" << BSON_ARRAY(BSON("a" << 1) << BSON("b" << 2))));
+    Document doc2 = fromBson(BSON("key" << BSON_ARRAY(BSON("c" << 3) << BSON("d" << 4))));
+
+    auto mergedDoc = Document::deepMerge(doc1, doc2);
+    auto arr = mergedDoc["key"].getArray();
+    ASSERT_EQ(3, arr[0]["c"].getInt());
+    ASSERT_EQ(4, arr[1]["d"].getInt());
+}
+
+TEST(DocumentMerge, SubDocumentsAreMerged) {
+    /**
+     * doc1
+     * {
+     *      "key": { "a": 1, "b": 2 }
+     * }
+     *
+     * doc2
+     * {
+     *      "key": { "c": 3, "d": 4 }
+     * }
+     *
+     * result
+     * {
+     *      "key": { "a": 1, "b": 2, "c": 3 , "d": 4 }
+     * }
+     */
+    Document doc1 = fromBson(BSON("key" << BSON("a" << 1 << "b" << 2)));
+    Document doc2 = fromBson(BSON("key" << BSON("c" << 3 << "d" << 4)));
+
+    auto mergedDoc = Document::deepMerge(doc1, doc2);
+    ASSERT_EQ(1, mergedDoc["key"]["a"].getInt());
+    ASSERT_EQ(2, mergedDoc["key"]["b"].getInt());
+    ASSERT_EQ(3, mergedDoc["key"]["c"].getInt());
+    ASSERT_EQ(4, mergedDoc["key"]["d"].getInt());
+}
+
+TEST(DocumentMerge, SubDocumentsAreMergedRecursively) {
+    /**
+     * doc1
+     * {
+     *      "key": { "a": { "b": 1 }, "c": { "d": 2 } }
+     * }
+     *
+     * doc2
+     * {
+     *      "key": { "a": { "e": 3 }, "f": { "g": 4 } }
+     * }
+     *
+     * result
+     * {
+     *      "key": { "a": { "b": 1, "e": 3 }, "c": { "d": 2 }, "f": { "g": 4 } }
+     * }
+     */
+    Document doc1 = fromBson(BSON("key" << BSON("a" << BSON("b" << 1) << "c" << BSON("d" << 2))));
+    Document doc2 = fromBson(BSON("key" << BSON("a" << BSON("e" << 3) << "f" << BSON("g" << 4))));
+
+    auto mergedDoc = Document::deepMerge(doc1, doc2);
+    ASSERT_EQ(1, mergedDoc["key"]["a"]["b"].getInt());
+    ASSERT_EQ(3, mergedDoc["key"]["a"]["e"].getInt());
+    ASSERT_EQ(2, mergedDoc["key"]["c"]["d"].getInt());
+    ASSERT_EQ(4, mergedDoc["key"]["f"]["g"].getInt());
+}
+
 /** Add Document fields. */
 class AddField {
 public:

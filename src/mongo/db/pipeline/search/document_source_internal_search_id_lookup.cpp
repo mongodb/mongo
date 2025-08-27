@@ -52,10 +52,9 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     ExecShardFilterPolicy shardFilterPolicy,
     boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
       _limit(limit),
       _shardFilterPolicy(shardFilterPolicy),
-      _viewPipeline(view ? Pipeline::parse(view->getEffectivePipeline(), pExpCtx) : nullptr) {
+      _viewPipeline(view ? Pipeline::parse(view->getEffectivePipeline(), getExpCtx()) : nullptr) {
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
@@ -117,85 +116,10 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         }
 
         outputSpec["subPipeline"] =
-            Value(Pipeline::parse(pipeline, pExpCtx)->serializeToBson(opts));
-
-        if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
-            const PlanSummaryStats& stats = _stats.planSummaryStats;
-            outputSpec["totalDocsExamined"] =
-                Value(static_cast<long long>(stats.totalDocsExamined));
-            outputSpec["totalKeysExamined"] =
-                Value(static_cast<long long>(stats.totalKeysExamined));
-            outputSpec["numDocsFilteredByIdLookup"] = opts.serializeLiteral(
-                Value((long long)(_searchIdLookupMetrics->getDocsSeenByIdLookup() -
-                                  _searchIdLookupMetrics->getDocsReturnedByIdLookup())));
-        }
+            Value(Pipeline::parse(pipeline, getExpCtx())->serializeToBson(opts));
     }
 
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() {
-    boost::optional<Document> result;
-    Document inputDoc;
-    if (_limit != 0 && _searchIdLookupMetrics->getDocsReturnedByIdLookup() >= _limit) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-    while (!result) {
-        auto nextInput = pSource->getNext();
-        if (!nextInput.isAdvanced()) {
-            return nextInput;
-        }
-
-        _searchIdLookupMetrics->incrementDocsSeenByIdLookup();
-        inputDoc = nextInput.releaseDocument();
-        auto documentId = inputDoc["_id"];
-
-        if (!documentId.missing()) {
-            auto documentKey = Document({{"_id", documentId}});
-
-            uassert(31052,
-                    "Collection must have a UUID to use $_internalSearchIdLookup.",
-                    pExpCtx->getUUID().has_value());
-
-            // Find the document by performing a local read.
-            MakePipelineOptions pipelineOpts;
-            pipelineOpts.attachCursorSource = false;
-            auto pipeline =
-                Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
-
-            if (_viewPipeline) {
-                // When search query is being run on a view, we append the view pipeline to the end
-                // of the idLookup's subpipeline. This allows idLookup to retrieve the
-                // full/unmodified documents (from the _id values returned by mongot), apply the
-                // view's data transforms, and pass said transformed documents through the rest of
-                // the user pipeline.
-                pipeline->appendPipeline(_viewPipeline->clone(pExpCtx));
-            }
-
-            pipeline =
-                pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                    pipeline.release(), boost::none, false, _shardFilterPolicy);
-            auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
-            result = execPipeline->getNext();
-            if (auto next = execPipeline->getNext()) {
-                uasserted(ErrorCodes::TooManyMatchingDocuments,
-                          str::stream() << "found more than one document with document key "
-                                        << documentKey.toString() << ": [" << result->toString()
-                                        << ", " << next->toString() << "]");
-            }
-
-            execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-        }
-    }
-
-    // Result must be populated here - EOF returns above.
-    invariant(result);
-    MutableDocument output(*result);
-
-    // Transfer searchScore metadata from inputDoc to the result.
-    output.copyMetaDataFrom(inputDoc);
-    _searchIdLookupMetrics->incrementDocsReturnedByIdLookup();
-    return output.freeze();
 }
 
 const char* DocumentSourceInternalSearchIdLookUp::getSourceName() const {

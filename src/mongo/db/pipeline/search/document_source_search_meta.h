@@ -74,11 +74,13 @@ public:
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
-        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        auto expCtx = newExpCtx ? newExpCtx : getExpCtx();
         auto executor =
             executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
         auto spec = getMongotRemoteSpec();
-        tassert(9497007, "Cannot clone with an initialized cursor - it cannot be shared", !_cursor);
+        tassert(9497007,
+                "Cannot clone with an initialized cursor - it cannot be shared",
+                !_sharedState->_cursor);
         if (_mergingPipeline) {
             spec.setMergingPipeline(_mergingPipeline->serializeToBson());
         }
@@ -101,20 +103,18 @@ public:
     }
 
     std::unique_ptr<executor::TaskExecutorCursor> getCursor() {
-        return std::move(_cursor);
+        return std::move(_sharedState->_cursor);
     }
 
-protected:
-    std::unique_ptr<executor::TaskExecutorCursor> establishCursor() override;
 
 private:
-    GetNextResult getNextAfterSetup() override;
-
-    bool _returnedAlready = false;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSearchMetaToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
     // An unique id of search stage in the pipeline, currently it is hard coded to 0 because we can
     // only have one search stage and sub-pipelines are not in the same PlanExecutor.
     // We should assign unique ids when we have everything in a single PlanExecutorSBE.
+    // TODO SERVER-109825: This should be moved to SearchMetaStage class.
     size_t _remoteCursorId{0};
 
     boost::optional<BSONObj> _remoteCursorVars;

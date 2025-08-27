@@ -32,10 +32,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
-#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/query/search/search_task_executors.h"
@@ -82,74 +80,8 @@ DocumentSourceSearchMeta::distributedPlanLogic() {
     // serialized and sent to a remote shard, which causes "_mergingPipeline" to go out of scope and
     // dispose() each stage. That screws up the other pointers to these stages who now have disposed
     // DocumentSources which are expected to immediately return EOF.
-    logic.mergingStages = cloneEachOne(_mergingPipeline->getSources(), pExpCtx);
+    logic.mergingStages = cloneEachOne(_mergingPipeline->getSources(), getExpCtx());
     return logic;
-}
-
-std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establishCursor() {
-    // TODO SERVER-94875 We should be able to remove any cursor establishment logic from
-    // DocumentSourceSearchMeta if we establish the cursors during search_helper
-    // pipeline preparation instead.
-    auto cursors =
-        mongot_cursor::establishCursorsForSearchMetaStage(pExpCtx,
-                                                          getSearchQuery(),
-                                                          getTaskExecutor(),
-                                                          getIntermediateResultsProtocolVersion(),
-                                                          nullptr,
-                                                          getView());
-
-    // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block.
-    // Mongot can return only an explain object or an explain with a cursor. If mongot returned
-    // the explain object only, the cursor will not have attached vars. Since there's a
-    // possibility of not having vars for explain, we skip the check.
-    if (pExpCtx->getExplain() && cursors.size() == 1) {
-        return std::move(*cursors.begin());
-    }
-    if (cursors.size() == 1) {
-        const auto& cursor = *cursors.begin();
-        tassert(6448010,
-                "If there's one cursor we expect to get SEARCH_META from the attached vars",
-                !getIntermediateResultsProtocolVersion() && !cursor->getType() &&
-                    cursor->getCursorVars());
-        return std::move(*cursors.begin());
-    }
-    for (auto&& cursor : cursors) {
-        auto maybeCursorType = cursor->getType();
-        tassert(6448008, "Expected every mongot cursor to come back with a type", maybeCursorType);
-        if (*maybeCursorType == CursorTypeEnum::SearchMetaResult) {
-            // Note this may leak the other cursor(s). Should look into whether we can
-            // killCursors.
-            return std::move(cursor);
-        }
-    }
-    tasserted(6448009, "Expected to get a metadata cursor back from mongot, found none");
-}
-
-DocumentSource::GetNextResult DocumentSourceSearchMeta::getNextAfterSetup() {
-    if (pExpCtx->getNeedsMerge()) {
-        // When we are merging $searchMeta we have established a cursor which only returns metadata
-        // results (see 'establishCursor()'). So just iterate that cursor normally.
-        return DocumentSourceInternalSearchMongotRemote::getNextAfterSetup();
-    }
-
-    if (!_returnedAlready) {
-        tryToSetSearchMetaVar();
-        auto& vars = pExpCtx->variables;
-
-        // TODO SERVER-91594: Remove this explain specific block.
-        // If mongot only returns an explain object, it will not have any attached vars and we
-        // should return EOF.
-        if (pExpCtx->getExplain() && !vars.hasConstantValue(Variables::kSearchMetaId)) {
-            return GetNextResult::makeEOF();
-        }
-        tassert(6448005,
-                "Expected SEARCH_META to be set for $searchMeta stage",
-                vars.hasConstantValue(Variables::kSearchMetaId) &&
-                    vars.getValue(Variables::kSearchMetaId).isObject());
-        _returnedAlready = true;
-        return {vars.getValue(Variables::kSearchMetaId).getDocument()};
-    }
-    return GetNextResult::makeEOF();
 }
 
 namespace {

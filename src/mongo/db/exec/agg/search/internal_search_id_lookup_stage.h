@@ -27,39 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/explain_util.h"
+#pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/exec_shard_filter_policy.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 
-namespace mongo {
+#include <memory>
 
-std::vector<Value> mergeExplains(const Pipeline& p1,
-                                 const exec::agg::Pipeline& p2,
-                                 const SerializationOptions& opts) {
-    auto e1 = p1.writeExplainOps(opts);
-    auto e2 = p2.writeExplainOps(opts);
-    return mergeExplains(e1, e2);
-}
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-std::vector<Value> mergeExplains(const std::vector<Value>& lhs, const std::vector<Value>& rhs) {
-    tassert(10422601, "pipeline sizes are not equal", lhs.size() == rhs.size());
+namespace mongo::exec::agg {
 
-    std::vector<Value> result;
-    result.reserve(lhs.size());
+class InternalSearchIdLookUpStage final : public Stage {
+public:
+    using SearchIdLookupMetrics = DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics;
 
-    for (size_t i = 0; i < lhs.size(); i++) {
-        tassert(10422602,
-                "expected explain input of type object",
-                lhs[i].getType() == BSONType::object);
-        tassert(10422603,
-                "expected explain input of type object",
-                rhs[i].getType() == BSONType::object);
-        Document d1 = lhs[i].getDocument();
-        Document d2 = rhs[i].getDocument();
-        result.emplace_back(Document::deepMerge(d1, d2));
+    InternalSearchIdLookUpStage(StringData stageName,
+                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                long long limit,
+                                ExecShardFilterPolicy shardFilterPolicy,
+                                const std::shared_ptr<SearchIdLookupMetrics>& searchIdLookupMetrics,
+                                std::unique_ptr<mongo::Pipeline> viewPipeline);
+
+    const SpecificStats* getSpecificStats() const override {
+        return &_stats;
     }
 
-    return result;
-}
+    Document getExplainOutput() const override;
 
-}  // namespace mongo
+private:
+    GetNextResult doGetNext() final;
+
+    const std::string _stageName;
+    const long long _limit;
+    ExecShardFilterPolicy _shardFilterPolicy;
+
+    std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics;
+    DocumentSourceIdLookupStats _stats;
+
+    // If a search query is run on a view, we store the parsed view pipeline.
+    std::unique_ptr<mongo::Pipeline> _viewPipeline;
+};
+
+}  // namespace mongo::exec::agg

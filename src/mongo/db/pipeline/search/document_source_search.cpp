@@ -89,7 +89,7 @@ Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
     // If we are in a router, serialize the full spec.
     // Otherwise, just serialize the mongotQuery.
     if ((!opts.isSerializingForQueryStats() && !opts.isSerializingForExplain()) ||
-        pExpCtx->getInRouter()) {
+        getExpCtx()->getInRouter()) {
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
     return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
@@ -135,7 +135,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     auto executor =
-        executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
+        executor::getMongotTaskExecutor(getExpCtx()->getOperationContext()->getServiceContext());
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline;
     // 'getBoolField' returns false if the field is not present.
     bool storedSource = _spec.getMongotQuery().getBoolField(mongot_cursor::kReturnStoredSourceArg);
@@ -153,11 +153,14 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     spec.setMergingPipeline(boost::none);
 
     auto mongoTRemoteStage = make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-        std::move(spec), pExpCtx, executor);
+        std::move(spec), getExpCtx(), executor);
     desugaredPipeline.push_back(mongoTRemoteStage);
 
-    search_helpers::promoteStoredSourceOrAddIdLookup(
-        pExpCtx, desugaredPipeline, storedSource, _spec.getLimit().value_or(0), _spec.getView());
+    search_helpers::promoteStoredSourceOrAddIdLookup(getExpCtx(),
+                                                     desugaredPipeline,
+                                                     storedSource,
+                                                     _spec.getLimit().value_or(0),
+                                                     _spec.getView());
 
     return desugaredPipeline;
 }
@@ -243,7 +246,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
         // sortSpec in response. Note that this is done for unsharded collections as well as sharded
         // ones because the two collection types are treated the same in the context of shard
         // targeting.
-        search_helpers::planShardedSearch(pExpCtx, &_spec);
+        search_helpers::planShardedSearch(getExpCtx(), &_spec);
         validateSortSpec(_spec.getSortSpec());
     }
 
@@ -253,8 +256,8 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
     logic.shardsStage = this;
     if (_spec.getMergingPipeline() && _spec.getRequiresSearchMetaCursor()) {
         logic.mergingStages = {DocumentSourceSetVariableFromSubPipeline::create(
-            pExpCtx,
-            Pipeline::parse(*_spec.getMergingPipeline(), pExpCtx),
+            getExpCtx(),
+            Pipeline::parse(*_spec.getMergingPipeline(), getExpCtx()),
             Variables::kSearchMetaId)};
     }
 

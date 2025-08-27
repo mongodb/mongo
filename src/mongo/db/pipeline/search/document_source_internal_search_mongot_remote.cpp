@@ -55,54 +55,25 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-namespace {
-auto withSortKeyMetadata(auto&& resultBson, const auto& stageSpec, const auto& sortKeyGen) {
-    // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
-    MutableDocument output(Document::fromBsonWithMetaData(std::move(resultBson)));
-
-    // If we have a sortSpec, then we use that to set sortKey. Otherwise, use the 'searchScore'
-    // if the document has one.
-    if (stageSpec.getSortSpec().has_value()) {
-        tassert(7320402,
-                "_sortKeyGen must be initialized if _sortSpec is present",
-                sortKeyGen.has_value());
-        auto sortKey = sortKeyGen->computeSortKeyFromDocument(output.peek());
-        output.metadata().setSortKey(sortKey, sortKeyGen->isSingleElementKey());
-    } else if (output.metadata().hasSearchScore()) {
-        // If this stage is getting metadata documents from mongot, those don't include
-        // searchScore.
-        output.metadata().setSortKey(Value{output.metadata().getSearchScore()},
-                                     true /* isSingleElementKey */);
-    }
-    return output.freeze();
-}
-
-}  // namespace
-MONGO_FAIL_POINT_DEFINE(failClassicSearch);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchMongotRemote,
                             DocumentSourceInternalSearchMongotRemote::id)
-
-using executor::TaskExecutorCursor;
 
 DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote(
     InternalSearchMongotRemoteSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor)
     : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
       _mergingPipeline(spec.getMergingPipeline().has_value()
                            ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
                            : nullptr),
+      _sharedState(std::make_shared<InternalSearchMongotRemoteSharedState>()),
       _spec(std::move(spec)),
       _taskExecutor(taskExecutor) {
     LOGV2_DEBUG(9497006,
                 5,
                 "Creating DocumentSourceInternalSearchMongotRemote",
                 "spec"_attr = redact(_spec.toBSON()));
-    if (_spec.getSortSpec().has_value()) {
-        _sortKeyGen.emplace(SortPattern{*_spec.getSortSpec(), pExpCtx}, pExpCtx->getCollator());
-    }
 }
 
 const char* DocumentSourceInternalSearchMongotRemote::getSourceName() const {
@@ -115,7 +86,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
         // We've redacted the interesting parts of the stage, return early.
         return innerSpecVal;
     }
-    if ((!opts.isSerializingForExplain() || pExpCtx->getInRouter()) &&
+    if ((!opts.isSerializingForExplain() || getExpCtx()->getInRouter()) &&
         _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
         MutableDocument innerSpec{innerSpecVal.getDocument()};
         innerSpec[InternalSearchMongotRemoteSpec::kMergingPipelineFieldName] =
@@ -128,7 +99,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
 Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     const SerializationOptions& opts) const {
     // Though router can generate explain output, it should never make a remote call to the mongot.
-    if (!opts.isSerializingForExplain() || pExpCtx->getInRouter()) {
+    if (!opts.isSerializingForExplain() || getExpCtx()->getInRouter()) {
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {
             // TODO SERVER-90941 The IDL should be able to handle this serialization once we
             // populate the query_shape field.
@@ -162,14 +133,16 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     // If the query is an explain that executed the query, we obtain the explain object from the
     // taskExecutorCursor. Otherwise, we need to obtain the explain
     // object now. We also obtain the getMoreStrategy which contains the batchSizeHistory.
+    // TODO SERVER-107930: Remove '_sharedState' and the need of a cursor once
+    // InternalSearchMongotRemoteStage::getExplainOutput() is implemented.
     boost::optional<BSONObj> explainResponse = boost::none;
     std::shared_ptr<executor::MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy =
         nullptr;
-    if (_cursor) {
-        explainResponse = _cursor->getCursorExplain();
+    if (_sharedState->_cursor) {
+        explainResponse = _sharedState->_cursor->getCursorExplain();
         mongotGetMoreStrategy =
             dynamic_pointer_cast<executor::MongotTaskExecutorCursorGetMoreStrategy>(
-                _cursor->getOptions().getMoreStrategy);
+                _sharedState->_cursor->getOptions().getMoreStrategy);
     }
 
     mongot_cursor::OptimizationFlags optFlags = search_helpers::isSearchMetaStage(this)
@@ -178,7 +151,7 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
 
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
         return mongot_cursor::getSearchExplainResponse(
-            pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get(), optFlags);
+            getExpCtx().get(), _spec.getMongotQuery(), _taskExecutor.get(), optFlags);
     });
 
     MutableDocument mDoc;
@@ -242,140 +215,5 @@ DepsTracker::State DocumentSourceInternalSearchMongotRemote::getDependencies(
     }
 
     return DepsTracker::State::NOT_SUPPORTED;
-}
-
-boost::optional<BSONObj> DocumentSourceInternalSearchMongotRemote::_getNext() {
-    try {
-        return _cursor->getNext(pExpCtx->getOperationContext());
-    } catch (DBException& ex) {
-        ex.addContext("Remote error from mongot");
-        throw;
-    }
-}
-
-bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
-    if (MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
-        return true;
-    }
-
-    if (MONGO_unlikely(failClassicSearch.shouldFail())) {
-        uasserted(7942401, "Fail because failClassicSearch is enabled");
-    }
-
-    if (_spec.getLimit().has_value() && *_spec.getLimit() != 0 &&
-        _docsReturned >= *_spec.getLimit()) {
-        return true;
-    }
-
-    // Return EOF if pExpCtx->getUUID() is unset here; the collection we are searching over has not
-    // been created yet.
-    if (!pExpCtx->getUUID()) {
-        LOGV2_DEBUG(8569402, 4, "Returning EOF due to lack of UUID");
-        return true;
-    }
-
-    if (pExpCtx->getExplain() &&
-        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) {
-        return true;
-    }
-
-    return false;
-}
-
-void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
-    // Meta variables will be constant across the query and only need to be set once.
-    // This feature was backported and is available on versions after 4.4. Therefore there is no
-    // need to check FCV, as downgrading should not cause any issues.
-    if (!pExpCtx->variables.hasConstantValue(Variables::kSearchMetaId) && _cursor &&
-        _cursor->getCursorVars()) {
-        // Variables on the cursor must be an object.
-        auto varsObj = Value(_cursor->getCursorVars().value());
-        LOGV2_DEBUG(8569400, 4, "Setting meta vars", "varsObj"_attr = redact(varsObj.toString()));
-        std::string varName = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
-        auto metaVal = varsObj.getDocument().getField(StringData{varName});
-        if (!metaVal.missing()) {
-            pExpCtx->variables.setReservedValue(Variables::kSearchMetaId, metaVal, true);
-            if (metaVal.isObject()) {
-                auto metaValDoc = metaVal.getDocument();
-                if (!metaValDoc.getField("count").missing()) {
-                    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
-                    opDebug.mongotCountVal = metaValDoc.getField("count").wrap("count");
-                }
-
-                if (!metaValDoc.getField(mongot_cursor::kSlowQueryLogFieldName).missing()) {
-                    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
-                    opDebug.mongotSlowQueryLog =
-                        metaValDoc.getField(mongot_cursor::kSlowQueryLogFieldName)
-                            .wrap(mongot_cursor::kSlowQueryLogFieldName);
-                }
-            }
-        }
-    }
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextAfterSetup() {
-    auto response = _getNext();
-    LOGV2_DEBUG(8569401,
-                5,
-                "getting next after setup",
-                "response"_attr = response.map([](const BSONObj& b) { return redact(b); }));
-    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
-
-    if (opDebug.msWaitingForMongot) {
-        *opDebug.msWaitingForMongot += durationCount<Milliseconds>(_cursor->resetWaitingTime());
-    } else {
-        opDebug.msWaitingForMongot = durationCount<Milliseconds>(_cursor->resetWaitingTime());
-    }
-    opDebug.mongotBatchNum = _cursor->getBatchNum();
-
-    // The TaskExecutorCursor will store '0' as its CursorId if the cursor to mongot is exhausted.
-    // If we already have a cursorId from a previous call, just use that.
-    if (!_cursorId) {
-        _cursorId = _cursor->getCursorId();
-    }
-
-    opDebug.mongotCursorId = _cursorId;
-
-    if (!response) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    ++_docsReturned;
-    // Populate $sortKey metadata field so that downstream operators can correctly reason about the
-    // sort order. This can be important for mongos, so it can properly merge sort the document
-    // stream, or for $rankFusion to calculate the ranks of the results. This metadata can be safely
-    // ignored if nobody ends up needing it. It will be stripped out before a response is sent back
-    // to a client.
-    return withSortKeyMetadata(std::move(response.value()), _spec, _sortKeyGen);
-}
-
-std::unique_ptr<executor::TaskExecutorCursor>
-DocumentSourceInternalSearchMongotRemote::establishCursor() {
-    // TODO SERVER-94874 We should be able to remove any cursor establishment logic from
-    // DocumentSourceInternalSearchMongotRemote if we establish the cursors during search_helper
-    // pipeline preparation instead.
-    auto cursors = mongot_cursor::establishCursorsForSearchStage(
-        pExpCtx, _spec, _taskExecutor, boost::none, nullptr, getSearchIdLookupMetrics());
-    // Should be called only in unsharded scenario, therefore only expect a results cursor and no
-    // metadata cursor.
-    tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);
-    return std::move(cursors[0]);
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::doGetNext() {
-    if (shouldReturnEOF()) {
-        LOGV2_DEBUG(8569404, 4, "Returning EOF from $internalSearchMongotRemote");
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    // If the collection is sharded we should have a cursor already. Otherwise establish it now.
-    if (!_cursor && !_dispatchedQuery) {
-        LOGV2_DEBUG(8569403, 4, "Establishing Cursor");
-        _cursor = establishCursor();
-        _dispatchedQuery = true;
-    }
-    tryToSetSearchMetaVar();
-
-    return getNextAfterSetup();
 }
 }  // namespace mongo

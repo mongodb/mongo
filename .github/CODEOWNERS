@@ -1860,6 +1860,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/list_catalog_stage* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/mongo/db/exec/agg/**/query_stats_stage* @10gen/query-integration-observability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/exec/agg/search/OWNERS.yml
+/src/mongo/db/exec/agg/search/**/* @10gen/query-integration-search @svc-auto-approve-bot
+/src/mongo/db/exec/agg/search/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/exec/express/OWNERS.yml
 /src/mongo/db/exec/express/**/* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/exec/express/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot

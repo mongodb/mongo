@@ -262,10 +262,14 @@ public:
 
     /**
      * Merge two documents.
+     * Sub-documents with the same key are merged together, otherwise the value in 'rhs' overwrites
+     * the one in 'lhs'.
+     *
+     * Note: Arrays are treated as non-object types, but that can be changed if needed.
      *
      * @returns a new document resulting after the merge.
      */
-    static Document merge(const Document& lhs, const Document& rhs);
+    static Document deepMerge(const Document& lhs, const Document& rhs);
 
     std::string toString() const;
 

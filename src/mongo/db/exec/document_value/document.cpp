@@ -867,11 +867,19 @@ int Document::compare(const Document& rL,
     }
 }
 
-Document Document::merge(const Document& lhs, const Document& rhs) {
+Document Document::deepMerge(const Document& lhs, const Document& rhs) {
     MutableDocument result(lhs);
     for (auto it = rhs.fieldIterator(); it.more();) {
         auto p = it.next();
-        result.addField(p.first, p.second);
+        // Merge the values recursively if they're both documents. Otherwise, the value in 'rhs'
+        // prevails.
+        auto val = lhs.getField(p.first);
+        if (val.getType() == BSONType::object && p.second.getType() == BSONType::object) {
+            result.setField(p.first,
+                            Value(Document::deepMerge(val.getDocument(), p.second.getDocument())));
+        } else {
+            result.setField(p.first, p.second);
+        }
     }
     return result.freeze();
 }

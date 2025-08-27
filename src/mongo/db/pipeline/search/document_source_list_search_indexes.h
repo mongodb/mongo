@@ -31,16 +31,13 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/search/search_query_view_spec_gen.h"
-
-#include <queue>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 class DocumentSourceListSearchIndexesSpec;
 
-class DocumentSourceListSearchIndexes final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceListSearchIndexes final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listSearchIndexes"_sd;
     static constexpr StringData kCursorFieldName = "cursor"_sd;
@@ -97,9 +94,7 @@ public:
 
     DocumentSourceListSearchIndexes(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                     BSONObj cmdObj)
-        : DocumentSource(kStageName, pExpCtx),
-          exec::agg::Stage(kStageName, pExpCtx),
-          _cmdObj(cmdObj.getOwned()) {}
+        : DocumentSource(kStageName, pExpCtx), _cmdObj(cmdObj.getOwned()) {}
 
     const char* getSourceName() const override {
         return kStageName.data();
@@ -122,19 +117,10 @@ public:
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 
 private:
-    GetNextResult doGetNext() final;
-    BSONObj _cmdObj;
-    std::queue<BSONObj> _searchIndexes;
-    bool _eof = false;
-    // Cache the collection UUID to avoid retrieving the collection UUID for each 'doGetNext'
-    // call.
-    boost::optional<UUID> _collectionUUID;
-    // Cache the underlying source collection name, which is necessary for supporting running
-    // search queries on views, to avoid retrieving on each getNext.
-    boost::optional<NamespaceString> _resolvedNamespace;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceListSearchIndexesToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
-    // Cache the view for search queries on views.
-    boost::optional<SearchQueryViewSpec> _view;
+    BSONObj _cmdObj;
 };
 
 }  // namespace mongo

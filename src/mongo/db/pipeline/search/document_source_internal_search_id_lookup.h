@@ -29,9 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/exec_shard_filter_policy.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
@@ -46,7 +44,7 @@ namespace mongo {
  * Input documents will be ignored and skipped if no document with key specified at "_id"
  * is locally-stored.
  */
-class DocumentSourceInternalSearchIdLookUp final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalSearchIdLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSearchIdLookup"_sd;
     /**
@@ -182,28 +180,23 @@ public:
         return _searchIdLookupMetrics;
     }
 
-    const SpecificStats* getSpecificStats() const override {
-        return &_stats;
-    }
-
 protected:
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) override;
 
 private:
-    DocumentSource::GetNextResult doGetNext() final;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
     long long _limit = 0;
+    // TODO SERVER-109825: Move to InternalSearchIdLookupStage class.
     ExecShardFilterPolicy _shardFilterPolicy = AutomaticShardFiltering{};
 
     std::shared_ptr<SearchIdLookupMetrics> _searchIdLookupMetrics =
         std::make_shared<SearchIdLookupMetrics>();
 
-    DocumentSourceIdLookupStats _stats;
-
     // If a search query is run on a view, we store the parsed view pipeline.
     std::unique_ptr<Pipeline> _viewPipeline;
-    std::unique_ptr<exec::agg::Pipeline> _viewExecPipeline;
 };
 
 }  // namespace mongo

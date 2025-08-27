@@ -27,39 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/explain_util.h"
+#pragma once
 
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/search/search_query_view_spec_gen.h"
+#include "mongo/util/uuid.h"
 
-namespace mongo {
+#include <queue>
 
-std::vector<Value> mergeExplains(const Pipeline& p1,
-                                 const exec::agg::Pipeline& p2,
-                                 const SerializationOptions& opts) {
-    auto e1 = p1.writeExplainOps(opts);
-    auto e2 = p2.writeExplainOps(opts);
-    return mergeExplains(e1, e2);
-}
+#include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-std::vector<Value> mergeExplains(const std::vector<Value>& lhs, const std::vector<Value>& rhs) {
-    tassert(10422601, "pipeline sizes are not equal", lhs.size() == rhs.size());
+namespace mongo::exec::agg {
 
-    std::vector<Value> result;
-    result.reserve(lhs.size());
+class ListSearchIndexesStage final : public Stage {
+public:
+    ListSearchIndexesStage(StringData stageName,
+                           const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                           BSONObj cmdObj);
 
-    for (size_t i = 0; i < lhs.size(); i++) {
-        tassert(10422602,
-                "expected explain input of type object",
-                lhs[i].getType() == BSONType::object);
-        tassert(10422603,
-                "expected explain input of type object",
-                rhs[i].getType() == BSONType::object);
-        Document d1 = lhs[i].getDocument();
-        Document d2 = rhs[i].getDocument();
-        result.emplace_back(Document::deepMerge(d1, d2));
-    }
+private:
+    GetNextResult doGetNext() final;
 
-    return result;
-}
+    BSONObj _cmdObj;
+    std::queue<BSONObj> _searchIndexes;
+    bool _eof = false;
+    // Cache the collection UUID to avoid retrieving the collection UUID for each 'doGetNext'
+    // call.
+    boost::optional<UUID> _collectionUUID;
+    // Cache the underlying source collection name, which is necessary for supporting running
+    // search queries on views, to avoid retrieving on each getNext.
+    boost::optional<NamespaceString> _resolvedNamespace;
+    // Cache the view for search queries on views.
+    boost::optional<SearchQueryViewSpec> _view;
+};
 
-}  // namespace mongo
+}  // namespace mongo::exec::agg

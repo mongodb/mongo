@@ -62,8 +62,8 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     BSONObj originalSpec)
     : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
       _taskExecutor(taskExecutor),
+      _execStatsWrapper(std::make_shared<DSVectorSearchExecStatsWrapper>()),
       _originalSpec(originalSpec.getOwned()) {
     if (auto limitElem = _originalSpec.getField(kLimitFieldName)) {
         uassert(
@@ -79,7 +79,7 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
 }
 
 void DocumentSourceVectorSearch::initializeOpDebugVectorSearchMetrics() {
-    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
+    auto& opDebug = CurOp::get(getExpCtx()->getOperationContext())->debug();
     double numCandidatesLimitRatio = [&] {
         if (!_limit.has_value()) {
             return 0.0;
@@ -119,16 +119,19 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
 
     // We don't want router to make a remote call to mongot even though it can generate explain
     // output.
-    if (!opts.verbosity || pExpCtx->getInRouter()) {
+    if (!opts.verbosity || getExpCtx()->getInRouter()) {
         return Value(Document{{kStageName, _originalSpec}});
     }
 
     // If the query is an explain that executed the query, we obtain the explain object from the
     // TaskExecutorCursor. Otherwise, we need to obtain the explain
     // object now.
-    boost::optional<BSONObj> explainResponse = boost::none;
-    if (_cursor) {
-        explainResponse = _cursor->getCursorExplain();
+    // TODO SERVER-107930: Execution stats should be collected in
+    // SourceVectorSearch::getExplainOutput() and merged by the owner of the pipelines
+    // (Note: deciding when to call 'getVectorSearchExplainResponse()' may not be straightforward).
+    boost::optional<BSONObj> explainResponse;
+    if (auto wrapper = _execStatsWrapper.lock()) {
+        explainResponse = wrapper->getExecStats();
     }
 
     auto explainSpec = _originalSpec;
@@ -140,7 +143,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
             explainSpec = explainSpec.removeField("view");
         }
         return search_helpers::getVectorSearchExplainResponse(
-            pExpCtx, explainSpec, _taskExecutor.get());
+            getExpCtx(), explainSpec, _taskExecutor.get());
     });
 
     auto explainObj = explainSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
@@ -151,76 +154,6 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         explainObj = explainObj.addFields(BSON("queryVector" << "redacted"));
     }
     return Value(Document{{kStageName, explainObj}});
-}
-
-boost::optional<BSONObj> DocumentSourceVectorSearch::getNext() {
-    try {
-        return _cursor->getNext(pExpCtx->getOperationContext());
-    } catch (DBException& ex) {
-        ex.addContext("Remote error from mongot");
-        throw;
-    }
-}
-
-DocumentSource::GetNextResult DocumentSourceVectorSearch::getNextAfterSetup() {
-    auto response = getNext();
-    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
-
-    if (opDebug.msWaitingForMongot) {
-        *opDebug.msWaitingForMongot += durationCount<Milliseconds>(_cursor->resetWaitingTime());
-    } else {
-        opDebug.msWaitingForMongot = durationCount<Milliseconds>(_cursor->resetWaitingTime());
-    }
-    opDebug.mongotBatchNum = _cursor->getBatchNum();
-
-    // The TaskExecutorCursor will store '0' as its CursorId if the cursor to mongot is exhausted.
-    // If we already have a cursorId from a previous call, just use that.
-    if (!_cursorId) {
-        _cursorId = _cursor->getCursorId();
-    }
-
-    opDebug.mongotCursorId = _cursorId;
-
-    if (!response) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    // Populate $sortKey metadata field so that downstream operators can correctly reason about the
-    // sort order. This can be important for mongos, so it can properly merge sort the document
-    // stream, or for $rankFusion to calculate the ranks of the results. This metadata can be safely
-    // ignored if nobody ends up needing it. It will be stripped out before a response is sent back
-    // to a client.
-
-    // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
-    MutableDocument output(Document::fromBsonWithMetaData(response.value()));
-
-    tassert(7828500,
-            "Expected vector search distance to be present",
-            output.metadata().hasVectorSearchScore());
-    output.metadata().setSortKey(Value{output.metadata().getVectorSearchScore()},
-                                 true /* isSingleElementKey */);
-    return output.freeze();
-}
-
-DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
-    // Return EOF if pExpCtx->getUUID() is unset here; the collection we are searching over has not
-    // been created yet.
-    if (!pExpCtx->getUUID()) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    if (pExpCtx->getExplain() &&
-        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    // If this is the first call, establish the cursor.
-    if (!_cursor) {
-        _cursor =
-            search_helpers::establishVectorSearchCursor(pExpCtx, _originalSpec, _taskExecutor);
-    }
-
-    return getNextAfterSetup();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
@@ -256,13 +189,14 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     auto executor =
-        executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
+        executor::getMongotTaskExecutor(getExpCtx()->getOperationContext()->getServiceContext());
 
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
-        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
+        make_intrusive<DocumentSourceVectorSearch>(
+            getExpCtx(), executor, _originalSpec.getOwned())};
 
     search_helpers::promoteStoredSourceOrAddIdLookup(
-        pExpCtx,
+        getExpCtx(),
         desugaredPipeline,
         isStoredSource(),
         _limit.value_or(0),
