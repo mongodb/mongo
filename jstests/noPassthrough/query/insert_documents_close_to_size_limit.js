@@ -24,14 +24,13 @@ function runTest(coll) {
     // Test that inserting large documents into all nodes of the replica set works.
     // The documents created below have total sizes that are below the BSON object size limit, but
     // as the _id value gets repeated in oplog entries, the examples below are already at the fringe
-    // of what can be inserted. Note that the error code returned by the shell is 'BadValue' and not
-    // 'BSONObjectTooLarge'.
+    // of what can be inserted.
     assert.commandWorked(runInsert(generateDoc(16384, 16760803)));
-    assert.commandFailedWithCode(runInsert(generateDoc(16384, 16760804)), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(runInsert(generateDoc(16384, 16760804)), ErrorCodes.BSONObjectTooLarge);
     assert.commandWorked(runInsert(generateDoc(16385, 16760802)));
-    assert.commandFailedWithCode(runInsert(generateDoc(16385, 16760803)), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(runInsert(generateDoc(16385, 16760803)), ErrorCodes.BSONObjectTooLarge);
     assert.commandWorked(runInsert(generateDoc(16485, 16760702)));
-    assert.commandFailedWithCode(runInsert(generateDoc(16485, 16760703)), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(runInsert(generateDoc(16485, 16760703)), ErrorCodes.BSONObjectTooLarge);
 
     assert.eq(3, coll.count());
 }

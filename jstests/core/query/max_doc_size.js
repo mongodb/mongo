@@ -10,6 +10,7 @@
  *     # In some passthroughs, specifically on tsan variants, this test can exhaust the number of
  *     # available retries or otherwise fail because of a long-running operation.
  *     tsan_incompatible,
+ *     multiversion_incompatible,
  *  ]
  */
 
@@ -57,7 +58,7 @@ const largerThanMaxString = maxStr + "a";
 coll.drop();
 assert.commandFailedWithCode(
     db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: largerThanMaxString}]}),
-    2,
+    ErrorCodes.BSONObjectTooLarge,
 );
 
 coll.drop();
@@ -78,5 +79,5 @@ assert.commandFailedWithCode(
         ordered: true,
         updates: [{q: {_id: objectId}, u: {$set: {x: largerThanMaxString}}}],
     }),
-    [17419, 8375908],
+    [17419, ErrorCodes.BSONObjectTooLarge],
 );

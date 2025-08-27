@@ -1152,7 +1152,7 @@ public:
         } else {
             newObj = doc.getObject();
             if (!DocumentValidationSettings::get(opCtx).isInternalValidationDisabled()) {
-                uassert(8375908,
+                uassert(ErrorCodes::BSONObjectTooLarge,
                         str::stream() << "Resulting document after update is larger than "
                                       << BSONObjMaxUserSize,
                         newObj.objsize() <= BSONObjMaxUserSize);

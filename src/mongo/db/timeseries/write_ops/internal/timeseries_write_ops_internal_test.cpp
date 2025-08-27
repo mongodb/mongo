@@ -147,6 +147,7 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
         preConditions,
         0,
         request.getDocuments().size(),
+        bucket_catalog::AllowQueryBasedReopening::kAllow,
         docsToRetry,
         optUuid,
         &errors);
@@ -192,6 +193,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -246,6 +248,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -301,6 +304,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -351,6 +355,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();

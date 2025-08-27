@@ -374,6 +374,7 @@ void performAtomicWritesForUpdate(
                                                 0,
                                                 modifiedMeasurements.size(),
                                                 {},
+                                                bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                 errorsAndIndices);
     uassertStatusOK(swWriteBatches);
 

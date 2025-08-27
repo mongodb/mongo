@@ -83,6 +83,7 @@ void performUnorderedTimeseriesWritesWithRetries(
     const CollectionPreConditions& preConditions,
     size_t start,
     size_t numDocs,
+    bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     std::vector<mongo::write_ops::WriteError>* errors,
     boost::optional<repl::OpTime>* opTime,
     boost::optional<OID>* electionId,
@@ -161,6 +162,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
+    bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     boost::optional<UUID>& optUuid,
     std::vector<mongo::write_ops::WriteError>* errors);
 
@@ -174,6 +176,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
     const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
+    bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     const std::vector<size_t>& docsToRetry,
     boost::optional<UUID>& optUuid,
     std::vector<mongo::write_ops::WriteError>* errors);

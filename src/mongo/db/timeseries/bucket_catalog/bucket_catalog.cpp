@@ -470,6 +470,16 @@ void freeze(BucketCatalog& catalog, const BucketId& bucketId) {
     freezeBucket(catalog.bucketStateRegistry, bucketId);
 }
 
+void markBucketInsertTooLarge(BucketCatalog& catalog, const UUID& collectionUUID) {
+    internal::getOrInitializeExecutionStats(catalog, collectionUUID)
+        .incNumBucketDocumentsTooLargeInsert();
+}
+
+void markBucketUpdateTooLarge(BucketCatalog& catalog, const UUID& collectionUUID) {
+    internal::getOrInitializeExecutionStats(catalog, collectionUUID)
+        .incNumBucketDocumentsTooLargeUpdate();
+}
+
 BucketId extractBucketId(BucketCatalog& bucketCatalog,
                          const TimeseriesOptions& options,
                          const UUID& collectionUUID,
@@ -786,13 +796,15 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           const StringDataComparator* comparator,
                           const uint64_t storageCacheSizeBytes,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                          AllowQueryBasedReopening allowQueryBasedReopening,
                           ExecutionStatsController& stats,
                           bool& bucketOpenedDueToMetadata) {
     Status reopeningStatus = Status::OK();
     auto numReopeningsAttempted = 0;
     auto reopeningLimit = gTimeseriesMaxRetriesForWriteConflictsOnReopening.load();
     do {
-        auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
+        // This can be disabled for the lifetime of the opCtx to avoid writing to the same bucket
+        // that already failed.
         // 1. Try to find an eligible open bucket for the next measurement.
         if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
                                                                stripe,
@@ -866,7 +878,11 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
 
     // 3. Reopening can release and reacquire the stripe lock. Look for an eligible open bucket
     // again. If not found, allocate a new bucket this time.
-    auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
+
+    // This variable is intended to only be consumed by potentiallyReopenBucket(). Its value
+    // doesn't indicate anything about whether a reopening has happened, but one will not be
+    // happening after this point, so it is set to kDisallow to reinforce this fact.
+    auto allowQueryBasedReopeningUnused = AllowQueryBasedReopening::kDisallow;
     if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
                                                            stripe,
                                                            stripeLock,
@@ -876,7 +892,7 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                                                            options,
                                                            comparator,
                                                            storageCacheSizeBytes,
-                                                           allowQueryBasedReopening,
+                                                           allowQueryBasedReopeningUnused,
                                                            stats,
                                                            bucketOpenedDueToMetadata)) {
         return *eligibleBucket;
@@ -1155,6 +1171,7 @@ TimeseriesWriteBatches stageInsertBatch(
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const AllowQueryBasedReopening allowQueryBasedReopening,
     BatchedInsertContext& batch) {
     auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
     stdx::unique_lock<stdx::mutex> stripeLock{stripe.mutex};
@@ -1178,6 +1195,7 @@ TimeseriesWriteBatches stageInsertBatch(
                                                  comparator,
                                                  storageCacheSizeBytes,
                                                  compressAndWriteBucketFunc,
+                                                 allowQueryBasedReopening,
                                                  batch.stats,
                                                  bucketOpenedDueToMetadata);
 
@@ -1232,6 +1250,7 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     size_t startIndex,
     size_t numDocsToStage,
     const std::vector<size_t>& indices,
+    const AllowQueryBasedReopening allowQueryBasedReopening,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
     auto batchedInsertContexts = buildBatchedInsertContexts(bucketCatalog,
                                                             bucketsColl->uuid(),
@@ -1257,6 +1276,7 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
                                              comparator,
                                              storageCacheSizeBytes,
                                              compressAndWriteBucketFunc,
+                                             allowQueryBasedReopening,
                                              batchedInsertContext);
 
         // Append all returned write batches to results, since multiple buckets may have been

@@ -920,6 +920,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
                                                              _stringDataComparatorUnused,
                                                              _storageCacheSizeBytes,
                                                              _compressBucketFuncUnused,
+                                                             AllowQueryBasedReopening::kAllow,
                                                              batchedInsertContexts[i]);
         ASSERT_EQ(writeBatches.size(), numWriteBatches[i]);
     }
@@ -3440,6 +3441,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                          bucketsColl->getDefaultCollator(),
                                          _storageCacheSizeBytes,
                                          _compressBucketFuncUnused,
+                                         AllowQueryBasedReopening::kAllow,
                                          batchedInsertCtx.stats,
                                          bucketOpenedDueToMetadata);
         ASSERT_EQ(0, bucket.size);
@@ -3501,6 +3503,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                               bucketsColl->getDefaultCollator(),
                               _storageCacheSizeBytes,
                               _compressBucketFuncUnused,
+                              AllowQueryBasedReopening::kAllow,
                               batchedInsertCtx.stats,
                               bucketOpenedDueToMetadata);
         ASSERT_EQ(&bucketAllocated, &bucketFound);
@@ -4570,7 +4573,7 @@ TEST_F(BucketCatalogTest,
     // different bucket.
     std::vector<BSONObj> batchOfMeasurementsWithCachePressure =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kCachePressure});
-    std::vector<size_t> numMeasurementsInWriteBatch{3, 1};
+    std::vector<size_t> numMeasurementsInWriteBatch{2, 2};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
 
     // Inserting a batch of measurements with meta field values into a collection with a meta field.
@@ -5379,6 +5382,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -5418,6 +5422,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -5460,6 +5465,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -5500,6 +5506,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_TRUE(swWriteBatches.isOK());
@@ -5539,6 +5546,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userMeasurementsBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_FALSE(swWriteBatches.isOK());
@@ -5575,6 +5583,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userMeasurementsBatch.size(),
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_FALSE(swWriteBatches.isOK());
@@ -5617,6 +5626,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -5662,6 +5672,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
                                                   /*docsToRetry=*/{},
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
@@ -5712,6 +5723,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
                                                   /*docsToRetry=*/docsToRetry,
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_OK(swWriteBatches);
@@ -5760,6 +5772,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
                                                   /*docsToRetry=*/docsToRetry,
+                                                  AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
     ASSERT_OK(swWriteBatches);

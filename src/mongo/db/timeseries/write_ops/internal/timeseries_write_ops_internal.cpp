@@ -331,17 +331,17 @@ void sortBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
     });
 }
 
-bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
-                                       const mongo::write_ops::InsertCommandRequest& request,
-                                       bucket_catalog::TimeseriesWriteBatches& batches,
-                                       boost::optional<repl::OpTime>* opTime,
-                                       boost::optional<OID>* electionId) {
+Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
+                                         const mongo::write_ops::InsertCommandRequest& request,
+                                         bucket_catalog::TimeseriesWriteBatches& batches,
+                                         boost::optional<repl::OpTime>* opTime,
+                                         boost::optional<OID>* electionId) {
     hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     if (batches.empty()) {
-        return true;
+        return Status::OK();
     }
 
     sortBatchesToCommit(batches);
@@ -387,7 +387,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             // inserts. Therefore, do not set the failed operation status on the operation sharding
             // state here, as it will be set during the unordered insert attempt.
             abortStatus = ex.toStatus();
-            return false;
+            return ex.toStatus();
         }
 
         for (auto& batch : batches) {
@@ -395,7 +395,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 bucket_catalog::prepareCommit(bucketCatalog, batch, collator);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
-                return false;
+                return prepareCommitStatus;
             }
 
             write_ops_utils::makeWriteRequestFromBatch(opCtx, batch, nss, &insertOps, &updateOps);
@@ -410,7 +410,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 bucket_catalog::resetBucketOIDCounter();
             }
             abortStatus = result;
-            return false;
+            return result;
         }
 
         timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
@@ -428,14 +428,14 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             "Encountered corrupt bucket while performing insert, will retry on a new bucket",
             "bucketId"_attr = ex->bucketId());
         abortStatus = ex.toStatus();
-        return false;
+        return ex.toStatus();
     } catch (...) {
         abortStatus = exceptionToStatus();
         throw;
     }
 
     batchGuard.dismiss();
-    return true;
+    return Status::OK();
 }
 
 void populateDocsToRetryFromWriteBatch(
@@ -660,20 +660,22 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     }
 
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    auto swWriteBatches = bucket_catalog::prepareInsertsToBuckets(opCtx,
-                                                                  bucketCatalog,
-                                                                  bucketsColl,
-                                                                  timeseriesOptions,
-                                                                  opCtx->getOpID(),
-                                                                  bucketsColl->getDefaultCollator(),
-                                                                  storageCacheSizeBytes,
-                                                                  /*earlyReturnOnError=*/true,
-                                                                  compressAndWriteBucketFunc,
-                                                                  measurementDocs,
-                                                                  0,
-                                                                  measurementDocs.size(),
-                                                                  {},
-                                                                  errorsAndIndices);
+    auto swWriteBatches =
+        bucket_catalog::prepareInsertsToBuckets(opCtx,
+                                                bucketCatalog,
+                                                bucketsColl,
+                                                timeseriesOptions,
+                                                opCtx->getOpID(),
+                                                bucketsColl->getDefaultCollator(),
+                                                storageCacheSizeBytes,
+                                                /*earlyReturnOnError=*/true,
+                                                compressAndWriteBucketFunc,
+                                                measurementDocs,
+                                                0,
+                                                measurementDocs.size(),
+                                                {},
+                                                bucket_catalog::AllowQueryBasedReopening::kAllow,
+                                                errorsAndIndices);
 
     if (!swWriteBatches.isOK()) {
         invariant(!errorsAndIndices.empty());
@@ -703,13 +705,14 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
  * Returns true on success, false otherwise, filling out errors as appropriate on failure as well
  * as containsRetry which is used at a higher layer to report a retry count metric.
  */
-bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
-                                              const mongo::write_ops::InsertCommandRequest& request,
-                                              const CollectionPreConditions& preConditions,
-                                              std::vector<mongo::write_ops::WriteError>* errors,
-                                              boost::optional<repl::OpTime>* opTime,
-                                              boost::optional<OID>* electionId,
-                                              bool* containsRetry) {
+Status performOrderedTimeseriesWritesAtomically(
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
+    std::vector<mongo::write_ops::WriteError>* errors,
+    boost::optional<repl::OpTime>* opTime,
+    boost::optional<OID>* electionId,
+    bool* containsRetry) {
     StageWritesStatus stageStatus{StageWritesStatus::kSuccess};
     auto batches =
         stageOrderedWritesToBucketCatalog(opCtx, request, preConditions, errors, stageStatus);
@@ -721,10 +724,10 @@ bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
         case StageWritesStatus::kStagingError:
             // Don't attempt commit, retry both of these cases as unordered.
             invariant(batches.empty());
-            return false;
+            return Status(ErrorCodes::UnknownError, "Error during time-series write staging"_sd);
         case StageWritesStatus::kCollectionAcquisitionError:
             // No retry, return to user.
-            return true;
+            return Status::OK();
         case StageWritesStatus::kSuccess:
             break;
         default:
@@ -733,11 +736,7 @@ bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-    if (!commitTimeseriesBucketsAtomically(opCtx, request, batches, opTime, electionId)) {
-        return false;
-    }
-
-    return true;
+    return commitTimeseriesBucketsAtomically(opCtx, request, batches, opTime, electionId);
 }
 
 /**
@@ -756,6 +755,7 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     const timeseries::CollectionPreConditions& preConditions,
     size_t start,
     size_t numDocs,
+    const bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     std::vector<size_t>& docsToRetry,
     std::vector<mongo::write_ops::WriteError>* errors,
     boost::optional<repl::OpTime>* opTime,
@@ -772,11 +772,24 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     }
 
     if (*containsRetry || !docsToRetry.empty()) {
-        batches = stageUnorderedWritesToBucketCatalogUnoptimized(
-            opCtx, request, preConditions, start, numDocs, docsToRetry, optUuid, errors);
+        batches = stageUnorderedWritesToBucketCatalogUnoptimized(opCtx,
+                                                                 request,
+                                                                 preConditions,
+                                                                 start,
+                                                                 numDocs,
+                                                                 allowQueryBasedReopening,
+                                                                 docsToRetry,
+                                                                 optUuid,
+                                                                 errors);
     } else {
-        batches = stageUnorderedWritesToBucketCatalog(
-            opCtx, request, preConditions, start, numDocs, optUuid, errors);
+        batches = stageUnorderedWritesToBucketCatalog(opCtx,
+                                                      request,
+                                                      preConditions,
+                                                      start,
+                                                      numDocs,
+                                                      allowQueryBasedReopening,
+                                                      optUuid,
+                                                      errors);
     }
 
     tassert(9213700,
@@ -910,10 +923,23 @@ Status performAtomicTimeseriesWrites(
 
     for (auto& op : insertOps) {
         invariant(op.getDocuments().size() == 1);
+        auto doc = op.getDocuments().front();
+
+        // Since this bypasses the usual write path, size validation is needed.
+        if (MONGO_unlikely(doc.objsize() > BSONObjMaxUserSize)) {
+            LOGV2_WARNING(10856500,
+                          "Ordered time-series bucket insert is too large.",
+                          "bucketSize"_attr = doc.objsize());
+            bucket_catalog::markBucketInsertTooLarge(
+                bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext()), coll.uuid());
+
+            return {ErrorCodes::BSONObjectTooLarge,
+                    "Ordered time-series bucket insert is too large"};
+        }
 
         inserts.emplace_back(op.getStmtIds() ? *op.getStmtIds()
                                              : std::vector<StmtId>{kUninitializedStmtId},
-                             op.getDocuments().front(),
+                             doc,
                              slot ? *(*slot)++ : OplogSlot{});
     }
 
@@ -968,6 +994,20 @@ Status performAtomicTimeseriesWrites(
             args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
         } else {
             invariant(false, "Unexpected update type");
+        }
+
+        // Since this bypasses the usual write path, size validation is needed.
+        if (MONGO_unlikely(updated.objsize() > BSONObjMaxUserSize)) {
+            LOGV2_WARNING(
+                10856501,
+                "Ordered time-series bucket update is too large. Will internally retry write on "
+                "a new bucket.",
+                "bucketSize"_attr = updated.objsize());
+            bucket_catalog::markBucketUpdateTooLarge(
+                bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext()), coll.uuid());
+
+            return {ErrorCodes::BSONObjectTooLarge,
+                    "Ordered time-series bucket update is too large"};
         }
 
         if (slot) {
@@ -1081,6 +1121,13 @@ commit_result::Result commitTimeseriesBucketForBatch(
                     gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
                 return commit_result::ContinuableRetryableErrorWithAbortBatch{insertStatus};
             } else {
+                if (insertStatus.code() == ErrorCodes::BSONObjectTooLarge) {
+                    LOGV2_WARNING(10856502,
+                                  "Unordered time-series bucket insert is too large.",
+                                  "statusMsg"_attr = insertStatus.reason());
+                    bucket_catalog::markBucketInsertTooLarge(bucketCatalog,
+                                                             batch->bucketId.collectionUUID);
+                }
                 if (output.canContinue)
                     return commit_result::ContinuableErrorWithAbortBatch{insertStatus};
                 return commit_result::NonContinuableErrorWithAbortBatch{insertStatus};
@@ -1104,6 +1151,13 @@ commit_result::Result commitTimeseriesBucketForBatch(
                     ? Status{ErrorCodes::WriteConflict, "Could not update non-existent bucket"}
                     : updateStatus};
         } else if (!updateStatus.isOK()) {
+            if (updateStatus.code() == ErrorCodes::BSONObjectTooLarge) {
+                LOGV2_WARNING(10856503,
+                              "Unordered time-series bucket update is too large.",
+                              "statusMsg"_attr = updateStatus.reason());
+                bucket_catalog::markBucketUpdateTooLarge(bucketCatalog,
+                                                         batch->bucketId.collectionUUID);
+            }
             if (output.canContinue) {
                 return commit_result::ContinuableErrorWithAbortBatch{updateStatus};
             }
@@ -1123,6 +1177,7 @@ void performUnorderedTimeseriesWritesWithRetries(
     const CollectionPreConditions& preConditions,
     size_t start,
     size_t numDocs,
+    const bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     std::vector<mongo::write_ops::WriteError>* errors,
     boost::optional<repl::OpTime>* opTime,
     boost::optional<OID>* electionId,
@@ -1135,6 +1190,7 @@ void performUnorderedTimeseriesWritesWithRetries(
                                                        preConditions,
                                                        start,
                                                        numDocs,
+                                                       allowQueryBasedReopening,
                                                        docsToRetry,
                                                        errors,
                                                        opTime,
@@ -1154,8 +1210,9 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       boost::optional<repl::OpTime>* opTime,
                                       boost::optional<OID>* electionId,
                                       bool* containsRetry) {
-    if (performOrderedTimeseriesWritesAtomically(
-            opCtx, request, preConditions, errors, opTime, electionId, containsRetry)) {
+    auto result = performOrderedTimeseriesWritesAtomically(
+        opCtx, request, preConditions, errors, opTime, electionId, containsRetry);
+    if (result.isOK()) {
         if (!errors->empty()) {
             invariant(errors->size() == 1);
             return errors->front().getIndex();
@@ -1164,8 +1221,20 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
     }
 
     for (size_t i = 0; i < request.getDocuments().size(); ++i) {
-        performUnorderedTimeseriesWritesWithRetries(
-            opCtx, request, preConditions, i, 1, errors, opTime, electionId, containsRetry);
+        bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening =
+            result.code() == ErrorCodes::BSONObjectTooLarge
+            ? bucket_catalog::AllowQueryBasedReopening::kDisallow
+            : bucket_catalog::AllowQueryBasedReopening::kAllow;
+        performUnorderedTimeseriesWritesWithRetries(opCtx,
+                                                    request,
+                                                    preConditions,
+                                                    i,
+                                                    1,
+                                                    allowQueryBasedReopening,
+                                                    errors,
+                                                    opTime,
+                                                    electionId,
+                                                    containsRetry);
         if (!errors->empty()) {
             return i;
         }
@@ -1218,6 +1287,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
+    const bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     boost::optional<UUID>& optUuid,
     std::vector<mongo::write_ops::WriteError>* errors) {
 
@@ -1299,6 +1369,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
                                                                   startIndex,
                                                                   numDocsToStage,
                                                                   /*indices=*/{},
+                                                                  allowQueryBasedReopening,
                                                                   errorsAndIndices);
 
     // Even if we encountered errors, in the unordered path we will continue and stage write batches
@@ -1332,6 +1403,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
     const CollectionPreConditions& preConditions,
     size_t startIndex,
     size_t numDocsToStage,
+    const bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening,
     const std::vector<size_t>& docsToRetry,
     boost::optional<UUID>& optUuid,
     std::vector<mongo::write_ops::WriteError>* errors) {
@@ -1431,6 +1503,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
         /*startIndex=*/0,  // We want to start from the beginning of the filtered batch
         /*numDocsToStage=*/batchExcludingExecutedStatements.size(),
         /*docsToRetry=*/{},  // We take indices into account when filtering
+        allowQueryBasedReopening,
         errorsAndIndices);
 
     // Even if we encountered errors while staging, in the unordered path we will continue and
