@@ -51,9 +51,9 @@ structs:
         description: "Arguments accepted by all commands."
         strict: false
         is_generic_cmd_list: "arg"
-        # Note that the _types_ of these fields are not checked for API version compatability!
+        # Note that the _types_ of these fields are not checked for API version compatibility!
         # Historically, these types were parsed and serialized directly from BSON by hand-written
-        # C++ code. The API comapatibility checker does not enforce stability of the types of these fields,
+        # C++ code. The API compatibility checker does not enforce stability of the types of these fields,
         # only of their names (i.e. that none are removed or have their name changed).
         fields:
             apiVersion:
@@ -78,6 +78,9 @@ structs:
             #     forward_to_shards: false
             #     ignore: true
             #     stability: "stable"
+
+            # A user-specified integer value dictating the maximum time that can be spent executing this query,
+            # in milliseconds.
             maxTimeMS:
                 type: exactInt64
                 validator: {gte: 0, lte: 2147483647} # [0, 2^31 - 1]
@@ -99,6 +102,7 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
+            # Used by mongos to mark the requests it generates as part of a single sharded query.
             clientOperationKey:
                 type: uuid
                 forward_to_shards: true
@@ -131,6 +135,7 @@ structs:
                 # did.
                 ignore: true
                 stability: "stable"
+            # User-specified comment associated to the query.
             comment:
                 type: IDLAnyTypeOwned
                 forward_to_shards: true
@@ -172,6 +177,8 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Object wrapping the directives for the query engine; currently it only accepts a readPreference
+            # field indicating from which node (primary/secondary/nearest) the sharded data should be fetched.
             $queryOptions:
                 type: object_owned
                 cpp_name: unwrappedReadPref
@@ -189,6 +196,8 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # When set to true, the query engine will not execute the provided query, but rather return a description
+            # of the requested command.
             help:
                 type: bool
                 forward_to_shards: false
@@ -209,12 +218,18 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "internal"
+            # An integer value dictating the maximum time that can be spent executing this query, in milliseconds.
+            # Specified by mongos on each request made to the shards, so that the total execution time doesn't exceed
+            # the user-provided maxTimeMS.
             maxTimeMSOpOnly:
                 type: exactInt64
                 validator: {callback: "::mongo::validateMaxTimeMSOpOnly"}
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Internal flag signaling that the execution time of the query is constrained by the default setting for
+            # maxTimeMS, not by a user-provided value. When set to true, aborted operations will be reported in a
+            # separate metric.
             usesDefaultMaxTimeMS:
                 type: bool
                 forward_to_shards: false
