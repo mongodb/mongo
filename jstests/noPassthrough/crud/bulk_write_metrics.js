@@ -226,7 +226,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         },
     );
 
-    // TODO SERVER-104131: Enable when 'WouldChangeOwningShard' writes are supported.
+    // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
     if (isMongos && !uweEnabled) {
         // Update modifying owning shard requires a transaction or retryable write, we do not want
         // actual retries here.
@@ -244,7 +244,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         metricChecker.executeCommand({insert: collName1, documents: [{timestamp: key4, x: 2}]});
     }
 
-    // TODO SERVER-104131: Enabled when 'multi: true' writes are supported.
+    // TODO SERVER-104123: Enabled when 'multi: true' writes are supported.
     if (!isMongos || !uweEnabled) {
         metricChecker.checkMetrics(
             "Simple update with multi: true",
