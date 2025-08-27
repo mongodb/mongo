@@ -55,14 +55,26 @@ void assertInsertExisting(RecordIdDeduplicator& recordIdDeduplicator, RecordId r
     ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
 }
 
+std::vector<int64_t> createIntRecords() {
+    std::vector<int64_t> recordIds;
+    recordIds.reserve(60 * 50);
+    int64_t number = 1;
+    for (int shiftNum = 0; shiftNum < 60; ++shiftNum) {
+        number <<= 1;
+        for (int64_t idx = 1; idx < 50; ++idx) {
+            number += idx * 3;
+            recordIds.emplace_back(number);
+        }
+    }
+
+    return recordIds;
+}
+
 class RecordIdDeduplicatorTest : public SpillingTestFixture {
 public:
     SpillingStats spillingStats;
 };
 
-//
-// Basic test that we get out valid stats objects.
-//
 TEST_F(RecordIdDeduplicatorTest, basicTest) {
     RecordIdDeduplicator recordIdDeduplicator{_expCtx.get(), 40, 6, 10000};
 
@@ -155,16 +167,7 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     uint64_t expectedSpilledRecords = 1;  // The record with id null is not spilled.
 
     // Create some recordIds.
-    std::vector<int64_t> recordIds;
-    recordIds.reserve(60 * 50);
-    int64_t number = 1;
-    for (int shiftNum = 0; shiftNum < 60; ++shiftNum) {
-        number <<= 1;
-        for (int64_t idx = 1; idx < 50; ++idx) {
-            number += idx * 3;
-            recordIds.emplace_back(number);
-        }
-    }
+    std::vector<int64_t> recordIds = createIntRecords();
 
     // Add more recordIds to cause roaring to switch to bitmap.
     for (const auto& ridInt : recordIds) {
@@ -246,9 +249,93 @@ TEST_F(RecordIdDeduplicatorTest, freeMemoryRemovesOnlyInMemoryElements) {
     assertInsertNew(recordIdDeduplicator, newRecordId);
 }
 
+TEST_F(RecordIdDeduplicatorTest, memoryConsumptionTest) {
+    _expCtx->setAllowDiskUse(true);
+    RecordIdDeduplicator recordIdDeduplicator{_expCtx.get(), 40, 6, 1'000'000};
+
+    // Insert a few recordIds.
+    std::vector<RecordId> stringRecordIds = {
+        RecordId{std::span("ABCDE", 5)},
+        RecordId{std::span("ABCDEFGHIJ", 10)},
+        RecordId{std::span("ABCDEFGHIJABCDEFGHIJ", 20)},
+        RecordId{std::span("ABCDEFGHIJABCDEFGHIJABCDEFGHIJKLMN", 34)},
+        RecordId{std::span("ABCDEFGHIJKLMOPQRSTUABCDEFGHIJABCDEFGHIJKLMOPQRSTU", 50)}};
+    RecordId longRecordId(12);
+    RecordId nullRecordId;
+
+    // HashRoaringSet occupies a small amount of memory even when it is empty (~200B)
+    auto memUsage = recordIdDeduplicator.getApproximateSize();
+
+    for (const auto& stringRecordId : stringRecordIds) {
+        recordIdDeduplicator.insert(stringRecordId);
+        memUsage += stringRecordId.memUsage();
+    }
+    // We cannot compute the exact memory usage of the hashset because it keeps some empty slots.
+    ASSERT_GREATER_THAN_OR_EQUALS(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    // A long recordId is stored in the HashRoaringSet and consumes sizeof(uint64_t) bytes if it has
+    // not been transferred to the bitmap.
+    memUsage = recordIdDeduplicator.getApproximateSize() + sizeof(uint64_t);
+    recordIdDeduplicator.insert(longRecordId);
+    ASSERT_EQ(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    // A null recordId does not affect the memory usage.
+    recordIdDeduplicator.insert(nullRecordId);
+    ASSERT_EQ(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    // Insert the same records.
+    recordIdDeduplicator.insert(stringRecordIds[0]);
+    recordIdDeduplicator.insert(longRecordId);
+    recordIdDeduplicator.insert(nullRecordId);
+    // The memory usage should not change.
+    ASSERT_EQ(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    // Remove some records.
+    recordIdDeduplicator.freeMemory(stringRecordIds[0]);
+    recordIdDeduplicator.freeMemory(stringRecordIds[stringRecordIds.size() - 1]);
+
+    // The data is removed but the slot is not freed.
+    memUsage -= (stringRecordIds[0].memUsage() +
+                 stringRecordIds[stringRecordIds.size() - 1].memUsage() - 2 * sizeof(RecordId));
+    ASSERT_EQ(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    recordIdDeduplicator.freeMemory(longRecordId);
+    memUsage -= sizeof(uint64_t);
+    ASSERT_EQ(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    recordIdDeduplicator.freeMemory(nullRecordId);
+    ASSERT_EQ(recordIdDeduplicator.getApproximateSize(), memUsage);
+
+    // Create some recordIds.
+    std::vector<int64_t> recordIds = createIntRecords();
+
+    bool hasDecreased = false;
+    bool hasIncreased = false;
+    // Add more recordIds to cause roaring to switch to bitmap.
+    for (const auto& ridInt : recordIds) {
+        recordIdDeduplicator.insert(RecordId{ridInt});
+        // After swithing to bitmap the memory consumption should decrease.
+        hasDecreased = hasDecreased | (memUsage > recordIdDeduplicator.getApproximateSize());
+        // The memory consumption should start increasing again when all records have been
+        // transferred to bitmap and more are added.
+        hasIncreased = hasDecreased && (memUsage < recordIdDeduplicator.getApproximateSize());
+        memUsage = recordIdDeduplicator.getApproximateSize();
+    }
+
+    ASSERT(hasDecreased && hasIncreased);
+
+    // After spilling, memory usage should have decreased. It does not return to the empty
+    // RecordIdDeduplicator memory consumption because the bitmap and the hashSet do not release all
+    // their memory.
+    SpillingStats stats;
+    recordIdDeduplicator.spill(stats);
+    ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
+    ASSERT_LESS_THAN(recordIdDeduplicator.getApproximateSize(), memUsage);
+}
+
 /**
- * A suite that also initializes a catalog to test interaction between RecordIdDeduplicator spilling
- * and having acquired collections.
+ * A suite that also initializes a catalog to test interaction between RecordIdDeduplicator
+ * spilling and having acquired collections.
  */
 class RecordIdDeduplicatorCatalogTest : public CatalogTestFixture {
 public:
