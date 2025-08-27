@@ -372,8 +372,8 @@ public:
                 auto opStr = doc.getStringField("op");
 
                 BSONObj aggregation;
-                if (opStr == "getMore") {
-                    // For getMore ops, look at the originiation agg command.
+                if (opStr == "getmore") {
+                    // For getmore ops, look at the originiation agg command.
                     aggregation = doc["originatingCommand"].Obj();
                 } else if (opStr == "command") {
                     aggregation = doc["command"].Obj();
