@@ -40,6 +40,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
+#include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -120,6 +121,12 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
+
+auto& replCoordMutexTotalWaitTimeInOplogServerStatus =
+    *MetricBuilder<Counter64>{"repl.waiters.replCoordMutexTotalWaitTimeInOplogServerStatusMillis"};
+
+auto& numReplCoordMutexAcquisitionsInOplogServerStatus =
+    *MetricBuilder<Counter64>("repl.waiters.numReplCoordMutexAcquisitionsInOplogServerStatus");
 
 // Hangs in the beginning of each hello command when set.
 MONGO_FAIL_POINT_DEFINE(shardWaitInHello);
@@ -296,7 +303,12 @@ public:
         }
 
         BSONObjBuilder result;
+
+        // Time the total amount of time spent waiting for repl coord mutex.
+        Timer timer;
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
+        replCoordMutexTotalWaitTimeInOplogServerStatus.increment(timer.millis());
+        numReplCoordMutexAcquisitionsInOplogServerStatus.increment(1);
 
         auto earliestOplogTimestampFetch = [&]() -> Timestamp {
             boost::optional<AutoGetOplogFastPath> oplog = boost::none;
