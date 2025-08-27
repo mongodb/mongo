@@ -105,12 +105,13 @@ const int kMaxRoundsWithoutProgress(5);
  * Send and process the child batches. Each child batch is targeted at a unique shard: therefore one
  * shard will have only one batch incoming.
  */
-void executeChildBatches(OperationContext* opCtx,
-                         const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                         TargetedBatchMap& childBatches,
-                         BulkWriteOp& bulkWriteOp,
-                         stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace,
-                         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+void executeChildBatches(
+    OperationContext* opCtx,
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+    TargetedBatchMap& childBatches,
+    BulkWriteOp& bulkWriteOp,
+    stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) {
     // We are starting a new round of execution and so this should have been reset to false.
     invariant(!bulkWriteOp.shouldStopCurrentRound());
     std::vector<AsyncRequestsSender::Request> requests;
@@ -574,19 +575,13 @@ void executeWriteWithoutShardKey(
     const auto nsIdx = op.getNsInfoIdx();
     auto& targeter = targeters[nsIdx];
 
-    auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
-
     // If there is only 1 targetable shard, we can skip using the two phase write protocol.
     if (childBatches.size() == 1) {
-        executeChildBatches(opCtx,
-                            targeters,
-                            childBatches,
-                            bulkWriteOp,
-                            errorsPerNamespace,
-                            allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        executeChildBatches(opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
     } else {
         // Execute the two phase write protocol for writes that cannot directly target a shard.
+        auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+            opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
         const auto targetedWriteBatch = [&] {
             // If there is a targeted write with a sampleId, use that write instead in order to pass
@@ -1125,8 +1120,30 @@ bool BulkWriteOp::isFinished() const {
     for (auto& writeOp : _writeOps) {
         if (writeOp.getWriteState() < WriteOpState_Completed) {
             return false;
-        } else if ((ordered || _inTransaction) && writeOp.getWriteState() == WriteOpState_Error) {
-            return true;
+        } else if (writeOp.getWriteState() == WriteOpState_Error) {
+            // If the WriteOp's state is "WriteOpState_Error" and if '_inTransaction || ordered'
+            // is true, then normally isFinished() will return true. Doing this allows the operation
+            // to be aborted quickly, without having to wait for any remaining child ops.
+            //
+            // However, the logic in "cluster_write_cmd.cpp" and "cluster_find_and_modify_cmd.cpp"
+            // that handles WouldChangeOwningShard errors requires that the current transaction
+            // (if any) not be aborted when a WouldChangeOwningShard error occurs.
+            //
+            // Thus, if the WriteOp's state is "WriteOpState_Error" with a WouldChangeOwningShard
+            // error and '_inTransaction || ordered' is true, and if the WriteOp still has pending
+            // child ops, then isFinished() must return false to allow the pending child ops to
+            // finish cleanly (to avoid causing the transaction to abort).
+            if (writeOp.getOpError().getStatus().code() == ErrorCodes::WouldChangeOwningShard &&
+                writeOp.hasPendingChildOps() && _inTransaction) {
+                return false;
+            }
+
+            // If the BulkWriteOp is ordered or we're in a transaction -AND- if this WriteOp
+            // encountered an error (excluding the WouldChangeOwningShard case handled above),
+            // then return true to indicate that this BulkWriteOp is finished.
+            if (_inTransaction || ordered) {
+                return true;
+            }
         }
     }
     return true;

@@ -477,20 +477,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     bool* useTwoPhaseWriteProtocol,
     bool* isNonTargetedWriteWithoutShardKeyWithExactId,
     std::set<ChunkRange>* chunkRanges) const {
-    // If the update is replacement-style:
-    // 1. Attempt to target using the query. If this fails, AND the query targets more than one
-    //    shard,
-    // 2. Fall back to targeting using the replacement document.
-    //
-    // If the update is an upsert:
-    // 1. Always attempt to target using the query. Upserts must have the full shard key in the
-    //    query.
-    //
-    // NOTE: A replacement document is allowed to have missing shard key values, because we target
-    // as if the shard key values are specified as NULL. A replacement document is also allowed
-    // to have a missing '_id', and if the '_id' exists in the query, it will be emplaced in the
-    // replacement document for targeting purposes.
-
     const auto& updateOp = itemRef.getUpdateRef();
     const bool isMulti = updateOp.getMulti();
 
@@ -606,7 +592,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // Targeting by replacement document is no longer necessary when an updateOne without shard key
     // is allowed, since we're able to decisively select a document to modify with the two phase
     // write without shard key protocol.
-    if (!isUpdateOneWithoutShardKeyEnabled() || isExactId) {
+    if (!isUpdateOneWithoutShardKeyEnabled()) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.

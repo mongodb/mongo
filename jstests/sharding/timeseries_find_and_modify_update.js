@@ -75,7 +75,7 @@ setUpShardedCluster();
 
 // Verifies that the collation is properly propagated to the bucket-level filter when the
 // query-level collation overrides the collection default collation. This is a two phase update due
-// to the user-specified collation.
+// to the user-specified collation. This should run in a transaction.
 (function testTwoPhaseUpdateCanHonorCollationOnShardedCollection() {
     const returnDoc = Object.assign({}, doc3_a_f102, {[metaFieldName]: "C"});
     const copyDocs = docs.map(doc => Object.assign({}, doc));
@@ -84,11 +84,10 @@ setUpShardedCluster();
 
     testFindOneAndUpdateOnShardedCollection({
         initialDocList: docs,
+        startTxn: true,
         cmd: {
             filter: {[metaFieldName]: "a", f: 102},
-            // This also excercises the shard key update in the two phase update. The two phase
-            // update will run inside an internal transaction. So we don't need to run this update
-            // in a transaction.
+            // This excercises the shard key update in the two phase update.
             update: {$set: {[metaFieldName]: "C"}},
             returnNew: true,
             // caseInsensitive collation
@@ -210,7 +209,7 @@ const replacementDoc = {
         initialDocList: docs,
         includeMeta: false,
         cmd: {filter: {[metaFieldName]: "B", f: 103}, update: replacementDoc},
-        res: {errorCode: 7717803},
+        res: {errorCode: [ErrorCodes.IllegalOperation, 7717803]},
     });
 })();
 

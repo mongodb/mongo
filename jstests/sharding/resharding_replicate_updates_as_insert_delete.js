@@ -73,12 +73,6 @@ reshardingTest.withReshardingInBackground(  //
             ErrorCodes.InvalidOptions,
             'was able to update value under new shard key when {multi: true} specified');
 
-        assert.commandFailedWithCode(
-            sessionColl.update({_id: 0}, {$set: {y: 10}}),
-            31025,
-            'was able to update value under new shard key without specifying the full shard ' +
-                'key in the query');
-
         let res;
         assert.soon(
             () => {

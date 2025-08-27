@@ -32,7 +32,8 @@ assert.commandWorked(testColl.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
 
 // Should increment the metric because we broadcast by _id, even though the update subsequently
 // fails on the individual shard.
-assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {multi: false}), 31025);
+assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {multi: false}),
+                             [ErrorCodes.IllegalOperation, 31025]);
 assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 12}, $hello: 1}, {multi: false}),
                              ErrorCodes.FailedToParse);
 
@@ -48,10 +49,7 @@ assert.commandWorked(testColl.update({}, {$set: {a: 3}}, {multi: true}));
 // Shouldn't increment the metric when update can target single shard.
 assert.commandWorked(testColl.update({x: 11}, {$set: {a: 2}}, {multi: false}));
 assert.commandWorked(testColl.update({x: 1}, {$set: {a: 2}}, {multi: false}));
-
-// Shouldn't increment the metric for replacement style updates.
-assert.commandWorked(testColl.update({_id: 1}, {x: 1, a: 2}));
-assert.commandWorked(testColl.update({x: 1}, {x: 1, a: 1}));
+assert.commandWorked(testColl.update({x: 1}, {x: 1, a: 1}, {multi: false}));
 
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write
 // protocol to execute.
@@ -84,7 +82,7 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
         assert.eq(updateRes.getWriteError().code, ErrorCodes.IllegalOperation);
         assert(updateRes.getWriteError().errmsg.includes(
             "Must run update to shard key field in a multi-statement transaction or with " +
-            "retryWrites: true."));
+            "retryWrites: true"));
     }
 
     // Should increment the metrics for unsharded collection.

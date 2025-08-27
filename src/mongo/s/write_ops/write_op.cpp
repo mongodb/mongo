@@ -264,6 +264,15 @@ size_t WriteOp::getNumTargeted() {
     return _childOps.size();
 }
 
+bool WriteOp::hasPendingChildOps() const {
+    for (const auto& childOp : _childOps) {
+        if (childOp.state == WriteOpState_Ready || childOp.state == WriteOpState_Pending) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * This is the core function which aggregates all the results of a write operation on multiple
  * shards and updates the write operation's state.
@@ -277,11 +286,11 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
     // only save off and use the first one.
     boost::optional<BulkWriteReplyItem const*> deferredChildSuccess;
 
-    bool isRetryError = true;
+    bool isRetryError = !_inTxn;
+    bool hasErrorThatAbortsTransaction = false;
     bool hasPendingChild = false;
     for (const auto& childOp : _childOps) {
-        // Don't do anything till we have all the info. Unless we're in a transaction because
-        // we abort aggresively whenever we get an error during a transaction.
+        // If we're not in a transaction, don't do anything until we have all the info.
         if (childOp.state < WriteOpState_Deferred) {
             hasPendingChild = true;
 
@@ -293,9 +302,11 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
         if (childOp.state == WriteOpState_Error) {
             childErrors.push_back(&childOp);
 
-            // Any non-retry error aborts all
-            if (_inTxn || !isRetryErrCode(childOp.error->getStatus().code())) {
+            if (!isRetryErrCode(childOp.error->getStatus().code())) {
                 isRetryError = false;
+            }
+            if (_inTxn && childOp.error->getStatus().code() != ErrorCodes::WouldChangeOwningShard) {
+                hasErrorThatAbortsTransaction = true;
             }
         }
 
@@ -305,6 +316,13 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
                    childOp.bulkWriteReplyItem.has_value()) {
             deferredChildSuccess = &childOp.bulkWriteReplyItem.value();
         }
+    }
+
+    // If there are still pending ops that have not finished yet, don't do anything unless we're
+    // running in a transaction and there's an error that requires an immediate state change to
+    // facilitate aborting the transaction.
+    if (hasPendingChild && !hasErrorThatAbortsTransaction) {
+        return;
     }
 
     // If we already combined replies from a previous round of targeting, we need to make sure to
@@ -361,10 +379,6 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
         } else {
             _state = WriteOpState_Error;
         }
-    } else if (hasPendingChild && _inTxn) {
-        // Return early here since this means that there were no errors while in txn
-        // but there are still ops that have not yet finished.
-        return;
     } else {
         // If we made it here, we finished all the child ops and thus this deferred
         // response is now a final response.

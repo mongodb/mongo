@@ -271,7 +271,9 @@ bool processResponseFromRemote(OperationContext* opCtx,
     // Dispatch was ok, note response
     batchOp.noteBatchResponse(*batch, batchedCommandResponse, &trackedErrors);
 
-    // If we are in a transaction, we must fail the whole batch on any error.
+    // If we are in a transaction, we must fail the batch immediately to facilitate aborting
+    // transaction on any error (excluding WouldChangeOwningShard, which also will fail the
+    // batch but in a more graceful manner that keeps the transaction open).
     if (TransactionRouter::get(opCtx)) {
         // Note: this returns a bad status if any part of the batch failed.
         auto batchStatus = batchedCommandResponse.toStatus();
@@ -351,29 +353,34 @@ bool processErrorResponseFromLocal(OperationContext* opCtx,
                 "shardInfo"_attr = shardInfo,
                 "error"_attr = redact(status));
 
-    // If we are in a transaction, we must stop immediately (even for unordered).
+    // If we are in a transaction, we must fail the batch immediately to facilitate aborting
+    // transaction on any error (excluding WouldChangeOwningShard, which also will fail the
+    // batch but in a more graceful manner that keeps the transaction open).
     if (TransactionRouter::get(opCtx)) {
-        // Throw when there is a transient transaction error since this should be a
-        // top level error and not just a write error.
-        if (isTransientTransactionError(status.code(), false, false)) {
-            uassertStatusOK(status);
-        }
+        if (status != ErrorCodes::WouldChangeOwningShard) {
+            // Throw when there is a transient transaction error since this should be a
+            // top level error and not just a write error.
+            if (isTransientTransactionError(status.code(), false, false)) {
+                uassertStatusOK(status);
+            }
 
-        return true;
+            return true;
+        }
     }
 
     return false;
 }
 
 // Iterates through all of the child batches and sends and processes each batch.
-void executeChildBatches(OperationContext* opCtx,
-                         NSTargeter& targeter,
-                         const BatchedCommandRequest& clientRequest,
-                         TargetedBatchMap& childBatches,
-                         BatchWriteExecStats* stats,
-                         BatchWriteOp& batchOp,
-                         bool& abortBatch,
-                         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+void executeChildBatches(
+    OperationContext* opCtx,
+    NSTargeter& targeter,
+    const BatchedCommandRequest& clientRequest,
+    TargetedBatchMap& childBatches,
+    BatchWriteExecStats* stats,
+    BatchWriteOp& batchOp,
+    bool& abortBatch,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) {
     const size_t numToSend = childBatches.size();
     size_t numSent = 0;
 
@@ -537,8 +544,10 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
                           TargetedBatchMap& childBatches,
                           BatchWriteExecStats* stats,
                           const BatchedCommandRequest& clientRequest,
-                          bool& abortBatch,
-                          bool allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+                          bool& abortBatch) {
+    const bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+
     const auto targetedWriteBatch = [&] {
         // If there is a targeted write with a sampleId, use that write instead in order to pass the
         // sampleId to the two phase write protocol. Otherwise, just choose the first targeted
@@ -730,31 +739,16 @@ void executeTwoPhaseOrTimeSeriesWriteChildBatches(OperationContext* opCtx,
             // protocol to apply the write.
             tassert(6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);
 
-            auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-                opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
-
             // If there is only 1 targetable shard, we can skip using the two phase write
             // protocol.
             if (childBatches.size() == 1) {
-                executeChildBatches(opCtx,
-                                    targeter,
-                                    clientRequest,
-                                    childBatches,
-                                    stats,
-                                    batchOp,
-                                    abortBatch,
-                                    allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+                executeChildBatches(
+                    opCtx, targeter, clientRequest, childBatches, stats, batchOp, abortBatch);
             } else {
                 // Execute the two phase write protocol for writes that cannot directly target a
                 // shard. If there are any transaction errors, 'abortBatch' will be set.
-                executeTwoPhaseWrite(opCtx,
-                                     targeter,
-                                     batchOp,
-                                     childBatches,
-                                     stats,
-                                     clientRequest,
-                                     abortBatch,
-                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+                executeTwoPhaseWrite(
+                    opCtx, targeter, batchOp, childBatches, stats, clientRequest, abortBatch);
             }
             break;
         }
@@ -864,14 +858,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 // Tries to execute all of the child batches. If there are any transaction errors,
                 // 'abortBatch' will be set.
                 executeChildBatches(
-                    opCtx,
-                    targeter,
-                    clientRequest,
-                    childBatches,
-                    stats,
-                    batchOp,
-                    abortBatch,
-                    boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
+                    opCtx, targeter, clientRequest, childBatches, stats, batchOp, abortBatch);
             } else {
                 executeTwoPhaseOrTimeSeriesWriteChildBatches(opCtx,
                                                              targeter,

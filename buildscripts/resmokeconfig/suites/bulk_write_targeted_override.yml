@@ -34,6 +34,7 @@ selector:
   - jstests/sharding/update_shard_key_doc_on_same_shard.js
   - jstests/sharding/update_compound_shard_key.js
   - jstests/sharding/update_shard_key_conflicting_writes.js
+  - jstests/sharding/update_shard_key_without_shard_key.js
   - jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
   - jstests/sharding/resharding_update_shard_key_in_retryable_write.js
   # End document shard key update tests
