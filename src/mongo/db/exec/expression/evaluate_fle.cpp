@@ -48,7 +48,7 @@ Value evaluate(const ExpressionInternalFLEEqual& expr, const Document& root, Var
             // extractMetadataBlocks should only be run once.
             tassert(9588901, "extractMetadataBlocks should only be run once by evaluate", !value);
             value.emplace(serverValue);
-            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
+            std::vector<ConstFLE2TagAndEncryptedMetadataBlock> metadataBlocks;
             metadataBlocks.push_back(value->getRawMetadataBlock());
             return metadataBlocks;
         }));
@@ -152,7 +152,7 @@ Value evaluate(const ExpressionEncStrNormalizedEq& expr,
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
             tassert(10256000, "extractMetadataBlocks should only be run once by evaluate", !value);
             value.emplace(serverValue);
-            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
+            std::vector<ConstFLE2TagAndEncryptedMetadataBlock> metadataBlocks;
             metadataBlocks.push_back(value->getExactStringMetadataBlock());
             return metadataBlocks;
         }));

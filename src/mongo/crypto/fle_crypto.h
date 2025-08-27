@@ -32,12 +32,10 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
-#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -60,7 +58,6 @@
 #include "mongo/util/uuid.h"
 
 #include <array>
-#include <compare>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -629,26 +626,8 @@ struct ECOCCompactionDocumentV2 {
     boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
 };
 
-// Simple view of a mc_FLE2TagAndEncryptedMetadataBlock_t
-// TODO SERVER-96973 Refactor this into a full wrapper class around
-// mc_FLE2TagAndEncryptedMetadataBlock_t
-struct FLE2TagAndEncryptedMetadataBlockView {
-    /**
-     * Create a view from a 96-byte serialized metadata block buffer
-     */
-    FLE2TagAndEncryptedMetadataBlockView(ConstDataRange serializedBlock);
-
-    FLE2TagAndEncryptedMetadataBlockView(ConstDataRange counts,
-                                         ConstDataRange tag,
-                                         ConstDataRange zeros);
-
-    ConstDataRange encryptedCounts;
-    ConstDataRange tag;
-    ConstDataRange encryptedZeros;
-};
-
 /**
- * Class to read/write the metadata block consisting of the encrypted counter
+ * Class for reading & decrypting the metadata block consisting of the encrypted counter
  * and contention factor, the tag, and the encrypted 128-bit string of zeros.
  *
  * In QE protocol version 2, this block appears exactly once in the on-disk
@@ -673,7 +652,8 @@ struct FLE2TagAndEncryptedMetadataBlockView {
  *   uint8_t[16] zerosBlob;
  * }
  */
-struct FLE2TagAndEncryptedMetadataBlock {
+class ConstFLE2TagAndEncryptedMetadataBlock {
+public:
     using ZerosBlob = std::array<std::uint8_t, 16>;
     using EncryptedCountersBlob =
         std::array<std::uint8_t, sizeof(uint64_t) * 2 + crypto::aesCTRIVSize>;
@@ -682,31 +662,86 @@ struct FLE2TagAndEncryptedMetadataBlock {
         std::array<std::uint8_t,
                    sizeof(EncryptedCountersBlob) + sizeof(PrfBlock) + sizeof(EncryptedZerosBlob)>;
 
-    FLE2TagAndEncryptedMetadataBlock(uint64_t countParam,
-                                     uint64_t contentionFactorParam,
-                                     PrfBlock tagParam);
-    FLE2TagAndEncryptedMetadataBlock(uint64_t countParam,
-                                     uint64_t contentionFactorParam,
-                                     PrfBlock tagParam,
-                                     ZerosBlob zerosParam);
-
-    StatusWith<std::vector<uint8_t>> serialize(ServerDerivedFromDataToken token);
-
-    static StatusWith<FLE2TagAndEncryptedMetadataBlock> decryptAndParse(
-        ServerDerivedFromDataToken token, const FLE2TagAndEncryptedMetadataBlockView& block);
+    struct CountersPair {
+        uint64_t counter;
+        uint64_t contentionFactor;
+    };
 
     /*
-     * Decrypts and returns the zeros blob from the FLE2TagAndEncryptedMetadataBlockView.
+     *  Simple view of the mc_FLE2TagAndEncryptedMetadataBlock_t buffers
      */
-    static StatusWith<ZerosBlob> decryptZerosBlob(
-        ServerZerosEncryptionToken token, const FLE2TagAndEncryptedMetadataBlockView& block);
+    struct View {
+        ConstDataRange encryptedCounts;
+        ConstDataRange tag;
+        ConstDataRange encryptedZeros;
+    };
+
+    /*
+     * Wrap an existing _mc_FLE2TagAndEncryptedMetadataBlock_t.
+     */
+    explicit ConstFLE2TagAndEncryptedMetadataBlock(_mc_FLE2TagAndEncryptedMetadataBlock_t* mblock);
+
+    /*
+     * Returns a view of the underlying mc_FLE2TagAndEncryptedMetadataBlock_t buffers.
+     * Throws if any of the encrypted buffers has incorrect length.
+     */
+    View getView() const;
+
+    /*
+     * Decrypts and returns the zeros blob.
+     * Throws if any of the encrypted buffers has incorrect length.
+     */
+    StatusWith<ZerosBlob> decryptZerosBlob(ServerZerosEncryptionToken token) const;
+
+    /*
+     * Decrypts and returns the {counter, contention factor} pair.
+     * Throws if any of the encrypted buffers has incorrect length.
+     */
+    StatusWith<CountersPair> decryptCounterAndContentionFactorPair(
+        ServerCountAndContentionFactorEncryptionToken token) const;
 
     static bool isValidZerosBlob(const ZerosBlob& blob);
 
-    uint64_t count;
-    uint64_t contentionFactor;
-    PrfBlock tag;
-    ZerosBlob zeros;
+protected:
+    _mc_FLE2TagAndEncryptedMetadataBlock_t* _block = nullptr;
+
+    static constexpr ZerosBlob kZeros = {0};
+};
+
+/**
+ * Class for a mutable tag and encrypted metadata block, which is either
+ * internally owned by the object instance, or a wrapper on an externally-allocated
+ * _mc_FLE2TagAndEncryptedMetadataBlock_t struct.
+ */
+class FLE2TagAndEncryptedMetadataBlock : public ConstFLE2TagAndEncryptedMetadataBlock {
+public:
+    /*
+     * Constructs an owned FLE2TagAndEncryptedMetadataBlock.
+     */
+    FLE2TagAndEncryptedMetadataBlock();
+
+    /*
+     * Constructs a FLE2TagAndEncryptedMetadataBlock as a wrapper for an existing
+     * _mc_FLE2TagAndEncryptedMetadataBlock_t.
+     */
+    explicit FLE2TagAndEncryptedMetadataBlock(_mc_FLE2TagAndEncryptedMetadataBlock_t* mblock);
+
+    /*
+     * Creates an encrypted metadata block from the given token, count, contentionFactor, and tag,
+     * and serializes the encrypted buffers into the underlying
+     * _mc_FLE2TagAndEncryptedMetadataBlock_t.
+     */
+    Status encryptAndSerialize(const ServerDerivedFromDataToken& token,
+                               uint64_t count,
+                               uint64_t contentionFactor,
+                               PrfBlock tag);
+
+private:
+    using UniqueMCFLE2TagAndEncryptedMetadataBlock =
+        std::unique_ptr<_mc_FLE2TagAndEncryptedMetadataBlock_t,
+                        void (*)(_mc_FLE2TagAndEncryptedMetadataBlock_t*)>;
+
+    UniqueMCFLE2TagAndEncryptedMetadataBlock _mblock;
 };
 
 /**
@@ -735,24 +770,14 @@ using UniqueMCFLE2IndexedEncryptedValueV2 =
 class FLE2IndexedEqualityEncryptedValueV2 {
 public:
     FLE2IndexedEqualityEncryptedValueV2(ConstDataRange cdr);
+
     static FLE2IndexedEqualityEncryptedValueV2 fromUnencrypted(
-        const FLE2InsertUpdatePayloadV2& payload,
-        PrfBlock tag,
-        uint64_t counter,
-        ServerDataEncryptionLevel1Token serverEncryptionToken,
-        ServerDerivedFromDataToken serverDataDerivedToken);
-    static FLE2IndexedEqualityEncryptedValueV2 fromUnencrypted(
-        BSONType typeParam,
-        UUID indexKeyIdParam,
-        std::vector<uint8_t> clientEncryptedValueParam,
-        FLE2TagAndEncryptedMetadataBlock metadataBlockParam,
-        ServerDataEncryptionLevel1Token serverEncryptionToken,
-        ServerDerivedFromDataToken serverDataDerivedToken);
+        const FLE2InsertUpdatePayloadV2& payload, PrfBlock tag, uint64_t counter);
 
     StatusWith<std::vector<uint8_t>> serialize() const;
 
     ConstDataRange getServerEncryptedValue() const;
-    FLE2TagAndEncryptedMetadataBlockView getRawMetadataBlock() const;
+    ConstFLE2TagAndEncryptedMetadataBlock getRawMetadataBlock() const;
     PrfBlock getMetadataBlockTag() const;
     UUID getKeyId() const;
     BSONType getBsonType() const;
@@ -816,7 +841,7 @@ public:
     BSONType getBsonType() const;
     uint32_t getTagCount() const;
     ConstDataRange getServerEncryptedValue() const;
-    std::vector<FLE2TagAndEncryptedMetadataBlockView> getMetadataBlocks() const;
+    std::vector<ConstFLE2TagAndEncryptedMetadataBlock> getMetadataBlocks() const;
 
 private:
     FLE2IndexedRangeEncryptedValueV2();
@@ -865,11 +890,11 @@ public:
     uint32_t getSubstringTagCount() const;
     uint32_t getSuffixTagCount() const;
     uint32_t getPrefixTagCount() const;
-    FLE2TagAndEncryptedMetadataBlockView getExactStringMetadataBlock() const;
-    std::vector<FLE2TagAndEncryptedMetadataBlockView> getSubstringMetadataBlocks() const;
-    std::vector<FLE2TagAndEncryptedMetadataBlockView> getSuffixMetadataBlocks() const;
-    std::vector<FLE2TagAndEncryptedMetadataBlockView> getPrefixMetadataBlocks() const;
-    std::vector<FLE2TagAndEncryptedMetadataBlockView> getAllMetadataBlocks() const;
+    ConstFLE2TagAndEncryptedMetadataBlock getExactStringMetadataBlock() const;
+    std::vector<ConstFLE2TagAndEncryptedMetadataBlock> getSubstringMetadataBlocks() const;
+    std::vector<ConstFLE2TagAndEncryptedMetadataBlock> getSuffixMetadataBlocks() const;
+    std::vector<ConstFLE2TagAndEncryptedMetadataBlock> getPrefixMetadataBlocks() const;
+    std::vector<ConstFLE2TagAndEncryptedMetadataBlock> getAllMetadataBlocks() const;
 
 private:
     FLE2IndexedTextEncryptedValue();

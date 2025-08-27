@@ -47,7 +47,6 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_numeric.h"
 #include "mongo/crypto/fle_options_gen.h"
-#include "mongo/crypto/fle_testing_util.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
@@ -1615,6 +1614,58 @@ TEST_F(ServiceContextTest, FLE_EDC_Disallowed_Types_FLE2InsertUpdatePayload) {
     disallowedEqualityPayloadType(static_cast<BSONType>(fakeBSONType));
 }
 
+bool areBuffersEqual(ConstDataRange lhs, ConstDataRange rhs) {
+    return (lhs.length() == rhs.length()) &&
+        std::equal(lhs.data<const uint8_t>(),
+                   lhs.data<const uint8_t>() + lhs.length(),
+                   rhs.data<const uint8_t>());
+}
+
+bool operator==(const ConstFLE2TagAndEncryptedMetadataBlock& lblk,
+                const ConstFLE2TagAndEncryptedMetadataBlock& rblk) {
+    auto lhs = lblk.getView();
+    auto rhs = rblk.getView();
+    return areBuffersEqual(lhs.encryptedCounts, rhs.encryptedCounts) &&
+        areBuffersEqual(lhs.encryptedZeros, rhs.encryptedZeros) &&
+        areBuffersEqual(lhs.tag, rhs.tag);
+}
+
+bool metadataBlocksEqual(const std::vector<ConstFLE2TagAndEncryptedMetadataBlock>& lhs,
+                         const std::vector<ConstFLE2TagAndEncryptedMetadataBlock>& rhs) {
+    return (lhs.size() == rhs.size()) && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+}
+
+bool operator==(const FLE2IndexedEqualityEncryptedValueV2& lhs,
+                const FLE2IndexedEqualityEncryptedValueV2& rhs) {
+    return (lhs.getBsonType() == rhs.getBsonType()) && (lhs.getKeyId() == rhs.getKeyId()) &&
+        (lhs.getRawMetadataBlock() == rhs.getRawMetadataBlock()) &&
+        areBuffersEqual(lhs.getServerEncryptedValue(), rhs.getServerEncryptedValue()) &&
+        areBuffersEqual(lhs.getMetadataBlockTag(), rhs.getMetadataBlockTag());
+}
+
+bool operator==(const FLE2IndexedRangeEncryptedValueV2& lhs,
+                const FLE2IndexedRangeEncryptedValueV2& rhs) {
+    return (lhs.getBsonType() == rhs.getBsonType()) && (lhs.getKeyId() == rhs.getKeyId()) &&
+        (lhs.getTagCount() == rhs.getTagCount()) &&
+        areBuffersEqual(lhs.getServerEncryptedValue(), rhs.getServerEncryptedValue()) &&
+        metadataBlocksEqual(lhs.getMetadataBlocks(), rhs.getMetadataBlocks());
+}
+
+bool operator==(const FLE2IndexedTextEncryptedValue& lhs,
+                const FLE2IndexedTextEncryptedValue& rhs) {
+    return (lhs.getBsonType() == rhs.getBsonType()) && (lhs.getKeyId() == rhs.getKeyId()) &&
+        (lhs.getTagCount() == rhs.getTagCount()) &&
+        (lhs.getSubstringTagCount() == rhs.getSubstringTagCount()) &&
+        (lhs.getSuffixTagCount() == rhs.getSuffixTagCount()) &&
+        (lhs.getPrefixTagCount() == rhs.getPrefixTagCount()) &&
+        areBuffersEqual(lhs.getServerEncryptedValue(), rhs.getServerEncryptedValue()) &&
+        (lhs.getExactStringMetadataBlock() == rhs.getExactStringMetadataBlock()) &&
+        metadataBlocksEqual(lhs.getAllMetadataBlocks(), rhs.getAllMetadataBlocks()) &&
+        metadataBlocksEqual(lhs.getSubstringMetadataBlocks(), rhs.getSubstringMetadataBlocks()) &&
+        metadataBlocksEqual(lhs.getSuffixMetadataBlocks(), rhs.getSuffixMetadataBlocks()) &&
+        metadataBlocksEqual(lhs.getPrefixMetadataBlocks(), rhs.getPrefixMetadataBlocks());
+}
+
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     TestKeyVault keyVault;
 
@@ -1632,15 +1683,15 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     auto ecocToken = ECOCToken::deriveFrom(collectionToken);
     auto serverDerivedFromDataToken =
         ServerDerivedFromDataToken::deriveFrom(serverDerivationToken, value);
-    FLECounter counter = 0;
+    FLECounter contention = 3;
 
     EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, value);
     ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, value);
 
     ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, counter);
+        ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDatakey, contention);
     EDCDerivedFromDataTokenAndContentionFactorToken edcDataCounterkey =
-        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, counter);
+        EDCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(edcDatakey, contention);
 
     FLE2InsertUpdatePayloadV2 iupayload;
     iupayload.setEdcDerivedToken(edcDataCounterkey);
@@ -1657,49 +1708,64 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     iupayload.setValue(value);
     iupayload.setType(stdx::to_underlying(element.type()));
 
-    iupayload.setContentionFactor(counter);
+    iupayload.setContentionFactor(contention);
 
     auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(edcDataCounterkey);
 
-    auto tag = EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, 123456);
+    uint64_t counter = 123456;  // counter from ESC
+    auto tag = EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, counter);
 
-    auto serverPayload = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-        iupayload, tag, 123456, serverEncryptToken, serverDerivedFromDataToken);
-
+    // serialize to on-disk format
+    auto serverPayload =
+        FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, tag, counter);
     auto buf = uassertStatusOK(serverPayload.serialize());
 
-    auto parsedType = serverPayload.getBsonType();
-    ASSERT_EQ(stdx::to_underlying(parsedType), iupayload.getType());
+    // We expect the serialized buffer to contain FLE subtype (1 byte), UUID (16), BSON type (1),
+    // CTR-encrypted client value (16 byte IV + ciphertext) + metadata block (96)
+    const size_t expectedSize = 1 + UUID::kNumBytes + 1 +
+        (crypto::aesCTRIVSize + iupayload.getValue().length()) +
+        sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
+    ASSERT_EQ(buf.size(), expectedSize);
 
-    auto parsedUuid = serverPayload.getKeyId();
-    ASSERT_EQ(parsedUuid, iupayload.getIndexKeyId());
+    // parse it back
+    FLE2IndexedEqualityEncryptedValueV2 parsed(buf);
 
+    // validate the original & parsed objects have identical values
+    ASSERT_EQ(serverPayload, parsed);
+
+    // validate individual fields have expected values
+    ASSERT_EQ(parsed.getKeyId(), indexKeyId);
+    ASSERT_EQ(parsed.getBsonType(), element.type());
+    ASSERT_EQ(parsed.getMetadataBlockTag(), tag);
+
+    // verify the server-encrypted value decrypts back to client-encrypted value
     auto clientEncryptedValue = uassertStatusOK(
-        IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptCiphertext(serverEncryptToken, buf));
+        FLEUtil::decryptData(serverEncryptToken.toCDR(), parsed.getServerEncryptedValue()));
     ASSERT_EQ(clientEncryptedValue.size(), value.length());
     ASSERT(std::equal(
         clientEncryptedValue.begin(), clientEncryptedValue.end(), value.data<uint8_t>()));
 
-    auto metadataBlock =
-        uassertStatusOK(IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptMetadataBlock(
-            serverDerivedFromDataToken, buf));
-    ASSERT_EQ(metadataBlock.contentionFactor, counter);
-    ASSERT_EQ(metadataBlock.count, 123456);
-    ASSERT(metadataBlock.tag == tag);
-    ASSERT_TRUE(metadataBlock.isValidZerosBlob(metadataBlock.zeros));
+    // verify the metadata blocks have the correct values after decrypt
+    auto mblock = parsed.getRawMetadataBlock();
+    auto zeros = uassertStatusOK(mblock.decryptZerosBlob(
+        ServerZerosEncryptionToken::deriveFrom(serverDerivedFromDataToken)));
+    ASSERT_TRUE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
 
-    auto pTag = serverPayload.getMetadataBlockTag();
-    ASSERT_EQ(pTag, tag);
+    auto counterPair = uassertStatusOK(mblock.decryptCounterAndContentionFactorPair(
+        ServerCountAndContentionFactorEncryptionToken::deriveFrom(serverDerivedFromDataToken)));
+    ASSERT_EQ(counterPair.counter, counter);
+    ASSERT_EQ(counterPair.contentionFactor, contention);
+
+    ASSERT_TRUE(areBuffersEqual(mblock.getView().tag, tag));
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2_InvalidArgs) {
     TestKeyVault keyVault;
-    auto value = ConstDataRange(0, 0);
+    auto emptyValue = ConstDataRange(0, 0);
     PrfBlock bogusTag;
     FLE2InsertUpdatePayloadV2 iupayload;
     auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
 
-    iupayload.setValue(value);
     iupayload.setType(stdx::to_underlying(BSONType::numberLong));
     iupayload.setContentionFactor(0);
     iupayload.setIndexKeyId(indexKeyId);
@@ -1709,21 +1775,24 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2_InvalidArgs) 
     iupayload.setServerDerivedFromDataToken({{}});
     iupayload.setEncryptedTokens(bogusEncryptedTokens);
 
-    // Test client encrypted value too small for server-side reencryption
-    ASSERT_THROWS_CODE(
-        FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0, {{}}, {{}}),
-        DBException,
-        ErrorCodes::LibmongocryptError);
-
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-                           BSONType::numberLong,
-                           indexKeyId,
-                           std::vector<uint8_t>(),
-                           FLE2TagAndEncryptedMetadataBlock(0, 0, bogusTag),
-                           {{}},
-                           {{}}),
+    // Test bad BSON Type
+    iupayload.setType(-9);
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0),
                        DBException,
-                       ErrorCodes::LibmongocryptError);
+                       9697301);
+
+    // Test unsupported BSON type for equality
+    iupayload.setType(stdx::to_underlying(BSONType::maxKey));
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0),
+                       DBException,
+                       7291906);
+    iupayload.setType(stdx::to_underlying(BSONType::numberLong));
+
+    // Test empty client encrypted value
+    iupayload.setValue(emptyValue);
+    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iupayload, bogusTag, 0),
+                       DBException,
+                       9697302);
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
@@ -1775,34 +1844,45 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
     }
 }
 
-TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_IsValidZerosBlob) {
+// Test correct encryption/decryption of metadata block
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2TagAndEncryptedMetadataBlock_RoundTrip) {
+    const ServerDerivedFromDataToken token(
+        decodePrf("986F23F132FF7F14F748AC69373CFC982AD0AD4BAD25BE92008B83AB43E96029"));
+    const PrfBlock tag =
+        decodePrf("BD53ACAC665EDD01E0CA30CB648B2B8F4967544047FD4E7D12B1A9BF07339928");
+    const uint64_t count = 65;
+    const uint64_t contention = 2;
+
+    FLE2TagAndEncryptedMetadataBlock mblock;
+
+    // Trying to get a view of a mblock before encryptAndSerialize throws.
+    ASSERT_THROWS(mblock.getView(), DBException);
+
+    ASSERT_OK(mblock.encryptAndSerialize(token, count, contention, tag));
+
+    auto zerosToken = ServerZerosEncryptionToken::deriveFrom(token);
+    auto countToken = ServerCountAndContentionFactorEncryptionToken::deriveFrom(token);
+    auto view = mblock.getView();
+
+    auto swZeros = mblock.decryptZerosBlob(zerosToken);
+    ASSERT_OK(swZeros.getStatus());
+    ASSERT_TRUE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(swZeros.getValue()));
+
+    auto swPair = mblock.decryptCounterAndContentionFactorPair(countToken);
+    ASSERT_OK(swPair.getStatus());
+    ASSERT_EQ(count, swPair.getValue().counter);
+    ASSERT_EQ(contention, swPair.getValue().contentionFactor);
+
+    ASSERT_TRUE(areBuffersEqual(view.tag, tag));
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2TagAndEncryptedMetadataBlock_IsValidZerosBlob) {
     FLE2TagAndEncryptedMetadataBlock::ZerosBlob zeros;
     zeros.fill(0);
     ASSERT_TRUE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
 
     zeros[1] = 1;
     ASSERT_FALSE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
-}
-
-TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_FLE2TagAndEncryptedMetadataBlockView) {
-    char badbuf[11];
-    FLE2TagAndEncryptedMetadataBlock::EncryptedCountersBlob counters;
-    PrfBlock tag;
-    FLE2TagAndEncryptedMetadataBlock::ZerosBlob zeros;
-    ASSERT_THROWS_CODE(
-        FLE2TagAndEncryptedMetadataBlockView{ConstDataRange(badbuf)}, DBException, 10164500);
-    ASSERT_THROWS_CODE(FLE2TagAndEncryptedMetadataBlockView(
-                           ConstDataRange(badbuf), ConstDataRange(tag), ConstDataRange(zeros)),
-                       DBException,
-                       10164501);
-    ASSERT_THROWS_CODE(FLE2TagAndEncryptedMetadataBlockView(
-                           ConstDataRange(counters), ConstDataRange(badbuf), ConstDataRange(zeros)),
-                       DBException,
-                       10164502);
-    ASSERT_THROWS_CODE(FLE2TagAndEncryptedMetadataBlockView(
-                           ConstDataRange(counters), ConstDataRange(tag), ConstDataRange(badbuf)),
-                       DBException,
-                       10164503);
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
@@ -1883,34 +1963,38 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     // parse it back
     FLE2IndexedRangeEncryptedValueV2 parsed(buf);
 
+    // validate the original & parsed objects have identical values
+    ASSERT_EQ(serverPayload, parsed);
+
+    // validate individual fields have expected values
     ASSERT_EQ(parsed.getKeyId(), indexKeyId);
     ASSERT_EQ(parsed.getBsonType(), element.type());
     ASSERT_EQ(parsed.getTagCount(), tags.size());
 
-    auto generatedSEV = serverPayload.getServerEncryptedValue();
-    auto parsedSEV = parsed.getServerEncryptedValue();
-    ASSERT_EQ(parsedSEV.length(), generatedSEV.length());
-    ASSERT_EQ(memcmp(parsedSEV.data(), generatedSEV.data(), generatedSEV.length()), 0);
-
-    ASSERT_EQ(parsed.getMetadataBlocks().size(), tags.size());
-    ASSERT_EQ(serverPayload.getMetadataBlocks().size(), tags.size());
-
     // verify the server-encrypted value decrypts back to client-encrypted value
-    auto swValue = FLEUtil::decryptData(serverEncryptToken.toCDR(), parsedSEV);
-    ASSERT(swValue.isOK());
-    ASSERT_EQ(swValue.getValue().size(), iupayload.getValue().length());
-    ASSERT(std::equal(swValue.getValue().begin(),
-                      swValue.getValue().end(),
-                      iupayload.getValue().data<uint8_t>()));
+    auto clientEncryptedValue = uassertStatusOK(
+        FLEUtil::decryptData(serverEncryptToken.toCDR(), parsed.getServerEncryptedValue()));
+    ASSERT_EQ(clientEncryptedValue.size(), value.length());
+    ASSERT(std::equal(
+        clientEncryptedValue.begin(), clientEncryptedValue.end(), value.data<uint8_t>()));
 
-    // verify the metadata blocks have the correct tags
-    for (uint32_t i = 0; i < parsed.getTagCount(); i++) {
-        auto swMeta = FLE2TagAndEncryptedMetadataBlock::decryptAndParse(
-            serverDerivedFromDataToken, parsed.getMetadataBlocks().at(i));
-        ASSERT(swMeta.isOK());
-        ASSERT_EQ(swMeta.getValue().count, counters[i]);
-        ASSERT_EQ(swMeta.getValue().contentionFactor, contention);
-        ASSERT_EQ(swMeta.getValue().tag, tags[i]);
+    // verify the metadata blocks have the correct values after decrypt
+    auto mblocks = parsed.getMetadataBlocks();
+    ASSERT_EQ(mblocks.size(), tags.size());
+    auto zeroEncryptToken = ServerZerosEncryptionToken::deriveFrom(serverDerivedFromDataToken);
+    auto counterEncryptToken =
+        ServerCountAndContentionFactorEncryptionToken::deriveFrom(serverDerivedFromDataToken);
+
+    for (size_t i = 0; i < mblocks.size(); i++) {
+        auto zeros = uassertStatusOK(mblocks[i].decryptZerosBlob(zeroEncryptToken));
+        ASSERT_TRUE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
+
+        auto counterPair =
+            uassertStatusOK(mblocks[i].decryptCounterAndContentionFactorPair(counterEncryptToken));
+        ASSERT_EQ(counterPair.counter, counters[i]);
+        ASSERT_EQ(counterPair.contentionFactor, contention);
+
+        ASSERT_TRUE(areBuffersEqual(mblocks[i].getView().tag, tags[i]));
     }
 }
 
@@ -2205,6 +2289,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     std::vector<PrfBlock> tags = EDCServerCollection::generateTagsForTextSearch(payload);
     ASSERT_EQ(tags.size(), tagCount);
 
+    // serialize to on-disk format
     auto serverPayload =
         FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts);
     auto buf = uassertStatusOK(serverPayload.serialize());
@@ -2214,7 +2299,11 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
         (tagCount * sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
     ASSERT_EQ(buf.size(), expectedSize);
 
+    // parse it back
     FLE2IndexedTextEncryptedValue parsed(buf);
+
+    // validate the original & parsed objects have identical values
+    ASSERT_EQ(serverPayload, parsed);
 
     ASSERT_EQ(stdx::to_underlying(parsed.getBsonType()), iupayload.getType());
     ASSERT_EQ(parsed.getKeyId(), iupayload.getIndexKeyId());
@@ -2223,6 +2312,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     ASSERT_EQ(parsed.getSuffixTagCount(), suffixes.size());
     ASSERT_EQ(parsed.getPrefixTagCount(), prefixes.size());
 
+    // verify the server-encrypted value decrypts back to client-encrypted value
     auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
     auto swValue =
         FLEUtil::decryptData(serverEncryptToken.toCDR(), parsed.getServerEncryptedValue());
@@ -2242,22 +2332,23 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     ASSERT_EQ(suffixBlks.size(), suffixes.size());
     ASSERT_EQ(prefixBlks.size(), prefixes.size());
 
-    std::vector<FLE2TagAndEncryptedMetadataBlockView> mblocks;
-    mblocks.reserve(parsed.getTagCount());
-    mblocks.push_back(parsed.getExactStringMetadataBlock());
-    mblocks.insert(mblocks.end(), substrBlks.begin(), substrBlks.end());
-    mblocks.insert(mblocks.end(), suffixBlks.begin(), suffixBlks.end());
-    mblocks.insert(mblocks.end(), prefixBlks.begin(), prefixBlks.end());
+    auto mblocks = parsed.getAllMetadataBlocks();
 
     // verify metadata blocks have the correct tags
     for (uint32_t i = 0; i < parsed.getTagCount(); i++) {
-        auto swMeta =
-            FLE2TagAndEncryptedMetadataBlock::decryptAndParse(serverDataTokens[i], mblocks[i]);
-        ASSERT(swMeta.isOK());
-        ASSERT_EQ(swMeta.getValue().count, payload.counts[i]);
-        ASSERT_EQ(swMeta.getValue().contentionFactor, 0);
-        ASSERT_EQ(swMeta.getValue().tag, tags[i]);
-        ASSERT(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(swMeta.getValue().zeros));
+        auto zeroEncryptToken = ServerZerosEncryptionToken::deriveFrom(serverDataTokens[i]);
+        auto counterEncryptToken =
+            ServerCountAndContentionFactorEncryptionToken::deriveFrom(serverDataTokens[i]);
+
+        auto zeros = uassertStatusOK(mblocks[i].decryptZerosBlob(zeroEncryptToken));
+        ASSERT_TRUE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
+
+        auto counterPair =
+            uassertStatusOK(mblocks[i].decryptCounterAndContentionFactorPair(counterEncryptToken));
+        ASSERT_EQ(counterPair.counter, payload.counts[i]);
+        ASSERT_EQ(counterPair.contentionFactor, 0);
+
+        ASSERT_TRUE(areBuffersEqual(mblocks[i].getView().tag, tags[i]));
     }
 
     // Verify the metadata blocks have unique encrypted zeros blob
@@ -2265,7 +2356,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     // like text search padding blocks.
     stdx::unordered_set<std::string> encryptedZeroesSet;
     for (auto& mblock : mblocks) {
-        ASSERT(encryptedZeroesSet.insert(hexdump(mblock.encryptedZeros)).second);
+        ASSERT(encryptedZeroesSet.insert(hexdump(mblock.getView().encryptedZeros)).second);
     }
 }
 
@@ -3302,21 +3393,21 @@ TEST_F(ServiceContextTest, FLE_Update_GetRemovedTags) {
         decodePrf("786F23F132FF7F14F748AC69373CFC982AD0AD4BAD25BE92008B83AB437EC82A"));
 
     std::vector<uint8_t> clientBlob(64);
+    PrfBlock nullBlock;
 
-    auto value1 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-        BSONType::string,
-        indexKeyId,
-        clientBlob,
-        FLE2TagAndEncryptedMetadataBlock(1, 0, tag1),
-        serverToken,
-        serverDerivedFromDataToken);
-    auto value2 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-        BSONType::string,
-        indexKeyId,
-        clientBlob,
-        FLE2TagAndEncryptedMetadataBlock(1, 0, tag2),
-        serverToken,
-        serverDerivedFromDataToken);
+    FLE2InsertUpdatePayloadV2 iup;
+    iup.setServerEncryptionToken(serverToken);
+    iup.setServerDerivedFromDataToken(serverDerivedFromDataToken);
+    iup.setIndexKeyId(indexKeyId);
+    iup.setValue(clientBlob);
+    iup.setType(stdx::to_underlying(BSONType::string));
+    iup.setContentionFactor(0);
+    // these two tokens below are not used in fromUnencrypted
+    iup.setEdcDerivedToken(EDCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
+    iup.setEscDerivedToken(ESCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
+
+    auto value1 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iup, tag1, 1);
+    auto value2 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(iup, tag2, 1);
 
     auto value1Blob = uassertStatusOK(value1.serialize());
     auto value2Blob = uassertStatusOK(value2.serialize());

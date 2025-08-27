@@ -392,19 +392,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "fle_testing_util",
-    srcs = [
-        "fle_testing_util.cpp",
-    ],
-    hdrs = [
-        "fle_testing_util.h",
-    ],
-    deps = [
-        ":fle_crypto",
-    ],
-)
-
 mongo_cc_unit_test(
     name = "crypto_test",
     srcs = [
@@ -443,7 +430,6 @@ mongo_cc_unit_test(
         ":encrypted_field_config",
         ":fle_crypto",
         ":fle_fields",
-        ":fle_testing_util",
         ":jwk_manager_test_framework",
         ":jwt",
         ":mongocryptutil",
