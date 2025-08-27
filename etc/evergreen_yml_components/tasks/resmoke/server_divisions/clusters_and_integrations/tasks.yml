@@ -1986,6 +1986,12 @@ tasks:
       resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
 
 - <<: *gen_task_template
+  name: sharding_jscore_passthrough_with_injected_catalog_metadata_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "sharding", "jscore", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
   # TODO SERVER-83445 Enable on non-all-feature-flag variants.
   tags: ["assigned_to_jira_team_server_catalog_and_routing", "default", "unsplittable_collections"]

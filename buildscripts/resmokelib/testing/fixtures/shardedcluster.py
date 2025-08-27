@@ -7,7 +7,12 @@ import pymongo
 import pymongo.errors
 import yaml
 
-from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
+from buildscripts.resmokelib.testing.fixtures import (
+    _builder,
+    external,
+    interface,
+    sharded_cluster_util,
+)
 
 
 class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface):
@@ -18,14 +23,34 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
-    def __init__(self, logger, job_num, fixturelib, mongos_options=None, mongod_executable=None,
-                 mongod_options=None, dbpath_prefix=None, preserve_dbpath=False, num_shards=1,
-                 num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
-                 configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
-                 config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
-                 replica_set_endpoint=False, random_migrations=False, launch_mongot=False,
-                 set_cluster_parameter=None,
-                 has_uninitialized_fcv_initial_sync_nodes_in_shards=False):
+    def __init__(
+        self,
+        logger,
+        job_num,
+        fixturelib,
+        mongos_options=None,
+        mongod_executable=None,
+        mongod_options=None,
+        dbpath_prefix=None,
+        preserve_dbpath=False,
+        num_shards=1,
+        num_rs_nodes_per_shard=1,
+        num_mongos=1,
+        enable_balancer=True,
+        auth_options=None,
+        configsvr_options=None,
+        shard_options=None,
+        cluster_logging_prefix=None,
+        config_shard=None,
+        use_auto_bootstrap_procedure=None,
+        embedded_router=False,
+        replica_set_endpoint=False,
+        random_migrations=False,
+        launch_mongot=False,
+        set_cluster_parameter=None,
+        has_uninitialized_fcv_initial_sync_nodes_in_shards=False,
+        inject_catalog_metadata=None,
+    ):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -70,6 +95,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.replica_endpoint_mode = replica_set_endpoint
         self.set_cluster_parameter = set_cluster_parameter
         self.has_uninitialized_fcv_initial_sync_nodes_in_shards = has_uninitialized_fcv_initial_sync_nodes_in_shards
+        self.inject_catalog_metadata = inject_catalog_metadata
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -247,6 +273,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         if self.set_cluster_parameter:
             self.run_set_cluster_parameter()
+
+        if self.inject_catalog_metadata:
+            csrs_client = interface.build_client(self.configsvr, self.auth_options)
+            sharded_cluster_util.inject_catalog_metadata_on_the_csrs(csrs_client, self.inject_catalog_metadata)
 
         self.is_ready = True
 
