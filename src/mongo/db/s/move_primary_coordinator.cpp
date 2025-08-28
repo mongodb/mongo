@@ -706,12 +706,6 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
             postCommitDbType.getPrimary() != ShardingState::get(opCtx)->shardId());
 }
 
-void MovePrimaryCoordinator::clearDbMetadataOnPrimary(OperationContext* opCtx) const {
-    AutoGetDb autoDb(opCtx, _dbName, MODE_IX);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
-    scopedDss->clearDbInfo(opCtx);
-}
-
 void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const {
     // Enable write blocking bypass to allow cleaning of stale data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
@@ -786,8 +780,6 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 }
 
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
-    // The release of the critical section will clear db metadata on secondaries
-    clearDbMetadataOnPrimary(opCtx);
     // In case of step-down, this operation could be re-executed and trigger the invariant in case
     // the new primary runs a DDL that acquires the critical section in the old primary shard
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
@@ -795,7 +787,7 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
         NamespaceString(_dbName),
         _csReason,
         ShardingCatalogClient::kLocalWriteConcern,
-        ShardingRecoveryService::NoCustomAction(),
+        ShardingRecoveryService::FilteringMetadataClearer(),
         false /*throwIfReasonDiffers*/);
 }
 
