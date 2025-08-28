@@ -45,6 +45,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
@@ -274,6 +275,8 @@ int dbtestsMain(int argc, char** argv) {
     setGlobalServiceContext(std::move(serviceUniq));
 
     const auto service = getGlobalServiceContext();
+
+    ReplicaSetDDLTracker::create(service);
 
     repl::ReplicationCoordinator::set(
         service,

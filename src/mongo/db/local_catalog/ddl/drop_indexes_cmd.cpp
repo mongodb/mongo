@@ -45,6 +45,7 @@
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/ddl/drop_indexes_gen.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/drop_indexes.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
@@ -131,6 +132,7 @@ public:
                                                             ActionType::dropIndex));
         }
         Reply typedRun(OperationContext* opCtx) final {
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
             return dropIndexes(opCtx,
                                request().getNamespace(),
                                request().getCollectionUUID(),
@@ -180,6 +182,9 @@ public:
 
         const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+
+        boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL> scopedReplicaSetDDL{
+            boost::in_place_init, opCtx, toReIndexNss};
 
         LOGV2(20457, "CMD reIndex", logAttrs(toReIndexNss));
 
@@ -264,6 +269,7 @@ public:
 
         result.appendNumber("nIndexesWas", static_cast<long long>(indexes.size()));
 
+
         std::unique_ptr<MultiIndexBlock> indexer = std::make_unique<MultiIndexBlock>();
         indexer->setIndexBuildMethod(IndexBuildMethodEnum::kForeground);
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
@@ -293,6 +299,12 @@ public:
             LOGV2(20458, "Exiting because 'reIndexCrashAfterDrop' fail point was set");
             quickExit(ExitCode::abrupt);
         }
+
+        // Explicitly release the scoped DDL object since we have finished initializing the index
+        // re-build. Not holding the object for the entire index re-build avoids blocking other
+        // operations that are waiting on this DDL operation to complete, such as draining direct
+        // connection DDLs during the promotion to sharded.
+        scopedReplicaSetDDL.reset();
 
         // The following function performs its own WriteConflict handling, so don't wrap it in a
         // writeConflictRetry loop.

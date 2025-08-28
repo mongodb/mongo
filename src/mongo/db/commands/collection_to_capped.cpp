@@ -41,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/local_catalog/database_holder.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
@@ -133,6 +134,8 @@ public:
         NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
         NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
 
+        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, fromNs);
+
         CollectionAcquisitionRequests acquisitionRequests = {
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, fromNs, AcquisitionPrerequisites::OperationType::kWrite),
@@ -203,6 +206,9 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+
+        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, nss);
+
         auto size = cmdObj.getField("size").safeNumberLong();
 
         uassert(ErrorCodes::InvalidOptions,

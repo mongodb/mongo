@@ -38,6 +38,7 @@
 #include "mongo/db/local_catalog/collection_impl.h"
 #include "mongo/db/local_catalog/database_holder.h"
 #include "mongo/db/local_catalog/database_holder_impl.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_state.h"
@@ -154,6 +155,8 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _opObserverRegistry = observerRegistry.get();
     serviceContext->setOpObserver(std::move(observerRegistry));
+
+    ReplicaSetDDLTracker::create(serviceContext);
 
     // Set up the periodic runner to allow background job execution for tests that require it.
     auto runner = makePeriodicRunner(serviceContext);

@@ -64,6 +64,7 @@
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/ddl/create_indexes_gen.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/index_key_validate.h"
@@ -471,8 +472,10 @@ IndexBuildProtocol determineProtocol(OperationContext* opCtx, const NamespaceStr
         : IndexBuildProtocol::kSinglePhase;
 }
 
-CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
-                                                   const CreateIndexesCommand& cmd) {
+CreateIndexesReply runCreateIndexesWithCoordinator(
+    OperationContext* opCtx,
+    const CreateIndexesCommand& cmd,
+    boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL>& scopedReplicaSetDDL) {
     const auto ns = cmd.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
@@ -628,6 +631,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                               buildUUID,
                                                               protocol,
                                                               indexBuildOptions));
+
+        // Explicitly release the scoped DDL object since we have finished initializing the index
+        // build coordinator. Not holding the object for the entire index build avoids blocking
+        // other operations that are waiting on this DDL operation to complete, such as draining
+        // direct connection DDLs during the promotion to sharded.
+        scopedReplicaSetDDL.reset();
 
         if (cmd.getReturnOnStart()) {
             LOGV2(8903900,
@@ -876,6 +885,9 @@ public:
         }
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
+            boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL> scopedReplicaSetDDL{
+                boost::in_place_init, opCtx, ns()};
+
             uassert(ErrorCodes::Error(8293400),
                     str::stream() << "Cannot create index on special internal config collection "
                                   << NamespaceString::kPreImagesCollectionName,
@@ -895,7 +907,7 @@ public:
             bool shouldLogMessageOnAlreadyBuildingError = true;
             while (true) {
                 try {
-                    return runCreateIndexesWithCoordinator(opCtx, cmd);
+                    return runCreateIndexesWithCoordinator(opCtx, cmd, scopedReplicaSetDDL);
                 } catch (const DBException& ex) {
                     // We can only wait for an existing index build to finish if we are able to
                     // release our locks, in order to allow the existing index build to proceed. We

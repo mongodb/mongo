@@ -48,6 +48,7 @@
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/local_catalog/ddl/create_gen.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/index_key_validate.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/namespace_string.h"
@@ -311,6 +312,10 @@ public:
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             // Intentional copy of request made here, as request object can be modified below.
             auto cmd = request();
+
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx,
+                                                                          cmd.getNamespace());
+
             auto createViewlessTimeseriesColl =
                 gFeatureFlagCreateViewlessTimeseriesCollections
                     .isEnabledUseLastLTSFCVWhenUninitialized(

@@ -58,6 +58,7 @@
 #include "mongo/db/local_catalog/ddl/coll_mod_reply_validation.h"
 #include "mongo/db/local_catalog/ddl/drop_database_gen.h"
 #include "mongo/db/local_catalog/ddl/drop_gen.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/drop_collection.h"
 #include "mongo/db/local_catalog/drop_database.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -151,6 +152,8 @@ public:
                         ->isAuthorizedForActionsOnNamespace(ns(), ActionType::dropDatabase));
         }
         Reply typedRun(OperationContext* opCtx) final {
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
+
             auto dbName = request().getDbName();
             // disallow dropping the config database
             if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
@@ -223,6 +226,8 @@ public:
                         ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
         }
         Reply typedRun(OperationContext* opCtx) final {
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
+
             if (request().getNamespace().isOplog()) {
                 uassert(5255000,
                         "can't drop live oplog while replicating",

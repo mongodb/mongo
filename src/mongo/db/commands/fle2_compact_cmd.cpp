@@ -52,6 +52,7 @@
 #include "mongo/db/local_catalog/create_collection.h"
 #include "mongo/db/local_catalog/ddl/create_gen.h"
 #include "mongo/db/local_catalog/ddl/drop_gen.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/drop_collection.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -265,6 +266,8 @@ public:
         using TC::InvocationBase::request;
 
         Reply typedRun(OperationContext* opCtx) {
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
+
             return Reply(compactEncryptedCompactionCollection(opCtx, request()));
         }
 

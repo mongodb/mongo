@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/local_catalog/ddl/rename_collection_common.h"
 #include "mongo/db/local_catalog/ddl/rename_collection_gen.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/local_catalog/rename_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -98,6 +99,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             const auto& fromNss = getFrom();
             const auto& toNss = request().getTo();
+
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, fromNss);
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't rename a collection to itself",

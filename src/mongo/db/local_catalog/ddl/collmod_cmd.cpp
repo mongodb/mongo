@@ -43,6 +43,7 @@
 #include "mongo/db/local_catalog/coll_mod.h"
 #include "mongo/db/local_catalog/ddl/coll_mod_gen.h"
 #include "mongo/db/local_catalog/ddl/coll_mod_reply_validation.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -132,6 +133,8 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
             const auto& cmd = request();
             const auto& nss = request().getNamespace();
+
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, nss);
 
             staticValidateCollMod(opCtx, nss, cmd.getCollModRequest());
 
