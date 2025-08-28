@@ -229,6 +229,7 @@ mongo_idl_library(
     src = "write_ops.idl",
     idl_deps = [
         "//src/mongo/crypto:fle_field_schema_idl_gen",
+        "//src/mongo/db/auth:access_checks_idl_gen",
         "//src/mongo/db/auth:action_type_idl_gen",
         "//src/mongo/db/session:logical_session_id_idl_gen",
         "//src/mongo/db/pipeline:legacy_runtime_constants_idl_gen",
