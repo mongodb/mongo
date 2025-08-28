@@ -127,7 +127,9 @@ void AuthOpObserver::onCreateCollection(
         o2 = repl::MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
             createCollCatalogIdentifier->ident,
-            createCollCatalogIdentifier->idIndexIdent);
+            createCollCatalogIdentifier->idIndexIdent,
+            createCollCatalogIdentifier->directoryPerDB,
+            createCollCatalogIdentifier->directoryForIndexes);
     }
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/op_observer/op_observer_util.h"
+#include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/logv2/redaction.h"
@@ -146,49 +147,25 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
     if (auto o2 = entry.getObject2(); o2 && parseO2) {
-        auto indexesElem = o2->getField("indexes");
-        if (indexesElem.eoo()) {
-            return {ErrorCodes::BadValue, "Missing required field 'indexes'"};
-        }
-        if (indexesElem.type() != BSONType::array) {
-            return {ErrorCodes::BadValue,
-                    fmt::format("Field 'indexes' must be an array of objects, got '{}'",
-                                indexesElem.toString())};
-        }
+        auto parsedO2 = repl::StartIndexBuildOplogEntryO2::parse(
+            *o2, IDLParserContext("startIndexBuildOplogEntryO2"));
+        auto indexes = parsedO2.getIndexes();
 
-        auto indexesElemVec = indexesElem.Array();
-        if (indexesVec.size() != indexesElemVec.size()) {
+        if (indexesVec.size() != indexes.size()) {
             return {
                 ErrorCodes::BadValue,
                 fmt::format("'indexes' array sizes differ between o and o2 objects, got {} vs {}",
                             indexesVec.size(),
-                            indexesElemVec.size())};
+                            indexes.size())};
         }
 
-        for (size_t i = 0; i < indexesElemVec.size(); ++i) {
-            auto& indexElem = indexesElemVec[i];
-            if (indexElem.type() != BSONType::object) {
+        for (size_t i = 0; i < indexes.size(); ++i) {
+            auto indexIdent = indexes[i].getIndexIdent();
+            if (!ident::isValidIdent(indexIdent)) {
                 return {ErrorCodes::BadValue,
-                        fmt::format("Element of 'indexes' must be an object, got '{}'",
-                                    indexElem.toString())};
+                        fmt::format("'indexIdent' '{}' is not a valid ident", indexIdent)};
             }
-
-            auto indexElemObj = indexElem.Obj();
-            auto indexIdentElem = indexElemObj.getField("indexIdent");
-            if (indexIdentElem.eoo()) {
-                return {ErrorCodes::BadValue, "Missing required field 'indexIdent'"};
-            }
-            if (indexIdentElem.type() != BSONType::string) {
-                return {ErrorCodes::BadValue,
-                        fmt::format("'indexIdent' must be a string, got '{}'",
-                                    indexIdentElem.toString())};
-            }
-            if (!ident::isValidIdent(indexIdentElem.valueStringData())) {
-                return {
-                    ErrorCodes::BadValue,
-                    fmt::format("'indexIdent' '{}' is not a valid ident", indexIdentElem.str())};
-            }
-            indexesVec[i].indexIdent = indexIdentElem.str();
+            indexesVec[i].indexIdent = std::string{indexIdent};
         }
     }
 

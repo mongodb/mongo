@@ -1,0 +1,88 @@
+# Copyright (C) 2025-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo::repl"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/record_id.idl"
+
+structs:
+    CreateOplogEntryO2:
+        description: "In a 'create' collection oplog entry, defines the fields expected in the 'o2' subobject."
+        strict: false
+        fields:
+            catalogId:
+                description: "The recordId mapping to the _mdb_catalog for the collection"
+                type: RecordId
+            ident:
+                description: "The ident where the collection's main data table is stored."
+                type: string
+            idIndexIdent:
+                description: "The ident where the collection's _id index is stored. Present if the _id index is generated as a part of collection creation"
+                type: string
+                optional: true
+            directoryPerDB:
+                description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
+                type: bool
+            directoryForIndexes:
+                description: "Whether 'directoryForIndexes' storage option is set, which decides how idents are created."
+                type: bool
+    CreateIndexesOplogEntryO2:
+        description: "In a 'createIndexes' oplog entry, defines the fields expected in the 'o2' subobject."
+        strict: false
+        fields:
+            indexIdent:
+                description: "The ident where the index's table is stored."
+                type: string
+            directoryPerDB:
+                description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
+                type: bool
+            directoryForIndexes:
+                description: "Whether 'directoryForIndexes' storage option is set, which decides how idents are created."
+                type: bool
+    IndexIdents:
+        description: "The idents used for an index build."
+        strict: false
+        fields:
+            indexIdent:
+                description: "The ident where the table of the index being built is stored."
+                type: string
+    StartIndexBuildOplogEntryO2:
+        description: "In a 'startIndexBuild' oplog entry, defines the fields expected in the 'o2' subobject."
+        strict: false
+        fields:
+            indexes:
+                description: "The array of index build idents."
+                type: array<IndexIdents>
+            directoryPerDB:
+                description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
+                type: bool
+            directoryForIndexes:
+                description: "Whether 'directoryForIndexes' storage option is set, which decides how idents are created."
+                type: bool

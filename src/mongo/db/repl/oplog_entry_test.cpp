@@ -41,6 +41,7 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
@@ -180,10 +181,14 @@ TEST_F(OplogEntryTest, CreateWithCatalogIdentifier) {
     RecordId catalogId = RecordId(1);
     std::string ident = "collection_ident";
     std::string idIndexIdent = "id_index_ident";
-    const auto oplogEntryObject2Doc =
-        MutableOplogEntry::makeCreateCollObject2(catalogId, ident, idIndexIdent);
+    bool directoryPerDB = true;
+    bool directoryForIndexes = true;
+    const auto oplogEntryObject2Doc = MutableOplogEntry::makeCreateCollObject2(
+        catalogId, ident, idIndexIdent, directoryPerDB, directoryForIndexes);
     ASSERT_BSONOBJ_EQ(oplogEntryObject2Doc,
-                      BSON("catalogId" << 1 << "ident" << ident << "idIndexIdent" << idIndexIdent));
+                      BSON("catalogId" << 1 << "ident" << ident << "idIndexIdent" << idIndexIdent
+                                       << "directoryPerDB" << true << "directoryForIndexes"
+                                       << true));
 
     const auto entry = makeCommandOplogEntry(
         entryOpTime, nss, oplogEntryObjectDoc, oplogEntryObject2Doc, opts.uuid);
@@ -200,6 +205,90 @@ TEST_F(OplogEntryTest, CreateWithCatalogIdentifier) {
     ASSERT(!entry.getTid());
     ASSERT(entry.getObject2());
     ASSERT_BSONOBJ_EQ(*entry.getObject2(), oplogEntryObject2Doc);
+}
+
+TEST_F(OplogEntryTest, CreateO2RoundTrip) {
+    // Tests the 'o2' object for a create oplog entry can be parsed and serialized back to its
+    // original form when supplied with catalog identifiers.
+
+    RecordId catalogId = RecordId(1);
+    std::string ident = "collection_ident";
+    std::string idIndexIdent = "id_index_ident";
+    bool directoryPerDB = true;
+    bool directoryForIndexes = true;
+    const auto rawO2 = MutableOplogEntry::makeCreateCollObject2(
+        catalogId, ident, idIndexIdent, directoryPerDB, directoryForIndexes);
+
+    // Test parsing of 'o2' BSON.
+    const auto parsedO2 = CreateOplogEntryO2::parse(rawO2, IDLParserContext("createOplogEntryO2"));
+    const auto& parsedCatalogId = parsedO2.getCatalogId();
+    const auto& parsedIdent = parsedO2.getIdent();
+    const auto& parsedIdIndexIdent = parsedO2.getIdIndexIdent();
+    const auto& parsedDirectoryPerDB = parsedO2.getDirectoryPerDB();
+    const auto& parsedDirectoryForIndexes = parsedO2.getDirectoryForIndexes();
+
+    ASSERT_EQ(catalogId, parsedCatalogId);
+    ASSERT_EQ(ident, parsedIdent);
+    ASSERT(parsedIdIndexIdent);
+    ASSERT_EQ(idIndexIdent, *parsedIdIndexIdent);
+    ASSERT(parsedDirectoryPerDB);
+    ASSERT(parsedDirectoryForIndexes);
+
+    // Confirm the parsed information can be round-tripped back to BSON.
+    const auto serializedO2 = parsedO2.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO2, serializedO2);
+}
+
+TEST_F(OplogEntryTest, CreateIndexesO2RoundTrip) {
+    // Tests the 'o2' object for a createIndexes oplog entry can be parsed and serialized back to
+    // its original form when supplied with catalog identifiers.
+
+    std::string indexIdent = "index_ident";
+    bool directoryPerDB = true;
+    bool directoryForIndexes = true;
+    const auto rawO2 = BSON("indexIdent" << indexIdent << "directoryPerDB" << directoryPerDB
+                                         << "directoryForIndexes" << directoryForIndexes);
+    // Test parsing of 'o2' BSON.
+    const auto parsedO2 =
+        CreateIndexesOplogEntryO2::parse(rawO2, IDLParserContext("createIndexesOplogEntryO2"));
+    const auto& parsedIndexIdent = parsedO2.getIndexIdent();
+    const auto& parsedDirectoryPerDB = parsedO2.getDirectoryPerDB();
+    const auto& parsedDirectoryForIndexes = parsedO2.getDirectoryForIndexes();
+
+    ASSERT_EQ(indexIdent, parsedIndexIdent);
+    ASSERT(parsedDirectoryPerDB);
+    ASSERT(parsedDirectoryForIndexes);
+
+    // Confirm the parsed information can be round-tripped back to BSON.
+    const auto serializedO2 = parsedO2.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO2, serializedO2);
+}
+
+TEST_F(OplogEntryTest, StartIndexBuildO2RoundTrip) {
+    // Tests the 'o2' object for a startIndexBuild oplog entry can be parsed and serialized back to
+    // its original form when supplied with catalog identifiers.
+
+    std::string indexIdent = "index_ident";
+    bool directoryPerDB = true;
+    bool directoryForIndexes = true;
+    const auto rawO2 =
+        BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdent)) << "directoryPerDB"
+                       << directoryPerDB << "directoryForIndexes" << directoryForIndexes);
+    // Test parsing of 'o2' BSON.
+    const auto parsedO2 =
+        StartIndexBuildOplogEntryO2::parse(rawO2, IDLParserContext("startIndexBuildOplogEntryO2"));
+    const auto& parsedIndexes = parsedO2.getIndexes();
+    const auto& parsedDirectoryPerDB = parsedO2.getDirectoryPerDB();
+    const auto& parsedDirectoryForIndexes = parsedO2.getDirectoryForIndexes();
+
+    ASSERT_EQ(parsedIndexes.size(), 1);
+    ASSERT_EQ(parsedIndexes[0].getIndexIdent(), indexIdent);
+    ASSERT(parsedDirectoryPerDB);
+    ASSERT(parsedDirectoryForIndexes);
+
+    // Confirm the parsed information can be round-tripped back to BSON.
+    const auto serializedO2 = parsedO2.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO2, serializedO2);
 }
 
 TEST_F(OplogEntryTest, ContainerInsert) {
@@ -844,7 +933,8 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
     {
         const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
                                               << "indexes" << indexSpecs);
-        const auto o2 = BSON("indexes" << o2Indexes);
+        const auto o2 = BSON("indexes" << o2Indexes << "directoryPerDB" << true
+                                       << "directoryForIndexes" << true);
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
@@ -936,11 +1026,22 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     // parse does not verify that the specs are valid beyond having names, so no further tests for
     // them here
 
-    ASSERT_EQ(parse(baseObj, BSONObj()), ErrorCodes::BadValue);
-    ASSERT_EQ(parse(baseObj, BSON("indexes" << 1)), ErrorCodes::BadValue);
-    ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY(1))), ErrorCodes::BadValue);
-    ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY("malformed-ident"))),
-              ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(parse(baseObj, BSONObj()), AssertionException, ErrorCodes::IDLFailedToParse);
+    ASSERT_THROWS_CODE(
+        parse(baseObj, BSON("indexes" << 1)), AssertionException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(parse(baseObj, BSON("indexes" << BSON_ARRAY(1))),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(parse(baseObj, BSON("indexes" << BSON_ARRAY("malformed-ident"))),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        parse(baseObj, BSON("indexes" << BSON_ARRAY(BSON("invalid-ident" << "ident")))),
+        AssertionException,
+        ErrorCodes::IDLFailedToParse);
+    ASSERT_THROWS_CODE(parse(baseObj, BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << 1)))),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
 
     baseObj =
         BSON("abortIndexBuild" << "test.coll"

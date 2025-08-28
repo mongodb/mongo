@@ -95,6 +95,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "create_oplog_entry_gen",
+    src = "create_oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:record_id_gen",
+    ],
+)
+
+idl_generator(
     name = "oplog_entry_gen",
     src = "oplog_entry.idl",
     deps = [
@@ -113,6 +122,7 @@ idl_generator(
 mongo_cc_library(
     name = "oplog_entry",
     srcs = [
+        "create_oplog_entry_gen",
         "oplog_entry.cpp",
         "oplog_entry_gen",
         "oplog_entry_serialization.cpp",

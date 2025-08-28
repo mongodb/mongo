@@ -5421,8 +5421,12 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
-    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("indexIdent" << indexes[0].indexIdent));
-    ASSERT_BSONOBJ_EQ(*entry2.getObject2(), BSON("indexIdent" << indexes[1].indexIdent));
+    ASSERT_BSONOBJ_EQ(*entry1.getObject2(),
+                      BSON("indexIdent" << indexes[0].indexIdent << "directoryPerDB" << false
+                                        << "directoryForIndexes" << false));
+    ASSERT_BSONOBJ_EQ(*entry2.getObject2(),
+                      BSON("indexIdent" << indexes[1].indexIdent << "directoryPerDB" << false
+                                        << "directoryForIndexes" << false));
 }
 
 TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {

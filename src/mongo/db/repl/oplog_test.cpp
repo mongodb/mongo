@@ -430,7 +430,8 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
         createIndexForApplyOps(opCtx.get(),
                                BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
                                         << "a_1"),
-                               BSON("indexIdent" << ident),
+                               BSON("indexIdent" << ident << "directoryPerDB" << false
+                                                 << "directoryForIndexes" << false),
                                _nss,
                                OplogApplication::Mode::kSecondary);
     }
@@ -457,24 +458,24 @@ TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {
     ASSERT_THROWS_CODE(createIndexForApplyOps(
                            opCtx.get(), spec, BSONObj(), _nss, OplogApplication::Mode::kSecondary),
                        AssertionException,
-                       ErrorCodes::BadValue);
+                       ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS_CODE(
         createIndexForApplyOps(
             opCtx.get(), spec, BSON("indexIdent" << 1), _nss, OplogApplication::Mode::kSecondary),
         AssertionException,
-        ErrorCodes::BadValue);
+        ErrorCodes::TypeMismatch);
     ASSERT_THROWS_CODE(
         createIndexForApplyOps(
             opCtx.get(), spec, BSON("indexIdent" << ""), _nss, OplogApplication::Mode::kSecondary),
         AssertionException,
-        ErrorCodes::BadValue);
+        ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS_CODE(createIndexForApplyOps(opCtx.get(),
                                               spec,
                                               BSON("ident" << "malformed-ident"),
                                               _nss,
                                               OplogApplication::Mode::kSecondary),
                        AssertionException,
-                       ErrorCodes::BadValue);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 }  // namespace

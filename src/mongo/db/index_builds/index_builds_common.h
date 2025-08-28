@@ -73,6 +73,9 @@ struct IndexBuildInfo {
     BSONObj spec;
     // Ident of the index table itself.
     std::string indexIdent;
+    // Storage options that can affect indexIdent generation.
+    bool directoryPerDB = false;
+    bool directoryForIndexes = false;
     // Idents of temporary tables used during an index build. Some of these may or may not be used
     // depending on the index type and the index build method being used.
     boost::optional<std::string> sorterIdent;

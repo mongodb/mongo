@@ -539,9 +539,12 @@ OplogEntry makeCreateCollectionOplogEntry(
 
     BSONObj o2;
     if (createCollCatalogIdentifier.has_value()) {
-        o2 = MutableOplogEntry::makeCreateCollObject2(createCollCatalogIdentifier->catalogId,
-                                                      createCollCatalogIdentifier->ident,
-                                                      createCollCatalogIdentifier->idIndexIdent);
+        o2 = MutableOplogEntry::makeCreateCollObject2(
+            createCollCatalogIdentifier->catalogId,
+            createCollCatalogIdentifier->ident,
+            createCollCatalogIdentifier->idIndexIdent,
+            createCollCatalogIdentifier->directoryPerDB,
+            createCollCatalogIdentifier->directoryForIndexes);
     }
     return makeCommandOplogEntry(opTime, nss, object, o2, collectionOptions.uuid);
 }

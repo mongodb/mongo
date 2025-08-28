@@ -152,6 +152,16 @@ struct CreateCollCatalogIdentifier {
      * Otherwise, boost::none.
      */
     boost::optional<std::string> idIndexIdent;
+
+    /**
+     * True if 'directoryPerDB' storage option is set.
+     */
+    bool directoryPerDB = false;
+
+    /**
+     * True if 'directoryForIndexes' storage option is set.
+     */
+    bool directoryForIndexes = false;
 };
 
 /**

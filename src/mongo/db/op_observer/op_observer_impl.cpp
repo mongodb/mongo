@@ -352,7 +352,10 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     }
     oplogEntry.setObject(builder.obj());
     if (replicateLocalCatalogIdentifiers) {
-        oplogEntry.setObject2(BSON("indexIdent" << indexBuildInfo.indexIdent));
+        oplogEntry.setObject2(BSON("indexIdent" << indexBuildInfo.indexIdent << "directoryPerDB"
+                                                << indexBuildInfo.directoryPerDB
+                                                << "directoryForIndexes"
+                                                << indexBuildInfo.directoryForIndexes));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
@@ -415,7 +418,11 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
-        oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr()));
+        // TODO (SERVER-109824): Move 'directoryPerDB' and 'directoryForIndexes' to the function
+        // parameters.
+        oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr() << "directoryPerDB"
+                                             << indexes[0].directoryPerDB << "directoryForIndexes"
+                                             << indexes[0].directoryForIndexes));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
@@ -1190,7 +1197,9 @@ void OpObserverImpl::onCreateCollection(
         const auto o2 = repl::MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
             createCollCatalogIdentifier->ident,
-            createCollCatalogIdentifier->idIndexIdent);
+            createCollCatalogIdentifier->idIndexIdent,
+            createCollCatalogIdentifier->directoryPerDB,
+            createCollCatalogIdentifier->directoryForIndexes);
         oplogEntry.setObject2(o2);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
