@@ -38,6 +38,7 @@
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
@@ -55,9 +56,15 @@
 
 namespace mongo {
 
-using std::string;
-using std::unique_ptr;
+namespace {
 
+int64_t getMemoryLimit() {
+    return feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()
+        ? loadMemoryLimit(StageMemoryLimit::TextOrStageMaxMemoryBytes)
+        : std::numeric_limits<int64_t>::max();
+}
+
+}  // namespace
 
 const char* TextOrStage::kStageType = "TEXT_OR";
 
@@ -70,11 +77,11 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
       _keyPrefixSize(keyPrefixSize),
       _ws(ws),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::TextOrStageMaxMemoryBytes))),
+          *expCtx, getMemoryLimit())),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID) {}
 
-void TextOrStage::addChild(unique_ptr<PlanStage> child) {
+void TextOrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.push_back(std::move(child));
 }
 
@@ -117,7 +124,7 @@ std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
         _commonStats.filter = _filter->serialize();
     }
 
-    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_OR);
+    auto ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_OR);
     ret->specific = std::make_unique<TextOrStats>(_specificStats);
 
     for (auto&& child : _children) {

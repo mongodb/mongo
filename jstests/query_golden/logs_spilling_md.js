@@ -10,6 +10,7 @@
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {code, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function getServerParameter(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
@@ -141,32 +142,34 @@ outputPipelineAndSlowQueryLog(
 );
 coll.drop();
 
-saveParameterToRestore("internalTextOrStageMaxMemoryBytes");
+if (FeatureFlagUtil.isPresentAndEnabled(db, "ExtendedAutoSpilling")) {
+    saveParameterToRestore("internalTextOrStageMaxMemoryBytes");
 
-section("TextOr and projection");
-setServerParameter("internalTextOrStageMaxMemoryBytes", 1);
+    section("TextOr and projection");
+    setServerParameter("internalTextOrStageMaxMemoryBytes", 1);
 
-assert.commandWorked(
-    coll.insertMany([
-        {a: "green tea", b: 5},
-        {a: "black tea", b: 6},
-        {a: "black coffee", b: 7},
-    ]),
-);
-assert.commandWorked(coll.createIndex({a: "text"}));
+    assert.commandWorked(
+        coll.insertMany([
+            {a: "green tea", b: 5},
+            {a: "black tea", b: 6},
+            {a: "black coffee", b: 7},
+        ]),
+    );
+    assert.commandWorked(coll.createIndex({a: "text"}));
 
-outputPipelineAndSlowQueryLog(
-    coll,
-    [{$match: {$text: {$search: "black tea"}}}, {$addFields: {score: {$meta: "textScore"}}}],
-    "text or project meta",
-);
+    outputPipelineAndSlowQueryLog(
+        coll,
+        [{$match: {$text: {$search: "black tea"}}}, {$addFields: {score: {$meta: "textScore"}}}],
+        "text or project meta",
+    );
 
-section("TextOr and sort");
-outputPipelineAndSlowQueryLog(
-    coll,
-    [{$match: {$text: {$search: "black tea"}}}, {$sort: {_: {$meta: "textScore"}}}],
-    "text or sort on meta",
-);
+    section("TextOr and sort");
+    outputPipelineAndSlowQueryLog(
+        coll,
+        [{$match: {$text: {$search: "black tea"}}}, {$sort: {_: {$meta: "textScore"}}}],
+        "text or sort on meta",
+    );
+}
 
 coll.drop();
 

@@ -12,6 +12,7 @@
  *   assumes_no_implicit_cursor_exhaustion,
  *   # $text is not supported on views.
  *   incompatible_with_views,
+ *   featureFlagExtendedAutoSpilling,
  * ]
  */
 

@@ -4,6 +4,7 @@
 //   requires_fcv_81,
 //   requires_persistence,
 //   requires_non_retryable_commands,
+//   featureFlagExtendedAutoSpilling,
 // ]
 
 import {arrayDiff} from "jstests/aggregation/extras/utils.js";

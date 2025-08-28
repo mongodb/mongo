@@ -13,6 +13,7 @@
  * command_not_supported_in_serverless,
  * requires_fcv_82,
  * assumes_against_mongod_not_mongos,
+ * featureFlagExtendedAutoSpilling,
  * ]
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";

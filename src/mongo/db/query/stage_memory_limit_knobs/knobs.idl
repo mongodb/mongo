@@ -128,9 +128,8 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: "internalTextOrStageMaxMemoryBytes"
         cpp_vartype: AtomicWord<long long>
-        # TODO SERVER-99279 Enable automatic spilling by setting a reasonable default value.
         default:
-            expr: std::numeric_limits<long long>::max()
+            expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false

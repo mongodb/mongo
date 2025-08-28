@@ -15,7 +15,7 @@ import {
 import {getAggPlanStages, getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {featureFlagExtendedAutoSpilling: true}});
 const testDB = conn.getDB("profile_agg");
 const collName = jsTestName();
 const coll = testDB.getCollection(collName);
@@ -126,7 +126,9 @@ assert.gt(profileObj.textOrSpilledBytes, 0, tojson(profileObj));
 assert.gt(profileObj.textOrSpilledRecords, 0, tojson(profileObj));
 assert.gt(profileObj.textOrSpilledDataStorageSize, 0, tojson(profileObj));
 
-coll.aggregate([{$match: {$text: {$search: "black tea"}}}, {$sort: {_: {$meta: "textScore"}}}], {allowDiskUse: true});
+coll.aggregate([{$match: {$text: {$search: "black tea"}}}, {$sort: {_: {$meta: "textScore"}}}], {
+    allowDiskUse: true,
+});
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 assert.gt(profileObj.textOrSpills, 0, tojson(profileObj));
