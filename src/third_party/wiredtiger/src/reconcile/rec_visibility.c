@@ -62,6 +62,14 @@ __rec_delete_hs_upd_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *
     delete_hs_upd->upd = upd;
     delete_hs_upd->tombstone = tombstone;
     ++r->delete_hs_upd_next;
+
+    /* Clear the durable flag to allow them being included in a delta. */
+    if (F_ISSET(upd, WT_UPDATE_DURABLE))
+        F_CLR(upd, WT_UPDATE_DURABLE);
+
+    if (tombstone != NULL && F_ISSET(tombstone, WT_UPDATE_DURABLE))
+        F_CLR(tombstone, WT_UPDATE_DURABLE);
+
     return (0);
 }
 

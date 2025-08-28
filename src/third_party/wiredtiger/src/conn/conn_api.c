@@ -1818,7 +1818,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
     wt_off_t size;
     size_t len;
     char buf[256];
-    bool bytelock, empty, exist, is_create, is_salvage, match;
+    bool bytelock, empty, exist, is_create, is_disag, is_salvage, match;
 
     conn = S2C(session);
     fh = NULL;
@@ -1828,6 +1828,14 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 
     if (F_ISSET(conn, WT_CONN_READONLY))
         is_create = false;
+
+    /*
+     * FIXME-WT-14721: As it stands, __wt_conn_is_disagg only works after we have metadata access,
+     * which depends on having run recovery, so the config hack is the simplest way to break that
+     * dependency.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "disaggregated.page_log", &cval));
+    is_disag = cval.len > 0;
 
     bytelock = true;
     __wt_spin_lock(session, &__wt_process.spinlock);
@@ -1880,12 +1888,16 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
      * above, locked files cannot be copied on Windows). If the WiredTiger
      * file exists in the directory, create the lock file, covering the case
      * of a hot backup.
+     *
+     * In addition, in disagg mode, we should create the lock file regardless
+     * of whether the  WiredTiger file exists or not because WiredTiger file may
+     * not be there.
      */
     exist = false;
     if (!is_create)
         WT_ERR(__wt_fs_exist(session, WT_WIREDTIGER, &exist));
     ret = __wt_open(session, WT_SINGLETHREAD, WT_FS_OPEN_FILE_TYPE_REGULAR,
-      is_create || exist ? WT_FS_OPEN_CREATE : 0, &conn->lock_fh);
+      is_create || is_disag || exist ? WT_FS_OPEN_CREATE : 0, &conn->lock_fh);
 
     /*
      * If this is a read-only connection and we cannot grab the lock file, check if it is because
@@ -3034,7 +3046,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     /*
      * Check for local files that need to be removed before starting in disaggregated mode.
      */
-    WT_ERR(__wti_disagg_check_local_files(session, cfg));
+    WT_ERR(__wti_ensure_clean_startup_dir(session, cfg));
 
     /* Make sure no other thread of control already owns this database. */
     WT_ERR(__conn_single(session, cfg));

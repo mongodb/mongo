@@ -26,10 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, wiredtiger, wttest
+import os, wiredtiger, wttest, helper_disagg
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
+def disagg_ignore_expected_output(testcase):
+    testcase.ignoreStdoutPattern('WT_VERB_RTS|(wiredtiger_open:.*WT_VERB_METADATA)')
+
+helper_disagg.disagg_ignore_expected_output = disagg_ignore_expected_output
+
+logdir = "log"
 
 # test_layered46.py
 #    Test deleting local files on restart.
@@ -39,6 +45,7 @@ class test_layered46(wttest.WiredTigerTestCase, DisaggConfigMixin):
     conn_config = (
         "statistics=(all),statistics_log=(wait=1,json=true,on_close=true),"
         + "disaggregated=(page_log=palm,lose_all_my_data=true),"
+        + f"log=(enabled=true,path={logdir}),"
     )
 
     disagg_storages = gen_disagg_storages("test_layered46", disagg_only=True)
@@ -49,6 +56,10 @@ class test_layered46(wttest.WiredTigerTestCase, DisaggConfigMixin):
     create_session_config = "key_format=S,value_format=S"
     uri = "layered:test_layered46"
     uri_local = "table:test_layered46local"
+
+    def wiredtiger_open(self, *args, **kwargs):
+        os.makedirs(logdir, exist_ok=True)
+        return super().wiredtiger_open(*args, **kwargs)
 
     # Load the page log extension, which has object storage support.
     def conn_extensions(self, extlist):

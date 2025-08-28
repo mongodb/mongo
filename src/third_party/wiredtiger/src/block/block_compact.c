@@ -674,7 +674,9 @@ __wt_block_compact_page_rewrite(
     *addr_sizep = WT_PTRDIFF(endp, addr);
     block->compact_bytes_rewritten += size;
 
+    WT_STAT_CONN_INCR(session, block_read);
     WT_STAT_CONN_INCR(session, block_write);
+    WT_STAT_CONN_INCRV(session, block_byte_read, size);
     WT_STAT_CONN_INCRV(session, block_byte_write, size);
     WT_STAT_CONN_INCRV(session, block_byte_write_compact, size);
 

@@ -37,7 +37,6 @@ from prepare_util import test_prepare_preserve_prepare_base
 class test_prepare34(test_prepare_preserve_prepare_base):
     uri = 'table:test_prepare34'
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_rollback_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
@@ -123,7 +122,6 @@ class test_prepare34(test_prepare_preserve_prepare_base):
             self.assertEqual(value, cursor[i])
         self.session.rollback_transaction()
 
-    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_commit_prepare_modify(self):
         """
         Test that prepared transactions containing modify operations that are rolled back
@@ -182,7 +180,7 @@ class test_prepare34(test_prepare_preserve_prepare_base):
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
 
-        # Now rollback the prepared transaction at timestamp 80
+        # Now commit the prepared transaction at timestamp 80
         session_prepare.commit_transaction('commit_timestamp='+ self.timestamp_str(80)+',durable_timestamp='+self.timestamp_str(90))
 
         # Move stable timestamp to after prepare timestamp but before committing
@@ -194,9 +192,15 @@ class test_prepare34(test_prepare_preserve_prepare_base):
 
         # Write prepare update to disk when prepare ts is stable but durable timestamp is not stable
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(80))
-        self.checkpoint_and_verify_stats({
-            wiredtiger.stat.dsrc.rec_time_window_prepared: True,
-        }, self.uri)
+        if 'disagg' in self.hook_names:
+            # We should write an empty delta as we still write prepared.
+            self.checkpoint_and_verify_stats({
+                wiredtiger.stat.dsrc.rec_page_delta_leaf: False,
+            }, self.uri)
+        else:
+            self.checkpoint_and_verify_stats({
+                wiredtiger.stat.dsrc.rec_time_window_prepared: True,
+            }, self.uri)
 
         # Write committed update to disk when prepare ts is stable but durable timestamp is not stable
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(95))
