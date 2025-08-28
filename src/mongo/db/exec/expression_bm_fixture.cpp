@@ -137,7 +137,73 @@ void registerExpressionForBenchmark(std::string expression, Parser parser) {
     }
 }
 
+Document genDocument(size_t fieldsPerLevel, size_t depth) {
+    if (depth < 1) {
+        return {};
+    }
+
+    static const std::vector<Value> values{
+        Value(BSONNULL),
+        Value(true),
+        Value(123123123),
+        Value(12313123123LL),
+        Value(std::vector<Value>{Value(1), Value(2)}),
+        Value(Decimal128{"-9223372036854775809.99"}),
+        Value(Timestamp::max()),
+        Value(OID::max()),
+        Value("\"string\""_sd),
+        Value(UUID::parse("00000000-0000-0000-0000-000000000000").getValue()),
+        Value(BSONRegEx{"abc", "g"}),
+        Value(MINKEY),
+        Value(MAXKEY),
+    };
+
+    MutableDocument doc;
+    for (size_t i = 0; i < fieldsPerLevel; i++) {
+        std::string key = str::stream() << "field" << i;
+        doc.setField(key, values[i % values.size()]);
+    }
+    doc.setField(str::stream() << "level" << depth, Value(genDocument(fieldsPerLevel, depth - 1)));
+    return doc.freeze();
+}
+
+std::string genJsonString(size_t fieldsPerLevel, size_t depth) {
+    if (depth < 1) {
+        return "{}";
+    }
+
+    static const std::vector<StringData> values{
+        "null",
+        "true",
+        "false",
+        "18446744073709551615",
+        "\"string\"",
+        "[1,2,3]",
+    };
+
+    str::stream ss{};
+    ss << '{';
+    for (size_t i = 0; i < fieldsPerLevel; i++) {
+        if (i > 0) {
+            ss << ',';
+        }
+        ss << "\"field" << i << "\":" << values[i % values.size()];
+    }
+    ss << ",\"child\":" << genJsonString(fieldsPerLevel, depth - 1) << '}';
+    return ss;
+}
+
 }  // namespace
+
+void ExpressionBenchmarkFixture::increaseJSHeapSizeLimit() {
+    originalPerQueryJSHeapSizeLimit = internalQueryJavaScriptHeapSizeLimitMB.load();
+    internalQueryJavaScriptHeapSizeLimitMB.store(
+        mongo::getGlobalScriptEngine()->getJSHeapLimitMB());
+}
+
+void ExpressionBenchmarkFixture::resetJSHeapSizeLimit() {
+    internalQueryJavaScriptHeapSizeLimitMB.store(originalPerQueryJSHeapSizeLimit);
+}
 
 void ExpressionBenchmarkFixture::SetUp(benchmark::State& state) {
     QueryFCVEnvironmentForTest::setUp();
@@ -147,9 +213,14 @@ void ExpressionBenchmarkFixture::SetUp(benchmark::State& state) {
     ON_BLOCK_EXIT([&] { configureLogging(false); });
     _scopedGlobalServiceContext = std::make_unique<QueryTestScopedGlobalServiceContext>();
     ScriptEngine::setup(ExecutionEnvironment::Server);
+
+    // Increase the JS heap size limit. Some benchmarks run JSON.parse() and JSON.stringify() with
+    // large inputs which can be memory intensive.
+    increaseJSHeapSizeLimit();
 }
 
 void ExpressionBenchmarkFixture::TearDown(benchmark::State& state) {
+    resetJSHeapSizeLimit();
     ScriptEngine::dropScopeCache();
     _scopedGlobalServiceContext = nullptr;
 }
@@ -2180,6 +2251,49 @@ void ExpressionBenchmarkFixture::benchmarkJSSubtype(benchmark::State& state) {
         state,
         std::vector<Document>(
             1, {{"input"_sd, Value(BSONBinData{"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, BinDataGeneral})}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkMQLConvertObjectToString(size_t fields,
+                                                                   size_t depth,
+                                                                   benchmark::State& state) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    benchmarkExpression(BSON("$convert" << BSON("input" << "$input" << "to"
+                                                        << stdx::to_underlying(BSONType::string))),
+                        state,
+                        std::vector<Document>(1, {{"input"_sd, genDocument(fields, depth)}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkJSConvertObjectToString(size_t fields,
+                                                                  size_t depth,
+                                                                  benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$function" << BSON("body" << "function(input) {return JSON.stringify(input);}"
+                                        << "args" << BSON_ARRAY("$input") << "lang"
+                                        << "js")),
+        state,
+        std::vector<Document>(1, {{"input"_sd, genDocument(fields, depth)}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkMQLConvertStringToObject(size_t fields,
+                                                                   size_t depth,
+                                                                   benchmark::State& state) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+    benchmarkExpression(
+        BSON("$convert" << BSON("input" << "$input" << "to"
+                                        << stdx::to_underlying(BSONType::object))),
+        state,
+        std::vector<Document>(1, {{"input"_sd, Value(genJsonString(fields, depth))}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkJSConvertStringToObject(size_t fields,
+                                                                  size_t depth,
+                                                                  benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$function" << BSON("body" << "function(input) {return JSON.parse(input);}"
+                                        << "args" << BSON_ARRAY("$input") << "lang"
+                                        << "js")),
+        state,
+        std::vector<Document>(1, {{"input"_sd, Value(genJsonString(fields, depth))}}));
 }
 
 }  // namespace mongo
