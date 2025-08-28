@@ -90,12 +90,12 @@ const expressionsWithNewFeaturesThatCannotBeParsedByOldFCV = [
     {
         viewName: "toObjectView",
         expression: {$toObject: "$convertStringToObjectParams.input"},
-        failureErrorCode: [ErrorCodes.QueryFeatureNotAllowed],
+        failureErrorCode: [31325, ErrorCodes.QueryFeatureNotAllowed],
     },
     {
         viewName: "toArrayView",
         expression: {$toArray: "$convertStringToArrayParams.input"},
-        failureErrorCode: [ErrorCodes.QueryFeatureNotAllowed],
+        failureErrorCode: [31325, ErrorCodes.QueryFeatureNotAllowed],
     },
 ];
 
