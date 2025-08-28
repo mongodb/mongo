@@ -233,7 +233,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry->setUuid(args.coll->uuid());
 
     if (args.coll->isNewTimeseriesWithoutView()) {
-        oplogEntry->setIsViewlessTimeseries();
+        oplogEntry->setIsTimeseries();
     }
     repl::OplogLink oplogLink;
     operationLogger->appendOplogEntryChainInfo(
@@ -267,15 +267,15 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            bool fromMigrate,
                            const DocumentKey& documentKey,
                            const boost::optional<ShardId>& destinedRecipient,
-                           bool isViewlessTimeseries,
+                           bool isTimeseries,
                            OperationLogger* operationLogger) {
     oplogEntry->setTid(nss.tenantId());
     oplogEntry->setNss(nss);
     oplogEntry->setUuid(uuid);
     oplogEntry->setDestinedRecipient(destinedRecipient);
 
-    if (isViewlessTimeseries) {
-        oplogEntry->setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry->setIsTimeseries();
     }
     repl::OplogLink oplogLink;
     operationLogger->appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
@@ -325,7 +325,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const UUID& uuid,
                                    const IndexBuildInfo& indexBuildInfo,
                                    bool fromMigrate,
-                                   bool isViewlessTimeseries) {
+                                   bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -347,8 +347,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setObject(builder.obj());
     if (replicateLocalCatalogIdentifiers) {
@@ -387,7 +387,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
                                        const UUID& indexBuildUUID,
                                        const std::vector<IndexBuildInfo>& indexes,
                                        bool fromMigrate,
-                                       bool isViewlessTimeseries) {
+                                       bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -410,8 +410,8 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
@@ -454,7 +454,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
                                         const UUID& indexBuildUUID,
                                         const std::vector<BSONObj>& indexes,
                                         bool fromMigrate,
-                                        bool isViewlessTimeseries) {
+                                        bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -473,8 +473,8 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
@@ -491,7 +491,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
                                        const std::vector<BSONObj>& indexes,
                                        const Status& cause,
                                        bool fromMigrate,
-                                       bool isViewlessTimeseries) {
+                                       bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -517,8 +517,8 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
@@ -578,7 +578,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
             oplogEntry.setRecordId(recordIds[i]);
         }
         if (collectionPtr->isNewTimeseriesWithoutView()) {
-            oplogEntry.setIsViewlessTimeseries();
+            oplogEntry.setIsTimeseries();
         }
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
@@ -696,7 +696,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 uuid,
                 iter->doc,
                 docKey,
-                /*isViewlessTimeseries=*/coll->isNewTimeseriesWithoutView());
+                /*isTimeseries=*/coll->isNewTimeseriesWithoutView());
             operation.setDestinedRecipient(
                 shardingWriteRouter->getReshardingDestinedRecipient(iter->doc));
 
@@ -743,7 +743,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         // This means setting optype, nss, and object at the minimum.
         MutableOplogEntry oplogEntryTemplate;
         if (coll->isNewTimeseriesWithoutView()) {
-            oplogEntryTemplate.setIsViewlessTimeseries();
+            oplogEntryTemplate.setIsTimeseries();
         }
         oplogEntryTemplate.setOpType(repl::OpTypeEnum::kInsert);
         oplogEntryTemplate.setTid(nss.tenantId());
@@ -837,7 +837,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             args.coll->uuid(),
             args.updateArgs->update,
             args.updateArgs->criteria,
-            /*isViewlessTimeseries=*/args.coll->isNewTimeseriesWithoutView());
+            /*isTimeseries=*/args.coll->isNewTimeseriesWithoutView());
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
@@ -1003,7 +1003,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             nss,
             uuid,
             documentKey.getShardKeyAndId(),
-            /*isViewlessTimeseries=*/coll->isNewTimeseriesWithoutView());
+            /*isTimeseries=*/coll->isNewTimeseriesWithoutView());
         operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
 
@@ -1176,15 +1176,15 @@ void OpObserverImpl::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isViewlessTimeseries) {
+    bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         return;
     }
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setTid(collectionName.tenantId());
     oplogEntry.setNss(collectionName.getCommandNS());
@@ -1232,7 +1232,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
                                boost::optional<IndexCollModInfo> indexInfo,
-                               bool isViewlessTimeseries) {
+                               bool isTimeseries) {
     const auto [collModOplogCmd, additionalO2Field] =
         backwards_compatible_collection_options::getCollModCmdAndAdditionalO2Field(collModCmd);
 
@@ -1268,8 +1268,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 
         oplogEntry.setTid(nss.tenantId());
         oplogEntry.setNss(nss.getCommandNS());
-        if (isViewlessTimeseries) {
-            oplogEntry.setIsViewlessTimeseries();
+        if (isTimeseries) {
+            oplogEntry.setIsTimeseries();
         }
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(makeCollModCmdObj(collModOplogCmd, oldCollOptions, indexInfo));
@@ -1333,7 +1333,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
                                               bool markFromMigrate,
-                                              bool isViewlessTimeseries) {
+                                              bool isTimeseries) {
     uassert(50715,
             "dropping the server configuration collection (admin.system.version) is not allowed.",
             collectionName != NamespaceString::kServerConfigurationNamespace);
@@ -1346,8 +1346,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(collectionName.tenantId());
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(collectionName.getCommandNS());
     oplogEntry.setUuid(uuid);
@@ -1373,7 +1373,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                                  const UUID& uuid,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo,
-                                 bool isViewlessTimeseries) {
+                                 bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -1382,8 +1382,8 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(nss.tenantId());
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
@@ -1409,7 +1409,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp,
                                                  bool markFromMigrate,
-                                                 bool isViewlessTimeseries) {
+                                                 bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, fromCollection)) {
         return {};
     }
@@ -1430,8 +1430,8 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(fromCollection.tenantId());
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(fromCollection.getCommandNS());
     oplogEntry.setUuid(uuid);
@@ -1472,7 +1472,7 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                         std::uint64_t numRecords,
                                         bool stayTemp,
                                         bool markFromMigrate,
-                                        bool isViewlessTimeseries) {
+                                        bool isTimeseries) {
     preRenameCollection(opCtx,
                         fromCollection,
                         toCollection,
@@ -1481,7 +1481,7 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                         numRecords,
                         stayTemp,
                         markFromMigrate,
-                        isViewlessTimeseries);
+                        isTimeseries);
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 void OpObserverImpl::onImportCollection(OperationContext* opCtx,
@@ -1492,7 +1492,7 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
                                         const BSONObj& catalogEntry,
                                         const BSONObj& storageMetadata,
                                         bool isDryRun,
-                                        bool isViewlessTimeseries) {
+                                        bool isTimeseries) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -1504,8 +1504,8 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(nss.tenantId());
-    if (isViewlessTimeseries) {
-        oplogEntry.setIsViewlessTimeseries();
+    if (isTimeseries) {
+        oplogEntry.setIsTimeseries();
     }
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setObject(importCollection.toBSON());

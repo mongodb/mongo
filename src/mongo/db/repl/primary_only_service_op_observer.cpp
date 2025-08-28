@@ -87,7 +87,7 @@ repl::OpTime PrimaryOnlyServiceOpObserver::onDropCollection(OperationContext* op
                                                             const UUID& uuid,
                                                             std::uint64_t numRecords,
                                                             bool markFromMigrate,
-                                                            bool isViewlessTimeseries) {
+                                                            bool isTimeseries) {
     auto service = _registry->lookupServiceByNamespace(collectionName);
     if (service) {
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(

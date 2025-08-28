@@ -138,7 +138,7 @@ public:
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate,
-                       bool isViewlessTimeseries) override {
+                       bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onCreateIndex(opCtx, nss, uuid, indexBuildInfo, fromMigrate);
@@ -150,7 +150,7 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate,
-                           bool isViewlessTimeseries) override {
+                           bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
@@ -171,7 +171,7 @@ public:
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
                             bool fromMigrate,
-                            bool isViewlessTimeseries) override {
+                            bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onCommitIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
@@ -185,7 +185,7 @@ public:
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
                            bool fromMigrate,
-                           bool isViewlessTimeseries) override {
+                           bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onAbortIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate);
@@ -344,7 +344,7 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) override {
+        bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onCreateCollection(opCtx,
@@ -362,7 +362,7 @@ public:
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo,
-                   bool isViewlessTimeseries) override {
+                   bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
@@ -381,7 +381,7 @@ public:
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   bool markFromMigrate,
-                                  bool isViewlessTimeseries) override {
+                                  bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
             auto time = observer->onDropCollection(
@@ -396,7 +396,7 @@ public:
                      const UUID& uuid,
                      const std::string& indexName,
                      const BSONObj& idxDescriptor,
-                     bool isViewlessTimeseries) override {
+                     bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onDropIndex(opCtx, nss, uuid, indexName, idxDescriptor);
@@ -410,7 +410,7 @@ public:
                             std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate,
-                            bool isViewlessTimeseries) override {
+                            bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onRenameCollection(opCtx,
@@ -421,7 +421,7 @@ public:
                                   numRecords,
                                   stayTemp,
                                   markFromMigrate,
-                                  isViewlessTimeseries);
+                                  isTimeseries);
     }
 
     void onImportCollection(OperationContext* opCtx,
@@ -432,7 +432,7 @@ public:
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
                             bool isDryRun,
-                            bool isViewlessTimeseries) override {
+                            bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onImportCollection(opCtx,
@@ -443,7 +443,7 @@ public:
                                   catalogEntry,
                                   storageMetadata,
                                   isDryRun,
-                                  isViewlessTimeseries);
+                                  isTimeseries);
     }
 
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
@@ -454,7 +454,7 @@ public:
                                      std::uint64_t numRecords,
                                      bool stayTemp,
                                      bool markFromMigrate,
-                                     bool isViewlessTimeseries) override {
+                                     bool isTimeseries) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
             const auto time = observer->preRenameCollection(opCtx,

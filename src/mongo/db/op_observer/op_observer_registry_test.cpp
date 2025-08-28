@@ -67,7 +67,7 @@ struct TestObserver : public OpObserverNoop {
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   bool markFromMigrate,
-                                  bool isViewlessTimeseries) override {
+                                  bool isTimeseries) override {
         drops++;
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
@@ -80,7 +80,7 @@ struct TestObserver : public OpObserverNoop {
                             std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate,
-                            bool isViewlessTimeseries) override {
+                            bool isTimeseries) override {
         preRenameCollection(opCtx,
                             fromCollection,
                             toCollection,
@@ -89,7 +89,7 @@ struct TestObserver : public OpObserverNoop {
                             numRecords,
                             stayTemp,
                             markFromMigrate,
-                            isViewlessTimeseries);
+                            isTimeseries);
         postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
 
@@ -101,7 +101,7 @@ struct TestObserver : public OpObserverNoop {
                                      std::uint64_t numRecords,
                                      bool stayTemp,
                                      bool markFromMigrate,
-                                     bool isViewlessTimeseries) override {
+                                     bool isTimeseries) override {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
@@ -214,7 +214,7 @@ TEST_F(OpObserverRegistryTest, OnDropCollectionObserverResultReturnsRightTime) {
                                          UUID::gen(),
                                          0U,
                                          /*markFromMigrate=*/false,
-                                         /*isViewlessTimeseries=*/false);
+                                         /*isTimeseries=*/false);
     };
     checkConsistentOpTime(op);
 }
@@ -232,7 +232,7 @@ TEST_F(OpObserverRegistryTest, PreRenameCollectionObserverResultReturnsRightTime
                                                    0U,
                                                    /*stayTemp=*/false,
                                                    /*markFromMigrate=*/false,
-                                                   /*isViewlessTimeseries=*/false);
+                                                   /*isTimeseries=*/false);
         registry.postRenameCollection(opCtx, testNss, testNss, uuid, {}, false);
         return opTime;
     };
@@ -248,7 +248,7 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
                                          UUID::gen(),
                                          0U,
                                          /*markFromMigrate=*/false,
-                                         /*isViewlessTimeseries=*/false);
+                                         /*isTimeseries=*/false);
     };
     checkInconsistentOpTime(op);
 }
@@ -266,7 +266,7 @@ DEATH_TEST_F(OpObserverRegistryTest, PreRenameCollectionReturnsInconsistentTime,
                                                    0U,
                                                    /*stayTemp=*/false,
                                                    /*markFromMigrate=*/false,
-                                                   /*isViewlessTimeseries=*/false);
+                                                   /*isTimeseries=*/false);
         registry.postRenameCollection(opCtx, testNss, testNss, uuid, {}, false);
         return opTime;
     };

@@ -97,7 +97,7 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) final;
+        bool isTimeseries) final;
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
@@ -105,7 +105,7 @@ public:
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo,
-                   bool isViewlessTimeseries) final;
+                   bool isTimeseries) final;
 
     void onDropDatabase(OperationContext* opCtx,
                         const DatabaseName& dbName,
@@ -116,14 +116,14 @@ public:
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   bool markFromMigrate,
-                                  bool isViewlessTimeseries) final;
+                                  bool isTimeseries) final;
 
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const UUID& uuid,
                      const std::string& indexName,
                      const BSONObj& indexInfo,
-                     bool isViewlessTimeseries) final;
+                     bool isTimeseries) final;
 
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
@@ -133,7 +133,7 @@ public:
                             std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate,
-                            bool isViewlessTimeseries) final;
+                            bool isTimeseries) final;
 
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
@@ -143,7 +143,7 @@ public:
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
                             bool isDryRun,
-                            bool isViewlessTimeseries) final;
+                            bool isTimeseries) final;
 
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,

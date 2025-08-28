@@ -192,7 +192,7 @@ protected:
                                             uuid,
                                             0,
                                             /*markFromMigrate=*/false,
-                                            /*isViewlessTimeseries*/ false);
+                                            /*isTimeseries*/ false);
                 opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false);
                 // For renames, make sure we check both from and to for the given namespace
                 opObserver.preRenameCollection(opCtx,
@@ -203,7 +203,7 @@ protected:
                                                0,
                                                /*stayTemp=*/false,
                                                /*markFromMigrate=*/false,
-                                               /*isViewlessTimeseries*/ false);
+                                               /*isTimeseries*/ false);
                 opObserver.preRenameCollection(opCtx,
                                                adminNss,
                                                nss,
@@ -212,7 +212,7 @@ protected:
                                                0,
                                                /*stayTemp=*/false,
                                                /*markFromMigrate=*/false,
-                                               /*isViewlessTimeseries*/ false);
+                                               /*isTimeseries*/ false);
                 opObserver.onRenameCollection(opCtx,
                                               nss,
                                               adminNss,
@@ -221,7 +221,7 @@ protected:
                                               0,
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
-                                              /*isViewlessTimeseries*/ false);
+                                              /*isTimeseries*/ false);
                 opObserver.onRenameCollection(opCtx,
                                               adminNss,
                                               nss,
@@ -230,7 +230,7 @@ protected:
                                               0,
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
-                                              /*isViewlessTimeseries*/ false);
+                                              /*isTimeseries*/ false);
                 opObserver.onImportCollection(
                     opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false);
             } catch (...) {
@@ -257,7 +257,7 @@ protected:
                                                       uuid,
                                                       0,
                                                       /*markFromMigrate=*/false,
-                                                      /*isViewlessTimeseries*/ false),
+                                                      /*isTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false),
                           AssertionException);
@@ -269,7 +269,7 @@ protected:
                                                          0,
                                                          /*stayTemp=*/false,
                                                          /*markFromMigrate=*/false,
-                                                         /*isViewlessTimeseries*/ false),
+                                                         /*isTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.preRenameCollection(opCtx,
                                                          adminNss,
@@ -279,7 +279,7 @@ protected:
                                                          0,
                                                          /*stayTemp=*/false,
                                                          /*markFromMigrate=*/false,
-                                                         /*isViewlessTimeseries*/ false),
+                                                         /*isTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         nss,
@@ -289,7 +289,7 @@ protected:
                                                         0,
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
-                                                        /*isViewlessTimeseries*/ false),
+                                                        /*isTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         adminNss,
@@ -299,7 +299,7 @@ protected:
                                                         0,
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
-                                                        /*isViewlessTimeseries*/ false),
+                                                        /*isTimeseries*/ false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onImportCollection(
                               opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false),

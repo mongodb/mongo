@@ -152,14 +152,13 @@ structs:
                 type: object
                 optional: true
                 description: "Additional information about the operation applied"
-            isViewlessTimeseries:
-                cpp_name: isViewlessTimeseries
+            isTimeseries:
+                cpp_name: isTimeseries
                 type: bool
                 optional: true
                 description:
-                    "Only set to 'true' on operations for viewless timeseries
-                    which no longer use the system.buckets.xxx namespace. This field
-                    allows for filtering out oplog entries on viewless time-series
+                    "Only set to 'true' on operations for timeseries. This field
+                    allows for filtering out oplog entries on time-series
                     collections for unsupported operations (such as change streams).
                     Unset otherwise."
             rid:

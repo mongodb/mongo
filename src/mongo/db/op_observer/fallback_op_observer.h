@@ -91,7 +91,7 @@ public:
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   bool markFromMigrate,
-                                  bool isViewlessTimeseries) final;
+                                  bool isTimeseries) final;
 };
 
 }  // namespace mongo

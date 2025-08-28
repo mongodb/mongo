@@ -573,8 +573,8 @@ protected:
         const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
         validateReplicatedCatalogIdentifier(
             oplogEntry, catalogIdentifier, catalogReplicationEnabled);
-        bool isViewlessTimeseries = oplogEntryBSON.getBoolField("isViewlessTimeseries");
-        ASSERT_EQ(viewless, isViewlessTimeseries);
+        bool isTimeseries = oplogEntryBSON.getBoolField("isTimeseries");
+        ASSERT_EQ(viewless, isTimeseries);
     }
 
     void testOnCreateCollClustered(bool catalogReplicationEnabled) {
@@ -841,7 +841,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     ASSERT_EQUALS(cause, getStatusFromCommandResult(o.getObjectField("cause")));
 }
 
-TEST_F(OpObserverTest, checkIsViewlessTimeseriesOnReplLogUpdate) {
+TEST_F(OpObserverTest, checkisTimeseriesOnReplLogUpdate) {
     RAIIServerParameterControllerForTest viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
@@ -877,8 +877,8 @@ TEST_F(OpObserverTest, checkIsViewlessTimeseriesOnReplLogUpdate) {
     wuow.commit();
 
     auto oplogEntry = getSingleOplogEntry(opCtx.get());
-    bool isViewlessTimeseries = oplogEntry.getBoolField("isViewlessTimeseries");
-    ASSERT(isViewlessTimeseries);
+    bool isTimeseries = oplogEntry.getBoolField("isTimeseries");
+    ASSERT(isTimeseries);
 }
 
 TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
@@ -906,8 +906,8 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
     auto oplogEntry = getSingleOplogEntry(opCtx.get());
     wunit.commit();
 
-    bool isViewlessTimeseries = oplogEntry.getBoolField("isViewlessTimeseries");
-    ASSERT(isViewlessTimeseries);
+    bool isTimeseries = oplogEntry.getBoolField("isTimeseries");
+    ASSERT(isTimeseries);
 }
 
 TEST_F(OpObserverTest, checkIsTimeseriesOnInserts) {
@@ -944,8 +944,8 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnInserts) {
     wuow.commit();
 
     auto oplogEntry = getSingleOplogEntry(opCtx.get());
-    bool isViewlessTimeseries = oplogEntry.getBoolField("isViewlessTimeseries");
-    ASSERT(isViewlessTimeseries);
+    bool isTimeseries = oplogEntry.getBoolField("isTimeseries");
+    ASSERT(isTimeseries);
 }
 
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
@@ -1167,7 +1167,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isViewlessTimeseries*/ false);
+                                      /*isTimeseries*/ false);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -1211,7 +1211,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isViewlessTimeseries*/ false);
+                                      /*isTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1255,7 +1255,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isViewlessTimeseries*/ false);
+                                      /*isTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1296,7 +1296,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isViewlessTimeseries*/ false);
+                                      /*isTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1351,7 +1351,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
                                       catalogEntry,
                                       storageMetadata,
                                       isDryRun,
-                                      /*isViewlessTimeseries*/ false);
+                                      /*isTimeseries*/ false);
         wunit.commit();
     }
 
@@ -1394,7 +1394,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
                                       catalogEntry,
                                       storageMetadata,
                                       isDryRun,
-                                      /*isViewlessTimeseries*/ false);
+                                      /*isTimeseries*/ false);
         wunit.commit();
     }
 
@@ -3193,7 +3193,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             if (!testCase.isRetryableWrite) {
                 ASSERT_FALSE(entry.getSessionId());
                 ASSERT_FALSE(entry.getTxnNumber());
-                ASSERT(!entry.getIsViewlessTimeseries());
+                ASSERT(!entry.getIsTimeseries());
                 ASSERT_EQ(0, entry.getStatementIds().size());
                 continue;
             }
@@ -3412,7 +3412,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         ASSERT(0 ==
                innerEntry.getObject().woCompare(BSON("_id" << 0 << "data"
                                                            << "x")));
-        ASSERT(!innerEntry.getIsViewlessTimeseries());
+        ASSERT(!innerEntry.getIsTimeseries());
     }
     {
         const auto innerEntry = innerEntries[1];
@@ -3420,7 +3420,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kDelete);
         ASSERT(innerEntry.getNss() == _nss);
         ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 1)));
-        ASSERT(!innerEntry.getIsViewlessTimeseries());
+        ASSERT(!innerEntry.getIsTimeseries());
     }
     {
         const auto innerEntry = innerEntries[2];
@@ -3428,7 +3428,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kUpdate);
         ASSERT(innerEntry.getNss() == _nss);
         ASSERT(0 == innerEntry.getObject().woCompare(BSON("fieldToUpdate" << "valueToUpdate")));
-        ASSERT(!innerEntry.getIsViewlessTimeseries());
+        ASSERT(!innerEntry.getIsTimeseries());
     }
 }
 
@@ -3514,7 +3514,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseri
         const auto& innerEntry = innerEntries[i];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
         ASSERT(innerEntry.getOpType() == expectedOpTypes[i]);
-        ASSERT(innerEntry.getIsViewlessTimeseries() == true);
+        ASSERT(innerEntry.getIsTimeseries() == true);
     }
 }
 
@@ -4348,7 +4348,7 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
         auto deleteOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
         checkSideCollectionIfNeeded(opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, deleteEntryArgs, deleteOplogEntry);
-        ASSERT(!deleteOplogEntry.getIsViewlessTimeseries());
+        ASSERT(!deleteOplogEntry.getIsTimeseries());
     }
 }
 
@@ -5395,8 +5395,8 @@ TEST_F(OpObserverTest, OnCreateIndexTimeseriesFlag) {
     }
 
     auto oplogEntries = getNOplogEntries(opCtx.get(), 2);
-    ASSERT_FALSE(oplogEntries[0].getBoolField("isViewlessTimeseries"));
-    ASSERT_TRUE(oplogEntries[1].getBoolField("isViewlessTimeseries"));
+    ASSERT_FALSE(oplogEntries[0].getBoolField("isTimeseries"));
+    ASSERT_TRUE(oplogEntries[1].getBoolField("isTimeseries"));
 }
 
 TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {

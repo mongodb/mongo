@@ -168,7 +168,7 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     const UUID& uuid,
     std::uint64_t numRecords,
     bool markFromMigrate,
-    bool isViewlessTimeseries) {
+    bool isTimeseries) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet() && !replCoord->isDataConsistent()) {
         return {};

@@ -678,7 +678,7 @@ void ShardServerOpObserver::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isViewlessTimeseries) {
+    bool isTimeseries) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
@@ -737,7 +737,7 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      const UUID& uuid,
                                                      std::uint64_t numRecords,
                                                      bool markFromMigrate,
-                                                     bool isViewlessTimeseries) {
+                                                     bool isTimeseries) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return {};
@@ -765,7 +765,7 @@ void ShardServerOpObserver::onCreateIndex(OperationContext* opCtx,
                                           const UUID& uuid,
                                           const IndexBuildInfo& indexBuildInfo,
                                           bool fromMigrate,
-                                          bool isViewlessTimeseries) {
+                                          bool isTimeseries) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
@@ -780,7 +780,7 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const UUID& indexBuildUUID,
                                               const std::vector<IndexBuildInfo>& indexes,
                                               bool fromMigrate,
-                                              bool isViewlessTimeseries) {
+                                              bool isTimeseries) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
@@ -804,7 +804,7 @@ void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         const UUID& uuid,
                                         const std::string& indexName,
                                         const BSONObj& indexInfo,
-                                        bool isViewlessTimeseries) {
+                                        bool isTimeseries) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
@@ -819,7 +819,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
                                       boost::optional<IndexCollModInfo> indexInfo,
-                                      bool isViewlessTimeseries) {
+                                      bool isTimeseries) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;

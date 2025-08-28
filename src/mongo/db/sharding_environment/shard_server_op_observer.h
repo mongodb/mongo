@@ -71,7 +71,7 @@ public:
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate,
-                       bool isViewlessTimeseries) override;
+                       bool isTimeseries) override;
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -79,7 +79,7 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate,
-                           bool isViewlessTimeseries) override;
+                           bool isTimeseries) override;
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) override;
 
@@ -112,7 +112,7 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) override;
+        bool isTimeseries) override;
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
@@ -120,21 +120,21 @@ public:
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo,
-                   bool isViewlessTimeseries) override;
+                   bool isTimeseries) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   bool markFromMigrate,
-                                  bool isViewlessTimeseries) override;
+                                  bool isTimeseries) override;
 
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const UUID& uuid,
                      const std::string& indexName,
                      const BSONObj& indexInfo,
-                     bool isViewlessTimeseries) override;
+                     bool isTimeseries) override;
 
     void onReplicationRollback(OperationContext* opCtx,
                                const RollbackObserverInfo& rbInfo) override;

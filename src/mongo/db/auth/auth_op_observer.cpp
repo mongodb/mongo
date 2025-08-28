@@ -115,7 +115,7 @@ void AuthOpObserver::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isViewlessTimeseries) {
+    bool isTimeseries) {
     const auto cmdNss = collectionName.getCommandNS();
 
     const auto cmdObj =
@@ -143,7 +143,7 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
                                boost::optional<IndexCollModInfo> indexInfo,
-                               bool isViewlessTimeseries) {
+                               bool isTimeseries) {
     const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
@@ -170,7 +170,7 @@ repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
                                               bool markFromMigrate,
-                                              bool isViewlessTimeseries) {
+                                              bool isTimeseries) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
 
@@ -186,7 +186,7 @@ void AuthOpObserver::onDropIndex(OperationContext* opCtx,
                                  const UUID& uuid,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo,
-                                 bool isViewlessTimeseries) {
+                                 bool isTimeseries) {
     const auto cmdNss = nss.getCommandNS();
     const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
@@ -226,7 +226,7 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         std::uint64_t numRecords,
                                         bool stayTemp,
                                         bool markFromMigrate,
-                                        bool isViewlessTimeseries) {
+                                        bool isTimeseries) {
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
@@ -238,7 +238,7 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
                                         const BSONObj& catalogEntry,
                                         const BSONObj& storageMetadata,
                                         bool isDryRun,
-                                        bool isViewlessTimeseries) {
+                                        bool isTimeseries) {
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
     AuthorizationManager::get(opCtx->getService())

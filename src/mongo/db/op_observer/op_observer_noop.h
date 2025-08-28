@@ -50,7 +50,7 @@ public:
                        const UUID& uuid,
                        const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate,
-                       bool isViewlessTimeseries) override {}
+                       bool isTimeseries) override {}
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -58,7 +58,7 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate,
-                           bool isViewlessTimeseries) override {}
+                           bool isTimeseries) override {}
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                       const NamespaceString& nss) override {}
@@ -69,7 +69,7 @@ public:
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
                             bool fromMigrate,
-                            bool isViewlessTimeseries) override {}
+                            bool isTimeseries) override {}
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -78,7 +78,7 @@ public:
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
                            bool fromMigrate,
-                           bool isViewlessTimeseries) override {}
+                           bool isTimeseries) override {}
 
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
@@ -145,7 +145,7 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) override {}
+        bool isTimeseries) override {}
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
@@ -153,7 +153,7 @@ public:
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo,
-                   bool isViewlessTimeseries) override {}
+                   bool isTimeseries) override {}
 
     void onDropDatabase(OperationContext* opCtx,
                         const DatabaseName& dbName,
@@ -164,7 +164,7 @@ public:
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   bool markFromMigrate,
-                                  bool isViewlessTimeseries) override {
+                                  bool isTimeseries) override {
         return {};
     }
 
@@ -173,7 +173,7 @@ public:
                      const UUID& uuid,
                      const std::string& indexName,
                      const BSONObj& idxDescriptor,
-                     bool isViewlessTimeseries) override {}
+                     bool isTimeseries) override {}
 
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
@@ -183,7 +183,7 @@ public:
                             std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate,
-                            bool isViewlessTimeseries) override {}
+                            bool isTimeseries) override {}
 
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
@@ -193,7 +193,7 @@ public:
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
                             bool isDryRun,
-                            bool isViewlessTimeseries) override {}
+                            bool isTimeseries) override {}
 
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
@@ -203,7 +203,7 @@ public:
                                      std::uint64_t numRecords,
                                      bool stayTemp,
                                      bool markFromMigrate,
-                                     bool isViewlessTimeseries) override {
+                                     bool isTimeseries) override {
         return {};
     }
 
