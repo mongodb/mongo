@@ -483,4 +483,19 @@ bool ExpressionContext::isFeatureFlagBinDataConvertEnabled() {
     return _featureFlagBinDataConvertValue.get();
 }
 
+bool ExpressionContext::shouldParserAllowBinDataConvert() const {
+    return shouldParserIgnoreFeatureFlagCheck() || _featureFlagBinDataConvertValue.get();
+}
+
+bool ExpressionContext::shouldParserAllowBasicRankFusion() const {
+    return shouldParserIgnoreFeatureFlagCheck() || _featureFlagRankFusionBasic.get();
+}
+
+void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(
+    StringData name, const boost::optional<FeatureFlag>& flag) {
+    if (!shouldParserIgnoreFeatureFlagCheck()) {
+        throwIfFeatureFlagIsNotEnabledOnFCV(name, flag);
+    }
+}
+
 }  // namespace mongo

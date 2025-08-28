@@ -146,7 +146,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             it != parserMap.end());
 
     auto& entry = it->second;
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(stageName, entry.featureFlag);
+    expCtx->ignoreFeatureInParserOrRejectAndThrow(stageName, entry.featureFlag);
 
     return it->second.parser(stageSpec, expCtx);
 }

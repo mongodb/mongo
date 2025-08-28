@@ -100,7 +100,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                 const auto& parser = parserRegistration.parser;
                 const auto& featureFlag = parserRegistration.featureFlag;
 
-                expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(exprName, featureFlag);
+                expCtx->ignoreFeatureInParserOrRejectAndThrow(exprName, featureFlag);
 
                 auto allowedWithApi = parserRegistration.allowedWithApi;
 

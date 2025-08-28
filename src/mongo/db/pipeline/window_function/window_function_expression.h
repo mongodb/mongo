@@ -489,7 +489,7 @@ public:
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
 
-        if (expCtx->isBasicRankFusionEnabled()) {
+        if (expCtx->shouldParserAllowBasicRankFusion()) {
             // The 'modern' way to do $rank is to just use the sort key. But we only support this on
             // newer versions, since we need to make sure that the $sort stage is giving us the sort
             // key.

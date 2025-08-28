@@ -290,7 +290,7 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
             it != parserMap.end());
 
     auto& entry = it->second;
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(opName, entry.featureFlag);
+    expCtx->ignoreFeatureInParserOrRejectAndThrow(opName, entry.featureFlag);
 
     if (expCtx->opCtx) {
         assertLanguageFeatureIsAllowed(
@@ -3251,7 +3251,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFF(ExpressionCon
     static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore,
                                                                      MetaType::kScoreDetails};
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
-    const bool hybridScoringFFEnabled =
+    const bool hybridScoringFFEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
         feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     uassert(ErrorCodes::FailedToParse,
@@ -7152,7 +7152,7 @@ Expression::Parser makeConversionAlias(const StringData shortcutName,
             toType,
             // The 'format' argument to $convert is not allowed on FCVs below 8.0. On a newer
             // binary, $toString will still specify it.
-            expCtx->isFeatureFlagBinDataConvertEnabled() ? format : boost::none,
+            expCtx->shouldParserAllowBinDataConvert() ? format : boost::none,
             toSubtype);
     };
 }
@@ -7229,7 +7229,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(ExpressionContext* co
         format ? ExpressionConstant::create(expCtx, Value(toStringData(*format))) : nullptr,
         nullptr,
         nullptr,
-        expCtx->isFeatureFlagBinDataConvertEnabled());
+        expCtx->shouldParserAllowBinDataConvert());
 }
 
 ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
@@ -7262,7 +7262,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
         hangBeforeSecondFeatureFlagBinDataConvertCheck.pauseWhileSet();
     }
 
-    const bool allowBinDataConvert = expCtx->isFeatureFlagBinDataConvertEnabled();
+    const bool allowBinDataConvert = expCtx->shouldParserAllowBinDataConvert();
 
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> to;

@@ -108,7 +108,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     auto&& [parser, allowedWithApiStrict, allowedWithClientType, featureFlag] =
         AccumulationStatement::getParser(accName);
 
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(accName, featureFlag);
+    expCtx->ignoreFeatureInParserOrRejectAndThrow(accName, featureFlag);
 
     tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
     assertLanguageFeatureIsAllowed(
