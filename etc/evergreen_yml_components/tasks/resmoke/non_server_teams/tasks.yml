@@ -238,6 +238,8 @@ tasks:
           decompress: tar --strip-components=1 -zxvf
           skip_extensions: true
       - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: resmoke_validation_tests

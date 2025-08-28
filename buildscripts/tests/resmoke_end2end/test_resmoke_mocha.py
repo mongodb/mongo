@@ -1,29 +1,47 @@
 """Test resmoke's integration with mocha-style style tests."""
 
+import logging
+import os
 import re
 import subprocess
 import sys
 import unittest
-
-
-def execute_resmoke(resmoke_args):
-    return subprocess.run(
-        [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+from shutil import rmtree
 
 
 class TestMochaRunner(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.test_dir = os.path.normpath("/data/db/selftest")
+
+    def setUp(self):
+        self.logger = logging.getLogger(self._testMethodName)
+        self.logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+        self.logger.addHandler(handler)
+
+        self.logger.info("Cleaning temp directory %s", self.test_dir)
+        rmtree(self.test_dir, ignore_errors=True)
+        os.makedirs(self.test_dir, mode=0o755, exist_ok=True)
+
+    def execute_resmoke(self, resmoke_args):
+        resmoke_args.append("--dbpathPrefix={}".format(self.test_dir))
+        return subprocess.run(
+            [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    
+
     def test_mocha_runner(self):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
             "jstests/noPassthrough/shell/js/mochalite.js",
         ]
 
-        result = execute_resmoke(resmoke_args)
-
+        result = self.execute_resmoke(resmoke_args)
         self.assertEqual(result.returncode, 0)
 
         for output in [
@@ -45,7 +63,7 @@ class TestMochaRunner(unittest.TestCase):
             "buildscripts/tests/resmoke_end2end/testfiles/mocha/async.js",
         ]
 
-        result = execute_resmoke(resmoke_args)
+        result = self.execute_resmoke(resmoke_args)
 
         self.assertEqual(result.returncode, 0)
 
@@ -111,7 +129,7 @@ class TestMochaRunner(unittest.TestCase):
             "buildscripts/tests/resmoke_end2end/testfiles/mocha/test_fail.js",
         ]
 
-        result = execute_resmoke(resmoke_args)
+        result = self.execute_resmoke(resmoke_args)
 
         self.assertNotEqual(result.returncode, 0)
 
@@ -139,7 +157,7 @@ class TestMochaRunner(unittest.TestCase):
             "buildscripts/tests/resmoke_end2end/testfiles/mocha/grep_names.js",
         ]
 
-        result = execute_resmoke(resmoke_args)
+        result = self.execute_resmoke(resmoke_args)
 
         self.assertEqual(result.returncode, 0)
 

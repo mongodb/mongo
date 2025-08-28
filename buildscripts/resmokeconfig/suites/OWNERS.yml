@@ -120,6 +120,9 @@ filters:
   - "read_concern*":
     approvers:
       - 10gen/server-rw-concerns
+  - "resmoke_end2end_tests.yml":
+    approvers:
+      - 10gen/devprod-correctness
   - "retryable_writes*":
     approvers:
       - 10gen/server-transactions

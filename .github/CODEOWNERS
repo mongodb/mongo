@@ -188,6 +188,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/multiversion* @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/replica_sets* @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/resmoke_end2end_tests.yml @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/retryable_writes* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/rollback* @10gen/server-recovery @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
