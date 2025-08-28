@@ -21,22 +21,20 @@ import {arrayDiff, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
 export const $config = (function () {
-    // Use the workload name as the prefix for the collection name.
-    const collectionNamePrefix = "long_secondary_reads_";
+    // Use the workload name as the collection name.
+    const collectionName = jsTestName();
 
     function getReadConcernLevel() {
         const readConcernLevels = ["local", "majority"];
         const readConcernLevel = readConcernLevels[Random.randInt(readConcernLevels.length)];
         jsTestLog("Testing find with readConcern " + readConcernLevel);
-        return readConcernLevels[Random.randInt(readConcernLevels.length)];
+        return readConcernLevel;
     }
 
     var states = {
         init: function (db, unusedCollName) {
-            this.collName = this.collPrefix + this.tid;
             this.session = db.getMongo().startSession({causalConsistency: true});
             this.sessionDb = this.session.getDatabase(db.getName());
-            assert.commandWorked(this.sessionDb[this.collName].insertMany(this.expectedDocuments));
         },
         readFromSecondaries: function (unusedDB, unusedCollName) {
             // The query can be retried on a RetryableError and the following additional errors:
@@ -68,8 +66,12 @@ export const $config = (function () {
         },
     };
 
-    var setup = function setup(unusedDB, unusedCollName, unusedCluster) {
+    var setup = function setup(db, unusedCollName, cluster) {
         this.expectedDocuments = Array.from({length: this.nDocumentsToInsert}).map((_, i) => ({_id: i, x: i}));
+        assert.commandWorked(db[this.collName].insertMany(this.expectedDocuments));
+        if (cluster.isReplication()) {
+            cluster.awaitReplication();
+        }
     };
 
     return {
@@ -77,7 +79,7 @@ export const $config = (function () {
         iterations: 10,
         startState: "init",
         states: states,
-        data: {nDocumentsToInsert: 2000, collPrefix: collectionNamePrefix},
+        data: {nDocumentsToInsert: 2000, collName: collectionName},
         transitions: uniformDistTransitions(states),
         setup: setup,
     };
