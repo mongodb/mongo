@@ -32,30 +32,30 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // the moveChunk command, which can lead to a hang.
         fsm.forceRunningOutsideTransaction(this);
 
-        var ns = db[collName].getFullName();
-        var config = connCache.rsConns.config;
+        let ns = db[collName].getFullName();
+        let config = connCache.rsConns.config;
 
         // Verify that more than one shard exists in the cluster. If only one shard existed,
         // there would be no way to move a chunk from one shard to another.
-        var numShards = config.getDB("config").shards.find().itcount();
-        var msg =
+        let numShards = config.getDB("config").shards.find().itcount();
+        let msg =
             "There must be more than one shard when performing a moveChunks operation\n" +
             "shards: " +
             tojson(config.getDB("config").shards.find().toArray());
         assert.gt(numShards, 1, msg);
 
         // Choose a random chunk in our partition to move.
-        var chunk = this.getRandomChunkInPartition(collName, config);
-        var fromShard = chunk.shard;
+        let chunk = this.getRandomChunkInPartition(collName, config);
+        let fromShard = chunk.shard;
 
         // Choose a random shard to move the chunk to.
-        var shardNames = Object.keys(connCache.shards);
-        var destinationShards = shardNames.filter(function (shard) {
+        let shardNames = Object.keys(connCache.shards);
+        let destinationShards = shardNames.filter(function (shard) {
             if (shard !== fromShard) {
                 return shard;
             }
         });
-        var toShard = destinationShards[Random.randInt(destinationShards.length)];
+        let toShard = destinationShards[Random.randInt(destinationShards.length)];
 
         // Save the number of documents in this chunk's range found on the chunk's current shard
         // (the fromShard) before the moveChunk operation. This will be used to verify that the
@@ -64,7 +64,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // chunk's range found on the _fromShard_ after a _failed_ moveChunk operation is the same
         // as numDocsBefore.
         // Choose the mongos randomly to distribute load.
-        var numDocsBefore = ChunkHelper.getNumDocs(
+        let numDocsBefore = ChunkHelper.getNumDocs(
             ChunkHelper.getRandomMongos(connCache.mongos),
             ns,
             chunk.min._id,
@@ -73,7 +73,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Save the number of chunks before the moveChunk operation. This will be used
         // to verify that the number of chunks after the moveChunk operation remains the same.
-        var numChunksBefore = ChunkHelper.getNumChunks(
+        let numChunksBefore = ChunkHelper.getNumChunks(
             config,
             ns,
             this.partition.chunkLower,
@@ -82,20 +82,20 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Randomly choose whether to wait for all documents on the fromShard
         // to be deleted before the moveChunk operation returns.
-        var waitForDelete = Random.rand() < 0.5;
+        let waitForDelete = Random.rand() < 0.5;
 
         // Use chunk_helper.js's moveChunk wrapper to tolerate acceptable failures
         // and to use a limited number of retries with exponential backoff.
-        var bounds = [{_id: chunk.min._id}, {_id: chunk.max._id}];
-        var moveChunkRes = ChunkHelper.moveChunk(db, collName, bounds, toShard, waitForDelete);
-        var msgBase = "Result of moveChunk operation: " + tojson(moveChunkRes);
+        let bounds = [{_id: chunk.min._id}, {_id: chunk.max._id}];
+        let moveChunkRes = ChunkHelper.moveChunk(db, collName, bounds, toShard, waitForDelete);
+        let msgBase = "Result of moveChunk operation: " + tojson(moveChunkRes);
 
         // Verify that the fromShard and toShard have the correct after-state
         // (see comments below for specifics).
-        var fromShardRSConn = connCache.rsConns.shards[fromShard];
-        var toShardRSConn = connCache.rsConns.shards[toShard];
-        var fromShardNumDocsAfter = ChunkHelper.getNumDocs(fromShardRSConn, ns, chunk.min._id, chunk.max._id);
-        var toShardNumDocsAfter = ChunkHelper.getNumDocs(toShardRSConn, ns, chunk.min._id, chunk.max._id);
+        let fromShardRSConn = connCache.rsConns.shards[fromShard];
+        let toShardRSConn = connCache.rsConns.shards[toShard];
+        let fromShardNumDocsAfter = ChunkHelper.getNumDocs(fromShardRSConn, ns, chunk.min._id, chunk.max._id);
+        let toShardNumDocsAfter = ChunkHelper.getNumDocs(toShardRSConn, ns, chunk.min._id, chunk.max._id);
         // If the moveChunk operation succeeded, verify that the shard the chunk
         // was moved to returns all data for the chunk. If waitForDelete was true,
         // also verify that the shard the chunk was moved from returns no data for the chunk.
@@ -143,7 +143,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // If the moveChunk operation succeeded, verify that the config updated the chunk's shard
         // with the toShard. If the operation failed, verify that the config kept the chunk's shard
         // as the fromShard.
-        var chunkAfter = config.getDB("config").chunks.findOne({_id: chunk._id});
+        let chunkAfter = config.getDB("config").chunks.findOne({_id: chunk._id});
         msg = msgBase + "\nchunkBefore: " + tojson(chunk) + "\nchunkAfter: " + tojson(chunkAfter);
         if (moveChunkRes.ok) {
             msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
@@ -155,18 +155,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Regardless of whether the operation succeeded or failed, verify that the number of chunks
         // in our partition stayed the same.
-        var numChunksAfter = ChunkHelper.getNumChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+        let numChunksAfter = ChunkHelper.getNumChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
         msg = "Number of chunks in partition seen by config changed with moveChunk.\n" + msgBase;
         assert.eq(numChunksBefore, numChunksAfter, msg);
 
         // Verify that all mongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
-        for (var mongos of connCache.mongos) {
+        for (let mongos of connCache.mongos) {
             // Regardless of if the moveChunk operation succeeded or failed,
             // verify that each mongos sees as many documents in the chunk's
             // range after the move as there were before.
             if (!skipDocumentCountCheck) {
-                var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
+                let numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
                 msg =
                     "Number of documents in range seen by mongos changed with moveChunk, range: " +
                     tojson(bounds) +
@@ -178,7 +178,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // If the moveChunk operation succeeded, verify that each mongos sees all data in the
             // chunk's range on only the toShard. If the operation failed, verify that each mongos
             // sees all data in the chunk's range on only the fromShard.
-            var shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
+            let shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
             msg = msgBase + "\nMongos find().explain() results for chunk: " + tojson(shardsForChunk);
             assert.eq(shardsForChunk.shards.length, 1, msg);
             if (moveChunkRes.ok) {

@@ -13,7 +13,7 @@ export const $config = (function () {
         return documents.reduce((total, account) => total + account.balance, 0);
     }
 
-    var states = (function () {
+    let states = (function () {
         function getAllDocuments(session, collection, numDocs, txnHelperOptions) {
             let documents;
             withTxnAndAutoRetry(
@@ -141,7 +141,7 @@ export const $config = (function () {
         }
     }
 
-    var transitions = {
+    let transitions = {
         init: {transferMoney: 1},
         transferMoney: {transferMoney: 0.9, checkMoneyBalance: 0.1},
         checkMoneyBalance: {transferMoney: 1},

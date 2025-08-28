@@ -14,13 +14,13 @@ import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js"
 TestData.runInsideTransaction = false;
 
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the role name,
         // since the workload name is assumed to be unique.
         prefix: "auth_create_role",
     };
 
-    var states = (function () {
+    let states = (function () {
         function uniqueRoleName(prefix, tid, num) {
             return prefix + tid + "_" + num;
         }
@@ -58,9 +58,9 @@ export const $config = (function () {
             );
 
             // Verify the newly created role exists, as well as all previously created roles
-            for (var i = 0; i < this.num; ++i) {
-                var name = uniqueRoleName(this.prefix, this.tid, i);
-                var res = db.getRole(name);
+            for (let i = 0; i < this.num; ++i) {
+                let name = uniqueRoleName(this.prefix, this.tid, i);
+                let res = db.getRole(name);
                 assert(res !== null, "role '" + name + "' should exist");
                 assert.eq(name, res.role);
                 assert(!res.isBuiltin, "role should be user-defined");
@@ -70,10 +70,10 @@ export const $config = (function () {
         return {init: init, createRole: createRole};
     })();
 
-    var transitions = {init: {createRole: 1}, createRole: {createRole: 1}};
+    let transitions = {init: {createRole: 1}, createRole: {createRole: 1}};
 
     function teardown(db, collName, cluster) {
-        var pattern = new RegExp("^" + this.prefix + "\\d+_\\d+$");
+        let pattern = new RegExp("^" + this.prefix + "\\d+_\\d+$");
         dropRoles(db, pattern);
     }
 

@@ -3,12 +3,12 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let baseName = "jstests_replsets_replset6";
 
-var rt = new ReplSetTest({name: "replset6tests", nodes: 2});
-var nodes = rt.startSet();
+let rt = new ReplSetTest({name: "replset6tests", nodes: 2});
+let nodes = rt.startSet();
 rt.initiate();
-var p = rt.getPrimary();
+let p = rt.getPrimary();
 rt.awaitSecondaryNodes();
-var secondaries = rt.getSecondaries();
+let secondaries = rt.getSecondaries();
 let s = secondaries[0];
 s.setSecondaryOk();
 let admin = p.getDB("admin");

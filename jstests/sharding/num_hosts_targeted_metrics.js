@@ -64,7 +64,7 @@ assertShardingStats(
 
 serverStatusInitial = testDb.serverStatus();
 let bulk = testDb.coll0.initializeUnorderedBulkOp();
-for (var x = 0; x < 10; x++) {
+for (let x = 0; x < 10; x++) {
     bulk.insert({x: x});
 }
 assert.commandWorked(bulk.execute());

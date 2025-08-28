@@ -137,8 +137,8 @@ TimeseriesTest.run((insert) => {
     };
 
     // Tests case #1: collA: non time-series, collB: time-series
-    var collAOption = nonTimeseriesCollOption;
-    var collBOption = timeseriesCollOption;
+    let collAOption = nonTimeseriesCollOption;
+    let collBOption = timeseriesCollOption;
     testFunc(collAOption, collBOption);
 
     // Tests case #2: collA: time-series, collB: non time-series

@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const dbName = jsTest.name();
 const collName = "coll";
 
-var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+let rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
 

@@ -12,7 +12,7 @@ export var ApplyOpsInsertWriteConflictTest = function (options) {
     }
 
     // Capture the 'this' reference
-    var self = this;
+    let self = this;
 
     self.options = options;
 
@@ -20,29 +20,29 @@ export var ApplyOpsInsertWriteConflictTest = function (options) {
      * Runs the test.
      */
     this.run = function () {
-        var options = this.options;
+        let options = this.options;
 
-        var replTest = new ReplSetTest({nodes: 1});
+        let replTest = new ReplSetTest({nodes: 1});
         replTest.startSet();
         replTest.initiate();
 
-        var primary = replTest.getPrimary();
-        var primaryDB = primary.getDB("test");
+        let primary = replTest.getPrimary();
+        let primaryDB = primary.getDB("test");
 
-        var t = primaryDB.getCollection(options.testName);
+        let t = primaryDB.getCollection(options.testName);
         t.drop();
 
         assert.commandWorked(primaryDB.createCollection(t.getName()));
 
-        var numOps = 1000;
-        var ops = Array(numOps)
+        let numOps = 1000;
+        let ops = Array(numOps)
             .fill("ignored")
             .map((unused, i) => {
                 return {op: "i", ns: t.getFullName(), o: {_id: i}};
             });
 
         // Probabilities for WCE are chosen based on empirical testing.
-        var probability = 5.0 / numOps;
+        let probability = 5.0 / numOps;
 
         // Set up failpoint to trigger WriteConflictException during write operations.
         assert.commandWorked(primaryDB.adminCommand({setParameter: 1, traceWriteConflictExceptions: true}));
@@ -54,9 +54,9 @@ export var ApplyOpsInsertWriteConflictTest = function (options) {
         );
 
         // This logs each operation being applied.
-        var previousLogLevel = assert.commandWorked(primaryDB.setLogLevel(3, "replication")).was.replication.verbosity;
+        let previousLogLevel = assert.commandWorked(primaryDB.setLogLevel(3, "replication")).was.replication.verbosity;
 
-        var applyOpsResult = primaryDB.adminCommand({applyOps: ops});
+        let applyOpsResult = primaryDB.adminCommand({applyOps: ops});
 
         // Reset log level.
         primaryDB.setLogLevel(previousLogLevel, "replication");

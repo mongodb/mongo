@@ -10,8 +10,8 @@
 
 // Run hello, and if it contains an automation service descriptor, save it, so we can restore
 // it later. If it wasn't set, original will just be undefined.
-var res = assert.commandWorked(db.runCommand({hello: 1}));
-var original = res.automationServiceDescriptor;
+let res = assert.commandWorked(db.runCommand({hello: 1}));
+let original = res.automationServiceDescriptor;
 
 // Try to set the descriptor to an invalid value: only strings are supported.
 assert.commandFailedWithCode(
@@ -45,7 +45,7 @@ res = assert.commandWorked(db.runCommand({hello: 1}));
 assert(!res.hasOwnProperty("automationServiceDescriptor"));
 
 // Verify that the shell has the correct prompt.
-var originalPrompt = db.getMongo().promptPrefix;
+let originalPrompt = db.getMongo().promptPrefix;
 assert.commandWorked(db.adminCommand({setParameter: 1, automationServiceDescriptor: "set"}));
 db.getMongo().promptPrefix = undefined;
 assert(/\[automated\]/.test(defaultPrompt()));

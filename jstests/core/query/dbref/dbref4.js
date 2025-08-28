@@ -12,7 +12,7 @@ coll.insert({
 // we inserted something with an int
 assert(coll.findOne({"refInt.$id": {$type: 16}}));
 
-var doc = coll.findOne();
+let doc = coll.findOne();
 doc.x = 1;
 coll.save(doc);
 

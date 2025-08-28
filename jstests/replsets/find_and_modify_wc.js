@@ -10,18 +10,18 @@ if (jsTest.options().storageEngine !== "inMemory") {
     quit();
 }
 
-var nodeCount = 3;
-var rst = new ReplSetTest({nodes: nodeCount});
+let nodeCount = 3;
+let rst = new ReplSetTest({nodes: nodeCount});
 rst.startSet();
 rst.initiate();
 
-var primary = rst.getPrimary();
-var coll = primary.getCollection("test.find_and_modify_wc");
+let primary = rst.getPrimary();
+let coll = primary.getCollection("test.find_and_modify_wc");
 coll.remove({});
 
 // insert some documents
-var docs = [];
-for (var i = 1; i <= 5; ++i) {
+let docs = [];
+for (let i = 1; i <= 5; ++i) {
     docs.push({i: i, j: 2 * i});
 }
 var res = coll.runCommand({insert: coll.getName(), documents: docs, writeConcern: {w: nodeCount}});
@@ -29,7 +29,7 @@ assert(res.ok);
 assert.eq(5, coll.find().itcount());
 
 // use for updates in subsequent runCommand calls
-var reqUpdate = {
+let reqUpdate = {
     findAndModify: coll.getName(),
     query: {i: 3},
     update: {$inc: {j: 1}},

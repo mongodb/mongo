@@ -5,13 +5,13 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+let st = new ShardingTest({shards: 2, mongos: 2});
 
-var testDB_s0 = st.s.getDB("test");
+let testDB_s0 = st.s.getDB("test");
 assert.commandWorked(testDB_s0.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
 assert.commandWorked(testDB_s0.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 
-var checkShardMajorVersion = function (conn, expectedMajorVersion) {
+let checkShardMajorVersion = function (conn, expectedMajorVersion) {
     const shardVersion = assert.commandWorked(conn.adminCommand({getShardVersion: "test.user"})).global;
     assert.eq(
         shardVersion.getTime(),
@@ -36,7 +36,7 @@ var checkShardMajorVersion = function (conn, expectedMajorVersion) {
 ///////////////////////////////////////////////////////
 // Test shard with empty chunk
 
-var testDB_s1 = st.s1.getDB("test");
+let testDB_s1 = st.s1.getDB("test");
 assert.commandWorked(testDB_s1.user.insert({x: 1}));
 assert.commandWorked(testDB_s1.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard0.shardName}));
 

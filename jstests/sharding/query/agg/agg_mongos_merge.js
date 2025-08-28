@@ -54,7 +54,7 @@ assert.commandWorked(
 );
 
 // Create a random geo co-ord generator for testing.
-var georng = new GeoNearRandomTest(mongosColl, mongosDB);
+let georng = new GeoNearRandomTest(mongosColl, mongosDB);
 
 // Write 400 documents across the 4 chunks.
 for (let i = -200; i < 200; i++) {

@@ -12,10 +12,10 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yi
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.remove = function remove(db, collName) {
-        var id = Random.randInt(this.nDocs);
-        var doc = db[collName].findOne({_id: id});
+        let id = Random.randInt(this.nDocs);
+        let doc = db[collName].findOne({_id: id});
         if (doc !== null) {
-            var res = db[collName].remove({_id: id});
+            let res = db[collName].remove({_id: id});
             assert.commandWorked(res);
             if (res.nRemoved > 0) {
                 // Re-insert the document with the same '_id', but an incremented

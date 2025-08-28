@@ -12,9 +12,9 @@ const kSamplesPerSecond = 1000; // per second.
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
-var originalCreateCollection = DB.prototype.createCollection;
-var originalGetCollection = DB.prototype.getCollection;
-var originalDBCollectionDrop = DBCollection.prototype.drop;
+let originalCreateCollection = DB.prototype.createCollection;
+let originalGetCollection = DB.prototype.getCollection;
+let originalDBCollectionDrop = DBCollection.prototype.drop;
 
 function isUnsupportedNamespace(dbName, collName) {
     const ns = dbName + "." + collName;

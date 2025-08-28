@@ -6,7 +6,7 @@ if (jsTest.options().storageEngine !== "inMemory") {
     quit();
 }
 
-var mongod = MongoRunner.runMongod({
+let mongod = MongoRunner.runMongod({
     storageEngine: "inMemory",
     inMemoryEngineConfigString: "eviction=(threads_min=1)",
 });

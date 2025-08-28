@@ -356,7 +356,7 @@ export function formatExplainRoot(explain) {
  * if no matching stages are found or if the plan is empty.
  */
 export function getPlanStages(root, stage) {
-    var results = [];
+    let results = [];
 
     if (root.stage === stage || stage === undefined || root.nodeType === stage) {
         results.push(root);
@@ -367,7 +367,7 @@ export function getPlanStages(root, stage) {
     }
 
     if ("inputStages" in root) {
-        for (var i = 0; i < root.inputStages.length; i++) {
+        for (let i = 0; i < root.inputStages.length; i++) {
             results = results.concat(getPlanStages(root.inputStages[i], stage));
         }
     }
@@ -450,7 +450,7 @@ export function getAllPlanStages(root) {
  */
 export function getPlanStage(root, stage) {
     assert(stage, "Stage was not defined in getPlanStage.");
-    var planStageList = getPlanStages(root, stage);
+    let planStageList = getPlanStages(root, stage);
 
     if (planStageList.length === 0) {
         return null;
@@ -1305,12 +1305,12 @@ export function isIxscanMultikey(winningPlan) {
 export function checkNWouldDelete(explain, nWouldDelete) {
     assert.commandWorked(explain);
     assert("executionStats" in explain);
-    var executionStats = explain.executionStats;
+    let executionStats = explain.executionStats;
     assert("executionStages" in executionStats);
 
     // If passed through mongos, then BATCHED_DELETE stage(s) should be below the SHARD_WRITE
     // mongos stage.  Otherwise the BATCHED_DELETE stage is the root stage.
-    var execStages = executionStats.executionStages;
+    let execStages = executionStats.executionStages;
     if ("SHARD_WRITE" === execStages.stage) {
         let totalToBeDeletedAcrossAllShards = 0;
         execStages.shards.forEach(function (shardExplain) {

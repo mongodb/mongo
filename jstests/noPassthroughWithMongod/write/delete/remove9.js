@@ -6,7 +6,7 @@ let js =
 let pid = startMongoProgramNoConnect("mongo", "--eval", js, db ? db.getMongo().host : null);
 
 Random.setRandomSeed();
-for (var i = 0; i < 10000; ++i) {
+for (let i = 0; i < 10000; ++i) {
     assert.commandWorked(t.remove({i: Random.randInt(10000)}));
 }
 

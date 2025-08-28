@@ -243,7 +243,7 @@ function insertDocumentsNotUnique(collection, numDocs, getDoc) {
     // exponentially growing sequence that allows us to create documents
     // that are duplicated X number of times, for many small values of X and
     // a few large values of X.
-    var bulk = collection.initializeUnorderedBulkOp();
+    let bulk = collection.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i += fibonacci(fibNum++)) {
         let doc = getDoc(i);
         for (let j = 0; j < fibonacci(fibNum); j++) {
@@ -256,7 +256,7 @@ function insertDocumentsNotUnique(collection, numDocs, getDoc) {
 // Inserts numDocs into the collection by calling getDoc.
 // NOTE: getDoc is called exactly numDocs times.
 function insertDocumentsUnique(collection, numDocs, getDoc) {
-    var bulk = collection.initializeUnorderedBulkOp();
+    let bulk = collection.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i++) {
         let doc = getDoc(i);
         bulk.insert(doc);

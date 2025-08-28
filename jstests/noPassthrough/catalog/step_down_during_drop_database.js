@@ -21,8 +21,8 @@ let testDB = primary.getDB(dbName);
 
 const size = 5;
 jsTest.log("Creating " + size + " test documents.");
-var bulk = testDB.getCollection(collName).initializeUnorderedBulkOp();
-for (var i = 0; i < size; ++i) {
+let bulk = testDB.getCollection(collName).initializeUnorderedBulkOp();
+for (let i = 0; i < size; ++i) {
     bulk.insert({i: i});
 }
 assert.commandWorked(bulk.execute());

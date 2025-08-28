@@ -10,7 +10,7 @@
 const coll = db.explain_nreturned;
 coll.drop();
 
-for (var i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     assert.commandWorked(coll.insert({x: i}));
 }
 

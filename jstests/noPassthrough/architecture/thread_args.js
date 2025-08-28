@@ -25,14 +25,14 @@ function testThread(threadType) {
         return true;
     }
 
-    var args = {
+    let args = {
         func1: returnTrue,
         // Pass some Code objects to simulate what happens with --enableJavaScriptProtection
         func2: new Code(returnTrue.toString()),
         funcArray: [new Code(returnTrue.toString())],
     };
 
-    var thread = new threadType(threadFn, args);
+    let thread = new threadType(threadFn, args);
     thread.start();
     thread.join();
     assert(thread.returnData());

@@ -8,10 +8,10 @@ function sortByName(a, b) {
 }
 
 function getCollections(shard) {
-    var res = shard.getDB("test1").runCommand({listCollections: 1});
+    let res = shard.getDB("test1").runCommand({listCollections: 1});
     assert.commandWorked(res);
 
-    var collections = res.cursor.firstBatch;
+    let collections = res.cursor.firstBatch;
 
     // Sort collections by name.
     collections.sort(sortByName);
@@ -26,7 +26,7 @@ function checkOptions(c, expectedOptions) {
 }
 
 function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, fooUUID) {
-    var c1, c2;
+    let c1, c2;
     [c1, c2] = getCollections(toShard);
 
     function checkName(c, expectedName) {
@@ -50,9 +50,9 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, f
     }
 
     function checkIndexes(collName, collTracked, expectedIndexes) {
-        var res = toShard.getDB("test1").runCommand({listIndexes: collName});
+        let res = toShard.getDB("test1").runCommand({listIndexes: collName});
         assert.commandWorked(res, "Failed to get indexes for collection " + collName);
-        var indexes = res.cursor.firstBatch;
+        let indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
         // For each unsharded collection, there should be a total of 2 indexes - one for the _id
@@ -63,7 +63,7 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, f
         else assert(indexes.length == 2);
 
         indexes.forEach((index, i) => {
-            var expected;
+            let expected;
             if (i == 0) {
                 expected = {name: "_id_", key: {_id: 1}};
             } else {
@@ -76,7 +76,7 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, f
     }
 
     function checkCount(shard, collName, count) {
-        var res = shard.getDB("test1").runCommand({count: collName});
+        let res = shard.getDB("test1").runCommand({count: collName});
         assert.commandWorked(res);
         assert.eq(res.n, count);
     }
@@ -110,7 +110,7 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, f
 
 function createCollections(sharded) {
     assert.commandWorked(st.getDB("test1").runCommand({dropDatabase: 1}));
-    var db = st.getDB("test1");
+    let db = st.getDB("test1");
 
     assert.commandWorked(db.createCollection("foo", fooOptions));
     assert.commandWorked(db.createCollection("bar", barOptions));
@@ -133,26 +133,26 @@ function createCollections(sharded) {
 }
 
 function movePrimaryWithFailpoint(sharded) {
-    var db = st.getDB("test1");
+    let db = st.getDB("test1");
     createCollections(sharded);
     let tracked = [
         FixtureHelpers.isTracked(st.s.getCollection("test1.foo")),
         FixtureHelpers.isTracked(st.s.getCollection("test1.bar")),
     ];
 
-    var fromShard = st.getPrimaryShard("test1");
-    var toShard = st.getOther(fromShard);
+    let fromShard = st.getPrimaryShard("test1");
+    let toShard = st.getOther(fromShard);
 
     assert.eq(3, fromShard.getDB("test1").foo.count(), "from shard doesn't have data before move");
     assert.eq(0, toShard.getDB("test1").foo.count(), "to shard has data before move");
     assert.eq(3, fromShard.getDB("test1").bar.count(), "from shard doesn't have data before move");
     assert.eq(0, toShard.getDB("test1").bar.count(), "to shard has data before move");
 
-    var listCollsFrom = fromShard.getDB("test1").runCommand({listCollections: 1});
-    var fromColls = listCollsFrom.cursor.firstBatch;
+    let listCollsFrom = fromShard.getDB("test1").runCommand({listCollections: 1});
+    let fromColls = listCollsFrom.cursor.firstBatch;
     fromColls.sort(sortByName);
-    var baruuid = fromColls[0].info.uuid;
-    var foouuid = fromColls[1].info.uuid;
+    let baruuid = fromColls[0].info.uuid;
+    let foouuid = fromColls[1].info.uuid;
 
     assert.commandWorked(
         toShard.getDB("admin").runCommand({configureFailPoint: "movePrimaryFailPoint", mode: "alwaysOn"}),
@@ -203,26 +203,26 @@ function movePrimaryWithFailpoint(sharded) {
 }
 
 function movePrimaryNoFailpoint(sharded) {
-    var db = st.getDB("test1");
+    let db = st.getDB("test1");
     createCollections(sharded);
     let tracked = [
         FixtureHelpers.isTracked(st.s.getCollection("test1.foo")),
         FixtureHelpers.isTracked(st.s.getCollection("test1.bar")),
     ];
 
-    var fromShard = st.getPrimaryShard("test1");
-    var toShard = st.getOther(fromShard);
+    let fromShard = st.getPrimaryShard("test1");
+    let toShard = st.getOther(fromShard);
 
     assert.eq(3, fromShard.getDB("test1").foo.count(), "from shard doesn't have data before move");
     assert.eq(0, toShard.getDB("test1").foo.count(), "to shard has data before move");
     assert.eq(3, fromShard.getDB("test1").bar.count(), "from shard doesn't have data before move");
     assert.eq(0, toShard.getDB("test1").bar.count(), "to shard has data before move");
 
-    var listCollsFrom = fromShard.getDB("test1").runCommand({listCollections: 1});
-    var fromColls = listCollsFrom.cursor.firstBatch;
+    let listCollsFrom = fromShard.getDB("test1").runCommand({listCollections: 1});
+    let fromColls = listCollsFrom.cursor.firstBatch;
     fromColls.sort(sortByName);
-    var baruuid = fromColls[0].info.uuid;
-    var foouuid = fromColls[1].info.uuid;
+    let baruuid = fromColls[0].info.uuid;
+    let foouuid = fromColls[1].info.uuid;
 
     assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
 

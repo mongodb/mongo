@@ -5,7 +5,7 @@ t.drop();
 
 // this is the best way to build auto-increment
 function getNextVal(counterName) {
-    var ret = t.findAndModify({
+    let ret = t.findAndModify({
         query: {_id: counterName},
         update: {$inc: {val: 1}},
         upsert: true,

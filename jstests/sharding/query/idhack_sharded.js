@@ -5,8 +5,8 @@ TestData.skipCheckOrphans = true;
 
 // Test that idhack queries with projections obey the sharding filter.  SERVER-14032, SERVER-14034.
 
-var st = new ShardingTest({shards: 2});
-var coll = st.s0.getCollection("test.foo");
+let st = new ShardingTest({shards: 2});
+let coll = st.s0.getCollection("test.foo");
 
 //
 // Pre-split collection: shard 0 takes {x: {$lt: 0}}, shard 1 takes {x: {$gte: 0}}.

@@ -10,10 +10,10 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+let st = new ShardingTest({shards: 2, mongos: 2});
 
-var mongos0 = st.s0;
-var mongos1 = st.s1;
+let mongos0 = st.s0;
+let mongos1 = st.s1;
 const kDbName = "test";
 var db = mongos0.getDB(kDbName);
 const kCollName = jsTestName();
@@ -23,7 +23,7 @@ const kNonExistingCollName = jsTestName() + "_nonExisting";
 
 assert.commandWorked(mongos0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.name}));
 assert.commandWorked(mongos0.adminCommand({shardCollection: kNs, key: {a: 1}}));
-var shardedColl = db.getCollection(kCollName);
+let shardedColl = db.getCollection(kCollName);
 
 // Assert only 2 chunks exist.
 assert.eq(2, st.config.chunks.count());

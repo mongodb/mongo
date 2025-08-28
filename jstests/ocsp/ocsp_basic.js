@@ -13,7 +13,7 @@ import {
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-var ocsp_options = {
+let ocsp_options = {
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: OCSP_SERVER_CERT,
     tlsCAFile: OCSP_CA_PEM,
@@ -27,7 +27,7 @@ var ocsp_options = {
 let mock_ocsp = new MockOCSPServer("", 1);
 mock_ocsp.start();
 
-var conn = null;
+let conn = null;
 
 assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);

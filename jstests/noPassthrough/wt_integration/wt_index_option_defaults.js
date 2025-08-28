@@ -6,7 +6,7 @@
  *   3. system-wide options specified by --wiredTigerIndexConfigString or by
  *     inMemoryIndexConfigString.
  */
-var engine = "wiredTiger";
+let engine = "wiredTiger";
 if (jsTest.options().storageEngine) {
     engine = jsTest.options().storageEngine;
 }
@@ -28,9 +28,9 @@ if (jsTest.options()[engine + "IndexConfigString"]) {
 // Use different values for the same configuration string key to test that index-specific
 // options override collection-wide options, and that collection-wide options override
 // system-wide options.
-var systemWideConfigString = "split_pct=70,";
-var collectionWideConfigString = "split_pct=75,";
-var indexSpecificConfigString = "split_pct=80,";
+let systemWideConfigString = "split_pct=70,";
+let collectionWideConfigString = "split_pct=75,";
+let indexSpecificConfigString = "split_pct=80,";
 
 // Start up a mongod with system-wide defaults for index options and create a collection without
 // any additional options. Tests than an index without any additional options should take on the
@@ -45,21 +45,21 @@ runTest({});
 runTest({indexOptionDefaults: collectionWideConfigString});
 
 function runTest(collOptions) {
-    var hasIndexOptionDefaults = collOptions.hasOwnProperty("indexOptionDefaults");
+    let hasIndexOptionDefaults = collOptions.hasOwnProperty("indexOptionDefaults");
 
-    var dbpath = MongoRunner.dataPath + "wt_index_option_defaults";
+    let dbpath = MongoRunner.dataPath + "wt_index_option_defaults";
     resetDbpath(dbpath);
 
     // Start a mongod with system-wide defaults for engine-specific index options.
-    var conn = MongoRunner.runMongod({
+    let conn = MongoRunner.runMongod({
         dbpath: dbpath,
         noCleanData: true,
         [engine + "IndexConfigString"]: systemWideConfigString,
     });
     assert.neq(null, conn, "mongod was unable to start up");
 
-    var testDB = conn.getDB("test");
-    var cmdObj = {create: "coll"};
+    let testDB = conn.getDB("test");
+    let cmdObj = {create: "coll"};
 
     // Apply collection-wide defaults for engine-specific index options if any were
     // specified.
@@ -84,7 +84,7 @@ function runTest(collOptions) {
         ),
     );
 
-    var collStats = testDB.runCommand({collStats: "coll"});
+    let collStats = testDB.runCommand({collStats: "coll"});
     assert.commandWorked(collStats);
 
     checkIndexWithoutOptions(collStats.indexDetails);
@@ -93,13 +93,13 @@ function runTest(collOptions) {
     MongoRunner.stopMongod(conn);
 
     function checkIndexWithoutOptions(indexDetails) {
-        var indexSpec = getIndexSpecByName(testDB.coll, "without_options");
+        let indexSpec = getIndexSpecByName(testDB.coll, "without_options");
         assert(
             !indexSpec.hasOwnProperty("storageEngine"),
             "no storage engine options should have been set in the index spec: " + tojson(indexSpec),
         );
 
-        var creationString = indexDetails.without_options.creationString;
+        let creationString = indexDetails.without_options.creationString;
         if (hasIndexOptionDefaults) {
             assert.eq(
                 -1,
@@ -136,7 +136,7 @@ function runTest(collOptions) {
     }
 
     function checkIndexWithOptions(indexDetails) {
-        var indexSpec = getIndexSpecByName(testDB.coll, "with_options");
+        let indexSpec = getIndexSpecByName(testDB.coll, "with_options");
         assert(
             indexSpec.hasOwnProperty("storageEngine"),
             "storage engine options should have been set in the index spec: " + tojson(indexSpec),
@@ -147,7 +147,7 @@ function runTest(collOptions) {
             engine + " index options not present in the index spec",
         );
 
-        var creationString = indexDetails.with_options.creationString;
+        let creationString = indexDetails.with_options.creationString;
         assert.eq(
             -1,
             creationString.indexOf(systemWideConfigString),
@@ -171,7 +171,7 @@ function runTest(collOptions) {
 }
 
 function getIndexSpecByName(coll, indexName) {
-    var indexes = coll.getIndexes().filter(function (spec) {
+    let indexes = coll.getIndexes().filter(function (spec) {
         return spec.name === indexName;
     });
     assert.eq(1, indexes.length, 'index "' + indexName + '" not found');

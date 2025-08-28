@@ -1,11 +1,11 @@
-var collectionName = "bulk_api_limits";
-var coll = db.getCollection(collectionName);
+let collectionName = "bulk_api_limits";
+let coll = db.getCollection(collectionName);
 coll.drop();
 
 jsTest.log("Starting unordered bulk tests...");
 
-var request;
-var result;
+let request;
+let result;
 
 /********************************************************
  *
@@ -13,7 +13,7 @@ var result;
  * well as for the legacy operations
  *
  *******************************************************/
-var executeTestsUnordered = function () {
+let executeTestsUnordered = function () {
     // Create unique index
     coll.dropIndexes();
     coll.remove({});
@@ -60,7 +60,7 @@ var executeTestsUnordered = function () {
     batch.insert({a: 4, b: hugeString});
     batch.insert({a: 5, b: hugeString});
     batch.insert({a: 6, b: hugeString});
-    var result = batch.execute();
+    let result = batch.execute();
     printjson(JSON.stringify(result));
 
     // Basic properties check
@@ -74,7 +74,7 @@ var executeTestsUnordered = function () {
  * well as for the legacy operations
  *
  *******************************************************/
-var executeTestsOrdered = function () {
+let executeTestsOrdered = function () {
     /**
      * Fail during batch construction due to single document > maxBSONSize
      */
@@ -116,7 +116,7 @@ var executeTestsOrdered = function () {
     batch.insert({a: 4, b: hugeString});
     batch.insert({a: 5, b: hugeString});
     batch.insert({a: 6, b: hugeString});
-    var result = batch.execute();
+    let result = batch.execute();
 
     // Basic properties check
     assert.eq(6, result.nInserted);

@@ -7,8 +7,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
-    var authzErrorCode = 13;
-    var hasAuthzError = function (result) {
+    let authzErrorCode = 13;
+    let hasAuthzError = function (result) {
         assert(result instanceof WriteCommandError);
         assert.eq(authzErrorCode, result.code);
     };
@@ -18,16 +18,16 @@ function runTest(conn) {
     conn.getDB("admin").createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
     conn.getDB("admin").logout();
 
-    var userAdminConn = new Mongo(conn.host);
-    var adminUserAdmin = userAdminConn.getDB("admin");
+    let userAdminConn = new Mongo(conn.host);
+    let adminUserAdmin = userAdminConn.getDB("admin");
     adminUserAdmin.auth("userAdmin", "pwd");
     adminUserAdmin.createRole({role: "adminRole", privileges: [], roles: []});
-    var testUserAdmin = userAdminConn.getDB("test");
+    let testUserAdmin = userAdminConn.getDB("test");
     testUserAdmin.createRole({role: "testRole1", privileges: [], roles: []});
     testUserAdmin.createRole({role: "testRole2", privileges: [], roles: ["testRole1"]});
     testUserAdmin.createUser({user: "testUser", pwd: "pwd", roles: ["testRole2", {role: "adminRole", db: "admin"}]});
 
-    var testDB = conn.getDB("test");
+    let testDB = conn.getDB("test");
     assert(testDB.auth("testUser", "pwd"));
 
     // At this point there are 3 db handles in use.  testUserAdmin and adminUserAdmin are handles to
@@ -140,11 +140,11 @@ function runTest(conn) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s);
 st.stop();

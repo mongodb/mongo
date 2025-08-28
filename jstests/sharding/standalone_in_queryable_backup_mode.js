@@ -22,9 +22,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     });
 
     jsTest.log("Going to set up the environment");
-    var kDbName = "testDb";
-    var kShardedCollName = "testShardedColl";
-    var kUnshardedCollName = "testUnshardedColl";
+    let kDbName = "testDb";
+    let kShardedCollName = "testShardedColl";
+    let kUnshardedCollName = "testUnshardedColl";
 
     const shard0Identity = st.rs0.getPrimary().getDB("admin").getCollection("system.version").findOne({
         _id: "shardIdentity",

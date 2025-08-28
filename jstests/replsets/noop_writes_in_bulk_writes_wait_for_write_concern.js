@@ -259,12 +259,12 @@ commands.push({
         assert.eq(res.cursor.firstBatch.length, 2);
 
         // the insert op succeeded
-        var res1 = res.cursor.firstBatch[0];
+        let res1 = res.cursor.firstBatch[0];
         assert.eq(res1.ok, 1);
         assert.eq(res1.n, 1);
 
         // the delete was a no-op
-        var res2 = res.cursor.firstBatch[1];
+        let res2 = res.cursor.firstBatch[1];
         assert.eq(res2.ok, 1);
         assert.eq(res2.n, 0);
     },
@@ -325,7 +325,7 @@ function testCommandWithWriteConcern(cmd) {
     // Run the function that makes the final bulk write op a no-op.
     // Provide a small wtimeout that we expect to time out.
     cmd.noopMakerReq.writeConcern = {w: 3, wtimeout: 1000};
-    var noopMakerRes = testDB.runCommand(cmd.noopMakerReq);
+    let noopMakerRes = testDB.runCommand(cmd.noopMakerReq);
     cmd.noopMakerConfirmFunc(noopMakerRes);
 
     // Disable the failpoint, allowing the bulkWrite to proceed.

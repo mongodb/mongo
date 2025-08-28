@@ -1,7 +1,7 @@
 // @tags: [requires_fastcount]
 
 // tests to make sure that the new _id is returned after the insert in the shell
-var l;
+let l;
 let t = db[jsTestName()];
 t.drop();
 

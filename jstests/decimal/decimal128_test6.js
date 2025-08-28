@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var parseErrors = [
+let parseErrors = [
     {"description": "Incomplete Exponent", "string": "1e"},
     {"description": "Exponent at the beginning", "string": "E01"},
     {"description": "Just a decimal place", "string": "."},

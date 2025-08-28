@@ -7,7 +7,7 @@ import {multversionInitialSyncTest} from "jstests/multiVersion/libs/initial_sync
 
 let newSecondaryVersion = "latest";
 
-var testName = "multiversion_initial_sync_latest_from_last_lts";
+let testName = "multiversion_initial_sync_latest_from_last_lts";
 jsTestLog("Testing that initial sync succeeds when latest syncs from last-lts");
 multversionInitialSyncTest(testName, "last-lts", newSecondaryVersion, {}, lastLTSFCV);
 

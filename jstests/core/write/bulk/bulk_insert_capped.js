@@ -15,7 +15,7 @@
  * ]
  */
 
-var t = db.capped_multi_insert;
+let t = db.capped_multi_insert;
 t.drop();
 
 db.createCollection(t.getName(), {capped: true, size: 16 * 1024, max: 1});
@@ -23,7 +23,7 @@ db.createCollection(t.getName(), {capped: true, size: 16 * 1024, max: 1});
 assert.commandWorked(t.insert([{_id: 1}, {_id: 2}]));
 
 // Ensure the collection is valid.
-var res = t.validate({full: true});
+let res = t.validate({full: true});
 assert(res.valid, tojson(res));
 
 // Ensure that various ways of iterating the collection only return one document.

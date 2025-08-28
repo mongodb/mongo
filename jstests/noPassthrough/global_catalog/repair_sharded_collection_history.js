@@ -1,6 +1,6 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 1,
 });
 
@@ -36,7 +36,7 @@ assert.writeOK(
 assert.commandWorked(st.s.adminCommand({repairShardedCollectionChunksHistory: "test1.foo"}));
 
 // Make sure chunks for test1.foo were given history after repair
-var chunks = st.s.getDB("config").getCollection("chunks").find({uuid: collection.uuid}).toArray();
+let chunks = st.s.getDB("config").getCollection("chunks").find({uuid: collection.uuid}).toArray();
 assert.eq(chunks.length, 4);
 chunks.forEach((chunk) => {
     assert.neq(null, chunk);

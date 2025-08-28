@@ -17,16 +17,16 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-var st = new ShardingTest({shards: 3, mongos: 1});
+let st = new ShardingTest({shards: 3, mongos: 1});
 
-var admin = st.s0.getDB("admin");
+let admin = st.s0.getDB("admin");
 
 const dbCollSharded = "fooSharded";
 const dbCollUnsharded = "fooUnsharded";
 assert.commandWorked(admin.runCommand({enableSharding: dbCollSharded, primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({enableSharding: dbCollUnsharded, primaryShard: st.shard0.shardName}));
-var collSharded = st.s0.getCollection(dbCollSharded + ".barSharded");
-var collUnsharded = st.s0.getCollection(dbCollUnsharded + ".barUnsharded");
+let collSharded = st.s0.getCollection(dbCollSharded + ".barSharded");
+let collUnsharded = st.s0.getCollection(dbCollUnsharded + ".barUnsharded");
 
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
@@ -42,9 +42,9 @@ assert.commandWorked(collUnsharded.remove({}));
 
 jsTest.log("Inserting initial data...");
 
-var mongosConnActive = new Mongo(st.s0.host);
-var mongosConnIdle = null;
-var mongosConnNew = null;
+let mongosConnActive = new Mongo(st.s0.host);
+let mongosConnIdle = null;
+let mongosConnNew = null;
 
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}));
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}));

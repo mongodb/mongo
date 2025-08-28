@@ -43,16 +43,16 @@ a.a = n;
 p = tojson(a);
 assert.eq('{ \"a\" : NumberLong(\"4294967296\") }', p);
 
-var goodValues = [
+let goodValues = [
     0,
     "9223372036854775807", // int64_t max
     "-9223372036854775808", // int64_t min
     -9223372036854776000,
     9223372036854775000,
 ];
-var badNum = "number passed to NumberLong must be representable as an int64_t";
-var badStr = "could not convert string to long long";
-var badValues = [
+let badNum = "number passed to NumberLong must be representable as an int64_t";
+let badStr = "could not convert string to long long";
+let badValues = [
     {val: NaN, msg: badNum},
     {val: "9223372036854775808", msg: badStr}, // int64_t max + 1
     {val: 9223372036854776000, msg: badNum},
@@ -161,8 +161,8 @@ assert.eq(n.toString(), 'NumberLong(\"11111111111111111\")');
 // Test NumberLong.compare()
 //
 
-var left = new NumberLong("0");
-var right = new NumberLong("0");
+let left = new NumberLong("0");
+let right = new NumberLong("0");
 assert.eq(left.compare(right), 0);
 assert.eq(right.compare(left), 0);
 
@@ -202,14 +202,14 @@ assert.throws(function () {
 });
 
 // Test auto complete
-var getCompletions = function (prefix) {
+let getCompletions = function (prefix) {
     shellAutocomplete(prefix);
     return __autocomplete__;
 };
 
 // assign `myNumberLong` to `globalThis` in case we are being run from another shell context.
 globalThis.myNumberLong = new NumberLong();
-var completions = getCompletions("myNumberLong.");
+let completions = getCompletions("myNumberLong.");
 assert(completions.indexOf("myNumberLong.floatApprox") >= 0);
 assert(completions.indexOf("myNumberLong.top") >= 0);
 assert(completions.indexOf("myNumberLong.bottom") >= 0);

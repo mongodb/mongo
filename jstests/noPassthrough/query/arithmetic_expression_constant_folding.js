@@ -4,7 +4,7 @@
  */
 
 // Randomized property testing.
-var conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 const coll = testDB.getCollection("coll");

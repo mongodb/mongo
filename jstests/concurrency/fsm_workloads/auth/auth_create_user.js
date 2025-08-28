@@ -14,13 +14,13 @@ import {dropUsers} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js"
 TestData.runInsideTransaction = false;
 
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the username,
         // since the workload name is assumed to be unique.
         prefix: "auth_create_user",
     };
 
-    var states = (function () {
+    let states = (function () {
         function uniqueUsername(prefix, tid, num) {
             return prefix + tid + "_" + num;
         }
@@ -49,8 +49,8 @@ export const $config = (function () {
             );
 
             // Verify the newly created user exists, as well as all previously created users
-            for (var i = 0; i < this.num; ++i) {
-                var res = db.getUser(username);
+            for (let i = 0; i < this.num; ++i) {
+                let res = db.getUser(username);
                 assert(res !== null, "user '" + username + "' should exist");
                 assert.eq(username, res.user);
                 assert.eq(db.getName(), res.db);
@@ -60,10 +60,10 @@ export const $config = (function () {
         return {init: init, createUser: createUser};
     })();
 
-    var transitions = {init: {createUser: 1}, createUser: {createUser: 1}};
+    let transitions = {init: {createUser: 1}, createUser: {createUser: 1}};
 
     function teardown(db, collName, cluster) {
-        var pattern = new RegExp("^" + this.prefix + "\\d+_\\d+$");
+        let pattern = new RegExp("^" + this.prefix + "\\d+_\\d+$");
         dropUsers(db, pattern);
     }
 

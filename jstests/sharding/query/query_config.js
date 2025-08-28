@@ -6,37 +6,37 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var getListCollectionsCursor = function (database, options, subsequentBatchSize) {
+let getListCollectionsCursor = function (database, options, subsequentBatchSize) {
     return new DBCommandCursor(database, database.runCommand("listCollections", options), subsequentBatchSize);
 };
 
-var getListIndexesCursor = function (coll, options, subsequentBatchSize) {
+let getListIndexesCursor = function (coll, options, subsequentBatchSize) {
     return new DBCommandCursor(coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
 };
 
-var arrayGetNames = function (array) {
+let arrayGetNames = function (array) {
     return array.map(function (spec) {
         return spec.name;
     });
 };
 
-var cursorGetCollectionNames = function (cursor) {
+let cursorGetCollectionNames = function (cursor) {
     return arrayGetNames(cursor.toArray());
 };
 
-var sortArrayByName = function (array) {
+let sortArrayByName = function (array) {
     return array.sort(function (a, b) {
         return a.name > b.name;
     });
 };
 
-var sortArrayById = function (array) {
+let sortArrayById = function (array) {
     return array.sort(function (a, b) {
         return a._id > b._id;
     });
 };
 
-var dropCollectionIfExists = function (coll) {
+let dropCollectionIfExists = function (coll) {
     try {
         coll.drop();
     } catch (err) {
@@ -49,18 +49,18 @@ var dropCollectionIfExists = function (coll) {
  *
  * @return The list of collection namespaces that were added to the test database.
  */
-var setupTestCollections = function (st) {
+let setupTestCollections = function (st) {
     // testKeys and testCollNames are parallel arrays, testKeys contains the shard key of the
     // corresponding collection whose name is in testCollNames.
-    var testCollNames = ["4a1", "1a12", "3a1b1", "2a1b1c1", "b1", "b1c1", "d1"];
-    var testKeys = [{a: 1}, {a: 1}, {a: 1, b: 1}, {a: 1, b: 1, c: 1}, {b: 1}, {b: 1, c: 1}, {d: 1}];
-    var testDB = st.s.getDB("test");
+    let testCollNames = ["4a1", "1a12", "3a1b1", "2a1b1c1", "b1", "b1c1", "d1"];
+    let testKeys = [{a: 1}, {a: 1}, {a: 1, b: 1}, {a: 1, b: 1, c: 1}, {b: 1}, {b: 1, c: 1}, {d: 1}];
+    let testDB = st.s.getDB("test");
 
     assert.commandWorked(st.s.adminCommand({enablesharding: testDB.getName()}));
-    var testNamespaces = testCollNames.map(function (e) {
+    let testNamespaces = testCollNames.map(function (e) {
         return testDB.getName() + "." + e;
     });
-    for (var i = 0; i < testKeys.length; i++) {
+    for (let i = 0; i < testKeys.length; i++) {
         assert.commandWorked(st.s.adminCommand({shardcollection: testNamespaces[i], key: testKeys[i]}));
     }
 
@@ -71,14 +71,14 @@ var setupTestCollections = function (st) {
  * Test that a list collections query works on the config database. This test cannot detect
  * whether list collections lists extra collections.
  */
-var testListConfigCollections = function (st) {
+let testListConfigCollections = function (st) {
     // This test depends on all the collections in the configCollList being in the config
     // database.
-    var configCollList = ["chunks", "collections", "databases", "shards", "tags", "version"];
-    var configDB = st.s.getDB("config");
-    var userAddedColl = configDB.userAddedColl;
-    var cursor;
-    var cursorArray;
+    let configCollList = ["chunks", "collections", "databases", "shards", "tags", "version"];
+    let configDB = st.s.getDB("config");
+    let userAddedColl = configDB.userAddedColl;
+    let cursor;
+    let cursorArray;
 
     // Dropping collections under config is not allowed via mongos.
     let configPrimary = st.configRS.getPrimary();
@@ -91,7 +91,7 @@ var testListConfigCollections = function (st) {
 
     cursor = getListCollectionsCursor(configDB);
     cursorArray = cursorGetCollectionNames(cursor);
-    for (var i = 0; i < configCollList.length; i++) {
+    for (let i = 0; i < configCollList.length; i++) {
         assert(cursorArray.indexOf(configCollList[i]) > -1, "Missing " + configCollList[i]);
     }
 
@@ -106,11 +106,11 @@ var testListConfigCollections = function (st) {
 /**
  * Test that a list indexes query works on the chunks collection of the config database.
  */
-var testListConfigChunksIndexes = function (st) {
+let testListConfigChunksIndexes = function (st) {
     // This test depends on all the indexes in the configChunksIndexes being the exact indexes
     // in the config chunks collection.
-    var configDB = st.s.getDB("config");
-    var expectedConfigChunksIndexes = [
+    let configDB = st.s.getDB("config");
+    let expectedConfigChunksIndexes = [
         "_id_",
         "uuid_1_lastmod_1",
         "uuid_1_min_1",
@@ -126,9 +126,9 @@ var testListConfigChunksIndexes = function (st) {
 /**
  * Test queries over the collections collection of the config database.
  */
-var queryConfigCollections = function (st, testNamespaces) {
-    var configDB = st.s.getDB("config");
-    var cursor;
+let queryConfigCollections = function (st, testNamespaces) {
+    let configDB = st.s.getDB("config");
+    let cursor;
 
     // Find query.
     cursor = configDB.collections.find({"key.a": 1}, {"key.a": 1, "key.c": 1}).sort({"_id": 1}).batchSize(2);
@@ -159,24 +159,24 @@ var queryConfigCollections = function (st, testNamespaces) {
 /**
  * Test queries over the chunks collection of the config database.
  */
-var queryConfigChunks = function (st) {
-    var configDB = st.s.getDB("config");
-    var testDB = st.s.getDB("test2");
-    var testColl = testDB.testColl;
-    var testCollData = [{e: 1}, {e: 3}, {e: 4}, {e: 5}, {e: 7}, {e: 9}, {e: 10}, {e: 12}];
-    var cursor;
-    var result;
+let queryConfigChunks = function (st) {
+    let configDB = st.s.getDB("config");
+    let testDB = st.s.getDB("test2");
+    let testColl = testDB.testColl;
+    let testCollData = [{e: 1}, {e: 3}, {e: 4}, {e: 5}, {e: 7}, {e: 9}, {e: 10}, {e: 12}];
+    let cursor;
+    let result;
 
     // Get shard names.
     cursor = configDB.shards.find().sort({_id: 1});
-    var shard1 = cursor.next()._id;
-    var shard2 = cursor.next()._id;
+    let shard1 = cursor.next()._id;
+    let shard2 = cursor.next()._id;
     assert(!cursor.hasNext());
     assert.commandWorked(st.s.adminCommand({enablesharding: testDB.getName(), primaryShard: shard1}));
 
     // Setup.
     assert.commandWorked(st.s.adminCommand({shardcollection: testColl.getFullName(), key: {e: 1}}));
-    for (var i = 0; i < testCollData.length; i++) {
+    for (let i = 0; i < testCollData.length; i++) {
         assert.commandWorked(testColl.insert(testCollData[i]));
     }
     assert.commandWorked(st.s.adminCommand({split: testColl.getFullName(), middle: {e: 2}}));
@@ -219,7 +219,7 @@ var queryConfigChunks = function (st) {
         }
     };
     /* eslint-enable */
-    var reduceFunction = function (key, values) {
+    let reduceFunction = function (key, values) {
         // We may be re-reducing values that have already been partially reduced. In that case, we
         // expect to see an object like {chunks: <count>} in the array of input values.
         const numValues = values.reduce(function (acc, currentValue) {
@@ -245,9 +245,9 @@ var queryConfigChunks = function (st) {
 /**
  * Test queries over a user created collection of an arbitrary database on the config servers.
  */
-var queryUserCreated = function (database) {
-    var userColl = database.userColl;
-    var userCollData = [
+let queryUserCreated = function (database) {
+    let userColl = database.userColl;
+    let userCollData = [
         {_id: 1, g: 1, c: 4, s: "c", u: [1, 2]},
         {_id: 2, g: 1, c: 5, s: "b", u: [1]},
         {_id: 3, g: 2, c: 16, s: "g", u: [3]},
@@ -256,15 +256,15 @@ var queryUserCreated = function (database) {
         {_id: 6, g: 3, c: 11, s: "e", u: [2, 3]},
         {_id: 7, g: 3, c: 2, s: "f", u: [1]},
     ];
-    var userCollIndexes = ["_id_", "s_1"];
-    var cursor;
-    var cursorArray;
-    var result;
+    let userCollIndexes = ["_id_", "s_1"];
+    let cursor;
+    let cursorArray;
+    let result;
 
     // Dropping collections under config is not allowed via mongos.
     let configPrimary = st.configRS.getPrimary();
     dropCollectionIfExists(configPrimary.getDB(database.getName()).userColl);
-    for (var i = 0; i < userCollData.length; i++) {
+    for (let i = 0; i < userCollData.length; i++) {
         assert.commandWorked(userColl.insert(userCollData[i]));
     }
     assert.commandWorked(userColl.createIndex({s: 1}));
@@ -322,10 +322,10 @@ var queryUserCreated = function (database) {
     assert.eq(userColl.distinct("g").sort(), [1, 2, 3]);
 
     // Map reduce query.
-    var mapFunction = function () {
+    let mapFunction = function () {
         emit(this.g, 1);
     };
-    var reduceFunction = function (key, values) {
+    let reduceFunction = function (key, values) {
         // We may be re-reducing values that have already been partially reduced. In that case, we
         // expect to see an object like {count: <count>} in the array of input values.
         const numValues = values.reduce(function (acc, currentValue) {
@@ -347,9 +347,9 @@ var queryUserCreated = function (database) {
 };
 
 var st = new ShardingTest({shards: 2, mongos: 1});
-var testNamespaces = setupTestCollections(st);
-var configDB = st.s.getDB("config");
-var adminDB = st.s.getDB("admin");
+let testNamespaces = setupTestCollections(st);
+let configDB = st.s.getDB("config");
+let adminDB = st.s.getDB("admin");
 
 testListConfigCollections(st);
 testListConfigChunksIndexes(st);

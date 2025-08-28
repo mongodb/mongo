@@ -12,55 +12,55 @@
  * ]
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
         prefix: "rename_capped_collection_dbname_droptarget",
     };
 
-    var states = (function () {
-        var options = {capped: true, size: 4096};
+    let states = (function () {
+        let options = {capped: true, size: 4096};
 
         function uniqueDBName(prefix, tid, num) {
             return prefix + tid + "_" + num;
         }
 
         function insert(db, collName, numDocs) {
-            for (var i = 0; i < numDocs; ++i) {
-                var res = db[collName].insert({});
+            for (let i = 0; i < numDocs; ++i) {
+                let res = db[collName].insert({});
                 assert.commandWorked(res);
                 assert.eq(1, res.nInserted);
             }
         }
 
         function init(db, collName) {
-            var num = 0;
+            let num = 0;
             this.fromDBName = db.getName() + uniqueDBName(this.prefix, this.tid, num++);
             this.toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, num++);
 
-            var fromDB = db.getSiblingDB(this.fromDBName);
+            let fromDB = db.getSiblingDB(this.fromDBName);
             assert.commandWorked(fromDB.createCollection(collName, options));
             assert(fromDB[collName].isCapped());
         }
 
         function rename(db, collName) {
-            var fromDB = db.getSiblingDB(this.fromDBName);
-            var toDB = db.getSiblingDB(this.toDBName);
+            let fromDB = db.getSiblingDB(this.fromDBName);
+            let toDB = db.getSiblingDB(this.toDBName);
 
             // Clear out the "from" collection and insert 'fromCollCount' documents
-            var fromCollCount = 7;
+            let fromCollCount = 7;
             assert(fromDB[collName].drop());
             assert.commandWorked(fromDB.createCollection(collName, options));
             assert(fromDB[collName].isCapped());
             insert(fromDB, collName, fromCollCount);
 
-            var toCollCount = 4;
+            let toCollCount = 4;
             assert.commandWorked(toDB.createCollection(collName, options));
             insert(toDB, collName, toCollCount);
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
             // after the rename occurs
-            var renameCommand = {
+            let renameCommand = {
                 renameCollection: this.fromDBName + "." + collName,
                 to: this.toDBName + "." + collName,
                 dropTarget: true,
@@ -72,7 +72,7 @@ export const $config = (function () {
             assert.eq(0, fromDB[collName].find().itcount());
 
             // Swap "to" and "from" collections for next execution
-            var temp = this.fromDBName;
+            let temp = this.fromDBName;
             this.fromDBName = this.toDBName;
             this.toDBName = temp;
         }
@@ -80,7 +80,7 @@ export const $config = (function () {
         return {init: init, rename: rename};
     })();
 
-    var transitions = {init: {rename: 1}, rename: {rename: 1}};
+    let transitions = {init: {rename: 1}, rename: {rename: 1}};
 
     return {
         threadCount: 10,

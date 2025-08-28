@@ -45,7 +45,7 @@ function testMovePrimary(db) {
     assert.eq(db.coll.countDocuments({}), 1);
 }
 
-for (var i = 0; i < fcvValues.length; i++) {
+for (let i = 0; i < fcvValues.length; i++) {
     // Latest FCV
     assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 

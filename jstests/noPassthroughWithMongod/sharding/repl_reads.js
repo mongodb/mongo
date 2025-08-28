@@ -4,7 +4,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testReadLoadBalancing(numReplicas) {
-    var s = new ShardingTest({shards: {rs0: {nodes: numReplicas}}, verbose: 2, other: {chunkSize: 1}});
+    let s = new ShardingTest({shards: {rs0: {nodes: numReplicas}}, verbose: 2, other: {chunkSize: 1}});
 
     s.adminCommand({enablesharding: "test"});
     s.config.settings.find().forEach(printjson);
@@ -29,9 +29,9 @@ function testReadLoadBalancing(numReplicas) {
     }
 
     assert.soon(function () {
-        var x = rsStats().hosts;
+        let x = rsStats().hosts;
         printjson(x);
-        for (var i = 0; i < x.length; i++) if (!isPrimaryOrSecondary(x[i])) return false;
+        for (let i = 0; i < x.length; i++) if (!isPrimaryOrSecondary(x[i])) return false;
         return true;
     });
 
@@ -45,7 +45,7 @@ function testReadLoadBalancing(numReplicas) {
     primary.getDB("test").setProfilingLevel(2);
 
     // Store references to the connection so they won't be garbage collected.
-    var connections = [];
+    let connections = [];
 
     for (var i = 0; i < secondaries.length * 10; i++) {
         let conn = new Mongo(s._mongos[0].host);
@@ -54,7 +54,7 @@ function testReadLoadBalancing(numReplicas) {
         connections.push(conn);
     }
 
-    var profileCriteria = {op: "query", ns: "test.foo"};
+    let profileCriteria = {op: "query", ns: "test.foo"};
 
     for (var i = 0; i < secondaries.length; i++) {
         var profileCollection = secondaries[i].getDB("test").system.profile;
@@ -81,9 +81,9 @@ function testReadLoadBalancing(numReplicas) {
 
     assert.soon(
         function () {
-            var x = rsStats();
+            let x = rsStats();
             printjson(x);
-            var numOk = 0;
+            let numOk = 0;
             // Now wait until the host disappears, since now we actually update our
             // replica sets via isMaster in mongos
             if (x.hosts.length == c["members"].length - 1) return true;
@@ -109,7 +109,7 @@ function testReadLoadBalancing(numReplicas) {
         connections.push(conn);
     }
 
-    var counts = [];
+    let counts = [];
     for (var i = 0; i < secondaries.length; i++) {
         var profileCollection = secondaries[i].getDB("test").system.profile;
         counts.push(profileCollection.find(profileCriteria).count());

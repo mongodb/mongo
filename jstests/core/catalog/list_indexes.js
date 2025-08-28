@@ -13,10 +13,10 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var coll = db.list_indexes1;
-var cursor;
-var res;
-var specs;
+let coll = db.list_indexes1;
+let cursor;
+let res;
+let specs;
 
 //
 // Test basic command output.
@@ -36,17 +36,17 @@ assert.eq("_id_", res.cursor.firstBatch[0].name);
 // Test basic usage with DBCommandCursor.
 //
 
-var getListIndexesCursor = function (coll, options, subsequentBatchSize) {
+let getListIndexesCursor = function (coll, options, subsequentBatchSize) {
     return new DBCommandCursor(coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
 };
 
-var cursorGetIndexSpecs = function (cursor) {
+let cursorGetIndexSpecs = function (cursor) {
     return cursor.toArray().sort(function (a, b) {
         return a.name > b.name;
     });
 };
 
-var cursorGetIndexNames = function (cursor) {
+let cursorGetIndexNames = function (cursor) {
     return cursorGetIndexSpecs(cursor).map(function (spec) {
         return spec.name;
     });

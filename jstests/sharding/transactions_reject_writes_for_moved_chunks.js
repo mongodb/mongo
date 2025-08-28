@@ -131,7 +131,7 @@ const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-var fixtures = [
+let fixtures = [
     {collName: "not_hashed", shardKey: "_id", docs: [{_id: -3}, {_id: 11}, {_id: 3}]},
     {
         collName: "not_hashed_nested",
@@ -312,7 +312,7 @@ let moveHashed = function (toShard) {
     });
 };
 
-var hashedDocs = [{_id: -3}, {_id: 11}];
+let hashedDocs = [{_id: -3}, {_id: 11}];
 
 // The "insert_into_multiple_chunks" test case depends on the first document targeting the chunk on
 // the second shard which isn't being moved.

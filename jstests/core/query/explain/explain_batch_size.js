@@ -12,12 +12,12 @@
 let t = db.explain_batch_size;
 t.drop();
 
-var n = 3;
+let n = 3;
 for (let i = 0; i < n; i++) {
     t.save({x: i});
 }
 
-var q = {};
+let q = {};
 
 assert.eq(n, t.find(q).count(), "A");
 assert.eq(n, t.find(q).itcount(), "B");

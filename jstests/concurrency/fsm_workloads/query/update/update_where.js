@@ -25,7 +25,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.update = function update(db, collName) {
-        var res = db[collName].update(
+        let res = db[collName].update(
             // Server-side JS does not support Random.randInt, so use Math.floor/random instead
             {
                 $where:

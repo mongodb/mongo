@@ -4,10 +4,10 @@ import {Thread} from "jstests/libs/parallelTester.js";
  * Implements a kill session test helper
  */
 export var _kill_sessions_api_module = (function () {
-    var KillSessionsTestHelper = {};
+    let KillSessionsTestHelper = {};
 
     function isdbgrid(client) {
-        var result = assert.commandWorked(client.getDB("admin").runCommand({ismaster: 1}));
+        let result = assert.commandWorked(client.getDB("admin").runCommand({ismaster: 1}));
 
         return result.msg === "isdbgrid";
     }
@@ -37,7 +37,7 @@ export var _kill_sessions_api_module = (function () {
     };
 
     Fixture.prototype.kill = function (db, command) {
-        var result = this._clientToKillVia.getDB(db).runCommand(command);
+        let result = this._clientToKillVia.getDB(db).runCommand(command);
         if (!result.ok) {
             jsTest.log.info({result});
         }
@@ -45,7 +45,7 @@ export var _kill_sessions_api_module = (function () {
     };
 
     Fixture.prototype.assertKillFailed = function (db, command) {
-        var result = this._clientToKillVia.getDB(db).runCommand(command);
+        let result = this._clientToKillVia.getDB(db).runCommand(command);
         if (result.ok) {
             jsTest.log.info({result, command});
         }
@@ -53,7 +53,7 @@ export var _kill_sessions_api_module = (function () {
     };
 
     Fixture.prototype.visit = function (cb) {
-        for (var i = 0; i < this._clientsToVerifyVia.length; ++i) {
+        for (let i = 0; i < this._clientsToVerifyVia.length; ++i) {
             cb(this._clientsToVerifyVia[i], i);
         }
     };
@@ -77,19 +77,19 @@ export var _kill_sessions_api_module = (function () {
      * of the random accessory nodes).
      */
     Fixture.prototype.startHangingOp = function () {
-        var id = this._hangingOpId++;
+        let id = this._hangingOpId++;
         // When creating a hanging op, we have to use a background thread (because the command will
         // hang).
-        var thread = new Thread(
+        let thread = new Thread(
             function (connstring, credentials, tag, isdbgrid) {
-                var client = new Mongo(connstring);
+                let client = new Mongo(connstring);
                 if (credentials) {
                     client.getDB("admin").auth(credentials, "password");
                 }
-                var session = client.startSession();
-                var db = session.getDatabase("admin");
+                let session = client.startSession();
+                let db = session.getDatabase("admin");
                 try {
-                    var cmd = {
+                    let cmd = {
                         sleep: 1,
                         lock: "none",
                         secs: tag,
@@ -112,7 +112,7 @@ export var _kill_sessions_api_module = (function () {
         );
         thread.start();
 
-        var lsid;
+        let lsid;
         // We verify that our hanging op is up by looking for it in current op on the required
         // hosts.  We identify particular ops by secs sleeping.
         this.visit(function (client) {
@@ -147,7 +147,7 @@ export var _kill_sessions_api_module = (function () {
      */
     Fixture.prototype.assertNoSessionsInCurrentOp = function (cb) {
         this.visit(function (client) {
-            var inprog = client.getDB("admin").currentOp().inprog;
+            let inprog = client.getDB("admin").currentOp().inprog;
             inprog.forEach(function (op) {
                 assert(op.killPending || !op.lsid);
             });
@@ -156,17 +156,17 @@ export var _kill_sessions_api_module = (function () {
 
     Fixture.prototype.assertSessionsInCurrentOp = function (checkExist, checkNotExist) {
         this.visit(function (client) {
-            var needToFind = checkExist.map(function (handle) {
+            let needToFind = checkExist.map(function (handle) {
                 return handle.getLsid();
             });
-            var inprog = client.getDB("admin").currentOp().inprog;
+            let inprog = client.getDB("admin").currentOp().inprog;
             inprog.forEach(function (op) {
                 if (op.lsid && !op.killPending) {
                     checkNotExist.forEach(function (handle) {
                         assert.neq(bsonWoCompare(handle.getLsid(), op.lsid), 0);
                     });
 
-                    for (var i = 0; i < needToFind.length; ++i) {
+                    for (let i = 0; i < needToFind.length; ++i) {
                         if (bsonWoCompare(needToFind[i], op.lsid) == 0) {
                             needToFind.splice(i, 1);
                             break;
@@ -184,7 +184,7 @@ export var _kill_sessions_api_module = (function () {
      */
     Fixture.prototype.assertNoSessionsInCursors = function () {
         this.visit(function (client) {
-            var db = client.getDB("admin");
+            let db = client.getDB("admin");
             db.setSecondaryOk();
             assert.soon(() => {
                 let cursors = db.aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}]).toArray();
@@ -198,15 +198,15 @@ export var _kill_sessions_api_module = (function () {
      */
     Fixture.prototype.assertSessionsInCursors = function (checkExist, checkNotExist) {
         this.visit(function (client) {
-            var needToFind = checkExist.map(function (handle) {
+            let needToFind = checkExist.map(function (handle) {
                 return {
                     lsid: handle.getLsid(),
                 };
             });
 
-            var db = client.getDB("admin");
+            let db = client.getDB("admin");
             db.setSecondaryOk();
-            var cursors = db
+            let cursors = db
                 .aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}, {"$match": {type: "idleCursor"}}])
                 .toArray();
             cursors.forEach(function (cursor) {
@@ -215,7 +215,7 @@ export var _kill_sessions_api_module = (function () {
                         assert.neq(bsonWoCompare({x: handle.getLsid().id}, {x: cursor.lsid.id}), 0);
                     });
 
-                    for (var i = 0; i < needToFind.length; ++i) {
+                    for (let i = 0; i < needToFind.length; ++i) {
                         if (bsonWoCompare({x: needToFind[i].lsid.id}, {x: cursor.lsid.id}) == 0) {
                             needToFind.splice(i, 1);
                             break;
@@ -267,10 +267,10 @@ export var _kill_sessions_api_module = (function () {
      * cursors on all nodes at once.
      */
     Fixture.prototype.startCursor = function () {
-        var session = this._clientToExecuteVia.startSession();
-        var db = session.getDatabase("admin");
+        let session = this._clientToExecuteVia.startSession();
+        let db = session.getDatabase("admin");
 
-        var cmd = {
+        let cmd = {
             aggregate: 1,
             pipeline: [
                 {"$currentOp": {"allUsers": false}},
@@ -286,8 +286,8 @@ export var _kill_sessions_api_module = (function () {
             writeConcern: {w: 1},
         };
 
-        var cursors = {};
-        var result;
+        let cursors = {};
+        let result;
         if (this._clientToExecuteViaIsdbgrid) {
             result = db.runCommand({multicast: cmd});
             for (let host of Object.keys(result.hosts)) {
@@ -309,7 +309,7 @@ export var _kill_sessions_api_module = (function () {
      * A suite of tests verifying that various forms of no argument kill work.  Outside of auth
      */
     function makeNoAuthNoArgKill(cmd) {
-        var obj = {};
+        let obj = {};
         obj[cmd] = [];
         return [
             // Verify that we can invoke cmd
@@ -319,7 +319,7 @@ export var _kill_sessions_api_module = (function () {
 
             // Verify that we can start a session and kill it with cmd
             function (fixture) {
-                var handle = fixture.startHangingOp();
+                let handle = fixture.startHangingOp();
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCurrentOp();
                 handle.join();
@@ -327,8 +327,8 @@ export var _kill_sessions_api_module = (function () {
 
             // Verify that we can kill two sessions
             function (fixture) {
-                var handle1 = fixture.startHangingOp();
-                var handle2 = fixture.startHangingOp();
+                let handle1 = fixture.startHangingOp();
+                let handle2 = fixture.startHangingOp();
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCurrentOp();
                 handle1.join();
@@ -337,7 +337,7 @@ export var _kill_sessions_api_module = (function () {
 
             // Verify that we can start a session with a cursor and kill it with cmd
             function (fixture) {
-                var handle = fixture.startCursor();
+                let handle = fixture.startCursor();
                 fixture.assertSessionsInCursors([handle], []);
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCursors();
@@ -347,8 +347,8 @@ export var _kill_sessions_api_module = (function () {
 
             // Verify that we can kill two sessions with cursors
             function (fixture) {
-                var handle1 = fixture.startCursor();
-                var handle2 = fixture.startCursor();
+                let handle1 = fixture.startCursor();
+                let handle2 = fixture.startCursor();
                 fixture.assertSessionsInCursors([handle1, handle2], []);
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCursors();
@@ -366,9 +366,9 @@ export var _kill_sessions_api_module = (function () {
         return [
             // Verify that we can kill two of three sessions, and that the other stays alive
             function (fixture) {
-                var handle1 = fixture.startHangingOp();
-                var handle2 = fixture.startHangingOp();
-                var handle3 = fixture.startHangingOp();
+                let handle1 = fixture.startHangingOp();
+                let handle2 = fixture.startHangingOp();
+                let handle3 = fixture.startHangingOp();
 
                 {
                     var obj = {};
@@ -391,9 +391,9 @@ export var _kill_sessions_api_module = (function () {
             // Verify that we can kill two of three sessions, and that the other stays (with
             // cursors)
             function (fixture) {
-                var handle1 = fixture.startCursor();
-                var handle2 = fixture.startCursor();
-                var handle3 = fixture.startCursor();
+                let handle1 = fixture.startCursor();
+                let handle2 = fixture.startCursor();
+                let handle3 = fixture.startCursor();
                 fixture.assertSessionsInCursors([handle1, handle2, handle3], []);
 
                 {
@@ -418,11 +418,11 @@ export var _kill_sessions_api_module = (function () {
         ];
     }
 
-    var noAuth = [
+    let noAuth = [
         // Verify that we can kill two sessions with the kill all args from killAllSessionsByPattern
         function (fixture) {
-            var handle1 = fixture.startHangingOp();
-            var handle2 = fixture.startHangingOp();
+            let handle1 = fixture.startHangingOp();
+            let handle2 = fixture.startHangingOp();
             fixture.kill("admin", {killAllSessionsByPattern: [{}]});
             fixture.assertNoSessionsInCurrentOp();
             handle1.join();
@@ -471,16 +471,16 @@ export var _kill_sessions_api_module = (function () {
     });
 
     KillSessionsTestHelper.runNoAuth = function (clientToExecuteVia, clientToKillVia, clientsToVerifyVia) {
-        var fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
+        let fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
 
-        for (var i = 0; i < noAuth.length; ++i) {
+        for (let i = 0; i < noAuth.length; ++i) {
             noAuth[i](fixture);
         }
     };
 
     // Run tests for a command that takes no args in auth
     function makeAuthNoArgKill(cmd, execUserCred, killUserCred) {
-        var obj = {};
+        let obj = {};
         obj[cmd] = [];
         return [
             // Verify that we can invoke cmd
@@ -494,7 +494,7 @@ export var _kill_sessions_api_module = (function () {
             function (fixture) {
                 fixture.loginForExecute(execUserCred);
                 fixture.loginForKill(killUserCred);
-                var handle = fixture.startHangingOp();
+                let handle = fixture.startHangingOp();
                 fixture.kill("admin", obj);
                 fixture.assertNoSessionsInCurrentOp();
                 handle.join();
@@ -512,12 +512,12 @@ export var _kill_sessions_api_module = (function () {
             // stays up
             function (fixture) {
                 fixture.loginForExecute(execUserCred1);
-                var handle1 = fixture.startHangingOp();
-                var handle2 = fixture.startHangingOp();
+                let handle1 = fixture.startHangingOp();
+                let handle2 = fixture.startHangingOp();
 
                 fixture.logout();
                 fixture.loginForExecute(execUserCred2);
-                var handle3 = fixture.startHangingOp();
+                let handle3 = fixture.startHangingOp();
 
                 fixture.loginForKill(killUserCred);
 
@@ -543,13 +543,13 @@ export var _kill_sessions_api_module = (function () {
             function (fixture) {
                 fixture.loginForExecute(execUserCred1);
 
-                var handle1 = fixture.startCursor();
-                var handle2 = fixture.startCursor();
+                let handle1 = fixture.startCursor();
+                let handle2 = fixture.startCursor();
 
                 fixture.logout();
                 fixture.loginForExecute(execUserCred2);
 
-                var handle3 = fixture.startCursor();
+                let handle3 = fixture.startCursor();
                 fixture.assertSessionsInCursors([handle1, handle2, handle3], []);
 
                 fixture.loginForKill(killUserCred);
@@ -576,12 +576,12 @@ export var _kill_sessions_api_module = (function () {
         ];
     }
 
-    var auth = [
+    let auth = [
         // Verify that we can start a session and kill it with the universal pattern
         function (fixture) {
             fixture.loginForExecute("simple");
             fixture.loginForKill("killAny");
-            var handle = fixture.startHangingOp();
+            let handle = fixture.startHangingOp();
             fixture.kill("admin", {killAllSessionsByPattern: [{}]});
             fixture.assertNoSessionsInCurrentOp();
             handle.join();
@@ -590,7 +590,7 @@ export var _kill_sessions_api_module = (function () {
         function (fixture) {
             fixture.loginForExecute("simple");
             fixture.loginForKill("impersonate");
-            var handle = fixture.startHangingOp();
+            let handle = fixture.startHangingOp();
             fixture.kill("admin", {killAllSessionsByPattern: [{users: [], roles: []}]});
             fixture.assertNoSessionsInCurrentOp();
             handle.join();
@@ -710,9 +710,9 @@ export var _kill_sessions_api_module = (function () {
                 fixture.loginForExecute(execUserCred);
                 fixture.loginForKill(killUserCred);
 
-                var session = fixture._clientToExecuteVia.startSession();
+                let session = fixture._clientToExecuteVia.startSession();
 
-                var obj = {};
+                let obj = {};
                 obj[cmd] = [session._serverSession.handle.getId()].map(genArg(execUserCred));
                 fixture.assertKillFailed("admin", obj);
                 session.endSession();
@@ -755,16 +755,16 @@ export var _kill_sessions_api_module = (function () {
     });
 
     KillSessionsTestHelper.runAuth = function (clientToExecuteVia, clientToKillVia, clientsToVerifyVia) {
-        var fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
+        let fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
 
-        for (var i = 0; i < auth.length; ++i) {
+        for (let i = 0; i < auth.length; ++i) {
             fixture.logout();
             auth[i](fixture);
         }
     };
 
     KillSessionsTestHelper.initializeAuth = function (client) {
-        var admin = client.getDB("admin");
+        let admin = client.getDB("admin");
         admin.createUser({user: "super", pwd: "password", roles: jsTest.adminUserRoles});
         admin.auth("super", "password");
         admin.createRole({
@@ -789,7 +789,7 @@ export var _kill_sessions_api_module = (function () {
         admin.createUser({user: "impersonate", pwd: "password", roles: ["forImpersonate", "killAnySession"]});
     };
 
-    var module = {};
+    let module = {};
     module.KillSessionsTestHelper = KillSessionsTestHelper;
 
     return module;

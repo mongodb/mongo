@@ -1,8 +1,8 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test basic behavior and correctness
 // of the stage.
 
-var local = db.local;
-var foreign = db.foreign;
+let local = db.local;
+let foreign = db.foreign;
 
 local.drop();
 foreign.drop();
@@ -46,8 +46,8 @@ assert.eq(
 local.drop();
 foreign.drop();
 
-var bulk = foreign.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
+let bulk = foreign.initializeUnorderedBulkOp();
+for (let i = 0; i < 100; i++) {
     bulk.insert({_id: i, neighbors: [i - 1, i + 1]});
 }
 assert.commandWorked(bulk.execute());
@@ -55,7 +55,7 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(local.insert({starting: 50}));
 
 // Perform a simple $graphLookup and ensure it retrieves every result.
-var res = local
+let res = local
     .aggregate({
         $graphLookup: {
             from: "foreign",

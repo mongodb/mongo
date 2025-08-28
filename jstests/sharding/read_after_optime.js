@@ -2,19 +2,19 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
+let shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
 
 assert(shardingTest.configRS, "this test requires config servers to run in CSRS mode");
 
-var configReplSetTest = shardingTest.configRS;
-var primaryConn = configReplSetTest.getPrimary();
+let configReplSetTest = shardingTest.configRS;
+let primaryConn = configReplSetTest.getPrimary();
 
-var lastOp = configReplSetTest.awaitLastOpCommitted();
+let lastOp = configReplSetTest.awaitLastOpCommitted();
 assert(lastOp, "invalid op returned from ReplSetTest.awaitLastOpCommitted()");
 
-var term = lastOp.t;
+let term = lastOp.t;
 
-var runFindCommand = function (ts) {
+let runFindCommand = function (ts) {
     return primaryConn.getDB("local").runCommand({
         find: "oplog.rs",
         readConcern: {
@@ -29,18 +29,18 @@ var runFindCommand = function (ts) {
 
 assert.commandWorked(runFindCommand(lastOp.ts));
 
-var pingIntervalSeconds = 10;
+let pingIntervalSeconds = 10;
 assert.commandFailedWithCode(
     runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
     ErrorCodes.MaxTimeMSExpired,
 );
 
-var msg = /Command timed out waiting for read concern to be satisfied.*"db":"local"/;
+let msg = /Command timed out waiting for read concern to be satisfied.*"db":"local"/;
 
 assert.soon(
     function () {
-        var logMessages = assert.commandWorked(primaryConn.adminCommand({getLog: "global"})).log;
-        for (var i = 0; i < logMessages.length; i++) {
+        let logMessages = assert.commandWorked(primaryConn.adminCommand({getLog: "global"})).log;
+        for (let i = 0; i < logMessages.length; i++) {
             if (logMessages[i].search(msg) != -1) {
                 return true;
             }

@@ -11,7 +11,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 1,
     mongos: 1,
     config: 1,
@@ -19,12 +19,12 @@ var st = new ShardingTest({
     useHostname: false, // Needed when relying on the localhost exception
     other: {mongosOptions: {verbose: 1}},
 });
-var mongos = st.s;
-var config = st.config0;
-var authzErrorCode = 13;
+let mongos = st.s;
+let config = st.config0;
+let authzErrorCode = 13;
 
 // set up user/pwd on admin db with clusterAdmin role (for serverStatus)
-var conn = new Mongo(mongos.host);
+let conn = new Mongo(mongos.host);
 var db = conn.getDB("admin");
 db.createUser({user: "user", pwd: "pwd", roles: ["clusterAdmin"]});
 db.auth("user", "pwd");
@@ -46,8 +46,8 @@ jsTest.log("repeat without config server");
 MongoRunner.stopMongod(config);
 
 // open a new connection to mongos (unauthorized)
-var conn2 = new Mongo(mongos.host);
-var db2 = conn2.getDB("admin");
+let conn2 = new Mongo(mongos.host);
+let db2 = conn2.getDB("admin");
 
 // should fail since user is not authorized.
 assert.commandFailedWithCode(db2.adminCommand("serverStatus"), authzErrorCode);

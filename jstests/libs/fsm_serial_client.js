@@ -1,15 +1,15 @@
 // This is the template file used in Powercycle testing for launching FSM Serial clients.
 import {runWorkloadsSerially} from "jstests/concurrency/fsm_libs/runner.js";
 
-var workloadDir = "jstests/concurrency/fsm_workloads";
+let workloadDir = "jstests/concurrency/fsm_workloads";
 
-var workloadList = TestData.workloadFiles || ls(workloadDir);
-var workloadDenylist = TestData.workloadDenylistFiles || [];
-var dbNamePrefix = TestData.dbNamePrefix || "";
-var fsmDbDenylist = TestData.fsmDbDenylist || [];
-var validateCollectionsOnCleanup = TestData.validateCollections;
+let workloadList = TestData.workloadFiles || ls(workloadDir);
+let workloadDenylist = TestData.workloadDenylistFiles || [];
+let dbNamePrefix = TestData.dbNamePrefix || "";
+let fsmDbDenylist = TestData.fsmDbDenylist || [];
+let validateCollectionsOnCleanup = TestData.validateCollections;
 
-var denylist = workloadDenylist.map(function (file) {
+let denylist = workloadDenylist.map(function (file) {
     return workloadDir + "/" + file;
 });
 

@@ -4,8 +4,8 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: "testSet", nodes: 3});
-var nodes = replTest.nodeList();
+let replTest = new ReplSetTest({name: "testSet", nodes: 3});
+let nodes = replTest.nodeList();
 printjson(nodes);
 
 // We need an arbiter to ensure that the primary doesn't step down when we restart the secondary
@@ -23,11 +23,11 @@ replTest.initiate(
     {initiateWithDefaultElectionTimeout: true},
 );
 
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
-var primaryDB = primary.getDB("test");
-var secondaryDB = secondary.getDB("test");
+let primaryDB = primary.getDB("test");
+let secondaryDB = secondary.getDB("test");
 
 // set up collections
 assert.commandWorked(
@@ -49,18 +49,18 @@ assert.commandWorked(primaryDB.keep4.insert({}, {writeConcern: {w: 2}}));
 
 // make sure they exist on primary and secondary
 function countCollection(mydb, nameFilter) {
-    var result = mydb.runCommand("listCollections", {filter: {name: nameFilter}});
+    let result = mydb.runCommand("listCollections", {filter: {name: nameFilter}});
     assert.commandWorked(result);
     return new DBCommandCursor(mydb, result).itcount();
 }
 
 function countIndexesFor(mydb, nameFilter) {
-    var result = mydb.runCommand("listCollections", {filter: {name: nameFilter}});
+    let result = mydb.runCommand("listCollections", {filter: {name: nameFilter}});
     assert.commandWorked(result);
-    var arr = new DBCommandCursor(mydb, result).toArray();
-    var total = 0;
-    for (var i = 0; i < arr.length; i++) {
-        var coll = arr[i];
+    let arr = new DBCommandCursor(mydb, result).toArray();
+    let total = 0;
+    for (let i = 0; i < arr.length; i++) {
+        let coll = arr[i];
         total += mydb.getCollection(coll.name).getIndexes().length;
     }
     return total;

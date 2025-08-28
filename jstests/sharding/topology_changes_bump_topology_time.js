@@ -31,7 +31,7 @@ function printConfigShards(st, msg) {
     print(msg, tojson(st.s.getDB("config").shards.find().toArray()));
 }
 
-var st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 3});
+let st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 3});
 
 let initialTopology = getTopologyTime(st);
 

@@ -3,7 +3,7 @@
 let t = db.indexe;
 t.drop();
 
-var num = 1000;
+let num = 1000;
 
 for (let i = 0; i < num; i++) {
     t.insert({a: "b"});

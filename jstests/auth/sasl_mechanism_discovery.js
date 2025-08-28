@@ -69,7 +69,7 @@ function runTest(conn) {
 }
 
 // Test standalone.
-var m = MongoRunner.runMongod({
+let m = MongoRunner.runMongod({
     keyFile: "jstests/libs/key1",
     setParameter: {authenticationMechanisms: "SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"},
 });
@@ -81,7 +81,7 @@ if (TestData.configShard) {
     // Config shard requires at least one shard.
     quit();
 }
-var st = new ShardingTest({
+let st = new ShardingTest({
     keyFile: "jstests/libs/key1",
     shards: 0,
     other: {

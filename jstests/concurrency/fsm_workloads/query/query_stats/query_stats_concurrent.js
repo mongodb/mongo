@@ -19,7 +19,7 @@
 import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
 
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {}
 
         function reInit(db, collName) {}
@@ -37,7 +37,7 @@ export const $config = (function () {
         // Runs many queries with different shapes to ensure eviction occurs in the queryStats
         // store.
         function multipleShapes(db, collName) {
-            for (var i = 0; i < 2000; i++) {
+            for (let i = 0; i < 2000; i++) {
                 let query = {};
                 query["foo" + i] = "bar";
                 db[collName].aggregate([{$match: query}]).itcount();
@@ -94,8 +94,8 @@ export const $config = (function () {
         };
     })();
 
-    var internalQueryStatsRateLimit;
-    var internalQueryStatsCacheSize;
+    let internalQueryStatsRateLimit;
+    let internalQueryStatsCacheSize;
 
     let setup = function (db, collName, cluster) {
         internalQueryStatsRateLimit = setParameterOnAllNodes({

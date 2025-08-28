@@ -5,9 +5,9 @@ function myprint(x) {
     print("chaining output: " + x);
 }
 
-var replTest = new ReplSetTest({name: "testSet", nodes: 3, useBridge: true});
-var nodes = replTest.startSet();
-var hostnames = replTest.nodeList();
+let replTest = new ReplSetTest({name: "testSet", nodes: 3, useBridge: true});
+let nodes = replTest.startSet();
+let hostnames = replTest.nodeList();
 replTest.initiate({
     "_id": "testSet",
     "members": [
@@ -18,7 +18,7 @@ replTest.initiate({
     "settings": {"chainingAllowed": false},
 });
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
 assert.commandWorked(
@@ -27,25 +27,25 @@ assert.commandWorked(
 
 replTest.awaitReplication();
 
-var breakNetwork = function () {
+let breakNetwork = function () {
     nodes[0].disconnect(nodes[2]);
     primary = replTest.getPrimary();
 };
 
-var checkNoChaining = function () {
+let checkNoChaining = function () {
     primary.getDB("test").foo.insert({x: 1});
 
     assert.soon(function () {
         return nodes[1].getDB("test").foo.findOne() != null;
     });
 
-    var endTime = new Date().getTime() + 10000;
+    let endTime = new Date().getTime() + 10000;
     while (new Date().getTime() < endTime) {
         assert(nodes[2].getDB("test").foo.findOne() == null, "Check that 2 does not catch up");
     }
 };
 
-var forceSync = function () {
+let forceSync = function () {
     syncFrom(nodes[2], nodes[1], replTest);
     assert.soon(function () {
         return nodes[2].getDB("test").foo.findOne() != null;
@@ -64,7 +64,7 @@ if (!_isWindows()) {
     print("check that forcing sync target still works");
     forceSync();
 
-    var config = primary.getDB("local").system.replset.findOne();
+    let config = primary.getDB("local").system.replset.findOne();
     assert.eq(false, config.settings.chainingAllowed, tojson(config));
 }
 

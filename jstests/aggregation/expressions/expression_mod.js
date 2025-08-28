@@ -4,10 +4,10 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
-var testDB = db.getSiblingDB("expression_mod");
+let testDB = db.getSiblingDB("expression_mod");
 assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();
-var coll = testDB.getCollection(collName);
+let coll = testDB.getCollection(collName);
 
 //
 // Confirm different input numeric types are evaluated correctly.
@@ -17,7 +17,7 @@ var coll = testDB.getCollection(collName);
 // The $match portion ensures they are of the correct type as the shell turns the ints back to
 // doubles at the end so we can not check types with assert.
 coll.save({});
-var result = coll
+let result = coll
     .aggregate(
         {
             $project: {
@@ -59,7 +59,7 @@ var result = coll
     .toArray();
 
 // Correct answers (it is mainly the types that are important here).
-var expectedResult = [
+let expectedResult = [
     {
         dub_dub: {type: "double", value: 0.5},
         dub_int: {type: "double", value: 0.5},

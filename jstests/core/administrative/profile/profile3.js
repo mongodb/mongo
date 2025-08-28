@@ -9,7 +9,7 @@
 // ]
 
 // special db so that it can be run in parallel tests
-var stddb = db;
+let stddb = db;
 var db = db.getSiblingDB("profile3");
 
 db.dropAllUsers();

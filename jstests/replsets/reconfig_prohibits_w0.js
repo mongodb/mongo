@@ -5,21 +5,21 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: "prohibit_w0", nodes: 1});
-var nodes = replTest.nodeList();
-var conns = replTest.startSet();
-var admin = conns[0].getDB("admin");
+let replTest = new ReplSetTest({name: "prohibit_w0", nodes: 1});
+let nodes = replTest.nodeList();
+let conns = replTest.startSet();
+let admin = conns[0].getDB("admin");
 
 replTest.initiate({_id: "prohibit_w0", members: [{_id: 0, host: nodes[0]}]});
 
 function testReconfig(gleDefaults) {
-    var conf = admin.runCommand({replSetGetConfig: 1}).config;
+    let conf = admin.runCommand({replSetGetConfig: 1}).config;
     jsTestLog("conf");
     printjson(conf);
     conf.settings = gleDefaults;
     conf.version++;
 
-    var response = admin.runCommand({replSetReconfig: conf});
+    let response = admin.runCommand({replSetReconfig: conf});
     assert.commandFailedWithCode(response, ErrorCodes.InvalidReplicaSetConfig);
 }
 

@@ -39,7 +39,7 @@ const dbName = "TestDB";
     const shardedCollName = "Coll";
     const shardedCollNs = dbName + "." + shardedCollName;
 
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    let st = new ShardingTest({shards: 2, mongos: 2});
 
     let router0ShardedColl = st.s0.getDB(dbName)[shardedCollName];
     let router1ShardedColl = st.s1.getDB(dbName)[shardedCollName];
@@ -129,7 +129,7 @@ const dbName = "TestDB";
 
     const unshardedCollName = "UnshardedColl";
 
-    var st = new ShardingTest({shards: 2, mongos: 2, other: {enableBalancer: true}});
+    let st = new ShardingTest({shards: 2, mongos: 2, other: {enableBalancer: true}});
 
     let router0UnshardedColl = st.s0.getDB(dbName)[unshardedCollName];
     let router1UnshardedColl = st.s1.getDB(dbName)[unshardedCollName];

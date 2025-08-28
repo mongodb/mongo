@@ -3,10 +3,10 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({mongos: 1, shards: 1});
-var mongos = st.s0;
+let st = new ShardingTest({mongos: 1, shards: 1});
+let mongos = st.s0;
 
-var kDbName = "db";
+let kDbName = "db";
 
 let db = mongos.getDB(kDbName);
 

@@ -140,7 +140,7 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
     coll.insert({a: 0});
 
     // Running numRequests / 2 times since we dispatch two requests per iteration
-    for (var i = 0; i < testOptions.numRequests / 2; i++) {
+    for (let i = 0; i < testOptions.numRequests / 2; i++) {
         coll.find({a: 0}).toArray();
         coll.aggregate([{$match: {a: 1}}]);
     }
@@ -166,7 +166,7 @@ function queryStatsStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
     // Only using three digit numbers (eg 100, 101) means the string length will be the same for all
     // entries and therefore the key size will be the same for all entries, which makes predicting
     // the total size of the store clean and easy.
-    for (var i = 100; i < 200; i++) {
+    for (let i = 100; i < 200; i++) {
         coll.aggregate([{$match: {["foo" + i]: "bar"}}]).itcount();
         if (i == 150) {
             halfWayPointSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;

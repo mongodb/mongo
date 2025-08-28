@@ -17,7 +17,7 @@ const st = new ShardingTest({});
 const mongos = st.s;
 
 const dbName = "testCheckMetadataConsistencyDB";
-var dbCounter = 0;
+let dbCounter = 0;
 
 function getNewDb() {
     return mongos.getDB(dbName + dbCounter++);

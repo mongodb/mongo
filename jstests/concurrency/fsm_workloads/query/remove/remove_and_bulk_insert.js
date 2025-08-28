@@ -14,22 +14,22 @@
  *
  */
 export const $config = (function () {
-    var states = {
+    let states = {
         insert: function insert(db, collName) {
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < 100; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = 0; i < 100; ++i) {
                 bulk.insert({});
             }
             assert.commandWorked(bulk.execute());
         },
 
         remove: function remove(db, collName) {
-            var res = db[collName].remove({});
+            let res = db[collName].remove({});
             assert.lte(0, res.nRemoved, tojson(res));
         },
     };
 
-    var transitions = {insert: {insert: 0.5, remove: 0.5}, remove: {insert: 0.5, remove: 0.5}};
+    let transitions = {insert: {insert: 0.5, remove: 0.5}, remove: {insert: 0.5, remove: 0.5}};
 
     return {
         threadCount: 5,

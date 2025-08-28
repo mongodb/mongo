@@ -8,7 +8,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var dbTest = db.getSiblingDB("DB_create_collection_fail_cleanup");
+let dbTest = db.getSiblingDB("DB_create_collection_fail_cleanup");
 dbTest.dropDatabase();
 
 let collectionNames = dbTest.getCollectionNames();

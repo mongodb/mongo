@@ -11,7 +11,7 @@ function runTest(downgradeFCV) {
 
     // Rig the election so that the first node is always primary and that modifying the
     // featureCompatibilityVersion document doesn't need to wait for data to replicate.
-    var replSetConfig = rst.getReplSetConfig();
+    let replSetConfig = rst.getReplSetConfig();
     replSetConfig.members[1].priority = 0;
     replSetConfig.members[1].votes = 0;
 

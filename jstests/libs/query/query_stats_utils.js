@@ -206,7 +206,7 @@ export function getQueryStatsWithTransform(
         matchExpr["key.queryShape.cmdNs.coll"] = options.collName;
     }
     // Filter out agg queries, including $queryStats.
-    var pipeline;
+    let pipeline;
     if (options.transformIdentifiers) {
         pipeline = [
             {
@@ -252,7 +252,7 @@ export function getQueryStatsAggCmd(
         hmacKey: kDefaultQueryStatsHmacKey,
     },
 ) {
-    var pipeline;
+    let pipeline;
     let queryStatsStage = {$queryStats: {}};
     if (options.transformIdentifiers) {
         queryStatsStage = {

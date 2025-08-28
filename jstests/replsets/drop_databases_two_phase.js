@@ -21,8 +21,8 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 // 'listCollections' command arguments.
 function listCollections(database, args) {
     var args = args || {};
-    var failMsg = "'listCollections' command failed";
-    var res = assert.commandWorked(database.runCommand("listCollections", args), failMsg);
+    let failMsg = "'listCollections' command failed";
+    let res = assert.commandWorked(database.runCommand("listCollections", args), failMsg);
     return res.cursor.firstBatch;
 }
 
@@ -31,26 +31,26 @@ function listCollectionNames(database, args) {
     return listCollections(database, args).map((c) => c.name);
 }
 
-var dbNameToDrop = "dbToDrop";
-var replTest = new ReplSetTest({nodes: [{}, {}, {arbiter: true}]});
+let dbNameToDrop = "dbToDrop";
+let replTest = new ReplSetTest({nodes: [{}, {}, {arbiter: true}]});
 
 // Initiate the replica set.
 replTest.startSet();
 replTest.initiate();
 replTest.awaitReplication();
 
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
     primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
 );
 
-var dbToDrop = primary.getDB(dbNameToDrop);
-var collNameToDrop = "collectionToDrop";
+let dbToDrop = primary.getDB(dbNameToDrop);
+let collNameToDrop = "collectionToDrop";
 
 // Create the collection that will be dropped and let it replicate.
-var collToDrop = dbToDrop.getCollection(collNameToDrop);
+let collToDrop = dbToDrop.getCollection(collNameToDrop);
 assert.commandWorked(collToDrop.insert({_id: 0}, {writeConcern: {w: 2, wtimeout: replTest.timeoutMS}}));
 assert.eq(1, collToDrop.find().itcount());
 
@@ -72,9 +72,9 @@ assert.contains(
  */
 
 // Drop the collection on the primary.
-var dropDatabaseFn = function () {
-    var dbNameToDrop = "dbToDrop";
-    var primary = db.getMongo();
+let dropDatabaseFn = function () {
+    let dbNameToDrop = "dbToDrop";
+    let primary = db.getMongo();
     jsTestLog(
         "Dropping database " +
             dbNameToDrop +
@@ -82,11 +82,11 @@ var dropDatabaseFn = function () {
             primary.host +
             ". This command will block because the oplog fetcher is paused on the secondary.",
     );
-    var dbToDrop = db.getSiblingDB(dbNameToDrop);
+    let dbToDrop = db.getSiblingDB(dbNameToDrop);
     assert.commandWorked(dbToDrop.dropDatabase());
     jsTestLog("Database " + dbNameToDrop + " successfully dropped on primary node " + primary.host);
 };
-var dropDatabaseProcess = startParallelShell(dropDatabaseFn, primary.port);
+let dropDatabaseProcess = startParallelShell(dropDatabaseFn, primary.port);
 
 // Check that primary has started two phase drop of the collection.
 jsTestLog(
@@ -121,7 +121,7 @@ jsTestLog("Waiting for collection drop operation to replicate to all nodes.");
 replTest.awaitReplication();
 
 jsTestLog("Waiting for dropDatabase command on " + primary.host + " to complete.");
-var exitCode = dropDatabaseProcess();
+let exitCode = dropDatabaseProcess();
 
 let db = primary.getDB(dbNameToDrop);
 checkLog.contains(

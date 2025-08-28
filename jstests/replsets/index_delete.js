@@ -8,8 +8,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function indexBuildInProgress(checkDB) {
-    var inprog = checkDB.currentOp().inprog;
-    var indexOps = inprog.filter(function (op) {
+    let inprog = checkDB.currentOp().inprog;
+    let indexOps = inprog.filter(function (op) {
         if (op.msg && op.msg.includes("Index Build")) {
             if (op.progress && op.progress.done / op.progress.total > 0.2) {
                 printjson(op);
@@ -21,23 +21,23 @@ function indexBuildInProgress(checkDB) {
 }
 
 // Set up replica set.
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     nodes: [{}, {}, {arbiter: true}],
 });
-var nodes = replTest.nodeList();
+let nodes = replTest.nodeList();
 
 // We need an arbiter to ensure that the primary doesn't step down when we restart the secondary.
 replTest.startSet();
 replTest.initiate();
 
-var dbName = "foo";
-var collName = "coll";
-var primary = replTest.getPrimary();
-var second = replTest.getSecondary();
-var primaryDB = primary.getDB(dbName);
-var secondDB = second.getDB(dbName);
+let dbName = "foo";
+let collName = "coll";
+let primary = replTest.getPrimary();
+let second = replTest.getSecondary();
+let primaryDB = primary.getDB(dbName);
+let secondDB = second.getDB(dbName);
 
-var size = 100;
+let size = 100;
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
@@ -47,8 +47,8 @@ assert.commandWorked(
 // Make sure that the index build does not terminate on the secondary.
 assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
 
-var bulk = primaryDB[collName].initializeUnorderedBulkOp();
-for (var i = 0; i < size; ++i) {
+let bulk = primaryDB[collName].initializeUnorderedBulkOp();
+for (let i = 0; i < size; ++i) {
     bulk.insert({i: i, j: i, k: i});
 }
 assert.commandWorked(bulk.execute());

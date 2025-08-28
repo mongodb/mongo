@@ -4,7 +4,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.log_exponential_expressions;
+let coll = db.log_exponential_expressions;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 8, b: 2}));
 

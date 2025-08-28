@@ -15,7 +15,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 assert.eq(jsTest.options().enableTestCommands, true);
 
 // we expect this to work just fine given that enableTestCommands is true by default
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {rs0: {nodes: 2}},
     mongos: 1,
     config: 1,
@@ -30,7 +30,7 @@ var st = new ShardingTest({
 // hanging in the commit phase of the create database DDL.
 assert.commandWorked(st.s.adminCommand({enableSharding: "testDB"}));
 
-var wc = {writeConcern: {w: 2, wtimeout: 4000}};
+let wc = {writeConcern: {w: 2, wtimeout: 4000}};
 
 // delayMessagesFrom should cause a write error on this insert
 st.rs0.getPrimary().delayMessagesFrom(st.rs0.getSecondary(), 13000);

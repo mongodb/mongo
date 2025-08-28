@@ -24,7 +24,7 @@ function verifyResultIds(results, expectedIds) {
     results.sort(compare);
     expectedIds.sort();
 
-    for (var i = 0; i < results.length; i++) {
+    for (let i = 0; i < results.length; i++) {
         assert.eq(results._id, expectedIds._ids);
     }
 }

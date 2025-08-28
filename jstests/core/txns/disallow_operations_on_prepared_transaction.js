@@ -59,7 +59,7 @@ assert.commandFailedWithCode(
 );
 
 jsTestLog("Test that you can't run delete on a prepared transaction.");
-var res = assert.commandFailedWithCode(sessionColl.remove({_id: 4}), ErrorCodes.PreparedTransactionInProgress);
+let res = assert.commandFailedWithCode(sessionColl.remove({_id: 4}), ErrorCodes.PreparedTransactionInProgress);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 jsTestLog("Test that you can't run distinct on a prepared transaction.");

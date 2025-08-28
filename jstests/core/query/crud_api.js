@@ -12,9 +12,9 @@
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
-var crudAPISpecTests = function crudAPISpecTests() {
+let crudAPISpecTests = function crudAPISpecTests() {
     // Get the colllection
-    var coll = db.crud_tests;
+    let coll = db.crud_tests;
 
     // Setup
     function createTestExecutor(coll, method, verifyResult) {
@@ -22,7 +22,7 @@ var crudAPISpecTests = function crudAPISpecTests() {
             // Drop collection
             coll.drop();
             // Insert test data
-            var r = coll.insertMany(args.insert);
+            let r = coll.insertMany(args.insert);
             assert.eq(args.insert.length, r.insertedIds.length);
 
             // Execute the method with arguments
@@ -32,7 +32,7 @@ var crudAPISpecTests = function crudAPISpecTests() {
             // Get all the results
             assert.soonNoExcept(
                 function () {
-                    var results = coll.find({}).sort({_id: 1}).toArray();
+                    let results = coll.find({}).sort({_id: 1}).toArray();
                     assert.docEq(args.expected, results);
                     return true;
                 },
@@ -49,19 +49,19 @@ var crudAPISpecTests = function crudAPISpecTests() {
     }
 
     // Setup executors
-    var deleteManyExecutor = createTestExecutor(coll, "deleteMany", checkResultObject);
-    var deleteOneExecutor = createTestExecutor(coll, "deleteOne", checkResultObject);
-    var bulkWriteExecutor = createTestExecutor(coll, "bulkWrite", checkResultObject);
-    var findOneAndDeleteExecutor = createTestExecutor(coll, "findOneAndDelete", checkResultObject);
-    var findOneAndReplaceExecutor = createTestExecutor(coll, "findOneAndReplace", checkResultObject);
-    var findOneAndUpdateExecutor = createTestExecutor(coll, "findOneAndUpdate", checkResultObject);
-    var insertManyExecutor = createTestExecutor(coll, "insertMany", checkResultObject);
-    var insertOneExecutor = createTestExecutor(coll, "insertOne", checkResultObject);
-    var replaceOneExecutor = createTestExecutor(coll, "replaceOne", checkResultObject);
-    var updateManyExecutor = createTestExecutor(coll, "updateMany", checkResultObject);
-    var updateOneExecutor = createTestExecutor(coll, "updateOne", checkResultObject);
-    var countExecutor = createTestExecutor(coll, "count", assert.eq);
-    var distinctExecutor = createTestExecutor(coll, "distinct", (a, b) => assert(arrayEq(a, b)));
+    let deleteManyExecutor = createTestExecutor(coll, "deleteMany", checkResultObject);
+    let deleteOneExecutor = createTestExecutor(coll, "deleteOne", checkResultObject);
+    let bulkWriteExecutor = createTestExecutor(coll, "bulkWrite", checkResultObject);
+    let findOneAndDeleteExecutor = createTestExecutor(coll, "findOneAndDelete", checkResultObject);
+    let findOneAndReplaceExecutor = createTestExecutor(coll, "findOneAndReplace", checkResultObject);
+    let findOneAndUpdateExecutor = createTestExecutor(coll, "findOneAndUpdate", checkResultObject);
+    let insertManyExecutor = createTestExecutor(coll, "insertMany", checkResultObject);
+    let insertOneExecutor = createTestExecutor(coll, "insertOne", checkResultObject);
+    let replaceOneExecutor = createTestExecutor(coll, "replaceOne", checkResultObject);
+    let updateManyExecutor = createTestExecutor(coll, "updateMany", checkResultObject);
+    let updateOneExecutor = createTestExecutor(coll, "updateOne", checkResultObject);
+    let countExecutor = createTestExecutor(coll, "count", assert.eq);
+    let distinctExecutor = createTestExecutor(coll, "distinct", (a, b) => assert(arrayEq(a, b)));
 
     //
     // BulkWrite

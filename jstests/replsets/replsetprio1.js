@@ -2,10 +2,10 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: "testSet", nodes: 3});
-var nodenames = replTest.nodeList();
+let replTest = new ReplSetTest({name: "testSet", nodes: 3});
+let nodenames = replTest.nodeList();
 
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 replTest.initiate(
     {
         "_id": "testSet",
@@ -36,7 +36,7 @@ replTest.stop(2);
 replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY);
 
 // do some writes on 1
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 for (var i = 0; i < 1000; i++) {
     assert.commandWorked(primary.getDB("foo").bar.insert({i: i}, {writeConcern: {w: "majority"}}));
 }

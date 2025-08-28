@@ -2,7 +2,7 @@
 
 import {queryIDS} from "jstests/libs/fts.js";
 
-var coll = db.fts_index_version2;
+let coll = db.fts_index_version2;
 
 coll.drop();
 

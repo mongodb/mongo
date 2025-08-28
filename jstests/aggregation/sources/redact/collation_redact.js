@@ -4,9 +4,9 @@
 // ]
 
 // Test that the $redact stage respects the collation.
-var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
+let caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 
-var coll = db.collation_redact;
+let coll = db.collation_redact;
 coll.drop();
 assert.commandWorked(coll.insert({a: "a"}));
 

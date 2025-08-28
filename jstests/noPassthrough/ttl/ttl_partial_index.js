@@ -3,14 +3,14 @@
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 // Launch mongod with shorter TTL monitor sleep interval.
-var runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
-var coll = runner.getDB("test").ttl_partial_index;
+let runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
+let coll = runner.getDB("test").ttl_partial_index;
 coll.drop();
 
 // Create TTL partial index.
 assert.commandWorked(coll.createIndex({x: 1}, {expireAfterSeconds: 0, partialFilterExpression: {z: {$exists: true}}}));
 
-var now = new Date();
+let now = new Date();
 assert.commandWorked(coll.insert({x: now, z: 2}));
 assert.commandWorked(coll.insert({x: now}));
 

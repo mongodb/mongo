@@ -14,7 +14,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
  *     { pwd: <password>, roles: [<list of roles>] }
  * @tags: [requires_sharding]
  */
-var AUTH_INFO = {
+let AUTH_INFO = {
     admin: {
         root: {pwd: "root", roles: ["root"]},
         cluster: {pwd: "cluster", roles: ["clusterAdmin"]},
@@ -39,11 +39,11 @@ var AUTH_INFO = {
 };
 
 // Constants that lists the privileges of a given role.
-var READ_PERM = {query: 1, index_r: 1, killCursor: 1};
-var READ_WRITE_PERM = {insert: 1, update: 1, remove: 1, query: 1, index_r: 1, index_w: 1, killCursor: 1};
-var ADMIN_PERM = {index_r: 1, index_w: 1, profile_r: 1};
-var UADMIN_PERM = {user_r: 1, user_w: 1};
-var CLUSTER_PERM = {killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, killAnyCursor: 1, profile_r: 1};
+let READ_PERM = {query: 1, index_r: 1, killCursor: 1};
+let READ_WRITE_PERM = {insert: 1, update: 1, remove: 1, query: 1, index_r: 1, index_w: 1, killCursor: 1};
+let ADMIN_PERM = {index_r: 1, index_w: 1, profile_r: 1};
+let UADMIN_PERM = {user_r: 1, user_w: 1};
+let CLUSTER_PERM = {killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, killAnyCursor: 1, profile_r: 1};
 
 /**
  * Checks whether an error occurs after running an operation.
@@ -51,10 +51,10 @@ var CLUSTER_PERM = {killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, kil
  * @param shouldPass {Boolean} true means that the operation should succeed.
  * @param opFunc {function()} a function object which contains the operation to perform.
  */
-var checkErr = function (shouldPass, opFunc) {
-    var success = true;
+let checkErr = function (shouldPass, opFunc) {
+    let success = true;
 
-    var exception = null;
+    let exception = null;
     try {
         opFunc();
     } catch (x) {
@@ -86,19 +86,19 @@ var checkErr = function (shouldPass, opFunc) {
  *     currentOp, index_r, index_w, profile_r, profile_w, user_r, user_w, killCursor,
  *     fsync_unlock.
  */
-var testOps = function (db, allowedActions) {
+let testOps = function (db, allowedActions) {
     checkErr(allowedActions.hasOwnProperty("insert"), function () {
-        var res = db.user.insert({y: 1});
+        let res = db.user.insert({y: 1});
         if (res.hasWriteError()) throw Error("insert failed: " + tojson(res.getRawResponse()));
     });
 
     checkErr(allowedActions.hasOwnProperty("update"), function () {
-        var res = db.user.update({y: 1}, {z: 3});
+        let res = db.user.update({y: 1}, {z: 3});
         if (res.hasWriteError()) throw Error("update failed: " + tojson(res.getRawResponse()));
     });
 
     checkErr(allowedActions.hasOwnProperty("remove"), function () {
-        var res = db.user.remove({y: 1});
+        let res = db.user.remove({y: 1});
         if (res.hasWriteError()) throw Error("remove failed: " + tojson(res.getRawResponse()));
     });
 
@@ -107,8 +107,8 @@ var testOps = function (db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty("killOp"), function () {
-        var errorCodeUnauthorized = 13;
-        var res = db.killOp(1);
+        let errorCodeUnauthorized = 13;
+        let res = db.killOp(1);
 
         if (res.code == errorCodeUnauthorized) {
             throw Error("unauthorized killOp");
@@ -116,8 +116,8 @@ var testOps = function (db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty("currentOp"), function () {
-        var errorCodeUnauthorized = 13;
-        var res = db.currentOp();
+        let errorCodeUnauthorized = 13;
+        let res = db.currentOp();
 
         if (res.code == errorCodeUnauthorized) {
             throw Error("unauthorized currentOp");
@@ -125,8 +125,8 @@ var testOps = function (db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty("index_r"), function () {
-        var errorCodeUnauthorized = 13;
-        var res = db.runCommand({"listIndexes": "user"});
+        let errorCodeUnauthorized = 13;
+        let res = db.runCommand({"listIndexes": "user"});
 
         if (res.code == errorCodeUnauthorized) {
             throw Error("unauthorized listIndexes");
@@ -134,7 +134,7 @@ var testOps = function (db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty("index_w"), function () {
-        var res = db.user.createIndex({x: 1});
+        let res = db.user.createIndex({x: 1});
         if (res.code == 13) {
             // Unauthorized
             throw Error("unauthorized currentOp");
@@ -146,14 +146,14 @@ var testOps = function (db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty("profile_w"), function () {
-        var res = db.system.profile.insert({x: 1});
+        let res = db.system.profile.insert({x: 1});
         if (res.hasWriteError()) {
             throw Error("profile insert failed: " + tojson(res.getRawResponse()));
         }
     });
 
     checkErr(allowedActions.hasOwnProperty("user_r"), function () {
-        var result = db.runCommand({usersInfo: 1});
+        let result = db.runCommand({usersInfo: 1});
         if (!result.ok) {
             throw new Error(tojson(result));
         }
@@ -166,9 +166,9 @@ var testOps = function (db, allowedActions) {
 
     // Test for kill cursor
     const checkKillCursor = function (inTransaction) {
-        var newConn = new Mongo(db.getMongo().host);
-        var dbName = db.getName();
-        var db2 = newConn.getDB(dbName);
+        let newConn = new Mongo(db.getMongo().host);
+        let dbName = db.getName();
+        let db2 = newConn.getDB(dbName);
 
         if (db2.getName() == "admin") {
             assert.eq(1, db2.auth("aro", AUTH_INFO.admin.aro.pwd));
@@ -177,13 +177,13 @@ var testOps = function (db, allowedActions) {
         }
 
         // Create cursor from db2.
-        var cmdRes = db2.runCommand({
+        let cmdRes = db2.runCommand({
             find: db2.kill_cursor.getName(),
             batchSize: 2,
             ...(inTransaction ? {startTransaction: true, autocommit: false, txnNumber: NumberLong(0)} : {}),
         });
         assert.commandWorked(cmdRes);
-        var cursorId = cmdRes.cursor.id;
+        let cursorId = cmdRes.cursor.id;
         assert(
             !bsonBinaryEqual({cursorId: cursorId}, {cursorId: NumberLong(0)}),
             "find command didn't return a cursor: " + tojson(cmdRes),
@@ -224,12 +224,12 @@ var testOps = function (db, allowedActions) {
     };
     checkKillCursor(false);
 
-    var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    let isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
     // Note: fsyncUnlock is not supported in mongos.
     if (!isMongos) {
         checkErr(allowedActions.hasOwnProperty("fsync_unlock"), function () {
-            var res = db.fsyncUnlock();
-            var errorCodeUnauthorized = 13;
+            let res = db.fsyncUnlock();
+            let errorCodeUnauthorized = 13;
 
             if (res.code == errorCodeUnauthorized) {
                 throw Error("unauthorized fsyncUnlock");
@@ -248,15 +248,15 @@ var testOps = function (db, allowedActions) {
 //   test: {function(Mongo)} the test function to run which accepts a Mongo connection
 //                           object.
 // }
-var TESTS = [
+let TESTS = [
     {
         name: "Test multiple user login separate connection",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("ro", AUTH_INFO.test.ro.pwd));
 
-            var conn2 = new Mongo(conn.host);
-            var testDB2 = conn2.getDB("test");
+            let conn2 = new Mongo(conn.host);
+            let testDB2 = conn2.getDB("test");
             assert.eq(1, testDB2.auth("uadmin", AUTH_INFO.test.uadmin.pwd));
 
             testOps(testDB, READ_PERM);
@@ -266,7 +266,7 @@ var TESTS = [
     {
         name: "Test user with no role",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("none", AUTH_INFO.test.none.pwd));
 
             testOps(testDB, {});
@@ -275,7 +275,7 @@ var TESTS = [
     {
         name: "Test read only user",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("ro", AUTH_INFO.test.ro.pwd));
 
             testOps(testDB, READ_PERM);
@@ -284,7 +284,7 @@ var TESTS = [
     {
         name: "Test read/write user",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("rw", AUTH_INFO.test.rw.pwd));
 
             testOps(testDB, READ_WRITE_PERM);
@@ -293,10 +293,10 @@ var TESTS = [
     {
         name: "Test read + dbAdmin user",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("roadmin", AUTH_INFO.test.roadmin.pwd));
 
-            var combinedPerm = Object.extend({}, READ_PERM);
+            let combinedPerm = Object.extend({}, READ_PERM);
             combinedPerm = Object.extend(combinedPerm, ADMIN_PERM);
             testOps(testDB, combinedPerm);
         },
@@ -304,7 +304,7 @@ var TESTS = [
     {
         name: "Test dbAdmin user",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("admin", AUTH_INFO.test.admin.pwd));
 
             testOps(testDB, ADMIN_PERM);
@@ -313,7 +313,7 @@ var TESTS = [
     {
         name: "Test userAdmin user",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("uadmin", AUTH_INFO.test.uadmin.pwd));
 
             testOps(testDB, UADMIN_PERM);
@@ -322,7 +322,7 @@ var TESTS = [
     {
         name: "Test cluster user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("cluster", AUTH_INFO.admin.cluster.pwd));
 
             testOps(conn.getDB("test"), CLUSTER_PERM);
@@ -331,7 +331,7 @@ var TESTS = [
     {
         name: "Test admin user with no role",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("anone", AUTH_INFO.admin.anone.pwd));
 
             testOps(adminDB, {});
@@ -341,7 +341,7 @@ var TESTS = [
     {
         name: "Test read only admin user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("aro", AUTH_INFO.admin.aro.pwd));
 
             testOps(adminDB, READ_PERM);
@@ -351,7 +351,7 @@ var TESTS = [
     {
         name: "Test read/write admin user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("arw", AUTH_INFO.admin.arw.pwd));
 
             testOps(adminDB, READ_WRITE_PERM);
@@ -361,7 +361,7 @@ var TESTS = [
     {
         name: "Test dbAdmin admin user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("aadmin", AUTH_INFO.admin.aadmin.pwd));
 
             testOps(adminDB, ADMIN_PERM);
@@ -371,7 +371,7 @@ var TESTS = [
     {
         name: "Test userAdmin admin user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("auadmin", AUTH_INFO.admin.auadmin.pwd));
 
             testOps(adminDB, UADMIN_PERM);
@@ -381,7 +381,7 @@ var TESTS = [
     {
         name: "Test read only any db user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("any_ro", AUTH_INFO.admin.any_ro.pwd));
 
             testOps(adminDB, READ_PERM);
@@ -391,7 +391,7 @@ var TESTS = [
     {
         name: "Test read/write any db user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("any_rw", AUTH_INFO.admin.any_rw.pwd));
 
             testOps(adminDB, READ_WRITE_PERM);
@@ -401,7 +401,7 @@ var TESTS = [
     {
         name: "Test dbAdmin any db user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("any_admin", AUTH_INFO.admin.any_admin.pwd));
 
             testOps(adminDB, ADMIN_PERM);
@@ -411,7 +411,7 @@ var TESTS = [
     {
         name: "Test userAdmin any db user",
         test: function (conn) {
-            var adminDB = conn.getDB("admin");
+            let adminDB = conn.getDB("admin");
             assert.eq(1, adminDB.auth("any_uadmin", AUTH_INFO.admin.any_uadmin.pwd));
 
             testOps(adminDB, UADMIN_PERM);
@@ -422,13 +422,13 @@ var TESTS = [
     {
         name: "Test change role",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("rw", AUTH_INFO.test.rw.pwd));
 
-            var newConn = new Mongo(conn.host);
+            let newConn = new Mongo(conn.host);
             assert.eq(1, newConn.getDB("admin").auth("any_uadmin", AUTH_INFO.admin.any_uadmin.pwd));
             newConn.getDB("test").updateUser("rw", {roles: ["read"]});
-            var origSpec = newConn.getDB("test").getUser("rw");
+            let origSpec = newConn.getDB("test").getUser("rw");
 
             // role change should affect users already authenticated.
             testOps(testDB, READ_PERM);
@@ -439,8 +439,8 @@ var TESTS = [
             testOps(testDB, READ_PERM);
 
             // role change should also affect new connections.
-            var newConn3 = new Mongo(conn.host);
-            var testDB3 = newConn3.getDB("test");
+            let newConn3 = new Mongo(conn.host);
+            let testDB3 = newConn3.getDB("test");
             assert.eq(1, testDB3.auth("rw", AUTH_INFO.test.rw.pwd));
             testOps(testDB3, READ_PERM);
 
@@ -451,7 +451,7 @@ var TESTS = [
     {
         name: "Test override user",
         test: function (conn) {
-            var testDB = conn.getDB("test");
+            let testDB = conn.getDB("test");
             assert.eq(1, testDB.auth("rw", AUTH_INFO.test.rw.pwd));
             testDB.logout();
             assert.eq(1, testDB.auth("ro", AUTH_INFO.test.ro.pwd));
@@ -469,29 +469,29 @@ var TESTS = [
  *
  * @param conn {Mongo} a connection to a mongod or mongos to test.
  */
-var runTests = function (conn) {
-    var setup = function () {
-        var testDB = conn.getDB("test");
-        var adminDB = conn.getDB("admin");
+let runTests = function (conn) {
+    let setup = function () {
+        let testDB = conn.getDB("test");
+        let adminDB = conn.getDB("admin");
 
         adminDB.createUser({user: "root", pwd: AUTH_INFO.admin.root.pwd, roles: AUTH_INFO.admin.root.roles});
         adminDB.auth("root", AUTH_INFO.admin.root.pwd);
 
-        for (var x = 0; x < 10; x++) {
+        for (let x = 0; x < 10; x++) {
             testDB.kill_cursor.insert({x: x});
             adminDB.kill_cursor.insert({x: x});
         }
 
-        for (var dbName in AUTH_INFO) {
-            var dbObj = AUTH_INFO[dbName];
+        for (let dbName in AUTH_INFO) {
+            let dbObj = AUTH_INFO[dbName];
 
-            for (var userName in dbObj) {
+            for (let userName in dbObj) {
                 if (dbName == "admin" && userName == "root") {
                     // We already registered this user.
                     continue;
                 }
 
-                var info = dbObj[userName];
+                let info = dbObj[userName];
                 conn.getDB(dbName).createUser({user: userName, pwd: info.pwd, roles: info.roles});
             }
         }
@@ -499,20 +499,20 @@ var runTests = function (conn) {
         adminDB.runCommand({logout: 1});
     };
 
-    var teardown = function () {
-        var adminDB = conn.getDB("admin");
+    let teardown = function () {
+        let adminDB = conn.getDB("admin");
         adminDB.auth("root", AUTH_INFO.admin.root.pwd);
         conn.getDB("test").dropDatabase();
         adminDB.dropDatabase();
     };
 
-    var failures = [];
+    let failures = [];
     setup();
     TESTS.forEach(function (testFunc) {
         try {
             jsTest.log(testFunc.name);
 
-            var newConn = new Mongo(conn.host);
+            let newConn = new Mongo(conn.host);
             newConn.host = conn.host;
             testFunc.test(newConn);
         } catch (x) {
@@ -524,7 +524,7 @@ var runTests = function (conn) {
     teardown();
 
     if (failures.length > 0) {
-        var list = "";
+        let list = "";
         failures.forEach(function (test) {
             list += test + "\n";
         });
@@ -532,12 +532,12 @@ var runTests = function (conn) {
     }
 };
 
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTests(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 1, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 1, keyFile: "jstests/libs/key1"});
 runTests(st.s);
 st.stop();
 

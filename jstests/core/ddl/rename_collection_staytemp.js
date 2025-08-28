@@ -21,9 +21,9 @@ function ns(coll) {
 }
 
 function istemp(name) {
-    var result = db.runCommand("listCollections", {filter: {name: name}});
+    let result = db.runCommand("listCollections", {filter: {name: name}});
     assert(result.ok);
-    var collections = new DBCommandCursor(db, result).toArray();
+    let collections = new DBCommandCursor(db, result).toArray();
     assert.eq(1, collections.length);
     return collections[0].options.temp ? true : false;
 }

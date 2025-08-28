@@ -26,16 +26,16 @@ export function getShardsWithAndWithoutChunk(st, shard0, shard1) {
  * and has a TTL index on the lastUse field, if we expect it to.
  */
 export function validateSessionsCollection(conn, collectionExists, indexExists, timeout) {
-    var config = conn.getDB("config");
+    let config = conn.getDB("config");
 
-    var info = config.getCollectionInfos({name: "system.sessions"});
-    var size = collectionExists ? 1 : 0;
+    let info = config.getCollectionInfos({name: "system.sessions"});
+    let size = collectionExists ? 1 : 0;
     assert.eq(info.length, size);
 
-    var indexes = config.system.sessions.getIndexes();
-    var found = false;
-    for (var i = 0; i < indexes.length; i++) {
-        var entry = indexes[i];
+    let indexes = config.system.sessions.getIndexes();
+    let found = false;
+    for (let i = 0; i < indexes.length; i++) {
+        let entry = indexes[i];
         if (entry["name"] == "lsidTTLIndex") {
             found = true;
 

@@ -26,7 +26,7 @@ let predicate =
     /Slow query.*test.foo.*"appName":"MongoDB Shell".*"command":{"count":"foo","query":{"\$where":{"\$code":"function\(\)/;
 
 // Dump the log line by line to avoid log truncation
-for (var a of log.split("\n")) {
+for (let a of log.split("\n")) {
     print("LOG_FILE_ENTRY: " + a);
 }
 

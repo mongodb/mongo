@@ -4,10 +4,10 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 3, mongos: 2});
+let st = new ShardingTest({shards: 3, mongos: 2});
 
-var admin = st.s0.getDB("admin");
-var coll = st.s0.getCollection("foo.bar");
+let admin = st.s0.getDB("admin");
+let coll = st.s0.getCollection("foo.bar");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {skey: 1}}));
@@ -36,7 +36,7 @@ assert.neq(null, st.shard1.getCollection(coll.toString()).findOne({updated: true
 assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updated: true}));
 
 // _id update works, and goes to all shards even on the stale mongos
-var staleColl = st.s1.getCollection("foo.bar");
+let staleColl = st.s1.getCollection("foo.bar");
 assert.commandWorked(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {multi: false}));
 
 // Ensure _id update goes to at least one shard

@@ -17,11 +17,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Create the sharded cluster with only one shard
-var st = new ShardingTest({name: "st", shards: 1});
+let st = new ShardingTest({name: "st", shards: 1});
 
 // Create a single node replica set and add a database
 jsTest.log("Creating a single node replica set and adding data to it");
-var rs0 = new ReplSetTest({name: "rs0", nodes: 1});
+let rs0 = new ReplSetTest({name: "rs0", nodes: 1});
 rs0.startSet();
 rs0.initiate();
 assert.commandWorked(db(rs0).coll.insertOne({a: 1}));
@@ -56,7 +56,7 @@ try {
 
 // Create a single node replica set and add a database
 jsTest.log("Creating a single node replica set and adding data to it");
-var rs1 = new ReplSetTest({name: "rs1", nodes: 1});
+let rs1 = new ReplSetTest({name: "rs1", nodes: 1});
 rs1.startSet();
 rs1.initiate();
 assert.commandWorked(db(rs1).coll.insertOne({a: 1}));

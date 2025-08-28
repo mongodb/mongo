@@ -3,7 +3,7 @@
 //   requires_getmore,
 // ]
 
-var coll = db.jstests_sorta;
+let coll = db.jstests_sorta;
 coll.drop();
 
 const docs = [

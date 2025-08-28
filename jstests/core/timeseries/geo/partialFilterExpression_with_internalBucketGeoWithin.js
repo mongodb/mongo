@@ -86,7 +86,7 @@ assert.commandWorked(
     }),
 );
 
-var southWestUSPolygon = {
+let southWestUSPolygon = {
     type: "Polygon",
     coordinates: [
         [
@@ -104,7 +104,7 @@ var southWestUSPolygon = {
     ],
 };
 
-var texasPolygon = {
+let texasPolygon = {
     type: "Polygon",
     coordinates: [
         [
@@ -146,7 +146,7 @@ IndexBuildTest.assertIndexes(
     kRawOperationSpec,
 );
 
-var findAndExplain = assert.commandWorked(
+let findAndExplain = assert.commandWorked(
     getTimeseriesCollForRawOps(coll)
         .find({
             a: 1,

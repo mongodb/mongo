@@ -11,16 +11,16 @@
  */
 
 export const $config = (function () {
-    var states = {
+    let states = {
         insert: function insert(db, collName) {
-            var query, update, options;
-            var res = db[collName].update(
+            let query, update, options;
+            let res = db[collName].update(
                 // The counter ensures that the query will not match any existing document.
                 (query = {tid: this.tid, i: this.counter++}),
                 (update = {$inc: {n: 1}}),
                 (options = {multi: true, upsert: true}),
             );
-            var debugDoc = tojson({query: query, update: update, options: options, result: res});
+            let debugDoc = tojson({query: query, update: update, options: options, result: res});
             assert.eq(1, res.nUpserted, debugDoc);
             assert.eq(0, res.nMatched, debugDoc);
             assert.eq(0, res.nModified, debugDoc);
@@ -63,7 +63,7 @@ export const $config = (function () {
             // the value of n should be non-increasing. (This should be true
             // because docs with lower i are newer, so they have had fewer
             // opportunities to have n incremented.)
-            var prevN = Infinity;
+            let prevN = Infinity;
             db[collName]
                 .find({tid: this.tid})
                 .sort({i: 1})
@@ -74,7 +74,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {
+    let transitions = {
         insert: {update: 0.875, assertConsistency: 0.125},
         update: {insert: 0.875, assertConsistency: 0.125},
         assertConsistency: {insert: 0.5, update: 0.5},

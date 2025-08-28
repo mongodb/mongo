@@ -8,8 +8,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
  * Allows synchronization between background ops and the test operations
  */
 export var waitForLock = function (mongo, name) {
-    var ts = new ObjectId();
-    var lockColl = mongo.getCollection("config.testLocks");
+    let ts = new ObjectId();
+    let lockColl = mongo.getCollection("config.testLocks");
 
     lockColl.update({_id: name, state: 0}, {$set: {state: 0}}, true);
 
@@ -17,7 +17,7 @@ export var waitForLock = function (mongo, name) {
     // Wait until we can set the state to 1 with our id
     //
 
-    var startTime = new Date().getTime();
+    let startTime = new Date().getTime();
 
     assert.soon(
         function () {
@@ -40,7 +40,7 @@ export var waitForLock = function (mongo, name) {
     jsTest.log.info("Acquired lock", {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
 
     // Set the state back to 0
-    var unlock = function () {
+    let unlock = function () {
         jsTest.log.info("Releasing lock", {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
         lockColl.update({_id: name, ts: ts}, {$set: {state: 0}});
     };
@@ -80,15 +80,15 @@ export var getResult = function (mongo, name) {
 };
 
 export var startParallelOps = function (mongo, proc, args, context) {
-    var procName = proc.name + "-" + new ObjectId();
-    var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join("")).getTimestamp().getTime();
+    let procName = proc.name + "-" + new ObjectId();
+    let seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join("")).getTimestamp().getTime();
 
     // Make sure we aren't finished before we start
     setFinished(mongo, procName, false);
     setResult(mongo, procName, undefined, undefined);
 
     // TODO: Make this a context of its own
-    var procContext = {
+    let procContext = {
         procName: procName,
         seed: seed,
         waitForLock: waitForLock,
@@ -112,25 +112,25 @@ export var startParallelOps = function (mongo, proc, args, context) {
         },
     };
 
-    var bootstrapper = function (stored) {
-        var procContext = stored.procContext;
+    let bootstrapper = function (stored) {
+        let procContext = stored.procContext;
         eval("procContext = " + procContext);
         procContext.setup(procContext, stored);
 
-        var contexts = stored.contexts;
+        let contexts = stored.contexts;
         eval("contexts = " + contexts);
 
-        for (var i = 0; i < contexts.length; i++) {
+        for (let i = 0; i < contexts.length; i++) {
             if (typeof contexts[i] != "undefined") {
                 // Evaluate all contexts
                 contexts[i](procContext);
             }
         }
 
-        var operation = stored.operation;
+        let operation = stored.operation;
         eval("operation = " + operation);
 
-        var args = stored.args;
+        let args = stored.args;
         eval("args = " + args);
 
         let result = undefined;
@@ -145,9 +145,9 @@ export var startParallelOps = function (mongo, proc, args, context) {
         setResult(result, err);
     };
 
-    var contexts = [RandomFunctionContext, context];
+    let contexts = [RandomFunctionContext, context];
 
-    var testDataColl = mongo.getCollection("config.parallelTest");
+    let testDataColl = mongo.getCollection("config.parallelTest");
 
     assert.commandWorked(
         testDataColl.insert({
@@ -160,7 +160,7 @@ export var startParallelOps = function (mongo, proc, args, context) {
         }),
     );
 
-    var bootstrapStartup =
+    let bootstrapStartup =
         "{ var procName = '" +
         procName +
         "'; " +
@@ -183,11 +183,11 @@ export var startParallelOps = function (mongo, proc, args, context) {
 
     jsTest.log("Starting " + proc.name + " operations...");
 
-    var rawJoin = startParallelShell(bootstrapStartup);
+    let rawJoin = startParallelShell(bootstrapStartup);
 
     globalThis.db = oldDB;
 
-    var join = function (options = {}) {
+    let join = function (options = {}) {
         const {checkExitSuccess = true} = options;
         delete options.checkExitSuccess;
         setFinished(mongo, procName, true);
@@ -227,11 +227,11 @@ export var RandomFunctionContext = function (context) {
     };
 
     Random.randShardKey = function () {
-        var numFields = 2; // Random.randInt(1, 3)
+        let numFields = 2; // Random.randInt(1, 3)
 
-        var key = {};
-        for (var i = 0; i < numFields; i++) {
-            var field = String.fromCharCode("a".charCodeAt() + i);
+        let key = {};
+        for (let i = 0; i < numFields; i++) {
+            let field = String.fromCharCode("a".charCodeAt() + i);
             key[field] = 1;
         }
 
@@ -239,7 +239,7 @@ export var RandomFunctionContext = function (context) {
     };
 
     Random.randShardKeyValue = function (shardKey) {
-        var keyValue = {};
+        let keyValue = {};
         for (let field in shardKey) {
             keyValue[field] = Random.randInt(1, 100);
         }
@@ -248,9 +248,9 @@ export var RandomFunctionContext = function (context) {
     };
 
     Random.randCluster = function () {
-        var numShards = 2; // Random.randInt( 1, 10 )
+        let numShards = 2; // Random.randInt( 1, 10 )
         const rs = false; // Random.randBool()
-        var st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});
+        let st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});
 
         return st;
     };
@@ -263,14 +263,14 @@ export var RandomFunctionContext = function (context) {
 export function moveOps(collName, options) {
     options = options || {};
 
-    var admin = db.getMongo().getDB("admin");
-    var config = db.getMongo().getDB("config");
-    var shards = config.shards.find().toArray();
-    var shardKey = config.collections.findOne({_id: collName}).key;
+    let admin = db.getMongo().getDB("admin");
+    let config = db.getMongo().getDB("config");
+    let shards = config.shards.find().toArray();
+    let shardKey = config.collections.findOne({_id: collName}).key;
 
     while (!isFinished()) {
-        var findKey = Random.randShardKeyValue(shardKey);
-        var toShard = shards[Random.randInt(shards.length)]._id;
+        let findKey = Random.randShardKeyValue(shardKey);
+        let toShard = shards[Random.randInt(shards.length)]._id;
 
         try {
             jsTest.log.info({res: admin.runCommand({moveChunk: collName, find: findKey, to: toShard})});
@@ -287,13 +287,13 @@ export function moveOps(collName, options) {
 export function splitOps(collName, options) {
     options = options || {};
 
-    var admin = db.getMongo().getDB("admin");
-    var config = db.getMongo().getDB("config");
-    var shards = config.shards.find().toArray();
-    var shardKey = config.collections.findOne({_id: collName}).key;
+    let admin = db.getMongo().getDB("admin");
+    let config = db.getMongo().getDB("config");
+    let shards = config.shards.find().toArray();
+    let shardKey = config.collections.findOne({_id: collName}).key;
 
     while (!isFinished()) {
-        var middleKey = Random.randShardKeyValue(shardKey);
+        let middleKey = Random.randShardKeyValue(shardKey);
 
         try {
             jsTest.log.info({res: admin.runCommand({split: collName, middle: middleKey})});

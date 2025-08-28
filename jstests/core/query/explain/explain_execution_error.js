@@ -13,10 +13,10 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var t = db.explain_execution_error;
+let t = db.explain_execution_error;
 t.drop();
 
-var result;
+let result;
 
 /**
  * Asserts that explain reports an error in its execution stats section.
@@ -68,14 +68,14 @@ function assertExecSuccess(explain) {
 }
 
 // Make a string that exceeds 1 MB.
-var bigStr = "x";
+let bigStr = "x";
 while (bigStr.length < 1024 * 1024) {
     bigStr += bigStr;
 }
 
 // Make a collection that is about 120 MB * number of shards.
 const numShards = FixtureHelpers.numberOfShardsForCollection(t);
-for (var i = 0; i < 120 * numShards; i++) {
+for (let i = 0; i < 120 * numShards; i++) {
     assert.commandWorked(t.insert({a: bigStr, b: 1, c: i}));
 }
 

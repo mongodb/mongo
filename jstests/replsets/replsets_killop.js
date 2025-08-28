@@ -22,7 +22,7 @@ assert.soon(function () {
 // Start a parallel shell to insert new documents on the primary.
 let inserter = startParallelShell(
     funWithArgs(function (numDocs) {
-        var bulk = db.test.initializeUnorderedBulkOp();
+        let bulk = db.test.initializeUnorderedBulkOp();
         for (let i = 1; i < numDocs; ++i) {
             bulk.insert({a: i});
         }

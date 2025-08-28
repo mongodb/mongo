@@ -14,7 +14,7 @@ export const ThreadManager = function (clusterOptions) {
         // Wrap the execution of 'threadFn' in a try/finally block
         // to ensure that the database connection implicitly created
         // within the thread's scope is closed.
-        var guardedThreadFn = function (threadFn, workloads, args, options) {
+        let guardedThreadFn = function (threadFn, workloads, args, options) {
             try {
                 return threadFn(workloads, args, options);
             } finally {
@@ -28,14 +28,14 @@ export const ThreadManager = function (clusterOptions) {
         return new Thread(guardedThreadFn, workerThread.fsm, workloads, args, options);
     }
 
-    var latch;
-    var errorLatch;
-    var numThreads;
+    let latch;
+    let errorLatch;
+    let numThreads;
 
-    var initialized = false;
-    var threads = [];
+    let initialized = false;
+    let threads = [];
 
-    var _workloads, _context;
+    let _workloads, _context;
 
     this.init = function init(workloads, context, maxAllowedThreads) {
         assert.eq("number", typeof maxAllowedThreads, "the maximum allowed threads must be a number");
@@ -54,16 +54,16 @@ export const ThreadManager = function (clusterOptions) {
             );
         }
 
-        var requestedNumThreads = computeNumThreads();
-        var perLoadThreads = {};
-        var factor = 1;
+        let requestedNumThreads = computeNumThreads();
+        let perLoadThreads = {};
+        let factor = 1;
         if (requestedNumThreads > maxAllowedThreads) {
             // Scale down the requested '$config.threadCount' values to make
             // them sum to less than 'maxAllowedThreads'
             factor = maxAllowedThreads / requestedNumThreads;
             workloads.forEach(function (workload) {
-                var config = context[workload].config;
-                var threadCount = config.threadCount;
+                let config = context[workload].config;
+                let threadCount = config.threadCount;
                 threadCount = Math.floor(factor * threadCount);
                 threadCount = Math.max(1, threadCount); // ensure workload is executed
                 config.threadCount = threadCount;
@@ -85,7 +85,7 @@ export const ThreadManager = function (clusterOptions) {
         latch = new CountDownLatch(numThreads);
         errorLatch = new CountDownLatch(numThreads);
 
-        var plural = numThreads === 1 ? "" : "s";
+        let plural = numThreads === 1 ? "" : "s";
         print("Using " + numThreads + " thread" + plural + " (requested " + requestedNumThreads + ")");
 
         _workloads = workloads;
@@ -99,15 +99,15 @@ export const ThreadManager = function (clusterOptions) {
             throw new Error("thread manager has not been initialized yet");
         }
 
-        var workloadData = {};
-        var tid = 0;
+        let workloadData = {};
+        let tid = 0;
         _workloads.forEach(function (workload) {
-            var config = _context[workload].config;
+            let config = _context[workload].config;
             workloadData[workload] = config.data;
-            var workloads = [workload]; // worker thread only needs to load 'workload'
+            let workloads = [workload]; // worker thread only needs to load 'workload'
 
-            for (var i = 0; i < config.threadCount; ++i) {
-                var args = {
+            for (let i = 0; i < config.threadCount; ++i) {
+                let args = {
                     tid: tid++,
                     tenantId: options.tenantId,
                     data: workloadData,
@@ -125,7 +125,7 @@ export const ThreadManager = function (clusterOptions) {
                     numThreads: numThreads,
                 };
 
-                var t = makeThread(workloads, args, options);
+                let t = makeThread(workloads, args, options);
                 threads.push(t);
                 t.start();
             }
@@ -137,7 +137,7 @@ export const ThreadManager = function (clusterOptions) {
             throw new Error("thread manager has not been initialized yet");
         }
 
-        var failedThreadIndexes = [];
+        let failedThreadIndexes = [];
         function handleFailedThread(thread, index) {
             if (thread.hasFailed() && !Array.contains(failedThreadIndexes, index)) {
                 failedThreadIndexes.push(index);
@@ -150,7 +150,7 @@ export const ThreadManager = function (clusterOptions) {
             sleep(100);
         }
 
-        var failedThreads = failedThreadIndexes.length;
+        let failedThreads = failedThreadIndexes.length;
         if (failedThreads > 0) {
             print(failedThreads + " thread(s) threw a JS or C++ exception while spawning");
         }
@@ -175,12 +175,12 @@ export const ThreadManager = function (clusterOptions) {
             throw new Error("thread manager has not been initialized yet");
         }
 
-        var errors = [];
+        let errors = [];
 
         threads.forEach(function (t) {
             t.join();
 
-            var data = t.returnData();
+            let data = t.returnData();
             if (data && !data.ok) {
                 errors.push(data);
             }
@@ -203,7 +203,7 @@ workerThread.fsm = async function (workloads, args, options) {
     const {fsm} = await import("jstests/concurrency/fsm_libs/fsm.js");
 
     return workerThread.main(workloads, args, async function (configs) {
-        var workloads = Object.keys(configs);
+        let workloads = Object.keys(configs);
         assert.eq(1, workloads.length);
         await fsm.run(configs[workloads[0]]);
     });

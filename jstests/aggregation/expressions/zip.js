@@ -2,12 +2,12 @@
 // cases of the expression.
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.zip;
+let coll = db.zip;
 coll.drop();
 
 coll.insert({"long": [1, 2, 3], "short": ["x", "y"]});
 
-var zipObj = 3;
+let zipObj = 3;
 assertErrorCode(coll, [{$project: {zipped: {$zip: zipObj}}}], 34460, "$zip requires an object" + " as an argument.");
 
 zipObj = {
@@ -74,8 +74,8 @@ zipObj = {
         ["A", "B", "C"],
     ],
 };
-var res = coll.aggregate([{$project: {zipped: {$zip: zipObj}}}]);
-var output = res.toArray();
+let res = coll.aggregate([{$project: {zipped: {$zip: zipObj}}}]);
+let output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].zipped, [
     [1, "A"],

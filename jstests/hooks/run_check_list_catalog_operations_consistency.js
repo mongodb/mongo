@@ -1,6 +1,6 @@
 import {assertCatalogListOperationsConsistencyForDb} from "jstests/libs/catalog_list_operations_consistency_validator.js";
 
-var startTime = Date.now();
+let startTime = Date.now();
 assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a mongod?");
 
 const multitenancyRes = db.adminCommand({getParameter: 1, multitenancySupport: 1});
@@ -19,5 +19,5 @@ for (const dbRes of dbs) {
     }
 }
 
-var totalTime = Date.now() - startTime;
+let totalTime = Date.now() - startTime;
 print("Finished catalog operations consistency check in " + totalTime + " ms.");

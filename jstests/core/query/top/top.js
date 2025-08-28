@@ -27,8 +27,8 @@ const dbName = jsTestName();
 const collName = dbName + "_coll_temp";
 const afterTestCollName = dbName + "_coll";
 
-var testDB = db.getSiblingDB(dbName);
-var testColl = testDB[collName];
+let testDB = db.getSiblingDB(dbName);
+let testColl = testDB[collName];
 testColl.drop();
 
 // Perform an operation on the collection so that it is present in the "top" command's output.
@@ -41,12 +41,12 @@ if (TestData.testingReplicaSetEndpoint) {
 }
 
 //  This variable is used to get differential output
-var lastTop = getTop(testColl);
+let lastTop = getTop(testColl);
 if (lastTop === undefined) {
     quit();
 }
 
-var numRecords = 100;
+let numRecords = 100;
 
 //  Insert
 for (var i = 0; i < numRecords; i++) {
@@ -62,7 +62,7 @@ for (i = 0; i < numRecords; i++) {
 lastTop = assertTopDiffEq(testDB, testColl, lastTop, "update", numRecords);
 
 // Queries
-var query = {};
+let query = {};
 for (i = 0; i < numRecords; i++) {
     query[i] = testColl.find({x: {$gte: i}}).batchSize(2);
     assert.eq(query[i].next()._id, i);
@@ -91,7 +91,7 @@ for (i = 0; i < numRecords; i++) {
 lastTop = assertTopDiffEq(testDB, testColl, lastTop, "update", numRecords);
 
 // Commands
-var res;
+let res;
 
 // "count" command
 lastTop = getTop(testColl); // ignore any commands before this

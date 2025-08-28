@@ -1,7 +1,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var s = new ShardingTest({shards: 2});
+let s = new ShardingTest({shards: 2});
 
 // Make sure that findAndModify with upsert against a non-existent database and collection will
 // implicitly create them both
@@ -12,7 +12,7 @@ assert.eq(
     }),
 );
 
-var newlyCreatedDb = s.getDB("NewUnshardedDB");
+let newlyCreatedDb = s.getDB("NewUnshardedDB");
 assert.eq(0, newlyCreatedDb.unsharded_coll.find({}).itcount());
 newlyCreatedDb.unsharded_coll.findAndModify({query: {_id: 1}, update: {$set: {Value: "Value"}}, upsert: true});
 assert.eq(1, newlyCreatedDb.unsharded_coll.find({}).itcount());
@@ -23,7 +23,7 @@ assert.commandWorked(s.s0.adminCommand({shardcollection: "test.sharded_coll", ke
 
 var db = s.getDB("test");
 
-var numObjs = 20;
+let numObjs = 20;
 
 // Pre-split the collection
 assert.commandWorked(s.s0.adminCommand({split: "test.sharded_coll", middle: {_id: numObjs / 2}}));
@@ -31,7 +31,7 @@ assert.commandWorked(
     s.s0.adminCommand({movechunk: "test.sharded_coll", find: {_id: numObjs / 2}, to: s.shard0.shardName}),
 );
 
-var bulk = db.sharded_coll.initializeUnorderedBulkOp();
+let bulk = db.sharded_coll.initializeUnorderedBulkOp();
 for (var i = 0; i < numObjs; i++) {
     bulk.insert({_id: i});
 }

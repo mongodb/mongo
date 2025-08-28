@@ -16,10 +16,10 @@ import {
     verifyServerStatusElectionReasonCounterChange,
 } from "jstests/replsets/libs/election_metrics.js";
 
-var name = "catchup_takeover_two_nodes_ahead";
-var replSet = new ReplSetTest({name: name, nodes: 5});
-var nodes = replSet.startSet();
-var config = replSet.getReplSetConfig();
+let name = "catchup_takeover_two_nodes_ahead";
+let replSet = new ReplSetTest({name: name, nodes: 5});
+let nodes = replSet.startSet();
+let config = replSet.getReplSetConfig();
 // Prevent nodes from syncing from other secondaries.
 config.settings = {
     chainingAllowed: false,
@@ -30,7 +30,7 @@ replSet.awaitReplication();
 // Write something so that nodes 0 and 1 are ahead.
 stopServerReplication(nodes.slice(2, 5));
 const primary = replSet.getPrimary();
-var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.timeoutMS}};
+let writeConcern = {writeConcern: {w: 2, wtimeout: replSet.timeoutMS}};
 assert.commandWorked(primary.getDB(name).bar.insert({x: 100}, writeConcern));
 
 // Write something so that node 0 is ahead of node 1.

@@ -1,6 +1,6 @@
 // Find the decimal using query operators
 
-var col = db.decimal_find_query;
+let col = db.decimal_find_query;
 col.drop();
 
 // Insert some sample data.

@@ -14,6 +14,6 @@ assert.eq("eliot", b.findOne().link.fetch().name, "A");
 assert.neq("el", b.findOne().link.fetch().name, "B");
 
 // $elemMatch value
-var doc = c.findOne({links: {$elemMatch: {$ref: "dbref2a", $id: a.findOne()._id}}});
+let doc = c.findOne({links: {$elemMatch: {$ref: "dbref2a", $id: a.findOne()._id}}});
 assert.eq("eliot", doc.links[0].fetch().name, "C");
 assert.neq("el", doc.links[0].fetch().name, "D");

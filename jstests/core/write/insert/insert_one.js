@@ -2,7 +2,7 @@
  * This test ensures that insertOne only accepts objects and that it doesn't insert any of the
  * object's prototype's methods.
  */
-var col = db.insert_one_number;
+let col = db.insert_one_number;
 col.drop();
 
 assert.eq(col.find().itcount(), 0, "collection should be empty");
@@ -17,7 +17,7 @@ assert.throws(
 
 assert.eq(col.find().itcount(), 0, "collection should still be empty");
 
-var result = col.insertOne({abc: "def"});
+let result = col.insertOne({abc: "def"});
 assert(result.acknowledged, "insertOne should succeed on documents");
 
 assert.docEq(
@@ -26,7 +26,7 @@ assert.docEq(
     "simple document not equal to collection find result",
 );
 
-var doc = new Number();
+let doc = new Number();
 doc.x = 12;
 assert("zeroPad" in doc, "number object should have 'zeroPad' in prototype");
 

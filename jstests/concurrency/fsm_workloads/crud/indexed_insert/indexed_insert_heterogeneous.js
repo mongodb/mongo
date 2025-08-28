@@ -23,12 +23,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         }
 
         function makeOID(tid) {
-            var str = pad(24, tid.toString(16));
+            let str = pad(24, tid.toString(16));
             return new ObjectId(str);
         }
 
         function makeDate(tid) {
-            var d = new ISODate("2000-01-01T00:00:00.000Z");
+            let d = new ISODate("2000-01-01T00:00:00.000Z");
             // setSeconds(n) where n >= 60 will just cause the minutes,
             // hours, etc to increase,
             // so this produces a unique date for each tid
@@ -36,7 +36,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             return d;
         }
 
-        var choices = [
+        let choices = [
             this.tid, // int
             this.tid.toString(), // string
             this.tid * 0.0001, // float

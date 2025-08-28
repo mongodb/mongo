@@ -11,10 +11,10 @@
 // Tests the behavior of single writes using write commands
 //
 
-var coll = db.write_result;
+let coll = db.write_result;
 coll.drop();
 
-var result = null;
+let result = null;
 
 //
 // Basic insert
@@ -120,7 +120,7 @@ assert.eq(coll.count(), 1);
 // Multi-update with error
 coll.remove({});
 var id = new ObjectId();
-for (var i = 0; i < 10; ++i) coll.insert({value: NumberInt(i)});
+for (let i = 0; i < 10; ++i) coll.insert({value: NumberInt(i)});
 coll.insert({value: "not a number"});
 // $bit operator fails when the field is not integer
 // Note that multi-updates do not currently report partial stats if they fail
@@ -174,8 +174,8 @@ coll.unsetWriteConcern();
 // Write concern error
 // NOTE: In a replica set write concern is checked after write
 coll.remove({});
-var wRes = assert.writeError(coll.insert({foo: "bar"}, {writeConcern: {w: "invalid"}}));
-var res = assert.commandWorked(db.hello());
-var replSet = res.hasOwnProperty("$clusterTime");
+let wRes = assert.writeError(coll.insert({foo: "bar"}, {writeConcern: {w: "invalid"}}));
+let res = assert.commandWorked(db.hello());
+let replSet = res.hasOwnProperty("$clusterTime");
 if (!replSet) assert.eq(coll.count(), 0, "not replset");
 else assert.eq(coll.count(), 1, "replset");

@@ -5,7 +5,7 @@
 
 let testname = "temp_namespace_sw";
 
-var conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 let d = conn.getDB("test");
 assert.commandWorked(
     d.runCommand({

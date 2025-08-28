@@ -27,7 +27,7 @@ function getRandomTimeseriesView(db) {
 export const $config = (function () {
     const setup = function (db, collName, cluster) {
         // Enable sharding for the test databases.
-        for (var i = 0; i < dbCount; i++) {
+        for (let i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
             db.adminCommand({enablesharding: dbName});
         }

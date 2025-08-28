@@ -15,10 +15,10 @@ function responseContainsTimestampOperationTime(res) {
 
 // A mongos that talks to a non-sharded collection on a sharded replica set returns an
 // operationTime that is a Timestamp.
-var st = new ShardingTest({name: "operation_time_api", shards: {rs0: {nodes: 1}}});
+let st = new ShardingTest({name: "operation_time_api", shards: {rs0: {nodes: 1}}});
 
-var testDB = st.s.getDB("test");
-var res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}]}));
+let testDB = st.s.getDB("test");
+let res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}]}));
 assert(
     responseContainsTimestampOperationTime(res),
     "Expected response from a mongos talking to a non-sharded collection on a sharded " +
@@ -57,7 +57,7 @@ if (jsTestOptions().useAutoBootstrapProcedure) {
 }
 
 // A mongod from a non-sharded replica set returns an operationTime that is a Timestamp.
-var replTest = new ReplSetTest({name: "operation_time_api_non_sharded_replset", nodes: 1});
+let replTest = new ReplSetTest({name: "operation_time_api_non_sharded_replset", nodes: 1});
 replTest.startSet();
 replTest.initiate();
 
@@ -71,7 +71,7 @@ assert(
 replTest.stopSet();
 
 // A standalone mongod does not return an operationTime.
-var standalone = MongoRunner.runMongod();
+let standalone = MongoRunner.runMongod();
 
 testDB = standalone.getDB("test");
 res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 5}]}));

@@ -5,7 +5,7 @@
 
 import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
-var t = db.getSiblingDB("test").getCollection("fts_projection");
+let t = db.getSiblingDB("test").getCollection("fts_projection");
 t.drop();
 
 assert.commandWorked(t.insert({_id: 0, a: "textual content"}));
@@ -14,7 +14,7 @@ assert.commandWorked(t.insert({_id: 2, a: "irrelevant content"}));
 assert.commandWorked(t.createIndex({a: "text"}));
 
 // Project the text score.
-var results = t
+let results = t
     .find(
         {$text: {$search: "textual content -irrelevant"}},
         {
@@ -29,7 +29,7 @@ assert(results[0].score);
 assert(results[1].score);
 
 // indexed by _id.
-var scores = [0, 0, 0];
+let scores = [0, 0, 0];
 scores[results[0]._id] = results[0].score;
 scores[results[1]._id] = results[1].score;
 
@@ -106,7 +106,7 @@ for (var i = 0; i < results.length; ++i) {
 // When $text operator is in $or, all non-$text children must be indexed. Otherwise, we should
 // produce
 // a readable error.
-var errorMessage = "";
+let errorMessage = "";
 assert.throws(
     function () {
         try {

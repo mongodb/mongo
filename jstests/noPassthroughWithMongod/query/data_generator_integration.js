@@ -30,7 +30,7 @@ try {
     // size: 2 to force various comparison functions to be used internally in the data_generator.
     tg.execute({spec: collName, size: 2});
 
-    var dbMetadata;
+    let dbMetadata;
     // Remove the 'export const' in the schema file so that we can eval() it
     const file = cat(tg.out + "/" + collName + ".schema").replace(/export const/, "");
     eval(file);

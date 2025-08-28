@@ -21,7 +21,7 @@ const primary = rst.getPrimary();
 const syncSource = rst.getSecondaries()[0];
 let initSyncNode = rst.getSecondaries()[1];
 
-var verbosityCmd = {
+let verbosityCmd = {
     "setParameter": 1,
     "logComponentVerbosity": {
         "replication": {"verbosity": 3},

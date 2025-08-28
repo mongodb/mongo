@@ -126,7 +126,7 @@ ReplSetTest.prototype.upgradeNode = function (node, opts = {}, user, pwd) {
     }
     jsTest.authenticate(node);
 
-    var isMaster = node.getDB("admin").runCommand({isMaster: 1});
+    let isMaster = node.getDB("admin").runCommand({isMaster: 1});
 
     if (!isMaster.arbiterOnly) {
         // Must retry this command, as it might return "currently running for election" and fail.
@@ -139,12 +139,12 @@ ReplSetTest.prototype.upgradeNode = function (node, opts = {}, user, pwd) {
         this.waitForState(node, ReplSetTest.State.RECOVERING);
     }
 
-    var newNode = this.restart(node, opts);
+    let newNode = this.restart(node, opts);
     if (user !== undefined) {
         newNode.getDB("admin").auth(user, pwd);
     }
 
-    var waitForStates = [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY, ReplSetTest.State.ARBITER];
+    let waitForStates = [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY, ReplSetTest.State.ARBITER];
     this.waitForState(newNode, waitForStates);
 
     if (user !== undefined) {
@@ -157,7 +157,7 @@ ReplSetTest.prototype.upgradeNode = function (node, opts = {}, user, pwd) {
 ReplSetTest.prototype.stepdown = function (nodeId) {
     nodeId = this.getNodeId(nodeId);
     assert.eq(this.getNodeId(this.getPrimary()), nodeId, "Trying to stepdown a non primary node");
-    var node = this.nodes[nodeId];
+    let node = this.nodes[nodeId];
 
     assert.soonNoExcept(function () {
         // Due to a rare race condition in stepdown, it's possible the secondary just replicated
@@ -178,7 +178,7 @@ ReplSetTest.prototype.stepdown = function (nodeId) {
 };
 
 ReplSetTest.prototype.reconnect = function (node) {
-    var nodeId = this.getNodeId(node);
+    let nodeId = this.getNodeId(node);
     this.nodes[nodeId] = new Mongo(node.host);
     // Skip the 'authenticated' property because the new connection hasn't been authenticated even
     // if the original one was. This ensures Mongo.prototype.getDB() will attempt to authenticate
@@ -188,7 +188,7 @@ ReplSetTest.prototype.reconnect = function (node) {
     // connection object. Copying the '_defaultSession' property would cause commands to go through
     // the original connection despite methods being called on DB objects from the new connection.
     const except = new Set(["authenticated", "_defaultSession"]);
-    for (var i in node) {
+    for (let i in node) {
         if (typeof node[i] == "function" || except.has(i)) continue;
         this.nodes[nodeId][i] = node[i];
     }
@@ -197,9 +197,9 @@ ReplSetTest.prototype.reconnect = function (node) {
 };
 
 ReplSetTest.prototype.conf = function () {
-    var admin = this.getPrimary().getDB("admin");
+    let admin = this.getPrimary().getDB("admin");
 
-    var resp = admin.runCommand({replSetGetConfig: 1});
+    let resp = admin.runCommand({replSetGetConfig: 1});
 
     if (resp.ok && !resp.errmsg && resp.config) return resp.config;
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))

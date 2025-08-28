@@ -96,8 +96,8 @@ function freeze(connection) {
 function getConfigServer(connection) {
     const adminDB = getAdminDB(connection);
     const res = assert.commandWorked(adminDB.runCommand({serverStatus: 1})).sharding.configsvrConnectionString;
-    var rx = /.*\/(.*)/g;
-    var arr = rx.exec(res);
+    let rx = /.*\/(.*)/g;
+    let arr = rx.exec(res);
     jsTestLog(`Config server: ${arr[1]} extracted from ${tojson(res)}`);
     return newMongoWithRetry(arr[1]);
 }
@@ -152,7 +152,7 @@ import {Topology, DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
-var cmdLineOpts = db.adminCommand("getCmdLineOpts");
+let cmdLineOpts = db.adminCommand("getCmdLineOpts");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 jsTestLog(`Run Hello fail injection in ${JSON.stringify(topology)},
                Invoked with ${JSON.stringify(cmdLineOpts)},

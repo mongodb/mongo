@@ -57,7 +57,7 @@ export var MetadataConsistencyChecker = (function () {
                 jsTest.log.info("Skipping index consistency check across the cluster");
             }
 
-            var inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
+            let inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
 
             // TODO SERVER-107821: do not ignore CorruptedChunkHistory in multiversion suites
             const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);

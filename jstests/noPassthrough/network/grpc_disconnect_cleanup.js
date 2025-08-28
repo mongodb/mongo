@@ -22,7 +22,7 @@ function setupShardedCollection(st, dbName, collName) {
 
     // Insert some docs on each shard
     let coll = admin.getSiblingDB(dbName).getCollection(collName);
-    var bulk = coll.initializeUnorderedBulkOp();
+    let bulk = coll.initializeUnorderedBulkOp();
     for (let i = -150; i < 150; i++) {
         bulk.insert({_id: i});
     }

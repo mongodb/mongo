@@ -50,7 +50,7 @@ let st = new ShardingTest({shards: {rs0: {nodes: 2}}, other: {keyFile: keyFile}}
 
 jsTestLog("Started ShardingTest");
 
-var adminDB = st.s.getDB("admin");
+let adminDB = st.s.getDB("admin");
 adminDB.createUser({user: adminUser.username, pwd: adminUser.password, roles: ["__system"]});
 
 adminDB.auth(adminUser.username, adminUser.password);
@@ -88,7 +88,7 @@ for (let i = 0; i < st.configRS.nodes.length; i++) {
     );
 }
 
-var priCSConn = st.configRS.getPrimary();
+let priCSConn = st.configRS.getPrimary();
 authutil.asCluster(priCSConn, keyFile, function () {
     priCSConn.getDB("admin").system.keys.remove({purpose: "HMAC"});
 });

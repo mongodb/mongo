@@ -7,12 +7,12 @@
 //   uses_parallel_shell,
 // ]
 
-var coll = db.getCollection("jstests_geo_update_btree");
+let coll = db.getCollection("jstests_geo_update_btree");
 coll.drop();
 
 coll.createIndex({loc: "2d"});
 
-var big = new Array(3000).toString();
+let big = new Array(3000).toString();
 
 if (testingReplication) {
     coll.setWriteConcern({w: 2});
@@ -20,7 +20,7 @@ if (testingReplication) {
 
 Random.setRandomSeed();
 
-var parallelInsert = startParallelShell(
+let parallelInsert = startParallelShell(
     "Random.setRandomSeed();" +
         "for ( var i = 0; i < 1000; i++ ) {" +
         "    var doc = { loc: [ Random.rand() * 180, Random.rand() * 180 ], v: '' };" +

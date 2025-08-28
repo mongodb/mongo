@@ -22,7 +22,7 @@ function setUpCollection(coll, options) {
     assert.commandWorked(coll.createIndex({"tags.loc": "2dsphere"}));
 
     const nMeasurements = 10;
-    var docs = Array(nMeasurements);
+    let docs = Array(nMeasurements);
     for (let i = 0; i < nMeasurements; i++) {
         docs[i] = {
             time: ISODate(),

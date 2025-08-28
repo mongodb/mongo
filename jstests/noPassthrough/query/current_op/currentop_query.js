@@ -136,7 +136,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         }
 
         // Run the operation in the background.
-        var awaitShell = startParallelShell(doTest, testDB.getMongo().port);
+        let awaitShell = startParallelShell(doTest, testDB.getMongo().port);
 
         // Augment the currentOpFilter with additional known predicates.
         if (!testObj.currentOpFilter.ns) {
@@ -159,7 +159,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         // field as well with the currentOp query argument.
         assert.soon(
             function () {
-                var result = currentOp(testDB, testObj.currentOpFilter, truncatedOps, localOps);
+                let result = currentOp(testDB, testObj.currentOpFilter, truncatedOps, localOps);
                 assert.commandWorked(result);
 
                 if (result.inprog.length > 0) {
@@ -205,7 +205,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         //
         // Confirm currentOp content for commands defined in 'testList'.
         //
-        var testList = [
+        let testList = [
             {
                 test: function (db) {
                     assert.eq(
@@ -496,7 +496,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             "7": "7".repeat(149),
         };
 
-        var truncatedQueryString =
+        let truncatedQueryString =
             '^\\{ find: "currentop_query", filter: \\{ ' +
             '1: "1{149}", 2: "2{149}", 3: "3{149}", 4: "4{149}", 5: "5{149}", ' +
             '6: "6{149}", 7: "7+\\.\\.\\.';
@@ -566,7 +566,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
 
         confirmCurrentOpContents({
             test: function (db) {
-                var cursor = new DBCommandCursor(db, TestData.commandResult, 5);
+                let cursor = new DBCommandCursor(db, TestData.commandResult, 5);
                 assert.eq(cursor.itcount(), 0);
             },
             planSummary: "COLLSCAN",

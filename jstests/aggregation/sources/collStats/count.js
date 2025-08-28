@@ -7,7 +7,7 @@ let coll = testDB.aggregation_count;
 coll.drop();
 
 let nDocs = 1000;
-for (var i = 0; i < nDocs; i++) {
+for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({a: i}));
 }
 

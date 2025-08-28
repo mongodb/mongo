@@ -1,18 +1,18 @@
 // Basic sanity check of log component helpers
 
-var mongo = db.getMongo();
+let mongo = db.getMongo();
 
 // Get current log component settings. We will reset to these later.
-var originalSettings = assert.commandWorked(
+let originalSettings = assert.commandWorked(
     db.adminCommand({getParameter: 1, logComponentVerbosity: 1}),
 ).logComponentVerbosity;
 
 // getLogComponents
-var components1 = mongo.getLogComponents();
+let components1 = mongo.getLogComponents();
 assert.docEq(originalSettings, components1);
 
 // getLogComponents via db
-var components2 = db.getLogComponents();
+let components2 = db.getLogComponents();
 assert.docEq(originalSettings, components2);
 
 // setLogLevel - default component

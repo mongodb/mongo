@@ -19,7 +19,7 @@ const dbPath = MongoRunner.toRealDir("$dataDir");
 mkdir(dbPath);
 const serverCertificatePath = dbPath + "/server_test.pem";
 
-var ocsp_options = {
+let ocsp_options = {
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: serverCertificatePath,
     tlsCAFile: OCSP_CA_PEM,
@@ -31,7 +31,7 @@ clearOCSPCache();
 // Start with the OCSP-enabled server certificate
 copyCertificateFile(OCSP_SERVER_CERT, serverCertificatePath);
 
-var mongod = null;
+let mongod = null;
 
 assert.doesNotThrow(() => {
     // Start the Mongo server without the mock OCSP server, but with ocspEnabled=true.

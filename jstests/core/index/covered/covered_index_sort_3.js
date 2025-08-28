@@ -10,7 +10,7 @@
 // Include helpers for analyzing explain output.
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.getCollection("covered_sort_3");
+let coll = db.getCollection("covered_sort_3");
 coll.drop();
 for (let i = 0; i < 100; i++) {
     coll.insert({a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10)});
@@ -19,7 +19,7 @@ for (let i = 0; i < 100; i++) {
 coll.createIndex({a: 1, b: -1, c: 1});
 
 // Test no query, sort on all fields in index order
-var plan = coll
+let plan = coll
     .find({}, {b: 1, c: 1, _id: 0})
     .sort({a: 1, b: -1, c: 1})
     .hint({a: 1, b: -1, c: 1})

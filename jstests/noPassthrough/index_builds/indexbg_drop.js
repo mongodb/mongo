@@ -8,9 +8,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-var dbname = jsTestName();
-var collection = "jstests_feh";
-var size = 100;
+let dbname = jsTestName();
+let collection = "jstests_feh";
+let size = 100;
 
 const replTest = new ReplSetTest({
     nodes: [
@@ -28,19 +28,19 @@ const replTest = new ReplSetTest({
 const nodes = replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var second = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let second = replTest.getSecondary();
 
-var primaryDB = primary.getDB(dbname);
-var secondDB = second.getDB(dbname);
+let primaryDB = primary.getDB(dbname);
+let secondDB = second.getDB(dbname);
 
-var dc = {dropIndexes: collection, index: "i_1"};
+let dc = {dropIndexes: collection, index: "i_1"};
 
 // Setup collections.
 primaryDB.dropDatabase();
 jsTest.log("Creating test data " + size + " documents");
 Random.setRandomSeed();
-var bulk = primaryDB.getCollection(collection).initializeUnorderedBulkOp();
+let bulk = primaryDB.getCollection(collection).initializeUnorderedBulkOp();
 for (i = 0; i < size; ++i) {
     bulk.insert({i: Random.rand()});
 }

@@ -15,7 +15,7 @@ export var TagsTest = function (options) {
     }
 
     // Capture the 'this' reference
-    var self = this;
+    let self = this;
 
     self.options = options;
 
@@ -25,10 +25,10 @@ export var TagsTest = function (options) {
     this.run = function () {
         var options = this.options;
         let nodes = options.nodes;
-        var host = getHostName();
-        var name = "tags";
+        let host = getHostName();
+        let name = "tags";
 
-        var replTest = new ReplSetTest({name: name, nodes: {n0: nodes[0]}, useBridge: true});
+        let replTest = new ReplSetTest({name: name, nodes: {n0: nodes[0]}, useBridge: true});
         replTest.startSet();
         replTest.initiate();
 
@@ -51,8 +51,8 @@ export var TagsTest = function (options) {
 
         const conns = replTest.nodes;
         nodes = replTest.nodeList();
-        var port = replTest.ports;
-        var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
+        let port = replTest.ports;
+        let nextVersion = replTest.getReplSetConfigFromNode().version + 1;
         const replSetConfig = {
             _id: name,
             protocolVersion: 1,
@@ -151,7 +151,7 @@ export var TagsTest = function (options) {
         // primary.
         // expectedWritableNodesCount is the number of nodes we can expect to write to. Defaults to
         //     expectedNodesAgreeOnPrimary.length.
-        var ensurePrimary = function (nodeId, expectedNodesAgreeOnPrimary, expectedWritableNodesCount) {
+        let ensurePrimary = function (nodeId, expectedNodesAgreeOnPrimary, expectedWritableNodesCount) {
             expectedWritableNodesCount = expectedWritableNodesCount || expectedNodesAgreeOnPrimary.length;
             jsTestLog("ensurePrimary - Node " + nodeId + " (" + replTest.nodes[nodeId].host + ") should be primary.");
 
@@ -172,7 +172,7 @@ export var TagsTest = function (options) {
                     ") should be primary.",
             );
 
-            var writeConcern = {
+            let writeConcern = {
                 writeConcern: {w: expectedWritableNodesCount, wtimeout: replTest.timeoutMS},
             };
             assert.commandWorked(primary.getDB("foo").bar.insert({x: 100}, writeConcern));
@@ -186,10 +186,10 @@ export var TagsTest = function (options) {
         };
 
         // Make sure node 2 becomes primary.
-        var primary = ensurePrimary(2, replTest.nodes);
+        let primary = ensurePrimary(2, replTest.nodes);
 
         jsTestLog("primary is now 2");
-        var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+        let config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
         jsTestLog("test configuration = " + tojson(config));
 
         jsTestLog("Setting up partitions: [0-1-2] [3] [4]");
@@ -205,7 +205,7 @@ export var TagsTest = function (options) {
         jsTestLog("partitions: nodes with each set of brackets [N1, N2, N3] form a complete network.");
         jsTestLog("partitions: [0-1-2] [3] [4] (only nodes 0 and 1 can replicate from primary node 2");
 
-        var doc = {x: 1};
+        let doc = {x: 1};
 
         // This timeout should be shorter in duration than the server parameter
         // maxSyncSourceLagSecs.
@@ -213,7 +213,7 @@ export var TagsTest = function (options) {
         // Depending on the order of heartbeats (containing last committed op time) received
         // by a node, it might hang up on its sync source. This may cause some of the write concern
         // tests to fail.
-        var failTimeout = 15 * 1000;
+        let failTimeout = 15 * 1000;
 
         jsTestLog("test1");
         primary = ensurePrimary(2, replTest.nodes.slice(0, 3));
@@ -221,7 +221,7 @@ export var TagsTest = function (options) {
         jsTestLog("Non-existent write concern should be rejected.");
         options = {writeConcern: {w: "blahblah", wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.commandWorked(primary.getDB("foo").bar.insert(doc));
-        var result = assert.writeError(primary.getDB("foo").bar.insert(doc, options));
+        let result = assert.writeError(primary.getDB("foo").bar.insert(doc, options));
         assert.neq(null, result.getWriteConcernError());
         assert.eq(
             ErrorCodes.UnknownReplWriteConcern,

@@ -15,14 +15,14 @@ TestData.skipCheckOrphans = true;
         return 0;
     }
 
-    var st = new ShardingTest({shards: 2}),
+    let st = new ShardingTest({shards: 2}),
         testDB = st.s.getDB("test");
 
     // Enable sharding on the test DB.
     assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 
     // Create two collections with non-default options.
-    var coll1Options = {capped: true, size: 500},
+    let coll1Options = {capped: true, size: 500},
         coll2Options = {validator: {$jsonSchema: {required: ["a"]}}};
 
     assert.commandWorked(testDB.createCollection("coll1", coll1Options));
@@ -39,7 +39,7 @@ TestData.skipCheckOrphans = true;
     });
 
     // Create indexes on each collection.
-    var coll1Indexes = [
+    let coll1Indexes = [
             {key: {a: 1}, name: "index1", sparse: true},
             {key: {b: -1}, name: "index2", unique: true},
         ],
@@ -60,15 +60,15 @@ TestData.skipCheckOrphans = true;
     st.configRS.awaitLastOpCommitted();
 
     // Get the primary shard, and the non-primary shard.
-    var fromShard = st.getPrimaryShard("test");
-    var toShard = st.getOther(fromShard);
+    let fromShard = st.getPrimaryShard("test");
+    let toShard = st.getOther(fromShard);
 
-    var res = fromShard.getDB("test").runCommand({listCollections: 1});
+    let res = fromShard.getDB("test").runCommand({listCollections: 1});
     assert.commandWorked(res);
-    var collections = res.cursor.firstBatch;
+    let collections = res.cursor.firstBatch;
 
     collections.sort(sortByName);
-    var coll2uuid = collections[1].info.uuid;
+    let coll2uuid = collections[1].info.uuid;
 
     // Have the other shard clone the DB from the primary.
     assert.commandWorked(
@@ -85,7 +85,7 @@ TestData.skipCheckOrphans = true;
     assert.eq(collections.length, 2);
     collections.sort(sortByName);
 
-    var c1, c2;
+    let c1, c2;
     [c1, c2] = collections;
 
     function checkName(c, expectedName) {
@@ -113,9 +113,9 @@ TestData.skipCheckOrphans = true;
     checkUUID(c2, coll2uuid);
 
     function checkIndexes(collName, expectedIndexes, trackedColl) {
-        var res = toShard.getDB("test").runCommand({listIndexes: collName});
+        let res = toShard.getDB("test").runCommand({listIndexes: collName});
         assert.commandWorked(res, "Failed to get indexes for collection " + collName);
-        var indexes = res.cursor.firstBatch;
+        let indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
         // For each unsharded, untracked collection, there should be a total of 3 indexes - one for
@@ -126,7 +126,7 @@ TestData.skipCheckOrphans = true;
         else assert(indexes.length === 3);
 
         indexes.forEach((index, i) => {
-            var expected;
+            let expected;
             if (i == 0) expected = {name: "_id_", key: {_id: 1}};
             else expected = expectedIndexes[i - 1];
             Object.keys(expected).forEach((k) => {
@@ -143,7 +143,7 @@ TestData.skipCheckOrphans = true;
     // Verify that the data from the untracked collections resides on the new primary shard, and was
     // copied as part of the clone.
     function checkCount(shard, collName, count) {
-        var res = shard.getDB("test").runCommand({count: collName});
+        let res = shard.getDB("test").runCommand({count: collName});
         assert.commandWorked(res);
         assert.eq(res.n, count);
     }

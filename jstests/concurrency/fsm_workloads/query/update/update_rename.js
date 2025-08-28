@@ -4,28 +4,28 @@
  * Each thread does a $rename to cause documents to jump between indexes.
  */
 export const $config = (function () {
-    var fieldNames = ["update_rename_x", "update_rename_y", "update_rename_z"];
+    let fieldNames = ["update_rename_x", "update_rename_y", "update_rename_z"];
 
     function choose(array) {
         assert.gt(array.length, 0, "can't choose an element of an empty array");
         return array[Random.randInt(array.length)];
     }
 
-    var states = {
+    let states = {
         update: function update(db, collName) {
-            var from = choose(fieldNames);
-            var to = choose(
+            let from = choose(fieldNames);
+            let to = choose(
                 fieldNames.filter(function (n) {
                     return n !== from;
                 }),
             );
-            var updater = {$rename: {}};
+            let updater = {$rename: {}};
             updater.$rename[from] = to;
 
-            var query = {};
+            let query = {};
             query[from] = {$exists: 1};
 
-            var res = db[collName].update(query, updater);
+            let res = db[collName].update(query, updater);
 
             assert.eq(0, res.nUpserted, tojson(res));
             assert.contains(res.nMatched, [0, 1], tojson(res));
@@ -33,13 +33,13 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {update: {update: 1}};
+    let transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         // Create an index on all but one fieldName key to make it possible to test renames
         // between indexed fields and non-indexed fields
         fieldNames.slice(1).forEach(function (fieldName) {
-            var indexSpec = {};
+            let indexSpec = {};
             indexSpec[fieldName] = 1;
             assert.commandWorked(db[collName].createIndex(indexSpec));
         });
@@ -48,11 +48,11 @@ export const $config = (function () {
         this.numDocs = Math.floor(this.threadCount / 5);
         assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
-        for (var i = 0; i < this.numDocs; ++i) {
-            var fieldName = fieldNames[i % fieldNames.length];
-            var doc = {};
+        for (let i = 0; i < this.numDocs; ++i) {
+            let fieldName = fieldNames[i % fieldNames.length];
+            let doc = {};
             doc[fieldName] = i;
-            var res = db[collName].insert(doc);
+            let res = db[collName].insert(doc);
             assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }

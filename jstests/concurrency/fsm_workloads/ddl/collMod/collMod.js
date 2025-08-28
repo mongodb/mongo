@@ -12,15 +12,15 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         numDocs: 1000,
         maxTTL: 5000, // max time to live
     };
 
-    var states = (function () {
+    let states = (function () {
         function collMod(db, collName) {
-            var newTTL = Random.randInt(this.maxTTL);
-            var res = db.runCommand({
+            let newTTL = Random.randInt(this.maxTTL);
+            let res = db.runCommand({
                 collMod: this.threadCollName,
                 index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL},
             });
@@ -68,17 +68,17 @@ export const $config = (function () {
         return {collMod: collMod};
     })();
 
-    var transitions = {collMod: {collMod: 1}};
+    let transitions = {collMod: {collMod: 1}};
 
     function setup(db, collName, cluster) {
         // other workloads that extend this one might have set 'this.threadCollName'
         this.threadCollName = this.threadCollName || collName;
-        var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
-        for (var i = 0; i < this.numDocs; ++i) {
+        let bulk = db[this.threadCollName].initializeUnorderedBulkOp();
+        for (let i = 0; i < this.numDocs; ++i) {
             bulk.insert({createdAt: new Date()});
         }
 
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(this.numDocs, res.nInserted);
 

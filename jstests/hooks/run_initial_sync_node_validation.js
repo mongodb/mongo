@@ -2,9 +2,9 @@
 // dbhashes of all of the nodes including the initial sync node.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var startTime = Date.now();
+let startTime = Date.now();
 
-var primaryInfo = null;
+let primaryInfo = null;
 assert.soonRetryOnNetworkErrors(
     () => {
         primaryInfo = db.isMaster();
@@ -16,16 +16,16 @@ assert.soonRetryOnNetworkErrors(
 );
 
 // The initial sync hooks only work for replica sets.
-var rst = new ReplSetTest(db.getMongo().host);
+let rst = new ReplSetTest(db.getMongo().host);
 
 // Call getPrimary to populate rst with information about the nodes.
-var primary = rst.getPrimary();
+let primary = rst.getPrimary();
 assert(primary, "calling getPrimary() failed");
 
 // Find the hidden node.
-var hiddenNode;
-for (var secondary of rst.getSecondaries()) {
-    var isMasterRes = secondary.getDB("admin").isMaster();
+let hiddenNode;
+for (let secondary of rst.getSecondaries()) {
+    let isMasterRes = secondary.getDB("admin").isMaster();
     if (isMasterRes.hidden) {
         hiddenNode = secondary;
         break;
@@ -35,7 +35,7 @@ for (var secondary of rst.getSecondaries()) {
 assert(hiddenNode, "No hidden initial sync node was found in the replica set");
 
 // Confirm that the hidden node is in SECONDARY state.
-var res;
+let res;
 assert.soonRetryOnNetworkErrors(
     () => {
         res = assert.commandWorked(hiddenNode.adminCommand({replSetGetStatus: 1}));
@@ -56,5 +56,5 @@ rst.checkReplicatedDataHashes(undefined, excludedDBs);
 
 await import("jstests/hooks/run_validate_collections_background.js");
 
-var totalTime = Date.now() - startTime;
+let totalTime = Date.now() - startTime;
 print("Finished consistency checks of initial sync node in " + totalTime + " ms.");

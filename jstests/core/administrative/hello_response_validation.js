@@ -10,7 +10,7 @@
 // ]
 
 function checkResponseFields(command, commandType) {
-    var res = db.runCommand(command);
+    let res = db.runCommand(command);
     // check that the fields that should be there are there and have proper values
     assert(
         res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
@@ -36,8 +36,8 @@ function checkResponseFields(command, commandType) {
     assert(res.connectionId, "connectionId missing or false" + tojson(res));
 
     if (!testingReplication && !TestData.testingReplicaSetEndpoint) {
-        var badFields = [];
-        var unwantedReplSetFields = [
+        let badFields = [];
+        let unwantedReplSetFields = [
             "setName",
             "setVersion",
             "secondary",
@@ -54,7 +54,7 @@ function checkResponseFields(command, commandType) {
             "buildIndexes",
             "me",
         ];
-        var field;
+        let field;
         // check that the fields that shouldn't be there are not there
         for (field in res) {
             if (!res.hasOwnProperty(field)) {

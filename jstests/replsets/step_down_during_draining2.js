@@ -15,21 +15,21 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-var replSet = new ReplSetTest({name: "testSet", nodes: 3});
-var nodes = replSet.nodeList();
+let replSet = new ReplSetTest({name: "testSet", nodes: 3});
+let nodes = replSet.nodeList();
 replSet.startSet();
-var conf = replSet.getReplSetConfig();
+let conf = replSet.getReplSetConfig();
 conf.members[2].priority = 0;
 conf.settings = conf.settings || {};
 conf.settings.chainingAllowed = false;
 conf.settings.catchUpTimeoutMillis = 0;
 replSet.initiate(conf, null, {initiateWithDefaultElectionTimeout: true});
 
-var primary = replSet.getPrimary();
-var secondary = replSet.getSecondary();
+let primary = replSet.getPrimary();
+let secondary = replSet.getSecondary();
 
 // Set verbosity for replication on all nodes.
-var verbosity = {
+let verbosity = {
     "setParameter": 1,
     "logComponentVerbosity": {
         "replication": {"verbosity": 3},
@@ -58,20 +58,20 @@ assert.commandWorked(
 );
 
 // Do an initial insert to prevent the secondary from going into recovery
-var numDocuments = 20;
-var coll = primary.getDB("foo").foo;
+let numDocuments = 20;
+let coll = primary.getDB("foo").foo;
 assert.commandWorked(coll.insert({x: 0}, {writeConcern: {w: 3}}));
 replSet.awaitReplication();
 
 // Enable fail point to stop replication.
-var secondaries = replSet.getSecondaries();
+let secondaries = replSet.getSecondaries();
 secondaries.forEach(enableFailPoint);
 
 const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
-var bufferCountBefore = reduceMajorityWriteLatency
+let bufferCountBefore = reduceMajorityWriteLatency
     ? secondary.getDB("foo").serverStatus().metrics.repl.buffer.write.count
     : secondary.getDB("foo").serverStatus().metrics.repl.buffer.count;
-for (var i = 1; i < numDocuments; ++i) {
+for (let i = 1; i < numDocuments; ++i) {
     assert.commandWorked(coll.insert({x: i}));
 }
 jsTestLog("Number of documents inserted into collection on primary: " + numDocuments);
@@ -79,11 +79,11 @@ assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());
 
 assert.soon(
     function () {
-        var serverStatus = secondary.getDB("foo").serverStatus();
-        var bufferCount = reduceMajorityWriteLatency
+        let serverStatus = secondary.getDB("foo").serverStatus();
+        let bufferCount = reduceMajorityWriteLatency
             ? serverStatus.metrics.repl.buffer.write.count
             : serverStatus.metrics.repl.buffer.count;
-        var bufferCountChange = bufferCount - bufferCountBefore;
+        let bufferCountChange = bufferCount - bufferCountBefore;
         jsTestLog("Number of operations buffered on secondary since stopping applier: " + bufferCountChange);
         return bufferCountChange == numDocuments - 1;
     },
@@ -96,12 +96,12 @@ reconnect(secondary);
 replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
 // Secondary doesn't allow writes yet.
-var res = secondary.getDB("admin").runCommand({"hello": 1});
+let res = secondary.getDB("admin").runCommand({"hello": 1});
 assert(!res.isWritablePrimary);
 
 // Prevent the current primary from stepping down
 jsTest.log("disallowing heartbeat stepdown " + secondary.host);
-var blockHeartbeatStepdownFailPoint = configureFailPoint(secondary, "blockHeartbeatStepdown");
+let blockHeartbeatStepdownFailPoint = configureFailPoint(secondary, "blockHeartbeatStepdown");
 jsTestLog("Shut down the rest of the set so the primary-elect has to step down");
 replSet.stop(primary);
 disableFailPoint(replSet.nodes[2]); // Fail point needs to be off when node is shut down.

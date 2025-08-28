@@ -1,8 +1,8 @@
 // Tests write passthrough
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 2, mongos: 2});
-var s2 = s.s1;
+let s = new ShardingTest({shards: 2, mongos: 2});
+let s2 = s.s1;
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));

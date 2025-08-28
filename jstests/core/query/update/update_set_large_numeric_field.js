@@ -3,7 +3,7 @@
 const t = db[jsTestName()];
 t.drop();
 
-var o = {
+let o = {
     "_id": 1,
     "actual": {
         "key1": "val1",
@@ -20,7 +20,7 @@ assert.eq(o, t.findOne(), "A1");
 
 assert.commandWorked(t.update({"profile-id": "test"}, {$set: {"actual.0030000000000000000000": "val6"}}));
 
-var q = t.findOne();
+let q = t.findOne();
 
 // server-1347
 assert.eq(q.actual["0020000000000000000000"], "val5", "A2");

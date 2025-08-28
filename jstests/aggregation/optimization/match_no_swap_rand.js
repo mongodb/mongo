@@ -40,7 +40,7 @@ function assertScanFilterEq({coll, pipeline, filter}) {
     coll.drop();
 
     let bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++) {
+    for (let i = 0; i < 100; i++) {
         bulk.insert({a: {b: i % 5, c: i}});
     }
     assert.commandWorked(bulk.execute());

@@ -10,16 +10,16 @@ TestData.disableImplicitSessions = true;
 function assertUnauthorized(res, msg) {
     if (res.ok == 0 && (res.errmsg.startsWith("not authorized") || res.errmsg.match(/requires authentication/))) return;
 
-    var finalMsg = "command worked when it should have been unauthorized: " + tojson(res);
+    let finalMsg = "command worked when it should have been unauthorized: " + tojson(res);
     if (msg) {
         finalMsg += " : " + msg;
     }
     doassert(finalMsg);
 }
 
-var st = new ShardingTest({auth: true, other: {keyFile: "jstests/libs/key1", useHostname: false}});
+let st = new ShardingTest({auth: true, other: {keyFile: "jstests/libs/key1", useHostname: false}});
 
-var shardAdmin = st.shard0.getDB("admin");
+let shardAdmin = st.shard0.getDB("admin");
 if (!TestData.configShard) {
     // In config shard mode, this will create a user on the config server, which we already do
     // below.
@@ -31,9 +31,9 @@ if (!TestData.configShard) {
     shardAdmin.auth("admin", "x");
 }
 
-var mongos = st.s0;
-var mongosAdmin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+let mongos = st.s0;
+let mongosAdmin = mongos.getDB("admin");
+let coll = mongos.getCollection("foo.bar");
 
 mongosAdmin.createUser({
     user: "admin",
@@ -52,7 +52,7 @@ if (!TestData.configShard) {
 }
 assertUnauthorized(shardAdmin.runCommand({cleanupOrphaned: "foo.bar"}));
 
-var fooDB = st.shard0.getDB("foo");
+let fooDB = st.shard0.getDB("foo");
 shardAdmin.auth("admin", "x");
 fooDB.createUser({user: "user", pwd: "x", roles: ["readWrite", "dbAdmin"]});
 shardAdmin.logout();

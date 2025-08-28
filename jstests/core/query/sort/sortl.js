@@ -4,11 +4,11 @@
 //   # Metadata projection behavior differs between find and aggregate.
 //   incompatible_with_views,
 // ]
-var coll = db.sortl;
+let coll = db.sortl;
 coll.drop();
 
 assert.commandWorked(coll.insert({_id: 1, a: 2}));
-var res = coll.find({_id: 1}).sort({a: 1});
+let res = coll.find({_id: 1}).sort({a: 1});
 assert.eq(res.next(), {_id: 1, a: 2});
 assert.eq(res.hasNext(), false);
 

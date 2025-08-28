@@ -12,7 +12,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     mongos: 1,
     shards: 1,
     rs: {
@@ -21,14 +21,14 @@ var st = new ShardingTest({
         setParameter: {ttlMonitorSleepSecs: 5},
     },
 });
-var kDbName = "db";
-var kCollName = "foo";
+let kDbName = "db";
+let kCollName = "foo";
 
-var mongos = st.s0;
+let mongos = st.s0;
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
-var ns = kDbName + "." + kCollName;
+let ns = kDbName + "." + kCollName;
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {a: 1}}));
 assert.commandWorked(mongos.getDB(kDbName)[kCollName].createIndex({b: 1}, {expireAfterSeconds: 20}));

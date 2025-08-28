@@ -10,9 +10,9 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
+let configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
 configRS.startSet({configsvr: "", storageEngine: "wiredTiger"});
-var replConfig = configRS.getReplSetConfig();
+let replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
 configRS.initiate(replConfig);
 
@@ -22,7 +22,7 @@ configRS.initiate(replConfig);
 
 jsTest.log("Starting first set of mongoses in parallel...");
 
-var mongoses = [];
+let mongoses = [];
 for (var i = 0; i < 3; i++) {
     var mongos = MongoRunner.runMongos({binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     mongoses.push(mongos);
@@ -30,7 +30,7 @@ for (var i = 0; i < 3; i++) {
 
 // Eventually connect to a mongo host, to be sure that the config upgrade happened
 // (This can take longer on extremely slow bbots or VMs)
-var mongosConn = null;
+let mongosConn = null;
 assert.soon(
     function () {
         try {
@@ -46,7 +46,7 @@ assert.soon(
     5 * 60 * 1000,
 );
 
-var version = mongosConn.getCollection("config.version").findOne();
+let version = mongosConn.getCollection("config.version").findOne();
 
 //
 // Start a second set of mongoses which should respect the initialized version
@@ -59,7 +59,7 @@ for (var i = 0; i < 3; i++) {
     mongoses.push(mongos);
 }
 
-var connectToMongos = function (host) {
+let connectToMongos = function (host) {
     // Eventually connect to a host
     assert.soon(
         function () {
@@ -92,8 +92,8 @@ for (var i = 0; i < mongoses.length; i++) {
 
 assert.hasFields(version, ["clusterId"], "Version document does not contain cluster ID");
 
-var oplog = configRS.getPrimary().getDB("local").oplog.rs;
-var updates = oplog.find({ns: "config.version"}).toArray();
+let oplog = configRS.getPrimary().getDB("local").oplog.rs;
+let updates = oplog.find({ns: "config.version"}).toArray();
 assert.eq(1, updates.length, "ops to config.version: " + tojson(updates));
 
 configRS.stopSet(15);

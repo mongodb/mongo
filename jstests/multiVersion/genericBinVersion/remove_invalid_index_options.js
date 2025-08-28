@@ -7,12 +7,12 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var nodes = {
+let nodes = {
     n1: {binVersion: "latest"},
     n2: {binVersion: "last-lts"},
 };
 
-var rst = new ReplSetTest({nodes: nodes});
+let rst = new ReplSetTest({nodes: nodes});
 rst.startSet();
 rst.initiate();
 

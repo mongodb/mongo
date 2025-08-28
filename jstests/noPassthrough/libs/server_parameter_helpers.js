@@ -7,10 +7,10 @@
  * connection to retrieve the current setting of that server parameter.
  */
 export function getParameter(conn, field) {
-    var q = {getParameter: 1};
+    let q = {getParameter: 1};
     q[field] = 1;
 
-    var ret = assert.commandWorked(conn.getDB("admin").runCommand(q));
+    let ret = assert.commandWorked(conn.getDB("admin").runCommand(q));
     return ret[field];
 }
 
@@ -18,7 +18,7 @@ export function getParameter(conn, field) {
  * Calls setParameter on 'conn' server connection, setting server parameter 'field' to 'value'.
  */
 export function setParameter(conn, field, value) {
-    var cmd = {setParameter: 1};
+    let cmd = {setParameter: 1};
     cmd[field] = value;
     return conn.adminCommand(cmd);
 }

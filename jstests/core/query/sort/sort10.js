@@ -8,8 +8,8 @@ function checkSorting1(opts) {
     t.drop();
     t.insert({x: new Date(50000)});
     t.insert({x: new Date(-50)});
-    var d = new Date(-50);
-    for (var pass = 0; pass < 2; pass++) {
+    let d = new Date(-50);
+    for (let pass = 0; pass < 2; pass++) {
         assert(t.find().sort({x: 1})[0].x.valueOf() == d.valueOf());
         t.createIndex({x: 1}, opts);
         t.insert({x: new Date()});
@@ -32,7 +32,7 @@ function checkSorting2(dates, sortOrder) {
 
 t.drop();
 let dates = [new Date(-5000000000000), new Date(5000000000000), new Date(0), new Date(5), new Date(-5)];
-for (var i = 0; i < dates.length; i++) {
+for (let i = 0; i < dates.length; i++) {
     t.insert({x: dates[i]});
 }
 dates.sort(function (a, b) {

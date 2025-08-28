@@ -10,7 +10,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 import {reconfig} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {rs0: {nodes: 2}},
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
@@ -21,9 +21,9 @@ var st = new ShardingTest({
 
 // Note: Adding new replica set member by hand because of SERVER-24011.
 
-var newNode = MongoRunner.runMongod({configsvr: "", replSet: st.configRS.name, storageEngine: "wiredTiger"});
+let newNode = MongoRunner.runMongod({configsvr: "", replSet: st.configRS.name, storageEngine: "wiredTiger"});
 
-var replConfig = st.configRS.getReplSetConfigFromNode();
+let replConfig = st.configRS.getReplSetConfigFromNode();
 replConfig.version += 1;
 replConfig.members.push({_id: 3, host: newNode.host});
 
@@ -33,23 +33,23 @@ reconfig(st.configRS, replConfig);
  * Returns true if the shardIdentity document has all the replica set member nodes in the
  * expectedConfigStr.
  */
-var checkConfigStrUpdated = function (conn, expectedConfigStr) {
-    var shardIdentity = conn.getDB("admin").system.version.findOne({_id: "shardIdentity"});
+let checkConfigStrUpdated = function (conn, expectedConfigStr) {
+    let shardIdentity = conn.getDB("admin").system.version.findOne({_id: "shardIdentity"});
 
-    var shardConfigsvrStr = shardIdentity.configsvrConnectionString;
-    var shardConfigReplName = shardConfigsvrStr.split("/")[0];
-    var expectedReplName = expectedConfigStr.split("/")[0];
+    let shardConfigsvrStr = shardIdentity.configsvrConnectionString;
+    let shardConfigReplName = shardConfigsvrStr.split("/")[0];
+    let expectedReplName = expectedConfigStr.split("/")[0];
 
     assert.eq(expectedReplName, shardConfigReplName);
 
-    var expectedHostList = expectedConfigStr.split("/")[1].split(",");
-    var shardConfigHostList = shardConfigsvrStr.split("/")[1].split(",");
+    let expectedHostList = expectedConfigStr.split("/")[1].split(",");
+    let shardConfigHostList = shardConfigsvrStr.split("/")[1].split(",");
 
     if (expectedHostList.length != shardConfigHostList.length) {
         return false;
     }
 
-    for (var x = 0; x < expectedHostList.length; x++) {
+    for (let x = 0; x < expectedHostList.length; x++) {
         if (shardConfigsvrStr.indexOf(expectedHostList[x]) == -1) {
             return false;
         }
@@ -58,8 +58,8 @@ var checkConfigStrUpdated = function (conn, expectedConfigStr) {
     return true;
 };
 
-var origConfigConnStr = st.configRS.getURL();
-var expectedConfigStr = origConfigConnStr + "," + newNode.host;
+let origConfigConnStr = st.configRS.getURL();
+let expectedConfigStr = origConfigConnStr + "," + newNode.host;
 assert.soon(function () {
     return checkConfigStrUpdated(st.rs0.getPrimary(), expectedConfigStr);
 });

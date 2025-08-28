@@ -6,7 +6,7 @@
  * ]
  */
 
-var coll = db.getCollection(jsTestName());
+let coll = db.getCollection(jsTestName());
 coll.drop();
 
 coll.createIndex({loc: "2d"}, {max: 0});

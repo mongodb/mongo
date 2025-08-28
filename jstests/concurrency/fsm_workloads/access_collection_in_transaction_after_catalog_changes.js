@@ -15,7 +15,7 @@
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.session = db.getMongo().startSession();
         }
@@ -167,7 +167,7 @@ export const $config = (function () {
         assert.commandWorked(db[collName].insert({_id: "startTxnDoc"}));
     }
 
-    var randomTxnState = {
+    let randomTxnState = {
         aggregate: 0.1,
         distinct: 0.1,
         findAndModify: 0.1,
@@ -180,9 +180,9 @@ export const $config = (function () {
         update: 0.1,
     };
 
-    var randomDDLState = {createColl: 0.4, createIndex: 0.2, dropColl: 0.2, renameColl: 0.2};
+    let randomDDLState = {createColl: 0.4, createIndex: 0.2, dropColl: 0.2, renameColl: 0.2};
 
-    var transitions = {
+    let transitions = {
         // 80% of threads perform transaction operations, and 20% perform DDL operations.
         init: {aggregate: 0.8, createColl: 0.2},
 

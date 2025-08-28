@@ -18,7 +18,7 @@ function runGroupFunction({accFn: grpFn, arg}) {
 function runWindowFunction({accFn: winFn, arg, skipWindow}) {
     assert(winFn);
     arg = arg || "$c";
-    var winStage = null;
+    let winStage = null;
     if (skipWindow == true) {
         winStage = {
             $setWindowFields: {partitionBy: "$a", sortBy: {b: 1}, output: {accumulated: {[winFn]: arg}}},
@@ -36,7 +36,7 @@ function runWindowFunction({accFn: winFn, arg, skipWindow}) {
 }
 
 function checkCounter(accInfo, counterType) {
-    var runFn = null;
+    let runFn = null;
     if (counterType == "groupAccumulators") {
         runFn = runGroupFunction;
     } else if (counterType == "windowAccumulators") {

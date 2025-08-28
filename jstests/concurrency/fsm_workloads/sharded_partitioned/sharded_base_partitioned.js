@@ -26,7 +26,7 @@ import {isMongodConfigsvr} from "jstests/concurrency/fsm_workload_helpers/server
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         partitionSize: 1,
         // We use a non-hashed shard key of { _id: 1 } so that documents reside on their expected
         // shard. The setup function creates documents with sequential numbering and gives
@@ -36,7 +36,7 @@ export const $config = (function () {
     };
 
     data.makePartition = function makePartition(ns, tid, partitionSize) {
-        var partition = {ns: ns};
+        let partition = {ns: ns};
         partition.lower = tid * partitionSize;
         partition.mid = tid * partitionSize + partitionSize / 2;
         partition.upper = tid * partitionSize + partitionSize;
@@ -68,7 +68,7 @@ export const $config = (function () {
     data.getRandomChunkInPartition = function getRandomChunkInPartition(collName, conn) {
         assert(isMongodConfigsvr(conn.getDB("admin")), "Not connected to a mongod configsvr");
         assert(this.partition, "This function must be called from workloads that partition data across threads.");
-        var coll = conn.getDB("config").chunks;
+        let coll = conn.getDB("config").chunks;
         // We must split up these cases because MinKey and MaxKey are not fully comparable.
         // This may be due to SERVER-18341, where the Matcher returns false positives in
         // comparison predicates with MinKey/MaxKey.
@@ -126,11 +126,11 @@ export const $config = (function () {
     // This is used by the extended workloads to perform additional setup for more splitPoints.
     data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {};
 
-    var states = (function () {
+    let states = (function () {
         // Inform this thread about its partition,
         // and verify that its partition is encapsulated in a single chunk.
         function init(db, collName, connCache) {
-            var ns = db[collName].getFullName();
+            let ns = db[collName].getFullName();
 
             // Inform this thread about its partition.
             // The tid of each thread is assumed to be in the range [0, this.threadCount).
@@ -138,10 +138,10 @@ export const $config = (function () {
             Object.freeze(this.partition);
 
             // Verify that there is exactly 1 chunk in our partition.
-            var config = connCache.rsConns.config;
-            var numChunks = ChunkHelper.getNumChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
-            var chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
-            var msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
+            let config = connCache.rsConns.config;
+            let numChunks = ChunkHelper.getNumChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+            let chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
+            let msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
             assert.eq(numChunks, 1, msg);
         }
 
@@ -150,25 +150,25 @@ export const $config = (function () {
         return {init: init, dummy: dummy};
     })();
 
-    var transitions = {init: {dummy: 1}, dummy: {dummy: 1}};
+    let transitions = {init: {dummy: 1}, dummy: {dummy: 1}};
 
     // Define each thread's data partition, populate it, and encapsulate it in a chunk.
-    var setup = function setup(db, collName, cluster) {
-        var ns = db[collName].getFullName();
-        var configDB = db.getSiblingDB("config");
+    let setup = function setup(db, collName, cluster) {
+        let ns = db[collName].getFullName();
+        let configDB = db.getSiblingDB("config");
 
         // Sharding must be enabled on db[collName].
-        var msg = "collection " + collName + " must be sharded.";
+        let msg = "collection " + collName + " must be sharded.";
         assert.gte(findChunksUtil.findChunksByNs(configDB, ns).itcount(), 1, msg);
 
-        for (var tid = 0; tid < this.threadCount; ++tid) {
+        for (let tid = 0; tid < this.threadCount; ++tid) {
             // Define this thread's partition.
             // The tid of each thread is assumed to be in the range [0, this.threadCount).
-            var partition = this.makePartition(ns, tid, this.partitionSize);
+            let partition = this.makePartition(ns, tid, this.partitionSize);
 
             // Populate this thread's partition.
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = partition.lower; i < partition.upper; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = partition.lower; i < partition.upper; ++i) {
                 bulk.insert({_id: i});
             }
             assert.commandWorked(bulk.execute());
@@ -186,7 +186,7 @@ export const $config = (function () {
         }
     };
 
-    var teardown = function teardown(db, collName, cluster) {};
+    let teardown = function teardown(db, collName, cluster) {};
 
     return {
         threadCount: 1,

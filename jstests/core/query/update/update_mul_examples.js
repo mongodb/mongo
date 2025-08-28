@@ -1,8 +1,8 @@
 // @tags: [requires_non_retryable_writes]
 
 // Basic examples for $mul (multiply)
-var res;
-var coll = db[jsTestName()];
+let res;
+let coll = db[jsTestName()];
 coll.drop();
 
 // $mul positive

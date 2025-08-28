@@ -1,7 +1,7 @@
 /**
  * Tests that a null embedded malformed string is rejected gracefully.
  */
-var engine = "wiredTiger";
+let engine = "wiredTiger";
 if (jsTest.options().storageEngine) {
     engine = jsTest.options().storageEngine;
 }
@@ -13,24 +13,24 @@ if (engine !== "wiredTiger" && engine !== "inMemory") {
 }
 
 // Build an array of malformed strings to test
-var malformedStrings = ["\u0000000", "\0,", "bl\0ah", "split_pct=30,\0split_pct=35,"];
+let malformedStrings = ["\u0000000", "\0,", "bl\0ah", "split_pct=30,\0split_pct=35,"];
 
 // Start up a mongod.
 // Test that collection and index creation with malformed creation strings fail gracefully.
 runTest();
 
 function runTest() {
-    var dbpath = MongoRunner.dataPath + "wt_malformed_creation_string";
+    let dbpath = MongoRunner.dataPath + "wt_malformed_creation_string";
     resetDbpath(dbpath);
 
     // Start a mongod
-    var conn = MongoRunner.runMongod({
+    let conn = MongoRunner.runMongod({
         dbpath: dbpath,
         noCleanData: true,
     });
     assert.neq(null, conn, "mongod was unable to start up");
 
-    var testDB = conn.getDB("test");
+    let testDB = conn.getDB("test");
 
     // Collection creation with malformed string should fail
     for (var i = 0; i < malformedStrings.length; i++) {

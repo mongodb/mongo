@@ -18,12 +18,12 @@ function nestArray(nstArray) {
 
 // sort and run the tests
 function runSort(chkDoc, nest, problem) {
-    var chkArray = setupArray();
+    let chkArray = setupArray();
     if (nest) {
         nestArray(chkArray);
     }
     Array.shuffle(chkArray);
-    var t = db[collName];
+    let t = db[collName];
     t.drop();
     assert.commandWorked(t.insert(chkArray));
 

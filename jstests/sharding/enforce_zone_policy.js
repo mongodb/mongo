@@ -10,13 +10,13 @@ const ns = dbName + "." + collName;
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: dbName, primaryShard: st.shard1.shardName}));
 
-var testDB = st.s0.getDB(dbName);
-var configDB = st.s0.getDB("config");
+let testDB = st.s0.getDB(dbName);
+let configDB = st.s0.getDB("config");
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 const bigString = "X".repeat(1024 * 1024); // 1MB
-var bulk = testDB.foo.initializeUnorderedBulkOp();
+let bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 9; i++) {
     bulk.insert({_id: i, x: bigString});
 }
@@ -70,7 +70,7 @@ st.addTagRange(ns, {_id: MinKey}, {_id: -100}, "b");
 st.addTagRange(ns, {_id: 100}, {_id: MaxKey}, "b");
 
 assertBalanceCompleteAndStable(function () {
-    var chunksOnShard2 = findChunksUtil
+    let chunksOnShard2 = findChunksUtil
         .findChunksByNs(configDB, ns, {shard: st.shard2.shardName})
         .sort({min: 1})
         .toArray();
@@ -99,7 +99,7 @@ st.removeShardTag(st.shard2.shardName, "b");
 st.addTagRange(ns, {_id: MinKey}, {_id: MaxKey}, "a");
 
 assertBalanceCompleteAndStable(function () {
-    var counts = st.chunkCounts(collName);
+    let counts = st.chunkCounts(collName);
     printjson(counts);
     // All chunks must have been moved to shard 0, none left on shard 1 and 2
     return counts[st.shard1.shardName] == 0 && counts[st.shard2.shardName] == 0;

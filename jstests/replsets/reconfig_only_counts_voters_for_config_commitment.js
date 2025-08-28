@@ -7,7 +7,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     nodes: [
         {rsConfig: {priority: 1, votes: 1}},
         {rsConfig: {priority: 0, votes: 1}},
@@ -17,10 +17,10 @@ var replTest = new ReplSetTest({
     ],
     useBridge: true,
 });
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 replTest.initiate();
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
 // Cause reconfigs via heartbeats to fail on these two nodes, so a config shouldn't be able to
 // commit on a majority of voting nodes.
@@ -29,7 +29,7 @@ let fp2 = configureFailPoint(nodes[2], "blockHeartbeatReconfigFinish");
 
 // Run a reconfig with a timeout of 5 seconds, this should fail with a maxTimeMSExpired error.
 jsTestLog("Doing reconfig.");
-var config = primary.getDB("local").system.replset.findOne();
+let config = primary.getDB("local").system.replset.findOne();
 config.version++;
 assert.commandFailedWithCode(
     primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),

@@ -1,21 +1,21 @@
 // Test write re-routing on version mismatch.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+let st = new ShardingTest({shards: 2, mongos: 2});
 
-var mongos = st.s;
-var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
-var coll = st.s.getCollection("TestDB.coll");
+let mongos = st.s;
+let admin = mongos.getDB("admin");
+let config = mongos.getDB("config");
+let coll = st.s.getCollection("TestDB.coll");
 
 assert.commandWorked(mongos.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: "TestDB.coll", key: {_id: 1}}));
 
 jsTest.log("Refreshing second mongos...");
 
-var mongosB = st.s1;
-var adminB = mongosB.getDB("admin");
-var collB = mongosB.getCollection(coll + "");
+let mongosB = st.s1;
+let adminB = mongosB.getDB("admin");
+let collB = mongosB.getCollection(coll + "");
 
 // Make sure mongosB knows about the coll
 assert.eq(0, collB.find().itcount());
@@ -25,7 +25,7 @@ assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to:
 
 jsTest.log("Inserting docs that needs to be retried...");
 
-var nextId = -1;
+let nextId = -1;
 for (var i = 0; i < 2; i++) {
     printjson("Inserting " + nextId);
     assert.commandWorked(collB.insert({_id: nextId--, hello: "world"}));

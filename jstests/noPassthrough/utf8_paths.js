@@ -1,8 +1,8 @@
 /**
  * Test that verifies mongod can start using paths that contain UTF-8 characters that are not ASCII.
  */
-var db_name = "ελληνικά";
-var path = MongoRunner.dataPath + "Росси́я";
+let db_name = "ελληνικά";
+let path = MongoRunner.dataPath + "Росси́я";
 
 mkdir(path);
 

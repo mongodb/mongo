@@ -18,7 +18,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: nDocs / 2}}));
 
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
     bulk.insert({_id: i, a: i, b: i * 2});
 }

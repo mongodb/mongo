@@ -5,7 +5,7 @@ import {validateSessionsCollection} from "jstests/libs/sessions_collection.js";
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: "refresh",
     nodes: [
         {
@@ -15,15 +15,15 @@ var replTest = new ReplSetTest({
         {/* arbiter */ rsConfig: {arbiterOnly: true}},
     ],
 });
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
-var primary = replTest.getPrimary();
-var primaryAdmin = primary.getDB("admin");
+let primary = replTest.getPrimary();
+let primaryAdmin = primary.getDB("admin");
 
 replTest.awaitSecondaryNodes();
-var secondary = replTest.getSecondary();
-var secondaryAdmin = secondary.getDB("admin");
+let secondary = replTest.getSecondary();
+let secondaryAdmin = secondary.getDB("admin");
 
 let arbiter = replTest.getArbiter();
 

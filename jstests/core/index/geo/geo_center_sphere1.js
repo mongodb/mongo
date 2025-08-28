@@ -30,7 +30,7 @@ function test(index) {
 
     let num = 0;
 
-    var bulk = t.initializeUnorderedBulkOp();
+    let bulk = t.initializeUnorderedBulkOp();
     for (let x = -179; x <= 179; x += skip) {
         for (let y = -89; y <= 89; y += skip) {
             let o = {_id: num++, loc: [x, y]};
@@ -61,11 +61,11 @@ function test(index) {
         // printjson( correct[i].map( function(z){ return z._id; } ).sort() )
         // printjson( t.find(q).map( function(z){ return z._id; } ).sort() )
 
-        var numExpected = correct[i].length;
-        var x = correct[i].map(function (z) {
+        let numExpected = correct[i].length;
+        let x = correct[i].map(function (z) {
             return z._id;
         });
-        var y = t.find(q).map(function (z) {
+        let y = t.find(q).map(function (z) {
             return z._id;
         });
 
@@ -93,7 +93,7 @@ function test(index) {
         assert.eq(numExpected, t.find(q).itcount(), "itcount : " + tojson(searches[i]));
         assert.eq(numExpected, t.find(q).count(), "count : " + tojson(searches[i]));
         if (index == "2d") {
-            var explain = t.find(q).explain("executionStats");
+            let explain = t.find(q).explain("executionStats");
             print("explain for " + tojson(q, "", true) + " = " + tojson(explain));
             // The index should be at least minimally effective in preventing the full collection
             // scan.

@@ -10,7 +10,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFacetBufferS
 
 // Save a reference to the original runCommand method in the IIFE's scope.
 // This scoping allows the original method to be called by the override below.
-var originalRunCommand = Mongo.prototype.runCommand;
+let originalRunCommand = Mongo.prototype.runCommand;
 
 Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
     // Skip wrapping the pipeline in a $facet stage if it's not an aggregation, or if it's
@@ -25,7 +25,7 @@ Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
         return originalRunCommand.apply(this, arguments);
     }
 
-    var originalPipeline = cmdObj.pipeline;
+    let originalPipeline = cmdObj.pipeline;
 
     const stagesDisallowedInsideFacet = [
         "$changeStream",

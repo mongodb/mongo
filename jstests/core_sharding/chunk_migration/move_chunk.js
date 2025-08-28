@@ -19,12 +19,12 @@ if (shardNames.length < 2) {
 
 // Finds and returns the initial chunk and the shard name it resides in, and one other shard name.
 function getInitialChunkAndShardNames(configDB, ns, shardNames) {
-    var chunk;
+    let chunk;
     // index to shard name that contains the chunk:
-    var chunkIndex = null;
+    let chunkIndex = null;
     // index to another shard name where the chunk can be moved to:
-    var otherIndex = null;
-    var i = 0;
+    let otherIndex = null;
+    let i = 0;
     while (i < shardNames.length && chunk == null) {
         chunk = findChunksUtil.findOneChunkByNs(configDB, ns, {shard: shardNames[i]});
         if (chunk != null) {
@@ -65,9 +65,9 @@ function testHashed(db) {
 
     assert.commandWorked(db.adminCommand({shardCollection: ns, key: {_id: "hashed"}, numInitialChunks: 1}));
 
-    var aChunk;
-    var shard0;
-    var shard1;
+    let aChunk;
+    let shard0;
+    let shard1;
     [aChunk, shard0, shard1] = getInitialChunkAndShardNames(configDB, ns, shardNames);
     assert(aChunk);
 
@@ -101,9 +101,9 @@ function testNotHashed(db, keyDoc) {
         return;
     }
 
-    var chunk;
-    var shard0;
-    var shard1;
+    let chunk;
+    let shard0;
+    let shard1;
     [chunk, shard0, shard1] = getInitialChunkAndShardNames(configDB, ns, shardNames);
     const chunkId = chunk._id;
 

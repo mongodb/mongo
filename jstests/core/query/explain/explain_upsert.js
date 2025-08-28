@@ -8,10 +8,10 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var t = db.jstests_explain_upsert;
+let t = db.jstests_explain_upsert;
 t.drop();
 
-var explain;
+let explain;
 
 // Explained upsert against an empty collection should succeed and be a no-op.
 explain = db.runCommand({explain: {update: t.getName(), updates: [{q: {a: 1}, u: {a: 1}, upsert: true}]}});

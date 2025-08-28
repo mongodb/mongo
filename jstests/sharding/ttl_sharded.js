@@ -11,11 +11,11 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // start up a new sharded cluster
-var s = new ShardingTest({shards: 2, mongos: 1});
+let s = new ShardingTest({shards: 2, mongos: 1});
 
-var dbname = "testDB";
-var coll = "ttl_sharded";
-var ns = dbname + "." + coll;
+let dbname = "testDB";
+let coll = "ttl_sharded";
+let ns = dbname + "." + coll;
 
 s.adminCommand({enablesharding: dbname, primaryShard: s.shard1.shardName});
 
@@ -24,10 +24,10 @@ let t = s.getDB(dbname).getCollection(coll);
 s.adminCommand({shardcollection: ns, key: {_id: 1}});
 
 // insert 24 docs, with timestamps at one hour intervals
-var now = new Date().getTime();
-var bulk = t.initializeUnorderedBulkOp();
-for (var i = 0; i < 24; i++) {
-    var past = new Date(now - 3600 * 1000 * i);
+let now = new Date().getTime();
+let bulk = t.initializeUnorderedBulkOp();
+for (let i = 0; i < 24; i++) {
+    let past = new Date(now - 3600 * 1000 * i);
     bulk.insert({_id: i, x: past});
 }
 assert.commandWorked(bulk.execute());
@@ -52,8 +52,8 @@ assert.soon(
 );
 
 // now lets check things explicily on each shard
-var shard0 = s._connections[0].getDB(dbname);
-var shard1 = s._connections[1].getDB(dbname);
+let shard0 = s._connections[0].getDB(dbname);
+let shard1 = s._connections[1].getDB(dbname);
 
 print("Shard 0 coll stats:");
 printjson(shard0.getCollection(coll).stats());
@@ -61,8 +61,8 @@ print("Shard 1 coll stats:");
 printjson(shard1.getCollection(coll).stats());
 
 function getTTLTime(theCollection, theKey) {
-    var indexes = theCollection.getIndexes();
-    for (var i = 0; i < indexes.length; i++) {
+    let indexes = theCollection.getIndexes();
+    for (let i = 0; i < indexes.length; i++) {
         if (friendlyEqual(theKey, indexes[i].key)) return indexes[i].expireAfterSeconds;
     }
     throw "not found";

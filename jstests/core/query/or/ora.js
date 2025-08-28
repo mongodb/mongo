@@ -3,11 +3,11 @@
 //     requires_scripting
 // ]
 
-var t = db.jstests_ora;
+let t = db.jstests_ora;
 
 // $where
 t.drop();
-for (var i = 0; i < 10; i += 1) {
+for (let i = 0; i < 10; i += 1) {
     t.save({x: i, y: 10 - i});
 }
 assert.eq(t.find({$or: [{$where: "this.x === 2"}]}).count(), 1);

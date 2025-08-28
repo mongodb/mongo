@@ -87,7 +87,7 @@ const findKeyFields = [
  */
 function validateInvalidHint(testDB) {
     const collName = "invalid_hint_coll";
-    var coll = testDB[collName];
+    let coll = testDB[collName];
     coll.drop();
     // $hint is supposed to be a string or object, but this works:
     assert.commandWorked(

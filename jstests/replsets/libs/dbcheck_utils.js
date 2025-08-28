@@ -419,7 +419,7 @@ export const injectInconsistencyOnSecondary = (
 
 // Returns a list of all collections in a given database excluding views.
 function listCollectionsWithoutViews(database) {
-    var failMsg = "'listCollections' command failed";
+    let failMsg = "'listCollections' command failed";
     // Some tests adds an invalid view, resulting in a failure of the 'listCollections' operation
     // with an 'InvalidViewDefinition' error.
     let res = assert.commandWorkedOrFailedWithCode(
@@ -435,7 +435,7 @@ function listCollectionsWithoutViews(database) {
 
 // Returns a list of names of all indexes.
 function getIndexNames(db, collName, allowedErrorCodes) {
-    var failMsg = "'listIndexes' command failed";
+    let failMsg = "'listIndexes' command failed";
     let res = assert.commandWorkedOrFailedWithCode(db[collName].runCommand("listIndexes"), allowedErrorCodes, failMsg);
     if (res.ok) {
         return new DBCommandCursor(db, res).toArray().map((spec) => spec.name);

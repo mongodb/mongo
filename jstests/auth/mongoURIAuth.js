@@ -31,7 +31,7 @@ const runURIAuthTest = function (userMech, uriMech, authMechanism, regexMechanis
         });
     }
 
-    var uri;
+    let uri;
 
     if (uriMech) {
         uri = "mongodb://user:password@localhost:" + conn.port + "/admin?authMechanism=" + authMechanism;
@@ -39,7 +39,7 @@ const runURIAuthTest = function (userMech, uriMech, authMechanism, regexMechanis
         uri = "mongodb://user:password@localhost:" + conn.port;
     }
 
-    var shell = runMongoProgram("mongo", uri, "--eval", "db.getName()");
+    let shell = runMongoProgram("mongo", uri, "--eval", "db.getName()");
     assert.eq(shell, 0, "Should be able to connect with specified params.");
 
     const log = adminDB.runCommand({getLog: "global"});

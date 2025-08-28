@@ -21,7 +21,7 @@
  */
 
 export const $config = (function () {
-    var data = {
+    let data = {
         partitionSize: 1,
         // We use a non-hashed shard key of { skey: 1 } so that documents reside on their expected
         // shard. The setup function creates documents with sequential numbering and gives
@@ -32,7 +32,7 @@ export const $config = (function () {
     };
 
     data.makePartition = function makePartition(ns, tid, partitionSize) {
-        var partition = {ns: ns};
+        let partition = {ns: ns};
         partition.lower = tid * partitionSize;
         partition.mid = tid * partitionSize + partitionSize / 2;
         partition.upper = tid * partitionSize + partitionSize;
@@ -59,10 +59,10 @@ export const $config = (function () {
         return partition;
     };
 
-    var states = (function () {
+    let states = (function () {
         // Inform this thread about its partition
         function init(db, collName, connCache) {
-            var ns = db[collName].getFullName();
+            let ns = db[collName].getFullName();
 
             // Inform this thread about its partition.
             // The tid of each thread is assumed to be in the range [0, this.threadCount).
@@ -75,26 +75,26 @@ export const $config = (function () {
         return {init: init, dummy: dummy};
     })();
 
-    var transitions = {init: {dummy: 1}, dummy: {dummy: 1}};
+    let transitions = {init: {dummy: 1}, dummy: {dummy: 1}};
 
     // Define each thread's data partition, populate it, and encapsulate it in a chunk.
-    var setup = function setup(db, collName, cluster) {
-        var ns = db[collName].getFullName();
-        for (var tid = 0; tid < this.threadCount; ++tid) {
+    let setup = function setup(db, collName, cluster) {
+        let ns = db[collName].getFullName();
+        for (let tid = 0; tid < this.threadCount; ++tid) {
             // Define this thread's partition.
             // The tid of each thread is assumed to be in the range [0, this.threadCount).
-            var partition = this.makePartition(ns, tid, this.partitionSize);
+            let partition = this.makePartition(ns, tid, this.partitionSize);
 
             // Populate this thread's partition.
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = partition.lower; i < partition.upper; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = partition.lower; i < partition.upper; ++i) {
                 bulk.insert({skey: i});
             }
             assert.commandWorked(bulk.execute());
         }
     };
 
-    var teardown = function teardown(db, collName, cluster) {};
+    let teardown = function teardown(db, collName, cluster) {};
 
     return {
         threadCount: 1,

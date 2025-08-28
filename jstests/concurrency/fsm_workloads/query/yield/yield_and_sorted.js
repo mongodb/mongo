@@ -33,7 +33,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Not very many docs returned in this, so loop to increase chances of yielding in the
         // middle.
-        for (var i = 0; i < 100; i++) {
+        for (let i = 0; i < 100; i++) {
             const explain = db[collName].explain().find(query).finish();
             assert(planHasStage(db, explain.queryPlanner.winningPlan, "AND_SORTED"));
 

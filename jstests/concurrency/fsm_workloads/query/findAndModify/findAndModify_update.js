@@ -7,28 +7,28 @@
  * using either the $min or $max operator.
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         numDocsPerThread: 3, // >1 for 'sort' to be meaningful
         shardKey: {tid: 1},
     };
 
-    var states = (function () {
+    let states = (function () {
         function makeDoc(tid) {
             return {_id: new ObjectId(), tid: tid, value: 0};
         }
 
         function init(db, collName) {
-            for (var i = 0; i < this.numDocsPerThread; ++i) {
-                var res = db[collName].insert(makeDoc(this.tid));
+            for (let i = 0; i < this.numDocsPerThread; ++i) {
+                let res = db[collName].insert(makeDoc(this.tid));
                 assert.commandWorked(res);
                 assert.eq(1, res.nInserted);
             }
         }
 
         function findAndModifyAscending(db, collName) {
-            var updatedValue = this.tid;
+            let updatedValue = this.tid;
 
-            var res = db.runCommand({
+            let res = db.runCommand({
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {value: 1},
@@ -37,7 +37,7 @@ export const $config = (function () {
             });
             assert.commandWorked(res);
 
-            var doc = res.value;
+            let doc = res.value;
             assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
             if (doc !== null) {
@@ -47,9 +47,9 @@ export const $config = (function () {
         }
 
         function findAndModifyDescending(db, collName) {
-            var updatedValue = -this.tid;
+            let updatedValue = -this.tid;
 
-            var res = db.runCommand({
+            let res = db.runCommand({
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {value: -1},
@@ -58,7 +58,7 @@ export const $config = (function () {
             });
             assert.commandWorked(res);
 
-            var doc = res.value;
+            let doc = res.value;
             assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
             if (doc !== null) {
@@ -74,14 +74,14 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         init: {findAndModifyAscending: 0.5, findAndModifyDescending: 0.5},
         findAndModifyAscending: {findAndModifyAscending: 0.5, findAndModifyDescending: 0.5},
         findAndModifyDescending: {findAndModifyAscending: 0.5, findAndModifyDescending: 0.5},
     };
 
     function setup(db, collName, cluster) {
-        var res = db[collName].createIndex({tid: 1, value: 1});
+        let res = db[collName].createIndex({tid: 1, value: 1});
         assert.commandWorked(res);
     }
 

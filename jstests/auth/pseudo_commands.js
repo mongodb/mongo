@@ -48,14 +48,14 @@ function runTest(conn) {
      * and false otherwise.
      */
     function isMongos(db) {
-        var res = db.adminCommand({isdbgrid: 1});
+        let res = db.adminCommand({isdbgrid: 1});
         return res.ok == 1 && res.isdbgrid == 1;
     }
 
     (function testInprog() {
         jsTestLog("Testing inprog");
 
-        var roles = {
+        let roles = {
             read: false,
             readAnyDatabase: false,
             readWrite: false,
@@ -71,10 +71,10 @@ function runTest(conn) {
             __system: true,
         };
 
-        var privilege = {resource: {cluster: true}, actions: ["inprog"]};
+        let privilege = {resource: {cluster: true}, actions: ["inprog"]};
 
-        var testFunc = function (shouldPass) {
-            var passed = true;
+        let testFunc = function (shouldPass) {
+            let passed = true;
             try {
                 var res = db.currentOp();
                 passed = res.ok && !res.hasOwnProperty("errmsg");
@@ -94,7 +94,7 @@ function runTest(conn) {
     (function testKillop() {
         jsTestLog("Testing killOp");
 
-        var roles = {
+        let roles = {
             read: false,
             readAnyDatabase: false,
             readWrite: false,
@@ -110,12 +110,12 @@ function runTest(conn) {
             __system: true,
         };
 
-        var privilege = {resource: {cluster: true}, actions: ["killop"]};
+        let privilege = {resource: {cluster: true}, actions: ["killop"]};
 
-        var testFunc = function (shouldPass) {
-            var passed = true;
+        let testFunc = function (shouldPass) {
+            let passed = true;
             try {
-                var opid;
+                let opid;
                 const maxOpId = Math.pow(2, 31) - 1; // Operation id cannot exceed INT_MAX.
                 if (isMongos(db)) {
                     // opid format different between mongos and mongod
@@ -123,7 +123,7 @@ function runTest(conn) {
                 } else {
                     opid = maxOpId;
                 }
-                var res = db.killOp(opid);
+                let res = db.killOp(opid);
                 printjson(res);
                 passed = res.ok && !res.errmsg && !res.err && !res["$err"];
             } catch (e) {
@@ -142,7 +142,7 @@ function runTest(conn) {
 
         jsTestLog("Testing unlock");
 
-        var roles = {
+        let roles = {
             read: false,
             readAnyDatabase: false,
             readWrite: false,
@@ -158,19 +158,19 @@ function runTest(conn) {
             __system: true,
         };
 
-        var privilege = {resource: {cluster: true}, actions: ["unlock"]};
+        let privilege = {resource: {cluster: true}, actions: ["unlock"]};
 
-        var testFunc = function (shouldPass) {
-            var passed = true;
+        let testFunc = function (shouldPass) {
+            let passed = true;
             try {
-                var ret = admin.fsyncLock(); // must be locked first
+                let ret = admin.fsyncLock(); // must be locked first
                 // If the storage engine doesnt support fsync lock, we can't proceed
                 if (!ret.ok) {
                     assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
                     assert(shouldPass); // If we get to the storage engine, we better be authorized.
                     return;
                 }
-                var res = db.fsyncUnlock();
+                let res = db.fsyncUnlock();
                 printjson(res);
                 passed = res.ok && !res.errmsg && !res.err && !res["$err"];
                 passed = passed || false; // convert undefined to false
@@ -189,11 +189,11 @@ function runTest(conn) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s);
 st.stop();

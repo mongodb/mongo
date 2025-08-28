@@ -12,7 +12,7 @@
 function getHostPart(hostAndPort) {
     return hostAndPort.substr(0, hostAndPort.lastIndexOf(":"));
 }
-var c1, c2, c3;
+let c1, c2, c3;
 
 // The config servers must support readConcern: majority to be run as a replica set, so
 // explicitly set storage engine to wiredTiger.

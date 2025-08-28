@@ -6,7 +6,7 @@
 // test $set with array indicies
 
 let t = db.jstests_set7;
-var res;
+let res;
 
 t.drop();
 

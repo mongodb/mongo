@@ -4,20 +4,20 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 const db = conn.getDB("test");
 
-var maxFields = 3;
+let maxFields = 3;
 
-for (var fields = 1; fields < maxFields; fields++) {
-    var coll = db.testMnyPts;
+for (let fields = 1; fields < maxFields; fields++) {
+    let coll = db.testMnyPts;
     coll.drop();
 
-    var totalPts = 500 * 1000;
+    let totalPts = 500 * 1000;
 
-    var bulk = coll.initializeUnorderedBulkOp();
+    let bulk = coll.initializeUnorderedBulkOp();
     // Add points in a 100x100 grid
     for (var i = 0; i < totalPts; i++) {
-        var ii = i % 10000;
+        let ii = i % 10000;
 
-        var doc = {loc: [ii % 100, Math.floor(ii / 100)]};
+        let doc = {loc: [ii % 100, Math.floor(ii / 100)]};
 
         // Add fields with different kinds of data
         for (var j = 0; j < fields; j++) {
@@ -59,8 +59,8 @@ for (var fields = 1; fields < maxFields; fields++) {
 
     // Check that quarter of points in each quadrant
     for (var i = 0; i < 4; i++) {
-        var x = i % 2;
-        var y = Math.floor(i / 2);
+        let x = i % 2;
+        let y = Math.floor(i / 2);
 
         var box = [
             [0, 0],
@@ -90,7 +90,7 @@ for (var fields = 1; fields < maxFields; fields++) {
     }
 
     // Check that all but corner set of points in radius
-    var circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
+    let circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
 
     // All [99,x] pts are field0 : "abcdefg"
     assert.eq(

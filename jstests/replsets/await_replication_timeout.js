@@ -3,13 +3,13 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-var replTest = new ReplSetTest({nodes: 3});
+let replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
 replTest.initiate();
-var primary = replTest.getPrimary();
-var testDB = primary.getDB("test");
+let primary = replTest.getPrimary();
+let testDB = primary.getDB("test");
 const collName = "foo";
-var testColl = testDB.getCollection(collName);
+let testColl = testDB.getCollection(collName);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -29,7 +29,7 @@ resetCollection(3);
 replTest.stop(2);
 
 // Test wtimeout
-var res = testDB.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1000}});
+let res = testDB.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1000}});
 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 assert.eq(ErrorCodes.WriteConcernTimeout, res.writeConcernError.code);
 
@@ -66,7 +66,7 @@ resetCollection(2);
 // Pause the oplog fetcher on secondary so that commit point doesn't advance, meaning that a dropped
 // database on the primary will remain in 'drop-pending' state. As there isn't anything in the oplog
 // buffer at this time, it is safe to pause the oplog fetcher.
-var secondary = replTest.getSecondary();
+let secondary = replTest.getSecondary();
 jsTestLog("Pausing the oplog fetcher on the secondary node.");
 stopServerReplication(secondary);
 

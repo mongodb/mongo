@@ -21,11 +21,11 @@ function assertCountUnauthorized(conn, dbName, collectionName) {
     assert.eq(runCountCommand(conn, dbName, collectionName).code, 13, "On " + dbName + "." + collectionName);
 }
 
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 
-var admin = conn.getDB("admin");
-var test = conn.getDB("test");
-var local = conn.getDB("local");
+let admin = conn.getDB("admin");
+let test = conn.getDB("test");
+let local = conn.getDB("local");
 
 //
 // Preliminary set up.

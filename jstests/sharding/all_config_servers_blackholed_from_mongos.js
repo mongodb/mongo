@@ -15,7 +15,7 @@ TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     mongos: 1,
     useBridge: true,
@@ -25,7 +25,7 @@ var st = new ShardingTest({
     other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}},
 });
 
-var testDB = st.s.getDB("BlackHoleDB");
+let testDB = st.s.getDB("BlackHoleDB");
 
 assert.commandWorked(testDB.adminCommand({enableSharding: "BlackHoleDB"}));
 assert.commandWorked(testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));

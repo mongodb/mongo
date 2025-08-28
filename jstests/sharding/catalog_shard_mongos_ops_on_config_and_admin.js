@@ -7,7 +7,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
+let st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
 // TODO (SERVER-88675): DDL commands against config and admin database are not allowed via a router
 // but are allowed via a direct connection to the config server or shard.
 const isReplicaSetEndpointActive = st.isReplicaSetEndpointActive();
@@ -18,8 +18,8 @@ let configSvrAdminDB = st.config0.getDB("admin");
 let configSvrConfigDB = st.config0.getDB("config");
 
 // Create a role so that the admin.system.roles collection exists for the tests
-var cmdObj = {createRole: "customRole", roles: [], privileges: []};
-var res = mongosAdminDB.runCommand(cmdObj);
+let cmdObj = {createRole: "customRole", roles: [], privileges: []};
+let res = mongosAdminDB.runCommand(cmdObj);
 assert.commandWorked(res);
 
 // Commands that should fail when run on collections in the config database when

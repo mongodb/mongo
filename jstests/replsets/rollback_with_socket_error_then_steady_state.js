@@ -12,10 +12,10 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
-var collName = "test.coll";
-var counter = 0;
+let collName = "test.coll";
+let counter = 0;
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     name: "rollback_with_socket_error_then_steady_state",
     nodes: [
         // Primary flops between nodes 0 and 1.
@@ -29,7 +29,7 @@ var rst = new ReplSetTest({
     ],
     useBridge: true,
 });
-var nodes = rst.startSet({setParameter: {allowMultipleArbiters: true}});
+let nodes = rst.startSet({setParameter: {allowMultipleArbiters: true}});
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
@@ -40,7 +40,7 @@ assert.commandWorked(
 rst.awaitReplication();
 
 function stepUp(rst, node) {
-    var primary = rst.getPrimary();
+    let primary = rst.getPrimary();
     if (primary != node) {
         assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
     }

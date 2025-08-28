@@ -17,8 +17,8 @@ const secondIndexName = "second";
 function addTestDocuments(db) {
     let size = 100;
     jsTest.log("Creating " + size + " test documents.");
-    var bulk = db.getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < size; ++i) {
+    let bulk = db.getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < size; ++i) {
         bulk.insert({i: i, j: i * i});
     }
     assert.commandWorked(bulk.execute());
@@ -67,8 +67,8 @@ jsTestLog("Index builds started on secondary. Op ID of one of the builds: " + op
 
 // Retry until the oplog applier is done with the entry, and the index is visible to listIndexes.
 // waitForIndexBuildToStart does not ensure this.
-var res;
-var indexes;
+let res;
+let indexes;
 assert.soon(
     function () {
         // Check the listIndexes() output.

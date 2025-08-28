@@ -1,6 +1,6 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
+let s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
@@ -114,7 +114,7 @@ assert.commandWorked(db.foo9.createIndex({a: 1}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo9", key: {a: 1}}));
 
 // --- listDatabases ---
-var r = db.getMongo().getDBs();
+let r = db.getMongo().getDBs();
 assert.eq(3, r.databases.length, tojson(r));
 assert(r.totalSize > 0, "listDatabases 3 : " + tojson(r));
 assert(r.totalSizeMb >= 0, "listDatabases 3 : " + tojson(r));

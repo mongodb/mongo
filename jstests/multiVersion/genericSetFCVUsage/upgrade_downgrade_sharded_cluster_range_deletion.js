@@ -41,8 +41,8 @@ const numOrphanedDocs = 10;
 function createTestCollection(st) {
     TestData.skipCheckOrphans = true;
     assert.commandWorked(st.s.adminCommand({shardCollection: testRangeDeletionNS, key: {_id: 1}}));
-    var batch = st.s.getCollection(testRangeDeletionNS).initializeOrderedBulkOp();
-    for (var i = 0; i < numOrphanedDocs; i++) {
+    let batch = st.s.getCollection(testRangeDeletionNS).initializeOrderedBulkOp();
+    for (let i = 0; i < numOrphanedDocs; i++) {
         batch.insert({_id: i});
     }
     assert.commandWorked(batch.execute());
@@ -52,7 +52,7 @@ function createTestCollection(st) {
 }
 
 function validateRangeDeletionTasks(st) {
-    var terminateSecondaryFeatureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    let terminateSecondaryFeatureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.configRS.getPrimary().getDB("admin"),
         "TerminateSecondaryReadsUponRangeDeletion",
     );
@@ -62,7 +62,7 @@ function validateRangeDeletionTasks(st) {
     if (terminateSecondaryFeatureFlagEnabled) {
         assert.soon(() => {
             try {
-                var doc = st.shard0.getCollection(kRangeDeletionNs).findOne({nss: testRangeDeletionNS});
+                let doc = st.shard0.getCollection(kRangeDeletionNs).findOne({nss: testRangeDeletionNS});
                 assert(doc.hasOwnProperty("preMigrationShardVersion"));
                 return true;
             } catch (e) {

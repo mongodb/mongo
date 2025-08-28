@@ -6,15 +6,15 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Start a 2 node replica set where one of the nodes has priority 0 to
 // prevent unnecessary elections.
-var replTest = new ReplSetTest({nodes: 1});
-var nodes = replTest.startSet();
+let replTest = new ReplSetTest({nodes: 1});
+let nodes = replTest.startSet();
 replTest.initiate();
 
 // After the first election, the term should be 1.
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 jsTestLog("Reconfig command ignores user provided term, 50");
-var config = primary.getDB("local").system.replset.findOne();
+let config = primary.getDB("local").system.replset.findOne();
 printjson(config);
 config.version++;
 config.members[nodes.indexOf(primary)].priority = 1; // Legal reconfig.

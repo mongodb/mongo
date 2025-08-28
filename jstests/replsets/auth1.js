@@ -9,19 +9,19 @@ import {wait} from "jstests/replsets/rslib.js";
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-var name = "rs_auth1";
-var port = allocatePorts(5);
-var path = "jstests/libs/";
+let name = "rs_auth1";
+let port = allocatePorts(5);
+let path = "jstests/libs/";
 
 // These keyFiles have their permissions set to 600 later in the test.
-var key1_600 = path + "key1";
-var key2_600 = path + "key2";
+let key1_600 = path + "key1";
+let key2_600 = path + "key2";
 
 // This keyFile has its permissions set to 644 later in the test.
-var key1_644 = path + "key1_644";
+let key1_644 = path + "key1_644";
 
 print("try starting mongod with auth");
-var m = MongoRunner.runMongod({auth: "", port: port[4], dbpath: MongoRunner.dataDir + "/wrong-auth"});
+let m = MongoRunner.runMongod({auth: "", port: port[4], dbpath: MongoRunner.dataDir + "/wrong-auth"});
 
 assert(!m.getDB("local").auth("__system", ""));
 
@@ -65,23 +65,23 @@ rs.awaitNodesAgreeOnPrimaryNoAuth();
 
 m.getDB("admin").logout(); // In case this node doesn't become primary, make sure its not auth'd
 
-var primary = rs.getPrimary();
+let primary = rs.getPrimary();
 rs.awaitSecondaryNodes();
-var mId = rs.getNodeId(primary);
-var secondary = rs.getSecondary();
+let mId = rs.getNodeId(primary);
+let secondary = rs.getSecondary();
 assert(primary.getDB("admin").auth("foo", "bar"));
 assert.commandWorked(
     primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
 );
 
 print("try some legal and illegal reads");
-var r = primary.getDB("test").foo.findOne();
+let r = primary.getDB("test").foo.findOne();
 assert.eq(r.x, 1);
 
 secondary.setSecondaryOk();
 
 function doQueryOn(p) {
-    var error = assert
+    let error = assert
         .throws(
             function () {
                 r = p.getDB("test").foo.findOne();
@@ -107,7 +107,7 @@ secondary.getDB("test").logout();
 
 print("add some data");
 assert(primary.getDB("test").auth("bar", "baz"));
-var bulk = primary.getDB("test").foo.initializeUnorderedBulkOp();
+let bulk = primary.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000; i++) {
     bulk.insert({x: i, foo: "bar"});
 }
@@ -152,7 +152,7 @@ var conn = MongoRunner.runMongod({
 });
 
 assert(primary.getDB("admin").auth("foo", "bar"));
-var config = primary.getDB("local").system.replset.findOne();
+let config = primary.getDB("local").system.replset.findOne();
 config.members.push({_id: 3, host: rs.host + ":" + port[3]});
 config.version++;
 try {
@@ -168,7 +168,7 @@ assert(primary.getDB("admin").auth("foo", "bar"));
 print("shouldn't ever sync");
 for (var i = 0; i < 10; i++) {
     print("iteration: " + i);
-    var results = primary.adminCommand({replSetGetStatus: 1});
+    let results = primary.adminCommand({replSetGetStatus: 1});
     printjson(results);
     assert(results.members[3].state != 2);
     sleep(1000);
@@ -190,7 +190,7 @@ var conn = MongoRunner.runMongod({
 assert(primary.getDB("admin").auth("foo", "bar"));
 wait(function () {
     try {
-        var results = primary.adminCommand({replSetGetStatus: 1});
+        let results = primary.adminCommand({replSetGetStatus: 1});
         printjson(results);
         return results.members[3].state == 2;
     } catch (e) {
@@ -202,7 +202,7 @@ primary.getDB("admin").logout();
 
 print("make sure it has the config, too");
 assert.soon(function () {
-    for (var i in rs.nodes) {
+    for (let i in rs.nodes) {
         // Make sure there are no lingering logins on the test database.
         rs.nodes[i].getDB("test").logout();
 

@@ -7,7 +7,7 @@
 // Case 1: Big string as key
 export var bigStringKeys = (() => {
     let keys = [];
-    var str = "aaaabbbbccccddddeeeeffffgggghhhh";
+    let str = "aaaabbbbccccddddeeeeffffgggghhhh";
     while (str.length < 20000) {
         keys.push(str);
         str = str + str;

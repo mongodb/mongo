@@ -10,13 +10,13 @@
  */
 import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
 
-var coll = db.getCollection("coll");
-var coll1 = db.getCollection("coll1");
+let coll = db.getCollection("coll");
+let coll1 = db.getCollection("coll1");
 coll.drop();
 coll1.drop();
 
 // Make sure a properly formed request has successful result.
-var res = db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: "test.coll"}]});
+let res = db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: "test.coll"}]});
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);

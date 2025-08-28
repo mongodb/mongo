@@ -2,7 +2,7 @@
 //   requires_getmore,
 // ]
 
-var t = db.geod;
+let t = db.geod;
 t.drop();
 t.save({loc: [0, 0]});
 t.save({loc: [0.5, 0]});

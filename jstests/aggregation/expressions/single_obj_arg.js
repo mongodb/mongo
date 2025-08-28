@@ -1,6 +1,6 @@
 // server9289 - support objects as single arguments to expressions.
 
-var t = db[jsTestName()];
+let t = db[jsTestName()];
 t.drop();
 
 t.insert({date: ISODate("2013-08-14T21:41:43Z")});

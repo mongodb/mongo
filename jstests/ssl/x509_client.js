@@ -118,7 +118,7 @@ const x509_options = {
 
 {
     print("2. Testing x.509 auth to mongos");
-    var st = new ShardingTest({
+    let st = new ShardingTest({
         shards: 1,
         mongos: 1,
         other: {

@@ -10,27 +10,27 @@
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         // uses the workload name as _id on the document.
         // assumes this name will be unique.
         id: "update_inc",
         getUpdateArgument: function (fieldName) {
-            var updateDoc = {$inc: {}};
+            let updateDoc = {$inc: {}};
             updateDoc.$inc[fieldName] = 1;
             return updateDoc;
         },
     };
 
-    var states = {
+    let states = {
         init: function init(db, collName) {
             this.fieldName = "t" + this.tid;
             this.count = 0;
         },
 
         update: function update(db, collName) {
-            var updateDoc = this.getUpdateArgument(this.fieldName);
+            let updateDoc = this.getUpdateArgument(this.fieldName);
 
-            var res = db[collName].update({_id: this.id}, updateDoc);
+            let res = db[collName].update({_id: this.id}, updateDoc);
             assert.commandWorked(res);
             assert.eq(0, res.nUpserted, tojson(res));
 
@@ -54,11 +54,11 @@ export const $config = (function () {
         },
 
         find: function find(db, collName) {
-            var docs = db[collName].find().toArray();
+            let docs = db[collName].find().toArray();
             if (!this.skipAssertions) {
                 assert.eq(1, docs.length);
                 // If the document hasn't been updated at all, then the field won't exist.
-                var doc = docs[0];
+                let doc = docs[0];
                 if (doc.hasOwnProperty(this.fieldName)) {
                     assert.eq(this.count, doc[this.fieldName]);
                 } else {
@@ -68,13 +68,13 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
+    let transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
 
     function setup(db, collName, cluster) {
-        var doc = {_id: this.id};
+        let doc = {_id: this.id};
 
         // Pre-populate the fields we need to avoid size change for capped collections.
-        for (var i = 0; i < this.threadCount; ++i) {
+        for (let i = 0; i < this.threadCount; ++i) {
             doc["t" + i] = 0;
         }
         db[collName].insert(doc);

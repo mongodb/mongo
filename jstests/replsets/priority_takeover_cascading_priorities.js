@@ -6,8 +6,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
-var name = "priority_takeover_cascading_priorities";
-var replSet = new ReplSetTest({
+let name = "priority_takeover_cascading_priorities";
+let replSet = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {priority: 5}},

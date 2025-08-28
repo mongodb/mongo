@@ -1,5 +1,5 @@
 // Ensure text search metadata is not lost in an external sort
-var t = db.external_sort_text_agg;
+let t = db.external_sort_text_agg;
 t.drop();
 t.createIndex({text: "text"});
 for (let i = 0; i < 100; i++) {
@@ -7,8 +7,8 @@ for (let i = 0; i < 100; i++) {
     // string over 1MB to hit the 100MB threshold for external sort
 }
 
-var score = t.find({$text: {$search: "asdf"}}, {score: {$meta: "textScore"}}).next().score;
-var res = t.aggregate(
+let score = t.find({$text: {$search: "asdf"}}, {score: {$meta: "textScore"}}).next().score;
+let res = t.aggregate(
     [
         {$match: {$text: {$search: "asdf"}}},
         {$sort: {"_id": 1}},

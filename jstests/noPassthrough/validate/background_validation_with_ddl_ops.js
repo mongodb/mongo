@@ -45,8 +45,8 @@ const resetCollection = () => {
 
     // Insert 10,000 documents because validation will yield every 4096 entries fetched.
     const docsToInsert = 10000;
-    var bulk = testColl.initializeUnorderedBulkOp();
-    for (var i = 0; i < docsToInsert; i++) {
+    let bulk = testColl.initializeUnorderedBulkOp();
+    for (let i = 0; i < docsToInsert; i++) {
         bulk.insert({x: i});
     }
     assert.commandWorked(bulk.execute());

@@ -40,7 +40,7 @@ function loadData(conn, dbName, collName, coll) {
                 const doc = {a: -1, x: "x".repeat(size), b: -1, t: t};
 
                 let bulkInsert = testColl.initializeUnorderedBulkOp();
-                for (var i = 0; i < count; ++i) {
+                for (let i = 0; i < count; ++i) {
                     bulkInsert.insert(doc);
                 }
                 jsTestLog("Committing inserts, t: " + t);
@@ -60,7 +60,7 @@ function loadData(conn, dbName, collName, coll) {
 
     jsTestLog("Pruning data...");
 
-    for (var t = 0; t < kThreads; t = t + 2) {
+    for (let t = 0; t < kThreads; t = t + 2) {
         coll.deleteMany({t: t});
     }
 

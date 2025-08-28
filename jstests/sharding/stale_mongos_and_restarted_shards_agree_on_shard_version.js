@@ -67,7 +67,7 @@ const staleMongoS = st.s1;
     jsTest.log("Testing: Insert with sharded collection unknown on a stale mongos");
     setupCollectionForTest("TestInsertColl");
 
-    var insertBulkOp = staleMongoS.getDB(kDatabaseName).TestInsertColl.initializeUnorderedBulkOp();
+    let insertBulkOp = staleMongoS.getDB(kDatabaseName).TestInsertColl.initializeUnorderedBulkOp();
     insertBulkOp.insert({Key: -2});
     insertBulkOp.insert({Key: 1});
     insertBulkOp.execute();
@@ -81,9 +81,9 @@ const staleMongoS = st.s1;
 
     assert.commandWorked(staleMongoS.getDB(kDatabaseName).TestUpdateColl.update({}, {$inc: {inc: 1}}, {multi: true}));
 
-    var s0Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: -1});
+    let s0Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: -1});
     assert.eq(1, s0Doc.inc);
-    var s1Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: 0});
+    let s1Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: 0});
     assert.eq(1, s1Doc.inc);
 }
 {
@@ -113,20 +113,20 @@ const staleMongoS = st.s1;
     jsTest.log("Testing: Find with sharded collection unknown on a stale mongos");
     setupCollectionForTest("TestFindColl");
 
-    var coll = staleMongoS.getDB(kDatabaseName).TestFindColl.find().toArray();
+    let coll = staleMongoS.getDB(kDatabaseName).TestFindColl.find().toArray();
     assert.eq(2, coll.length);
 }
 {
     jsTest.log("Testing: Aggregate with sharded collection unknown on a stale mongos");
     setupCollectionForTest("TestAggregateColl");
 
-    var count = staleMongoS
+    let count = staleMongoS
         .getDB(kDatabaseName)
         .TestAggregateColl.aggregate([{$count: "total"}])
         .toArray();
     assert.eq(2, count[0].total);
 }
-var session = null;
+let session = null;
 withRetryOnTransientTxnError(
     () => {
         jsTest.log("Testing: Transactions with unsharded collection, which is unknown on the shard");

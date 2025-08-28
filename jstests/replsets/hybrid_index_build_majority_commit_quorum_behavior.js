@@ -11,7 +11,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+let rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
 
@@ -38,7 +38,7 @@ rst.awaitReplication();
 function isIndexBuildInProgress(conn, indexName) {
     jsTestLog("Running collection stats on " + conn.host);
     const coll = conn.getDB(dbName)[collName];
-    var stats = assert.commandWorked(coll.stats());
+    let stats = assert.commandWorked(coll.stats());
     return Array.contains(stats["indexBuilds"], indexName);
 }
 

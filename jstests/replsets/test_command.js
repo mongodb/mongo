@@ -3,9 +3,9 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "test_command";
-var replSet = new ReplSetTest({name: name, nodes: 3});
-var nodes = replSet.nodeList();
+let name = "test_command";
+let replSet = new ReplSetTest({name: name, nodes: 3});
+let nodes = replSet.nodeList();
 replSet.startSet();
 replSet.initiate({
     _id: name,
@@ -49,8 +49,8 @@ try {
     );
 }
 
-var primary = replSet.getPrimary();
-var secondary = replSet.getSecondary();
+let primary = replSet.getPrimary();
+let secondary = replSet.getSecondary();
 
 // Check replication mode.
 

@@ -3,15 +3,15 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: "sync2",
     nodes: [{rsConfig: {priority: 5}}, {arbiter: true}, {}, {}, {}],
     useBridge: true,
 });
-var conns = replTest.startSet();
+let conns = replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 jsTestLog("Replica set test initialized");
 
 primary.getDB("foo").bar.insert({x: 1});
@@ -37,7 +37,7 @@ assert.soon(
 
 replTest.awaitReplication();
 jsTestLog("Checking that ops still replicate correctly");
-var option = {writeConcern: {w: conns.length - 1, wtimeout: replTest.timeoutMS}};
+let option = {writeConcern: {w: conns.length - 1, wtimeout: replTest.timeoutMS}};
 // In PV0, this write can fail as a result of a bad spanning tree. If 2 was syncing from 4 prior
 // to bridging, it will not change sync sources and receive the write in time. This was not a
 // problem in 3.0 because the old version of mongobridge caused all the nodes to restart during

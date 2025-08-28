@@ -16,11 +16,11 @@ const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-var primary = rst.getPrimary();
+let primary = rst.getPrimary();
 var db = primary.getDB(dbName);
-var primaryAdmin = primary.getDB("admin");
-var primaryColl = db[collName];
-var collNss = primaryColl.getFullName();
+let primaryAdmin = primary.getDB("admin");
+let primaryColl = db[collName];
+let collNss = primaryColl.getFullName();
 
 jsTestLog("Writing data to collection.");
 assert.commandWorked(primaryColl.insert({_id: "readOp"}, {"writeConcern": {"w": 2}}));

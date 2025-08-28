@@ -11,19 +11,19 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardTest = new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
+let shardTest = new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
 
-var mongos = shardTest.s0;
-var mongosSOK = shardTest.s1;
+let mongos = shardTest.s0;
+let mongosSOK = shardTest.s1;
 mongosSOK.setSecondaryOk();
 
 const dbName = "test";
-var dbase = mongos.getDB(dbName);
-var coll = dbase.getCollection("foo");
-var collSOk = mongosSOK.getCollection("" + coll);
+let dbase = mongos.getDB(dbName);
+let coll = dbase.getCollection("foo");
+let collSOk = mongosSOK.getCollection("" + coll);
 
-var rsA = shardTest.rs0;
-var rsB = shardTest.rs1;
+let rsA = shardTest.rs0;
+let rsB = shardTest.rs1;
 
 assert.commandWorked(rsA.getPrimary().getDB("test_a").dummy.insert({x: 1}));
 assert.commandWorked(rsB.getPrimary().getDB("test_b").dummy.insert({x: 1}));
@@ -50,11 +50,11 @@ shardTest.shardColl(
 print("3: test normal and secondaryOk queries");
 
 // Make shardA and rsA the same
-var shardA = shardTest.getShard(coll, {_id: -1});
-var shardAColl = shardA.getCollection("" + coll);
+let shardA = shardTest.getShard(coll, {_id: -1});
+let shardAColl = shardA.getCollection("" + coll);
 
 if (shardA.name == rsB.getURL()) {
-    var swap = rsB;
+    let swap = rsB;
     rsB = rsA;
     rsA = swap;
 }
@@ -72,9 +72,9 @@ assert.eq(shardAColl.findOne()._id, -1);
 
 print("5: make one of the secondaries RECOVERING");
 
-var secs = rsA.getSecondaries();
-var goodSec = secs[0];
-var badSec = secs[1];
+let secs = rsA.getSecondaries();
+let goodSec = secs[0];
+let badSec = secs[1];
 
 assert.commandWorked(badSec.adminCommand("replSetMaintenance"));
 rsA.waitForState(badSec, ReplSetTest.State.RECOVERING);
@@ -111,9 +111,9 @@ awaitRSClientHosts(collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: tr
 awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
 
 print("SecondaryOk Query...");
-var sOKCount = collSOk.find().itcount();
+let sOKCount = collSOk.find().itcount();
 
-var collCount = null;
+let collCount = null;
 try {
     print("Normal query...");
     collCount = coll.find().itcount();

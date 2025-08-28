@@ -1,8 +1,8 @@
-var t = db.geo_s2selfintersectingpoly;
+let t = db.geo_s2selfintersectingpoly;
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
-var intersectingPolygon = {
+let intersectingPolygon = {
     "type": "Polygon",
     "coordinates": [
         [

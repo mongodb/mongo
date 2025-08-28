@@ -1,29 +1,29 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
+let test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
-var mongos = test.s0;
-var mongod = test.shard0;
+let mongos = test.s0;
+let mongod = test.shard0;
 
-var res;
-var dbArray;
+let res;
+let dbArray;
 
 // grab the config db instance by name
-var getDBSection = function (dbsArray, dbToFind) {
-    for (var pos in dbsArray) {
+let getDBSection = function (dbsArray, dbToFind) {
+    for (let pos in dbsArray) {
         if (dbsArray[pos].name && dbsArray[pos].name === dbToFind) return dbsArray[pos];
     }
     return null;
 };
 
 // Function to verify information for a database entry in listDatabases.
-var dbEntryCheck = function (dbEntry, onConfig) {
+let dbEntryCheck = function (dbEntry, onConfig) {
     assert.neq(null, dbEntry);
     assert.neq(null, dbEntry.sizeOnDisk);
     assert.eq(false, dbEntry.empty);
 
     // Check against shards
-    var shards = dbEntry.shards;
+    let shards = dbEntry.shards;
     assert(shards);
     assert((shards["config"] && onConfig) || (!shards["config"] && !onConfig));
 };

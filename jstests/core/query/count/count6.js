@@ -17,7 +17,7 @@ function checkCountForObject(obj) {
         assert.eq(expected, t.find(query).skip(0).limit(0).count(true), "A2");
         // Check proper counts with various skip and limit specs.
         for (var skip = 1; skip <= 2; ++skip) {
-            for (var limit = 1; limit <= 2; ++limit) {
+            for (let limit = 1; limit <= 2; ++limit) {
                 assert.eq(Math.max(expected - skip, 0), t.find(query).skip(skip).count(true), "B1");
                 assert.eq(Math.min(expected, limit), t.find(query).limit(limit).count(true), "B2");
                 assert.eq(

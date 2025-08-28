@@ -2,7 +2,7 @@
 //
 // Verify that various types cannot be invoked as constructors
 
-var t = db.jstests_type4;
+let t = db.jstests_type4;
 t.drop();
 t.insert({});
 t.insert({});
@@ -18,7 +18,7 @@ assert.throws(
 
 assert.throws(
     function () {
-        var doc = db.test.findOne();
+        let doc = db.test.findOne();
         new doc();
     },
     [],
@@ -27,7 +27,7 @@ assert.throws(
 
 assert.throws(
     function () {
-        var cursor = t.find();
+        let cursor = t.find();
         cursor.next();
 
         new cursor._cursor._cursorHandle();

@@ -20,9 +20,9 @@ export const workerThread = (function () {
     // args.sessionOptions = the options to start a session with
     // run = callback that takes a map of workloads to their associated $config
     async function main(workloads, args, run) {
-        var myDB;
-        var configs = {};
-        var connectionString = "mongodb://" + args.host + "/?appName=tid:" + args.tid;
+        let myDB;
+        let configs = {};
+        let connectionString = "mongodb://" + args.host + "/?appName=tid:" + args.tid;
         if (typeof args.replSetName !== "undefined") {
             connectionString += "&replicaSet=" + args.replSetName;
         }
@@ -209,7 +209,7 @@ export const workerThread = (function () {
 
             for (const workload of workloads) {
                 const {$config} = await import(workload);
-                var config = parseConfig($config); // to normalize
+                let config = parseConfig($config); // to normalize
 
                 // Copy any modifications that were made to $config.data
                 // during the setup function of the workload (see caveat
@@ -223,7 +223,7 @@ export const workerThread = (function () {
                 // (known as $super to workload B). This reference is lost when
                 // the config object is serialized to BSON, which results in
                 // undefined variables in the derived workload.
-                var data = Object.extend({}, args.data[workload], true);
+                let data = Object.extend({}, args.data[workload], true);
                 data = Object.extend(data, config.data, true);
 
                 // Object.extend() defines all properties added to the destination object as
@@ -280,7 +280,7 @@ export const workerThread = (function () {
             // the workload are closed.
             // TODO SERVER-74993: Remove this.
             try {
-                var session = myDB.getSession();
+                let session = myDB.getSession();
                 if (session) {
                     myDB.runCommand({killSessions: [session.getSessionId()]});
                 }

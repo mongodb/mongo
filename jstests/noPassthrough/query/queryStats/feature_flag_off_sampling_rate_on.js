@@ -12,7 +12,7 @@ const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "failed to start mongod");
 const testdb = conn.getDB("test");
 
-var coll = testdb[jsTestName()];
+let coll = testdb[jsTestName()];
 coll.drop();
 
 // Bulk insert documents to reduces roundtrips and make timeout on a slow machine less likely.

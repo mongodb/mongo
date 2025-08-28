@@ -11,9 +11,9 @@ let options = {
 
 const conn = MongoRunner.runMongod(options);
 const testdb = conn.getDB("test");
-var coll = testdb[jsTestName()];
+let coll = testdb[jsTestName()];
 coll.drop();
-for (var i = 0; i < 20; i++) {
+for (let i = 0; i < 20; i++) {
     coll.insert({foo: 0, bar: Math.floor(Math.random() * 3)});
 }
 

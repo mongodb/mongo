@@ -9,8 +9,8 @@ t.drop();
 
 let n = 1;
 let arr = [];
-for (var x = -100; x < 100; x += 2) {
-    for (var y = -100; y < 100; y += 2) {
+for (let x = -100; x < 100; x += 2) {
+    for (let y = -100; y < 100; y += 2) {
         arr.push({_id: n++, loc: [x, y], a: Math.abs(x) % 5, b: Math.abs(y) % 5});
     }
 }
@@ -28,9 +28,9 @@ res.forEach((doc) => assert.eq(2, doc.a, tojson(doc)));
 
 function avgA(q, len) {
     if (!len) len = 10;
-    var realq = {loc: {$near: [50, 50]}};
+    let realq = {loc: {$near: [50, 50]}};
     if (q) Object.extend(realq, q);
-    var as = t
+    let as = t
         .find(realq)
         .limit(len)
         .map(function (z) {

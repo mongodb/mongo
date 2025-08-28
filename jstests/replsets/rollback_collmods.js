@@ -10,10 +10,10 @@ import {RollbackTestDeluxe} from "jstests/replsets/libs/rollback_test_deluxe.js"
 const testName = "rollback_collmods";
 const dbName = testName;
 
-var coll1Name = "NoInitialValidationAtAll";
-var coll2Name = "NoInitialValidationAction";
-var coll3Name = "NoInitialValidator";
-var coll4Name = "NoInitialValidationLevel";
+let coll1Name = "NoInitialValidationAtAll";
+let coll2Name = "NoInitialValidationAction";
+let coll3Name = "NoInitialValidator";
+let coll4Name = "NoInitialValidationLevel";
 
 function printCollectionOptionsForNode(node, time) {
     let opts = assert.commandWorked(node.getDB(dbName).runCommand({"listCollections": 1}));

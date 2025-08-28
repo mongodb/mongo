@@ -23,7 +23,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
  * begun to block behind the prepared transaction.
  */
 function runConcurrentTransactionOnSession(dbName, collName, lsid) {
-    var awaitShell;
+    let awaitShell;
     try {
         // Turn on failpoint that parallel shell will hit when blocked on prepare.
         assert.commandWorked(

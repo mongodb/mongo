@@ -2,7 +2,7 @@
 // cause entries to be created in the catalog.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardingTest = new ShardingTest({name: "read_does_not_create_namespaces", shards: 1});
+let shardingTest = new ShardingTest({name: "read_does_not_create_namespaces", shards: 1});
 var db = shardingTest.getDB("NonExistentDB");
 
 assert.isnull(db.nonExistentColl.findOne({}));

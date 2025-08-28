@@ -12,14 +12,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // shell to clean up the core dump that is left behind.
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     nodes: 1,
 });
 
 rst.startSet();
 rst.initiate();
 
-var conn = rst.getPrimary(); // Waits for PRIMARY state.
+let conn = rst.getPrimary(); // Waits for PRIMARY state.
 
 // Wait for the commit point to reach the top of the oplog so that the stableTS can advance.
 assert.soon(function () {
@@ -30,11 +30,11 @@ assert.soon(function () {
 conn = rst.restart(0, {noReplSet: true}); // Restart as a standalone node.
 assert.neq(null, conn, "failed to restart");
 
-var oplog = conn.getCollection("local.oplog.rs");
-var lastOplogDoc = conn.getCollection("local.oplog.rs").find().sort({$natural: -1}).limit(1)[0];
-var lastTs = lastOplogDoc.ts;
-var newTs = Timestamp(lastTs.t + 1, 1);
-var term = lastOplogDoc.t;
+let oplog = conn.getCollection("local.oplog.rs");
+let lastOplogDoc = conn.getCollection("local.oplog.rs").find().sort({$natural: -1}).limit(1)[0];
+let lastTs = lastOplogDoc.ts;
+let newTs = Timestamp(lastTs.t + 1, 1);
+let term = lastOplogDoc.t;
 
 assert.commandWorked(
     oplog.insert({
@@ -47,7 +47,7 @@ assert.commandWorked(
     }),
 );
 
-var injectedMinValidDoc = {
+let injectedMinValidDoc = {
     _id: ObjectId(),
 
     // appliedThrough
@@ -63,7 +63,7 @@ var injectedMinValidDoc = {
 
 // This weird mechanism is the only way to bypass mongod's attempt to fill in null
 // Timestamps.
-var minValidColl = conn.getCollection("local.replset.minvalid");
+let minValidColl = conn.getCollection("local.replset.minvalid");
 assert.commandWorked(minValidColl.remove({}));
 assert.commandWorked(minValidColl.update({}, {$set: injectedMinValidDoc}, {upsert: true}));
 assert.eq(

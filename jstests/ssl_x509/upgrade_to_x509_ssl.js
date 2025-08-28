@@ -13,8 +13,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {CA_CERT, KEYFILE, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 function authAllNodes() {
-    for (var n = 0; n < rst.nodes.length; n++) {
-        var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
+    for (let n = 0; n < rst.nodes.length; n++) {
+        let status = rst.nodes[n].getDB("admin").auth("root", "pwd");
         assert.eq(status, 1);
     }
 }
@@ -27,7 +27,7 @@ let opts = {
     keyFile: KEYFILE,
     tlsCAFile: CA_CERT,
 };
-var NUM_NODES = 3;
+let NUM_NODES = 3;
 var rst = new ReplSetTest({
     name: "tlsSet",
     nodes: NUM_NODES,
@@ -39,7 +39,7 @@ rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Connect to master and do some basic operations
-var rstConn1 = rst.getPrimary();
+let rstConn1 = rst.getPrimary();
 print("Performing basic operations on master.");
 rstConn1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]}, {w: NUM_NODES});
 rstConn1.getDB("admin").auth("root", "pwd");
@@ -64,12 +64,12 @@ rst.upgradeSet(
 );
 // The upgradeSet call restarts the nodes so we need to reauthenticate.
 authAllNodes();
-var rstConn3 = rst.getPrimary();
+let rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a: 3, str: "TESTTESTTEST"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 rst.awaitReplication();
 // Test that a non-ssl connection can still be made
-var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval", ";");
+let canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval", ";");
 assert.eq(0, canConnectNoSSL, "SSL Connection attempt failed when it should succeed");
 
 print("===== UPGRADE preferTLS,sendX509 -> requireTLS,x509 =====");
@@ -86,7 +86,7 @@ rst.upgradeSet(
     "pwd",
 );
 authAllNodes();
-var rstConn4 = rst.getPrimary();
+let rstConn4 = rst.getPrimary();
 rstConn4.getDB("test").a.insert({a: 4, str: "TESTTESTTEST"});
 assert.eq(4, rstConn4.getDB("test").a.count(), "Error interacting with replSet");
 rst.stopSet();

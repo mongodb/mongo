@@ -2,7 +2,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var s = new ShardingTest({shards: 2, mongos: 1});
+let s = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));

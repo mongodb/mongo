@@ -6,10 +6,10 @@
  * @tags: [assumes_balancer_off]
  */
 export const $config = (function () {
-    var states = {
+    let states = {
         remove: function remove(db, collName) {
             // try removing a random document
-            var res = assert.commandWorked(this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true}));
+            let res = assert.commandWorked(this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true}));
 
             assert.lte(res.nRemoved, 1, res);
             if (res.nRemoved === 0) {
@@ -23,12 +23,12 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {remove: {remove: 1}};
+    let transitions = {remove: {remove: 1}};
 
     function setup(db, collName, cluster) {
         // insert enough documents so that each thread can remove exactly one per iteration
-        var num = this.threadCount * this.iterations;
-        for (var i = 0; i < num; ++i) {
+        let num = this.threadCount * this.iterations;
+        for (let i = 0; i < num; ++i) {
             db[collName].insert({i: i, rand: Random.rand()});
         }
         assert.eq(db[collName].find().itcount(), num);

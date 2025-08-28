@@ -28,7 +28,7 @@ function testDuplicates(shapeName, shapeWithDupes, shapeWithoutDupes) {
 }
 
 // LineString
-var lineWithDupes = {
+let lineWithDupes = {
     _id: "line",
     geo: {
         type: "LineString",
@@ -41,7 +41,7 @@ var lineWithDupes = {
         ],
     },
 };
-var lineWithoutDupes = {
+let lineWithoutDupes = {
     type: "LineString",
     coordinates: [
         [40, 5],
@@ -50,7 +50,7 @@ var lineWithoutDupes = {
 };
 
 // Polygon
-var polygonWithDupes = {
+let polygonWithDupes = {
     _id: "poly",
     geo: {
         type: "Polygon",
@@ -73,7 +73,7 @@ var polygonWithDupes = {
         ],
     },
 };
-var polygonWithoutDupes = {
+let polygonWithoutDupes = {
     type: "Polygon",
     coordinates: [
         [
@@ -94,7 +94,7 @@ var polygonWithoutDupes = {
 };
 
 // MultiPolygon
-var multiPolygonWithDupes = {
+let multiPolygonWithDupes = {
     _id: "multi",
     geo: {
         type: "MultiPolygon",
@@ -131,7 +131,7 @@ var multiPolygonWithDupes = {
         ],
     },
 };
-var multiPolygonWithoutDupes = {
+let multiPolygonWithoutDupes = {
     type: "MultiPolygon",
     coordinates: [
         [

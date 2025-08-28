@@ -2,7 +2,7 @@
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var c = db.c;
+let c = db.c;
 c.drop();
 
 c.save({});

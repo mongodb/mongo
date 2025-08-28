@@ -38,7 +38,7 @@ function runTest(optionsObjOrOutString) {
 
         // Verify that explain's output contains the fields that we expect.
         // We loop through in the case that explain is run against a sharded cluster.
-        for (var i = 0; i < stages.length; i++) {
+        for (let i = 0; i < stages.length; i++) {
             const stage = stages[i]["$cursor"];
             if (verbosity != "allPlansExecution") {
                 assert(stage.hasOwnProperty(verbosity));

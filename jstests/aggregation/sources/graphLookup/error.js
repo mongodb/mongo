@@ -18,15 +18,15 @@ function setKnob(knob, value) {
     setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
 }
 
-var local = db.local;
-var foreign = db.foreign;
+let local = db.local;
+let foreign = db.foreign;
 
 local.drop();
 assert.commandWorked(local.insert({b: 0}));
 
 foreign.drop();
 
-var pipeline = {$graphLookup: 4};
+let pipeline = {$graphLookup: 4};
 assertErrorCode(local, pipeline, ErrorCodes.FailedToParse, "$graphLookup spec must be an object");
 
 pipeline = {
@@ -343,9 +343,9 @@ const originalMemoryLimitKnobValues = getKnob(memoryLimitKnob);
 setKnob(memoryLimitKnob, 100 * 1024);
 
 // Here, the visited set exceeds 100 KB.
-var initial = [];
-for (var i = 0; i < 8; i++) {
-    var obj = {_id: i};
+let initial = [];
+for (let i = 0; i < 8; i++) {
+    let obj = {_id: i};
     obj["longString"] = string14KB;
     initial.push(i);
     assert.commandWorked(foreign.insertOne(obj));
@@ -403,7 +403,7 @@ for (let i = 0; i < 13; i++) {
     assert.commandWorked(foreign.insertOne(obj));
 }
 
-var res = local
+let res = local
     .aggregate(
         {
             $graphLookup: {

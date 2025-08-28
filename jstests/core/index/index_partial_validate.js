@@ -1,7 +1,7 @@
-var t = db.index_partial_validate;
+let t = db.index_partial_validate;
 t.drop();
 
-var res = t.createIndex({a: 1}, {partialFilterExpression: {a: {$lte: 1}}});
+let res = t.createIndex({a: 1}, {partialFilterExpression: {a: {$lte: 1}}});
 assert.commandWorked(res);
 
 res = t.createIndex({b: 1});

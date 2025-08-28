@@ -6,20 +6,20 @@
 // in the sharding passthrough (because mongos does not have this parameter), and cannot run in the
 // parallel suite (because the change of the parameter value would interfere with other tests).
 
-var coll = db[jsTestName()];
+let coll = db[jsTestName()];
 coll.drop();
 
 // Set the internal sort memory limit to 1MB.
-var result = db.adminCommand({getParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1});
+let result = db.adminCommand({getParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1});
 assert.commandWorked(result);
-var oldSortLimit = result.internalQueryMaxBlockingSortMemoryUsageBytes;
-var newSortLimit = 1024 * 1024;
+let oldSortLimit = result.internalQueryMaxBlockingSortMemoryUsageBytes;
+let newSortLimit = 1024 * 1024;
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: newSortLimit}));
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: false}));
 
 try {
     // Insert ~3MB of data.
-    var largeStr = "";
+    let largeStr = "";
     for (var i = 0; i < 32 * 1024; ++i) {
         largeStr += "x";
     }

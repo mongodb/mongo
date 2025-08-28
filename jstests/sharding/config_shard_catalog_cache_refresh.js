@@ -23,7 +23,7 @@ function forceReadPreferenceNearestToTargetPrimary(replSet) {
     //
     // Turn on serverPingMonitorSetRTT on primary to simulate slow 'ping' from secondaries.
     const kDelayMicros = 200 * 1000;
-    var hosts = {};
+    let hosts = {};
     replSet.getSecondaries().forEach((sec) => {
         // Current RTT accounts for kRttAlpha(0.2) of new RTT.
         // Use a value large enough so the computation is guaranteed to exceed
@@ -40,7 +40,7 @@ function forceReadPreferenceNearestToTargetPrimary(replSet) {
 }
 
 const logLevel = tojson({sharding: {shardingCatalogRefresh: 1}, command: 2, query: 1});
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 1,
     rs: {
         nodes: [

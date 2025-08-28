@@ -20,14 +20,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // For startParallelOps to write its state
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
-var st = new ShardingTest({shards: 4});
+let st = new ShardingTest({shards: 4});
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.TestColl", key: {Key: 1}}));
 
-var coll = st.s0.getDB("TestDB").TestColl;
+let coll = st.s0.getDB("TestDB").TestColl;
 
 // Create 4 chunks initially
 assert.commandWorked(coll.insert({Key: 1, Value: "Test value 1"}));
@@ -57,7 +57,7 @@ pauseMigrateAtStep(st.shard2, migrateStepNames.rangeDeletionTaskScheduled);
 pauseMigrateAtStep(st.shard3, migrateStepNames.rangeDeletionTaskScheduled);
 
 // Both move chunk operations should proceed
-var joinMoveChunk1 = moveChunkParallel(
+let joinMoveChunk1 = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {Key: 10},
@@ -65,7 +65,7 @@ var joinMoveChunk1 = moveChunkParallel(
     "TestDB.TestColl",
     st.shard2.shardName,
 );
-var joinMoveChunk2 = moveChunkParallel(
+let joinMoveChunk2 = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {Key: 30},

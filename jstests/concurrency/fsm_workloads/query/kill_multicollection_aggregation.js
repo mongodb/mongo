@@ -19,7 +19,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * is successful) in 'this.cursor'.
      */
     $config.data.runAggregation = function runAggregation(db, collName, pipeline) {
-        var res = db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
+        let res = db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
 
         if (res.ok) {
             this.cursor = new DBCommandCursor(db, res, this.batchSize);
@@ -27,7 +27,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.makeLookupPipeline = function makeLookupPipeline(foreignColl) {
-        var pipeline = [
+        let pipeline = [
             {
                 $lookup: {
                     from: foreignColl,
@@ -48,7 +48,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.makeGraphLookupPipeline = function makeGraphLookupPipeline(foreignName) {
-        var pipeline = [
+        let pipeline = [
             {
                 $graphLookup: {
                     from: foreignName,
@@ -70,10 +70,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * 'this.cursor'.
      */
     $config.states.normalAggregation = function normalAggregation(db, collName) {
-        var myDB = db.getSiblingDB(this.uniqueDBName);
-        var targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let myDB = db.getSiblingDB(this.uniqueDBName);
+        let targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
 
-        var pipeline = [{$sort: this.chooseRandomlyFrom(this.indexSpecs)}];
+        let pipeline = [{$sort: this.chooseRandomlyFrom(this.indexSpecs)}];
         this.runAggregation(myDB, targetCollName, pipeline);
     };
 
@@ -82,11 +82,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * 'this.cursor'.
      */
     $config.states.lookupAggregation = function lookupAggregation(db, collName) {
-        var myDB = db.getSiblingDB(this.uniqueDBName);
-        var targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
-        var foreignCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let myDB = db.getSiblingDB(this.uniqueDBName);
+        let targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let foreignCollName = this.chooseRandomlyFrom(this.involvedCollections);
 
-        var pipeline = this.makeLookupPipeline(foreignCollName);
+        let pipeline = this.makeLookupPipeline(foreignCollName);
         this.runAggregation(myDB, targetCollName, pipeline);
     };
 
@@ -95,11 +95,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * 'this.cursor'.
      */
     $config.states.graphLookupAggregation = function graphLookupAggregation(db, collName) {
-        var myDB = db.getSiblingDB(this.uniqueDBName);
-        var targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
-        var foreignCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let myDB = db.getSiblingDB(this.uniqueDBName);
+        let targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let foreignCollName = this.chooseRandomlyFrom(this.involvedCollections);
 
-        var pipeline = this.makeGraphLookupPipeline(foreignCollName);
+        let pipeline = this.makeGraphLookupPipeline(foreignCollName);
         this.runAggregation(myDB, targetCollName, pipeline);
     };
 
@@ -108,12 +108,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * and saves the resulting cursor to 'this.cursor'.
      */
     $config.states.facetAggregation = function facetAggregation(db, collName) {
-        var myDB = db.getSiblingDB(this.uniqueDBName);
-        var targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
-        var lookupForeignCollName = this.chooseRandomlyFrom(this.involvedCollections);
-        var graphLookupForeignCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let myDB = db.getSiblingDB(this.uniqueDBName);
+        let targetCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let lookupForeignCollName = this.chooseRandomlyFrom(this.involvedCollections);
+        let graphLookupForeignCollName = this.chooseRandomlyFrom(this.involvedCollections);
 
-        var pipeline = [
+        let pipeline = [
             {
                 $facet: {
                     // The lookup pipeline computes a Cartesian product of the input collection, which
@@ -162,7 +162,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // be unique.
         this.uniqueDBName = db.getName() + jsTestName();
 
-        var myDB = db.getSiblingDB(this.uniqueDBName);
+        let myDB = db.getSiblingDB(this.uniqueDBName);
         this.involvedCollections.forEach((collName) => {
             this.populateDataAndIndexes(myDB, collName);
             assert.eq(this.numDocs, myDB[collName].find({}).itcount());

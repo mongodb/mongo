@@ -44,11 +44,11 @@ function setupTest(reshardingTest, namespace, timeout) {
 // This test will not timeout.
 const successReshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 const noTimeoutMillis = 8000;
-var namespace = `reshardingDb.coll${noTimeoutMillis}`;
+let namespace = `reshardingDb.coll${noTimeoutMillis}`;
 
 setupTest(successReshardingTest, namespace, noTimeoutMillis);
 
-var recipientShardNames = successReshardingTest.recipientShardNames;
+let recipientShardNames = successReshardingTest.recipientShardNames;
 successReshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [

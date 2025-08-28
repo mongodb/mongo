@@ -10,8 +10,8 @@ const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
 assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");
 assert.throws(sh.enableBalancing, [], "sh.enableBalancing requires a collection");
 
-var shardAName = st.shard0.shardName;
-var shardBName = st.shard1.shardName;
+let shardAName = st.shard0.shardName;
+let shardBName = st.shard1.shardName;
 
 const dbName = jsTest.name();
 const collAName = "collA";
@@ -29,7 +29,7 @@ sh.disableBalancing(collB);
 // Insert 10MB data so balancing can occur
 const bigString = "X".repeat(1024 * 1024); // 1MB
 const bulkA = collA.initializeUnorderedBulkOp();
-var bulkB = collB.initializeUnorderedBulkOp();
+let bulkB = collB.initializeUnorderedBulkOp();
 for (var i = 0; i < 10; i++) {
     bulkA.insert({_id: i, s: bigString});
     assert.commandWorked(st.s.adminCommand({split: collA.getFullName(), middle: {_id: i}}));
@@ -50,10 +50,10 @@ st.awaitBalance(collAName, dbName, 60 * 1000);
 jsTest.log("Chunks for " + collA + " are balanced.");
 
 // Check that the collB chunks were not moved
-var shardAChunks = findChunksUtil
+let shardAChunks = findChunksUtil
     .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardAName})
     .itcount();
-var shardBChunks = findChunksUtil
+let shardBChunks = findChunksUtil
     .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardBName})
     .itcount();
 printjson({shardA: shardAChunks, shardB: shardBChunks});
@@ -76,7 +76,7 @@ const db = st.s0.getDB("config");
 st.awaitBalancerRound();
 
 // Make sure auto-migrates on insert don't move data
-var lastMigration = sh._lastMigration(collB);
+let lastMigration = sh._lastMigration(collB);
 
 bulkB = collB.initializeUnorderedBulkOp();
 for (var i = 10; i < 20; i++) {

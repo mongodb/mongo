@@ -11,10 +11,10 @@ db.filler_collection.drop();
 assert.commandWorked(db.createCollection("filler_collection"));
 db.filler_collection.drop();
 
-var missingColl = db.explain_null_collection;
+let missingColl = db.explain_null_collection;
 
-var explain;
-var explainColl;
+let explain;
+let explainColl;
 
 // .find()
 missingColl.drop();

@@ -42,7 +42,7 @@ function runTest(conn) {
     assert.commandWorked(coll.insert({a: "foobar", b: 20}));
     assert.commandWorked(otherColl.insert({a: "foobar", price: 2.5}));
 
-    var statsSize = 0;
+    let statsSize = 0;
 
     // $jsonSchema properties list with $stdDevPop field and $_internalSchemaType is correctly
     // tokenized. Reproduces BF-31616.

@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var testData = [
+let testData = [
     {"description": "Special - Canonical NaN", "input": "NaN"},
     {"description": "Special - Negative NaN", "input": "NaN", "lossy": true},
     {"description": "Special - Negative NaN", "expected": "NaN", "input": "-NaN", "lossy": true},
@@ -150,7 +150,7 @@ var testData = [
 
 testData.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
-    var output = NumberDecimal(testCase.input).toString();
+    let output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {
         assert.eq(output, `NumberDecimal("${testCase.expected}")`);
     } else {

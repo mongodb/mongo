@@ -39,7 +39,7 @@ assert.commandWorked(coll.insert(docs));
 st.awaitBalancerRound();
 
 // Group by the large string field.
-var results = assert.doesNotThrow(() => {
+let results = assert.doesNotThrow(() => {
     return coll
         .aggregate([{$group: {_id: "$otherField", document_count: {$count: {}}, max_time: {$max: "$t"}}}])
         .toArray();

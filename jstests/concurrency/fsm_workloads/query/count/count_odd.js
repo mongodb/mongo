@@ -9,7 +9,7 @@
  *
  */
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {}
 
         function write(db, collName) {

@@ -6,7 +6,7 @@ let t = db.geo_polygon4;
 t.drop();
 
 let num = 0;
-var bulk = t.initializeUnorderedBulkOp();
+let bulk = t.initializeUnorderedBulkOp();
 for (let x = -180; x < 180; x += 0.5) {
     for (let y = -180; y < 180; y += 0.5) {
         let o = {_id: num++, loc: [x, y]};
@@ -15,8 +15,8 @@ for (let x = -180; x < 180; x += 0.5) {
 }
 assert.commandWorked(bulk.execute());
 
-var numTests = 31;
-for (var n = 0; n < numTests; n++) {
+let numTests = 31;
+for (let n = 0; n < numTests; n++) {
     t.dropIndexes();
     t.createIndex({loc: "2d"}, {bits: 2 + n});
 

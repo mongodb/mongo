@@ -88,7 +88,7 @@ for (let i = 0; i < 3; i++) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
 
-var outputCollectionName = "output_col";
+let outputCollectionName = "output_col";
 coll.mapReduce(mapFunction, reduceFunction, {query: {a: {$gte: 0}}, out: outputCollectionName});
 
 profileObj = getLatestProfilerEntry(testDB);

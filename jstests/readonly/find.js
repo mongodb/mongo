@@ -5,12 +5,12 @@ runReadOnlyTest(
         return {
             name: "find",
             load: function (writableCollection) {
-                for (var i = 0; i < 10; ++i) {
+                for (let i = 0; i < 10; ++i) {
                     assert.commandWorked(writableCollection.insert({x: i, y: 2 * i}));
                 }
             },
             exec: function (readableCollection) {
-                var res = readableCollection.findOne({x: 3});
+                let res = readableCollection.findOne({x: 3});
                 assert.neq(res, null);
                 assert.eq(res.y, 6);
 

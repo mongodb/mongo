@@ -155,11 +155,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // that no duplicate events (e.g due to writes on orphans) are received. Only used in
         // non-transaction suites. For transaction suites we do a strict check on the expected
         // events.
-        var seenUpdates = [];
-        var seenDeletes = [];
+        let seenUpdates = [];
+        let seenDeletes = [];
 
         // Read the operations that the workload threads did.
-        var operationsByTid = {}; // tid -> [operations]
+        let operationsByTid = {}; // tid -> [operations]
         for (var tid = 0; tid < $config.threadCount; ++tid) {
             operationsByTid[tid] = db["operations"].find({tid: tid}).sort({iteration: 1}).toArray();
         }
@@ -182,7 +182,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             if (TestData.runInsideTransaction) {
                 // Check that this event corresponds to the next outstanding operation one of the
                 // worker threads did.
-                var found = false;
+                let found = false;
                 for (let tid = 0; tid < $config.threadCount; ++tid) {
                     const nextOperationForTid = operationsByTid[tid][0];
                     if (
@@ -299,7 +299,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             previousWritePeriodicNoopsOnConfigServer = res.was;
         });
 
-        var startAtOperationTime = Timestamp(this.startAtOperationTime.t, this.startAtOperationTime.i);
+        let startAtOperationTime = Timestamp(this.startAtOperationTime.t, this.startAtOperationTime.i);
         checkChangeStream(db, collName, startAtOperationTime);
 
         // Restore the original configuration.

@@ -35,7 +35,7 @@ function runTest(conn) {
     // Next we run queries over each of the collection types to generate query stats.
 
     // Base _collection has a few simple documents.
-    var coll = testDB[jsTestName() + "_collection"];
+    let coll = testDB[jsTestName() + "_collection"];
     coll.insert({v: 1});
     coll.insert({v: 2});
     coll.insert({v: 3});

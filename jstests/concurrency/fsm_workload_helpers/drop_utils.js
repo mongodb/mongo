@@ -18,12 +18,12 @@ export function dropCollections(db, pattern) {
 export function dropDatabases(db, pattern) {
     assert(pattern instanceof RegExp, "expected pattern to be a regular expression");
 
-    var res = db.adminCommand("listDatabases");
+    let res = db.adminCommand("listDatabases");
     assert.commandWorked(res);
 
     res.databases.forEach(function (dbInfo) {
         if (pattern.test(dbInfo.name)) {
-            var res = db.getSiblingDB(dbInfo.name).dropDatabase();
+            let res = db.getSiblingDB(dbInfo.name).dropDatabase();
             assert.commandWorked(res);
         }
     });

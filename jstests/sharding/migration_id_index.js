@@ -3,12 +3,12 @@
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
-var testDB = st.s.getDB("test");
+let st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+let testDB = st.s.getDB("test");
 assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Create a collection with a v:1 _id index.
-var coll = testDB.getCollection("migration_id_index");
+let coll = testDB.getCollection("migration_id_index");
 coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName(), {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
 // We must insert a document into the collection so that subsequent index builds are two-phase.
@@ -16,7 +16,7 @@ assert.commandWorked(testDB.createCollection(coll.getName(), {idIndex: {key: {_i
 // to finish building on the secondary before returning.
 assert.commandWorked(testDB.coll.insert({a: 6}));
 st.rs0.awaitReplication();
-var spec = IndexCatalogHelpers.findByName(st.rs0.getPrimary().getDB("test").migration_id_index.getIndexes(), "_id_");
+let spec = IndexCatalogHelpers.findByName(st.rs0.getPrimary().getDB("test").migration_id_index.getIndexes(), "_id_");
 assert.neq(spec, null, "_id index spec not found");
 assert.eq(spec.v, 1, tojson(spec));
 spec = IndexCatalogHelpers.findByName(st.rs0.getSecondary().getDB("test").migration_id_index.getIndexes(), "_id_");

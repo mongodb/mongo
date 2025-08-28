@@ -10,7 +10,7 @@ export var IndexInitialSyncTest = function (options) {
     }
 
     // Capture the 'this' reference
-    var self = this;
+    let self = this;
 
     self.options = options;
 

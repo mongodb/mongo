@@ -8,6 +8,6 @@ testDb.test.drop();
 testDb.test.insert({d: ISODate("1950-01-01")});
 testDb.test.insert({d: ISODate("1980-01-01")});
 
-var out = testDb.test.aggregate({$sort: {d: 1}}).toArray();
+let out = testDb.test.aggregate({$sort: {d: 1}}).toArray();
 
 assert.lt(out[0].d, out[1].d);

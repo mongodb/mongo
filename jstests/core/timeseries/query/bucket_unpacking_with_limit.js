@@ -64,7 +64,7 @@ const assertPlanStagesInPipeline = ({
 }) => {
     // If onlyMeta is set to true, we only want to include the collection with onlyMeta field
     // specified to ensure sort can be done on the onlyMeta field
-    var colls = onlyMeta ? [metaColl] : [coll, metaColl];
+    let colls = onlyMeta ? [metaColl] : [coll, metaColl];
     for (const c of colls) {
         const aggRes = c.explain().aggregate(pipeline);
         const planStage = getExplainedPipelineFromAggregation(db, c, pipeline, {inhibitOptimization: false});
@@ -98,7 +98,7 @@ const testLimitCorrectness = (size) => {
         assert.eq(res.length, Math.min(size, allElements.length), tojson(res));
         assert.eq(res.length, new Set(res).size, tojson(res));
         // checks that each element in the result is actually from the collection
-        for (var i = 0; i < res.length; i++) {
+        for (let i = 0; i < res.length; i++) {
             assert.contains(res[i], allElements, tojson(res));
         }
     }

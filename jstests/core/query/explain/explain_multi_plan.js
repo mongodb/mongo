@@ -13,7 +13,7 @@ import {hasRejectedPlans} from "jstests/libs/query/analyze_plan.js";
  * Tests running explain on a variety of explainable commands (find, update, remove, etc.) when
  * there are multiple plans available. This is a regression test for SERVER-20849 and SERVER-21376.
  */
-var coll = db.explainMultiPlan;
+let coll = db.explainMultiPlan;
 coll.drop();
 
 // Create indices to ensure there are multiple plans available.
@@ -21,9 +21,9 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 assert.commandWorked(coll.createIndex({a: -1, b: -1}));
 
 // Insert some data to work with.
-var bulk = coll.initializeOrderedBulkOp();
-var nDocs = 100;
-for (var i = 0; i < nDocs; ++i) {
+let bulk = coll.initializeOrderedBulkOp();
+let nDocs = 100;
+for (let i = 0; i < nDocs; ++i) {
     bulk.insert({a: i, b: nDocs - i});
 }
 bulk.execute();
@@ -59,7 +59,7 @@ assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").distinct("a", {a: {$gte: 1}});
 });
 
-var res = coll
+let res = coll
     .explain("queryPlanner")
     .find({a: {$gte: 1}})
     .finish();

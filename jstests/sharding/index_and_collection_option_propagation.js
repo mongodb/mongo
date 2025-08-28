@@ -109,7 +109,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-var st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
+let st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
@@ -149,7 +149,7 @@ checkShardCollOption("validator", validationOption1, [st.shard0, st.shard1], [st
 // will retry on shard version errors, and only report overall success. That is, IndexNotFound
 // errors from shards are ignored, and not included in the 'raw' shard responses.
 
-var res;
+let res;
 
 // createIndex
 res = st.s.getDB(dbName).getCollection(collName).createIndex({"idx2": 1});

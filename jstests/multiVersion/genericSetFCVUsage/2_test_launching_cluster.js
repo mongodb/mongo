@@ -3,14 +3,14 @@ import "jstests/multiVersion/libs/verify_versions.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function checkEquivalent(testConfig, st) {
-    var expectedVersions = [testConfig.other.mongosOptions.binVersion];
-    var expectedNodes = [...testConfig.shards.rs0.nodes, ...testConfig.shards.rs1.nodes];
+    let expectedVersions = [testConfig.other.mongosOptions.binVersion];
+    let expectedNodes = [...testConfig.shards.rs0.nodes, ...testConfig.shards.rs1.nodes];
     for (j = 0; j < expectedNodes.length; j++) {
         expectedVersions.push(expectedNodes[j].binVersion);
     }
 
-    var versionsFound = [st.s0.getBinVersion()];
-    var nodes = [...st._rs[0].test.nodes, ...st._rs[1].test.nodes];
+    let versionsFound = [st.s0.getBinVersion()];
+    let nodes = [...st._rs[0].test.nodes, ...st._rs[1].test.nodes];
     for (var j = 0; j < nodes.length; j++) {
         versionsFound.push(nodes[j].getBinVersion());
     }
@@ -54,8 +54,8 @@ const validMixedVersionsToCheck = [
 
 for (let config of validMixedVersionsToCheck) {
     jsTest.log("Testing valid mixed versions: " + tojson(config));
-    var st = new ShardingTest({shards: config.shards, other: config.other});
-    var configs = [st.config0, st.config1, st.config2];
+    let st = new ShardingTest({shards: config.shards, other: config.other});
+    let configs = [st.config0, st.config1, st.config2];
     checkEquivalent(config, st);
 
     st.stop();

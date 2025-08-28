@@ -11,9 +11,9 @@ let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
 assert.neq(null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
 let adminDB = conn.getDB("admin");
 
-var collName = "collModTest";
-var coll = adminDB.getCollection(collName);
-var ttlBeforeRollback = 50;
+let collName = "collModTest";
+let coll = adminDB.getCollection(collName);
+let ttlBeforeRollback = 50;
 
 assert.commandWorked(coll.createIndex({b: 1}, {"name": "index1", "expireAfterSeconds": ttlBeforeRollback}));
 
@@ -27,7 +27,7 @@ assert.commandFailedWithCode(
 );
 
 const index = coll.getIndexes();
-var ttlAfterRollback = index[1].expireAfterSeconds;
+let ttlAfterRollback = index[1].expireAfterSeconds;
 assert.eq(ttlAfterRollback, ttlBeforeRollback);
 
 MongoRunner.stopMongod(conn);

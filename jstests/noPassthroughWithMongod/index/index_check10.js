@@ -9,8 +9,8 @@ function doIt() {
     t.drop();
 
     function sort() {
-        var sort = {};
-        for (var i = 0; i < n; ++i) {
+        let sort = {};
+        for (let i = 0; i < n; ++i) {
             sort[fields[i]] = Random.rand() > 0.5 ? 1 : -1;
         }
         return sort;
@@ -18,37 +18,37 @@ function doIt() {
 
     var fields = ["a", "b", "c", "d", "e"];
     let n = Random.randInt(5) + 1;
-    var idx = sort();
+    let idx = sort();
 
-    var chars = "abcdefghijklmnopqrstuvwxyz";
+    let chars = "abcdefghijklmnopqrstuvwxyz";
 
     function obj() {
-        var ret = {};
-        for (var i = 0; i < n; ++i) {
+        let ret = {};
+        for (let i = 0; i < n; ++i) {
             ret[fields[i]] = r();
         }
         return ret;
     }
 
     function r() {
-        var len = Random.randInt(700 / n);
+        let len = Random.randInt(700 / n);
         let buf = "";
-        for (var i = 0; i < len; ++i) {
+        for (let i = 0; i < len; ++i) {
             buf += chars.charAt(Random.randInt(chars.length));
         }
         return buf;
     }
 
     function check() {
-        var v = t.validate();
+        let v = t.validate();
         if (!v.valid) {
             printjson(v);
             assert(v.valid);
         }
-        var spec = {};
+        let spec = {};
         for (var i = 0; i < n; ++i) {
             if (Random.rand() > 0.5) {
-                var bounds = [r(), r()];
+                let bounds = [r(), r()];
                 if (bounds[0] > bounds[1]) {
                     bounds.reverse();
                 }
@@ -65,7 +65,7 @@ function doIt() {
                 }
                 spec[fields[i]] = s;
             } else {
-                var vals = [];
+                let vals = [];
                 for (var j = 0; j < Random.randInt(15); ++j) {
                     vals.push(r());
                 }
@@ -88,13 +88,13 @@ function doIt() {
             if (friendlyEqual(c1[j], c3[i])) {
                 ++j;
             } else {
-                var o = c3[i];
-                var size = Object.bsonsize(o);
-                for (var f in o) {
+                let o = c3[i];
+                let size = Object.bsonsize(o);
+                for (let f in o) {
                     size -= f.length;
                 }
 
-                var max = 818; // KeyMax
+                let max = 818; // KeyMax
                 if (size <= max) {
                     assert.eq(c1, c3, "size: " + size);
                 }
@@ -102,7 +102,7 @@ function doIt() {
         }
     }
 
-    var bulk = t.initializeUnorderedBulkOp();
+    let bulk = t.initializeUnorderedBulkOp();
     for (var i = 0; i < 10000; ++i) {
         bulk.insert(obj());
     }
@@ -129,6 +129,6 @@ function doIt() {
     check();
 }
 
-for (var z = 0; z < 5; ++z) {
+for (let z = 0; z < 5; ++z) {
     doIt();
 }

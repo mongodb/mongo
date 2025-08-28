@@ -24,9 +24,9 @@ export var ChunkHelper = (function () {
         const INITIAL_BACKOFF_SLEEP = 500; // milliseconds
         const MAX_RETRIES = 5;
 
-        var res;
-        var retries = 0;
-        var backoffSleep = INITIAL_BACKOFF_SLEEP;
+        let res;
+        let retries = 0;
+        let backoffSleep = INITIAL_BACKOFF_SLEEP;
         while (retries < MAX_RETRIES) {
             retries++;
             res = db.adminCommand(cmd);
@@ -50,7 +50,7 @@ export var ChunkHelper = (function () {
     }
 
     function splitChunkAt(db, collName, middle) {
-        var cmd = {split: db[collName].getFullName(), middle: middle};
+        let cmd = {split: db[collName].getFullName(), middle: middle};
         return runCommandWithRetries(db, cmd, (res) => res.code === ErrorCodes.LockBusy);
     }
 
@@ -59,12 +59,12 @@ export var ChunkHelper = (function () {
     }
 
     function splitChunkWithBounds(db, collName, bounds) {
-        var cmd = {split: db[collName].getFullName(), bounds: bounds};
+        let cmd = {split: db[collName].getFullName(), bounds: bounds};
         return runCommandWithRetries(db, cmd, (res) => res.code === ErrorCodes.LockBusy);
     }
 
     function moveChunk(db, collName, bounds, toShard, waitForDelete, secondaryThrottle) {
-        var cmd = {
+        let cmd = {
             moveChunk: db[collName].getFullName(),
             bounds: bounds,
             to: toShard,
@@ -123,7 +123,7 @@ export var ChunkHelper = (function () {
     }
 
     function mergeChunks(db, collName, bounds) {
-        var cmd = {mergeChunks: db[collName].getFullName(), bounds: bounds};
+        let cmd = {mergeChunks: db[collName].getFullName(), bounds: bounds};
         return runCommandWithRetries(db, cmd, (res) => res.code === ErrorCodes.LockBusy);
     }
 
@@ -159,7 +159,7 @@ export var ChunkHelper = (function () {
     // random connection.
     function getRandomMongos(connArr) {
         assert(Array.isArray(connArr), "Expected an array but got " + tojson(connArr));
-        var conn = connArr[Random.randInt(connArr.length)];
+        let conn = connArr[Random.randInt(connArr.length)];
         assert(isMongos(conn.getDB("admin")), tojson(conn) + " is not to a mongos");
         return conn;
     }
@@ -168,24 +168,24 @@ export var ChunkHelper = (function () {
     // Return all shards containing documents in [lower, upper).
     function getShardsForRange(conn, collName, lower, upper) {
         assert(isMongos(conn.getDB("admin")), tojson(conn) + " is not to a mongos");
-        var adminDB = conn.getDB("admin");
-        var shardVersion = adminDB.runCommand({getShardVersion: collName, fullMetadata: true});
+        let adminDB = conn.getDB("admin");
+        let shardVersion = adminDB.runCommand({getShardVersion: collName, fullMetadata: true});
         assert.commandWorked(shardVersion);
         // As noted in SERVER-20768, doing a range query with { $lt : X },  where
         // X is the _upper bound_ of a chunk,  incorrectly targets the shard whose
         // _lower bound_ is X. Therefore, if upper !== MaxKey, we use a workaround
         // to ensure that only the shard whose lower bound = X is targeted.
-        var query;
+        let query;
         if (upper === MaxKey) {
             query = {$and: [{_id: {$gte: lower}}, {_id: {$lt: upper}}]};
         } else {
             query = {$and: [{_id: {$gte: lower}}, {_id: {$lte: upper - 1}}]};
         }
-        var res = conn.getCollection(collName).find(query).explain();
+        let res = conn.getCollection(collName).find(query).explain();
         assert.commandWorked(res);
         assert.gt(res.queryPlanner.winningPlan.shards.length, 0, "Explain did not have shards key.");
 
-        var shards = res.queryPlanner.winningPlan.shards.map((shard) => shard.shardName);
+        let shards = res.queryPlanner.winningPlan.shards.map((shard) => shard.shardName);
         return {shards: shards, explain: res, query: query, shardVersion: shardVersion};
     }
 
@@ -202,8 +202,8 @@ export var ChunkHelper = (function () {
     // Note it will ignore those documents whose shardKey value type does not match the type of
     // lower/upper.
     function getNumDocs(conn, collName, lower, upper) {
-        var coll = conn.getCollection(collName);
-        var query = {$and: [{_id: {$gte: lower}}, {_id: {$lt: upper}}]};
+        let coll = conn.getCollection(collName);
+        let query = {$and: [{_id: {$gte: lower}}, {_id: {$lt: upper}}]};
         return itcount(coll, query);
     }
 

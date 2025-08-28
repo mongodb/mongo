@@ -8,7 +8,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
 function getShardingStats(conn) {
     return assert.commandWorked(conn.adminCommand({serverStatus: 1})).sharding;

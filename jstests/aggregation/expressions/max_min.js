@@ -2,7 +2,7 @@
  * Tests $max and $min when used as aggregation expressions.
  */
 
-var coll = db.collection;
+let coll = db.collection;
 assert(coll.drop());
 coll.insertOne({
     "int1": 5,

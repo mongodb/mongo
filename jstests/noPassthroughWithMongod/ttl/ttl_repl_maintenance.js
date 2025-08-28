@@ -6,25 +6,25 @@
  *  restarts, ensuring that the TTL monitor deletes the docs.
  */
 
-var runner;
-var conn;
+let runner;
+let conn;
 
-var primeSystemReplset = function () {
+let primeSystemReplset = function () {
     conn = MongoRunner.runMongod();
-    var localDB = conn.getDB("local");
+    let localDB = conn.getDB("local");
     localDB.system.replset.insert({x: 1});
 
     print("create a TTL collection");
-    var testDB = conn.getDB("test");
+    let testDB = conn.getDB("test");
     assert.commandWorked(testDB.foo.createIndex({x: 1}, {expireAfterSeconds: 2}));
 };
 
-var restartWithConfig = function () {
+let restartWithConfig = function () {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: conn.dbpath});
     let testDB = conn.getDB("test");
-    var n = 100;
-    for (var i = 0; i < n; i++) {
+    let n = 100;
+    for (let i = 0; i < n; i++) {
         testDB.foo.insert({x: new Date()});
     }
 
@@ -34,8 +34,8 @@ var restartWithConfig = function () {
     assert.eq(testDB.foo.count(), n);
 };
 
-var restartWithoutConfig = function () {
-    var localDB = conn.getDB("local");
+let restartWithoutConfig = function () {
+    let localDB = conn.getDB("local");
     assert.commandWorked(localDB.system.replset.remove({}));
 
     MongoRunner.stopMongod(conn);

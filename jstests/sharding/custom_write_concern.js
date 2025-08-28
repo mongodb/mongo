@@ -59,7 +59,7 @@ if (!TestData.configShard) {
 }
 
 // Reconfigure CSRS
-var cfg = st.configRS.getReplSetConfigFromNode();
+let cfg = st.configRS.getReplSetConfigFromNode();
 for (let i = 0; i < cfg.members.length; i++) {
     if (i % 2) {
         cfg.members[i].tags = {region: "us", dc: "west"};

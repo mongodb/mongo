@@ -6,9 +6,9 @@ function test(data, popExpected, sampExpected) {
     t.drop();
     assert.commandWorked(t.insert({})); // need one document to ensure we get output
 
-    for (var i = 0; i < data.length; i++) assert.commandWorked(t.insert({num: data[i]}));
+    for (let i = 0; i < data.length; i++) assert.commandWorked(t.insert({num: data[i]}));
 
-    var res = t
+    let res = t
         .aggregate({
             $group: {
                 _id: 1,

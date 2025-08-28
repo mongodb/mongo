@@ -26,19 +26,19 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
  * query was routed to a secondary node.
  */
 function doesRouteToSec(coll, query) {
-    var explain = coll.find(query).explain();
+    let explain = coll.find(query).explain();
     assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
-    var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
-    var conn = new Mongo(serverInfo.host + ":" + serverInfo.port.toString());
-    var cmdRes = conn.getDB("admin").runCommand({hello: 1});
+    let serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
+    let conn = new Mongo(serverInfo.host + ":" + serverInfo.port.toString());
+    let cmdRes = conn.getDB("admin").runCommand({hello: 1});
 
     jsTest.log("hello: " + tojson(cmdRes));
 
     return cmdRes.secondary;
 }
 
-var rsOpts = {oplogSize: 50};
-var st = new ShardingTest({
+let rsOpts = {oplogSize: 50};
+let st = new ShardingTest({
     shards: 1,
     rs: rsOpts,
     other: {keyFile: "jstests/libs/key1"},
@@ -49,18 +49,18 @@ var st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
 });
 
-var mongos = st.s;
-var replTest = st.rs0;
-var testDB = mongos.getDB("AAAAA");
-var coll = testDB.user;
-var nodeCount = replTest.nodes.length;
+let mongos = st.s;
+let replTest = st.rs0;
+let testDB = mongos.getDB("AAAAA");
+let coll = testDB.user;
+let nodeCount = replTest.nodes.length;
 
 /* Add an admin user to the replica member to simulate connecting from
  * remote location. This is because mongod allows unautheticated
  * connections to access the server from localhost connections if there
  * is no admin user.
  */
-var adminDB = mongos.getDB("admin");
+let adminDB = mongos.getDB("admin");
 adminDB.createUser({user: "user", pwd: "password", roles: jsTest.adminUserRoles});
 adminDB.auth("user", "password");
 if (!TestData.configShard) {
@@ -79,8 +79,8 @@ coll.setSecondaryOk();
  */
 awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true});
 
-var bulk = coll.initializeUnorderedBulkOp();
-for (var x = 0; x < 20; x++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let x = 0; x < 20; x++) {
     bulk.insert({v: x, k: 10});
 }
 assert.commandWorked(bulk.execute({w: nodeCount}));
@@ -88,15 +88,15 @@ assert.commandWorked(bulk.execute({w: nodeCount}));
 /* Although mongos never caches query results, try to do a different query
  * everytime just to be sure.
  */
-var vToFind = 0;
+let vToFind = 0;
 
 jsTest.log("First query to SEC");
 assert(doesRouteToSec(coll, {v: vToFind++}));
 
-var SIG_TERM = 15;
+let SIG_TERM = 15;
 replTest.stopSet(SIG_TERM, true, {auth: {user: "user", pwd: "password"}});
 
-for (var n = 0; n < nodeCount; n++) {
+for (let n = 0; n < nodeCount; n++) {
     replTest.restart(n, rsOpts);
 }
 

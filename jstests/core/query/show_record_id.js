@@ -4,7 +4,7 @@
 
 // Sanity check for the showRecordId option.
 
-var t = db.show_record_id;
+let t = db.show_record_id;
 t.drop();
 
 function checkResults(arr) {

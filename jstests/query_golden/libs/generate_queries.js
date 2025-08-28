@@ -73,7 +73,7 @@ export function nextChar(thisChar, distance) {
  * distance: "small", "middle", "large".
  */
 export function nextStr(str, distance) {
-    var res = "nextStrUndefined";
+    let res = "nextStrUndefined";
     const spec = {"small": 3, "medium": 2, "large": 1};
     if (str.length == 0) {
         const nextCharCode = min_char_code + 4 - spec[distance];
@@ -122,7 +122,7 @@ export function generateRanges(values, fieldType, rangeSize) {
         for (const val of values) {
             const nanPos = val.indexOf("NaN");
             assert(nanPos == -1, `Found NaN in values: ${values}, ${val}, ${nanPos}`);
-            var nextVar = nextStr(val, rangeSize);
+            let nextVar = nextStr(val, rangeSize);
             assert(
                 nextVar != "nextStrUndefined",
                 `Found nextStrUndefined in values: ${values}, nextVar: ${nextVar}, val=${val}, rangeSize=${rangeSize}`,
@@ -227,7 +227,7 @@ export function generateRangePredicates(field, queryValues, fieldType) {
     for (const qSize in querySpecs) {
         let ranges = [];
         if (elemType == "integer" || elemType == "double") {
-            var valueDiff = queryValues["max"] - queryValues["min"];
+            let valueDiff = queryValues["max"] - queryValues["min"];
             const rangeSize = Math.round(valueDiff * querySpecs[qSize]);
             if (rangeSize < 2 && elemType == "integer") {
                 continue;

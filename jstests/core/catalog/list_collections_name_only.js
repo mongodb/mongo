@@ -6,9 +6,9 @@
  *   does_not_support_stepdowns
  * ]
  */
-var mydb = db.getSiblingDB("list_collections_nameonly");
-var res;
-var collObj;
+let mydb = db.getSiblingDB("list_collections_nameonly");
+let res;
+let collObj;
 
 assert.commandWorked(mydb.dropDatabase());
 assert.commandWorked(mydb.createCollection("foo"));

@@ -13,18 +13,18 @@
  * would not result in a zero return code.
  */
 
-var baseName = "jstests_disk_killall";
-var dbpath = MongoRunner.dataPath + baseName;
+let baseName = "jstests_disk_killall";
+let dbpath = MongoRunner.dataPath + baseName;
 
-var mongod = MongoRunner.runMongod({dbpath: dbpath});
+let mongod = MongoRunner.runMongod({dbpath: dbpath});
 var db = mongod.getDB("test");
-var collection = db.getCollection(baseName);
+let collection = db.getCollection(baseName);
 assert.commandWorked(collection.insert({}));
 
 // set timeout for js function execution to 100 ms to speed up the test.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
 
-var awaitShell = startParallelShell(
+let awaitShell = startParallelShell(
     "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )",
     mongod.port,
 );
@@ -37,7 +37,7 @@ sleep(1000);
  * will not exit cleanly.  We're checking in this assert that mongod will stop quickly even while
  * evaling an infinite loop in server side js.
  */
-var exitCode = MongoRunner.stopMongod(mongod);
+let exitCode = MongoRunner.stopMongod(mongod);
 assert.eq(0, exitCode, "got unexpected exitCode");
 
 // Waits for shell to complete

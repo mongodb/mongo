@@ -12,18 +12,18 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartReplicationOnSecondaries, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-var nodeCount = 3;
-var replTest = new ReplSetTest({name: "applyOpsWCSet", nodes: nodeCount});
+let nodeCount = 3;
+let replTest = new ReplSetTest({name: "applyOpsWCSet", nodes: nodeCount});
 replTest.startSet();
-var cfg = replTest.getReplSetConfig();
+let cfg = replTest.getReplSetConfig();
 cfg.settings = {};
 cfg.settings.chainingAllowed = false;
 replTest.initiate(cfg);
 
-var testDB = "applyOps-wc-test";
+let testDB = "applyOps-wc-test";
 
 // Get test collection.
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -32,7 +32,7 @@ assert.commandWorked(
 replTest.awaitReplication();
 
 var db = primary.getDB(testDB);
-var coll = db.apply_ops_wc;
+let coll = db.apply_ops_wc;
 
 function dropTestCollection() {
     coll.drop();
@@ -42,7 +42,7 @@ function dropTestCollection() {
 dropTestCollection();
 
 // Set up the applyOps command.
-var applyOpsReq = {
+let applyOpsReq = {
     applyOps: [
         {op: "i", ns: coll.getFullName(), o: {_id: 2, x: "b"}},
         {op: "i", ns: coll.getFullName(), o: {_id: 3, x: "c"}},
@@ -62,7 +62,7 @@ function assertWriteConcernError(res) {
     assert(res.writeConcernError.errmsg);
 }
 
-var invalidWriteConcerns = [{w: "invalid"}, {w: nodeCount + 1}];
+let invalidWriteConcerns = [{w: "invalid"}, {w: nodeCount + 1}];
 
 function testInvalidWriteConcern(wc) {
     jsTest.log("Testing invalid write concern " + tojson(wc));
@@ -70,7 +70,7 @@ function testInvalidWriteConcern(wc) {
     applyOpsReq.writeConcern = wc;
     dropTestCollection();
     assert.commandWorked(coll.insert({_id: 1, x: "a"}));
-    var res = coll.runCommand(applyOpsReq);
+    let res = coll.runCommand(applyOpsReq);
     assertApplyOpsCommandWorked(res);
     assertWriteConcernError(res);
 }
@@ -79,9 +79,9 @@ function testInvalidWriteConcern(wc) {
 coll.insert({_id: 1, x: "a"});
 invalidWriteConcerns.forEach(testInvalidWriteConcern);
 
-var secondaries = replTest.getSecondaries();
+let secondaries = replTest.getSecondaries();
 
-var majorityWriteConcerns = [
+let majorityWriteConcerns = [
     {w: 2, wtimeout: 30000},
     {w: "majority", wtimeout: 30000},
 ];
@@ -99,7 +99,7 @@ function testMajorityWriteConcerns(wc) {
 
     // applyOps with a full replica set should succeed.
     assert.commandWorked(coll.insert({_id: 1, x: "a"}));
-    var res = db.runCommand(applyOpsReq);
+    let res = db.runCommand(applyOpsReq);
 
     assertApplyOpsCommandWorked(res);
     assert(

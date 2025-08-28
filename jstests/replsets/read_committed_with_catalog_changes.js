@@ -187,7 +187,7 @@ const testCases = {
             assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
         performOp: function (db) {
-            var res = db.coll.runCommand("compact", {force: true});
+            let res = db.coll.runCommand("compact", {force: true});
             if (res.code != ErrorCodes.CommandNotSupported) {
                 // It is fine for a storage engine to support snapshots but not compact. Since
                 // compact doesn't block any collections we are fine with doing a no-op here.
@@ -236,12 +236,12 @@ function assertReadsSucceed(coll, timeoutMs = 20000) {
 }
 
 // Set up a set and grab things for later.
-var name = "read_committed_with_catalog_changes";
-var replTest = new ReplSetTest({name: name, nodes: 3});
+let name = "read_committed_with_catalog_changes";
+let replTest = new ReplSetTest({name: name, nodes: 3});
 
 replTest.startSet();
-var nodes = replTest.nodeList();
-var config = {
+let nodes = replTest.nodeList();
+let config = {
     "_id": name,
     "members": [
         {"_id": 0, "host": nodes[0]},
@@ -253,8 +253,8 @@ var config = {
 replTest.initiate(config);
 
 // Get connections.
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -262,17 +262,17 @@ assert.commandWorked(
 );
 replTest.awaitReplication();
 // This is the DB that all of the tests will use.
-var mainDB = primary.getDB("mainDB");
+let mainDB = primary.getDB("mainDB");
 
 // This DB won't be used by any tests so it should always be unblocked.
-var otherDB = primary.getDB("otherDB");
-var otherDBCollection = otherDB.collection;
+let otherDB = primary.getDB("otherDB");
+let otherDBCollection = otherDB.collection;
 assert.commandWorked(
     otherDBCollection.insert({}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
 );
 assertReadsSucceed(otherDBCollection);
 
-for (var testName in testCases) {
+for (let testName in testCases) {
     jsTestLog("Running test " + testName);
     var test = testCases[testName];
 
@@ -316,7 +316,7 @@ for (var testName in testCases) {
     // operation they are waiting on becomes committed while the read is still blocked.
     // We don't do this when testing auth because Thread's don't propagate auth
     // credentials.
-    var threads = jsTest.options().auth
+    let threads = jsTest.options().auth
         ? []
         : test.blockedCollections.map((name) => {
               // This function must get all inputs as arguments and can't use closure because it
@@ -326,7 +326,7 @@ for (var testName in testCases) {
                   // seconds).
                   assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
               }
-              var thread = new Thread(bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
+              let thread = new Thread(bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
               thread.start();
               return thread;
           });

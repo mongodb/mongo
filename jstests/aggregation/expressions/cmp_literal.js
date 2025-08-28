@@ -4,7 +4,7 @@ coll.drop();
 assert.commandWorked(coll.insertOne({string: "foo"}));
 
 // check that without $literal we end up comparing a field with itself and the result is true
-var result = db.runCommand({
+let result = db.runCommand({
     aggregate: collName,
     pipeline: [{$project: {stringis$string: {$eq: ["$string", "$string"]}}}],
     cursor: {},

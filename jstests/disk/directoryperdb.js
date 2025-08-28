@@ -1,10 +1,10 @@
-var baseDir = "jstests_disk_directoryper";
-var baseName = "directoryperdb";
-var dbpath = MongoRunner.dataPath + baseDir + "/";
-var storageEngine = "wiredTiger";
+let baseDir = "jstests_disk_directoryper";
+let baseName = "directoryperdb";
+let dbpath = MongoRunner.dataPath + baseDir + "/";
+let storageEngine = "wiredTiger";
 
 // Matches wiredTiger collection-*.wt and index-*.wt files
-var dbFileMatcher = /(collection|index)-.+\.wt$/;
+let dbFileMatcher = /(collection|index)-.+\.wt$/;
 
 // Set up helper functions.
 let assertDocumentCount = function (db, count) {
@@ -55,7 +55,7 @@ let checkDBFilesInDBDirectory = function (conn, dbToCheck) {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: "", restart: true});
 
-    var dir = dbpath + dbToCheck;
+    let dir = dbpath + dbToCheck;
 
     // The KV catalog escapes non alpha-numeric characters with its UTF-8 byte sequence in
     // decimal when creating the directory on disk.
@@ -68,7 +68,7 @@ let checkDBFilesInDBDirectory = function (conn, dbToCheck) {
     }
 
     let files = listFiles(dir);
-    var fileCount = 0;
+    let fileCount = 0;
     for (let f in files) {
         if (files[f].isDirectory) continue;
         fileCount += 1;
@@ -85,7 +85,7 @@ let checkDBDirectoryNonexistent = function (conn, dbToCheck) {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: "", restart: true});
 
-    var files = listFiles(dbpath);
+    let files = listFiles(dbpath);
     // Check that there are no files in the toplevel dbpath.
     for (let f in files) {
         if (!files[f].isDirectory) {
@@ -97,7 +97,7 @@ let checkDBDirectoryNonexistent = function (conn, dbToCheck) {
     }
 
     // Check db directories to ensure db files in them have been destroyed.
-    var dir = dbpath + dbToCheck;
+    let dir = dbpath + dbToCheck;
     // The KV catalog escapes non alpha-numeric characters with its UTF-8 byte sequence in
     // decimal when creating the directory on disk.
     if (dbToCheck == "&") {
@@ -115,12 +115,12 @@ let checkDBDirectoryNonexistent = function (conn, dbToCheck) {
 };
 
 // Start the directoryperdb instance of mongod.
-var m = MongoRunner.runMongod({storageEngine: storageEngine, dbpath: dbpath, directoryperdb: ""});
+let m = MongoRunner.runMongod({storageEngine: storageEngine, dbpath: dbpath, directoryperdb: ""});
 // Check that the 'local' db has allocated data.
 m = checkDBFilesInDBDirectory(m, "local");
 
 // Create database with directoryperdb.
-var dbBase = m.getDB(baseName);
+let dbBase = m.getDB(baseName);
 dbBase[baseName].insert({});
 assertDocumentCount(dbBase, 1);
 m = checkDBFilesInDBDirectory(m, baseName);
@@ -142,18 +142,18 @@ assert.writeError(db[ 'journal' ].insert( {} ));
 
 // Using WiredTiger, it should be impossible to create a database named 'WiredTiger' with
 // directoryperdb, as that file is created by the WiredTiger storageEngine.
-var dbW = m.getDB("WiredTiger");
+let dbW = m.getDB("WiredTiger");
 assert.writeError(dbW[baseName].insert({}));
 
 // Create a database named 'a' repeated 63 times.
-var dbNameAA = Array(64).join("a");
-var dbAA = m.getDB(dbNameAA);
+let dbNameAA = Array(64).join("a");
+let dbAA = m.getDB(dbNameAA);
 assert.commandWorked(dbAA[baseName].insert({}));
 assertDocumentCount(dbAA, 1);
 m = checkDBFilesInDBDirectory(m, dbAA);
 
 // Create a database named '&'.
-var dbAnd = m.getDB("&");
+let dbAnd = m.getDB("&");
 assert.commandWorked(dbAnd[baseName].insert({}));
 assertDocumentCount(dbAnd, 1);
 m = checkDBFilesInDBDirectory(m, dbAnd);
@@ -163,15 +163,15 @@ m = checkDBFilesInDBDirectory(m, dbAnd);
 // is resolved.
 if (!_isWindows()) {
     // Create a database named '処'.
-    var dbNameU = "処";
-    var dbU = m.getDB(dbNameU);
+    let dbNameU = "処";
+    let dbU = m.getDB(dbNameU);
     assert.commandWorked(dbU[baseName].insert({}));
     assertDocumentCount(dbU, 1);
     m = checkDBFilesInDBDirectory(m, dbU);
 
     // Create a database named '処' repeated 21 times.
-    var dbNameUU = Array(22).join("処");
-    var dbUU = m.getDB(dbNameUU);
+    let dbNameUU = Array(22).join("処");
+    let dbUU = m.getDB(dbNameUU);
     assert.commandWorked(dbUU[baseName].insert({}));
     assertDocumentCount(dbUU, 1);
     m = checkDBFilesInDBDirectory(m, dbUU);

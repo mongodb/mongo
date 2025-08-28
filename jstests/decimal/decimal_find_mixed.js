@@ -1,6 +1,6 @@
 // Tests finding NumberDecimal from the shell in mixed collections.
 
-var col = db.decimal_find_mixed;
+let col = db.decimal_find_mixed;
 col.drop();
 
 // Insert some sample data.

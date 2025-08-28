@@ -1,5 +1,5 @@
 // Signal that the test has started running
-var sentinelPath = (_getEnv("TMPDIR") || _getEnv("TMP_DIR") || "/tmp") + "/timeout0.js.sentinel";
+let sentinelPath = (_getEnv("TMPDIR") || _getEnv("TMP_DIR") || "/tmp") + "/timeout0.js.sentinel";
 removeFile(sentinelPath);
 
 // Loop infinitely to simulate timeout.

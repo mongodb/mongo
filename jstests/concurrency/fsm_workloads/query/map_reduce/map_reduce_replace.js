@@ -28,7 +28,7 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/ma
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the workload name as a prefix for the collection name,
     // since the workload name is assumed to be unique.
-    var prefix = "map_reduce_replace";
+    let prefix = "map_reduce_replace";
 
     function uniqueCollectionName(prefix, tid) {
         return prefix + tid;
@@ -42,17 +42,17 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.mapReduce = function mapReduce(db, collName) {
-        var fullName = db[this.outCollName].getFullName();
+        let fullName = db[this.outCollName].getFullName();
         assert(db[this.outCollName].exists() !== null, "output collection '" + fullName + "' should exist");
 
-        var options = {
+        let options = {
             finalize: this.finalizer,
             out: {replace: this.outCollName},
             query: {key: {$exists: true}, value: {$exists: true}},
             sort: {_id: -1}, // sort key must be an existing index
         };
 
-        var res = db[collName].mapReduce(this.mapper, this.reducer, options);
+        let res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assert.commandWorked(res);
     };
 

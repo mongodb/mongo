@@ -1,14 +1,14 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     name: "rshbcrash",
     nodes: {n0: {}},
     nodeOptions: {setParameter: {logComponentVerbosity: tojson({replication: 5})}},
 });
 rst.startSet();
 rst.initiate();
-var primary = rst.getPrimary();
-var response1 = primary.getDB("admin").adminCommand({
+let primary = rst.getPrimary();
+let response1 = primary.getDB("admin").adminCommand({
     replSetHeartbeat: "rshbcrash",
     version: 1,
     term: 0,
@@ -25,7 +25,7 @@ assert(response1.ok, "Initial heartbeat failed. Heartbeat response: " + response
 jsTestLog(
     "sending heartbeat request with a higher configVersion. Config version sent: " + (response1.config.version + 1),
 );
-var response2 = primary.getDB("admin").adminCommand({
+let response2 = primary.getDB("admin").adminCommand({
     replSetHeartbeat: "rshbcrash",
     version: 1,
     term: response1.term,

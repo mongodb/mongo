@@ -1,7 +1,7 @@
 import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Neither tlsCAFile nor tlsUseSystemCA
-var opts = {
+let opts = {
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: SERVER_CERT,
 };

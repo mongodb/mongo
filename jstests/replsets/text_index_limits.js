@@ -12,7 +12,7 @@ replTest.startSet();
 replTest.initiate();
 
 const db = replTest.getPrimary().getDB("test");
-var t = db.text_index_limits;
+let t = db.text_index_limits;
 t.drop();
 
 assert.commandWorked(t.createIndex({comments: "text"}));

@@ -12,10 +12,10 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var dbName = "list_collections_not_blocked";
-var mydb = db.getSiblingDB(dbName);
-var session = db.getMongo().startSession({causalConsistency: false});
-var sessionDb = session.getDatabase(dbName);
+let dbName = "list_collections_not_blocked";
+let mydb = db.getSiblingDB(dbName);
+let session = db.getMongo().startSession({causalConsistency: false});
+let sessionDb = session.getDatabase(dbName);
 
 mydb.foo.drop({writeConcern: {w: "majority"}});
 

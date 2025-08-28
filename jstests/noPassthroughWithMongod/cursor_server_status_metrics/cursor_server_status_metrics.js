@@ -1,7 +1,7 @@
 /**
  * Tests for serverStatus metrics.cursor stats.
  */
-var coll = db[jsTest.name()];
+let coll = db[jsTest.name()];
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(coll.insert({_id: 2}));
@@ -17,7 +17,7 @@ function getCurrentCursorsPinned() {
     return db.serverStatus().metrics.cursor.open.pinned;
 }
 
-var initialTotalOpen = getCurrentCursorsOpen();
+let initialTotalOpen = getCurrentCursorsOpen();
 
 // We expect no pinned cursors
 assert.eq(0, getCurrentCursorsPinned());

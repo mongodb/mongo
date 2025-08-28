@@ -2,7 +2,7 @@
  * Additional tests for $avg and $sum when used as expressions.
  */
 
-var coll = db.collection;
+let coll = db.collection;
 assert(coll.drop());
 
 /*

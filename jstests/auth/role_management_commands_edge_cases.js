@@ -7,8 +7,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
-    var db = conn.getDB("test");
-    var admin = conn.getDB("admin");
+    let db = conn.getDB("test");
+    let admin = conn.getDB("admin");
     admin.createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
     admin.auth("userAdmin", "pwd");
 
@@ -240,7 +240,7 @@ function runTest(conn) {
             db.grantPrivilegesToRole("role1", []);
         });
 
-        var basicPriv = {resource: {db: "test", collection: ""}, actions: ["find"]};
+        let basicPriv = {resource: {db: "test", collection: ""}, actions: ["find"]};
 
         // Invalid first argument
         assert.throws(function () {
@@ -253,7 +253,7 @@ function runTest(conn) {
         });
 
         // Test with invalid privileges
-        var badPrivs = [];
+        let badPrivs = [];
         badPrivs.push("find");
         badPrivs.push({resource: {db: "test", collection: ""}, actions: ["fakeAction"]});
         badPrivs.push({resource: {db: ["test"], collection: ""}, actions: ["find"]});
@@ -294,7 +294,7 @@ function runTest(conn) {
             db.revokePrivilegesFromRole("readWrite", [{resource: {db: "test", collection: ""}, actions: ["find"]}]);
         });
 
-        var basicPriv = {resource: {db: "test", collection: ""}, actions: ["find"]};
+        let basicPriv = {resource: {db: "test", collection: ""}, actions: ["find"]};
 
         // Invalid first argument
         assert.throws(function () {
@@ -307,7 +307,7 @@ function runTest(conn) {
         });
 
         // Test with invalid privileges
-        var badPrivs = [];
+        let badPrivs = [];
         badPrivs.push("find");
         badPrivs.push({resource: {db: "test", collection: ""}, actions: ["fakeAction"]});
         badPrivs.push({resource: {db: ["test"], collection: ""}, actions: ["find"]});
@@ -369,11 +369,11 @@ function runTest(conn) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s);
 st.stop();

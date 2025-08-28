@@ -26,16 +26,16 @@ import {
     stopReplicationOnSecondaries,
 } from "jstests/libs/write_concern_util.js";
 
-var name = "stepdown_needs_electable_secondary";
+let name = "stepdown_needs_electable_secondary";
 
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: name,
     nodes: 5,
     nodeOptions: {
         setParameter: {logComponentVerbosity: tojson({replication: 2}), numInitialSyncAttempts: 25},
     },
 });
-var nodes = replTest.nodeList();
+let nodes = replTest.nodeList();
 
 replTest.startSet();
 replTest.initiate({
@@ -62,15 +62,15 @@ function assertStepDownSucceeds(node) {
     assert.commandWorked(node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
 }
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 jsTestLog("Blocking writes to all secondaries.");
 stopReplicationOnSecondaries(replTest);
 
 jsTestLog("Doing a write to primary.");
-var testDB = replTest.getPrimary().getDB("testdb");
-var coll = testDB.stepdown_needs_electable_secondary;
-var timeout = ReplSetTest.kDefaultTimeoutMS;
+let testDB = replTest.getPrimary().getDB("testdb");
+let coll = testDB.stepdown_needs_electable_secondary;
+let timeout = ReplSetTest.kDefaultTimeoutMS;
 assert.commandWorked(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 1, wtimeout: timeout}}));
 
 // Try to step down with only the primary caught up (1 node out of 5).
@@ -79,12 +79,12 @@ jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
 assertStepDownFailsWithExceededTimeLimit(primary);
 
 // Get the two unelectable secondaries
-var secondaryB_unelectable = replTest.nodes[3];
-var secondaryC_unelectable = replTest.nodes[4];
+let secondaryB_unelectable = replTest.nodes[3];
+let secondaryC_unelectable = replTest.nodes[4];
 
 // Get an electable secondary
-var secondaryA_electable = replTest.getSecondaries().find(function (s) {
-    var nodeId = replTest.getNodeId(s);
+let secondaryA_electable = replTest.getSecondaries().find(function (s) {
+    let nodeId = replTest.getNodeId(s);
     return nodeId !== 3 && nodeId !== 4; // nodes 3 and 4 are set to be unelectable
 });
 

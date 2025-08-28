@@ -1,11 +1,11 @@
 // Utility functions for FTS tests
 //
 export function queryIDS(coll, search, filter, extra, limit) {
-    var query = {"$text": {"$search": search}};
+    let query = {"$text": {"$search": search}};
     if (extra) query = {"$text": Object.extend({"$search": search}, extra)};
     if (filter) Object.extend(query, filter);
 
-    var result;
+    let result;
     if (limit)
         result = coll
             .find(query, {score: {"$meta": "textScore"}})

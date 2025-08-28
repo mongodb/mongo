@@ -10,13 +10,13 @@ function runTest(admindb) {
     admindb.createUser({user: "admin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
     assert.eq(1, admindb.auth("admin", "pwd"));
 
-    var sysCollections = ["system.js", "system.profile", "system.roles", "system.users"];
-    var sysPrivs = new Array();
+    let sysCollections = ["system.js", "system.profile", "system.roles", "system.users"];
+    let sysPrivs = new Array();
     for (let i in sysCollections) {
         sysPrivs.push({resource: {db: admindb.getName(), collection: sysCollections[i]}, actions: ["find"]});
     }
 
-    var findPriv = {resource: {db: admindb.getName(), collection: ""}, actions: ["find"]};
+    let findPriv = {resource: {db: admindb.getName(), collection: ""}, actions: ["find"]};
 
     admindb.createRole({role: "FindInDB", roles: [], privileges: [findPriv]});
     admindb.createRole({role: "FindOnSysRes", roles: [], privileges: sysPrivs});
@@ -50,11 +50,11 @@ function runTest(admindb) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn.getDB("admin"));
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s.getDB("admin"));
 st.stop();

@@ -190,8 +190,8 @@ function verifyChangeStreamEvents(csCursor, events) {
     // Spin a mongoD instance and initiate chunk-migration in parallel. The mongoD instance will
     // be used as a mode of communication.
     jsTest.log("Migration chunk with documents '{_id: 1}' and '{_id: 2}'");
-    var staticMongod = MongoRunner.runMongod({});
-    var joinMoveChunk = moveChunkParallel(
+    let staticMongod = MongoRunner.runMongod({});
+    let joinMoveChunk = moveChunkParallel(
         staticMongod,
         st.s0.host,
         {_id: 1},

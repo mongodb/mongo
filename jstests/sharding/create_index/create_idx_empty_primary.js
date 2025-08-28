@@ -3,10 +3,10 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 assert.commandWorked(st.s.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
-var testDB = st.s.getDB("test");
+let testDB = st.s.getDB("test");
 assert.commandWorked(testDB.adminCommand({shardcollection: "test.user", key: {_id: 1}}));
 
 // Move only chunk out of primary shard.
@@ -14,10 +14,10 @@ assert.commandWorked(testDB.adminCommand({movechunk: "test.user", find: {_id: 0}
 
 assert.commandWorked(testDB.user.insert({_id: 0}));
 
-var res = testDB.user.createIndex({i: 1});
+let res = testDB.user.createIndex({i: 1});
 assert.commandWorked(res);
 
-var indexes = testDB.user.getIndexes();
+let indexes = testDB.user.getIndexes();
 assert.eq(2, indexes.length);
 
 indexes = st.rs0.getPrimary().getDB("test").user.getIndexes();

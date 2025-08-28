@@ -12,8 +12,8 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(m, failPointName, altFailPointName) {
-    var db = m.getDB("foo");
-    var admin = m.getDB("admin");
+    let db = m.getDB("foo");
+    let admin = m.getDB("admin");
 
     admin.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
     admin.auth("admin", "password");
@@ -27,7 +27,7 @@ function runTest(m, failPointName, altFailPointName) {
     });
     db.createUser({user: "opAdmin", pwd: "opAdmin", roles: [{role: "opAdmin", db: "admin"}]});
 
-    var t = db.jstests_killop;
+    let t = db.jstests_killop;
     t.save({x: 1});
 
     if (!FixtureHelpers.isMongos(db)) {
@@ -48,7 +48,7 @@ function runTest(m, failPointName, altFailPointName) {
     function ops(ownOps = true) {
         const ops = admin.aggregate([{$currentOp: {allUsers: !ownOps, localOps: true}}]).toArray();
 
-        var ids = [];
+        let ids = [];
         for (let o of ops) {
             if (
                 (o.active || o.waitingForLock) &&
@@ -62,15 +62,15 @@ function runTest(m, failPointName, altFailPointName) {
         return ids;
     }
 
-    var queryAsReader =
+    let queryAsReader =
         'db = db.getSiblingDB("foo"); db.auth("reader", "reader"); db.jstests_killop.find().comment("kill_own_ops").toArray()';
 
     jsTestLog("Starting long-running operation");
     db.auth("reader", "reader");
     const fp = configureFailPoint(m, failPointName);
-    var s1 = startParallelShell(queryAsReader, m.port);
+    let s1 = startParallelShell(queryAsReader, m.port);
     jsTestLog("Finding ops in $currentOp output");
-    var o = [];
+    let o = [];
     assert.soon(
         function () {
             o = ops();
@@ -91,26 +91,26 @@ function runTest(m, failPointName, altFailPointName) {
     assert.eq(1, ops().length);
     db.logout();
     jsTestLog("Checking that originating user can kill operation");
-    var start = new Date();
+    let start = new Date();
     db.auth("reader", "reader");
     assert.commandWorked(db.killOp(o[0]));
     checkLog.contains(db, '"msg":"Successful killOp"');
     fp.off();
 
     jsTestLog("Waiting for ops to terminate");
-    var exitCode = s1({checkExitSuccess: false});
+    let exitCode = s1({checkExitSuccess: false});
     assert.neq(0, exitCode, "expected shell to exit abnormally due to operation execution being terminated");
 
     // don't want to pass if timeout killed the js function.
-    var end = new Date();
-    var diff = end - start;
+    let end = new Date();
+    let diff = end - start;
     assert.lt(diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);
 
     jsTestLog("Starting a second long-running operation");
     const fp2 = configureFailPoint(m, failPointName);
-    var s2 = startParallelShell(queryAsReader, m.port);
+    let s2 = startParallelShell(queryAsReader, m.port);
     jsTestLog("Finding ops in $currentOp output");
-    var o2 = [];
+    let o2 = [];
     assert.soon(
         function () {
             o2 = ops();
@@ -144,11 +144,11 @@ function runTest(m, failPointName, altFailPointName) {
     assert.lt(diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);
 }
 
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn, "setYieldAllLocksHang");
 MongoRunner.stopMongod(conn);
 
-var st = new ShardingTest({shards: 1, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 1, keyFile: "jstests/libs/key1"});
 // Use a different failpoint in the sharded version, since the mongos does not have a
 // setYieldAlllocksHang failpoint.
 runTest(st.s, "waitInFindBeforeMakingBatch");

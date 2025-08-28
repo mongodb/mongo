@@ -7,7 +7,7 @@
 //   incompatible_with_views,
 // ]
 
-var t = db.dbref3;
+let t = db.dbref3;
 
 t.drop();
 
@@ -29,13 +29,13 @@ t.find().forEach(function (obj) {
 });
 
 // We should be able to run distinct against DBRef fields.
-var distinctRefs = t.distinct("sub.$ref");
+let distinctRefs = t.distinct("sub.$ref");
 print("distinct $ref = " + distinctRefs);
 
-var distinctIDs = t.distinct("sub.$id");
+let distinctIDs = t.distinct("sub.$id");
 print("distinct $id = " + distinctIDs);
 
-var distinctDBs = t.distinct("sub.$db");
+let distinctDBs = t.distinct("sub.$db");
 print("distinct $db = " + distinctDBs);
 
 // Confirm number of unique values in each DBRef field.
@@ -54,7 +54,7 @@ t.insert({
         ],
     },
 });
-var k = t.findOne({"sub.$id": {$elemMatch: {x: 2}}}, {_id: 0, "sub.$id.$": 1});
+let k = t.findOne({"sub.$id": {$elemMatch: {x: 2}}}, {_id: 0, "sub.$id.$": 1});
 print("k = " + tojson(k));
 assert.eq({sub: {$id: [{x: 2, y: 2}]}}, k);
 

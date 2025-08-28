@@ -17,18 +17,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Pick a random word and search for it using full text search.
      */
     $config.states.query = function text(db, collName) {
-        var word = this.words[Random.randInt(this.words.length)];
+        let word = this.words[Random.randInt(this.words.length)];
 
-        var cursor = db[collName].find({$text: {$search: word}, yield_text: {$exists: true}}).batchSize(this.batchSize);
+        let cursor = db[collName].find({$text: {$search: word}, yield_text: {$exists: true}}).batchSize(this.batchSize);
 
-        var verifier = function textVerifier(doc, prevDoc) {
+        let verifier = function textVerifier(doc, prevDoc) {
             return doc.yield_text.indexOf(word) !== -1;
         };
         this.advanceCursor(cursor, verifier);
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var newWord = this.words[Random.randInt(this.words.length)];
+        let newWord = this.words[Random.randInt(this.words.length)];
         return {$set: {yield_text: newWord}};
     };
 

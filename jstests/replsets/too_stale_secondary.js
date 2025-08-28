@@ -48,16 +48,16 @@ function myState(conn) {
     return assert.commandWorked(conn.adminCommand("replSetGetStatus")).myState;
 }
 
-var testName = "too_stale_secondary";
+let testName = "too_stale_secondary";
 
-var smallOplogSizeMB = 1;
-var bigOplogSizeMB = 1000;
+let smallOplogSizeMB = 1;
+let bigOplogSizeMB = 1000;
 
 // Node 0 is given a small oplog so we can overflow it. Node 1's large oplog allows it to
 // store all entries comfortably without overflowing, so that Node 2 can eventually use it as
 // a sync source after it goes too stale. Because this test overflows the oplog, a small
 // syncdelay is chosen to frequently take checkpoints, allowing oplog truncation to proceed.
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: testName,
     nodes: [{oplogSize: smallOplogSizeMB}, {oplogSize: bigOplogSizeMB}, {oplogSize: smallOplogSizeMB}],
     nodeOptions: {
@@ -66,7 +66,7 @@ var replTest = new ReplSetTest({
     },
 });
 
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 replTest.initiate({
     _id: testName,
     members: [
@@ -76,14 +76,14 @@ replTest.initiate({
     ],
 });
 
-var dbName = testName;
-var collName = "test";
+let dbName = testName;
+let collName = "test";
 
 jsTestLog("Wait for Node 0 to become the primary.");
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
-var primary = replTest.getPrimary();
-var primaryTestDB = primary.getDB(dbName);
+let primary = replTest.getPrimary();
+let primaryTestDB = primary.getDB(dbName);
 
 jsTestLog("1: Insert one document on the primary (Node 0) and ensure it is replicated.");
 assert.commandWorked(primaryTestDB[collName].insert({a: 1}, {writeConcern: {w: 3}}));

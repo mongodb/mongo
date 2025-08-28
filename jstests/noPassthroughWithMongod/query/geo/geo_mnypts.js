@@ -1,14 +1,14 @@
 // Test sanity of geo queries with a lot of points
 
-var coll = db.testMnyPts;
+let coll = db.testMnyPts;
 coll.drop();
 
-var totalPts = 500 * 1000;
+let totalPts = 500 * 1000;
 
 // Add points in a 100x100 grid
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < totalPts; i++) {
-    var ii = i % 10000;
+    let ii = i % 10000;
     bulk.insert({loc: [ii % 100, Math.floor(ii / 100)]});
 }
 assert.commandWorked(bulk.execute());
@@ -17,8 +17,8 @@ coll.createIndex({loc: "2d"});
 
 // Check that quarter of points in each quadrant
 for (var i = 0; i < 4; i++) {
-    var x = i % 2;
-    var y = Math.floor(i / 2);
+    let x = i % 2;
+    let y = Math.floor(i / 2);
 
     var box = [
         [0, 0],
@@ -47,7 +47,7 @@ for (var i = 0; i < 2; i++) {
 }
 
 // Check that all but corner set of points in radius
-var circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
+let circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
 
 assert.eq(totalPts - totalPts / (100 * 100), coll.find({loc: {$within: {$center: circle}}}).count());
 assert.eq(totalPts - totalPts / (100 * 100), coll.find({loc: {$within: {$center: circle}}}).itcount());

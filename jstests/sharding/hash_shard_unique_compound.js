@@ -6,12 +6,12 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 1, mongos: 1});
-var dbName = "test";
-var collName = "foo";
-var ns = dbName + "." + collName;
+let s = new ShardingTest({shards: 1, mongos: 1});
+let dbName = "test";
+let collName = "foo";
+let ns = dbName + "." + collName;
 var db = s.getDB(dbName);
-var coll = db.getCollection(collName);
+let coll = db.getCollection(collName);
 
 // Enable sharding on DB
 assert.commandWorked(db.adminCommand({enablesharding: dbName}));

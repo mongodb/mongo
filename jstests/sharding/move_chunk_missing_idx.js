@@ -8,9 +8,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // This test runs dropIndex on one of the shards.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var testDB = st.s.getDB("test");
+let testDB = st.s.getDB("test");
 
 testDB.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName});
 testDB.adminCommand({shardCollection: "test.user", key: {x: 1}});

@@ -46,7 +46,7 @@ assert.commandWorked(
 );
 
 // Find the tags docs.
-var configDB = st.s.getDB("config");
+let configDB = st.s.getDB("config");
 let tags = configDB.tags.find({}).toArray();
 
 // Assert only one tag doc is present and zone ranges are correct.

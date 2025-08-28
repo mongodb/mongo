@@ -10,8 +10,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // but are allowed via a direct connection to the config server or shard.
 TestData.replicaSetEndpointIncompatible = true;
 
-var st = new ShardingTest({shards: 1});
-var mongos = st.s;
+let st = new ShardingTest({shards: 1});
+let mongos = st.s;
 var config = st.configRS.getPrimary().getDB("config");
 
 jsTest.log("Dropping a collection in admin/config DB is illegal");

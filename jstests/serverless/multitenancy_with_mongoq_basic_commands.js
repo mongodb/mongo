@@ -284,13 +284,13 @@ const tokenDB = tokenConn.getDB(kDbName);
 
     // Test createIndexes, listIndexes and dropIndexes command.
     {
-        var sortIndexesByName = function (indexes) {
+        let sortIndexesByName = function (indexes) {
             return indexes.sort(function (a, b) {
                 return a.name > b.name;
             });
         };
 
-        var getIndexesKeyAndName = function (indexes) {
+        let getIndexesKeyAndName = function (indexes) {
             return sortIndexesByName(indexes).map(function (index) {
                 return {key: index.key, name: index.name};
             });

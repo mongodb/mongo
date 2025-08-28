@@ -17,7 +17,7 @@
 // iteration, or it may hang if the final getMore is blocked waiting on a different consumer to make
 // space in its buffer.
 export const $config = (function () {
-    var data = {
+    let data = {
         numDocs: 10000,
         numConsumers: 5,
         bufferSize: 100 * 1024,
@@ -44,7 +44,7 @@ export const $config = (function () {
 
     // One state per consumer consumer, with equal probability so we exhaust each cursor in
     // approximately the same timeline. See runGetMoreOnCursor for details.
-    var states = (function () {
+    let states = (function () {
         function makeConsumerCallback(consumerId) {
             return function consumerCallback(db, collName) {
                 return runGetMoreOnCursor(db, collName, consumerId, this.batchSize, this.cursorIds, this.sessionId);
@@ -62,8 +62,8 @@ export const $config = (function () {
         };
     })();
 
-    var allStatesEqual = {init: 0, consumer0: 0.2, consumer1: 0.2, consumer2: 0.2, consumer3: 0.2, consumer4: 0.2};
-    var transitions = {
+    let allStatesEqual = {init: 0, consumer0: 0.2, consumer1: 0.2, consumer2: 0.2, consumer3: 0.2, consumer4: 0.2};
+    let transitions = {
         init: allStatesEqual,
         consumer0: allStatesEqual,
         consumer1: allStatesEqual,

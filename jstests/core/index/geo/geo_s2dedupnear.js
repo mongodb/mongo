@@ -8,7 +8,7 @@ let t = db.geo_s2dedupnear;
 t.drop();
 
 t.createIndex({geo: "2dsphere"});
-var x = {
+let x = {
     "type": "Polygon",
     "coordinates": [
         [

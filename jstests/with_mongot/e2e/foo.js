@@ -27,7 +27,7 @@ createSearchIndex(
     {name: "foo-non-block", definition: {"mappings": {"dynamic": true}}},
     {blockUntilSearchIndexQueryable: false},
 );
-var searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
+let searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
 assert.eq(searchIndexes.length, 2, searchIndexes);
 
 let searchRes = coll

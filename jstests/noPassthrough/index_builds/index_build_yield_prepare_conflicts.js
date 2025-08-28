@@ -26,7 +26,7 @@ const primaryAdmin = primary.getDB("admin");
 const primaryColl = primaryDB[collName];
 const collNss = primaryColl.getFullName();
 
-for (var i = 0; i < 3; i++) {
+for (let i = 0; i < 3; i++) {
     assert.commandWorked(primaryColl.insert({_id: i, x: i}));
 }
 rst.awaitReplication();

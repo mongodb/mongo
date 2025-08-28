@@ -25,7 +25,7 @@ function runBasicTest(adminDB) {
         }
     }
 
-    var res;
+    let res;
 
     // A failpoint's state can be read through getParameter by prefixing its name with
     // "failpoint"
@@ -76,7 +76,7 @@ function runBasicTest(adminDB) {
     expectFailPointState(res["failpoint.dummy"], 1, {x: 1});
 
     // Test that the timeout for waitForFailPoint can be set via maxTimeMS.
-    var configureFailPointRes = adminDB.runCommand({configureFailPoint: "dummy", mode: "alwaysOn"});
+    let configureFailPointRes = adminDB.runCommand({configureFailPoint: "dummy", mode: "alwaysOn"});
     assert.commandWorked(configureFailPointRes);
     assert.commandFailedWithCode(
         adminDB.adminCommand({
@@ -95,11 +95,11 @@ function runBasicTest(adminDB) {
 }
 
 // Test the parameter handling.
-var conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 runBasicTest(conn.getDB("admin"));
 MongoRunner.stopMongod(conn);
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 runBasicTest(st.s.getDB("admin"));
 
 // Test the functionality of the commands.
@@ -108,7 +108,7 @@ const testColl = testDB["user"];
 const failPointName = "hangAfterCollectionInserts";
 
 // Turn on the fail point and check that the returned count is 0.
-var configureFailPointRes = assert.commandWorked(
+let configureFailPointRes = assert.commandWorked(
     testDB.adminCommand({
         configureFailPoint: failPointName,
         mode: "alwaysOn",

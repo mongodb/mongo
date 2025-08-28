@@ -43,7 +43,7 @@ function runUpdateQuery(db) {
     let coll = db.getCollection(collName);
 
     let pre = coll.findOne({$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
-    var preSalesWins = pre.salesWins;
+    let preSalesWins = pre.salesWins;
 
     assert.commandWorked(
         coll.update(
@@ -54,7 +54,7 @@ function runUpdateQuery(db) {
     );
 
     let post = coll.findOne({$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
-    var postSalesWins = post.salesWins;
+    let postSalesWins = post.salesWins;
 
     assert.eq(postSalesWins, preSalesWins + 1000);
 }
@@ -81,7 +81,7 @@ function runFindAndModifyQuery(db) {
     let coll = db.getCollection(collName);
 
     let pre = coll.findOne({$expr: {allowedRole: "$$USER_ROLES.role"}});
-    var preSalesWins = pre.salesWins;
+    let preSalesWins = pre.salesWins;
 
     db.coll.findAndModify({
         query: {allowedRole: "read", $expr: {allowedRole: "$$USER_ROLES.role"}},
@@ -89,7 +89,7 @@ function runFindAndModifyQuery(db) {
     });
 
     let post = coll.findOne({$expr: {allowedRole: "$$USER_ROLES.role"}});
-    var postSalesWins = post.salesWins;
+    let postSalesWins = post.salesWins;
 
     assert.eq(postSalesWins, preSalesWins + 1000);
 }

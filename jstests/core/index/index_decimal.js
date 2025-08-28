@@ -10,7 +10,7 @@
 // Include helpers for analyzing explain output.
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var t = db.decimal_indexing;
+let t = db.decimal_indexing;
 t.drop();
 
 // Create doubles and NumberDecimals. The double 0.1 is actually 0.10000000000000000555
@@ -30,8 +30,8 @@ assert.writeError(t.insert({_id: -0.0}));
 
 // Check that we return exactly the right document, use an index to do so, and that the
 // result of the covered query has the right number of trailing zeros.
-var qres = t.find({x: NumberDecimal("0.1")}, {_id: 0, x: 1}).toArray();
-var qplan = t.find({x: NumberDecimal("0.1")}, {_id: 0, x: 1}).explain();
+let qres = t.find({x: NumberDecimal("0.1")}, {_id: 0, x: 1}).toArray();
+let qplan = t.find({x: NumberDecimal("0.1")}, {_id: 0, x: 1}).explain();
 assert.neq(
     tojson(NumberDecimal("0.1")),
     tojson(NumberDecimal("0.10")),

@@ -4,11 +4,11 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1, mongos: 1});
+let st = new ShardingTest({shards: 1, mongos: 1});
 
 function checkResponseFields(commandString) {
     jsTestLog("Running the " + commandString + " command");
-    var res = st.s0.getDB("admin").runCommand(commandString);
+    let res = st.s0.getDB("admin").runCommand(commandString);
 
     // check that the fields that should be there are there and have proper values
     assert(
@@ -31,7 +31,7 @@ function checkResponseFields(commandString) {
     assert(res.localTime, "localTime possibly missing:" + tojson(res));
     assert(res.msg && res.msg == "isdbgrid", "msg possibly missing or wrong:" + tojson(res));
 
-    var unwantedFields = [
+    let unwantedFields = [
         "setName",
         "setVersion",
         "secondary",
@@ -48,8 +48,8 @@ function checkResponseFields(commandString) {
         "me",
     ];
     // check that the fields that shouldn't be there are not there
-    var badFields = [];
-    var field;
+    let badFields = [];
+    let field;
     for (field in res) {
         if (!res.hasOwnProperty(field)) {
             continue;

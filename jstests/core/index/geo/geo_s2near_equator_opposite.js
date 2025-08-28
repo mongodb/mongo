@@ -5,7 +5,7 @@
 //   requires_getmore,
 // ]
 
-var t = db.geos2nearequatoropposite;
+let t = db.geos2nearequatoropposite;
 
 t.drop();
 
@@ -15,19 +15,19 @@ t.insert({loc: {type: "Point", coordinates: [-1, 0]}});
 t.createIndex({loc: "2dsphere"});
 
 // upper bound for half of earth's circumference in meters
-var dist = 40075000 / 2 + 1;
+let dist = 40075000 / 2 + 1;
 
-var nearSphereCount = t
+let nearSphereCount = t
     .find({
         loc: {$nearSphere: {$geometry: {type: "Point", coordinates: [180, 0]}, $maxDistance: dist}},
     })
     .itcount();
-var nearCount = t
+let nearCount = t
     .find({
         loc: {$near: {$geometry: {type: "Point", coordinates: [180, 0]}, $maxDistance: dist}},
     })
     .itcount();
-var geoNearResult = t
+let geoNearResult = t
     .aggregate([
         {
             $geoNear: {

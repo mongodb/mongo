@@ -31,7 +31,7 @@ update_succeeds({_id: 2, a: 3}, 2, {_id: 2, a: 3});
 
 function update_fails(updateDoc, qid) {
     prepare();
-    var res = t.update({_id: qid}, updateDoc, true);
+    let res = t.update({_id: qid}, updateDoc, true);
     assert.writeError(res);
     assert.eq(t.count(), 1);
     assert.eq(t.findOne(), startingDoc);

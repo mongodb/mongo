@@ -10,11 +10,11 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var compare_configs = function (c1, c2) {
+let compare_configs = function (c1, c2) {
     assert.eq(c1.version, c2.version, "version same");
     assert.eq(c1._id, c2._id, "_id same");
 
-    for (var i in c1.members) {
+    for (let i in c1.members) {
         assert(c2.members[i] !== undefined, "field " + i + " exists in both configs");
         assert.eq(c1.members[i]._id, c2.members[i]._id, "id is equal in both configs");
         assert.eq(c1.members[i].host, c2.members[i].host, "host is equal in both configs");
@@ -22,7 +22,7 @@ var compare_configs = function (c1, c2) {
 };
 
 // Create a new replica set test. Specify set name and the number of nodes you want.
-var replTest = new ReplSetTest({name: "testSet", nodes: 3});
+let replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
 // call startSet() to start each mongod in the replica set
 // this returns a list of nodes
@@ -38,14 +38,14 @@ replTest.awaitSecondaryNodes();
 
 // Call getPrimary to return a reference to the node that's been
 // elected primary.
-var primary = replTest.getPrimary();
-var config1 = primary.getDB("local").system.replset.findOne();
+let primary = replTest.getPrimary();
+let config1 = primary.getDB("local").system.replset.findOne();
 
 // Now we're going to shut down all nodes
-var pId = replTest.getNodeId(primary);
-var [s1, s2] = replTest.getSecondaries();
-var s1Id = replTest.getNodeId(s1);
-var s2Id = replTest.getNodeId(s2);
+let pId = replTest.getNodeId(primary);
+let [s1, s2] = replTest.getSecondaries();
+let s1Id = replTest.getNodeId(s1);
+let s2Id = replTest.getNodeId(s2);
 
 replTest.stop(s1Id);
 replTest.stop(s2Id);
@@ -62,6 +62,6 @@ replTest.restart(s2Id);
 // Make sure that a new primary comes up
 primary = replTest.getPrimary();
 replTest.awaitSecondaryNodes();
-var config2 = primary.getDB("local").system.replset.findOne();
+let config2 = primary.getDB("local").system.replset.findOne();
 compare_configs(config1, config2);
 replTest.stopSet();

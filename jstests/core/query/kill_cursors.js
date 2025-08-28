@@ -13,14 +13,14 @@
 //   assumes_no_implicit_cursor_exhaustion,
 // ]
 
-var cmdRes;
-var cursor;
-var cursorId;
+let cmdRes;
+let cursor;
+let cursorId;
 
-var coll = db.jstest_killcursors;
+let coll = db.jstest_killcursors;
 coll.drop();
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 

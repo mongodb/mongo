@@ -30,7 +30,7 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/ma
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the workload name as the database name,
     // since the workload name is assumed to be unique.
-    var uniqueDBName = "map_reduce_merge";
+    let uniqueDBName = "map_reduce_merge";
 
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
@@ -39,21 +39,21 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.mapReduce = function mapReduce(db, collName) {
-        var outDB = db.getSiblingDB(this.outDBName);
-        var fullName = outDB[collName].getFullName();
+        let outDB = db.getSiblingDB(this.outDBName);
+        let fullName = outDB[collName].getFullName();
         assert(outDB[collName].exists() !== null, "output collection '" + fullName + "' should exist");
 
         // Have all threads combine their results into the same collection
-        var options = {finalize: this.finalizer, out: {merge: collName, db: this.outDBName}};
+        let options = {finalize: this.finalizer, out: {merge: collName, db: this.outDBName}};
 
-        var res = db[collName].mapReduce(this.mapper, this.reducer, options);
+        let res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assert.commandWorked(res);
     };
 
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        var outDB = db.getSiblingDB(db.getName() + uniqueDBName);
+        let outDB = db.getSiblingDB(db.getName() + uniqueDBName);
         assert.commandWorked(outDB.createCollection(collName));
     };
 

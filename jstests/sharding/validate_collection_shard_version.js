@@ -7,10 +7,10 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 1}});
+let st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 1}});
 
-var s0 = st.s0;
-var s1 = st.s1;
+let s0 = st.s0;
+let s1 = st.s1;
 
 const kDbName = "test";
 const kCollName = "foo";
@@ -35,11 +35,11 @@ assert.commandWorked(s1Coll.insert({_id: 1}));
 configureFailPoint(st.shard1, "corruptDocumentOnInsert", {}, "off");
 
 // Up-to-date mongos detects the corrupted document.
-var res1 = s1Coll.validate();
+let res1 = s1Coll.validate();
 assert.eq(res1.valid, false, "Validate returned valid true when expected false: " + tojson(res1));
 
 // The stale mongos performs a refresh and detects the corrupted document.
-var res0 = s0Coll.validate();
+let res0 = s0Coll.validate();
 assert.eq(res0.valid, false, "Validate returned valid true when expected false: " + tojson(res0));
 
 // Drop the database so that we don't fail the automatic validation which runs when the test exits.

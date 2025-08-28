@@ -29,7 +29,7 @@ const stOtherOptions = {
     enableBalancer: false,
 };
 
-var st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
+let st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
 assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
 
 jsTest.log("Testing all commands on a sharded collection where {_id: 1} is the shard key.");

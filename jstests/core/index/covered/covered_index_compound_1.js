@@ -10,7 +10,7 @@
 // Include helpers for analyzing explain output.
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.getCollection("covered_compound_1");
+let coll = db.getCollection("covered_compound_1");
 coll.drop();
 for (let i = 0; i < 100; i++) {
     coll.insert({a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10)});

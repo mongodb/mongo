@@ -1,8 +1,8 @@
 // Test enabling and disabling the MONGODB-X509 auth mech
 
-var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
+let CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
 
-var conn = MongoRunner.runMongod({
+let conn = MongoRunner.runMongod({
     auth: "",
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: "jstests/libs/server.pem",
@@ -11,7 +11,7 @@ var conn = MongoRunner.runMongod({
 
 // Find out if this build supports the authenticationMechanisms startup parameter.
 // If it does, restart with and without the MONGODB-X509 mechanisms enabled.
-var cmdOut = conn.getDB("admin").runCommand({getParameter: 1, authenticationMechanisms: 1});
+let cmdOut = conn.getDB("admin").runCommand({getParameter: 1, authenticationMechanisms: 1});
 if (cmdOut.ok) {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({restart: conn, setParameter: "authenticationMechanisms=MONGODB-X509"});

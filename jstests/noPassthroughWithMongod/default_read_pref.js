@@ -1,8 +1,8 @@
 // Tests that the default read preference is 'unset', and that the slaveOk bit is not set
 // on read commands run with an 'unset' read preference.
-var mongo = db.getMongo();
+let mongo = db.getMongo();
 try {
-    var commandsRan = [];
+    let commandsRan = [];
     db._mongo = {
         getSecondaryOk: function () {
             return false;

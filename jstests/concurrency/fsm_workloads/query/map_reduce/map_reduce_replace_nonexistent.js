@@ -35,18 +35,18 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     }
 
     $config.states.mapReduce = function mapReduce(db, collName) {
-        var outCollName = uniqueCollectionName(this.prefix, this.tid);
+        let outCollName = uniqueCollectionName(this.prefix, this.tid);
         // Dropping the targeted collection in case it contains garbage from previous runs and
         // creating it again to support concurrent mapReduce targeting the same collection.
         assertDropAndRecreateCollection(db, outCollName);
 
-        var options = {
+        let options = {
             finalize: this.finalizer,
             out: {replace: outCollName},
             query: {key: {$exists: true}, value: {$exists: true}},
         };
 
-        var res = db[collName].mapReduce(this.mapper, this.reducer, options);
+        let res = db[collName].mapReduce(this.mapper, this.reducer, options);
         assert.commandWorked(res);
         assert(db[outCollName].drop());
     };

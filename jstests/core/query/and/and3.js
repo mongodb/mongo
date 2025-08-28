@@ -17,7 +17,7 @@ t.save({a: "foo"});
 t.createIndex({a: 1});
 
 function checkScanMatch(query, docsExamined, n) {
-    var e = t.find(query).hint({a: 1}).explain("executionStats");
+    let e = t.find(query).hint({a: 1}).explain("executionStats");
     assert.eq(docsExamined, e.executionStats.totalDocsExamined);
     assert.eq(n, e.executionStats.nReturned);
 }

@@ -15,11 +15,11 @@ runReadOnlyTest(
                 // read-only aware.
                 if (TestData.fixture === "sharded") return;
 
-                var db = writableCollection.getDB();
+                let db = writableCollection.getDB();
 
                 // Create some collections so we can verify that listCollections works in read-only
                 // mode.
-                for (var collectionName of this.collectionNames) {
+                for (let collectionName of this.collectionNames) {
                     assert.commandWorked(db.runCommand({create: collectionName}));
                 }
 
@@ -31,7 +31,7 @@ runReadOnlyTest(
                 this.collectionNames.push(this.tsCollectionName, this.tsBucketsCollectionName);
 
                 // Create some indexes so we can verify that listIndexes works in read-only mode.
-                for (var indexSpec of this.indexSpecs) {
+                for (let indexSpec of this.indexSpecs) {
                     assert.commandWorked(writableCollection.createIndex(indexSpec));
                 }
             },
@@ -75,11 +75,11 @@ runReadOnlyTest(
                 assert.commandFailed(db.runCommand({dropDatabase: 1}));
 
                 // Check that we can read our indexes out.
-                var indexes = readableCollection.getIndexes();
-                var actualIndexes = indexes.map((fullSpec) => {
+                let indexes = readableCollection.getIndexes();
+                let actualIndexes = indexes.map((fullSpec) => {
                     return fullSpec.key;
                 });
-                var expectedIndexes = [{_id: 1}].concat(this.indexSpecs);
+                let expectedIndexes = [{_id: 1}].concat(this.indexSpecs);
 
                 assert.docEq(expectedIndexes, actualIndexes);
 

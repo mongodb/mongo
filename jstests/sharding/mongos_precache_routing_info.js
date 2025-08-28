@@ -1,14 +1,14 @@
 // create
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({
+let s = new ShardingTest({
     shards: 2,
     other: {
         mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
     },
 });
 var db = s.getDB("test");
-var ss = db.serverStatus();
+let ss = db.serverStatus();
 
 const shardCommand = {
     shardcollection: "test.foo",
@@ -21,9 +21,9 @@ assert.commandWorked(s.s0.adminCommand(shardCommand));
 
 // split numSplits times
 const numSplits = 2;
-var i;
+let i;
 for (i = 0; i < numSplits; i++) {
-    var midKey = {num: i};
+    let midKey = {num: i};
     assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: midKey}));
 }
 

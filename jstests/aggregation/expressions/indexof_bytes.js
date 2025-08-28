@@ -25,22 +25,22 @@ function testExpressionBytes(coll, expression, result, shouldTestEquivalence = t
     if (shouldTestEquivalence) {
         // If we are specifying a starting or ending index for the search, we should be able to
         // achieve equivalent behavior using $substrBytes.
-        var indexOfSpec = expression["$indexOfBytes"];
-        var input = indexOfSpec[0];
-        var token = indexOfSpec[1];
-        var start = indexOfSpec.length > 2 ? indexOfSpec[2] : 0;
+        let indexOfSpec = expression["$indexOfBytes"];
+        let input = indexOfSpec[0];
+        let token = indexOfSpec[1];
+        let start = indexOfSpec.length > 2 ? indexOfSpec[2] : 0;
         // Use $strLenBytes because JavaScript's length property is based off of UTF-16, not the
         // actual number of bytes.
-        var end = indexOfSpec.length > 3 ? indexOfSpec[3] : {$strLenBytes: input};
+        let end = indexOfSpec.length > 3 ? indexOfSpec[3] : {$strLenBytes: input};
 
-        var substrExpr = {
+        let substrExpr = {
             $indexOfBytes: [{$substrBytes: [input, start, {$subtract: [end, start]}]}, token],
         };
 
         // Since the new expression takes the index with respect to a shortened string, the
         // output index will differ from the index with respect to the full length string,
         // unless the output is -1.
-        var substrResult = result === -1 ? -1 : result - start;
+        let substrResult = result === -1 ? -1 : result - start;
 
         testExpression(coll, substrExpr, substrResult);
     }
@@ -212,7 +212,7 @@ testExpressionBytes(coll, {$indexOfBytes: ["abc\0d\0", "d", 5, 6]}, -1);
 
 // Error cases.
 
-var pipeline = {
+let pipeline = {
     $project: {
         output: {
             $indexOfBytes: [3, "s"],

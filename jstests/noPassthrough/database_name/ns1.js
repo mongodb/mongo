@@ -3,7 +3,7 @@ assert.neq(null, conn, "mongod failed to start.");
 let mydb = conn.getDB(jsTestName());
 
 const check = function (n, isNew) {
-    var coll = mydb["x" + n];
+    let coll = mydb["x" + n];
     if (isNew) {
         assert.eq(0, coll.count(), "pop a: " + n);
         assert.commandWorked(coll.insert({_id: n}));
@@ -20,7 +20,7 @@ for (; max < 1000; max++) {
 }
 
 function checkall(removed) {
-    for (var i = 0; i < max; i++) {
+    for (let i = 0; i < max; i++) {
         if (removed == i) {
             assert.eq(0, mydb["x" + i].count(), "should be 0 : " + removed);
         } else {

@@ -24,16 +24,16 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
 /**
  * Start up new sharded cluster, stop balancer that would interfere in manual chunk management.
  */
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 st.stopBalancer();
 
-var mongos = st.s0,
+let mongos = st.s0,
     admin = mongos.getDB("admin"),
     dbName = "testDB",
     ns = dbName + ".foo",
@@ -90,7 +90,7 @@ pauseMigrateAtStep(recipient, migrateStepNames.cloned);
 // Donor:     [0, 20)
 // Recipient:    [20, 40)
 jsTest.log("Starting migration, pause after cloning...");
-var joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), st.shard1.shardName);
 
 /**
  * Wait for recipient to finish cloning step.
@@ -141,9 +141,9 @@ assert.eq(12, coll.count());
  */
 
 jsTest.log("Checking that documents were updated correctly...");
-var donorCollUpdatedNum = donorColl.find({updatedData: "updated"}).count();
+let donorCollUpdatedNum = donorColl.find({updatedData: "updated"}).count();
 assert.eq(1, donorCollUpdatedNum, "Update failed on donor shard during migration!");
-var recipientCollUpdatedNum = recipientColl.find({updatedData: "updated"}).count();
+let recipientCollUpdatedNum = recipientColl.find({updatedData: "updated"}).count();
 assert.eq(1, recipientCollUpdatedNum, "Update failed on recipient shard during migration!");
 
 jsTest.log("DONE!");

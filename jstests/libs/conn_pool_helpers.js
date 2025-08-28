@@ -2,10 +2,10 @@ import {Thread} from "jstests/libs/parallelTester.js";
 
 export function launchFinds(conn, threads, {times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
-    for (var i = 0; i < times; i++) {
-        var thread = new Thread(
+    for (let i = 0; i < times; i++) {
+        let thread = new Thread(
             function (connStr, readPref, dbName, shouldFail) {
-                var client = new Mongo(connStr);
+                let client = new Mongo(connStr);
                 const ret = client
                     .getDB(dbName)
                     .runCommand({find: "test", limit: 1, "$readPreference": {mode: readPref}});

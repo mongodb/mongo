@@ -52,7 +52,7 @@ function assertMetricsEqual(
 
 {
     const testDB = db.getSiblingDB("test");
-    var coll = testDB[jsTestName()];
+    let coll = testDB[jsTestName()];
     coll.drop();
 
     for (let b = 0; b < 5; ++b) {
@@ -83,7 +83,7 @@ function assertMetricsEqual(
 
     {
         // Find command against a non-existent collection, metrics should still appear.
-        var nonExistentCollection = testDB[jsTestName() + "_does_not_exist"];
+        let nonExistentCollection = testDB[jsTestName() + "_does_not_exist"];
         nonExistentCollection.drop();
         const result = testDB.runCommand({
             find: nonExistentCollection.getName(),

@@ -10,7 +10,7 @@
 // the same document multiple times only apply
 // the update once
 
-var t = db.jstests_geo_update_dedup;
+let t = db.jstests_geo_update_dedup;
 
 // 2d index with $near
 t.drop();
@@ -23,10 +23,10 @@ t.save({
     ],
 });
 
-var q = {locs: {$near: [50.0, 50.0]}};
+let q = {locs: {$near: [50.0, 50.0]}};
 assert.eq(1, t.find(q).itcount(), "duplicates returned from query");
 
-var res = t.update({locs: {$near: [50.0, 50.0]}}, {$inc: {touchCount: 1}}, false, true);
+let res = t.update({locs: {$near: [50.0, 50.0]}}, {$inc: {touchCount: 1}}, false, true);
 assert.eq(1, res.nMatched);
 assert.eq(1, t.findOne().touchCount);
 
@@ -60,7 +60,7 @@ assert.eq(1, t.findOne().touchCount);
 // 2dsphere index with $geoNear
 t.drop();
 t.createIndex({geo: "2dsphere"});
-var x = {
+let x = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -78,7 +78,7 @@ assert.eq(1, res.nMatched);
 assert.eq(1, t.findOne().touchCount);
 
 t.drop();
-var locdata = [
+let locdata = [
     {geo: {type: "Point", coordinates: [49.999, 49.999]}},
     {geo: {type: "Point", coordinates: [50.0, 50.0]}},
     {geo: {type: "Point", coordinates: [50.001, 50.001]}},

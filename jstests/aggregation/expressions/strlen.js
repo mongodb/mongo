@@ -7,7 +7,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.substr;
+let coll = db.substr;
 assert(coll.drop());
 
 assert.commandWorked(

@@ -1,11 +1,11 @@
 // Verifies that mongos correctly handles empty documents when all fields are projected out
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var mongos = st.s0;
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let coll = mongos.getCollection("foo.bar");
+let admin = mongos.getDB("admin");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -16,8 +16,8 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(), find: {_id
 st.printShardingStatus();
 
 // Insert 100 documents, half of which have an extra field
-for (var i = -50; i < 50; i++) {
-    var doc = {};
+for (let i = -50; i < 50; i++) {
+    let doc = {};
     if (i >= 0) doc.positiveId = true;
     assert.commandWorked(coll.insert(doc));
 }
@@ -34,10 +34,10 @@ assert.eq(100, coll.find({}, {_id: 0}).sort({positiveId: 1}).itcount());
 //
 //
 // Ensure projecting out all fields still returns the same ordering of documents
-var assertLast50Positive = function (sortedDocs) {
+let assertLast50Positive = function (sortedDocs) {
     assert.eq(100, sortedDocs.length);
-    var positiveCount = 0;
-    for (var i = 0; i < sortedDocs.length; ++i) {
+    let positiveCount = 0;
+    for (let i = 0; i < sortedDocs.length; ++i) {
         if (sortedDocs[i].positiveId) {
             positiveCount++;
         } else {

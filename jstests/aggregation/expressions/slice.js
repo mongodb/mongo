@@ -2,14 +2,14 @@
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.agg_slice_expr;
+let coll = db.agg_slice_expr;
 coll.drop();
 
 // Need to have at least one document to ensure the pipeline executes.
 assert.commandWorked(coll.insert({}));
 
 function testSlice(sliceArgs, expArray) {
-    var pipeline = [{$project: {_id: 0, slice: {$slice: sliceArgs}}}];
+    let pipeline = [{$project: {_id: 0, slice: {$slice: sliceArgs}}}];
     assert.eq(coll.aggregate(pipeline).toArray(), [{slice: expArray}]);
 }
 

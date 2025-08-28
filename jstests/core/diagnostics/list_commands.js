@@ -1,13 +1,13 @@
 // Test for listCommands.
 // @tags: [multiversion_incompatible]
 
-var commands = db.runCommand({listCommands: 1});
+let commands = db.runCommand({listCommands: 1});
 assert.commandWorked(commands);
 
 // Test that result is sorted.
 function isSorted(obj) {
-    var previousProperty;
-    for (var property in obj["commands"]) {
+    let previousProperty;
+    for (let property in obj["commands"]) {
         if (previousProperty && previousProperty > property) {
             return false;
         }

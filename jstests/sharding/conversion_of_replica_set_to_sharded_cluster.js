@@ -301,9 +301,9 @@ waitForAllMembers(rst0.getPrimary().getDB(dbName));
 
 let coll = rst0.getPrimary().getDB(dbName).getCollection(collName);
 // Initial set up.
-for (var i = 0; i < 100; i++) {
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var j = 0; j < 10; j++) {
+for (let i = 0; i < 100; i++) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let j = 0; j < 10; j++) {
         bulk.insert({i: i, j: j, str: str});
     }
     assert.commandWorked(bulk.execute({w: "majority"}));

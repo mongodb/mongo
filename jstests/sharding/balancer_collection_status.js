@@ -47,7 +47,7 @@ assert.eq(result.balancerCompliant, true);
 const shards = st.s0.getDB("config").shards.find().toArray();
 
 const bigString = "X".repeat(1024 * 1024); // 1MB
-for (var i = 0; i < 30; i += 10) {
+for (let i = 0; i < 30; i += 10) {
     assert.commandWorked(st.s0.getDB("db").getCollection("col").insert({key: i, s: bigString}));
 }
 // manually split and place the 3 chunks on the same shard

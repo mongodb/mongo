@@ -34,8 +34,8 @@ coll.createIndex(indexSpec);
 const bulkInsertDocs = function (coll, numDocs, makeDocFn) {
     print("Bulk inserting " + numDocs + " documents");
 
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; ++i) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; ++i) {
         bulk.insert(makeDocFn(i));
     }
 

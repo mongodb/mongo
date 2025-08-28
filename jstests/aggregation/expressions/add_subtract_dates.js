@@ -4,8 +4,8 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var millis = 12345;
-var num = 54312;
+let millis = 12345;
+let num = 54312;
 
 // Clear db
 const coll = db[jsTestName()];
@@ -15,7 +15,7 @@ coll.drop();
 assert.commandWorked(coll.insertOne({date: new Date(millis), num: num}));
 
 function test(expression, expected) {
-    var res = coll.aggregate({$project: {out: expression}});
+    let res = coll.aggregate({$project: {out: expression}});
     assert.eq(res.toArray()[0].out, expected, tojson(expression));
 }
 function fail(expression, code) {

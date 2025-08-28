@@ -9,18 +9,18 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-var name = "readCommittedStaleHistory";
-var dbName = "wMajorityCheck";
-var collName = "stepdown";
+let name = "readCommittedStaleHistory";
+let dbName = "wMajorityCheck";
+let collName = "stepdown";
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     name: name,
     nodes: [{}, {}, {rsConfig: {priority: 0}}],
     useBridge: true,
 });
 
 rst.startSet();
-var nodes = rst.nodes;
+let nodes = rst.nodes;
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 /**
@@ -35,15 +35,15 @@ function waitForPrimary(node) {
 
 // Asserts that the given document is not visible in the committed snapshot on the given node.
 function checkDocNotCommitted(node, doc) {
-    var docs = node.getDB(dbName).getCollection(collName).find(doc).readConcern("majority").toArray();
+    let docs = node.getDB(dbName).getCollection(collName).find(doc).readConcern("majority").toArray();
     assert.eq(0, docs.length, tojson(docs));
 }
 
 // SERVER-20844 ReplSetTest starts up a single node replica set then reconfigures to the correct
 // size for faster startup, so nodes[0] is always the first primary.
 jsTestLog("Make sure node 0 is primary.");
-var primary = rst.getPrimary();
-var secondaries = rst.getSecondaries();
+let primary = rst.getPrimary();
+let secondaries = rst.getSecondaries();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -62,7 +62,7 @@ assert.commandWorked(
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
 // Stop the primary from being able to complete stepping down.
-var blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], "blockHeartbeatStepdown");
+let blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], "blockHeartbeatStepdown");
 
 jsTestLog("Do a write that won't ever reach a majority of nodes");
 assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2}));
@@ -71,7 +71,7 @@ assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2
 checkDocNotCommitted(nodes[0], {a: 2});
 
 // Prevent the primary from rolling back later on.
-var rollbackHangBeforeStartFailPoint = configureFailPoint(nodes[0], "rollbackHangBeforeStart");
+let rollbackHangBeforeStartFailPoint = configureFailPoint(nodes[0], "rollbackHangBeforeStart");
 
 jsTest.log("Disconnect primary from all secondaries");
 nodes[0].disconnect(nodes[1]);
@@ -108,7 +108,7 @@ sleep(10000);
 checkDocNotCommitted(nodes[0], {a: 2});
 
 jsTest.log("Allow the old primary to finish stepping down and become secondary");
-var res = null;
+let res = null;
 try {
     blockHeartbeatStepdownFailPoint.off();
 } catch (e) {

@@ -4,7 +4,7 @@
  * set on the aggregation, or the default collation of the collection.
  * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
-var res;
+let res;
 const caseInsensitiveUS = {
     collation: {locale: "en_US", strength: 2},
 };
@@ -12,8 +12,8 @@ const caseSensitiveUS = {
     collation: {locale: "en_US", strength: 3},
 };
 
-var coll = db.collation_graphlookup;
-var foreignColl = db.collation_graphlookup_foreign;
+let coll = db.collation_graphlookup;
+let foreignColl = db.collation_graphlookup_foreign;
 
 // Test that $graphLookup respects the collation set on the aggregation pipeline. Case
 // insensitivity should mean that we find both "jeremy" and "jimmy" as friends.

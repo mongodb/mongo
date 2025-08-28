@@ -2,7 +2,7 @@
 //   requires_getmore,
 // ]
 
-var coll = db.sort1;
+let coll = db.sort1;
 coll.drop();
 
 coll.save({x: 3, z: 33});
@@ -46,7 +46,7 @@ assert.commandWorked(coll.insert({_id: 0, str: "1000"}));
 assert.commandWorked(coll.insert({_id: 1, str: "5"}));
 assert.commandWorked(coll.insert({_id: 2, str: "200"}));
 
-var cursor = coll.find().sort({str: -1}).collation({locale: "en_US", numericOrdering: true});
+let cursor = coll.find().sort({str: -1}).collation({locale: "en_US", numericOrdering: true});
 assert.eq(cursor.next(), {_id: 0, str: "1000"});
 assert.eq(cursor.next(), {_id: 2, str: "200"});
 assert.eq(cursor.next(), {_id: 1, str: "5"});

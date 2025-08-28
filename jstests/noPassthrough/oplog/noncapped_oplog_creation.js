@@ -2,16 +2,16 @@
  * Test that the server returns an error response for operations that attempt to create a non-capped
  * oplog collection.
  */
-var dbpath = MongoRunner.dataPath + "noncapped_oplog_creation";
+let dbpath = MongoRunner.dataPath + "noncapped_oplog_creation";
 resetDbpath(dbpath);
 
-var conn = MongoRunner.runMongod({
+let conn = MongoRunner.runMongod({
     dbpath: dbpath,
     noCleanData: true,
 });
 assert.neq(null, conn, "mongod was unable to start up");
 
-var localDB = conn.getDB("local");
+let localDB = conn.getDB("local");
 
 // Test that explicitly creating a non-capped oplog collection fails.
 assert.commandFailed(localDB.createCollection("oplog.fake", {capped: false}));

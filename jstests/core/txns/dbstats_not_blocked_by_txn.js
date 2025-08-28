@@ -10,14 +10,14 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var dbName = "dbstats_not_blocked_by_txn";
-var mydb = db.getSiblingDB(dbName);
+let dbName = "dbstats_not_blocked_by_txn";
+let mydb = db.getSiblingDB(dbName);
 
 mydb.foo.drop({writeConcern: {w: "majority"}});
 mydb.createCollection("foo", {writeConcern: {w: "majority"}});
 
-var session = db.getMongo().startSession();
-var sessionDb = session.getDatabase(dbName);
+let session = db.getMongo().startSession();
+let sessionDb = session.getDatabase(dbName);
 
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Before starting the transaction below, access the collection so it can be implicitly

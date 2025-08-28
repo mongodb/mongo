@@ -12,7 +12,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.indexedField = "indexed_insert_2dsphere";
 
     $config.data.getIndexSpec = function getIndexSpec() {
-        var ixSpec = {};
+        let ixSpec = {};
         ixSpec[this.indexedField] = "2dsphere";
         return ixSpec;
     };

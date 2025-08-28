@@ -3,7 +3,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var s = new ShardingTest({name: "sharding_cursor1", shards: 2});
+let s = new ShardingTest({name: "sharding_cursor1", shards: 2});
 
 s.config.settings.find().forEach(printjson);
 
@@ -15,8 +15,8 @@ const db = s.getDB("test");
 let primary = s.getPrimaryShard("test").getDB("test");
 let secondary = s.getOther(primary).getDB("test");
 
-var numObjs = 30;
-var bulk = db.foo.initializeUnorderedBulkOp();
+let numObjs = 30;
+let bulk = db.foo.initializeUnorderedBulkOp();
 for (let i = 0; i < numObjs; i++) {
     bulk.insert({_id: i});
 }
@@ -35,11 +35,11 @@ TestData.disableImplicitSessions = true;
 // cursor1 still has more data in the first chunk, the one that didn't move
 // cursor2 buffered the last obj of the first chunk
 // cursor3 buffered data that was moved on the second chunk
-var cursor1 = db.foo.find().batchSize(3);
+let cursor1 = db.foo.find().batchSize(3);
 assert.eq(3, cursor1.objsLeftInBatch());
-var cursor2 = db.foo.find().batchSize(5);
+let cursor2 = db.foo.find().batchSize(5);
 assert.eq(5, cursor2.objsLeftInBatch());
-var cursor3 = db.foo.find().batchSize(7);
+let cursor3 = db.foo.find().batchSize(7);
 assert.eq(7, cursor3.objsLeftInBatch());
 
 s.adminCommand({split: "test.foo", middle: {_id: 5}});
@@ -52,7 +52,7 @@ assert.eq(numObjs, cursor2.itcount(), "c2");
 assert.eq(numObjs, cursor3.itcount(), "c3");
 
 // Test that a cursor with a 1 second timeout eventually times out.
-var cur = db.foo.find().batchSize(2);
+let cur = db.foo.find().batchSize(2);
 assert(cur.next(), "T1");
 assert(cur.next(), "T2");
 assert.commandWorked(

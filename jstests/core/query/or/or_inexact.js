@@ -5,8 +5,8 @@
 //   # $text is not supported on views.
 //   incompatible_with_views,
 // ]
-var t = db.jstests_or_inexact;
-var cursor;
+let t = db.jstests_or_inexact;
+let cursor;
 
 // A predicate which uses an index falls into one of three categories:
 //

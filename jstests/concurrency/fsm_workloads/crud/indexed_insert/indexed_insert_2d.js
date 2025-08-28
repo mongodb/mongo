@@ -24,9 +24,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         //  odd:        0 1 1 0 = 6
         // This lets us turn every tid into a unique pair of numbers within the range [0, 255].
         // The pairs are then normalized to have valid longitude and latitude values.
-        var oddBits = 0;
-        var evenBits = 0;
-        for (var i = 0; i < 16; ++i) {
+        let oddBits = 0;
+        let evenBits = 0;
+        for (let i = 0; i < 16; ++i) {
             if (this.tid & (1 << i)) {
                 if (i % 2 === 0) {
                     // i is even
@@ -43,7 +43,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.getIndexSpec = function getIndexSpec() {
-        var ixSpec = {};
+        let ixSpec = {};
         ixSpec[this.indexedField] = "2d";
         return ixSpec;
     };

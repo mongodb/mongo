@@ -149,8 +149,8 @@ testScoreDetails("minMaxScaler", "unspecified", expectedScoreResults);
 // Testcase: multiple (recursive) $score stages results in the correct score details output.
 (function testMultipleScoreStagesWithScoreDetails() {
     const normalizationMethods = ["none", "minMaxScaler", "sigmoid"];
-    for (var firstScoreNormalization of normalizationMethods) {
-        for (var secondScoreNormalization of normalizationMethods) {
+    for (let firstScoreNormalization of normalizationMethods) {
+        for (let secondScoreNormalization of normalizationMethods) {
             let firstScore = {
                 score: "$single",
                 normalization: firstScoreNormalization,

@@ -1,14 +1,14 @@
 /**
  * Tests $geoIntersect basic functionality.
  */
-var t = db.geo_s2intersectinglines;
+let t = db.geo_s2intersectinglines;
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
 /**All the tests in this file are generally confirming intersections based upon
  * these three geo objects.
  */
-var canonLine = {
+let canonLine = {
     name: "canonLine",
     geo: {
         type: "LineString",
@@ -19,9 +19,9 @@ var canonLine = {
     },
 };
 
-var canonPoint = {name: "canonPoint", geo: {type: "Point", coordinates: [10.0, 10.0]}};
+let canonPoint = {name: "canonPoint", geo: {type: "Point", coordinates: [10.0, 10.0]}};
 
-var canonPoly = {
+let canonPoly = {
     name: "canonPoly",
     geo: {
         type: "Polygon",
@@ -42,7 +42,7 @@ t.insert(canonPoint);
 t.insert(canonPoly);
 
 // Case 1: Basic sanity intersection.
-var testLine = {
+let testLine = {
     type: "LineString",
     coordinates: [
         [0.5, 0.5],
@@ -56,7 +56,7 @@ assert.eq(result[0]["name"], "canonLine");
 
 // Case 2: Basic Polygon intersection.
 // we expect that the canonLine should intersect with this polygon.
-var testPoly = {
+let testPoly = {
     type: "Polygon",
     coordinates: [
         [
@@ -204,8 +204,8 @@ t.insert({
     },
 });
 
-var firstPoint = {$geometry: {type: "Point", coordinates: [3.0, 1.0]}};
-var secondPoint = {$geometry: {type: "Point", coordinates: [4.0, 1.0]}};
+let firstPoint = {$geometry: {type: "Point", coordinates: [3.0, 1.0]}};
+let secondPoint = {$geometry: {type: "Point", coordinates: [4.0, 1.0]}};
 
 // First point should intersect with the polygon.
 result = t.find({a: {$geoIntersects: firstPoint}});

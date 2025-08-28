@@ -9,7 +9,7 @@
 
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
-var test = new GeoNearRandomTest("geo_near_random2");
+let test = new GeoNearRandomTest("geo_near_random2");
 
 test.insertPts(5000);
 

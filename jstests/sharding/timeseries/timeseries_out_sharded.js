@@ -132,7 +132,7 @@ function runOutAndCompareResults({
 }
 
 function validateResultValues({result: outResult, value: ExpectedValue}) {
-    for (var i = 0; i < outResult.length; ++i) {
+    for (let i = 0; i < outResult.length; ++i) {
         // Make sure all the values for the fieldName specified are as expected.
         assert.eq(
             outResult[i],

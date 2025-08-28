@@ -15,11 +15,11 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-var name = "interrupted_batch_insert";
-var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
-var nodes = replTest.nodeList();
+let name = "interrupted_batch_insert";
+let replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+let nodes = replTest.nodeList();
 
-var conns = replTest.startSet();
+let conns = replTest.startSet();
 replTest.initiate(
     {
         _id: name,
@@ -35,8 +35,8 @@ replTest.initiate(
 
 // The test starts with node 0 as the primary.
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var primary = replTest.nodes[0];
-var collName = primary.getDB("db")[name].getFullName();
+let primary = replTest.nodes[0];
+let collName = primary.getDB("db")[name].getFullName();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
     primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
@@ -62,13 +62,13 @@ let failPoint = configureFailPoint(
 
 // In a background thread, issue an insert command to the primary that will insert 10 batches of
 // documents.
-var worker = new Thread(
+let worker = new Thread(
     (host, collName, numToInsert) => {
         // Insert elements [{idx: 0}, {idx: 1}, ..., {idx: numToInsert - 1}].
         const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
             return {idx: i};
         });
-        var coll = new Mongo(host).getCollection(collName);
+        let coll = new Mongo(host).getCollection(collName);
         assert.commandFailedWithCode(
             coll.insert(docsToInsert, {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
             ErrorCodes.InterruptedDueToReplStateChange,
@@ -98,7 +98,7 @@ assert.eq(replTest.nodes[1], replTest.getPrimary());
 restartServerReplication(conns[2]);
 
 // Issue a write to the new primary.
-var collOnNewPrimary = replTest.nodes[1].getCollection(collName);
+let collOnNewPrimary = replTest.nodes[1].getCollection(collName);
 assert.commandWorked(collOnNewPrimary.insert({singleDoc: 1}, {writeConcern: {w: "majority"}}));
 
 // Isolate node 1, forcing it to step down as primary, and reconnect node 0, allowing it to step
@@ -118,7 +118,7 @@ assert.soon(() => primary.getDB("db").currentOp({"command.insert": name, active:
 
 worker.join();
 
-var docs = primary
+let docs = primary
     .getDB("db")
     [name].find({idx: {$exists: 1}})
     .sort({idx: 1})

@@ -2,14 +2,14 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
 const kDbName = "foo";
 
 assert.commandWorked(admin.runCommand({enableSharding: kDbName + "", primaryShard: st.shard0.shardName}));
-var coll = mongos.getCollection(kDbName + ".bar");
+let coll = mongos.getCollection(kDbName + ".bar");
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 st.printShardingStatus();

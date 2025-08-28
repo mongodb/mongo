@@ -40,7 +40,7 @@ assertLastOplog({_id: 1}, null, "save -- setup ");
 var msg = "IncRewriteExistingField: $inc $set";
 coll.save({_id: 1, a: 2});
 assertLastOplog({_id: 1, a: 2}, {_id: 1}, "save " + msg);
-var res = assert.commandWorked(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
+let res = assert.commandWorked(coll.update({}, {$inc: {a: 1}, $set: {b: 2}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: 3, b: 2}, coll.findOne({}), msg);
 assertLastOplog({$v: 2, diff: {u: {a: 3}, i: {b: 2}}}, {_id: 1}, msg);
@@ -100,7 +100,7 @@ var msg = "bad array $inc";
 res = assert.commandWorked(coll.update({}, {$inc: {"a.0": 1}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: [3]}, coll.findOne({}), msg);
-var lastTS = assertLastOplog({"$v": 2, "diff": {"sa": {"a": true, "u0": 3}}}, {_id: 1}, msg);
+let lastTS = assertLastOplog({"$v": 2, "diff": {"sa": {"a": true, "u0": 3}}}, {_id: 1}, msg);
 
 var msg = "bad $setOnInsert";
 res = assert.commandWorked(coll.update({}, {$setOnInsert: {a: -1}}));
@@ -114,7 +114,7 @@ assert.eq(coll.find().itcount(), 0, "collection not empty");
 var msg = "bad $setOnInsert w/upsert";
 res = assert.commandWorked(coll.update({}, {$setOnInsert: {a: 200}}, {upsert: true})); // upsert
 assert.eq(res.nUpserted, 1, "update failed for '" + msg + "': " + res.toString());
-var id = res.getUpsertedId()._id;
+let id = res.getUpsertedId()._id;
 assert.docEq({_id: id, a: 200}, coll.findOne({}), msg); // No-op
 assertLastOplog({_id: id, a: 200}, null, msg); // No new oplog entry
 

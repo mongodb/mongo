@@ -12,27 +12,27 @@ TestData.skipCheckShardFilteringMetadata = true;
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var PRI_TAG = {dc: "ny"};
-var SEC_TAGS = [
+let PRI_TAG = {dc: "ny"};
+let SEC_TAGS = [
     {dc: "sf", s: "1"},
     {dc: "ma", s: "2"},
     {dc: "eu", s: "3"},
     {dc: "jp", s: "4"},
 ];
-var NODES = SEC_TAGS.length + 1;
+let NODES = SEC_TAGS.length + 1;
 
-var doTest = function () {
-    var st = new ShardingTest({shards: {rs0: {nodes: NODES, oplogSize: 10, useHostName: true}}});
-    var replTest = st.rs0;
-    var primaryNode = replTest.getPrimary();
+let doTest = function () {
+    let st = new ShardingTest({shards: {rs0: {nodes: NODES, oplogSize: 10, useHostName: true}}});
+    let replTest = st.rs0;
+    let primaryNode = replTest.getPrimary();
 
-    var setupConf = function () {
-        var replConf = primaryNode.getDB("local").system.replset.findOne();
+    let setupConf = function () {
+        let replConf = primaryNode.getDB("local").system.replset.findOne();
         replConf.version = (replConf.version || 0) + 1;
 
-        var secIdx = 0;
-        for (var x = 0; x < NODES; x++) {
-            var node = replConf.members[x];
+        let secIdx = 0;
+        for (let x = 0; x < NODES; x++) {
+            let node = replConf.members[x];
 
             if (node.host == primaryNode.name) {
                 node.tags = PRI_TAG;
@@ -51,17 +51,17 @@ var doTest = function () {
         return replConf;
     };
 
-    var checkTag = function (nodeToCheck, tag) {
-        for (var idx = 0; idx < NODES; idx++) {
-            var node = replConf.members[idx];
+    let checkTag = function (nodeToCheck, tag) {
+        for (let idx = 0; idx < NODES; idx++) {
+            let node = replConf.members[idx];
 
             if (node.host == nodeToCheck) {
                 jsTest.log("node[" + node.host + "], Tag: " + tojson(node["tags"]));
                 jsTest.log("tagToCheck: " + tojson(tag));
 
-                var nodeTag = node["tags"];
+                let nodeTag = node["tags"];
 
-                for (var key in tag) {
+                for (let key in tag) {
                     assert.eq(tag[key], nodeTag[key]);
                 }
 
@@ -74,12 +74,12 @@ var doTest = function () {
 
     var replConf = setupConf();
 
-    var conn = st.s;
+    let conn = st.s;
 
     // Wait until the ReplicaSetMonitor refreshes its view and see the tags
-    var replConfig = replTest.getReplSetConfigFromNode();
+    let replConfig = replTest.getReplSetConfigFromNode();
     replConfig.members.forEach(function (node) {
-        var nodeConn = new Mongo(node.host);
+        let nodeConn = new Mongo(node.host);
         awaitRSClientHosts(conn, nodeConn, {ok: true, tags: node.tags}, replTest);
     });
     replTest.awaitReplication();
@@ -87,15 +87,15 @@ var doTest = function () {
     jsTest.log("New rs config: " + tojson(primaryNode.getDB("local").system.replset.findOne()));
     jsTest.log("connpool: " + tojson(conn.getDB("admin").runCommand({connPoolStats: 1})));
 
-    var coll = conn.getDB("test").user;
+    let coll = conn.getDB("test").user;
 
     assert.soon(function () {
-        var res = coll.insert({x: 1}, {writeConcern: {w: NODES}});
+        let res = coll.insert({x: 1}, {writeConcern: {w: NODES}});
         if (!res.hasWriteError()) {
             return true;
         }
 
-        var err = res.getWriteError().errmsg;
+        let err = res.getWriteError().errmsg;
         // Transient transport errors may be expected b/c of the replSetReconfig
         if (err.indexOf("transport error") == -1) {
             throw err;
@@ -103,19 +103,19 @@ var doTest = function () {
         return false;
     });
 
-    var getExplain = function (readPrefMode, readPrefTags) {
+    let getExplain = function (readPrefMode, readPrefTags) {
         return coll.find().readPref(readPrefMode, readPrefTags).explain("executionStats");
     };
 
-    var getExplainServer = function (explain) {
+    let getExplainServer = function (explain) {
         assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
-        var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
+        let serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
         return serverInfo.host + ":" + serverInfo.port.toString();
     };
 
     // Read pref should work without secondaryOk
-    var explain = getExplain("secondary");
-    var explainServer = getExplainServer(explain);
+    let explain = getExplain("secondary");
+    let explainServer = getExplainServer(explain);
     assert.neq(primaryNode.name, explainServer);
 
     conn.setSecondaryOk();
@@ -165,8 +165,8 @@ var doTest = function () {
     const stopOpts = {skipValidation: replTest.isReplicaSetEndpointActive()};
 
     // Kill all members except one
-    var stoppedNodes = [];
-    for (var x = 0; x < NODES - 1; x++) {
+    let stoppedNodes = [];
+    for (let x = 0; x < NODES - 1; x++) {
         replTest.stop(x, null, stopOpts);
         stoppedNodes.push(replTest.nodes[x]);
     }
@@ -175,7 +175,7 @@ var doTest = function () {
     awaitRSClientHosts(conn, stoppedNodes, {ok: false}, replTest.name);
 
     // Wait for the last node to be in steady state -> secondary (not recovering)
-    var lastNode = replTest.nodes[NODES - 1];
+    let lastNode = replTest.nodes[NODES - 1];
     awaitRSClientHosts(conn, lastNode, {ok: true, secondary: true}, replTest.name);
 
     jsTest.log("connpool: " + tojson(conn.getDB("admin").runCommand({connPoolStats: 1})));

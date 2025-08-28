@@ -11,7 +11,7 @@ coll.drop();
 
 // The first collection ensures our changes work with a variety of types (polygon, point,
 // linestring) and guarantees some shapes are not inside our index (bigPoly20).
-var bigPoly20 = {
+let bigPoly20 = {
     type: "Polygon",
     coordinates: [
         [
@@ -24,7 +24,7 @@ var bigPoly20 = {
     ],
 };
 
-var bigPoly20Comp = {
+let bigPoly20Comp = {
     type: "Polygon",
     coordinates: [
         [
@@ -37,7 +37,7 @@ var bigPoly20Comp = {
     ],
 };
 
-var poly10 = {
+let poly10 = {
     type: "Polygon",
     coordinates: [
         [
@@ -50,7 +50,7 @@ var poly10 = {
     ],
 };
 
-var line10 = {
+let line10 = {
     type: "LineString",
     coordinates: [
         [5.0, 5.0],
@@ -61,11 +61,11 @@ var line10 = {
     ],
 };
 
-var centerPoint = {type: "Point", coordinates: [0, 0]};
+let centerPoint = {type: "Point", coordinates: [0, 0]};
 
-var polarPoint = {type: "Point", coordinates: [85, 85]};
+let polarPoint = {type: "Point", coordinates: [85, 85]};
 
-var lineEquator = {
+let lineEquator = {
     type: "LineString",
     coordinates: [
         [-20, 0],
@@ -108,7 +108,7 @@ assert.commandWorked(
 );
 assert.commandWorked(coll.insert({a: 1, name: "NYC", loc: {type: "Point", coordinates: [-74.0059729, 40.7142691]}}));
 
-var texasPolygon = {
+let texasPolygon = {
     type: "Polygon",
     coordinates: [
         [
@@ -124,7 +124,7 @@ var texasPolygon = {
         ],
     ],
 };
-var southWestUSPolygon = {
+let southWestUSPolygon = {
     type: "Polygon",
     coordinates: [
         [
@@ -152,14 +152,14 @@ assert.commandWorked(
 
 // Search for points only located in a smaller region within our larger index, in this case
 // Texas.
-var command = coll.find({
+let command = coll.find({
     a: 1,
     loc: {$geoWithin: {$geometry: texasPolygon}},
 });
 var explainResults = command.explain("queryPlanner");
 var winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
-var results = command.toArray();
+let results = command.toArray();
 assert.eq(results.length, 3);
 
 // Test index maintenace to make sure a doc is removed from index when it is no longer in the
@@ -194,7 +194,7 @@ coll.insert({loc: [-73.974709, 40.79311]});
 // Point corresponding to Downtown Brooklyn.
 coll.insert({loc: [-73.985728, 40.705174]});
 // Polygon roughly representing the UWS of Manhattan.
-var uwsPolygon = {
+let uwsPolygon = {
     type: "Polygon",
     coordinates: [
         [

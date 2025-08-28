@@ -10,7 +10,7 @@ t.insert({_id: 4, x: [1, 2]});
 t.insert({_id: 5, x: [3]});
 t.insert({_id: 6, x: 4});
 
-var res = t.aggregate([{$unwind: "$x"}, {$sort: {_id: 1}}]).toArray();
+let res = t.aggregate([{$unwind: "$x"}, {$sort: {_id: 1}}]).toArray();
 assert.eq(4, res.length);
 assert.eq(
     [1, 2, 3, 4],

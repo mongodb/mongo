@@ -6,7 +6,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
-var s = new ShardingTest({
+let s = new ShardingTest({
     shards: 2,
     other: {
         chunkSize: 1,
@@ -21,7 +21,7 @@ var s = new ShardingTest({
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "TestDB", primaryShard: s.shard0.shardName}));
 
-var bulk = s.s0.getDB("TestDB").TestColl.initializeUnorderedBulkOp();
+let bulk = s.s0.getDB("TestDB").TestColl.initializeUnorderedBulkOp();
 for (var i = 0; i < 2100; i++) {
     bulk.insert({_id: i, x: i});
 }
@@ -33,10 +33,10 @@ for (i = 0; i < 20; i++) {
     assert.commandWorked(s.s0.adminCommand({split: "TestDB.TestColl", middle: {_id: i * 100}}));
 }
 
-var collPrimary = new Mongo(s.s0.host).getDB("TestDB").TestColl;
+let collPrimary = new Mongo(s.s0.host).getDB("TestDB").TestColl;
 assert.eq(2100, collPrimary.find().itcount());
 
-var collSecondaryOk = new Mongo(s.s0.host).getDB("TestDB").TestColl;
+let collSecondaryOk = new Mongo(s.s0.host).getDB("TestDB").TestColl;
 collSecondaryOk.setSecondaryOk();
 assert.eq(2100, collSecondaryOk.find().itcount());
 

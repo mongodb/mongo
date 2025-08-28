@@ -4,7 +4,7 @@
  *   requires_getmore,
  * ]
  */
-var t = db.geo_mindistance_boundaries;
+let t = db.geo_mindistance_boundaries;
 t.drop();
 t.insert({loc: [1, 0]}); // 1 degree of longitude from origin.
 
@@ -15,7 +15,7 @@ t.createIndex({loc: "2dsphere"});
 // Useful constants.
 //
 
-var km = 1000,
+let km = 1000,
     earthRadiusMeters = 6378.1 * km,
     geoJSONPoint = {type: "Point", coordinates: [0, 0]},
     // One degree of longitude at the equator, about 111 km.
@@ -102,7 +102,7 @@ assert.eq(
 // supported.
 //
 
-var legacyPoint = [0, 0],
+let legacyPoint = [0, 0],
     degreeInRadians = (2 * Math.PI) / 360,
     radiansEpsilon = Number.MIN_VALUE;
 

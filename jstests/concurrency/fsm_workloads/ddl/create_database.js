@@ -110,7 +110,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {
+    let transitions = {
         init: {
             useSemiUniqueDBName: 0.25,
             createView: 0.25,

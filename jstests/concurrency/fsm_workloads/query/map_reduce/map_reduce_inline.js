@@ -23,14 +23,14 @@
 export const $config = (function () {
     function mapper() {
         if (this.hasOwnProperty("key") && this.hasOwnProperty("value")) {
-            var obj = {};
+            let obj = {};
             obj[this.value] = 1;
             emit(this.key, obj);
         }
     }
 
     function reducer(key, values) {
-        var res = {};
+        let res = {};
 
         values.forEach(function (obj) {
             Object.keys(obj).forEach(function (value) {
@@ -48,29 +48,29 @@ export const $config = (function () {
         return reducedValue;
     }
 
-    var data = {numDocs: 2000, mapper: mapper, reducer: reducer, finalizer: finalizer};
+    let data = {numDocs: 2000, mapper: mapper, reducer: reducer, finalizer: finalizer};
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             // no-op
             // other workloads that extend this workload use this method
         }
 
         function mapReduce(db, collName) {
-            var options = {finalize: this.finalizer, out: {inline: 1}};
+            let options = {finalize: this.finalizer, out: {inline: 1}};
 
-            var res = db[collName].mapReduce(this.mapper, this.reducer, options);
+            let res = db[collName].mapReduce(this.mapper, this.reducer, options);
             assert.commandWorked(res);
         }
 
         return {init: init, mapReduce: mapReduce};
     })();
 
-    var transitions = {init: {mapReduce: 1}, mapReduce: {mapReduce: 1}};
+    let transitions = {init: {mapReduce: 1}, mapReduce: {mapReduce: 1}};
 
     function setup(db, collName, cluster) {
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 0; i < this.numDocs; ++i) {
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 0; i < this.numDocs; ++i) {
             // TODO: this actually does assume that there are no unique indexes
             bulk.insert({
                 _id: i,
@@ -79,7 +79,7 @@ export const $config = (function () {
             });
         }
 
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(this.numDocs, res.nInserted);
     }

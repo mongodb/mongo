@@ -32,7 +32,7 @@ replSet.initiate();
 const doc1 = {
     x: [],
 };
-for (var j = 0; j < 100000; j++) {
+for (let j = 0; j < 100000; j++) {
     doc1.x.push("" + Math.random() + Math.random());
 }
 

@@ -12,12 +12,12 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 2, mongos: 1});
-var dbForTest = s.getDB("test");
-var admin = s.getDB("admin");
+let s = new ShardingTest({shards: 2, mongos: 1});
+let dbForTest = s.getDB("test");
+let admin = s.getDB("admin");
 dbForTest.foo.drop();
 
-var numDocs = 10000;
+let numDocs = 10000;
 
 // shard test.foo and add a split point
 s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
@@ -36,8 +36,8 @@ s.adminCommand({
 s.startBalancer();
 
 // insert 10k small documents into the sharded collection
-var bulk = dbForTest.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < numDocs; i++) {
+let bulk = dbForTest.foo.initializeUnorderedBulkOp();
+for (let i = 0; i < numDocs; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());
@@ -61,15 +61,15 @@ assert.eq("test.bar", x.ns, "XXX2");
 assert(!x.sharded, "XXX3: " + tojson(x));
 
 // fork shell and start querying the data
-var start = new Date();
+let start = new Date();
 
-var whereKillSleepTime = 1000;
-var parallelCommand =
+let whereKillSleepTime = 1000;
+let parallelCommand =
     "db.foo.find(function() { " + "    sleep(" + whereKillSleepTime + "); " + "    return false; " + "}).itcount(); ";
 
 // fork a parallel shell, but do not wait for it to start
 print("about to fork new shell at: " + Date());
-var awaitShell = startParallelShell(parallelCommand, s.s.port);
+let awaitShell = startParallelShell(parallelCommand, s.s.port);
 print("done forking shell at: " + Date());
 
 // Get all current $where operations
@@ -78,7 +78,7 @@ function getInProgWhereOps() {
     let inProgressStr = "";
 
     // Find all the where queries
-    var myProcs = [];
+    let myProcs = [];
     while (inProgressOps.hasNext()) {
         let op = inProgressOps.next();
         inProgressStr += tojson(op);
@@ -96,9 +96,9 @@ function getInProgWhereOps() {
     return myProcs;
 }
 
-var curOpState = 0; // 0 = not found, 1 = killed
-var killTime = null;
-var mine;
+let curOpState = 0; // 0 = not found, 1 = killed
+let killTime = null;
+let mine;
 
 assert.soon(
     function () {
@@ -137,10 +137,10 @@ print("time if run full: " + numDocs * whereKillSleepTime);
 assert.gt((whereKillSleepTime * numDocs) / 20, killTime, "took too long to kill");
 
 // wait for the parallel shell we spawned to complete
-var exitCode = awaitShell({checkExitSuccess: false});
+let exitCode = awaitShell({checkExitSuccess: false});
 assert.neq(0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
 
-var end = new Date();
+let end = new Date();
 print("elapsed: " + (end.getTime() - start.getTime()));
 
 // test fsync command on non-admin db

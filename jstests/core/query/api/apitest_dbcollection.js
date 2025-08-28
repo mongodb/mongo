@@ -51,9 +51,9 @@ for (var i = 0; i < 100; i++) {
 }
 
 (function () {
-    var validateResult = assert.commandWorked(coll.validate());
+    let validateResult = assert.commandWorked(coll.validate());
     // Extract validation results from mongos output if running in a sharded context.
-    var isShardedNS = validateResult.hasOwnProperty("raw");
+    let isShardedNS = validateResult.hasOwnProperty("raw");
 
     if (isShardedNS) {
         // Sample mongos format:
@@ -72,9 +72,9 @@ for (var i = 0; i < 100; i++) {
         //   "ok": 1
         // }
 
-        var numFields = 0;
-        var result = null;
-        for (var field in validateResult.raw) {
+        let numFields = 0;
+        let result = null;
+        for (let field in validateResult.raw) {
             result = validateResult.raw[field];
             numFields++;
         }
@@ -155,11 +155,11 @@ assert.eq(0, coll.getIndexes().length, "24");
  */
 
 (function () {
-    var t = testDb.apttest_dbcollection;
+    let t = testDb.apttest_dbcollection;
 
     // Non-existent collection.
     t.drop();
-    var noCollStats = assert.commandWorked(
+    let noCollStats = assert.commandWorked(
         t.stats(),
         "testDb.collection.stats() should work on non-existent collection",
     );
@@ -225,7 +225,7 @@ assert.eq(0, coll.getIndexes().length, "24");
 
     // Returns index name.
     function getIndexName(indexKey) {
-        var indexes = t.getIndexes().filter(function (doc) {
+        let indexes = t.getIndexes().filter(function (doc) {
             return friendlyEqual(doc.key, indexKey);
         });
         assert.eq(1, indexes.length, tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()));
@@ -233,7 +233,7 @@ assert.eq(0, coll.getIndexes().length, "24");
     }
 
     function checkIndexDetails(options, indexName) {
-        var collectionStats = assert.commandWorked(t.stats(options));
+        let collectionStats = assert.commandWorked(t.stats(options));
         assert(
             collectionStats.hasOwnProperty("indexDetails"),
             "indexDetails missing from " +
@@ -243,7 +243,7 @@ assert.eq(0, coll.getIndexes().length, "24");
                 tojson(collectionStats),
         );
         // Currently, indexDetails is only supported with WiredTiger.
-        var storageEngine = jsTest.options().storageEngine;
+        let storageEngine = jsTest.options().storageEngine;
         if (storageEngine && storageEngine !== "wiredTiger") {
             return;
         }
@@ -260,15 +260,15 @@ assert.eq(0, coll.getIndexes().length, "24");
     }
 
     // indexDetailsKey - show indexDetails results for this index key only.
-    var indexKey = {a: 1};
-    var indexName = getIndexName(indexKey);
+    let indexKey = {a: 1};
+    let indexName = getIndexName(indexKey);
     checkIndexDetails({indexDetails: true, indexDetailsKey: indexKey}, indexName);
 
     // indexDetailsName - show indexDetails results for this index name only.
     checkIndexDetails({indexDetails: true, indexDetailsName: indexName}, indexName);
 
     // Cannot specify both indexDetailsKey and indexDetailsName.
-    var error = assert.throws(
+    let error = assert.throws(
         function () {
             t.stats({indexDetails: true, indexDetailsKey: indexKey, indexDetailsName: indexName});
         },
@@ -289,10 +289,10 @@ assert.eq(0, coll.getIndexes().length, "24");
  * test testDb.collection.totalSize()
  */
 (function () {
-    var t = testDb.apitest_dbcollection;
+    let t = testDb.apitest_dbcollection;
 
     t.drop();
-    var emptyStats = assert.commandWorked(t.stats());
+    let emptyStats = assert.commandWorked(t.stats());
     assert.eq(emptyStats.storageSize, 0);
     assert.eq(emptyStats.totalIndexSize, 0);
 
@@ -301,7 +301,7 @@ assert.eq(0, coll.getIndexes().length, "24");
     assert.eq(0, t.totalSize(), "testDb.collection.totalSize() on empty collection should return 0");
 
     t.save({a: 1});
-    var stats = assert.commandWorked(t.stats());
+    let stats = assert.commandWorked(t.stats());
     assert.neq(
         undefined,
         t.storageSize(),

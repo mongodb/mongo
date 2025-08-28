@@ -24,7 +24,7 @@ export const $config = (function () {
     }
 
     function countDocuments(coll, query) {
-        var count;
+        let count;
         assert.soon(() => {
             try {
                 count = coll.countDocuments(query);
@@ -304,7 +304,7 @@ export const $config = (function () {
             try {
                 jsTestLog("CRUD - Insert " + threadInfos);
                 // Check if insert succeeded
-                var res = insertBulkOp.execute();
+                let res = insertBulkOp.execute();
                 assert.commandWorked(res);
 
                 let currentDocs = countDocuments(coll, {generation: generation});
@@ -317,7 +317,7 @@ export const $config = (function () {
                 jsTestLog("CRUD - Update " + threadInfos);
                 res = coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});
                 if (res.hasWriteError()) {
-                    var err = res.getWriteError();
+                    let err = res.getWriteError();
                     if (err.code == ErrorCodes.QueryPlanKilled) {
                         // Update is expected to throw ErrorCodes::QueryPlanKilled if performed
                         // concurrently with a rename (SERVER-31695).

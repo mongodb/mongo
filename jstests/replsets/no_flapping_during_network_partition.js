@@ -12,11 +12,11 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "no_flapping_during_network_partition";
+let name = "no_flapping_during_network_partition";
 
-var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
-var nodes = replTest.startSet();
-var config = replTest.getReplSetConfig();
+let replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+let nodes = replTest.startSet();
+let config = replTest.getReplSetConfig();
 config.members[0].priority = 5;
 config.members[2].arbiterOnly = true;
 config.settings = {
@@ -30,9 +30,9 @@ function getTerm(node) {
 
 replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
 
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
-var initialTerm = getTerm(primary);
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
+let initialTerm = getTerm(primary);
 
 jsTestLog("Create a network partition between the primary and secondary.");
 primary.disconnect(secondary);

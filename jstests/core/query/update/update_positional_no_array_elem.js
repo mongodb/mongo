@@ -7,7 +7,7 @@
 // If no array element position from a query is available to substitute for the positional operator
 // setinel ('$'), the update fails with an error.  SERVER-6669 SERVER-4713
 
-var res;
+let res;
 const t = db[jsTestName()];
 t.drop();
 

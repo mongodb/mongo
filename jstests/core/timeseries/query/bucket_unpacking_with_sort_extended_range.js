@@ -130,7 +130,7 @@ function insertDocuments() {
 
     insertBucket(underflowMin);
 
-    var numBatches = 5;
+    let numBatches = 5;
 
     const batchOffset = Math.floor(intervalMillis / (numBatches + 1));
     for (let i = 0; i < numBatches; ++i) {
@@ -190,7 +190,7 @@ function checkAgainstReferenceBoundedSortUnexpected(collection, reference, pipel
     assertSorted(opt, sortOrder);
 
     assert.eq(reference.length, opt.length);
-    for (var i = 0; i < opt.length; ++i) {
+    for (let i = 0; i < opt.length; ++i) {
         assert.docEq(reference[i], opt[i]);
     }
 }
@@ -206,7 +206,7 @@ function checkAgainstReferenceBoundedSortExpected(collection, reference, pipelin
     assertSorted(opt, sortOrder);
 
     assert.eq(reference.length, opt.length);
-    for (var i = 0; i < opt.length; ++i) {
+    for (let i = 0; i < opt.length; ++i) {
         assert.docEq(reference[i], opt[i]);
     }
 }

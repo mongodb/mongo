@@ -12,27 +12,27 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
-var five_minutes = 5 * 60 * 1000;
+let five_minutes = 5 * 60 * 1000;
 
-var numRSHosts = function () {
-    var result = assert.commandWorked(rsObj.nodes[0].adminCommand({hello: 1}));
+let numRSHosts = function () {
+    let result = assert.commandWorked(rsObj.nodes[0].adminCommand({hello: 1}));
     return result.hosts.length + result.passives.length;
 };
 
-var numMongosHosts = function () {
-    var commandResult = assert.commandWorked(mongos.adminCommand("connPoolStats"));
-    var result = commandResult.replicaSets[rsObj.name];
+let numMongosHosts = function () {
+    let commandResult = assert.commandWorked(mongos.adminCommand("connPoolStats"));
+    let result = commandResult.replicaSets[rsObj.name];
     return result.hosts.length;
 };
 
-var configServerURL = function () {
-    var result = config.shards.find().toArray()[0];
+let configServerURL = function () {
+    let result = config.shards.find().toArray()[0];
     return result.host;
 };
 
-var checkNumHosts = function (expectedNumHosts) {
+let checkNumHosts = function (expectedNumHosts) {
     jsTest.log("Waiting for the shard to discover that it now has " + expectedNumHosts + " hosts.");
-    var numHostsSeenByShard;
+    let numHostsSeenByShard;
 
     // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
     // seconds.
@@ -48,7 +48,7 @@ var checkNumHosts = function (expectedNumHosts) {
     );
 
     jsTest.log("Waiting for the mongos to discover that the shard now has " + expectedNumHosts + " hosts.");
-    var numHostsSeenByMongos;
+    let numHostsSeenByMongos;
 
     // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
     // seconds.
@@ -64,7 +64,7 @@ var checkNumHosts = function (expectedNumHosts) {
     );
 };
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     name: "mongos_no_replica_set_refresh",
     shards: 1,
     mongos: 1,
@@ -92,9 +92,9 @@ printjson(mongos.getCollection("foo.bar").findOne());
 
 jsTestLog("Removing a node from the shard's replica set.");
 
-var rsConfig = rsObj.getReplSetConfigFromNode(0);
+let rsConfig = rsObj.getReplSetConfigFromNode(0);
 
-var removedNode = rsConfig.members.pop();
+let removedNode = rsConfig.members.pop();
 rsConfig.version++;
 reconfig(rsObj, rsConfig);
 

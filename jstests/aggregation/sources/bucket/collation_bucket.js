@@ -2,12 +2,12 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Test that the $bucket stage defines and sorts buckets according to the collation.
-var results;
+let results;
 const numericOrdering = {
     collation: {locale: "en_US", numericOrdering: true},
 };
 
-var coll = db.collation_bucket;
+let coll = db.collation_bucket;
 coll.drop();
 
 function insertData() {

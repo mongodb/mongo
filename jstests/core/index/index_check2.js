@@ -9,9 +9,9 @@ t.drop();
 // Include helpers for analyzing explain output.
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
-for (var i = 0; i < 1000; i++) {
-    var a = [];
-    for (var j = 1; j < 5; j++) {
+for (let i = 0; i < 1000; i++) {
+    let a = [];
+    for (let j = 1; j < 5; j++) {
         a.push("tag" + ((i * j) % 50));
     }
     t.save({num: i, tags: a});

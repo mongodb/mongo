@@ -10,7 +10,7 @@
  * ]
  */
 
-var testDb = db.getSiblingDB("convert_to_capped_nonexistent");
+let testDb = db.getSiblingDB("convert_to_capped_nonexistent");
 testDb.dropDatabase();
 
 // Database does not exist here

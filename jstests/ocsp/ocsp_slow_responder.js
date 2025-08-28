@@ -9,7 +9,7 @@ if (determineSSLProvider() !== "windows") {
     quit();
 }
 
-var ocsp_options = {
+let ocsp_options = {
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: OCSP_SERVER_CERT,
     tlsCAFile: OCSP_CA_PEM,
@@ -27,7 +27,7 @@ clearOCSPCache();
 let mock_ocsp = new MockOCSPServer("", 1, undefined, 3);
 mock_ocsp.start();
 
-var conn = null;
+let conn = null;
 
 assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);

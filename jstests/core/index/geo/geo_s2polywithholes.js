@@ -2,19 +2,19 @@
 //   requires_getmore,
 // ]
 
-var t = db.geo_s2weirdpolys;
+let t = db.geo_s2weirdpolys;
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
-var centerPoint = {"type": "Point", "coordinates": [0.5, 0.5]};
-var edgePoint = {"type": "Point", "coordinates": [0, 0.5]};
-var cornerPoint = {"type": "Point", "coordinates": [0, 0]};
+let centerPoint = {"type": "Point", "coordinates": [0.5, 0.5]};
+let edgePoint = {"type": "Point", "coordinates": [0, 0.5]};
+let cornerPoint = {"type": "Point", "coordinates": [0, 0]};
 
 t.insert({geo: centerPoint});
 t.insert({geo: edgePoint});
 t.insert({geo: cornerPoint});
 
-var polygonWithNoHole = {
+let polygonWithNoHole = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -28,11 +28,11 @@ var polygonWithNoHole = {
 };
 
 // Test 1: Sanity check.  Expect all three points.
-var sanityResult = t.find({geo: {$within: {$geometry: polygonWithNoHole}}});
+let sanityResult = t.find({geo: {$within: {$geometry: polygonWithNoHole}}});
 assert.eq(sanityResult.itcount(), 3);
 
 // Test 2: Polygon with a hole that isn't contained byt the poly shell.
-var polygonWithProtrudingHole = {
+let polygonWithProtrudingHole = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -62,7 +62,7 @@ assert.throws(function () {
 
 // Test 3: This test will confirm that a polygon with overlapping holes throws
 // an error.
-var polyWithOverlappingHoles = {
+let polyWithOverlappingHoles = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -92,7 +92,7 @@ var polyWithOverlappingHoles = {
 assert.writeError(t.insert({geo: polyWithOverlappingHoles}));
 
 // Test 4: Only one nesting is allowed by GeoJSON.
-var polyWithDeepHole = {
+let polyWithDeepHole = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -121,7 +121,7 @@ var polyWithDeepHole = {
 assert.writeError(t.insert({geo: polyWithDeepHole}));
 
 // Test 5: The first ring must be the exterior ring.
-var polyWithBiggerHole = {
+let polyWithBiggerHole = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -143,7 +143,7 @@ var polyWithBiggerHole = {
 assert.writeError(t.insert({geo: polyWithBiggerHole}));
 
 // Test 6: Holes cannot share more than one vertex with exterior loop
-var polySharedVertices = {
+let polySharedVertices = {
     "type": "Polygon",
     "coordinates": [
         [

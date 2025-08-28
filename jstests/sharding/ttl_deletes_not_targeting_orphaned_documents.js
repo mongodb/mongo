@@ -27,7 +27,7 @@ assert.commandWorked(st.s.adminCommand({shardCollection: collName, key: {_id: 1}
 
 // Insert documents that are going to be deleted by the TTL index created later on
 const currTime = new Date();
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 const nDocs = 100;
 for (let i = 0; i < nDocs; i++) {
     bulk.insert({_id: i, a: currTime});

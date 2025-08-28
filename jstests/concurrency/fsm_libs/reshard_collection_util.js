@@ -37,7 +37,7 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
         if (TestData.runningWithShardStepdowns) {
             assert.soon(
                 function () {
-                    var res = db.adminCommand(reshardCollectionCmdObj);
+                    let res = db.adminCommand(reshardCollectionCmdObj);
                     if (res.ok) {
                         return true;
                     }

@@ -18,11 +18,11 @@
 //   requires_getmore,
 // ]
 
-var coll = db.count10;
+let coll = db.count10;
 coll.drop();
 
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = 0; i < 100; i++) {
     coll.insertOne({x: i});
 }
 assert.commandWorked(bulk.execute());
@@ -30,9 +30,9 @@ assert.commandWorked(bulk.execute());
 // Start a parallel shell which repeatedly checks for a count
 // query using db.currentOp(). As soon as the op is found,
 // kill it via db.killOp().
-var s = startParallelShell(function () {
+let s = startParallelShell(function () {
     assert.soon(function () {
-        var currentCountOps = db
+        let currentCountOps = db
             .getSiblingDB("admin")
             .aggregate([
                 {$currentOp: {}},
@@ -50,7 +50,7 @@ var s = startParallelShell(function () {
             return false;
         }
 
-        var countOp = currentCountOps[0];
+        let countOp = currentCountOps[0];
         jsTest.log("Found count op:");
         printjson(countOp);
         // Found the count op. Try to kill it.
@@ -59,7 +59,7 @@ var s = startParallelShell(function () {
     }, "Could not find count op after retrying, gave up");
 });
 
-var res = assert.throws(
+let res = assert.throws(
     function () {
         coll.find("sleep(1000)").count();
     },

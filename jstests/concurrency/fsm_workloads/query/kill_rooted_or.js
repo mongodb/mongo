@@ -16,17 +16,17 @@ export const $config = (function () {
     // Use the workload name as the collection name, since the workload name is assumed to be
     // unique. Note that we choose our own collection name instead of using the collection provided
     // by the concurrency framework, because this workload drops its collection.
-    var uniqueCollectionName = "kill_rooted_or";
+    let uniqueCollectionName = "kill_rooted_or";
 
-    var data = {
+    let data = {
         collName: uniqueCollectionName,
         indexSpecs: [{a: 1}, {a: 1, c: 1}, {b: 1}, {b: 1, c: 1}],
         numDocs: 200,
     };
 
-    var states = {
+    let states = {
         query: function query(db, collNameUnused) {
-            var cursor = db[this.collName].find({$or: [{a: 0}, {b: 0}]});
+            let cursor = db[this.collName].find({$or: [{a: 0}, {b: 0}]});
             try {
                 // We don't know exactly how many documents will be in the collection at the time of
                 // the query, so we can't verify this value.
@@ -50,7 +50,7 @@ export const $config = (function () {
         },
 
         dropIndex: function dropIndex(db, collNameUnused) {
-            var indexSpec = this.indexSpecs[Random.randInt(this.indexSpecs.length)];
+            let indexSpec = this.indexSpecs[Random.randInt(this.indexSpecs.length)];
 
             // We don't assert that the command succeeded when dropping an index because it's
             // possible another thread has already dropped this index.
@@ -78,7 +78,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {
+    let transitions = {
         query: {query: 0.8, dropCollection: 0.1, dropIndex: 0.1},
         dropCollection: {query: 1},
         dropIndex: {query: 1},

@@ -32,17 +32,17 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }
 
-var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
-var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
-var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
+let crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
+let epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
+let strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
 
 const collName = "geo_bigpoly_edgecases";
-var coll = db[collName];
+let coll = db[collName];
 coll.drop();
 
 // Edge cases producing error
 // These non-polygon objects cannot be queried because they are strictCRS
-var objects = [
+let objects = [
     {name: "point with strictCRS", type: "Point", coordinates: [-97.9, 0], crs: strictCRS},
     {
         name: "multipoint with strictCRS",
@@ -85,7 +85,7 @@ objects.forEach(function (o) {
 });
 
 // Big Polygon query for $nearSphere & geoNear should fail
-var bigPoly = {
+let bigPoly = {
     name: "3 sided closed polygon",
     type: "Polygon", // triangle
     coordinates: [
@@ -196,7 +196,7 @@ objects.forEach(function (o) {
 });
 
 // Use Polygon to search for objects which should be ignored
-var poly = {
+let poly = {
     name: "4 sided polygon around NYC",
     type: "Polygon", // triangle
     coordinates: [
@@ -216,7 +216,7 @@ assert.eq(0, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "ignore obj
 
 // Now remove the strictCRS and find all the objects
 coll.update({}, {$unset: {"geo.crs": ""}}, {multi: true});
-var totalDocs = coll.count();
+let totalDocs = coll.count();
 
 assert.eq(totalDocs, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "no strictCRS within");
 assert.eq(totalDocs, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "no strictCRS intersects");

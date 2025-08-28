@@ -68,7 +68,7 @@ function assertChangeStreamBehaviour(projection, expectedEvents, expectedErrorCo
     const commentID = `${Math.random()}`;
 
     // Create a change stream cursor with the specified projection.
-    var csCursor = testColl.watch([{$addFields: projection}], {
+    let csCursor = testColl.watch([{$addFields: projection}], {
         startAtOperationTime: Timestamp(1, 1),
         comment: commentID,
     });

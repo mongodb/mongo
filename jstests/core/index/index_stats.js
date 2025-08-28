@@ -15,15 +15,15 @@
 //   references_foreign_collection,
 // ]
 
-var colName = "jstests_index_stats";
-var col = db[colName];
+let colName = "jstests_index_stats";
+let col = db[colName];
 col.drop();
 
-var getUsageCount = function (indexName, collection) {
+let getUsageCount = function (indexName, collection) {
     collection = collection || col;
-    var cursor = collection.aggregate([{$indexStats: {}}]);
+    let cursor = collection.aggregate([{$indexStats: {}}]);
     while (cursor.hasNext()) {
-        var doc = cursor.next();
+        let doc = cursor.next();
 
         if (doc.name === indexName) {
             return doc.accesses.ops;
@@ -33,10 +33,10 @@ var getUsageCount = function (indexName, collection) {
     return undefined;
 };
 
-var getIndexKey = function (indexName) {
-    var cursor = col.aggregate([{$indexStats: {}}]);
+let getIndexKey = function (indexName) {
+    let cursor = col.aggregate([{$indexStats: {}}]);
     while (cursor.hasNext()) {
-        var doc = cursor.next();
+        let doc = cursor.next();
 
         if (doc.name === indexName) {
             return doc.key;
@@ -61,8 +61,8 @@ assert.eq(undefined, getUsageCount("a_1"));
 //
 assert.commandWorked(col.createIndex({a: 1}, {name: "a_1"}));
 assert.commandWorked(col.createIndex({b: 1, c: 1}, {name: "b_1_c_1"}));
-var countA = 0; // Tracks expected index access for "a_1".
-var countB = 0; // Tracks expected index access for "b_1_c_1".
+let countA = 0; // Tracks expected index access for "a_1".
+let countB = 0; // Tracks expected index access for "b_1_c_1".
 
 //
 // Confirm a stats object exists post index creation (with 0 count).
@@ -81,7 +81,7 @@ assert.eq(countA, getUsageCount("a_1"));
 //
 // Confirm index stats tick on findAndModify() update.
 //
-var res = db.runCommand({findAndModify: colName, query: {a: 1}, update: {$set: {d: 1}}, "new": true});
+let res = db.runCommand({findAndModify: colName, query: {a: 1}, update: {$set: {d: 1}}, "new": true});
 assert.commandWorked(res);
 countA++;
 assert.eq(countA, getUsageCount("a_1"));

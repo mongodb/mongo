@@ -4,29 +4,29 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isFinished, startParallelOps} from "jstests/libs/test_background_ops.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-var oldVersion = "last-lts";
+let oldVersion = "last-lts";
 
-var nodes = {
+let nodes = {
     n1: {binVersion: oldVersion},
     n2: {binVersion: oldVersion},
     a3: {binVersion: oldVersion},
 };
 
-var rst = new ReplSetTest({nodes: nodes});
+let rst = new ReplSetTest({nodes: nodes});
 
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Wait for a primary node...
 var primary = rst.getPrimary();
-var otherOpConn = new Mongo(rst.getURL());
-var insertNS = "test.foo";
+let otherOpConn = new Mongo(rst.getURL());
+let insertNS = "test.foo";
 
 jsTest.log("Starting parallel operations during upgrade...");
 
 function findAndInsert(rsURL, coll) {
     var coll = new Mongo(rsURL).getCollection(coll + "");
-    var count = 0;
+    let count = 0;
 
     jsTest.log("Starting finds and inserts...");
 
@@ -45,7 +45,7 @@ function findAndInsert(rsURL, coll) {
     return count;
 }
 
-var joinFindInsert = startParallelOps(
+let joinFindInsert = startParallelOps(
     primary, // The connection where the test info is passed and stored
     findAndInsert,
     [rst.getURL(), insertNS],
@@ -60,7 +60,7 @@ jsTest.log("Replica set upgraded.");
 // We save a reference to the old primary so that we can call reconnect() on it before
 // joinFindInsert() would attempt to send the node an update operation that signals the parallel
 // shell running the background operations to stop.
-var oldPrimary = primary;
+let oldPrimary = primary;
 
 // Wait for primary
 var primary = rst.getPrimary();
@@ -76,8 +76,8 @@ sleep(10 * 1000);
 reconnect(oldPrimary.getDB("admin"));
 joinFindInsert();
 
-var totalInserts = primary.getCollection(insertNS).find().sort({_id: -1}).next()._id + 1;
-var dataFound = primary.getCollection(insertNS).count();
+let totalInserts = primary.getCollection(insertNS).find().sort({_id: -1}).next()._id + 1;
+let dataFound = primary.getCollection(insertNS).count();
 
 jsTest.log("Found " + dataFound + " docs out of " + tojson(totalInserts) + " inserted.");
 

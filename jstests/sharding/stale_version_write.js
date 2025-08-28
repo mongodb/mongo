@@ -1,17 +1,17 @@
 // Tests whether a reset sharding version triggers errors
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1, mongos: 2});
+let st = new ShardingTest({shards: 1, mongos: 2});
 
-var mongosA = st.s0;
-var mongosB = st.s1;
+let mongosA = st.s0;
+let mongosB = st.s1;
 
 jsTest.log("Adding new collections...");
 
-var collA = mongosA.getCollection(jsTestName() + ".coll");
+let collA = mongosA.getCollection(jsTestName() + ".coll");
 assert.commandWorked(collA.insert({hello: "world"}));
 
-var collB = mongosB.getCollection("" + collA);
+let collB = mongosB.getCollection("" + collA);
 assert.commandWorked(collB.insert({hello: "world"}));
 
 jsTest.log("Enabling sharding...");

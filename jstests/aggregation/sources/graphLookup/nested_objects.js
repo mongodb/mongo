@@ -1,22 +1,22 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the behavior of graphLookup
 // when the 'connectToField' is a nested array, or when the 'connectFromField' is a nested array.
 
-var local = db.local;
-var foreign = db.foreign;
+let local = db.local;
+let foreign = db.foreign;
 
 local.drop();
 foreign.drop();
 
 // 'connectFromField' is an array of objects.
-var bulk = foreign.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
+let bulk = foreign.initializeUnorderedBulkOp();
+for (let i = 0; i < 100; i++) {
     bulk.insert({_id: i, neighbors: [{id: i + 1}, {id: i + 2}]});
 }
 assert.commandWorked(bulk.execute());
 
 assert.commandWorked(local.insert({starting: 0}));
 
-var res = local
+let res = local
     .aggregate({
         $graphLookup: {
             from: "foreign",

@@ -24,14 +24,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // shell to clean up the core dump that is left behind.
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
-var name = "interruptStepDown";
+let name = "interruptStepDown";
 // Set the fassert timeout to shorter than the default to avoid having a long-running test.
-var replSet = new ReplSetTest({
+let replSet = new ReplSetTest({
     name: name,
     nodes: 3,
     nodeOptions: {setParameter: "fassertOnLockTimeoutForStepUpDown=5"},
 });
-var nodes = replSet.nodeList();
+let nodes = replSet.nodeList();
 replSet.startSet();
 replSet.initiate(
     {
@@ -48,8 +48,8 @@ replSet.initiate(
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 
-var primary = replSet.getPrimary();
-var secondary = replSet.getSecondary();
+let primary = replSet.getPrimary();
+let secondary = replSet.getSecondary();
 assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
 assert.commandWorked(
     primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
@@ -66,7 +66,7 @@ let failPoint = configureFailPoint(primary.getDB(name), "hangWithLockDuringBatch
 });
 
 jsTestLog("Initiating write which will hang on failpoint");
-var bgInserter = startParallelShell(
+let bgInserter = startParallelShell(
     "db.getSiblingDB('interruptStepDown').foo.insert([{_id:0}, {_id:1}, {_id:2}]);",
     primary.port,
 );
@@ -74,17 +74,17 @@ var bgInserter = startParallelShell(
 jsTestLog("Wait for failpoint after bgwrite and before asking the PRIMARY to stepdown");
 failPoint.wait();
 
-var stepDownCmd = function () {
+let stepDownCmd = function () {
     jsTestLog("Sending stepdown to primary");
     db.getSiblingDB("admin").runCommand({replSetStepDown: 10, force: true});
 };
-var stepDowner = startParallelShell(stepDownCmd, primary.port);
+let stepDowner = startParallelShell(stepDownCmd, primary.port);
 
 jsTestLog("Waiting for primary to be down");
 replSet.waitForState(primary, ReplSetTest.State.DOWN);
 
 jsTestLog("Make sure there is a new primary");
-var newprimary = replSet.getPrimary();
+let newprimary = replSet.getPrimary();
 assert(primary != newprimary);
 
 stepDowner({checkExitSuccess: false});

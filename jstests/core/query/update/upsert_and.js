@@ -1,7 +1,7 @@
 // @tags: [requires_non_retryable_writes]
 
 // tests to ensure fields in $and conditions are created when using the query to do upsert
-var res;
+let res;
 let coll = db[jsTestName()];
 coll.drop();
 

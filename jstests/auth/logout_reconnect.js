@@ -4,11 +4,11 @@
  * It is a regression test for SERVER-8798.
  */
 
-var conn = MongoRunner.runMongod({auth: "", remember: true});
+let conn = MongoRunner.runMongod({auth: "", remember: true});
 
 // create user with rw permissions and login
-var testDB = conn.getDB("test");
-var adminDB = conn.getDB("admin");
+let testDB = conn.getDB("test");
+let adminDB = conn.getDB("admin");
 adminDB.createUser({user: "admin", pwd: "admin", roles: ["userAdminAnyDatabase"]});
 adminDB.auth("admin", "admin");
 testDB.createUser({user: "rwuser", pwd: "rwuser", roles: ["readWrite"]});

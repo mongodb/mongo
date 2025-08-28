@@ -17,7 +17,7 @@ describe("listShards correct functionality test", function () {
             Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 
         this.checkShardName = function (shardName, shardsArray) {
-            var found = false;
+            let found = false;
             shardsArray.forEach((shardObj) => {
                 if (shardObj._id === shardName) {
                     found = true;

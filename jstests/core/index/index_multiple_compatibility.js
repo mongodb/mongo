@@ -7,7 +7,7 @@
 //]
 
 // Test that multiple indexes behave correctly together.
-var coll = db.index_multiple_compatibility;
+let coll = db.index_multiple_compatibility;
 coll.drop();
 
 const enUSStrength1 = {

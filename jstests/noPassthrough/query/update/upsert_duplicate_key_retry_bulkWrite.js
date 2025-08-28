@@ -29,7 +29,7 @@ function performUpsert() {
     // This function is called from startParallelShell(), so closed-over variables will not be
     // available.
     const testDB = db.getMongo().getDB("test");
-    var res = testDB.adminCommand({
+    let res = testDB.adminCommand({
         bulkWrite: 1,
         ops: [{update: 0, filter: {x: 3}, updateMods: {$inc: {y: 1}}, upsert: true}],
         nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}],
@@ -73,7 +73,7 @@ assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 // DuplicateKey error on replacement-style upsert, where the unique index key value to be
 // written does not match the value of the query predicate.
 assert.commandWorked(testColl.insert({_id: 1, "a": 12345}));
-var res = testDB.adminCommand({
+let res = testDB.adminCommand({
     bulkWrite: 1,
     ops: [{update: 0, filter: {x: 3}, updateMods: {}, upsert: true}],
     nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}],

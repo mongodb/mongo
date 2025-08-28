@@ -10,29 +10,29 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
-var rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
+let rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
 
 /******** Part 1 ***************/
 
 // setup set
-var nodes = rt.startSet();
+let nodes = rt.startSet();
 rt.initiate();
-var primary = rt.getPrimary();
+let primary = rt.getPrimary();
 rt.awaitSecondaryNodes();
-var secondary1 = rt.getSecondary();
+let secondary1 = rt.getSecondary();
 
 // shortcuts
-var primarydb = primary.getDB("d");
-var secondary1db = secondary1.getDB("d");
-var primarycol = primarydb["c"];
-var secondary1col = secondary1db["c"];
+let primarydb = primary.getDB("d");
+let secondary1db = secondary1.getDB("d");
+let primarycol = primarydb["c"];
+let secondary1col = secondary1db["c"];
 
 primarycol.drop();
 primarydb.createCollection(primarycol.getName());
 
 // create new collection. insert 24 docs, aged at one-hour intervalss
 let now = new Date().getTime();
-var bulk = primarycol.initializeUnorderedBulkOp();
+let bulk = primarycol.initializeUnorderedBulkOp();
 for (let i = 0; i < 24; i++) {
     bulk.insert({x: new Date(now - 3600 * 1000 * i)});
 }
@@ -49,7 +49,7 @@ printjson(secondary1col.stats());
 
 // create TTL index, wait for TTL monitor to kick in, then check that
 // the correct number of docs age out
-var initialExpireAfterSeconds = 20000;
+let initialExpireAfterSeconds = 20000;
 assert.commandWorked(primarycol.createIndex({x: 1}, {expireAfterSeconds: initialExpireAfterSeconds}));
 rt.awaitReplication();
 
@@ -67,12 +67,12 @@ assert.eq(6, secondary1col.count(), "docs not deleted on secondary");
 /******** Part 2 ***************/
 
 // add a new secondary, wait for it to fully join
-var secondary = rt.add();
-var config = rt.getReplSetConfig();
+let secondary = rt.add();
+let config = rt.getReplSetConfig();
 config.version = rt.getReplSetConfigFromNode().version + 1;
 reconfig(rt, config);
 
-var secondary2col = secondary.getDB("d")["c"];
+let secondary2col = secondary.getDB("d")["c"];
 
 // check that the new secondary has the correct number of docs
 print("New Secondary stats:");
@@ -86,8 +86,8 @@ primarydb.runCommand({collMod: "c", index: {keyPattern: {x: 1}, expireAfterSecon
 rt.awaitReplication();
 
 function getTTLTime(theCollection, theKey) {
-    var indexes = theCollection.getIndexes();
-    for (var i = 0; i < indexes.length; i++) {
+    let indexes = theCollection.getIndexes();
+    for (let i = 0; i < indexes.length; i++) {
         if (friendlyEqual(theKey, indexes[i].key)) return indexes[i].expireAfterSeconds;
     }
     throw "not found";
@@ -99,8 +99,8 @@ assert.eq(10000, getTTLTime(secondary1db.c, {x: 1}));
 
 // Verify the format of TTL collMod oplog entry. The old expiration time should be saved,
 // and index key patterns should be normalized to index names.
-var primaryOplog = primary.getDB("local").oplog.rs.find().sort({$natural: 1}).toArray();
-var collModEntry = primaryOplog.find((op) => op.o.collMod);
+let primaryOplog = primary.getDB("local").oplog.rs.find().sort({$natural: 1}).toArray();
+let collModEntry = primaryOplog.find((op) => op.o.collMod);
 
 assert(collModEntry, "collMod entry was not present in the oplog.");
 assert.eq(initialExpireAfterSeconds, collModEntry.o2["indexOptions_old"]["expireAfterSeconds"]);

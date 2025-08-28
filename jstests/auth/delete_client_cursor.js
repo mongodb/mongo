@@ -8,10 +8,10 @@
  * @tags: [requires_persistence]
  */
 
-var baseName = jsTestName();
-var dbpath = MongoRunner.dataPath + baseName;
+let baseName = jsTestName();
+let dbpath = MongoRunner.dataPath + baseName;
 resetDbpath(dbpath);
-var mongodCommonArgs = {
+let mongodCommonArgs = {
     dbpath: dbpath,
     noCleanData: true,
 };
@@ -23,7 +23,7 @@ var mongodCommonArgs = {
  * 'extraMongodArgs' are extra arguments to pass on the mongod command line, as an object.
  */
 function withMongod(extraMongodArgs, operation) {
-    var mongod = MongoRunner.runMongod(Object.merge(mongodCommonArgs, extraMongodArgs));
+    let mongod = MongoRunner.runMongod(Object.merge(mongodCommonArgs, extraMongodArgs));
 
     try {
         operation(mongod);
@@ -37,9 +37,9 @@ function withMongod(extraMongodArgs, operation) {
  * cursors on the server.
  */
 function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
-    var db = mongod.getDB("admin");
+    let db = mongod.getDB("admin");
     db.auth("admin", "admin");
-    var actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
+    let actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
     assert(
         actualNumLiveCursors == expectedNumLiveCursors,
         "actual num live cursors (" + actualNumLiveCursors + ") != exptected (" + expectedNumLiveCursors + ")",
@@ -47,7 +47,7 @@ function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
 }
 
 withMongod({noauth: ""}, function setupTest(mongod) {
-    var admin, somedb, conn;
+    let admin, somedb, conn;
     conn = new Mongo(mongod.host);
     admin = conn.getDB("admin");
     somedb = conn.getDB("somedb");
@@ -55,20 +55,20 @@ withMongod({noauth: ""}, function setupTest(mongod) {
     admin.auth("admin", "admin");
     somedb.createUser({user: "frim", pwd: "fram", roles: jsTest.basicUserRoles});
     somedb.data.drop();
-    for (var i = 0; i < 10; ++i) {
+    for (let i = 0; i < 10; ++i) {
         assert.commandWorked(somedb.data.insert({val: i}));
     }
     admin.logout();
 });
 
 withMongod({auth: ""}, function runTest(mongod) {
-    var conn = new Mongo(mongod.host);
-    var somedb = conn.getDB("somedb");
+    let conn = new Mongo(mongod.host);
+    let somedb = conn.getDB("somedb");
     somedb.auth("frim", "fram");
 
     expectNumLiveCursors(mongod, 0);
 
-    var cursor = somedb.data.find({}, {"_id": 1}).batchSize(1);
+    let cursor = somedb.data.find({}, {"_id": 1}).batchSize(1);
     cursor.next();
     expectNumLiveCursors(mongod, 1);
 

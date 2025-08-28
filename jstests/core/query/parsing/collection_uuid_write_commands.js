@@ -18,7 +18,7 @@ const validateErrorResponse = function (res, db, collectionUUID, expectedCollect
     assert.eq(res.actualCollection, actualCollection);
 };
 
-var testCommand = function (cmd, cmdObj) {
+let testCommand = function (cmd, cmdObj) {
     const testDB = db.getSiblingDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());
     const coll = testDB["coll"];

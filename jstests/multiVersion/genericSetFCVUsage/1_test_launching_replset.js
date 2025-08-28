@@ -32,7 +32,7 @@ for (let versions of [
     var nodes = rst.nodes;
 
     // Make sure we have hosts of all the different versions
-    var versionsFound = [];
+    let versionsFound = [];
     for (var j = 0; j < nodes.length; j++) versionsFound.push(nodes[j].getBinVersion());
 
     assert.allBinVersions(versions, versionsFound);

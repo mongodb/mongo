@@ -23,14 +23,14 @@ import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from 
 // command so we need to test it manually.
 
 function runTest(retryableWrite) {
-    var coll = db.getCollection("coll");
-    var coll1 = db.getCollection("coll1");
+    let coll = db.getCollection("coll");
+    let coll1 = db.getCollection("coll1");
     coll.drop();
     coll1.drop();
 
     // Test getMore by setting batch size to 1 and running 2 inserts.
     // Should end up with 1 insert return per batch.
-    var cmdObj = {
+    let cmdObj = {
         bulkWrite: 1,
         ops: [
             {insert: 1, document: {skey: "MongoDB"}},
@@ -59,7 +59,7 @@ function runTest(retryableWrite) {
     );
 
     // First batch only had 1 of 2 responses so run a getMore to get the next batch.
-    var getMoreRes = assert.commandWorked(db.adminCommand({getMore: res.cursor.id, collection: "$cmd.bulkWrite"}));
+    let getMoreRes = assert.commandWorked(db.adminCommand({getMore: res.cursor.id, collection: "$cmd.bulkWrite"}));
     assert(
         !getMoreRes.cursor.nextBatch[1],
         "Unexpectedly found cursor entry at index 1 in getMore command response: " + tojson(getMoreRes),

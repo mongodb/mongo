@@ -11,9 +11,9 @@ import {stopServerReplication, restartServerReplication} from "jstests/libs/writ
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
-var replTest = new ReplSetTest({nodes: 3});
+let replTest = new ReplSetTest({nodes: 3});
 replTest.startSet({shardsvr: ""});
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -22,9 +22,9 @@ assert.commandWorked(
     st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
 );
 
-var priConn = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
-var configConnStr = st.configRS.getURL();
+let priConn = replTest.getPrimary();
+let secondaries = replTest.getSecondaries();
+let configConnStr = st.configRS.getURL();
 
 // Wait for the secondaries to have the latest oplog entries before stopping the fetcher to
 // avoid the situation where one of the secondaries will not have an overlapping oplog with
@@ -37,7 +37,7 @@ stopServerReplication(secondaries);
 
 jsTest.log("inserting shardIdentity document to primary that shouldn't replicate");
 
-var shardIdentityDoc = {
+let shardIdentityDoc = {
     _id: "shardIdentity",
     configsvrConnectionString: configConnStr,
     shardName: "newShard",
@@ -49,7 +49,7 @@ assert.commandWorked(
 );
 
 // Ensure sharding state on the primary was initialized
-var res = priConn.getDB("admin").runCommand({shardingState: 1});
+let res = priConn.getDB("admin").runCommand({shardingState: 1});
 assert(res.enabled, tojson(res));
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
@@ -76,7 +76,7 @@ replTest.stop(priConn);
 restartServerReplication(secondaries);
 
 // Wait for a new healthy primary
-var newPriConn = replTest.getPrimary();
+let newPriConn = replTest.getPrimary();
 assert.neq(priConn, newPriConn);
 assert.commandWorked(newPriConn.getDB("test").foo.insert({a: 1}, {writeConcern: {w: "majority"}}));
 

@@ -6,10 +6,10 @@
 // Test that expressions which make can make string comparisons respect the collation.
 import {testExpression, testExpressionWithCollation} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.collation_expressions;
+let coll = db.collation_expressions;
 coll.drop();
 
-var results;
+let results;
 const caseInsensitive = {
     locale: "en_US",
     strength: 2,
@@ -123,10 +123,10 @@ assert.eq(4, results[0].out.length);
 assert(coll.drop);
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, upper: "A", lower: "a"}));
-var results1 = coll
+let results1 = coll
     .aggregate([{$project: {out: {$setUnion: [["$upper"], ["a"]]}}}], {collation: caseInsensitive})
     .toArray();
-var results2 = coll
+let results2 = coll
     .aggregate([{$project: {out: {$setUnion: [["A"], ["$lower"]]}}}], {collation: caseInsensitive})
     .toArray();
 assert.eq(results1, results2);

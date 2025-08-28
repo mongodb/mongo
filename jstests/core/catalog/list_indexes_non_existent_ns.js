@@ -6,10 +6,10 @@
  * ]
  */
 // Test the listIndexes command on non-existent collection.
-var dbTest = db.getSiblingDB("list_indexes_non_existent_db");
+let dbTest = db.getSiblingDB("list_indexes_non_existent_db");
 assert.commandWorked(dbTest.dropDatabase());
 
-var coll;
+let coll;
 
 // Non-existent database
 coll = dbTest.getCollection("list_indexes_non_existent_db");

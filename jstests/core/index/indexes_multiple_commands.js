@@ -7,7 +7,7 @@
 
 // Test that commands behave correctly under the presence of multiple indexes with the same key
 // pattern.
-var coll = db.indexes_multiple_commands;
+let coll = db.indexes_multiple_commands;
 
 /**
  * Assert that the result of the index creation ('cmd') indicates that 'numIndexes' were
@@ -19,7 +19,7 @@ var coll = db.indexes_multiple_commands;
  * @param numIndexes {Number} The expected number of indexes that cmd creates.
  */
 function assertIndexesCreated(cmd, numIndexes) {
-    var cmdResult;
+    let cmdResult;
 
     if (typeof numIndexes === "undefined") {
         numIndexes = 1;
@@ -32,7 +32,7 @@ function assertIndexesCreated(cmd, numIndexes) {
     }
 
     assert.commandWorked(cmdResult);
-    var isShardedNS = cmdResult.hasOwnProperty("raw");
+    let isShardedNS = cmdResult.hasOwnProperty("raw");
     if (isShardedNS) {
         cmdResult = cmdResult["raw"][Object.getOwnPropertyNames(cmdResult["raw"])[0]];
     }
@@ -85,7 +85,7 @@ coll.drop();
 assert.commandWorked(db.createCollection(coll.getName()));
 
 // Multiple non-conflicting indexes can be created in one command.
-var multipleCreate = () =>
+let multipleCreate = () =>
     db.runCommand({
         createIndexes: coll.getName(),
         indexes: [

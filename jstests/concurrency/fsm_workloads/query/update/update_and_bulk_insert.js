@@ -15,24 +15,24 @@
  *
  */
 export const $config = (function () {
-    var states = {
+    let states = {
         insert: function insert(db, collName) {
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < 10; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = 0; i < 10; ++i) {
                 bulk.insert({});
             }
             assert.commandWorked(bulk.execute());
         },
 
         update: function update(db, collName) {
-            var res = db[collName].update({}, {$inc: {n: 1}}, {multi: true});
+            let res = db[collName].update({}, {$inc: {n: 1}}, {multi: true});
             assert.lte(0, res.nMatched, tojson(res));
             assert.eq(res.nMatched, res.nModified, tojson(res));
             assert.eq(0, res.nUpserted, tojson(res));
         },
     };
 
-    var transitions = {insert: {insert: 0.2, update: 0.8}, update: {insert: 0.2, update: 0.8}};
+    let transitions = {insert: {insert: 0.2, update: 0.8}, update: {insert: 0.2, update: 0.8}};
 
     return {
         threadCount: 5,

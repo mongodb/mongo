@@ -3,7 +3,7 @@
 //   requires_getmore,
 // ]
 
-var t = db.jstests_regexc;
+let t = db.jstests_regexc;
 
 // $and using same index twice
 t.drop();

@@ -4,7 +4,7 @@
  * Runs multiple aggregations with $_externalDataSources option concurrently.
  */
 export const $config = (function () {
-    var data = (() => {
+    let data = (() => {
         Random.setRandomSeed();
 
         let localCollObjs = [];
@@ -37,7 +37,7 @@ export const $config = (function () {
         };
     })();
 
-    var states = (function () {
+    let states = (function () {
         const kUrlProtocolFile = "file://";
 
         function init(db, collName) {
@@ -221,7 +221,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         init: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
         scan: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
         match: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},

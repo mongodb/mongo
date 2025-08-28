@@ -15,7 +15,7 @@ const dbName = "test";
 
 // Try and prevent split vote failed elections after freezing / unfreezing by preventing the
 // secondary from being electable.
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     rs: {nodes: [{rsConfig: {}}, {rsConfig: {priority: 0}}]},
     // By default, our test infrastructure sets the election timeout to a very high value (24

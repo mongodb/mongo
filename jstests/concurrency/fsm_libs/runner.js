@@ -6,7 +6,7 @@ import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 
 export const runner = (function () {
     function validateExecutionMode(mode) {
-        var allowedKeys = ["parallel", "serial"];
+        let allowedKeys = ["parallel", "serial"];
 
         Object.keys(mode).forEach(function (option) {
             assert.contains(
@@ -22,7 +22,7 @@ export const runner = (function () {
         mode.serial = mode.serial || false;
         assert.eq("boolean", typeof mode.serial);
 
-        var numEnabledModes = 0;
+        let numEnabledModes = 0;
         Object.keys(mode).forEach((key) => {
             if (mode[key]) {
                 numEnabledModes++;
@@ -34,7 +34,7 @@ export const runner = (function () {
     }
 
     function validateExecutionOptions(mode, options) {
-        var allowedKeys = [
+        let allowedKeys = [
             "dbNamePrefix",
             "iterationMultiplier",
             "sessionOptions",
@@ -99,7 +99,7 @@ export const runner = (function () {
     }
 
     function validateCleanupOptions(options) {
-        var allowedKeys = ["dropDatabaseDenylist", "keepExistingDatabases", "validateCollections"];
+        let allowedKeys = ["dropDatabaseDenylist", "keepExistingDatabases", "validateCollections"];
 
         Object.keys(options).forEach(function (option) {
             assert.contains(
@@ -144,16 +144,16 @@ export const runner = (function () {
             });
         }
 
-        var schedule = [];
+        let schedule = [];
 
         // Take 'numSubsets' random subsets of the workloads, each
         // of size 'subsetSize'. Each workload must get scheduled
         // once before any workload can be scheduled again.
-        var subsetSize = executionOptions.subsetSize || 10;
+        let subsetSize = executionOptions.subsetSize || 10;
 
         // If the number of subsets is not specified, then have each
         // workload get scheduled 2 to 3 times.
-        var numSubsets = executionOptions.numSubsets;
+        let numSubsets = executionOptions.numSubsets;
         if (!numSubsets) {
             numSubsets = Math.ceil((2.5 * workloads.length) / subsetSize);
         }
@@ -161,8 +161,8 @@ export const runner = (function () {
         workloads = workloads.slice(0); // copy
         workloads = Array.shuffle(workloads);
 
-        var start = 0;
-        var end = subsetSize;
+        let start = 0;
+        let end = subsetSize;
 
         while (schedule.length < numSubsets) {
             schedule.push(workloads.slice(start, end));
@@ -175,8 +175,8 @@ export const runner = (function () {
             if (end > workloads.length) {
                 // Re-shuffle the beginning of the array, and prepend it
                 // with the workloads that have not been scheduled yet.
-                var temp = Array.shuffle(workloads.slice(0, start));
-                for (var i = workloads.length - 1; i >= start; --i) {
+                let temp = Array.shuffle(workloads.slice(0, start));
+                for (let i = workloads.length - 1; i >= start; --i) {
                     temp.unshift(workloads[i]);
                 }
                 workloads = temp;
@@ -190,8 +190,8 @@ export const runner = (function () {
     }
 
     function prepareCollections(workloads, context, cluster, clusterOptions, executionOptions) {
-        var dbName, collName, myDB;
-        var firstWorkload = true;
+        let dbName, collName, myDB;
+        let firstWorkload = true;
 
         workloads.forEach(function (workload) {
             // Workloads cannot have a shardKey if sameCollection is specified
@@ -225,7 +225,7 @@ export const runner = (function () {
                             }),
                     );
                     if (shouldShard) {
-                        var shardKey = context[workload].config.data.shardKey || {_id: "hashed"};
+                        let shardKey = context[workload].config.data.shardKey || {_id: "hashed"};
                         // TODO: allow workload config data to specify split
                         cluster.shardCollection(myDB[collName], shardKey, false);
                     }
@@ -241,7 +241,7 @@ export const runner = (function () {
     }
 
     function dropAllDatabases(db, denylist) {
-        var res = db.adminCommand("listDatabases");
+        let res = db.adminCommand("listDatabases");
         assert.commandWorked(res);
 
         res.databases.forEach(function (dbInfo) {
@@ -256,7 +256,7 @@ export const runner = (function () {
         // then drop it to avoid having too many files open
         if (!clusterOptions.sameCollection) {
             workloads.forEach(function (workload) {
-                var config = context[workload];
+                let config = context[workload];
                 config.db[config.collName].drop();
             });
         }
@@ -265,7 +265,7 @@ export const runner = (function () {
         // then drop it to avoid having too many files open
         if (!clusterOptions.sameDB) {
             workloads.forEach(function (workload) {
-                var config = context[workload];
+                let config = context[workload];
                 config.db.dropDatabase();
             });
         }
@@ -287,11 +287,11 @@ export const runner = (function () {
         // their corresponding number of occurrences in the stackTraces array, and
         // the associated thread ids (tids).
         function freqCount(stackTraces, tids) {
-            var uniqueStackTraces = [];
-            var associatedTids = [];
+            let uniqueStackTraces = [];
+            let associatedTids = [];
 
             stackTraces.forEach(function (item, stackTraceIndex) {
-                var i = uniqueStackTraces.indexOf(item);
+                let i = uniqueStackTraces.indexOf(item);
                 if (i < 0) {
                     uniqueStackTraces.push(item);
                     associatedTids.push(new Set([tids[stackTraceIndex]]));
@@ -316,15 +316,15 @@ export const runner = (function () {
         }
 
         function pluralize(str, num) {
-            var suffix = num > 1 ? "s" : "";
+            let suffix = num > 1 ? "s" : "";
             return num + " " + str + suffix;
         }
 
         function prepareMsg(workerErrs) {
-            var stackTraces = workerErrs.map((e) => e.format());
-            var stackTids = workerErrs.map((e) => e.tid);
-            var uniqueTraces = freqCount(stackTraces, stackTids);
-            var numUniqueTraces = uniqueTraces.length;
+            let stackTraces = workerErrs.map((e) => e.format());
+            let stackTids = workerErrs.map((e) => e.tid);
+            let uniqueTraces = freqCount(stackTraces, stackTids);
+            let numUniqueTraces = uniqueTraces.length;
 
             // Special case message when threads all have the same trace
             if (numUniqueTraces === 1) {
@@ -337,7 +337,7 @@ export const runner = (function () {
                 );
             }
 
-            var summary =
+            let summary =
                 pluralize("exception", stackTraces.length) +
                 " were thrown, " +
                 numUniqueTraces +
@@ -347,7 +347,7 @@ export const runner = (function () {
                 summary +
                 uniqueTraces
                     .map(function (obj) {
-                        var line =
+                        let line =
                             pluralize("thread", obj.freq) + " with tids " + JSON.stringify(obj.tids) + " threw\n";
                         return indent(line + obj.value, 8);
                     })
@@ -356,10 +356,10 @@ export const runner = (function () {
         }
 
         if (workerErrs.length > 0) {
-            var err = new Error(prepareMsg(workerErrs) + "\n");
+            let err = new Error(prepareMsg(workerErrs) + "\n");
 
             // Avoid having any stack traces omitted from the logs
-            var maxLogLine = 10 * 1024; // 10KB
+            let maxLogLine = 10 * 1024; // 10KB
 
             // Check if the combined length of the error message and the stack traces
             // exceeds the maximum line-length the shell will log.
@@ -374,11 +374,11 @@ export const runner = (function () {
     }
 
     function setupWorkload(workload, context, cluster) {
-        var myDB = context[workload].db;
-        var collName = context[workload].collName;
+        let myDB = context[workload].db;
+        let collName = context[workload].collName;
 
         const fn = () => {
-            var config = context[workload].config;
+            let config = context[workload].config;
             config.setup.call(config.data, myDB, collName, cluster);
         };
 
@@ -390,10 +390,10 @@ export const runner = (function () {
     }
 
     function teardownWorkload(workload, context, cluster) {
-        var myDB = context[workload].db;
-        var collName = context[workload].collName;
+        let myDB = context[workload].db;
+        let collName = context[workload].collName;
 
-        var config = context[workload].config;
+        let config = context[workload].config;
         config.teardown.call(config.data, myDB, collName, cluster);
     }
 
@@ -440,7 +440,7 @@ export const runner = (function () {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
-        var phase = "before workload " + workload + " teardown";
+        let phase = "before workload " + workload + " teardown";
 
         try {
             // Ensure that all data has replicated correctly to the secondaries before calling the
@@ -484,10 +484,10 @@ export const runner = (function () {
         dbHashDenylist,
         cleanupOptions,
     ) {
-        var cleanup = [];
-        var teardownFailed = false;
-        var startTime = Date.now(); // Initialize in case setupWorkload fails below.
-        var totalTime;
+        let cleanup = [];
+        let teardownFailed = false;
+        let startTime = Date.now(); // Initialize in case setupWorkload fails below.
+        let totalTime;
 
         jsTest.log("Workload(s) started: " + workloads.join(" "));
 
@@ -554,7 +554,7 @@ export const runner = (function () {
         } finally {
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
-            var cleanupResults = cleanup.map((workload) =>
+            let cleanupResults = cleanup.map((workload) =>
                 cleanupWorkload(workload, context, cluster, errors, "Foreground", dbHashDenylist, cleanupOptions),
             );
             teardownFailed = cleanupResults.some((success) => success === false);
@@ -587,21 +587,21 @@ export const runner = (function () {
         validateCleanupOptions(cleanupOptions);
         Object.freeze(cleanupOptions); // immutable after validation (and normalization)
 
-        var context = {};
+        let context = {};
         await loadWorkloadContext(workloads, context, executionOptions, true /* applyMultipliers */);
-        var threadMgr = new ThreadManager(clusterOptions);
+        let threadMgr = new ThreadManager(clusterOptions);
 
-        var cluster = new Cluster(clusterOptions, executionOptions.sessionOptions);
+        let cluster = new Cluster(clusterOptions, executionOptions.sessionOptions);
         cluster.setup();
 
         // Clean up the state left behind by other tests in the concurrency suite
         // to avoid having too many open files.
 
         // List of DBs that will not be dropped.
-        var dbDenylist = ["admin", "config", "local", "$external"];
+        let dbDenylist = ["admin", "config", "local", "$external"];
 
         // List of DBs that dbHash is not run on.
-        var dbHashDenylist = ["local"];
+        let dbHashDenylist = ["local"];
 
         if (cleanupOptions.dropDatabaseDenylist) {
             dbDenylist.push(...cleanupOptions.dropDatabaseDenylist);
@@ -611,12 +611,12 @@ export const runner = (function () {
             dropAllDatabases(cluster.getDB("test"), dbDenylist);
         }
 
-        var maxAllowedThreads = 100 * executionOptions.threadMultiplier;
+        let maxAllowedThreads = 100 * executionOptions.threadMultiplier;
         Random.setRandomSeed(clusterOptions.seed);
-        var errors = [];
+        let errors = [];
 
         try {
-            var schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
+            let schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
             printWorkloadSchedule(schedule);
 
             schedule.forEach(function (workloads) {
@@ -625,7 +625,7 @@ export const runner = (function () {
                 // $config.data. This is necessary because $config.data keeps track of
                 // thread-local state that may be updated during a workload's setup(),
                 // teardown(), and state functions.
-                var groupContext = {};
+                let groupContext = {};
                 workloads.forEach(function (workload) {
                     groupContext[workload] = Object.extend({}, context[workload], true);
                 });

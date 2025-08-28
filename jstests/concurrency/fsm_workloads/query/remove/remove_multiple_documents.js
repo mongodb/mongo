@@ -11,32 +11,32 @@
  * @tags: [assumes_balancer_off, requires_getmore]
  */
 export const $config = (function () {
-    var states = {
+    let states = {
         init: function init(db, collName) {
             this.numDocs = 200;
-            for (var i = 0; i < this.numDocs; ++i) {
+            for (let i = 0; i < this.numDocs; ++i) {
                 db[collName].insert({tid: this.tid, rand: Random.rand()});
             }
         },
 
         remove: function remove(db, collName) {
             // choose a random interval to remove documents from
-            var low = Random.rand();
-            var high = low + 0.05 * Random.rand();
+            let low = Random.rand();
+            let high = low + 0.05 * Random.rand();
 
-            var res = db[collName].remove({tid: this.tid, rand: {$gte: low, $lte: high}});
+            let res = db[collName].remove({tid: this.tid, rand: {$gte: low, $lte: high}});
             assert.gte(res.nRemoved, 0);
             assert.lte(res.nRemoved, this.numDocs);
             this.numDocs -= res.nRemoved;
         },
 
         count: function count(db, collName) {
-            var numDocs = db[collName].find({tid: this.tid}).itcount();
+            let numDocs = db[collName].find({tid: this.tid}).itcount();
             assert.eq(this.numDocs, numDocs);
         },
     };
 
-    var transitions = {init: {count: 1}, count: {remove: 1}, remove: {remove: 0.825, count: 0.125}};
+    let transitions = {init: {count: 1}, count: {remove: 1}, remove: {remove: 0.825, count: 0.125}};
 
     return {threadCount: 10, iterations: 20, states: states, transitions: transitions};
 })();

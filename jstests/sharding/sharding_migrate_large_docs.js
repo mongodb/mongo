@@ -5,13 +5,13 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s0;
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
-var shards = mongos.getCollection("config.shards").find().toArray();
-var shardAdmin = st.shard0.getDB("admin");
+let mongos = st.s0;
+let coll = mongos.getCollection("foo.bar");
+let admin = mongos.getDB("admin");
+let shards = mongos.getCollection("config.shards").find().toArray();
+let shardAdmin = st.shard0.getDB("admin");
 
 assert(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: shards[0]._id}).ok);
 assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
@@ -19,13 +19,13 @@ assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
 
 jsTest.log("Preparing large insert...");
 
-var data1MB = "x";
+let data1MB = "x";
 while (data1MB.length < 1024 * 1024) data1MB += data1MB;
 
-var data15MB = "";
+let data15MB = "";
 for (var i = 0; i < 15; i++) data15MB += data1MB;
 
-var data15PlusMB = data15MB;
+let data15PlusMB = data15MB;
 for (var i = 0; i < 1023 * 1024; i++) data15PlusMB += "x";
 
 print("~15MB object size is : " + Object.bsonsize({_id: 0, d: data15PlusMB}));

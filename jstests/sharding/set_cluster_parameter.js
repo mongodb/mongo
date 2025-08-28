@@ -376,7 +376,7 @@ if (!TestData.configShard) {
 
         configShard.getPrimary().adminCommand({setClusterParameter: clusterParameter2});
 
-        var cfg = configShard.getReplSetConfigFromNode();
+        let cfg = configShard.getReplSetConfigFromNode();
         cfg.configsvr = true;
         reconfig(configShard, cfg);
 
@@ -401,7 +401,7 @@ if (!TestData.configShard) {
                 configShard.getPrimary().adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
             );
         }
-        var mongos = MongoRunner.runMongos({
+        let mongos = MongoRunner.runMongos({
             configdb: configShard.getURL(),
             setParameter: "featureFlagTransitionToCatalogShard=true",
         });

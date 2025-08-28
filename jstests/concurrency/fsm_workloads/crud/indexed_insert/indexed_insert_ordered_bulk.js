@@ -18,14 +18,14 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.shardKey[$config.data.indexedField] = 1;
 
     $config.states.insert = function insert(db, collName) {
-        var doc = {};
+        let doc = {};
         doc[this.indexedField] = this.indexedValue;
 
-        var bulk = db[collName].initializeOrderedBulkOp();
-        for (var i = 0; i < this.docsPerInsert; ++i) {
+        let bulk = db[collName].initializeOrderedBulkOp();
+        for (let i = 0; i < this.docsPerInsert; ++i) {
             bulk.insert(doc);
         }
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(this.docsPerInsert, res.nInserted, tojson(res));
 

@@ -17,7 +17,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 (function () {
     "use strict";
 
-    var st = new ShardingTest({mongos: 1, shards: 1});
+    let st = new ShardingTest({mongos: 1, shards: 1});
 
     const dbName = "db";
     const collName = "foo";

@@ -6,11 +6,11 @@
 // @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 2});
+let s = new ShardingTest({shards: 2});
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
 var db = s.getDB("test");
-var res;
+let res;
 
 //
 // Target count command
@@ -19,7 +19,7 @@ var res;
 // Shard key is the same with command name.
 s.shardColl("foo", {count: 1}, {count: ""});
 
-for (var i = 0; i < 50; i++) {
+for (let i = 0; i < 50; i++) {
     db.foo.insert({count: i}); // chunk [MinKey, ""), including numbers
     db.foo.insert({count: "" + i}); // chunk ["", MaxKey]
 }

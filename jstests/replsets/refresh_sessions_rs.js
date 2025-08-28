@@ -3,26 +3,26 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.disableImplicitSessions = true;
 
-var refresh = {refreshLogicalSessionCacheNow: 1};
-var startSession = {startSession: 1};
+let refresh = {refreshLogicalSessionCacheNow: 1};
+let startSession = {startSession: 1};
 
 // Start up a replica set.
-var dbName = "config";
+let dbName = "config";
 
-var replTest = new ReplSetTest({name: "refresh", nodes: 3});
-var nodes = replTest.startSet();
+let replTest = new ReplSetTest({name: "refresh", nodes: 3});
+let nodes = replTest.startSet();
 
 replTest.initiate();
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 replTest.awaitSecondaryNodes();
-var [server2, server3] = replTest.getSecondaries();
+let [server2, server3] = replTest.getSecondaries();
 
-var db1 = primary.getDB(dbName);
-var db2 = server2.getDB(dbName);
-var db3 = server3.getDB(dbName);
+let db1 = primary.getDB(dbName);
+let db2 = server2.getDB(dbName);
+let db3 = server3.getDB(dbName);
 
-var res;
+let res;
 
 // The primary needs to create the sessions collection so that the secondaries can act upon it.
 // This is done by an initial refresh of the primary.

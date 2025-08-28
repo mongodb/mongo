@@ -9,11 +9,11 @@ import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 // therefore preventing orphans from being cleaned up.
 TestData.skipCheckOrphans = true;
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+let mongos = st.s;
+let admin = mongos.getDB("admin");
+let coll = mongos.getCollection("foo.bar");
 
 // Shard collection with initial chunk on shard0
 assert.commandWorked(mongos.adminCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));

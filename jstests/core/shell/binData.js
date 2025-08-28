@@ -1,4 +1,4 @@
-var x = new BinData(3, "OEJTfmD8twzaj/LPKLIVkA==");
+let x = new BinData(3, "OEJTfmD8twzaj/LPKLIVkA==");
 assert.eq(x.hex(), "3842537e60fcb70cda8ff2cf28b21590", "bad hex");
 assert.eq(x.base64(), "OEJTfmD8twzaj/LPKLIVkA==", "bad base64");
 assert.eq(x.type, 3, "bad type");

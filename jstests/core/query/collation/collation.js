@@ -33,22 +33,22 @@ import {
 } from "jstests/libs/query/analyze_plan.js";
 
 let testDb = db.getSiblingDB("collation_js");
-var coll = testDb.collation;
+let coll = testDb.collation;
 coll.drop();
 
-var explainRes;
-var writeRes;
-var planStage;
+let explainRes;
+let writeRes;
+let planStage;
 
-var hello = testDb.runCommand("hello");
+let hello = testDb.runCommand("hello");
 assert.commandWorked(hello);
-var isMongos = hello.msg === "isdbgrid";
-var isStandalone = !isMongos && !hello.hasOwnProperty("setName");
-var isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(testDb);
+let isMongos = hello.msg === "isdbgrid";
+let isStandalone = !isMongos && !hello.hasOwnProperty("setName");
+let isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(testDb);
 
-var assertIndexHasCollation = function (keyPattern, collation) {
-    var indexSpecs = coll.getIndexes();
-    var found = IndexCatalogHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
+let assertIndexHasCollation = function (keyPattern, collation) {
+    let indexSpecs = coll.getIndexes();
+    let found = IndexCatalogHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
     assert.neq(
         null,
         found,
@@ -61,7 +61,7 @@ var assertIndexHasCollation = function (keyPattern, collation) {
     );
 };
 
-var getQueryCollation = function (explainRes) {
+let getQueryCollation = function (explainRes) {
     if (explainRes.queryPlanner.hasOwnProperty("collation")) {
         return explainRes.queryPlanner.collation;
     }
@@ -1046,7 +1046,7 @@ coll = testDb.collation_find22;
 coll.drop();
 assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en", strength: 2}}));
 assert.commandWorked(coll.createIndex({x: 1, y: 1, z: 1}));
-for (var i = 0; i < 10; ++i) {
+for (let i = 0; i < 10; ++i) {
     assert.commandWorked(coll.insert({_id: i, x: 1, y: 10 - i, z: "str" + (i % 3)}));
 }
 const expectedResultsAsc = [{"z": "str0"}, {"z": "str0"}, {"z": "str1"}, {"z": "str2"}];
@@ -1673,7 +1673,7 @@ assert.eq(
 // Tests for the bulk API.
 //
 
-var bulk;
+let bulk;
 
 // update().
 coll = testDb.collation_bulkupdate;
@@ -1950,7 +1950,7 @@ if (!isMongos) {
         "query should have performed a case-insensitive match",
     );
 
-    var cloneCollOutput = testDb.runCommand({
+    let cloneCollOutput = testDb.runCommand({
         cloneCollectionAsCapped: coll.getName(),
         toCollection: clonedColl.getName(),
         size: 4096,
@@ -2030,7 +2030,7 @@ assert.commandWorked(
         {a: 2, b: 2},
     ]),
 );
-var expected = [
+let expected = [
     {a: 1, b: 1},
     {a: 1, b: 2},
     {a: 1, b: "a"},

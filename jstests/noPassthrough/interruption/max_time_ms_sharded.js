@@ -6,7 +6,7 @@
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     mongos: 1,
     config: 1,
     shards: 2,
@@ -16,26 +16,26 @@ var st = new ShardingTest({
     mongosOptions: {setParameter: {replicaSetMonitorProtocol: "sdam"}},
 });
 
-var mongos = st.s0;
-var shards = [st.shard0, st.shard1];
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
-var cursor;
-var res;
+let mongos = st.s0;
+let shards = [st.shard0, st.shard1];
+let coll = mongos.getCollection("foo.bar");
+let admin = mongos.getDB("admin");
+let cursor;
+let res;
 
 const defaultMaxTimeMS = 60 * 1000;
 
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
 // to throw if it receives an operation with a max time. See fail point declaration for complete
 // description.
-var configureMaxTimeAlwaysTimeOut = function (mode) {
+let configureMaxTimeAlwaysTimeOut = function (mode) {
     assert.commandWorked(shards[0].getDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
     assert.commandWorked(shards[1].getDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
 };
 
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
 // mongod from enforcing time limits. See fail point declaration for complete description.
-var configureMaxTimeNeverTimeOut = function (mode) {
+let configureMaxTimeNeverTimeOut = function (mode) {
     assert.commandWorked(shards[0].getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
     assert.commandWorked(shards[1].getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
 };
@@ -52,8 +52,8 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(), find: {_id
 // Insert 1000 documents into sharded collection, such that each shard owns 500.
 //
 const nDocsPerShard = 500;
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = -nDocsPerShard; i < nDocsPerShard; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = -nDocsPerShard; i < nDocsPerShard; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());

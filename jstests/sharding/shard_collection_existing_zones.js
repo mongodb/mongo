@@ -3,28 +3,28 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({shards: 3});
-var kDbName = "test";
-var kCollName = "foo";
-var ns = kDbName + "." + kCollName;
-var zoneName = "zoneName";
-var mongos = st.s0;
-var testDB = mongos.getDB(kDbName);
-var configDB = mongos.getDB("config");
-var shardName = st.shard0.shardName;
+let st = new ShardingTest({shards: 3});
+let kDbName = "test";
+let kCollName = "foo";
+let ns = kDbName + "." + kCollName;
+let zoneName = "zoneName";
+let mongos = st.s0;
+let testDB = mongos.getDB(kDbName);
+let configDB = mongos.getDB("config");
+let shardName = st.shard0.shardName;
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 /**
  * Test that shardCollection correctly validates that a zone is associated with a shard.
  */
 function testShardZoneAssociationValidation(proposedShardKey, numberLongMin, numberLongMax) {
-    var zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
-    var zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
+    let zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
+    let zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
     assert.commandWorked(
         configDB.tags.insert({_id: {ns: ns, min: zoneMin}, ns: ns, min: zoneMin, max: zoneMax, tag: zoneName}),
     );
 
-    var tagDoc = configDB.tags.findOne();
+    let tagDoc = configDB.tags.findOne();
     assert.eq(ns, tagDoc.ns);
     assert.eq(zoneMin, tagDoc.min);
     assert.eq(zoneMax, tagDoc.max);
@@ -45,11 +45,11 @@ function testShardKeyValidation(proposedShardKey, numberLongMin, numberLongMax, 
     assert.commandWorked(testDB.foo.createIndex(proposedShardKey));
     assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: zoneName}));
 
-    var zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
-    var zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
+    let zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
+    let zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
     assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: zoneMin, max: zoneMax, zone: zoneName}));
 
-    var tagDoc = configDB.tags.findOne();
+    let tagDoc = configDB.tags.findOne();
     jsTestLog("xxx tag doc " + tojson(tagDoc));
     assert.eq(ns, tagDoc.ns);
     assert.eq(zoneMin, tagDoc.min);
@@ -69,13 +69,13 @@ function testShardKeyValidation(proposedShardKey, numberLongMin, numberLongMax, 
  * Test that shardCollection uses existing zone ranges to split chunks.
  */
 function testChunkSplits(collectionExists) {
-    var shardKey = {x: 1};
-    var ranges = [
+    let shardKey = {x: 1};
+    let ranges = [
         {min: {x: 0}, max: {x: 10}},
         {min: {x: 10}, max: {x: 20}},
         {min: {x: 30}, max: {x: 40}},
     ];
-    var shards = configDB.shards.find().toArray();
+    let shards = configDB.shards.find().toArray();
     assert.eq(ranges.length, shards.length);
     if (collectionExists) {
         assert.commandWorked(testDB.foo.createIndex(shardKey));
@@ -85,7 +85,7 @@ function testChunkSplits(collectionExists) {
     // shard0 - zonename0 - [0, 10)
     // shard1 - zonename1 - [10, 20)
     // shard2 - zonename2 - [30, 40)
-    for (var i = 0; i < shards.length; i++) {
+    for (let i = 0; i < shards.length; i++) {
         assert.commandWorked(st.s.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
         assert.commandWorked(
             st.s.adminCommand({updateZoneKeyRange: ns, min: ranges[i].min, max: ranges[i].max, zone: zoneName + i}),
@@ -103,7 +103,7 @@ function testChunkSplits(collectionExists) {
     // Expected:
     //   - zoned chunks on the corresponding shard.
     //   - 2 chunks on each shard
-    var expectedChunks = [
+    let expectedChunks = [
         {range: [{x: {"$minKey": 1}}, {x: 0}], shardId: null}, // any shard
         {range: [{x: 0}, {x: 10}], shardId: st.shard0.shardName}, // pre-defined
         {range: [{x: 10}, {x: 20}], shardId: st.shard1.shardName}, // pre-defined
@@ -111,10 +111,10 @@ function testChunkSplits(collectionExists) {
         {range: [{x: 30}, {x: 40}], shardId: st.shard2.shardName}, // pre-defined
         {range: [{x: 40}, {x: {"$maxKey": 1}}], shardId: null}, // any shard
     ];
-    var chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
+    let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
     assert.eq(chunkDocs.length, expectedChunks.length, "shardCollection failed to create chunk documents correctly");
     for (let i = 0; i < chunkDocs.length; i++) {
-        var errMsg = "expect to see chunk " + tojson(expectedChunks[i]) + " but found chunk " + tojson(chunkDocs[i]);
+        let errMsg = "expect to see chunk " + tojson(expectedChunks[i]) + " but found chunk " + tojson(chunkDocs[i]);
         assert.eq(expectedChunks[i].range[0], chunkDocs[i].min, errMsg);
         assert.eq(expectedChunks[i].range[1], chunkDocs[i].max, errMsg);
         if (expectedChunks[i].shardId !== null) {
@@ -132,10 +132,10 @@ function testChunkSplits(collectionExists) {
  * Tests that a non-empty collection associated with zones can be sharded.
  */
 function testNonemptyZonedCollection() {
-    var shardKey = {x: 1};
-    var shards = configDB.shards.find().toArray();
-    var testColl = testDB.getCollection(kCollName);
-    var ranges = [
+    let shardKey = {x: 1};
+    let shards = configDB.shards.find().toArray();
+    let testColl = testDB.getCollection(kCollName);
+    let ranges = [
         {min: {x: 0}, max: {x: 10}},
         {min: {x: 10}, max: {x: 20}},
         {min: {x: 20}, max: {x: 40}},

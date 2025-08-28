@@ -23,20 +23,20 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
+let rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
 rst.startSet();
 rst.initiate();
 
-var primaryColl = rst.getPrimary().getDB("test").coll;
+let primaryColl = rst.getPrimary().getDB("test").coll;
 
 // Insert 500000 documents. Make the last two documents larger, so that {_id: 0, x: 0} and {_id:
 // 1, x: 1} will fit into their positions when we grow them.
-var count = 500000;
-var bulk = primaryColl.initializeUnorderedBulkOp();
-for (var i = 0; i < count - 2; ++i) {
+let count = 500000;
+let bulk = primaryColl.initializeUnorderedBulkOp();
+for (let i = 0; i < count - 2; ++i) {
     bulk.insert({_id: i, x: i});
 }
-var longString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+let longString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 bulk.insert({_id: count - 2, x: count - 2, longString: longString});
 bulk.insert({_id: count - 1, x: count - 1, longString: longString});
 assert.commandWorked(bulk.execute());
@@ -45,12 +45,12 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(primaryColl.createIndex({x: 1}, {unique: true}));
 
 // Add a secondary.
-var secondary = rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
+let secondary = rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
 secondary.setSecondaryOk();
-var secondaryColl = secondary.getDB("test").coll;
+let secondaryColl = secondary.getDB("test").coll;
 
 // Pause initial sync when the secondary has copied {_id: 0, x: 0} and {_id: 1, x: 1}.
-var failPoint = configureFailPoint(secondary, "initialSyncHangDuringCollectionClone", {
+let failPoint = configureFailPoint(secondary, "initialSyncHangDuringCollectionClone", {
     namespace: secondaryColl.getFullName(),
     numDocsToClone: 2,
 });
@@ -87,7 +87,7 @@ assert.eq(1, secondaryColl.find({_id: 0, x: count}).itcount());
 assert.eq(1, secondaryColl.find({_id: count, x: 1}).itcount());
 
 // Check for unique index on secondary.
-var indexSpec = IndexCatalogHelpers.findByKeyPattern(secondaryColl.getIndexes(), {x: 1});
+let indexSpec = IndexCatalogHelpers.findByKeyPattern(secondaryColl.getIndexes(), {x: 1});
 assert.neq(null, indexSpec);
 assert.eq(true, indexSpec.unique);
 rst.stopSet();

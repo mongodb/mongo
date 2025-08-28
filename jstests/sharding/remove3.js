@@ -7,7 +7,7 @@ import {moveOutSessionChunks, removeShard} from "jstests/sharding/libs/remove_sh
 // therefore preventing orphans from being cleaned up.
 TestData.skipCheckOrphans = true;
 
-var st = new ShardingTest({name: "remove_shard3", shards: 2, mongos: 2});
+let st = new ShardingTest({name: "remove_shard3", shards: 2, mongos: 2});
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}));
@@ -26,7 +26,7 @@ assert.eq(2, st.s0.getDB("TestDB").Coll.find({}).toArray().length);
 assert.eq(2, st.s1.getDB("TestDB").Coll.find({}).toArray().length);
 
 // Remove st.shard1.shardName
-var removeRes;
+let removeRes;
 removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: st.shard1.shardName}));
 assert.eq("started", removeRes.state);
 removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: st.shard1.shardName}));

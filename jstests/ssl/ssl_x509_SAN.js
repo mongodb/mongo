@@ -5,7 +5,7 @@ const CLIENT_CERT = "jstests/libs/client.pem";
 
 // Some test machines lack ipv6 so test for by starting a mongod that needs to bind to an ipv6
 // address.
-var hasIpv6 = true;
+let hasIpv6 = true;
 const mongodHasIpv6 = MongoRunner.runMongod({
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: SERVER1_CERT,

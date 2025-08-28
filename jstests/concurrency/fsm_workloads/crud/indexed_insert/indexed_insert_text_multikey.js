@@ -12,9 +12,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.getRandomTextSnippet = function getRandomTextSnippet() {
-        var len = Random.randInt(5) + 1; // ensure we always add some text, not just empty array
-        var textArr = [];
-        for (var i = 0; i < len; ++i) {
+        let len = Random.randInt(5) + 1; // ensure we always add some text, not just empty array
+        let textArr = [];
+        for (let i = 0; i < len; ++i) {
             textArr.push($super.data.getRandomTextSnippet.call(this, arguments));
         }
         return textArr;

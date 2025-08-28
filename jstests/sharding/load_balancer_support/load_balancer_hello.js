@@ -16,8 +16,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
      * The whole ShardingTest is restarted just to get a fresh connection.
      * Obviously this could be accomplished much more efficiently.
      */
-    var runInShardingTest = (func) => {
-        var st = new ShardingTest({shards: 1, mongos: 1});
+    let runInShardingTest = (func) => {
+        let st = new ShardingTest({shards: 1, mongos: 1});
         try {
             func(st.s0.getDB("admin"));
         } finally {
@@ -25,13 +25,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         }
     };
 
-    var doHello = (admin, {lbConnection, lbHello}) => {
+    let doHello = (admin, {lbConnection, lbHello}) => {
         if (lbConnection)
             assert.commandWorked(
                 admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}),
             );
         try {
-            var helloDoc = {};
+            let helloDoc = {};
             if (lbHello) helloDoc["loadBalanced"] = true;
             return admin.runCommand("hello", helloDoc);
         } finally {
@@ -41,13 +41,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         }
     };
 
-    var assertServiceId = (res) => {
+    let assertServiceId = (res) => {
         assert.commandWorked(res);
         assert(res.hasOwnProperty("serviceId"), "serviceId missing from hello response:" + tojson(res));
         assert(res.serviceId.isObjectId, "res.serviceId = " + tojson(res.serviceId));
     };
 
-    var assertNoServiceId = (res) => {
+    let assertNoServiceId = (res) => {
         assert.commandWorked(res);
         assert(!res.hasOwnProperty("serviceId"), "res.serviceId = " + tojson(res.serviceId));
     };

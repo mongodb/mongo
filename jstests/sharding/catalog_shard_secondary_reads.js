@@ -12,7 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
@@ -56,7 +56,7 @@ assert.commandWorked(
     st.s0.adminCommand({moveChunk: "config.system.sessions", find: {_id: 0}, to: st.shard1.shardName}),
 );
 
-var joinMoveChunk = moveChunkParallel(
+let joinMoveChunk = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {_id: 0},

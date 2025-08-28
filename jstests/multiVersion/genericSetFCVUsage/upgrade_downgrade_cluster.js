@@ -19,7 +19,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // Test upgrade/downgrade between "latest" and "last-lts"/"last-continuous".
 for (let oldVersion of ["last-lts", "last-continuous"]) {
-    var st = new ShardingTest({
+    let st = new ShardingTest({
         shards: 2,
         mongos: 1,
         other: {
@@ -37,8 +37,8 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     st.configRS.awaitReplication();
 
     // check that config.version document gets initialized properly
-    var version = st.s.getCollection("config.version").findOne();
-    var clusterID = version.clusterId;
+    let version = st.s.getCollection("config.version").findOne();
+    let clusterID = version.clusterId;
     assert.neq(null, clusterID);
 
     // Setup sharded collection

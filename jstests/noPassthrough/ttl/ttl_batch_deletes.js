@@ -160,7 +160,7 @@ const verifyTTLOnShardedCluster = function (conn, clustered = false) {
     }
 
     // Verify batchedDeletes status to verify ttl deletions have been batched.
-    var sum = 0;
+    let sum = 0;
     FixtureHelpers.mapOnEachShardNode({
         db: db,
         func: (db) => {

@@ -11,12 +11,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = Object.extend(
         {
             explainBasicDistinct: function (db, collName) {
-                var res = db[collName].explain().distinct("i");
+                let res = db[collName].explain().distinct("i");
                 assert.commandWorked(res);
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "COLLSCAN"));
             },
             explainDistinctIndex: function (db, collName) {
-                var res = db[collName].explain().distinct("_id");
+                let res = db[collName].explain().distinct("_id");
                 assert.commandWorked(res);
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "PROJECTION"));
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "DISTINCT_SCAN"));

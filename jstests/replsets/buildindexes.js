@@ -5,22 +5,22 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // Skip db hash check because secondary will have different number of indexes due to
 // buildIndexes=false on the secondary.
 TestData.skipCheckDBHashes = true;
-var name = "buildIndexes";
-var host = getHostName();
+let name = "buildIndexes";
+let host = getHostName();
 
-var replTest = new ReplSetTest({name: name, nodes: 3});
+let replTest = new ReplSetTest({name: name, nodes: 3});
 
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 
-var config = replTest.getReplSetConfig();
+let config = replTest.getReplSetConfig();
 config.members[2].priority = 0;
 config.members[2].buildIndexes = false;
 
 replTest.initiate(config);
 
-var primary = replTest.getPrimary().getDB(name);
-var secondaryConns = replTest.getSecondaries();
-var secondaries = [];
+let primary = replTest.getPrimary().getDB(name);
+let secondaryConns = replTest.getSecondaries();
+let secondaries = [];
 for (var i in secondaryConns) {
     secondaryConns[i].setSecondaryOk();
     secondaries.push(secondaryConns[i].getDB(name));
@@ -45,7 +45,7 @@ replTest.awaitReplication();
 
 assert.commandWorked(secondaries[0].runCommand({count: "x"}));
 
-var indexes = secondaries[0].stats().indexes;
+let indexes = secondaries[0].stats().indexes;
 assert.eq(indexes, 2, "number of indexes");
 
 indexes = secondaries[1].stats().indexes;
@@ -53,7 +53,7 @@ assert.eq(indexes, 1);
 
 indexes = secondaries[0].x.stats().indexSizes;
 
-var count = 0;
+let count = 0;
 for (i in indexes) {
     count++;
     if (i == "_id_") {

@@ -34,8 +34,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {
         let innerChunkSize = Math.floor(this.partitionSize / this.iterations);
         jsTestLog("innerChunkSize: " + innerChunkSize);
-        for (var i = 0; i < this.iterations; ++i) {
-            var splitPoint = (i + 1) * innerChunkSize + partition.lower;
+        for (let i = 0; i < this.iterations; ++i) {
+            let splitPoint = (i + 1) * innerChunkSize + partition.lower;
             assert.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, splitPoint));
         }
     };
@@ -44,8 +44,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // in the cluster affected by the splitChunk operation sees the appropriate
     // after-state regardless of whether the operation succeeded or failed.
     function doSplitChunk(db, collName, connCache) {
-        var ns = db[collName].getFullName();
-        var config = ChunkHelper.getPrimary(connCache.config);
+        let ns = db[collName].getFullName();
+        let config = ChunkHelper.getPrimary(connCache.config);
 
         // Choose a random chunk in our partition to split.
         let chunk = this.getRandomChunkInPartition(collName, config);
@@ -54,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // operation. This will be used to verify that the same number of documents in that
         // range are found after the splitChunk.
         // Choose the mongos randomly to distribute load.
-        var numDocsBefore = ChunkHelper.getNumDocs(
+        let numDocsBefore = ChunkHelper.getNumDocs(
             ChunkHelper.getRandomMongos(connCache.mongos),
             ns,
             chunk.min._id,
@@ -64,7 +64,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // Save the number of chunks before the splitChunk operation. This will be used
         // to verify that the number of chunks after a successful splitChunk increases
         // by one, or after a failed splitChunk stays the same.
-        var numChunksBefore = ChunkHelper.getNumChunks(
+        let numChunksBefore = ChunkHelper.getNumChunks(
             config,
             ns,
             this.partition.chunkLower,
@@ -80,7 +80,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         } else {
             // Use chunk_helper.js's splitChunk wrapper to tolerate acceptable failures
             // and to use a limited number of retries with exponential backoff.
-            var bounds = [{_id: chunk.min._id}, {_id: chunk.max._id}];
+            let bounds = [{_id: chunk.min._id}, {_id: chunk.max._id}];
             splitChunkRes = ChunkHelper.splitChunkWithBounds(db, collName, bounds);
         }
 
@@ -88,14 +88,14 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Regardless of whether the splitChunk operation succeeded or failed,
         // verify that the shard the original chunk was on returns all data for the chunk.
-        var shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk.shard]);
-        var shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk.min._id, chunk.max._id);
-        var msg = "Shard does not have same number of documents after splitChunk.\n" + msgBase;
+        let shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk.shard]);
+        let shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk.min._id, chunk.max._id);
+        let msg = "Shard does not have same number of documents after splitChunk.\n" + msgBase;
         assert.eq(shardNumDocsAfter, numDocsBefore, msg);
 
         // Verify that all config servers have the correct after-state.
         // (see comments below for specifics).
-        for (var conn of connCache.config) {
+        for (let conn of connCache.config) {
             let res = conn.adminCommand({hello: 1});
             assert.commandWorked(res);
             if (res.isWritablePrimary) {
@@ -103,7 +103,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 // two chunks between the old chunk's lower and upper bounds.
                 // If the operation failed, verify that there is still only one chunk
                 // between the old chunk's lower and upper bounds.
-                var numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(conn, ns, chunk.min._id, chunk.max._id);
+                let numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(conn, ns, chunk.min._id, chunk.max._id);
                 if (splitChunkRes.ok) {
                     msg =
                         "splitChunk succeeded but the config does not see exactly 2 chunks " +
@@ -121,7 +121,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 // If the splitChunk operation succeeded, verify that the total number
                 // of chunks in our partition has increased by 1. If it failed, verify
                 // that it has stayed the same.
-                var numChunksAfter = ChunkHelper.getNumChunks(
+                let numChunksAfter = ChunkHelper.getNumChunks(
                     config,
                     ns,
                     this.partition.chunkLower,
@@ -145,11 +145,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Verify that all mongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
-        for (var mongos of connCache.mongos) {
+        for (let mongos of connCache.mongos) {
             // Regardless of if the splitChunk operation succeeded or failed, verify that each
             // mongos sees as many documents in the chunk's range after the move as there were
             // before.
-            var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
+            let numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
 
             msg = "Mongos does not see same number of documents after splitChunk.\n" + msgBase;
             assert.eq(numDocsAfter, numDocsBefore, msgBase);
@@ -157,7 +157,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // Regardless of if the splitChunk operation succeeded or failed,
             // verify that each mongos sees all data in the original chunk's
             // range only on the shard the original chunk was on.
-            var shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
+            let shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
             msg =
                 "Mongos does not see exactly 1 shard for chunk after splitChunk.\n" +
                 msgBase +

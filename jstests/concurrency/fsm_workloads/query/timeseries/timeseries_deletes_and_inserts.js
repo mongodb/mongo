@@ -20,8 +20,8 @@
 // when the mongos is fetching data from the shard using getMore(). Remove the helper and
 // allowedErrorCodes from the entire test once this issue is fixed
 function retryUntilWorked(query, readConcernIsObject = false) {
-    var attempts = 0;
-    var options = TestData.runningWithBalancer
+    let attempts = 0;
+    let options = TestData.runningWithBalancer
         ? readConcernIsObject
             ? {"readConcern": {level: "majority"}}
             : {"readConcern": "majority"}
@@ -91,7 +91,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {
+    let transitions = {
         init: {deleteMany: 0.25, insert: 0.75},
         deleteMany: {deleteMany: 0.4, deleteBucket: 0.2, insert: 0.4},
         deleteBucket: {deleteMany: 0.4, deleteBucket: 0.2, insert: 0.4},

@@ -39,15 +39,15 @@ let admin3 = st.s2.getDB("admin");
 let admin4 = st.s3.getDB("admin");
 
 function setParam(admin, obj) {
-    var ret = admin.runCommand(Object.extend({setParameter: 1}, obj));
+    let ret = admin.runCommand(Object.extend({setParameter: 1}, obj));
     return ret;
 }
 
 function getParam(admin, field) {
-    var q = {getParameter: 1};
+    let q = {getParameter: 1};
     q[field] = 1;
 
-    var ret = admin.runCommand(q);
+    let ret = admin.runCommand(q);
     assert.commandWorked(ret);
     return ret[field];
 }

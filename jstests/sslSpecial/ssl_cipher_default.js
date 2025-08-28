@@ -1,10 +1,10 @@
 // validate default for opensslCipherConfig
 
 function getparam(mongod, field) {
-    var q = {getParameter: 1};
+    let q = {getParameter: 1};
     q[field] = 1;
 
-    var ret = mongod.getDB("admin").runCommand(q);
+    let ret = mongod.getDB("admin").runCommand(q);
     return ret[field];
 }
 

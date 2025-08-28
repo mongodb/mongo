@@ -7,7 +7,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function waitAndGetShardVersion(conn, collNs) {
-    var shardVersion = undefined;
+    let shardVersion = undefined;
     assert.soon(() => {
         shardVersion = conn.adminCommand({getShardVersion: collNs}).global;
         return !(typeof shardVersion == "string" && shardVersion == "UNKNOWN");
@@ -16,11 +16,11 @@ function waitAndGetShardVersion(conn, collNs) {
     return shardVersion;
 }
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
+let coll = mongos.getCollection("foo.bar");
 
 assert(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}).ok);
 assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
@@ -30,8 +30,8 @@ st.printShardingStatus();
 
 jsTest.log("Testing failed migrations...");
 
-var oldVersion = null;
-var newVersion = null;
+let oldVersion = null;
+let newVersion = null;
 
 // failMigrationCommit -- this creates an error that aborts the migration before the commit
 // migration command is sent.

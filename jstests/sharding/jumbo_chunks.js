@@ -3,8 +3,8 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function bulkInsert(coll, keyValue, sizeMBytes) {
     const big = "X".repeat(1024 * 1024); // 1MB
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < sizeMBytes; i++) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < sizeMBytes; i++) {
         bulk.insert({x: keyValue, big: big});
     }
     assert.commandWorked(bulk.execute());
@@ -30,7 +30,7 @@ function setCollectionChunkSize(st, ns, chunkSizeMBytes) {
 }
 
 // Test setup
-var st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
+let st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
 assert.commandWorked(st.s.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneShard0"}));
@@ -48,14 +48,14 @@ const configDB = mongosSession.getDatabase("config");
         st.s.adminCommand({updateZoneKeyRange: "test.foo", min: {x: 0}, max: {x: MaxKey}, zone: "zoneShard0"}),
     );
 
-    var db = st.getDB("test");
+    let db = st.getDB("test");
 
     const big = "X".repeat(1024 * 1024); // 1MB
 
     // Insert 3MB of documents to create a jumbo chunk, and use the same shard key in all of
     // them so that the chunk cannot be split.
-    var bulk = db.foo.initializeUnorderedBulkOp();
-    for (var i = 0; i < 3; i++) {
+    let bulk = db.foo.initializeUnorderedBulkOp();
+    for (let i = 0; i < 3; i++) {
         bulk.insert({x: 0, big: big});
     }
 

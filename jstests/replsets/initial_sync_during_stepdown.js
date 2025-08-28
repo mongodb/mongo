@@ -17,15 +17,15 @@ const rst = new ReplSetTest({
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-var primary = rst.getPrimary();
-var primaryDB = primary.getDB(dbName);
-var primaryAdmin = primary.getDB("admin");
-var primaryColl = primaryDB[collName];
-var secondary = rst.getSecondary();
-var secondaryDB = secondary.getDB(dbName);
-var secondaryColl = secondaryDB[collName];
-var dbNss = primaryDB.getName();
-var collNss = primaryColl.getFullName();
+let primary = rst.getPrimary();
+let primaryDB = primary.getDB(dbName);
+let primaryAdmin = primary.getDB("admin");
+let primaryColl = primaryDB[collName];
+let secondary = rst.getSecondary();
+let secondaryDB = secondary.getDB(dbName);
+let secondaryColl = secondaryDB[collName];
+let dbNss = primaryDB.getName();
+let collNss = primaryColl.getFullName();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(

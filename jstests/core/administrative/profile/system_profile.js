@@ -14,8 +14,8 @@
 //   queries_system_profile_collection
 // ]
 
-var testDB = db.getSiblingDB("system_profile");
-var testDBCopy = db.getSiblingDB("system_profile_copy");
+let testDB = db.getSiblingDB("system_profile");
+let testDBCopy = db.getSiblingDB("system_profile_copy");
 
 // Create/drop should succeed.
 assert.commandWorked(testDB.dropDatabase());

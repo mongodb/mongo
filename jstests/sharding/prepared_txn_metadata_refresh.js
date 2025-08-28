@@ -6,7 +6,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2, other: {rsOptions: {verbose: 1}}});
 
@@ -39,7 +39,7 @@ assert.commandWorked(
 );
 
 // Bumping the collection version on the config server without involving any shard
-var collUuid = st.config.collections.findOne({_id: "test.user"}).uuid;
+let collUuid = st.config.collections.findOne({_id: "test.user"}).uuid;
 assert.commandWorked(st.config.chunks.updateOne({uuid: collUuid, min: {x: 42}}, {$set: {lastmod: Timestamp(100, 0)}}));
 
 // Flushing the routing information on the mongos, so next time it needs this information it will

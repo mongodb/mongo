@@ -6,14 +6,14 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-var name = "stepdown_catch_up_opt";
+let name = "stepdown_catch_up_opt";
 // Only 2 nodes, so that we can control whether the secondary is caught up.
-var replTest = new ReplSetTest({name: name, nodes: 2});
+let replTest = new ReplSetTest({name: name, nodes: 2});
 replTest.startSet();
 replTest.initiate();
 replTest.awaitSecondaryNodes();
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -26,10 +26,10 @@ assert.commandWorked(
 const noCaughtUpSecondariesCode = ErrorCodes.ExceededTimeLimit;
 
 // If the stepdown period is shorter than the secondaryCatchUpPeriodSecs argument.
-var stepDownPeriodTooShortCode = 2;
+let stepDownPeriodTooShortCode = 2;
 
 // If we give a string as an argument instead of an integer.
-var stringNotIntCode = 14;
+let stringNotIntCode = 14;
 
 // Expect a failure with a string argument.
 assert.commandFailedWithCode(
@@ -61,13 +61,13 @@ try {
     // Secondary is now at least 1 second behind.
 
     jsTestLog("Try to step down.");
-    var startTime = new Date();
+    let startTime = new Date();
     assert.commandFailedWithCode(
         primary.getDB("admin").runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 2}),
         noCaughtUpSecondariesCode,
         "Expected replSetStepDown to fail, since no secondaries should be caught up.",
     );
-    var endTime = new Date();
+    let endTime = new Date();
 
     // Ensure it took at least 2 second to time out. Adjust the timeout a little bit
     // for the precision issue of clock on Windows 2K8.
@@ -80,7 +80,7 @@ try {
 disableFailPoint();
 
 // Make sure the primary hasn't changed, since all stepdowns should have failed.
-var primaryStatus = primary.getDB("admin").runCommand({replSetGetStatus: 1});
+let primaryStatus = primary.getDB("admin").runCommand({replSetGetStatus: 1});
 assert.commandWorked(primaryStatus, "replSetGetStatus failed.");
 assert.eq(primaryStatus.myState, ReplSetTest.State.PRIMARY, "Expected original primary node to still be primary");
 

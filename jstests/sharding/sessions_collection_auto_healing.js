@@ -13,16 +13,16 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 0,
     other: {
         mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
     },
 });
-var configSvr = st.configRS.getPrimary();
+let configSvr = st.configRS.getPrimary();
 
-var mongos = st.s;
-var mongosConfig = mongos.getDB("config");
+let mongos = st.s;
+let mongosConfig = mongos.getDB("config");
 
 // Test that we can use sessions on the config server before we add any shards.
 {
@@ -63,8 +63,8 @@ const rs = new ReplSetTest({nodes: 1});
 rs.startSet({shardsvr: ""});
 rs.initiate();
 
-var shard = rs.getPrimary();
-var shardConfig = shard.getDB("config");
+let shard = rs.getPrimary();
+let shardConfig = shard.getDB("config");
 
 // Test that we can add this shard, even with a local config.system.sessions collection,
 // and test that we drop its local collection

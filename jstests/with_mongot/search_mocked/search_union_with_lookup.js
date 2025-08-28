@@ -46,7 +46,7 @@ assert.commandWorked(collBase2.insert({"_id": 201, "ref_id": 8}));
 
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 
-var cursorCounter = 123;
+let cursorCounter = 123;
 
 /**
  * Term: Search term to query for.

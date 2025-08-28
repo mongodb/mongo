@@ -37,7 +37,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Perform insertMany with ordered:false that may target multiple buckets across multiple chunks
      */
     $config.states.insert = function insert(db, collName, connCache) {
-        var docs = [];
+        let docs = [];
         for (let i = 0; i < 10; i++) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
             const timer = this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);

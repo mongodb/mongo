@@ -8,7 +8,7 @@
  */
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.jstests_bindata_indexonly;
+let coll = db.jstests_bindata_indexonly;
 
 coll.drop();
 assert.commandWorked(coll.insert({_id: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"), a: 1}));
@@ -26,7 +26,7 @@ assert.throws(
 );
 
 function testIndexOnlyBinData(blob) {
-    var explain = coll
+    let explain = coll
         .find({$and: [{_id: {$lte: BinData(0, blob)}}, {_id: {$gte: BinData(0, blob)}}]}, {_id: 1, a: 1})
         .hint({_id: 1, a: 1})
         .explain("executionStats");
@@ -47,7 +47,7 @@ testIndexOnlyBinData("AQAAAAEBAAVlbl9VSwAAAAAAAAhv");
 testIndexOnlyBinData("AQAAAAEBAAVlbl9VSwAAAAAAAAhz");
 testIndexOnlyBinData("////////////////////////////");
 
-var explain;
+let explain;
 
 explain = coll
     .find({_id: {$lt: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, {_id: 1, a: 1})

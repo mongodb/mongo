@@ -351,12 +351,12 @@ const normalizationMethods = ["sigmoid", "minMaxScaler"];
 const combinationMethods = ["expression", "avg"];
 const inputPipelineNormalizationMethods = ["none", "sigmoid", "minMaxScaler"];
 
-for (var normalizationMethod of normalizationMethods) {
-    for (var combinationMethod of combinationMethods) {
-        for (var scoreDetailsOnFirstInputPipeline of [true, false]) {
-            for (var scoreDetailsOnSecondInputPipeline of [true, false]) {
-                for (var firstInputPipelineNormalization of inputPipelineNormalizationMethods) {
-                    for (var secondInputPipelineNormalization of inputPipelineNormalizationMethods) {
+for (let normalizationMethod of normalizationMethods) {
+    for (let combinationMethod of combinationMethods) {
+        for (let scoreDetailsOnFirstInputPipeline of [true, false]) {
+            for (let scoreDetailsOnSecondInputPipeline of [true, false]) {
+                for (let firstInputPipelineNormalization of inputPipelineNormalizationMethods) {
+                    for (let secondInputPipelineNormalization of inputPipelineNormalizationMethods) {
                         checkScoreDetailsNormalizationCombinationMethod(
                             normalizationMethod,
                             combinationMethod,

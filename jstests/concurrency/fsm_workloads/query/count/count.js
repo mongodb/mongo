@@ -12,7 +12,7 @@
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         randRange: function randRange(low, high) {
             // return random number in range [low, high]
             assert.gt(high, low);
@@ -22,12 +22,12 @@ export const $config = (function () {
             return this.modulus * this.countPerNum;
         },
         getCount: function getCount(db, predicate) {
-            var query = Object.extend({tid: this.tid}, predicate);
+            let query = Object.extend({tid: this.tid}, predicate);
             return db[this.threadCollName].count(query);
         },
     };
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.modulus = this.randRange(5, 10);
             this.countPerNum = this.randRange(50, 100);
@@ -35,11 +35,11 @@ export const $config = (function () {
             // workloads that extend this one might have set 'this.threadCollName'
             this.threadCollName = this.threadCollName || collName;
 
-            var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
-            for (var i = 0; i < this.getNumDocs(); ++i) {
+            let bulk = db[this.threadCollName].initializeUnorderedBulkOp();
+            for (let i = 0; i < this.getNumDocs(); ++i) {
                 bulk.insert({i: i % this.modulus, tid: this.tid});
             }
-            var res = bulk.execute();
+            let res = bulk.execute();
             assert.commandWorked(res);
             assert.eq(this.getNumDocs(), res.nInserted);
         }
@@ -50,14 +50,14 @@ export const $config = (function () {
                 assert.eq(this.getCount(db), this.getNumDocs());
             }
 
-            var num = Random.randInt(this.modulus);
+            let num = Random.randInt(this.modulus);
             assert.eq(this.getCount(db, {i: num}), this.countPerNum);
         }
 
         return {init: init, count: count};
     })();
 
-    var transitions = {init: {count: 1}, count: {count: 1}};
+    let transitions = {init: {count: 1}, count: {count: 1}};
 
     return {data: data, threadCount: 10, iterations: 20, states: states, transitions: transitions};
 })();

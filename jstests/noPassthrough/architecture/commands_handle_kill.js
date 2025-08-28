@@ -73,10 +73,10 @@ function assertCommandPropogatesPlanExecutorFailure(cmdObj) {
 function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
     options = options || {};
 
-    var curOpFilter = options.curOpFilter;
+    let curOpFilter = options.curOpFilter;
     if (!curOpFilter) {
         curOpFilter = {};
-        for (var arg in cmdObj) {
+        for (let arg in cmdObj) {
             curOpFilter["command." + arg] = {$eq: cmdObj[arg]};
         }
     }

@@ -86,7 +86,7 @@ let timeFieldName = "timestamp";
 let timeFieldShardKeyPrefix = "control.min.";
 let timeFieldShardKey = timeFieldShardKeyPrefix + timeFieldName;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });

@@ -2,9 +2,9 @@
 // @tags: [requires_replication, requires_majority_read_concern]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var standalone = MongoRunner.runMongod({storageEngine: "wiredTiger"});
+let standalone = MongoRunner.runMongod({storageEngine: "wiredTiger"});
 
-var testDB = standalone.getDB("test");
+let testDB = standalone.getDB("test");
 
 assert.commandWorked(testDB.runCommand({insert: "after_cluster_time", documents: [{x: 1}]}));
 
@@ -42,16 +42,16 @@ assert.commandFailedWithCode(
 );
 MongoRunner.stopMongod(standalone);
 
-var rst = new ReplSetTest({nodes: 1});
+let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-var adminDBRS = rst.getPrimary().getDB("admin");
+let adminDBRS = rst.getPrimary().getDB("admin");
 
-var res = adminDBRS.runCommand({ping: 1});
+let res = adminDBRS.runCommand({ping: 1});
 assert.commandWorked(res);
 assert(res.hasOwnProperty("$clusterTime"), tojson(res));
 assert(res.$clusterTime.hasOwnProperty("clusterTime"), tojson(res));
-var clusterTime = res.$clusterTime.clusterTime;
+let clusterTime = res.$clusterTime.clusterTime;
 // afterClusterTime is not allowed in  ping command.
 assert.commandFailedWithCode(
     adminDBRS.runCommand({ping: 1, readConcern: {afterClusterTime: clusterTime}}),

@@ -2,7 +2,7 @@
 // functionality and error cases of the expression.
 import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.reduce;
+let coll = db.reduce;
 
 testExpression(coll, {$reduce: {input: [1, 2, 3], initialValue: {$literal: 0}, in: {$sum: ["$$this", "$$value"]}}}, 6);
 testExpression(coll, {$reduce: {input: [], initialValue: {$literal: 0}, in: 10}}, 0);
@@ -90,7 +90,7 @@ testExpression(coll, {$reduce: {input: "$nonexistent", initialValue: {$literal: 
 // Error cases for $reduce.
 
 // $reduce requires an object.
-var pipeline = {$project: {reduced: {$reduce: 0}}};
+let pipeline = {$project: {reduced: {$reduce: 0}}};
 assertErrorCode(coll, pipeline, 40075);
 
 // Unknown field specified.

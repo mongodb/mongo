@@ -109,8 +109,8 @@ export const commandNotSupportedCode = 115;
 let shard0name = "shard0000";
 
 // useful shorthand when defining the tests below
-var roles_write = {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, restore: 1, root: 1, __system: 1};
-var roles_read = {
+let roles_write = {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, restore: 1, root: 1, __system: 1};
+let roles_read = {
     read: 1,
     readAnyDatabase: 1,
     readWrite: 1,
@@ -121,7 +121,7 @@ var roles_read = {
     searchCoordinator: 1,
     __system: 1,
 };
-var roles_userAdmin = {
+let roles_userAdmin = {
     userAdmin: 1,
     dbOwner: 1,
     userAdminAnyDatabase: 1,
@@ -129,13 +129,13 @@ var roles_userAdmin = {
     root: 1,
     __system: 1,
 };
-var roles_userAdminAny = {
+let roles_userAdminAny = {
     userAdminAnyDatabase: 1,
     restore: 1,
     root: 1,
     __system: 1,
 };
-var roles_readAny = {
+let roles_readAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
     backup: 1,
@@ -143,9 +143,9 @@ var roles_readAny = {
     searchCoordinator: 1,
     __system: 1,
 };
-var roles_dbAdmin = {dbAdmin: 1, dbAdminAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1};
-var roles_dbAdminAny = {dbAdminAnyDatabase: 1, root: 1, __system: 1};
-var roles_writeDbAdmin = {
+let roles_dbAdmin = {dbAdmin: 1, dbAdminAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1};
+let roles_dbAdminAny = {dbAdminAnyDatabase: 1, root: 1, __system: 1};
+let roles_writeDbAdmin = {
     readWrite: 1,
     readWriteAnyDatabase: 1,
     dbAdmin: 1,
@@ -154,8 +154,8 @@ var roles_writeDbAdmin = {
     root: 1,
     __system: 1,
 };
-var roles_writeDbAdminAny = {readWriteAnyDatabase: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1};
-var roles_readDbAdmin = {
+let roles_writeDbAdminAny = {readWriteAnyDatabase: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1};
+let roles_readDbAdmin = {
     read: 1,
     readAnyDatabase: 1,
     readWrite: 1,
@@ -167,7 +167,7 @@ var roles_readDbAdmin = {
     searchCoordinator: 1,
     __system: 1,
 };
-var roles_readDbAdminAny = {
+let roles_readDbAdminAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
     dbAdminAnyDatabase: 1,
@@ -175,10 +175,10 @@ var roles_readDbAdminAny = {
     searchCoordinator: 1,
     __system: 1,
 };
-var roles_monitoring = {clusterMonitor: 1, clusterAdmin: 1, root: 1, searchCoordinator: 1, __system: 1};
-var roles_hostManager = {hostManager: 1, clusterAdmin: 1, root: 1, __system: 1};
-var roles_clusterManager = {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1};
-var roles_all = {
+let roles_monitoring = {clusterMonitor: 1, clusterAdmin: 1, root: 1, searchCoordinator: 1, __system: 1};
+let roles_hostManager = {hostManager: 1, clusterAdmin: 1, root: 1, __system: 1};
+let roles_clusterManager = {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1};
+let roles_all = {
     read: 1,
     readLocal: 1,
     readAnyDatabase: 1,
@@ -203,7 +203,7 @@ var roles_all = {
 };
 
 // Common test cases for the aggregation stages that perform transformation only.
-var testcases_transformationOnly = [
+let testcases_transformationOnly = [
     {
         runOnDb: firstDbName,
         roles: roles_read,
@@ -218,7 +218,7 @@ var testcases_transformationOnly = [
 
 // Similar to 'testcases_transformationOnly' with expectation to fail. For instance, a stage is not
 // allowed in user request.
-var testcases_transformationOnlyExpectFail = testcases_transformationOnly.map((t) =>
+let testcases_transformationOnlyExpectFail = testcases_transformationOnly.map((t) =>
     Object.extend({expectFail: true}, t),
 );
 
@@ -721,7 +721,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.commandWorked(sibling.runCommand({create: "x"}));
 
                 return {
@@ -761,7 +761,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.commandWorked(sibling.runCommand({create: "x"}));
 
                 return {
@@ -887,7 +887,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.commandWorked(sibling.runCommand({create: "x"}));
 
                 return {
@@ -926,7 +926,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.commandWorked(sibling.runCommand({create: "x"}));
 
                 return {
@@ -967,7 +967,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.commandWorked(sibling.runCommand({create: "x"}));
 
                 return {
@@ -1109,7 +1109,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.writeOK(sibling.x.save({_id: 1, data: 1}));
 
                 return {
@@ -1148,7 +1148,7 @@ export const authCommandsLib = {
             },
             skipSharded: true,
             setup: function (db) {
-                var sibling = db.getSiblingDB(firstDbName);
+                let sibling = db.getSiblingDB(firstDbName);
                 assert.writeOK(sibling.x.save({_id: 1, data: 1}));
 
                 return {
@@ -9075,10 +9075,10 @@ export const authCommandsLib = {
     },
 
     setup: function (conn, t, runOnDb, testcase) {
-        var adminDb = conn.getDB(adminDbName);
+        let adminDb = conn.getDB(adminDbName);
         if (t.setup) {
             adminDb.auth("admin", "password");
-            var state = t.setup(runOnDb, testcase);
+            let state = t.setup(runOnDb, testcase);
             adminDb.logout();
             return state;
         }
@@ -9093,7 +9093,7 @@ export const authCommandsLib = {
     },
 
     teardown: function (conn, t, runOnDb, response) {
-        var adminDb = conn.getDB(adminDbName);
+        let adminDb = conn.getDB(adminDbName);
         if (t.teardown) {
             adminDb.auth("admin", "password");
             t.teardown(runOnDb, response);
@@ -9119,7 +9119,7 @@ export const authCommandsLib = {
         const setupConn = "getSideChannel" in impls ? impls.getSideChannel(conn) : conn;
         checkAggStageCoverage(setupConn);
 
-        var failures = [];
+        let failures = [];
 
         for (let i = 0; i < this.tests.length; i++) {
             const res = this.runOneTest(conn, this.tests[i], impls, options);

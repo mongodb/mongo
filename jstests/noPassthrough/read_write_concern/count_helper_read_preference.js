@@ -1,5 +1,5 @@
 // Tests that the read preference set on the connection is used when we call the count helper.
-var commandsRan = [];
+let commandsRan = [];
 
 // Create a new DB object backed by a mock connection.
 function MockMongo() {

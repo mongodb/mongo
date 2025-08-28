@@ -49,13 +49,13 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
         }
 
         for (const analyze_key of analyze ? analyze : ["a"]) {
-            var analyze_cmd = {analyze: collName, key: analyze_key, numberBuckets: numberBuckets};
+            let analyze_cmd = {analyze: collName, key: analyze_key, numberBuckets: numberBuckets};
 
             assert.commandWorked(coll.runCommand(analyze_cmd));
         }
 
         for (const predicate of dataset.predicates()) {
-            var cursor = coll.find(predicate);
+            let cursor = coll.find(predicate);
             const actualDocuments = cursor.count();
 
             const explain = cursor.explain();

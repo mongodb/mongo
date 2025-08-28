@@ -62,7 +62,7 @@ const searchCollDocs = [
 
 function loadData(coll, docs) {
     coll.drop();
-    var bulk = coll.initializeUnorderedBulkOp();
+    let bulk = coll.initializeUnorderedBulkOp();
     for (const doc of docs) {
         bulk.insert(doc);
     }

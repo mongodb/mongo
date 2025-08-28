@@ -48,7 +48,7 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
         shards: TestData.configShard ? 1 : 0,
         mongos: 1,
     });
-    var admin = st.getDB("admin");
+    let admin = st.getDB("admin");
 
     if (CWWCSet) {
         jsTestLog("Setting the CWWC before adding shard.");

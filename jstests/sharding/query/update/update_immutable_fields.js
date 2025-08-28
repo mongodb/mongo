@@ -1,11 +1,11 @@
 // Tests that save style updates correctly change immutable fields
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s;
-var config = mongos.getDB("config");
-var coll = mongos.getCollection(jsTestName() + ".coll1");
+let mongos = st.s;
+let config = mongos.getDB("config");
+let coll = mongos.getCollection(jsTestName() + ".coll1");
 
 assert.commandWorked(config.adminCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(config.adminCommand({shardCollection: "" + coll, key: {a: 1}}));

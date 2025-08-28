@@ -5,13 +5,13 @@
  * built on a shared underlying collection.
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the view name, since the workload name is assumed
         // to be unique.
         prefix: "view_catalog",
     };
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.threadCollName = db[collName].getName();
             this.threadViewName = this.prefix + "_" + this.tid;
@@ -62,14 +62,14 @@ export const $config = (function () {
         return {init: init, create: create, modify: modify, drop: drop};
     })();
 
-    var transitions = {
+    let transitions = {
         init: {create: 1},
         create: {modify: 0.75, drop: 0.25},
         modify: {modify: 0.5, drop: 0.5},
         drop: {create: 1},
     };
 
-    var setup = function setup(db, collName, cluster) {
+    let setup = function setup(db, collName, cluster) {
         let bulk = db[collName].initializeOrderedBulkOp();
         for (let i = 0; i < this.iterations; i++) {
             bulk.insert({_id: i});

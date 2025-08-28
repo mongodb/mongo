@@ -7,16 +7,16 @@
  *
  */
 export const $config = (function () {
-    var data = {numDocs: 1000, prefix: "distinct_fsm", shardKey: {i: 1}};
+    let data = {numDocs: 1000, prefix: "distinct_fsm", shardKey: {i: 1}};
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.threadCollName = this.prefix + "_" + this.tid;
-            var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
-            for (var i = 0; i < this.numDocs; ++i) {
+            let bulk = db[this.threadCollName].initializeUnorderedBulkOp();
+            for (let i = 0; i < this.numDocs; ++i) {
                 bulk.insert({i: i});
             }
-            var res = bulk.execute();
+            let res = bulk.execute();
             assert.commandWorked(res);
             assert.eq(this.numDocs, res.nInserted);
             assert.commandWorked(db[this.threadCollName].createIndex({i: 1}));
@@ -39,7 +39,7 @@ export const $config = (function () {
         return {init: init, distinct: distinct};
     })();
 
-    var transitions = {init: {distinct: 1}, distinct: {distinct: 1}};
+    let transitions = {init: {distinct: 1}, distinct: {distinct: 1}};
 
     return {
         data: data,

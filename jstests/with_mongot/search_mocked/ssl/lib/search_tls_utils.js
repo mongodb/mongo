@@ -60,7 +60,7 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
         }, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`,
     );
 
-    var [mongotmock, mongodConn] = setUpMongotAndMongodWithTLSOptions({
+    let [mongotmock, mongodConn] = setUpMongotAndMongodWithTLSOptions({
         mongotMockTLSMode,
         mongodTLSMode,
         searchTLSMode,
@@ -154,7 +154,7 @@ export function verifyTLSConfigurationFails({mongotMockTLSMode, mongodTLSMode, s
             mongotMockTLSMode
         }, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`,
     );
-    var [mongotmock, mongodConn] = setUpMongotAndMongodWithTLSOptions({
+    let [mongotmock, mongodConn] = setUpMongotAndMongodWithTLSOptions({
         mongotMockTLSMode,
         mongodTLSMode,
         searchTLSMode,

@@ -5,9 +5,9 @@
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 3});
+let st = new ShardingTest({shards: 3});
 
-var mongos = st.s0;
+let mongos = st.s0;
 
 const kDbName = "TestDB";
 const kCollName = "Foo";
@@ -23,7 +23,7 @@ printjson(mongos.getDB("config").chunks.find().toArray());
 
 print("1: insert some invalid data");
 
-var value = null;
+let value = null;
 
 // Insert an object with invalid array key
 assert.commandFailedWithCode(coll.insert({i: [1, 2]}), ErrorCodes.ShardKeyNotFound);

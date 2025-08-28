@@ -18,7 +18,7 @@ TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 1,
     config: 3,
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
@@ -34,14 +34,14 @@ var st = new ShardingTest({
     },
 });
 
-var testDB = st.s.getDB("test");
+let testDB = st.s.getDB("test");
 
 assert.commandWorked(testDB.adminCommand({enableSharding: "test"}));
 assert.commandWorked(testDB.adminCommand({shardCollection: "test.user", key: {_id: 1}}));
 
-var configSecondaryList = st.configRS.getSecondaries();
-var configSecondaryToKill = configSecondaryList[0];
-var delayedConfigSecondary = configSecondaryList[1];
+let configSecondaryList = st.configRS.getSecondaries();
+let configSecondaryToKill = configSecondaryList[0];
+let delayedConfigSecondary = configSecondaryList[1];
 
 assert.commandWorked(testDB.user.insert({_id: 1}));
 
@@ -60,7 +60,7 @@ MongoRunner.stopMongod(configSecondaryToKill);
 st.s.adminCommand({flushRouterConfig: 1});
 
 print("Attempting read on a sharded collection...");
-var exception = assert.throws(function () {
+let exception = assert.throws(function () {
     testDB.user.find({}).maxTimeMS(15000).itcount();
 });
 
@@ -72,8 +72,8 @@ let msgB = /Command timed out waiting for read concern to be satisfied.*"db":"co
 
 assert.soon(
     function () {
-        var logMessages = assert.commandWorked(delayedConfigSecondary.adminCommand({getLog: "global"})).log;
-        for (var i = 0; i < logMessages.length; i++) {
+        let logMessages = assert.commandWorked(delayedConfigSecondary.adminCommand({getLog: "global"})).log;
+        for (let i = 0; i < logMessages.length; i++) {
             if (
                 (logMessages[i].indexOf(msgAA) != -1 && logMessages[i].indexOf(msgAB) != -1) ||
                 logMessages[i].search(msgB) != -1

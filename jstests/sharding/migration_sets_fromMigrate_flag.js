@@ -23,9 +23,9 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
-var st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
+let st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
 
 const dbName = "testDB";
 const ns = dbName + ".foo";
@@ -86,7 +86,7 @@ pauseMigrateAtStep(recipient, migrateStepNames.cloned);
 // Recipient:    [2, 5)
 jsTest.log("Starting chunk migration, pause after cloning...");
 
-var joinMoveChunk = moveChunkParallel(
+let joinMoveChunk = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {_id: 2},
@@ -149,7 +149,7 @@ function assertEqAndDumpOpLog(expected, actual, msg) {
     assert.eq(expected, actual, msg);
 }
 
-var donorOplogRes = donorLocal.oplog.rs.find({op: "d", fromMigrate: true, "o._id": 2}).count();
+let donorOplogRes = donorLocal.oplog.rs.find({op: "d", fromMigrate: true, "o._id": 2}).count();
 // This delete oplog entry could be wrapped in a applyOps entry if the delete was done in a batch.
 if (!donorOplogRes) {
     // Validate this is a batched delete, which generates one applyOps entry instead of a 'd' entry.

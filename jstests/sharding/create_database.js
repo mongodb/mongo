@@ -56,7 +56,7 @@ const dbName = "db1";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
 // A new database is given a databaseVersion.
 let dbEntry1 = assertDbVersionAssigned(st.s, dbName);

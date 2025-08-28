@@ -40,7 +40,7 @@ function optimesAndWallTimesAreEqual(replTest, isPersistent) {
     let prevAppliedWallTime = prevReplStatus.optimes.lastAppliedWallTime;
     let prevDurableWallTime = prevReplStatus.optimes.lastDurableWallTime;
     let prevWrittenWallTime = reduceMajorityWriteLatency ? prevReplStatus.optimes.lastWrittenWallTime : null;
-    for (var i = 1; i < replTest.nodes.length; i++) {
+    for (let i = 1; i < replTest.nodes.length; i++) {
         let currentReplStatus = replTest.nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
         let currOptime = currentReplStatus.optimes.appliedOpTime.ts;
         let currAppliedWallTime = currentReplStatus.optimes.lastAppliedWallTime;
@@ -85,7 +85,7 @@ function optimesAndWallTimesAreEqual(replTest, isPersistent) {
 
 // This test has a part that rolls over the oplog. Doing so requires a fresh stable
 // checkpoint. Set the syncdelay to a small value to increase checkpoint frequency.
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: "replStatus",
     nodes: 3,
     oplogSize: 1,
@@ -102,7 +102,7 @@ assert.eq(oplogStatus.earliestOptime, zeroTs);
 assert.eq(oplogStatus.latestOptime, zeroTs);
 
 replTest.initiate();
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 
@@ -112,12 +112,12 @@ const isPersistent = primary.getDB("admin").serverStatus().storageEngine.persist
 assert.soon(function () {
     return optimesAndWallTimesAreEqual(replTest, isPersistent);
 });
-var initialInfo = primary.getDB("admin").serverStatus({oplog: true}).oplog;
+let initialInfo = primary.getDB("admin").serverStatus({oplog: true}).oplog;
 let initialReplStatusInfo = primary.getDB("admin").runCommand({replSetGetStatus: 1});
 
 // Do an insert to increment optime, but without rolling the oplog
 // latestOptime should be updated, but earliestOptime should be unchanged
-var options = {writeConcern: {w: replTest.nodes.length}};
+let options = {writeConcern: {w: replTest.nodes.length}};
 if (isPersistent) {
     // Ensure the durable optime is advanced.
     options.writeConcern.j = true;
@@ -127,8 +127,8 @@ assert.soon(function () {
     return optimesAndWallTimesAreEqual(replTest, isPersistent);
 });
 
-var info = primary.getDB("admin").serverStatus({oplog: true}).oplog;
-var entry = primary.getDB("local").oplog.rs.findOne().ts;
+let info = primary.getDB("admin").serverStatus({oplog: true}).oplog;
+let entry = primary.getDB("local").oplog.rs.findOne().ts;
 jsTest.log("First entry's timestamp is " + tojson(entry));
 let replStatusInfo = primary.getDB("admin").runCommand({replSetGetStatus: 1});
 
@@ -143,8 +143,8 @@ assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0, dump
 assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0, dumpInfoFn);
 
 // Insert some large documents to force the oplog to roll over
-var largeString = new Array(1024 * 10).toString();
-for (var i = 0; i < 2000; i++) {
+let largeString = new Array(1024 * 10).toString();
+for (let i = 0; i < 2000; i++) {
     primary.getDB("test").foo.insert({largeString: largeString}, options);
 }
 assert.soon(function () {

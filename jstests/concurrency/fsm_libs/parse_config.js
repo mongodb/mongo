@@ -4,7 +4,7 @@
 export function parseConfig(config) {
     config = Object.extend({}, config, true); // defensive deep copy
 
-    var allowedKeys = [
+    let allowedKeys = [
         "data",
         "iterations",
         "passConnectionCache",

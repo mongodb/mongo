@@ -16,10 +16,10 @@
  * ]
  */
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         // Picks a random index to drop and recreate.
         function modifyIndices(db, collName) {
-            var spec = {};
+            let spec = {};
             spec["foo" + this.tid] = 1;
 
             assert.commandWorked(db[collName].dropIndex(spec));
@@ -29,22 +29,22 @@ export const $config = (function () {
 
         // List indexes, using a batchSize of 2 to ensure getmores happen.
         function listIndices(db, collName) {
-            var cursor = new DBCommandCursor(db, db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}));
+            let cursor = new DBCommandCursor(db, db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}));
             assert.gte(cursor.itcount(), 0);
         }
 
         return {modifyIndices: modifyIndices, listIndices: listIndices};
     })();
 
-    var transitions = {
+    let transitions = {
         modifyIndices: {listIndices: 0.75, modifyIndices: 0.25},
         listIndices: {listIndices: 0.25, modifyIndices: 0.75},
     };
 
     function setup(db, collName) {
         // Create indices {fooi: 1}.
-        for (var i = 0; i < this.threadCount; ++i) {
-            var spec = {};
+        for (let i = 0; i < this.threadCount; ++i) {
+            let spec = {};
             spec["foo" + i] = 1;
             assert.commandWorked(db[collName].createIndex(spec));
         }

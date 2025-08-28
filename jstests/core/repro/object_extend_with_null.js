@@ -1,4 +1,4 @@
-var x = {};
+let x = {};
 
 assert.doesNotThrow(
     function () {

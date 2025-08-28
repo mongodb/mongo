@@ -6,7 +6,7 @@
 //   requires_getmore,
 // ]
 
-var t = db.where5;
+let t = db.where5;
 
 t.drop();
 
@@ -31,5 +31,5 @@ print("Running JS function in server...");
 assert.eq(t.find({$where: printIdConstructor}).itcount(), 1);
 
 print("Running JS function in client...");
-var doc = t.findOne();
+let doc = t.findOne();
 printIdConstructor(doc);

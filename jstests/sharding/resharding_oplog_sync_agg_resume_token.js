@@ -12,7 +12,7 @@ function timestampGreaterThan(ts1, ts2) {
     return ts1.getTime() > ts2.getTime() || (ts1.getTime() == ts2.getTime() && ts1.getInc() > ts2.getInc());
 }
 
-var rst = new ReplSetTest({nodes: 1});
+let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 

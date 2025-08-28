@@ -50,7 +50,7 @@ function testFAMFailed(insert, cmdObj) {
     t.drop();
     assert.commandWorked(t.insert(insert));
 
-    var res = t.runCommand("findAndModify", cmdObj);
+    let res = t.runCommand("findAndModify", cmdObj);
     assert.commandFailed(res, "findAndModify command unexpectedly succeeded");
 }
 

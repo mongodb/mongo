@@ -6,13 +6,13 @@ import {resultsEq} from "jstests/aggregation/extras/utils.js";
 const testDb = db.getSiblingDB("MapReduceTestDB");
 testDb.dropDatabase();
 
-var coll = testDb.getCollection("mrInput");
+let coll = testDb.getCollection("mrInput");
 
 // Insert 10 x 49 elements (10 i-s, 49 j-s)
-var expectedOutColl = [];
+let expectedOutColl = [];
 
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < 10; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = 0; i < 10; i++) {
     for (var j = 1; j < 50; j++) {
         bulk.insert({idx: i, j: j});
     }
@@ -27,8 +27,8 @@ function reduceFn(key, values) {
     return Array.sum(values);
 }
 
-var out = coll.mapReduce(mapFn, reduceFn, {out: {replace: "mrOutput"}});
+let out = coll.mapReduce(mapFn, reduceFn, {out: {replace: "mrOutput"}});
 
 // Check the output is as expected
-var outColl = testDb.getCollection("mrOutput").find().toArray();
+let outColl = testDb.getCollection("mrOutput").find().toArray();
 assert(resultsEq(outColl, expectedOutColl));

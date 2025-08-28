@@ -4,7 +4,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const SERVER_CERT = "jstests/libs/server.pem";
 const CAFILE = "jstests/libs/ca.pem";
 
-var opts = {
+let opts = {
     tlsMode: "allowTLS",
     tlsCertificateKeyFile: SERVER_CERT,
     tlsAllowInvalidCertificates: "",
@@ -13,7 +13,7 @@ var opts = {
     setParameter: "authenticationMechanisms=MONGODB-X509,SCRAM-SHA-1",
 };
 
-var rst = new ReplSetTest({name: "tlsSet", nodes: 3, nodeOptions: opts});
+let rst = new ReplSetTest({name: "tlsSet", nodes: 3, nodeOptions: opts});
 
 rst.startSet();
 rst.initiate();
@@ -32,7 +32,7 @@ mongod.getDB("test").createUser({user: username, pwd: username, roles: []});
 mongod.getDB("notTest").createUser({user: usernameNotTest, pwd: usernameNotTest, roles: []});
 mongod.getDB("$external").createUser({user: usernameX509, roles: []});
 
-var i = 0;
+let i = 0;
 function testConnect(expectPasswordPrompt, expectSuccess, ...args) {
     const command = [
         "mongo",
@@ -54,7 +54,7 @@ function testConnect(expectPasswordPrompt, expectSuccess, ...args) {
     );
 
     clearRawMongoProgramOutput();
-    var clientPID = _startMongoProgram({args: command});
+    let clientPID = _startMongoProgram({args: command});
 
     assert.soon(function () {
         const output = rawMongoProgramOutput(".*");

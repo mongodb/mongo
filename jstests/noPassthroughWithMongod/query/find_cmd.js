@@ -1,11 +1,11 @@
 // Basic tests for invoking the find command directly.
 
-var coll = db.findcmd;
-var collname = coll.getName();
+let coll = db.findcmd;
+let collname = coll.getName();
 coll.drop();
 
-var res;
-var cursor;
+let res;
+let cursor;
 
 // Non-existent collection.
 res = coll.runCommand("find");
@@ -31,7 +31,7 @@ assert.eq([{_id: 1}], res.cursor.firstBatch);
 
 // Multiple batches.
 coll.drop();
-for (var i = 0; i < 150; i++) {
+for (let i = 0; i < 150; i++) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 res = coll.runCommand("find", {filter: {_id: {$lt: 140}}});

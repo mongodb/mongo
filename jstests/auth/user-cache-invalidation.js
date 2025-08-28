@@ -49,10 +49,10 @@ function isStartAcquireUserEvent(log) {
  * transposed to a Javascript Date object.
  */
 function assertHasLog(conn, cond, after) {
-    var ret = undefined;
+    let ret = undefined;
     assert.soon(function () {
         const log = checkLog.getGlobalLog(conn);
-        var line;
+        let line;
         for (line in log) {
             line = JSON.parse(log[line]);
             if (!cond(line)) {

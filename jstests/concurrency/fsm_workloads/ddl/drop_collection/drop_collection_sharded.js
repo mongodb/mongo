@@ -21,15 +21,15 @@ function getRandomCollection(db) {
 }
 
 export const $config = (function () {
-    var setup = function (db, collName, cluster) {
+    let setup = function (db, collName, cluster) {
         // Initialize databases
-        for (var i = 0; i < dbCount; i++) {
+        for (let i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
             db.adminCommand({enablesharding: dbName});
         }
     };
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {}
 
         function create(db, collName) {
@@ -47,7 +47,7 @@ export const $config = (function () {
         return {init: init, create: create, drop: drop};
     })();
 
-    var transitions = {
+    let transitions = {
         init: {create: 0.5, drop: 0.5},
         create: {create: 0.5, drop: 0.5},
         drop: {create: 0.5, drop: 0.5},

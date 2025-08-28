@@ -10,7 +10,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.disableImplicitSessions = true;
 
 function runTests(needAuth) {
-    var other = {
+    let other = {
         rs: true,
         rs0: {nodes: 3},
         rs1: {nodes: 3},
@@ -19,23 +19,23 @@ function runTests(needAuth) {
         other.keyFile = "jstests/libs/key1";
     }
 
-    var st = new ShardingTest({shards: 2, mongos: 1, other: other});
+    let st = new ShardingTest({shards: 2, mongos: 1, other: other});
 
-    var forExec = st.s0;
+    let forExec = st.s0;
 
     if (needAuth) {
         KillSessionsTestHelper.initializeAuth(forExec);
     }
 
-    var forKill = new Mongo(forExec.host);
+    let forKill = new Mongo(forExec.host);
 
-    var r = forExec.getDB("admin").runCommand({
+    let r = forExec.getDB("admin").runCommand({
         multicast: {ping: 1},
         db: "admin",
     });
     assert(r.ok);
 
-    var hosts = [];
+    let hosts = [];
     for (var host in r["hosts"]) {
         var host = new Mongo(host);
         if (needAuth) {
@@ -44,7 +44,7 @@ function runTests(needAuth) {
         hosts.push(host);
     }
 
-    var args = [forExec, forKill, hosts];
+    let args = [forExec, forKill, hosts];
     if (needAuth) {
         KillSessionsTestHelper.runAuth.apply({}, args);
     } else {

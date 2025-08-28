@@ -58,7 +58,7 @@ function getStat(stats, statName, mirrorMode) {
 function sendReads({nodeToReadFrom, db, cmd, burstCount, initialStatsOnReadingNode}) {
     jsTestLog(`Sending ${burstCount} request burst of ${tojson(cmd)} to ${nodeToReadFrom.host}`);
 
-    for (var i = 0; i < burstCount; ++i) {
+    for (let i = 0; i < burstCount; ++i) {
         nodeToReadFrom.getDB(db).runCommand(cmd);
     }
 

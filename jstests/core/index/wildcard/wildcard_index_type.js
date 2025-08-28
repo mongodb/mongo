@@ -142,7 +142,7 @@ assertExpectedDocAnswersWildcardIndexQuery({a: null}, {a: {$type: "undefined"}},
 assertExpectedDocAnswersWildcardIndexQuery(
     {
         a: function () {
-            var a = 0;
+            let a = 0;
         },
     },
     {a: {$type: "javascript"}},

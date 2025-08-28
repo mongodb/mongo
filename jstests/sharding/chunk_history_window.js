@@ -131,7 +131,7 @@ assert.commandFailedWithCode(
 );
 
 // One second before the newest history entry is valid (check we don't delete *all* old entries).
-var recentTS = Timestamp(chunk.history[0].validAfter.getTime() - 1, 0);
+let recentTS = Timestamp(chunk.history[0].validAfter.getTime() - 1, 0);
 assert.commandWorked(mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: recentTS}}));
 
 st.stop();

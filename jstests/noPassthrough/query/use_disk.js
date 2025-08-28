@@ -24,14 +24,14 @@ testDB.setProfilingLevel(2);
 
 function resetCollection() {
     coll.drop();
-    for (var i = 0; i < 10; ++i) {
+    for (let i = 0; i < 10; ++i) {
         assert.commandWorked(coll.insert({a: i}));
     }
 }
 function resetForeignCollection() {
     testDB.foreign.drop();
     const forColl = testDB.getCollection("foreign");
-    for (var i = 4; i < 18; i += 2) assert.commandWorked(forColl.insert({b: i}));
+    for (let i = 4; i < 18; i += 2) assert.commandWorked(forColl.insert({b: i}));
 }
 //
 // Confirm hasSortStage with in-memory sort.
@@ -41,7 +41,7 @@ resetCollection();
 // Confirm 'usedDisk' is not set if 'allowDiskUse' is set but no stages need to use disk.
 //
 coll.aggregate([{$match: {a: {$gte: 2}}}], {allowDiskUse: true});
-var profileObj = getLatestProfilerEntry(testDB);
+let profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 
 resetCollection();

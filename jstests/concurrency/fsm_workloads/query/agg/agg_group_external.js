@@ -37,13 +37,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.query = function query(db, collName) {
-        var otherCollName = this.getOutputCollPrefix(collName) + this.tid;
-        var cursor = db[collName].aggregate([{$group: {_id: "$randInt", count: {$sum: 1}}}, {$out: otherCollName}], {
+        let otherCollName = this.getOutputCollPrefix(collName) + this.tid;
+        let cursor = db[collName].aggregate([{$group: {_id: "$randInt", count: {$sum: 1}}}, {$out: otherCollName}], {
             allowDiskUse: true,
         });
         assert.eq(0, cursor.itcount());
         // sum the .count fields in the output coll
-        var sum = db[otherCollName]
+        let sum = db[otherCollName]
             .aggregate([{$group: {_id: null, totalCount: {$sum: "$count"}}}])
             .toArray()[0].totalCount;
         assert.eq(this.numDocs, sum);

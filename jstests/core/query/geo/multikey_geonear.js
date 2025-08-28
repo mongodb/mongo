@@ -5,13 +5,13 @@
 //    incompatible_with_views,
 // ]
 
-var t = db.jstests_multikey_geonear;
+let t = db.jstests_multikey_geonear;
 t.drop();
 
 // Check that the result set from the cursor is the document with _id: 2,
 // followed by _id: 1, and _id: 0.
 function checkResults(cursor) {
-    for (var i = 2; i >= 0; i--) {
+    for (let i = 2; i >= 0; i--) {
         assert.eq(i, cursor.next()["_id"]);
     }
     assert(!cursor.hasNext());
@@ -24,7 +24,7 @@ t.insert({_id: 1, a: 0, b: {type: "Point", coordinates: [1, 1]}});
 t.insert({_id: 2, a: 0, b: {type: "Point", coordinates: [2, 2]}});
 
 // Ensure that the results are returned sorted by increasing distance.
-var cursor = t.find({a: {$gte: 0}, b: {$near: {$geometry: {type: "Point", coordinates: [2, 2]}}}});
+let cursor = t.find({a: {$gte: 0}, b: {$near: {$geometry: {type: "Point", coordinates: [2, 2]}}}});
 checkResults(cursor);
 
 // The results should be the same if we make the "a" field multikey.

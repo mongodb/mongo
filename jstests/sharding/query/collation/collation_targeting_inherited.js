@@ -7,16 +7,16 @@ const caseInsensitive = {
     strength: 2,
 };
 
-var explain;
-var writeRes;
+let explain;
+let writeRes;
 
 // Create a cluster with 3 shards.
-var st = new ShardingTest({shards: 3});
-var testDB = st.s.getDB("test");
+let st = new ShardingTest({shards: 3});
+let testDB = st.s.getDB("test");
 assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}));
 
 // Create a collection with a case-insensitive default collation sharded on {a: 1}.
-var collCaseInsensitive = testDB.getCollection("case_insensitive");
+let collCaseInsensitive = testDB.getCollection("case_insensitive");
 collCaseInsensitive.drop();
 assert.commandWorked(testDB.createCollection("case_insensitive", {collation: caseInsensitive}));
 assert.commandWorked(collCaseInsensitive.createIndex({a: 1}, {collation: {locale: "simple"}}));
@@ -51,10 +51,10 @@ assert.commandWorked(
 // st.shard1.shardName: {a: 100}, {a: "FOO"}
 // shard0002: {a: "foo"}
 // Include geo field to test geoNear.
-var a_1 = {_id: 0, a: 1, geo: {type: "Point", coordinates: [0, 0]}};
-var a_100 = {_id: 1, a: 100, geo: {type: "Point", coordinates: [0, 0]}};
-var a_FOO = {_id: 2, a: "FOO", geo: {type: "Point", coordinates: [0, 0]}};
-var a_foo = {_id: 3, a: "foo", geo: {type: "Point", coordinates: [0, 0]}};
+let a_1 = {_id: 0, a: 1, geo: {type: "Point", coordinates: [0, 0]}};
+let a_100 = {_id: 1, a: 100, geo: {type: "Point", coordinates: [0, 0]}};
+let a_FOO = {_id: 2, a: "FOO", geo: {type: "Point", coordinates: [0, 0]}};
+let a_foo = {_id: 3, a: "foo", geo: {type: "Point", coordinates: [0, 0]}};
 assert.commandWorked(collCaseInsensitive.insert(a_1));
 assert.commandWorked(collCaseInsensitive.insert(a_100));
 assert.commandWorked(collCaseInsensitive.insert(a_FOO));

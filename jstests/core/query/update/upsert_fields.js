@@ -6,27 +6,27 @@
 // Upsert behavior tests for field extraction
 //
 
-var coll = db[jsTestName()];
+let coll = db[jsTestName()];
 coll.drop();
 
-var upsertedResult = function (query, expr) {
+let upsertedResult = function (query, expr) {
     coll.drop();
     let result = coll.update(query, expr, {upsert: true});
     return result;
 };
 
-var upsertedField = function (query, expr, fieldName) {
-    var res = assert.commandWorked(upsertedResult(query, expr));
-    var doc = coll.findOne();
+let upsertedField = function (query, expr, fieldName) {
+    let res = assert.commandWorked(upsertedResult(query, expr));
+    let doc = coll.findOne();
     assert.neq(doc, null, "findOne query returned no results! UpdateRes: " + tojson(res));
     return doc[fieldName];
 };
 
-var upsertedId = function (query, expr) {
+let upsertedId = function (query, expr) {
     return upsertedField(query, expr, "_id");
 };
 
-var upsertedXVal = function (query, expr) {
+let upsertedXVal = function (query, expr) {
     return upsertedField(query, expr, "x");
 };
 
@@ -141,7 +141,7 @@ for (var i = 0; i < 3; i++) {
     var isReplStyle = i == 0;
 
     // field extracted when replacement style
-    var value = isReplStyle ? undefined : 1;
+    let value = isReplStyle ? undefined : 1;
     assert.eq(value, upsertedXVal({x: 1}, expr));
     assert.eq(value, upsertedXVal({x: {$eq: 1}}, expr));
     assert.eq(value, upsertedXVal({x: {$in: [1]}}, expr));
@@ -181,7 +181,7 @@ for (var i = 0; i < 3; i++) {
     }
 
     // nested field extraction
-    var docValue = isReplStyle ? undefined : {x: 1};
+    let docValue = isReplStyle ? undefined : {x: 1};
     assert.docEq(docValue, upsertedXVal({"x.x": 1}, expr));
     assert.docEq(docValue, upsertedXVal({"x.x": {$eq: 1}}, expr));
     assert.docEq(docValue, upsertedXVal({"x.x": {$all: [1]}}, expr));

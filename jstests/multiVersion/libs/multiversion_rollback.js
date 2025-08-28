@@ -293,13 +293,13 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     let higherVersion = MongoRunner.getBinVersionFor(sortedVersions[1]);
 
     jsTestLog(`[${testName}] Starting up first two nodes with version: ${higherVersion}`);
-    var initialNodes = {n1: {binVersion: higherVersion}, n2: {binVersion: higherVersion}};
+    let initialNodes = {n1: {binVersion: higherVersion}, n2: {binVersion: higherVersion}};
 
     // Start up a two-node cluster first. This cluster contains two data bearing nodes, but the
     // second node will be priority: 0 to ensure that it will never become primary. This, in
     // addition to stopping/restarting server replication should make the node exhibit similar
     // behavior to an arbiter.
-    var rst = new ReplSetTest({
+    let rst = new ReplSetTest({
         name: testName,
         nodes: initialNodes,
         useBridge: true,

@@ -5,7 +5,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "json_schema_sharding";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 

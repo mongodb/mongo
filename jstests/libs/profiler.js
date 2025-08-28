@@ -40,7 +40,7 @@ export function getNLatestProfilerEntries(profileDB, count, filter) {
     if (filter === null) {
         filter = {};
     }
-    var cursor = profileDB.system.profile.find(filter).sort({$natural: -1}).limit(count);
+    let cursor = profileDB.system.profile.find(filter).sort({$natural: -1}).limit(count);
     assert(cursor.hasNext(), "could not find any entries in the profile collection matching filter: " + tojson(filter));
     return cursor.toArray();
 }

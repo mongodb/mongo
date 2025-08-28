@@ -44,9 +44,9 @@ for (let z = 0; z < 2; z++) {
     assert.eq(1000, t.count());
 
     // NPE test
-    var ok = false;
+    let ok = false;
     try {
-        var x = t.find({
+        let x = t.find({
             $where: function () {
                 // eslint-disable-next-line
                 asdf.asdf.f.s.s();

@@ -213,7 +213,7 @@ export const UserWriteBlockHelpers = (function () {
                 this.conn.port,
             );
 
-            var opId;
+            let opId;
 
             assert.soon(() => {
                 let result = this.adminConn

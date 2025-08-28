@@ -7,14 +7,14 @@
  */
 export const $config = (function () {
     function makeSortSpecFromIndexSpec(ixSpec) {
-        var sort = {};
+        let sort = {};
 
-        for (var field in ixSpec) {
+        for (let field in ixSpec) {
             if (!ixSpec.hasOwnProperty(field)) {
                 continue;
             }
 
-            var order = ixSpec[field];
+            let order = ixSpec[field];
             if (order !== 1 && order !== -1) {
                 // e.g. '2d' or '2dsphere'
                 order = 1;
@@ -26,14 +26,14 @@ export const $config = (function () {
         return sort;
     }
 
-    var states = {
+    let states = {
         init: function init(db, collName) {
             this.nInserted = 0;
             this.indexedValue = this.tid;
         },
 
         insert: function insert(db, collName) {
-            var res = db[collName].insert(this.getDoc());
+            let res = db[collName].insert(this.getDoc());
             assert.commandWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
             this.nInserted += this.docsPerInsert;
@@ -41,7 +41,7 @@ export const $config = (function () {
 
         find: function find(db, collName) {
             // collection scan
-            var count = db[collName].find(this.getQuery()).sort({$natural: 1}).itcount();
+            let count = db[collName].find(this.getQuery()).sort({$natural: 1}).itcount();
             if (!this.skipAssertions) {
                 assert.eq(count, this.nInserted);
             }
@@ -58,7 +58,7 @@ export const $config = (function () {
             else {
                 // For single and compound-key indexes, the index specification is a
                 // valid sort spec; however, for geospatial and text indexes it is not
-                var sort = makeSortSpecFromIndexSpec(this.getIndexSpec());
+                let sort = makeSortSpecFromIndexSpec(this.getIndexSpec());
                 count = db[collName].find(this.getQuery()).sort(sort).itcount();
                 if (!this.skipAssertions) {
                     assert.eq(count, this.nInserted);
@@ -67,7 +67,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {init: {insert: 1}, insert: {find: 1}, find: {insert: 1}};
+    let transitions = {init: {insert: 1}, insert: {find: 1}, find: {insert: 1}};
 
     function setup(db, collName, cluster) {
         const spec = {name: this.getIndexName(), key: this.getIndexSpec()};
@@ -91,12 +91,12 @@ export const $config = (function () {
                 return this.indexedField + "_1";
             },
             getIndexSpec: function getIndexSpec() {
-                var ixSpec = {};
+                let ixSpec = {};
                 ixSpec[this.indexedField] = 1;
                 return ixSpec;
             },
             getDoc: function getDoc() {
-                var doc = {};
+                let doc = {};
                 doc[this.indexedField] = this.indexedValue;
                 return doc;
             },

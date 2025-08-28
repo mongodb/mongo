@@ -4,23 +4,23 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
 var db = st.s.getDB("test");
-var coll = db.sharding_system_namespaces;
+let coll = db.sharding_system_namespaces;
 
 // This test relies on the wiredTiger storage engine being compiled
 // into the server. Must check shard member for WT as it is not built into mongos.
 
-var storageEngines = st.shard0.getDB("local").getServerBuildInfo().rawData().storageEngines;
+let storageEngines = st.shard0.getDB("local").getServerBuildInfo().rawData().storageEngines;
 
 print("Supported storage engines: " + storageEngines);
 
 if (Array.contains(storageEngines, "wiredTiger")) {
     function checkCollectionOptions(database) {
-        var collectionsInfos = database.getCollectionInfos();
+        let collectionsInfos = database.getCollectionInfos();
         printjson(collectionsInfos);
-        var info = collectionsInfos.filter(function (c) {
+        let info = collectionsInfos.filter(function (c) {
             return c.name == "sharding_system_namespaces";
         })[0];
         assert.eq(info.options.storageEngine.wiredTiger.configString, "block_compressor=zlib");
@@ -42,7 +42,7 @@ if (Array.contains(storageEngines, "wiredTiger")) {
 
     st.printShardingStatus();
 
-    var primaryShard = st.getPrimaryShard("test");
+    let primaryShard = st.getPrimaryShard("test");
     let anotherShard = st.getOther(primaryShard);
     assert.commandWorked(db.adminCommand({movechunk: coll + "", find: {x: 5}, to: anotherShard.name}));
 

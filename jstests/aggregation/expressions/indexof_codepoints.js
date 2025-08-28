@@ -22,23 +22,23 @@ function testExpressionCodePoints(coll, expression, result, shouldTestEquivalenc
     assert.eq(result, aggResult.byteLocation);
     coll.drop();
 
-    var indexOfSpec = expression["$indexOfCP"];
+    let indexOfSpec = expression["$indexOfCP"];
     if (shouldTestEquivalence) {
         // If we are specifying a starting or ending index for the search, we should be able to
         // achieve equivalent behavior using $substrCP.
-        var input = indexOfSpec[0];
-        var token = indexOfSpec[1];
-        var start = indexOfSpec.length > 2 ? indexOfSpec[2] : 0;
-        var end = indexOfSpec.length > 3 ? indexOfSpec[3] : {$strLenCP: input};
+        let input = indexOfSpec[0];
+        let token = indexOfSpec[1];
+        let start = indexOfSpec.length > 2 ? indexOfSpec[2] : 0;
+        let end = indexOfSpec.length > 3 ? indexOfSpec[3] : {$strLenCP: input};
 
-        var substrExpr = {
+        let substrExpr = {
             $indexOfCP: [{$substrCP: [input, start, {$subtract: [end, start]}]}, token],
         };
 
         // Since the new expression takes the index with respect to a shortened string, the
         // output index will differ from the index with respect to the full length string,
         // unless the output is -1.
-        var substrResult = result === -1 ? -1 : result - start;
+        let substrResult = result === -1 ? -1 : result - start;
 
         testExpression(coll, substrExpr, substrResult);
     }
@@ -205,7 +205,7 @@ testExpressionCodePoints(coll, {$indexOfCP: ["πbƒ\0d\0", "d", 5, 6]}, -1);
 
 // Error cases.
 
-var pipeline = {
+let pipeline = {
     $project: {
         output: {
             $indexOfCP: [3, "s"],

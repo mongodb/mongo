@@ -10,13 +10,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-var options = {
+let options = {
     shards: [{binVersion: "last-lts"}, {binVersion: "last-lts"}, {binVersion: "latest"}, {binVersion: "latest"}],
     mongos: 1,
     other: {mongosOptions: {binVersion: "last-lts"}},
 };
 
-var st = new ShardingTest(options);
+let st = new ShardingTest(options);
 st.stopBalancer();
 
 assert.binVersion(st.shard0, "last-lts");
@@ -27,14 +27,14 @@ assert.binVersion(st.s0, "last-lts");
 
 const fooDB = "fooTest";
 const barDB = "barTest";
-var mongos = st.s0,
+let mongos = st.s0,
     admin = mongos.getDB("admin"),
     shards = mongos.getCollection("config.shards").find().toArray();
 
 assert.commandWorked(admin.runCommand({enableSharding: fooDB, primaryShard: shards[0]._id}));
 assert.commandWorked(admin.runCommand({enableSharding: barDB, primaryShard: shards[3]._id}));
 
-var fooNS = fooDB + ".foo",
+let fooNS = fooDB + ".foo",
     fooColl = mongos.getCollection(fooNS),
     fooDonor = st.shard0,
     fooRecipient = st.shard2,

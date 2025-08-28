@@ -149,7 +149,7 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
     checkSessionCatalog(primary, lsid, txnNumber, updateOp.ts);
     checkSessionCatalog(secondary, lsid, txnNumber, updateOp.ts);
 
-    var sessionInfo = {sessionId: lsid, txnNum: txnNumber};
+    let sessionInfo = {sessionId: lsid, txnNum: txnNumber};
     checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
     checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
 

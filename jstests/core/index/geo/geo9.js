@@ -13,7 +13,7 @@ t.createIndex({a: "2d"});
 t.createIndex({b: "2d"});
 
 function check(field) {
-    var q = {};
+    let q = {};
     q[field] = {$near: [11, 11]};
     let arr = t
         .find(q)

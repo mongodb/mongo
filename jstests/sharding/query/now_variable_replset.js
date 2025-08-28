@@ -9,7 +9,7 @@ if (jsTestOptions().useAutoBootstrapProcedure) {
     quit();
 }
 
-var replTest = new ReplSetTest({name: "now_and_cluster_time", nodes: 1});
+let replTest = new ReplSetTest({name: "now_and_cluster_time", nodes: 1});
 replTest.startSet();
 replTest.initiate();
 

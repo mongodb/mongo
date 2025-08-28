@@ -37,7 +37,7 @@ function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
             .getCollection(nss)
             .aggregate([{$planCacheStats: {}}])
             .toArray();
-        var numSBEEntries = 0;
+        let numSBEEntries = 0;
         entries.forEach((entry) => {
             if (entry.version == "2") numSBEEntries++;
         });

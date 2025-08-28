@@ -24,7 +24,7 @@ function test(index) {
             [50, 50],
         ],
     });
-    var res = t.insert({
+    let res = t.insert({
         zip: "10003",
         loc: [
             [30, 30],

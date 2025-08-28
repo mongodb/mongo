@@ -11,7 +11,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // Disable the behavior of aborting on exit so that we can stop the sharded cluster normally.
 TestData.testingDiagnosticsEnabled = false;
 
-var st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+let st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 
 const db = st.s.getDB(jsTestName());
 const coll = db.coll;

@@ -25,7 +25,7 @@ function runDeprecatedCommand() {
     assert.commandFailedWithCode(testDB.runCommand({"listSearchIndexes": collName}), 31082);
 }
 // Assert that deprecation msg is not logged before map reduce command is even run.
-var matchingLogLines = getMatchingLogLines();
+let matchingLogLines = getMatchingLogLines();
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 // Run listSearchIndexes. Expect the command to fail as we haven't configured search.

@@ -5,13 +5,13 @@
 //   requires_getmore,
 // ]
 
-var t = db.geo_s2oddshapes;
+let t = db.geo_s2oddshapes;
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
-var testPoint = {name: "origin", geo: {type: "Point", coordinates: [0.0, 0.0]}};
+let testPoint = {name: "origin", geo: {type: "Point", coordinates: [0.0, 0.0]}};
 
-var testHorizLine = {
+let testHorizLine = {
     name: "horiz",
     geo: {
         type: "LineString",
@@ -22,7 +22,7 @@ var testHorizLine = {
     },
 };
 
-var testVertLine = {
+let testVertLine = {
     name: "vert",
     geo: {
         type: "LineString",
@@ -39,7 +39,7 @@ t.insert(testVertLine);
 
 // Test a poly that runs vertically all the way along the meridian.
 
-var tallPoly = {
+let tallPoly = {
     type: "Polygon",
     coordinates: [
         [
@@ -65,7 +65,7 @@ result = t.find({geo: {$geoIntersects: {$geometry: tallPoly}}});
 
 // Test a poly that runs horizontally along the equator.
 
-var longPoly = {
+let longPoly = {
     type: "Polygon",
     coordinates: [
         [
@@ -89,9 +89,9 @@ assert.eq(result.itcount(), 3);
 t.drop();
 t.createIndex({geo: "2dsphere"});
 
-var insidePoint = {name: "inside", geo: {type: "Point", name: "inside", coordinates: [100.0, 0.0]}};
+let insidePoint = {name: "inside", geo: {type: "Point", name: "inside", coordinates: [100.0, 0.0]}};
 
-var outsidePoint = {
+let outsidePoint = {
     name: "inside",
     geo: {type: "Point", name: "inside", coordinates: [-100.0, 0.0]},
 };
@@ -99,7 +99,7 @@ var outsidePoint = {
 t.insert(insidePoint);
 t.insert(outsidePoint);
 
-var largePoly = {
+let largePoly = {
     type: "Polygon",
     coordinates: [
         [
@@ -114,7 +114,7 @@ var largePoly = {
 result = t.find({geo: {$within: {$geometry: largePoly}}});
 assert.eq(result.itcount(), 1);
 result = t.find({geo: {$within: {$geometry: largePoly}}});
-var point = result[0];
+let point = result[0];
 assert.eq(point.name, "inside");
 
 // Test a poly that is very small.  A couple meters around.

@@ -15,10 +15,10 @@ import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/cluste
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
-var testDB = db.getSiblingDB("profile_findandmodify");
+let testDB = db.getSiblingDB("profile_findandmodify");
 assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();
-var coll = testDB.getCollection(collName);
+let coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
@@ -45,7 +45,7 @@ assert.eq(
     }),
 );
 
-var profileObj = getLatestProfilerEntry(testDB);
+let profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.op, "command", tojson(profileObj));
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));

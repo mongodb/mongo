@@ -9,9 +9,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var waitForPrimary = function (conn) {
+let waitForPrimary = function (conn) {
     assert.soon(function () {
-        var res = conn.getDB("admin").runCommand({hello: 1});
+        let res = conn.getDB("admin").runCommand({hello: 1});
         return res.isWritablePrimary;
     });
 };
@@ -26,8 +26,8 @@ var waitForPrimary = function (conn) {
  * restarting.  That allows our standalone corrupting update to see the write (and cause us to
  * fail on startup).
  */
-var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
-    var shardIdentityDoc = {
+let runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
+    let shardIdentityDoc = {
         _id: "shardIdentity",
         configsvrConnectionString: configConnStr,
         shardName: "newShard",
@@ -39,21 +39,21 @@ var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
      * document. Then, restarts the server again with --shardsvr. This also returns a
      * connection to the server after the last restart.
      */
-    var restartAndFixShardIdentityDoc = function (startOptions) {
-        var options = Object.extend({}, startOptions);
+    let restartAndFixShardIdentityDoc = function (startOptions) {
+        let options = Object.extend({}, startOptions);
         // With Recover to a Timestamp, writes to a replica set member may not be written to
         // disk in the collection, but are instead re-applied from the oplog at startup. When
         // restarting with `--shardsvr`, the update to the `shardIdentity` document is not
         // processed. Turning off `--replSet` guarantees the update is written out to the
         // collection and the test no longer relies on replication recovery from performing
         // the update with `--shardsvr` on.
-        var rsName = options.replSet;
+        let rsName = options.replSet;
         delete options.replSet;
         delete options.shardsvr;
-        var mongodConn = MongoRunner.runMongod(options);
+        let mongodConn = MongoRunner.runMongod(options);
         waitForPrimary(mongodConn);
 
-        var res = mongodConn.getDB("admin").system.version.update({_id: "shardIdentity"}, shardIdentityDoc);
+        let res = mongodConn.getDB("admin").system.version.update({_id: "shardIdentity"}, shardIdentityDoc);
         assert.eq(1, res.nModified);
 
         MongoRunner.stopMongod(mongodConn);
@@ -91,7 +91,7 @@ var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
 
     awaitVersionUpdate();
 
-    var res = mongodConn.getDB("admin").runCommand({shardingState: 1});
+    let res = mongodConn.getDB("admin").runCommand({shardingState: 1});
 
     assert(res.enabled);
     assert.eq(shardIdentityDoc.shardName, res.shardName);
@@ -133,7 +133,7 @@ var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
     // Note: modification of the shardIdentity is allowed only when not running with --shardsvr
     MongoRunner.stopMongod(mongodConn);
     // The manipulation of `--replSet` is explained in `restartAndFixShardIdentityDoc`.
-    var rsName = newMongodOptions.replSet;
+    let rsName = newMongodOptions.replSet;
     delete newMongodOptions.replSet;
     delete newMongodOptions.shardsvr;
     mongodConn = MongoRunner.runMongod(newMongodOptions);
@@ -154,7 +154,7 @@ var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
     newMongodOptions.shardsvr = "";
     newMongodOptions.replSet = rsName;
     assert.throws(function () {
-        var connToCrashedMongod = MongoRunner.runMongod(newMongodOptions);
+        let connToCrashedMongod = MongoRunner.runMongod(newMongodOptions);
         waitForPrimary(connToCrashedMongod);
     });
 
@@ -170,7 +170,7 @@ var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
     assert(res.enabled);
 };
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
 {
     const replTest = new ReplSetTest({nodes: 1});

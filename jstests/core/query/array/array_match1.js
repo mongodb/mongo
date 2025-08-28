@@ -10,7 +10,7 @@ t.insert({_id: 2, a: [6, 6]});
 t.insert({_id: 3, a: [5, 5]});
 
 function test(f, m) {
-    var q = {};
+    let q = {};
 
     q[f] = [5, 5];
     assert.eq(2, t.find(q).itcount(), m + "1");

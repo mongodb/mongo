@@ -3,10 +3,10 @@
 // @tags: [requires_scripting]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
-var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});
+let runner = MongoRunner.runMongod({setParameter: "notablescan=1"});
 const db = runner.getDB("test");
-var coll = db[jsTestName()];
-var ret;
+let coll = db[jsTestName()];
+let ret;
 
 coll.drop();
 db.getCollection("mrOutput").drop();
@@ -25,10 +25,10 @@ assert.throws(function () {
 // Test mapReduce.
 //
 
-var mapFunc = function () {
+let mapFunc = function () {
     emit(this._id, 1);
 };
-var reduceFunc = function (keyId, countArray) {
+let reduceFunc = function (keyId, countArray) {
     return Array.sum(countArray);
 };
 

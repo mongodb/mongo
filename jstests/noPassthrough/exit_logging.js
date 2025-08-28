@@ -14,7 +14,7 @@ TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 function makeShutdownByCrashFn(crashHow) {
     return function (conn) {
-        var admin = conn.getDB("admin");
+        let admin = conn.getDB("admin");
         assert.commandWorked(
             admin.runCommand({configureFailPoint: "crashOnShutdown", mode: "alwaysOn", data: {how: crashHow}}),
         );
@@ -30,10 +30,10 @@ function makeRegExMatchFn(pattern) {
 
 function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
     clearRawMongoProgramOutput();
-    var conn = launcher.start({});
+    let conn = launcher.start({});
 
     function checkOutput() {
-        var logContents = rawMongoProgramOutput(".*");
+        let logContents = rawMongoProgramOutput(".*");
         function printLog() {
             // We can't just return a string because it will be well over the max
             // line length.
@@ -101,13 +101,13 @@ if (_isWindows()) {
 (function testMongos() {
     print("********************\nTesting exit logging in mongos\n********************");
 
-    var st = new ShardingTest({
+    let st = new ShardingTest({
         shards: 1,
         configOptions: {setParameter: {transactionLifetimeLimitSeconds: 10}},
     });
-    var mongosLauncher = {
+    let mongosLauncher = {
         start: function (opts) {
-            var actualOpts = {configdb: st._configDB};
+            let actualOpts = {configdb: st._configDB};
             Object.extend(actualOpts, opts);
             return MongoRunner.runMongos(actualOpts);
         },

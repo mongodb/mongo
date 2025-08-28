@@ -2,8 +2,8 @@
  * Tests that using a $lookup stage inside of a $facet stage will yield the same results as using
  * the $lookup stage outside of the $facet stage.
  */
-var local = db.facetLookupLocal;
-var foreign = db.facetLookupForeign;
+let local = db.facetLookupLocal;
+let foreign = db.facetLookupForeign;
 
 local.drop();
 assert.commandWorked(local.insert({_id: 0}));

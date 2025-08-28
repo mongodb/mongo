@@ -6,14 +6,14 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
-    var authzErrorCode = 13;
+    let authzErrorCode = 13;
 
     conn.getDB("admin").createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
 
-    var userAdminConn = new Mongo(conn.host);
+    let userAdminConn = new Mongo(conn.host);
     userAdminConn.getDB("admin").auth("userAdmin", "pwd");
-    var testUserAdmin = userAdminConn.getDB("test");
-    var adminUserAdmin = userAdminConn.getDB("admin");
+    let testUserAdmin = userAdminConn.getDB("test");
+    let adminUserAdmin = userAdminConn.getDB("admin");
     testUserAdmin.createRole({role: "testRole", roles: [], privileges: []});
     adminUserAdmin.createRole({role: "adminRole", roles: [], privileges: []});
     testUserAdmin.createUser({user: "spencer", pwd: "pwd", roles: ["testRole", {role: "adminRole", db: "admin"}]});
@@ -21,7 +21,7 @@ function runTest(conn) {
 
     var db = conn.getDB("test");
     db.auth("spencer", "pwd");
-    var admindb = conn.getDB("admin");
+    let admindb = conn.getDB("admin");
 
     // "adminUserAdmin" and "testUserAdmin" are handles to the "admin" and "test" dbs, respectively.
     // Both are on the same connection, which has been auth'd as a user with 'userAdminAnyDatabase'.
@@ -33,7 +33,7 @@ function runTest(conn) {
     (function testCreateUser() {
         jsTestLog("Testing user creation");
 
-        var res = db.runCommand({createUser: "andy", pwd: "pwd", roles: []});
+        let res = db.runCommand({createUser: "andy", pwd: "pwd", roles: []});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -49,7 +49,7 @@ function runTest(conn) {
     (function testCreateRole() {
         jsTestLog("Testing role creation");
 
-        var res = db.runCommand({createRole: "testRole2", roles: [], privileges: []});
+        let res = db.runCommand({createRole: "testRole2", roles: [], privileges: []});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -65,11 +65,11 @@ function runTest(conn) {
     (function () {
         jsTestLog("Testing role creation, of user-defined roles with same name as built-in roles");
 
-        var cmdObj = {createRole: "readWrite", roles: [], privileges: []};
-        var res = adminUserAdmin.runCommand(cmdObj);
+        let cmdObj = {createRole: "readWrite", roles: [], privileges: []};
+        let res = adminUserAdmin.runCommand(cmdObj);
         assert.commandFailed(res, tojson(cmdObj));
 
-        var roleObj = adminUserAdmin.system.roles.findOne({role: "readWrite", db: "admin"});
+        let roleObj = adminUserAdmin.system.roles.findOne({role: "readWrite", db: "admin"});
         // double check that no role object named "readWrite" has been created
         assert(!roleObj, 'user-defined "readWrite" role was created: ' + tojson(roleObj));
     })();
@@ -77,7 +77,7 @@ function runTest(conn) {
     (function testViewUser() {
         jsTestLog("Testing viewing user information");
 
-        var res = db.runCommand({usersInfo: "andy"});
+        let res = db.runCommand({usersInfo: "andy"});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -93,7 +93,7 @@ function runTest(conn) {
     (function testViewRole() {
         jsTestLog("Testing viewing role information");
 
-        var res = db.runCommand({rolesInfo: "testRole2"});
+        let res = db.runCommand({rolesInfo: "testRole2"});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -109,7 +109,7 @@ function runTest(conn) {
     (function testDropUser() {
         jsTestLog("Testing dropping user");
 
-        var res = db.runCommand({dropUser: "andy"});
+        let res = db.runCommand({dropUser: "andy"});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -125,7 +125,7 @@ function runTest(conn) {
     (function testDropRole() {
         jsTestLog("Testing dropping role");
 
-        var res = db.runCommand({dropRole: "testRole2"});
+        let res = db.runCommand({dropRole: "testRole2"});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         testUserAdmin.grantPrivilegesToRole("testRole", [
@@ -141,7 +141,7 @@ function runTest(conn) {
     (function testGrantRole() {
         jsTestLog("Testing granting roles");
 
-        var res = db.runCommand({createUser: "andy", pwd: "pwd", roles: ["read"]});
+        let res = db.runCommand({createUser: "andy", pwd: "pwd", roles: ["read"]});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         res = db.runCommand({grantRolesToUser: "spencer", roles: ["read"]});
@@ -173,7 +173,7 @@ function runTest(conn) {
     (function testRevokeRole() {
         jsTestLog("Testing revoking roles");
 
-        var res = db.runCommand({revokeRolesFromUser: "spencer", roles: ["read"]});
+        let res = db.runCommand({revokeRolesFromUser: "spencer", roles: ["read"]});
         assert.commandFailedWithCode(res, authzErrorCode);
 
         res = db.runCommand({revokeRolesFromRole: "testRole", roles: ["read"]});
@@ -205,7 +205,7 @@ function runTest(conn) {
             {resource: {db: "test", collection: ""}, actions: ["grantRole"]},
         ]);
 
-        var res = db.runCommand({
+        let res = db.runCommand({
             createRole: "testRole2",
             roles: [],
             privileges: [{resource: {db: "test", collection: ""}, actions: ["find"]}],
@@ -263,7 +263,7 @@ function runTest(conn) {
             {resource: {db: "test", collection: ""}, actions: ["revokeRole"]},
         ]);
 
-        var res = db.runCommand({
+        let res = db.runCommand({
             revokePrivilegesFromRole: "testRole",
             privileges: [{resource: {db: "test", collection: ""}, actions: ["find"]}],
         });
@@ -302,11 +302,11 @@ function runTest(conn) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s);
 st.stop();

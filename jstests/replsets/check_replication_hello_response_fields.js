@@ -12,8 +12,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 TestData.skipCheckDBHashes = true;
 
 // function create the error message if an assert fails
-var generateErrorString = function (badFields, missingFields, badValues, result) {
-    var str = "\nThe result was:\n" + tojson(result);
+let generateErrorString = function (badFields, missingFields, badValues, result) {
+    let str = "\nThe result was:\n" + tojson(result);
     if (badFields.length !== 0) {
         str += "\nIt had the following fields which it shouldn't have: ";
         str += badFields;
@@ -32,7 +32,7 @@ var generateErrorString = function (badFields, missingFields, badValues, result)
 };
 
 // This function calls checkResponseFields with the isMaster and hello commands.
-var runHelloCmdAndAliases = function (memberInfo) {
+let runHelloCmdAndAliases = function (memberInfo) {
     checkResponseFields(memberInfo, "ismaster");
     checkResponseFields(memberInfo, "isMaster");
     checkResponseFields(memberInfo, "hello");
@@ -42,7 +42,7 @@ var runHelloCmdAndAliases = function (memberInfo) {
 // we expect.
 var checkResponseFields = function (memberInfo, cmd) {
     // run the passed in command on the connection
-    var result = memberInfo.conn.getDB("admin").runCommand(cmd);
+    let result = memberInfo.conn.getDB("admin").runCommand(cmd);
     // If we are running the hello command, we must modify the expected fields. We expect
     // "isWritablePrimary" and "secondaryDelaySecs" instead of "ismaster" and "slaveDelay" in the
     // hello command response.
@@ -61,7 +61,7 @@ var checkResponseFields = function (memberInfo, cmd) {
     }
 
     // make sure result doesn't contain anything it shouldn't
-    var badFields = [];
+    let badFields = [];
     for (let field in result) {
         if (!result.hasOwnProperty(field)) {
             continue;
@@ -72,7 +72,7 @@ var checkResponseFields = function (memberInfo, cmd) {
     }
 
     // make sure result contains the fields we want
-    var missingFields = [];
+    let missingFields = [];
     for (let i = 0; i < memberInfo.wantedFields.length; i++) {
         const field = memberInfo.wantedFields[i];
         if (!result.hasOwnProperty(field)) {
@@ -82,7 +82,7 @@ var checkResponseFields = function (memberInfo, cmd) {
     }
 
     // make sure the result has proper values for fields with known values
-    var badValues = []; // each mistake will be saved as three entries (key, badvalue, goodvalue)
+    let badValues = []; // each mistake will be saved as three entries (key, badvalue, goodvalue)
     for (let field in memberInfo.goodValues) {
         if (typeof memberInfo.goodValues[field] === "object") {
             // assumes nested obj is disk in tags this is currently true, but may change
@@ -108,10 +108,10 @@ var checkResponseFields = function (memberInfo, cmd) {
 };
 
 // start of test code
-var name = "hello_and_aliases";
-var replTest = new ReplSetTest({name: name, nodes: 4});
-var nodes = replTest.startSet();
-var config = replTest.getReplSetConfig();
+let name = "hello_and_aliases";
+let replTest = new ReplSetTest({name: name, nodes: 4});
+let nodes = replTest.startSet();
+let config = replTest.getReplSetConfig();
 config.members[1].priority = 0;
 config.members[2].priority = 0;
 config.members[2].hidden = true;
@@ -120,13 +120,13 @@ config.members[2].buildIndexes = false;
 config.members[3].arbiterOnly = true;
 replTest.initiate(config);
 
-var agreeOnPrimaryAndSetVersion = function (setVersion) {
+let agreeOnPrimaryAndSetVersion = function (setVersion) {
     print("Waiting for primary and replica set version " + setVersion);
 
-    var nodes = replTest.nodes;
-    var currPrimary = undefined;
-    var lastSetVersion = setVersion;
-    for (var i = 0; i < nodes.length; i++) {
+    let nodes = replTest.nodes;
+    let currPrimary = undefined;
+    let lastSetVersion = setVersion;
+    for (let i = 0; i < nodes.length; i++) {
         try {
             var helloResult = nodes[i].getDB("admin").runCommand({hello: 1});
         } catch (e) {
@@ -145,9 +145,9 @@ var agreeOnPrimaryAndSetVersion = function (setVersion) {
     return true;
 };
 
-var primary = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
-var expectedVersion = replTest.getReplSetConfigFromNode().version;
+let primary = replTest.getPrimary();
+let secondaries = replTest.getSecondaries();
+let expectedVersion = replTest.getReplSetConfigFromNode().version;
 assert.soon(
     function () {
         return agreeOnPrimaryAndSetVersion(expectedVersion);

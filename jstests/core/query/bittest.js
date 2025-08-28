@@ -6,10 +6,10 @@
  */
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.jstests_bitwise;
+let coll = db.jstests_bitwise;
 
 function assertQueryCorrect(query, count) {
-    var explain = coll.find(query).explain("executionStats");
+    let explain = coll.find(query).explain("executionStats");
     assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected bit test query plan to be COLLSCAN");
     assert.eq(count, explain.executionStats.nReturned, "bit test query not returning correct documents");
 }
@@ -124,8 +124,8 @@ assertQueryCorrect({a: {$bitsAnyClear: 53}}, 3);
 assertQueryCorrect({a: {$bitsAnyClear: 127}}, 3);
 
 // Tests with array of bit positions.
-var allPositions = [];
-for (var i = 0; i < 64; i++) {
+let allPositions = [];
+for (let i = 0; i < 64; i++) {
     allPositions.push(i);
 }
 assertQueryCorrect({a: {$bitsAllSet: []}}, 4);

@@ -52,12 +52,12 @@ const testCases = {
 };
 
 // Set up a set and grab things for later.
-var name = "read_committed";
-var replTest = new ReplSetTest({name: name, nodes: 3});
+let name = "read_committed";
+let replTest = new ReplSetTest({name: name, nodes: 3});
 
 replTest.startSet();
-var nodes = replTest.nodeList();
-var config = {
+let nodes = replTest.nodeList();
+let config = {
     "_id": name,
     "members": [
         {"_id": 0, "host": nodes[0]},
@@ -69,10 +69,10 @@ var config = {
 replTest.initiate(config);
 
 // Get connections and collection.
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
-var coll = primary.getDB(name)[name];
-var secondaryColl = secondary.getDB(name)[name];
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
+let coll = primary.getDB(name)[name];
+let secondaryColl = secondary.getDB(name)[name];
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -85,27 +85,27 @@ function log(arg) {
 
 function doRead(coll, readConcern) {
     readConcern.maxTimeMS = 3000;
-    var res = assert.commandWorked(coll.runCommand("find", readConcern));
+    let res = assert.commandWorked(coll.runCommand("find", readConcern));
     return new DBCommandCursor(coll.getDB(), res).toArray();
 }
 
 function doDirtyRead(coll) {
     log("doing dirty read");
-    var ret = doRead(coll, {"readConcern": {"level": "local"}});
+    let ret = doRead(coll, {"readConcern": {"level": "local"}});
     log("done doing dirty read.");
     return ret;
 }
 
 function doCommittedRead(coll) {
     log("doing committed read");
-    var ret = doRead(coll, {"readConcern": {"level": "majority"}});
+    let ret = doRead(coll, {"readConcern": {"level": "majority"}});
     log("done doing committed read.");
     return ret;
 }
 
 function readLatestOplogEntry(readConcernLevel) {
-    var oplog = primary.getDB("local").oplog.rs;
-    var res = oplog.runCommand("find", {
+    let oplog = primary.getDB("local").oplog.rs;
+    let res = oplog.runCommand("find", {
         "readConcern": {"level": readConcernLevel},
         "maxTimeMS": 3000,
         sort: {$natural: -1},
@@ -115,7 +115,7 @@ function readLatestOplogEntry(readConcernLevel) {
     return new DBCommandCursor(coll.getDB(), res).toArray()[0];
 }
 
-for (var testName in testCases) {
+for (let testName in testCases) {
     jsTestLog("Running test " + testName);
     var test = testCases[testName];
 

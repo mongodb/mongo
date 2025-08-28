@@ -13,7 +13,7 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getQueryPlanner, getSingleNodeExplain, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.orToIn;
+let coll = db.orToIn;
 coll.drop();
 
 function compareValues(v1, v2) {

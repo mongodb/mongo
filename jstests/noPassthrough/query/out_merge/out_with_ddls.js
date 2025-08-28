@@ -75,7 +75,7 @@ function setup() {
 
     st.s.adminCommand({enableSharding: sourceDB.getName(), primaryShard: st.shard0.shardName});
 
-    var batch = sourceColl.initializeUnorderedBulkOp();
+    let batch = sourceColl.initializeUnorderedBulkOp();
     for (let i = 0; i < 10; i++) {
         batch.insert({val: i});
     }
@@ -92,7 +92,7 @@ function setupLargeDocs() {
     st.s.adminCommand({enableSharding: sourceDB.getName(), primaryShard: st.shard0.shardName});
 
     // Insert 20 ~1MB documents so they don't all fit in one 16MB out write batch.
-    var batch = sourceColl.initializeUnorderedBulkOp();
+    let batch = sourceColl.initializeUnorderedBulkOp();
     let largeVal = "a".repeat(1024 * 1024);
     for (let i = 0; i < 20; i++) {
         batch.insert({val: i, x: largeVal});

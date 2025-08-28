@@ -10,9 +10,9 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 const testName = "rollback_drop_index_after_rename";
 const dbName = testName;
 
-var fromColl = "fromColl";
-var toColl = "toColl";
-var idxName = "a_1";
+let fromColl = "fromColl";
+let toColl = "toColl";
+let idxName = "a_1";
 
 // Operations that will be present on both nodes, before the common point.
 let CommonOps = (node) => {

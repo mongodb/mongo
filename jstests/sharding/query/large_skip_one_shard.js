@@ -3,13 +3,13 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s0;
+let mongos = st.s0;
 
-var admin = mongos.getDB("admin");
-var collSharded = mongos.getCollection("testdb.collSharded");
-var collUnSharded = mongos.getCollection("testdb.collUnSharded");
+let admin = mongos.getDB("admin");
+let collSharded = mongos.getCollection("testdb.collSharded");
+let collUnSharded = mongos.getCollection("testdb.collUnSharded");
 
 // Set up a sharded and unsharded collection
 assert(admin.runCommand({enableSharding: collSharded.getDB() + "", primaryShard: st.shard0.shardName}).ok);
@@ -18,12 +18,12 @@ assert(admin.runCommand({split: collSharded + "", middle: {_id: 0}}).ok);
 assert(admin.runCommand({moveChunk: collSharded + "", find: {_id: 0}, to: st.shard1.shardName}).ok);
 
 function testSelectWithSkip(coll) {
-    for (var i = -100; i < 100; i++) {
+    for (let i = -100; i < 100; i++) {
         assert.commandWorked(coll.insert({_id: i}));
     }
 
     // Run a query which only requires 5 results from a single shard
-    var explain = coll
+    let explain = coll
         .find({_id: {$gt: 1}})
         .sort({_id: 1})
         .skip(90)

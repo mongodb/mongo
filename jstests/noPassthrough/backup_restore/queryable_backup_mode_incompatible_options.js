@@ -8,16 +8,16 @@
  */
 
 // Check that starting mongod with both --queryableBackupMode and --replSet fails.
-var name = "queryable_backup_mode_repl_set";
-var dbdir = MongoRunner.dataPath + name + "/";
+let name = "queryable_backup_mode_repl_set";
+let dbdir = MongoRunner.dataPath + name + "/";
 
 resetDbpath(dbdir);
 
 // Insert dummy document to ensure startup failure isn't due to lack of storage metadata file.
-var conn = MongoRunner.runMongod({dbpath: dbdir, noCleanData: true});
+let conn = MongoRunner.runMongod({dbpath: dbdir, noCleanData: true});
 assert.neq(null, conn, "mongod was unable to start up");
 
-var coll = conn.getCollection("test.foo");
+let coll = conn.getCollection("test.foo");
 coll.insertOne({a: 1});
 MongoRunner.stopMongod(conn);
 

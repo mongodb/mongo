@@ -3,7 +3,7 @@
  * @tags: [requires_wiredtiger, requires_fcv_52, requires_collstats]
  */
 // Grab the storage engine, default is wiredTiger
-var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+let storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
 // Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring
 // that the parallel suite runs this test only on WT configurations. See SERVER-36181.

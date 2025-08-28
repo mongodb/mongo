@@ -5,10 +5,10 @@
  * @tags: [requires_persistence]
  */
 
-var collName = "leaves";
-var coll = db[collName];
+let collName = "leaves";
+let coll = db[collName];
 
-var commands = [];
+let commands = [];
 
 commands.push({
     req: {insert: collName, documents: [{type: "maple"}]},
@@ -153,7 +153,7 @@ function testValidWriteConcern(cmd) {
 
     coll.drop();
     cmd.setupFunc();
-    var res = db.runCommand(cmd.req);
+    let res = db.runCommand(cmd.req);
     assert.commandWorked(res);
     assert(!res.writeConcernError, "command had writeConcernError: " + tojson(res));
     cmd.confirmFunc();
@@ -165,13 +165,13 @@ function testInvalidWriteConcern(wc, cmd) {
 
     coll.drop();
     cmd.setupFunc();
-    var res = coll.runCommand(cmd.req);
+    let res = coll.runCommand(cmd.req);
     // These commands should fail because standalone writeConcerns are found to be invalid at
     // the validation stage when the writeConcern is parsed, before the command is run.
     assert.commandFailed(res);
 }
 
-var invalidWriteConcerns = [{w: "invalid"}, {w: 2}, {j: "invalid"}];
+let invalidWriteConcerns = [{w: "invalid"}, {w: 2}, {j: "invalid"}];
 
 commands.forEach(function (cmd) {
     testValidWriteConcern(cmd);

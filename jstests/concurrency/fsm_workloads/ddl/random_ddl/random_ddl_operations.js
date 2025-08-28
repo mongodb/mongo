@@ -131,7 +131,7 @@ export const $config = (function () {
     };
 
     let setup = function (db, collName, cluster) {
-        for (var i = 0; i < data.dbCount; i++) {
+        for (let i = 0; i < data.dbCount; i++) {
             const dbName = data.dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
             newDb.adminCommand({enablesharding: dbName});

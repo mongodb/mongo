@@ -12,8 +12,8 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-var local = db.local;
-var foreign = db.foreign;
+let local = db.local;
+let foreign = db.foreign;
 
 function drop() {
     local.drop();

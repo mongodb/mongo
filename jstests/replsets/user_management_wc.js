@@ -11,14 +11,14 @@ import {assertWriteConcernError, runCommandCheckAdmin} from "jstests/libs/write_
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-var replTest = new ReplSetTest({name: "UserManagementWCSet", nodes: 3, settings: {chainingAllowed: false}});
+let replTest = new ReplSetTest({name: "UserManagementWCSet", nodes: 3, settings: {chainingAllowed: false}});
 replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var dbName = "user-management-wc-test";
+let primary = replTest.getPrimary();
+let dbName = "user-management-wc-test";
 var db = primary.getDB(dbName);
-var adminDB = primary.getDB("admin");
+let adminDB = primary.getDB("admin");
 
 function dropUsersAndRoles() {
     db.dropUser("username");
@@ -26,7 +26,7 @@ function dropUsersAndRoles() {
     db.dropUser("user2");
 }
 
-var commands = [];
+let commands = [];
 
 commands.push({
     req: {createUser: "username", pwd: "password", roles: jsTest.basicUserRoles},
@@ -112,7 +112,7 @@ function testValidWriteConcern(cmd) {
 
     dropUsersAndRoles();
     cmd.setupFunc();
-    var res = runCommandCheckAdmin(db, cmd);
+    let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
     assert(!res.writeConcernError, "command on a full replicaset had writeConcernError: " + tojson(res));
     cmd.confirmFunc();
@@ -124,7 +124,7 @@ function testInvalidWriteConcern(cmd) {
 
     dropUsersAndRoles();
     cmd.setupFunc();
-    var res = runCommandCheckAdmin(db, cmd);
+    let res = runCommandCheckAdmin(db, cmd);
     assertUserManagementWriteConcernError(res);
     cmd.confirmFunc();
 }

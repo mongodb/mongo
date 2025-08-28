@@ -144,8 +144,8 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // Insert some docs into the collection.
     const numDocs = 1000;
-    var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; i++) {
+    let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
     }
     assert.commandWorked(bulk.execute());
@@ -213,8 +213,8 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // Insert some docs into the collection.
     const numDocs = 1000;
-    var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; i++) {
+    let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
     }
     assert.commandWorked(bulk.execute());

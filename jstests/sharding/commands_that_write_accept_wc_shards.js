@@ -19,7 +19,7 @@ import {
     shardCollectionWithChunks,
 } from "jstests/libs/write_concern_util.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     // Set priority of secondaries to zero to prevent spurious elections.
     shards: {
         rs0: {
@@ -35,11 +35,11 @@ var st = new ShardingTest({
     mongos: 1,
 });
 
-var mongos = st.s;
-var dbName = "wc-test-shards";
+let mongos = st.s;
+let dbName = "wc-test-shards";
 var db = mongos.getDB(dbName);
-var collName = "leaves";
-var coll = db[collName];
+let collName = "leaves";
+let coll = db[collName];
 
 function dropTestDatabase() {
     db.runCommand({dropDatabase: 1});
@@ -49,7 +49,7 @@ function dropTestDatabase() {
     assert.eq(1, db.extra.find().itcount(), "extra collection should have 1 document");
 }
 
-var commands = [];
+let commands = [];
 
 // Tests a runOnAllShardsCommand against a sharded collection.
 commands.push({
@@ -269,7 +269,7 @@ const map = function () {
 };
 
 const reduce = function (key, values) {
-    var count = 0;
+    let count = 0;
     values.forEach(function (v) {
         count = count + v;
     });
@@ -508,7 +508,7 @@ function testValidWriteConcern(cmd) {
 
     dropTestDatabase();
     cmd.setupFunc();
-    var res = runCommandCheckAdmin(db, cmd);
+    let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
     assert(!res.writeConcernError, "command on a full cluster had writeConcernError: " + tojson(res));
     cmd.confirmFunc();
@@ -520,7 +520,7 @@ function testInvalidWriteConcern(cmd) {
 
     dropTestDatabase();
     cmd.setupFunc();
-    var res = runCommandCheckAdmin(db, cmd);
+    let res = runCommandCheckAdmin(db, cmd);
 
     // When a cluster aggregate command with a write stage fails due to write concern error it will
     // return a regular error response with "ok: 0" rather than "ok: 1" with a `writeConcernError`

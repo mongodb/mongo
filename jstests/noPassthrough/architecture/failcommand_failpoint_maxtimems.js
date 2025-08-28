@@ -1,8 +1,8 @@
-var conn = MongoRunner.runMongod();
-var admin = conn.getDB("admin");
+let conn = MongoRunner.runMongod();
+let admin = conn.getDB("admin");
 var db = conn.getDB("test");
 
-var fpCmd = {
+let fpCmd = {
     configureFailPoint: "failCommand",
     mode: {times: 1},
     data: {
@@ -14,7 +14,7 @@ var fpCmd = {
 
 assert.commandWorked(admin.runCommand(fpCmd));
 
-var insertCmd = {
+let insertCmd = {
     insert: "coll",
     documents: [{x: 1}],
     maxTimeMS: 100,

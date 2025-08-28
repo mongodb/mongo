@@ -15,19 +15,19 @@ import {allowTLS, requireTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 TestData.disableImplicitSessions = true;
 
-var dbName = "upgradeToX509";
+let dbName = "upgradeToX509";
 
-var transitionToX509allowTLS = Object.merge(allowTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
+let transitionToX509allowTLS = Object.merge(allowTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
 
 // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-var x509requireTLS = Object.merge(requireTLS, {transitionToAuth: undefined, clusterAuthMode: "x509"});
+let x509requireTLS = Object.merge(requireTLS, {transitionToAuth: undefined, clusterAuthMode: "x509"});
 
-var rst = new ReplSetTest({name: "noauthSet", nodes: 3, nodeOptions: transitionToX509allowTLS});
+let rst = new ReplSetTest({name: "noauthSet", nodes: 3, nodeOptions: transitionToX509allowTLS});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-var rstConn1 = rst.getPrimary();
-var testDB = rstConn1.getDB(dbName);
+let rstConn1 = rst.getPrimary();
+let testDB = rstConn1.getDB(dbName);
 
 // Create a user to login when auth is enabled later
 assert.commandWorked(rstConn1.adminCommand({createUser: "root", pwd: "root", roles: ["root"], writeConcern: {w: 3}}));

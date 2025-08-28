@@ -6,14 +6,14 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var NUM_NODES = 3;
-var rsTest = new ReplSetTest({nodes: NUM_NODES});
+let NUM_NODES = 3;
+let rsTest = new ReplSetTest({nodes: NUM_NODES});
 rsTest.startSet({oplogSize: 10, keyFile: "jstests/libs/key1"});
 rsTest.initiate();
 rsTest.awaitSecondaryNodes();
 
-var setupConn = rsTest.getPrimary();
-var admin = setupConn.getDB("admin");
+let setupConn = rsTest.getPrimary();
+let admin = setupConn.getDB("admin");
 
 // Setup initial data
 admin.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
@@ -24,12 +24,12 @@ setupConn.getDB("foo").logout();
 setupConn.getDB("bar").createUser({user: "bar", pwd: "barpwd", roles: jsTest.basicUserRoles}, {w: NUM_NODES});
 setupConn.getDB("bar").logout();
 
-var replConn0 = new Mongo(rsTest.getURL());
-var replConn1 = new Mongo(rsTest.getURL());
-var fooDB0 = replConn0.getDB("foo");
-var barDB0 = replConn0.getDB("bar");
-var fooDB1 = replConn1.getDB("foo");
-var barDB1 = replConn1.getDB("bar");
+let replConn0 = new Mongo(rsTest.getURL());
+let replConn1 = new Mongo(rsTest.getURL());
+let fooDB0 = replConn0.getDB("foo");
+let barDB0 = replConn0.getDB("bar");
+let fooDB1 = replConn1.getDB("foo");
+let barDB1 = replConn1.getDB("bar");
 
 fooDB0.auth("foo", "foopwd");
 barDB1.auth("bar", "barpwd");
@@ -49,7 +49,7 @@ rsTest.getSecondaries().forEach(function (sec) {
 // Note: secondary nodes are selected randomly and connections will only be returned to the
 // pool if a different secondary is selected from the previous one so we have to iterate
 // a couple of times.
-for (var x = 0; x < 20; x++) {
+for (let x = 0; x < 20; x++) {
     var explain = fooDB0.user.find().readPref("secondary").explain("executionStats");
     assert.eq(1, explain.executionStats.nReturned);
 

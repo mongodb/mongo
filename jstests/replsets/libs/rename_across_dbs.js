@@ -16,7 +16,7 @@ export var RenameAcrossDatabasesTest = function (options) {
     }
 
     // Capture the 'this' reference
-    var self = this;
+    let self = this;
 
     self.options = options || {};
 
@@ -149,7 +149,7 @@ export var RenameAcrossDatabasesTest = function (options) {
                 " with dropTarget set to " +
                 dropTarget,
         );
-        var results = assert.commandWorked(
+        let results = assert.commandWorked(
             primary.adminCommand({
                 renameCollection: sourceColl.getFullName(),
                 to: targetColl.getFullName(),

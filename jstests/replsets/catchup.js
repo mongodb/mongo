@@ -10,11 +10,11 @@ import {
     stopReplicationAndEnforceNewPrimaryToCatchUp,
 } from "jstests/replsets/rslib.js";
 
-var name = "catch_up";
-var rst = new ReplSetTest({name: name, nodes: 3, useBridge: true, waitForKeys: true});
+let name = "catch_up";
+let rst = new ReplSetTest({name: name, nodes: 3, useBridge: true, waitForKeys: true});
 
 rst.startSet();
-var conf = rst.getReplSetConfig();
+let conf = rst.getReplSetConfig();
 conf.members[2].priority = 0;
 conf.settings = {
     heartbeatIntervalMillis: 500,
@@ -24,8 +24,8 @@ conf.settings = {
 rst.initiate(conf);
 rst.awaitSecondaryNodes();
 
-var primary = rst.getPrimary();
-var primaryColl = primary.getDB("test").coll;
+let primary = rst.getPrimary();
+let primaryColl = primary.getDB("test").coll;
 
 // The default WC is majority and this test can't test catchup properly if it used majority writes.
 assert.commandWorked(
@@ -33,7 +33,7 @@ assert.commandWorked(
 );
 
 // Set verbosity for replication on all nodes.
-var verbosity = {
+let verbosity = {
     "setParameter": 1,
     "logComponentVerbosity": {
         "replication": {"verbosity": 2},
@@ -45,8 +45,8 @@ rst.nodes.forEach(function (node) {
 
 function checkOpInOplog(node, op, count) {
     node.getDB("admin").getMongo().setSecondaryOk();
-    var oplog = node.getDB("local")["oplog.rs"];
-    var oplogArray = oplog.find().toArray();
+    let oplog = node.getDB("local")["oplog.rs"];
+    let oplogArray = oplog.find().toArray();
     assert.eq(oplog.count(op), count, "op: " + tojson(op) + ", oplog: " + tojson(oplogArray));
 }
 
@@ -56,7 +56,7 @@ function reconfigElectionAndCatchUpTimeout(electionTimeout, catchupTimeout) {
     // Wait for the config with the new term to propagate.
     rst.waitForConfigReplication(rst.getPrimary());
     // Reconfigure replica set to decrease catchup timeout.
-    var newConfig = rst.getReplSetConfigFromNode();
+    let newConfig = rst.getReplSetConfigFromNode();
     newConfig.version++;
     newConfig.settings.catchUpTimeoutMillis = catchupTimeout;
     newConfig.settings.electionTimeoutMillis = electionTimeout;
@@ -194,8 +194,8 @@ assert.commandWorked(stepUpResults.voter.adminCommand({replSetSyncFrom: stepUpRe
 // Wait until the new primary knows the last applied optime on the voter, so it will keep
 // catching up after the old primary is disconnected.
 assert.soon(function () {
-    var replSetStatus = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
-    var voterStatus = replSetStatus.members.filter((m) => m.name == stepUpResults.voter.host)[0];
+    let replSetStatus = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+    let voterStatus = replSetStatus.members.filter((m) => m.name == stepUpResults.voter.host)[0];
     return rs.compareOpTimes(voterStatus.optime, stepUpResults.latestOpOnOldPrimary) == 0;
 });
 // Disconnect the new primary and the old one.
@@ -288,7 +288,7 @@ verifyCatchUpConclusionReason(
 );
 
 // Rename the primary.
-var steppedDownPrimary = stepUpResults.newPrimary;
+let steppedDownPrimary = stepUpResults.newPrimary;
 var newPrimary = rst.getPrimary();
 assert.neq(newPrimary, steppedDownPrimary);
 

@@ -33,7 +33,7 @@ const st = new ShardingTest({
  * SHARD0 : "test0.coll0"
  * SHARD1 : "test1.coll1"
  */
-var collectionMap = {};
+let collectionMap = {};
 collectionMap[st.shard0.shardName] = {
     rs: st.rs0,
     dbName: "test0",
@@ -63,12 +63,12 @@ createCollectionOnShard(st.shard0);
 createCollectionOnShard(st.shard1);
 
 let testNoopWrite = (sourceShardName, destinationShardName) => {
-    var fromDbName = collectionMap[sourceShardName].dbName;
-    var fromCollName = collectionMap[sourceShardName].collName;
+    let fromDbName = collectionMap[sourceShardName].dbName;
+    let fromCollName = collectionMap[sourceShardName].collName;
 
-    var toDbName = collectionMap[destinationShardName].dbName;
-    var toCollName = collectionMap[destinationShardName].collName;
-    var toRS = collectionMap[destinationShardName].rs;
+    let toDbName = collectionMap[destinationShardName].dbName;
+    let toCollName = collectionMap[destinationShardName].collName;
+    let toRS = collectionMap[destinationShardName].rs;
 
     jsTest.log(`Testing source shard ${sourceShardName}, destination shard ${destinationShardName}`);
 

@@ -23,7 +23,7 @@ let getNumberofAppNamesReturned = function () {
     return Object.keys(db.serverStatus().metrics.apiVersions).length;
 };
 
-for (var i = 0; i < 2000; i++) {
+for (let i = 0; i < 2000; i++) {
     addAppName(i);
     assert(getNumberofAppNamesReturned() <= KMaxNumOfOutputAppNames);
 }

@@ -22,7 +22,7 @@ function runTest(downgradeVersion) {
     // binVersion. We set "writePeriodicNoops" to write to the oplog every 1 second, which ensures
     // that test change streams do not wait for longer than 1 second if one of the shards has no
     // changes to report.
-    var st = new ShardingTest({
+    let st = new ShardingTest({
         shards: 2,
         rs: {
             nodes: 2,
@@ -56,7 +56,7 @@ function runTest(downgradeVersion) {
     // Insert new documents on both shards, verify that each insertion outputs a result from the
     // 'changeStream' cursor, verify that the change stream results have monotonically increasing
     // timestamps, and return the resume token.
-    var nextId = 0;
+    let nextId = 0;
     function insertAndValidateChanges(coll, changeStream) {
         const docsToInsert = Array.from({length: 10}, (_, i) => ({_id: nextId + i, shard: i % 2, val: i}));
         nextId += docsToInsert.length;

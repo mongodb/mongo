@@ -4,12 +4,12 @@
 //   requires_getmore,
 // ]
 
-var t = db.jstests_skip1;
+let t = db.jstests_skip1;
 
 // SERVER-13537: Ensure that combinations of skip and limit don't crash
 // the server due to overflow.
 t.drop();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({a: i});
 }
 assert.eq(9, t.find().sort({a: 1}).limit(2147483647).skip(1).itcount());

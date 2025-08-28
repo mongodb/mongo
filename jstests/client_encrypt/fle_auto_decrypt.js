@@ -32,7 +32,7 @@ const keyVault = shell.getKeyVault();
 
 const keyId = keyVault.createKey("local", "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]);
 
-var test = function (conn, clientSideFLEOptions, keyId) {
+let test = function (conn, clientSideFLEOptions, keyId) {
     const test_shell = Mongo(conn.host, clientSideFLEOptions);
 
     const clientEncrypt = test_shell.getClientEncryption();
@@ -41,7 +41,7 @@ var test = function (conn, clientSideFLEOptions, keyId) {
     // Insert encrypted string into database
     const collection = conn.getDB("test").getCollection("collection");
 
-    for (var i = 0; i < 150; i++) {
+    for (let i = 0; i < 150; i++) {
         assert.commandWorked(collection.insert({string: encryptedStr, id: 1}));
     }
 

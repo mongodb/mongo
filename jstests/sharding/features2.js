@@ -1,7 +1,7 @@
 // @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 2, mongos: 1});
+let s = new ShardingTest({shards: 2, mongos: 1});
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
 let db = s.getDB("test");
@@ -81,8 +81,8 @@ let m = function () {
 };
 
 let r = function (key, values) {
-    var total = 0;
-    for (var i = 0; i < values.length; i++) {
+    let total = 0;
+    for (let i = 0; i < values.length; i++) {
         total += values[i].count;
     }
     return {count: total};
@@ -96,7 +96,7 @@ let doMR = function (n) {
     var res = db.mr.mapReduce(m, r, "smr1_out");
     printjson(res);
 
-    var x = db[res.result];
+    let x = db[res.result];
     assert.eq(3, x.find().count(), "MR T1 " + n);
 
     var z = {};

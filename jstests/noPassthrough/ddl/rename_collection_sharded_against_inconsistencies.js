@@ -3,7 +3,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({});
+let st = new ShardingTest({});
 
 const dbName = "test";
 const primaryShardName = st.shard0.shardName;

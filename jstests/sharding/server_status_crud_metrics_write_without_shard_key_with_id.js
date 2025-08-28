@@ -29,7 +29,7 @@ const session = st.s.startSession({retryWrites: true});
 const sessionColl = session.getDatabase(testDB.getName()).getCollection(testDB.coll.getName());
 
 // Insert five documents.
-for (var i = 0; i < 5; i++) {
+for (let i = 0; i < 5; i++) {
     assert.commandWorked(sessionColl.insert({x: -100 + Random.randInt(100), _id: i}));
 }
 

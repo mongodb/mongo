@@ -9,7 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {
-    var res;
+    let res;
     assert.soon(() => {
         res = st.configRS.getPrimary().adminCommand({
             _configsvrRemoveChunks: 1,
@@ -35,9 +35,9 @@ function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {
 
 function insertLeftoverChunks(configDB, uuid) {
     const chunkDocsForNs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
-    var chunksToInsert = [];
+    let chunksToInsert = [];
     chunkDocsForNs.forEach((originalChunk) => {
-        var newChunk = originalChunk;
+        let newChunk = originalChunk;
         newChunk._id = ObjectId();
         newChunk.uuid = otherCollectionUUID;
         chunksToInsert.push(newChunk);

@@ -8,17 +8,17 @@ const testDB = conn.getDB("test");
 var coll = testDB[jsTestName()];
 
 var coll = testDB[jsTestName()];
-var collTwo = testDB[jsTestName() + "Two"];
+let collTwo = testDB[jsTestName() + "Two"];
 coll.drop();
 
-for (var i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     coll.insert({foo: 0});
     coll.insert({foo: 1});
     collTwo.insert({foo: Math.random(0, 1), bar: Math.random(0, 1)});
 }
 assert.commandWorked(testDB.setProfilingLevel(2));
-var commandProfilerFilter = {op: "command", ns: "test.profile_query_planning_time_metric"};
-var findProfilerFilter = {op: "query", ns: "test.profile_query_planning_time_metric"};
+let commandProfilerFilter = {op: "command", ns: "test.profile_query_planning_time_metric"};
+let findProfilerFilter = {op: "query", ns: "test.profile_query_planning_time_metric"};
 
 function verifyProfilerLog(profilerFilter) {
     let profileObj = getLatestProfilerEntry(testDB, profilerFilter);

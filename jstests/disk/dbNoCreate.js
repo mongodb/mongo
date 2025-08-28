@@ -1,8 +1,8 @@
-var baseName = "jstests_dbNoCreate";
+let baseName = "jstests_dbNoCreate";
 
-var m = MongoRunner.runMongod({});
+let m = MongoRunner.runMongod({});
 
-var t = m.getDB(baseName).t;
+let t = m.getDB(baseName).t;
 
 assert.eq(0, t.find().toArray().length);
 t.remove({});

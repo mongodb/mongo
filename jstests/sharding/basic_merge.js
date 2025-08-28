@@ -4,15 +4,15 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
-var mongos = st.s0;
+let st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
+let mongos = st.s0;
 
-var kDbName = "db";
+let kDbName = "db";
 
-var shard0 = st.shard0.shardName;
-var shard1 = st.shard1.shardName;
+let shard0 = st.shard0.shardName;
+let shard1 = st.shard1.shardName;
 
-var ns = kDbName + ".foo";
+let ns = kDbName + ".foo";
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 

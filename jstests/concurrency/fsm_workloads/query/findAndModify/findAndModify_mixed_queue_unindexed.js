@@ -40,7 +40,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.validateResult = function validateResult(db, collName, res) {
         assert.commandWorked(res);
 
-        var doc = res.value;
+        let doc = res.value;
         if (isMongod(db)) {
             // Storage engines should automatically retry the operation, and thus should never
             // return null.
@@ -54,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = (function () {
         // Avoid removing documents that were already updated.
         function remove(db, collName) {
-            var res = db.runCommand({
+            let res = db.runCommand({
                 findAndModify: db[collName].getName(),
                 query: {counter: 0},
                 sort: {rand: -1},
@@ -65,7 +65,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         function update(db, collName) {
             // Update the counter field to avoid matching the same document again.
-            var res = db.runCommand({
+            let res = db.runCommand({
                 findAndModify: db[collName].getName(),
                 query: {counter: 0},
                 sort: {rand: -1},

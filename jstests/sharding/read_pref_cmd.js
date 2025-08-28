@@ -30,8 +30,8 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 /**
  * Prepares to call testConnReadPreference(), testCursorReadPreference() or testBadMode().
  */
-var setUp = function (rst) {
-    var configDB = st.s.getDB("config");
+let setUp = function (rst) {
+    let configDB = st.s.getDB("config");
     assert.commandWorked(configDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
@@ -48,7 +48,7 @@ var setUp = function (rst) {
  * Cleans up after testConnReadPreference(), testCursorReadPreference() or testBadMode(),
  * prepares to call setUp() again.
  */
-var tearDown = function (rst) {
+let tearDown = function (rst) {
     assert.commandWorked(st.s.getDB(kDbName).dropDatabase());
     rst.awaitReplication();
 };
@@ -141,7 +141,7 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
      * @param dbName the name of the database against which to run the command,
      *     and to which the 'system.profile' entry for this command is written.
      */
-    var cmdTest = function (cmdObj, secOk, isReadOnlyCmd, profileQuery, dbName = kDbName) {
+    let cmdTest = function (cmdObj, secOk, isReadOnlyCmd, profileQuery, dbName = kDbName) {
         jsTest.log("about to do: " + tojson(cmdObj));
 
         const cmdFunc = () => {
@@ -173,8 +173,8 @@ let testConnReadPreference = function (conn, isMongos, isReplicaSetEndpointActiv
     // Make sure the unsharded collection is propagated to secondaries before proceeding.
     rst.awaitReplication();
 
-    var mapFunc = function () {};
-    var reduceFunc = function (key, values) {
+    let mapFunc = function () {};
+    let reduceFunc = function (key, values) {
         return values;
     };
 
@@ -434,7 +434,7 @@ let testBadMode = function (conn, isMongos, rsNodes, readPref) {
     }
 };
 
-var testAllModes = function (conn, rst, isMongos, isReplicaSetEndpointActive) {
+let testAllModes = function (conn, rst, isMongos, isReplicaSetEndpointActive) {
     // The primary is tagged with { tag: "one" } and one of the secondaries is
     // tagged with { tag: "two" }. We can use this to test the interaction between
     // modes and tags. Test a bunch of combinations.
@@ -530,7 +530,7 @@ const kSecondaryTag2 = {
     tag: "three",
 };
 
-var rsConfig = primary.getDB("local").system.replset.findOne();
+let rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log("got rsconf " + tojson(rsConfig));
 rsConfig.members.forEach(function (member) {
     switch (member.host) {
@@ -582,7 +582,7 @@ reconnect(secondary2);
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log("got rsconf " + tojson(rsConfig));
 
-var replConn = new Mongo(st.rs0.getURL());
+let replConn = new Mongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: kPrimaryTag}, st.rs0.name);

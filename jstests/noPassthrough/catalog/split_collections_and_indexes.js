@@ -1,9 +1,9 @@
 if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
-    var baseDir = jsTestName();
+    let baseDir = jsTestName();
 
-    var dbpath = MongoRunner.dataPath + baseDir + "/";
+    let dbpath = MongoRunner.dataPath + baseDir + "/";
 
-    var m = MongoRunner.runMongod({dbpath: dbpath, wiredTigerDirectoryForIndexes: ""});
+    let m = MongoRunner.runMongod({dbpath: dbpath, wiredTigerDirectoryForIndexes: ""});
     const db = m.getDB("foo");
     db.bar.insert({x: 1});
     assert.eq(1, db.bar.count());

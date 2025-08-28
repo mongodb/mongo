@@ -7,8 +7,8 @@ let N = 1000;
 
 function pop() {
     t.drop();
-    var arr = [];
-    for (var i = 0; i < N; i++) {
+    let arr = [];
+    for (let i = 0; i < N; i++) {
         arr.push({x: 1, tags: ["a", "b", "c"]});
     }
     assert.commandWorked(t.insert(arr));
@@ -25,7 +25,7 @@ function test(n, idx) {
     if (idx) {
         assert.commandWorked(t.createIndex(idx));
     }
-    var res = del();
+    let res = del();
     assert(!res.hasWriteError(), "error deleting: " + res.toString());
     assert.eq(0, t.count(), n + " B " + idx);
 }

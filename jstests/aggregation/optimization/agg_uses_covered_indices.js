@@ -32,11 +32,11 @@ function assertResultsMatch(pipeline, ignoreSortOrder) {
 
     // Once with an index.
     assert.commandWorked(coll.createIndex(indexSpec));
-    var resultsWithIndex = coll.aggregate(pipeline).toArray();
+    let resultsWithIndex = coll.aggregate(pipeline).toArray();
 
     // Again without an index.
     assert.commandWorked(coll.dropIndex(indexSpec));
-    var resultsWithoutIndex = coll.aggregate(pipeline).toArray();
+    let resultsWithoutIndex = coll.aggregate(pipeline).toArray();
 
     if (ignoreSortOrder) {
         assert(

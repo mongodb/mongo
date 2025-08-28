@@ -45,8 +45,8 @@ const strings = [
 ];
 
 const nItems = 200000;
-var bulk = database.ts1.initializeUnorderedBulkOp();
-for (var i = 0; i < nItems; ++i) {
+let bulk = database.ts1.initializeUnorderedBulkOp();
+for (let i = 0; i < nItems; ++i) {
     bulk.insert({_id: i, counter: i + 1, number: strings[i % 20], random: Math.random()});
 
     // Generate one chunk for each 1000 documents so the balancer is kept busy throughout the
@@ -63,7 +63,7 @@ shardedAggTest.awaitBalancerRound();
 
 (function testProjectAndGroup() {
     jsTestLog("Testing project and group in shards, result combined in mongos");
-    var a1 = database.ts1
+    let a1 = database.ts1
         .aggregate([
             {$project: {cMod10: {$mod: ["$counter", 10]}, number: 1, counter: 1}},
             {
@@ -77,13 +77,13 @@ shardedAggTest.awaitBalancerRound();
         ])
         .toArray();
     assert.eq(a1.length, 10, tojson(a1));
-    for (var i = 0; i < 10; ++i) {
+    for (let i = 0; i < 10; ++i) {
         assert.eq(a1[i].avgCounter, a1[i]._id, "agg sharded test avgCounter failed");
         assert.eq(a1[i].numberSet.length, 2, "agg sharded test numberSet length failed");
     }
 
     jsTestLog("an initial group starts the group in the shards, and combines them in mongos");
-    var a2 = database.ts1.aggregate([{$group: {_id: "all", total: {$sum: "$counter"}}}]).toArray();
+    let a2 = database.ts1.aggregate([{$group: {_id: "all", total: {$sum: "$counter"}}}]).toArray();
 
     jsTestLog("sum of an arithmetic progression S(n) = (n/2)(a(1) + a(n));");
     assert.eq(a2[0].total, (nItems / 2) * (1 + nItems), "agg sharded test counter sum failed");
@@ -94,14 +94,14 @@ shardedAggTest.awaitBalancerRound();
     ]);
 
     jsTestLog("an initial group starts the group in the shards, and combines them in mongos");
-    var a3 = database.ts1.aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}]).toArray();
+    let a3 = database.ts1.aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}]).toArray();
 
     for (let i = 0; i < strings.length; ++i) {
         assert.eq(a3[i].total, nItems / strings.length, "agg sharded test sum numbers failed");
     }
 
     jsTestLog("a match takes place in the shards; just returning the results from mongos");
-    var a4 = database.ts1
+    let a4 = database.ts1
         .aggregate([
             {
                 $match: {
@@ -119,7 +119,7 @@ shardedAggTest.awaitBalancerRound();
         .toArray();
     assert.eq(a4.length, 6, tojson(a4));
     for (let i = 0; i < 6; ++i) {
-        var c = a4[i].counter;
+        let c = a4[i].counter;
         printjson({c: c});
         assert(
             c == 55 || c == 1111 || c == 2222 || c == 33333 || c == 99999 || c == 55555,
@@ -137,7 +137,7 @@ function testSkipLimit(ops, expectedCount) {
 
     ops.push({$group: {_id: 1, count: {$sum: 1}}});
 
-    var out = database.ts1.aggregate(ops).toArray();
+    let out = database.ts1.aggregate(ops).toArray();
     assert.eq(out[0].count, expectedCount);
 }
 testSkipLimit([], nItems); // control
@@ -152,8 +152,8 @@ testSkipLimit([{$limit: 10}, {$skip: 5}, {$skip: 3}], 10 - 3 - 5);
 // test sort + limit (using random to pull from both shards)
 function testSortLimit(limit, direction) {
     jsTestLog("Testing $sort with $limit: " + limit + ", " + direction);
-    var from_cursor = database.ts1.find({}, {random: 1, _id: 0}).sort({random: direction}).limit(limit).toArray();
-    var from_agg = database.ts1
+    let from_cursor = database.ts1.find({}, {random: 1, _id: 0}).sort({random: direction}).limit(limit).toArray();
+    let from_agg = database.ts1
         .aggregate([{$project: {random: 1, _id: 0}}, {$sort: {random: direction}}, {$limit: limit}])
         .toArray();
     assert.eq(from_cursor, from_agg);
@@ -169,7 +169,7 @@ testSortLimit(100, -1);
     jsTestLog("Testing $avg and $stdDevPop in sharded $group");
     // $stdDevPop can vary slightly between runs if a migration occurs. This is why we use
     // assert.close below.
-    var res = database.ts1
+    let res = database.ts1
         .aggregate([
             {
                 $group: {
@@ -181,11 +181,11 @@ testSortLimit(100, -1);
         ])
         .toArray();
     // http://en.wikipedia.org/wiki/Arithmetic_progression#Sum
-    var avg = (1 + nItems) / 2;
+    let avg = (1 + nItems) / 2;
     assert.close(res[0].avg, avg, "", 10 /*decimal places*/);
 
     // http://en.wikipedia.org/wiki/Arithmetic_progression#Standard_deviation
-    var stdDev = Math.sqrt(((nItems - 1) * (nItems + 1)) / 12);
+    let stdDev = Math.sqrt(((nItems - 1) * (nItems + 1)) / 12);
     assert.close(res[0].stdDevPop, stdDev, "", 10 /*decimal places*/);
 })();
 
@@ -210,7 +210,7 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
     jsTestLog("Testing $out by copying source collection verbatim to output");
     assert.commandWorked(shardedAggTest.s0.adminCommand({shardcollection: "aggShard.literal", key: {"_id": 1}}));
 
-    var outCollection = database.ts1_out;
+    let outCollection = database.ts1_out;
     assert.eq(database.ts1.aggregate([{$out: outCollection.getName()}]).toArray(), "");
     assert.eq(database.ts1.find().itcount(), outCollection.find().itcount());
     assert.eq(database.ts1.find().sort({_id: 1}).toArray(), outCollection.find().sort({_id: 1}).toArray());
@@ -235,12 +235,12 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
 (function testMatch() {
     jsTestLog("Testing a $match stage on the shard key.");
 
-    var outCollection = "testShardKeyMatchOut";
+    let outCollection = "testShardKeyMatchOut";
 
     // Point query.
-    var targetId = Math.floor(nItems * Math.random());
-    var pipeline = [{$match: {_id: targetId}}, {$project: {_id: 1}}, {$sort: {_id: 1}}];
-    var expectedDocs = [{_id: targetId}];
+    let targetId = Math.floor(nItems * Math.random());
+    let pipeline = [{$match: {_id: targetId}}, {$project: {_id: 1}}, {$sort: {_id: 1}}];
+    let expectedDocs = [{_id: targetId}];
     // Normal pipeline.
     assert.eq(database.ts1.aggregate(pipeline).toArray(), expectedDocs);
     // With $out.
@@ -250,15 +250,15 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
     assert.eq(database[outCollection].find().toArray(), expectedDocs);
 
     // Range query.
-    var range = 500;
-    var targetStart = Math.floor((nItems - range) * Math.random());
+    let range = 500;
+    let targetStart = Math.floor((nItems - range) * Math.random());
     pipeline = [
         {$match: {_id: {$gte: targetStart, $lt: targetStart + range}}},
         {$project: {_id: 1}},
         {$sort: {_id: 1}},
     ];
     expectedDocs = [];
-    for (var i = targetStart; i < targetStart + range; i++) {
+    for (let i = targetStart; i < targetStart + range; i++) {
         expectedDocs.push({_id: i});
     }
     // Normal pipeline.

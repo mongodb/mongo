@@ -1,7 +1,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var s = new ShardingTest({name: "sort1", shards: 2, mongos: 2});
+let s = new ShardingTest({name: "sort1", shards: 2, mongos: 2});
 
 s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.data", key: {"sub.num": 1}});
@@ -10,8 +10,8 @@ var db = s.getDB("test");
 
 const N = 100;
 
-var forward = [];
-var backward = [];
+let forward = [];
+let backward = [];
 for (var i = 0; i < N; i++) {
     db.data.insert({_id: i, sub: {num: i, x: N - i}});
     forward.push(i);
@@ -30,10 +30,10 @@ s.adminCommand({
 
 assert.lte(3, findChunksUtil.findChunksByNs(s.config, "test.data").itcount(), "A1");
 
-var temp = findChunksUtil.findChunksByNs(s.config, "test.data").sort({min: 1}).toArray();
+let temp = findChunksUtil.findChunksByNs(s.config, "test.data").sort({min: 1}).toArray();
 temp.forEach(printjsononeline);
 
-var z = 0;
+let z = 0;
 for (; z < temp.length; z++) if (temp[z].min["sub.num"] <= 50 && temp[z].max["sub.num"] > 50) break;
 
 assert.eq(temp[z - 1].shard, temp[z + 1].shard, "A2");
@@ -48,12 +48,12 @@ for (i = 0; i < 100; i++) {
 db.data.find().sort({"sub.num": 1}).toArray();
 s.getPrimaryShard("test").getDB("test").data.find().sort({"sub.num": 1}).toArray();
 
-var a = Date.timeFunc(function () {
+let a = Date.timeFunc(function () {
     z = db.data.find().sort({"sub.num": 1}).toArray();
 }, 200);
 assert.eq(100, z.length, "C1");
 
-var b =
+let b =
     1.5 *
     Date.timeFunc(function () {
         z = s.getPrimaryShard("test").getDB("test").data.find().sort({"sub.num": 1}).toArray();
@@ -65,10 +65,10 @@ print("a: " + a + " b:" + b + " mongos slow down: " + Math.ceil(100 * ((a - b) /
 // -- secondary index sorting
 
 function getSorted(by, dir, proj) {
-    var s = {};
+    let s = {};
     s[by] = dir || 1;
     printjson(s);
-    var cur = db.data.find({}, proj || {}).sort(s);
+    let cur = db.data.find({}, proj || {}).sort(s);
     return terse(
         cur.map(function (z) {
             return z.sub.num;
@@ -77,8 +77,8 @@ function getSorted(by, dir, proj) {
 }
 
 function terse(a) {
-    var s = "";
-    for (var i = 0; i < a.length; i++) {
+    let s = "";
+    for (let i = 0; i < a.length; i++) {
         if (i > 0) s += ",";
         s += a[i];
     }

@@ -2,20 +2,20 @@
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-var res;
-var refresh = {refreshLogicalSessionCacheNow: 1};
-var startSession = {startSession: 1};
+let res;
+let refresh = {refreshLogicalSessionCacheNow: 1};
+let startSession = {startSession: 1};
 
 // Start up a standalone server.
-var conn = MongoRunner.runMongod();
-var admin = conn.getDB("admin");
-var config = conn.getDB("config");
+let conn = MongoRunner.runMongod();
+let admin = conn.getDB("admin");
+let config = conn.getDB("config");
 
 // Trigger an initial refresh, as a sanity check.
 res = admin.runCommand(refresh);
 assert.commandWorked(res, "failed to refresh");
 
-var sessions = [];
+let sessions = [];
 for (var i = 0; i < 20; i++) {
     res = admin.runCommand(startSession);
     assert.commandWorked(res, "unable to start session");
@@ -27,7 +27,7 @@ assert.commandWorked(res, "failed to refresh");
 
 assert.eq(config.system.sessions.count(), 20, "refresh should have written 20 session records");
 
-var endSessionsIds = [];
+let endSessionsIds = [];
 for (var i = 0; i < 10; i++) {
     endSessionsIds.push(sessions[i].id);
 }
@@ -67,7 +67,7 @@ assert.commandWorked(res, "failed to refresh");
 
 // verify that end on the session handle actually ends sessions
 {
-    var session = conn.startSession();
+    let session = conn.startSession();
 
     assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}), "do something to tickle the session");
     assert.commandWorked(session.getDatabase("admin").runCommand(refresh), "failed to refresh");

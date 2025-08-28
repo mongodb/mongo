@@ -17,11 +17,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Issue a query that will use the FETCH stage.
      */
     $config.states.query = function fetch(db, collName) {
-        var nMatches = 100;
+        let nMatches = 100;
 
-        var cursor = db[collName].find({c: {$lt: nMatches}}).batchSize(this.batchSize);
+        let cursor = db[collName].find({c: {$lt: nMatches}}).batchSize(this.batchSize);
 
-        var verifier = function fetchVerifier(doc, prevDoc) {
+        let verifier = function fetchVerifier(doc, prevDoc) {
             return doc.c < nMatches;
         };
 

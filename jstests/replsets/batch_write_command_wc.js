@@ -8,8 +8,8 @@ if (jsTest.options().storageEngine !== "inMemory") {
     quit();
 }
 
-var request;
-var result;
+let request;
+let result;
 
 // NOTE: ALL TESTS BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 
@@ -17,11 +17,11 @@ jsTest.log("Starting no journal/repl set tests...");
 
 // Start a single-node replica set with no journal
 // Allows testing immediate write concern failures and wc application failures
-var rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
-var mongod = rst.getPrimary();
-var coll = mongod.getCollection("test.batch_write_command_wc");
+let mongod = rst.getPrimary();
+let coll = mongod.getCollection("test.batch_write_command_wc");
 
 //
 // Basic insert, default WC

@@ -15,11 +15,11 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-var name = "catchup_takeover_one_high_priority";
-var replSet = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+let name = "catchup_takeover_one_high_priority";
+let replSet = new ReplSetTest({name: name, nodes: 3, useBridge: true});
 
-var nodenames = replSet.nodeList();
-var nodes = replSet.startSet();
+let nodenames = replSet.nodeList();
+let nodes = replSet.startSet();
 replSet.initiate(
     {
         "_id": name,
@@ -65,8 +65,8 @@ jsTestLog("node 0 is now primary");
 // This will ensure it can't do a priority takeover until it catches up.
 sleep(3000);
 
-var primary = replSet.getPrimary();
-var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.timeoutMS}};
+let primary = replSet.getPrimary();
+let writeConcern = {writeConcern: {w: 2, wtimeout: replSet.timeoutMS}};
 assert.commandWorked(primary.getDB(name).bar.insert({y: 100}, writeConcern));
 
 // Write something so that node 0 is ahead of node 1.

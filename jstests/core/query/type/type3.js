@@ -78,7 +78,7 @@ assert.eq(
 t.remove({});
 t.save({
     a: function () {
-        var a = 0;
+        let a = 0;
     },
 });
 assert.eq(1, t.find({a: {$type: 13}}).itcount());

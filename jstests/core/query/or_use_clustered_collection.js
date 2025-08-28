@@ -325,7 +325,7 @@ function validateQuerySort() {
     let expectedStageCount = {"MERGE_SORT": 0, "COLLSCAN": 1, "CLUSTERED_IXSCAN": 0, "OR": 0};
     const shardMergeStage = haveShardMergeStage(winningPlan, "SHARD_MERGE_SORT");
     const shards = "shards" in winningPlan;
-    for (var stage in expectedStageCount) {
+    for (let stage in expectedStageCount) {
         let planStages = getPlanStages(winningPlan, stage);
         assert(planStages, tojson(winningPlan));
         if (shardMergeStage || shards) {

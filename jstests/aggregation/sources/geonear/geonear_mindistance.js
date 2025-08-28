@@ -1,5 +1,5 @@
 // SERVER-14421 minDistance for $geoNear aggregation operator
-var coll = db.mindistance;
+let coll = db.mindistance;
 coll.drop();
 assert.commandWorked(
     coll.insert([
@@ -7,9 +7,9 @@ assert.commandWorked(
         {_id: 1, loc: {type: "Point", coordinates: [0, 0.01]}},
     ]),
 );
-var response = coll.createIndex({loc: "2dsphere"});
+let response = coll.createIndex({loc: "2dsphere"});
 assert.eq(response.ok, 1, "Could not create 2dsphere index");
-var results = coll.aggregate([
+let results = coll.aggregate([
     {
         $geoNear: {
             minDistance: 10000,

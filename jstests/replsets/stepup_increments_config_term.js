@@ -4,13 +4,13 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
-var name = "stepup_increments_config_term";
-var replTest = new ReplSetTest({name: name, nodes: 3, settings: {chainingAllowed: false}});
+let name = "stepup_increments_config_term";
+let replTest = new ReplSetTest({name: name, nodes: 3, settings: {chainingAllowed: false}});
 
 replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // The original config should have the valid "version" and "term" fields.
 const originalConfig = replTest.getReplSetConfigFromNode();

@@ -1,7 +1,7 @@
 // Test that missing values are not returned when the connectFrom value in a $graphLookup is null.
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
-var local = db[jsTestName()];
+let local = db[jsTestName()];
 
 local.drop();
 

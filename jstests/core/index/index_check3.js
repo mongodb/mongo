@@ -36,7 +36,7 @@ assert.gt(30, explain.executionStats.totalKeysExamined, "gt");
 
 t.drop();
 t.save({i: "a"});
-for (var i = 0; i < 10; ++i) {
+for (let i = 0; i < 10; ++i) {
     t.save({});
 }
 

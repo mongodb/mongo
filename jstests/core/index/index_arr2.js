@@ -29,7 +29,7 @@ function test(withIndex) {
         t.createIndex({"a.b.c": 1}, {name: "x"});
     }
 
-    var res = t.update(query, {"$set": {"a.0.b.c": 0}}, false, true);
+    let res = t.update(query, {"$set": {"a.0.b.c": 0}}, false, true);
     assert.eq(Z, res.nMatched, "num updated withIndex:" + withIndex);
 
     // now see how many were actually updated.

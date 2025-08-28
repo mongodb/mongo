@@ -4,7 +4,7 @@ import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 
-var test = new GeoNearRandomTest("weekly.query/geo_near_random2", conn.getDB("test"));
+let test = new GeoNearRandomTest("weekly.query/geo_near_random2", conn.getDB("test"));
 
 test.insertPts(50000);
 

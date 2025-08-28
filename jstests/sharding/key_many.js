@@ -2,7 +2,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Values have to be sorted - you must have exactly 6 values in each array
-var types = [
+let types = [
     {name: "string", values: ["allan", "bob", "eliot", "joe", "mark", "sara"], keyfield: "k"},
     {name: "double", values: [1.2, 3.5, 4.5, 4.6, 6.7, 9.9], keyfield: "a"},
     {
@@ -61,20 +61,20 @@ var types = [
     },
 ];
 
-var s = new ShardingTest({name: "key_many", shards: 2});
+let s = new ShardingTest({name: "key_many", shards: 2});
 
 assert.commandWorked(s.s0.adminCommand({enableSharding: "test", primaryShard: s.shard1.shardName}));
 
 var db = s.getDB("test");
-var primary = s.getPrimaryShard("test").getDB("test");
-var secondary = s.getOther(primary).getDB("test");
+let primary = s.getPrimaryShard("test").getDB("test");
+let secondary = s.getOther(primary).getDB("test");
 
-var curT;
+let curT;
 
 function makeObjectDotted(v) {
-    var o = {};
+    let o = {};
     if (curT.compound) {
-        var prefix = curT.keyfield + ".";
+        let prefix = curT.keyfield + ".";
         if (typeof v == "object") {
             for (var key in v) o[prefix + key] = v[key];
         } else {
@@ -87,10 +87,10 @@ function makeObjectDotted(v) {
 }
 
 function makeObject(v) {
-    var o = {};
-    var p = o;
+    let o = {};
+    let p = o;
 
-    var keys = curT.keyfield.split(".");
+    let keys = curT.keyfield.split(".");
     for (var i = 0; i < keys.length - 1; i++) {
         p[keys[i]] = {};
         p = p[keys[i]];
@@ -111,8 +111,8 @@ function makeInQuery() {
 }
 
 function getKey(o) {
-    var keys = curT.keyfield.split(".");
-    for (var i = 0; i < keys.length; i++) {
+    let keys = curT.keyfield.split(".");
+    for (let i = 0; i < keys.length; i++) {
         o = o[keys[i]];
     }
     return o;
@@ -120,22 +120,22 @@ function getKey(o) {
 
 Random.setRandomSeed();
 
-for (var i = 0; i < types.length; i++) {
+for (let i = 0; i < types.length; i++) {
     curT = types[i];
 
     print("\n\n#### Now Testing " + curT.name + " ####\n\n");
 
-    var shortName = "foo_" + curT.name;
-    var longName = "test." + shortName;
+    let shortName = "foo_" + curT.name;
+    let longName = "test." + shortName;
 
-    var c = db[shortName];
+    let c = db[shortName];
     s.adminCommand({shardcollection: longName, key: makeObjectDotted(1)});
 
     assert.eq(1, findChunksUtil.findChunksByNs(s.config, longName).count(), curT.name + " sanity check A");
 
-    var unsorted = Array.shuffle(Object.extend([], curT.values));
+    let unsorted = Array.shuffle(Object.extend([], curT.values));
     c.insert(makeObject(unsorted[0]));
-    for (var x = 1; x < unsorted.length; x++) {
+    for (let x = 1; x < unsorted.length; x++) {
         c.save(makeObject(unsorted[x]));
     }
 
@@ -195,12 +195,12 @@ for (var i = 0; i < types.length; i++) {
         curT.name + " $nor itcount()",
     );
 
-    var stats = c.stats();
+    let stats = c.stats();
     printjson(stats);
     assert.eq(6, stats.count, curT.name + " total count with stats()");
 
-    var count = 0;
-    for (var shard in stats.shards) {
+    let count = 0;
+    for (let shard in stats.shards) {
         count += stats.shards[shard].count;
     }
     assert.eq(6, count, curT.name + " total count with stats() sum");

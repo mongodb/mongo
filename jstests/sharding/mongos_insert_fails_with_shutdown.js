@@ -34,13 +34,13 @@ const hangBeforeCheckInterruptFailPoint = configureFailPoint(st.s, "hangBeforeCh
 
 const insertThread = new Thread(
     function insertDoc(host, dbName, collName) {
-        var lsid = UUID();
+        let lsid = UUID();
         const conn = new Mongo(host);
         const retrySession = conn.startSession({retryWrites: true});
         const retrySessionDB = retrySession.getDatabase(dbName);
 
         try {
-            var res = assert.commandWorked(
+            let res = assert.commandWorked(
                 retrySessionDB.runCommand({
                     insert: "mycoll",
                     documents: [{x: 0}, {x: 1}],

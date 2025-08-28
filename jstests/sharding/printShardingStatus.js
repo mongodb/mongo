@@ -6,12 +6,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const MONGOS_COUNT = 2;
 
-var st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT});
+let st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT});
 
-var standalone = MongoRunner.runMongod();
+let standalone = MongoRunner.runMongod();
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
 
 // Wait for the background thread from the mongos to insert their entries before beginning
 // the tests.
@@ -20,10 +20,10 @@ assert.soon(function () {
 });
 
 function grabStatusOutput(configdb, verbose) {
-    var res = print.captureAllOutput(function () {
+    let res = print.captureAllOutput(function () {
         return printShardingStatus(configdb, verbose);
     });
-    var output = res.output.join("\n");
+    let output = res.output.join("\n");
     jsTestLog(output);
     return output;
 }
@@ -46,13 +46,13 @@ function assertNotPresentInOutput(output, content, what) {
 // Basic tests
 ////////////////////////
 
-var dbName = "thisIsTheDatabase";
-var collName = "thisIsTheCollection";
-var shardKeyName = "thisIsTheShardKey";
-var nsName = dbName + "." + collName;
+let dbName = "thisIsTheDatabase";
+let collName = "thisIsTheCollection";
+let shardKeyName = "thisIsTheShardKey";
+let nsName = dbName + "." + collName;
 
 assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-var key = {};
+let key = {};
 key[shardKeyName] = 1;
 assert.commandWorked(admin.runCommand({shardCollection: nsName, key: key}));
 
@@ -78,26 +78,26 @@ function testBasicVerboseOnly(output) {
     assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "active mongos hostname");
 }
 
-var buildinfo = assert.commandWorked(mongos.adminCommand("buildinfo"));
-var serverStatus1 = assert.commandWorked(mongos.adminCommand("serverStatus"));
-var serverStatus2 = assert.commandWorked(st.s1.adminCommand("serverStatus"));
+let buildinfo = assert.commandWorked(mongos.adminCommand("buildinfo"));
+let serverStatus1 = assert.commandWorked(mongos.adminCommand("serverStatus"));
+let serverStatus2 = assert.commandWorked(st.s1.adminCommand("serverStatus"));
 var version = buildinfo.version;
 var s1Host = serverStatus1.host;
 var s2Host = serverStatus2.host;
 
 // Normal, active mongoses
-var outputNormal = grabStatusOutput(st.config, false);
+let outputNormal = grabStatusOutput(st.config, false);
 testBasic(outputNormal);
 testBasicNormalOnly(outputNormal);
 
-var outputVerbose = grabStatusOutput(st.config, true);
+let outputVerbose = grabStatusOutput(st.config, true);
 testBasic(outputVerbose);
 testBasicVerboseOnly(outputVerbose);
 
 // Take a copy of the config db, in order to test the harder-to-setup cases below.
 // Copy into a standalone to also test running printShardingStatus() against a config dump.
-var config = mongos.getDB("config");
-var configCopy = standalone.getDB("configCopy");
+let config = mongos.getDB("config");
+let configCopy = standalone.getDB("configCopy");
 config.getCollectionInfos().forEach(function (c) {
     // It's illegal to copy the system collections.
     if (
@@ -128,7 +128,7 @@ config.getCollectionInfos().forEach(function (c) {
         .getCollection(c.name)
         .getIndexes()
         .forEach(function (i) {
-            var key = i.key;
+            let key = i.key;
             delete i.key;
             delete i.ns;
             delete i.v;
@@ -139,14 +139,14 @@ config.getCollectionInfos().forEach(function (c) {
 // Inactive mongoses
 // Make the first ping be older than now by 1 second more than the threshold
 // Make the second ping be older still by the same amount again
-var pingAdjustMs = 60000 + 1000;
-var then = new Date();
+let pingAdjustMs = 60000 + 1000;
+let then = new Date();
 then.setTime(then.getTime() - pingAdjustMs);
 configCopy.mongos.update({_id: s1Host}, {$set: {ping: then}});
 then.setTime(then.getTime() - pingAdjustMs);
 configCopy.mongos.update({_id: s2Host}, {$set: {ping: then}});
 
-var output = grabStatusOutput(configCopy, false);
+let output = grabStatusOutput(configCopy, false);
 assertPresentInOutput(output, "most recently active mongoses:", "section header");
 assertPresentInOutput(output, tojson(version) + " : 1\n", "recent mongos version");
 
@@ -182,24 +182,24 @@ assert(mongos.getDB(dbName).dropDatabase());
 // Extended tests
 ////////////////////////
 
-var testCollDetailsNum = 0;
+let testCollDetailsNum = 0;
 function testCollDetails(args) {
     if (args === undefined || typeof args != "object") {
         args = {};
     }
 
-    var getCollName = function (x) {
+    let getCollName = function (x) {
         return "test.test" + x.zeroPad(4);
     };
-    var collName = getCollName(testCollDetailsNum);
+    let collName = getCollName(testCollDetailsNum);
 
-    var cmdObj = {shardCollection: collName, key: {_id: 1}};
+    let cmdObj = {shardCollection: collName, key: {_id: 1}};
     if (args.unique) {
         cmdObj.unique = true;
     }
     assert.commandWorked(admin.runCommand(cmdObj));
 
-    var originalValues = {};
+    let originalValues = {};
     if (args.hasOwnProperty("unique")) {
         originalValues["unique"] = mongos.getDB("config").collections.findOne({_id: collName}).unique;
         assert.commandWorked(
@@ -213,7 +213,7 @@ function testCollDetails(args) {
         );
     }
 
-    var output = grabStatusOutput(st.config);
+    let output = grabStatusOutput(st.config);
 
     assertPresentInOutput(output, collName, "collection");
 
@@ -221,7 +221,7 @@ function testCollDetails(args) {
     // might also be present.  This might taint the results when we go searching through
     // the output.
     // This also means that earlier collNames can't be a prefix of later collNames.
-    for (var i = 0; i < testCollDetailsNum; i++) {
+    for (let i = 0; i < testCollDetailsNum; i++) {
         assertNotPresentInOutput(output, getCollName(i), "previous collection");
     }
 

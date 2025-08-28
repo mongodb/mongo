@@ -10,13 +10,13 @@ import {getLatestOp, reconfig} from "jstests/replsets/rslib.js";
 // Skip db hash check since secondary has slave delay.
 TestData.skipCheckDBHashes = true;
 
-var ns = "test.coll";
+let ns = "test.coll";
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     nodes: 2,
 });
 
-var conf = rst.getReplSetConfig();
+let conf = rst.getReplSetConfig();
 conf.members[1].votes = 0;
 conf.members[1].priority = 0;
 conf.members[1].hidden = true;
@@ -25,7 +25,7 @@ conf.members[1].secondaryDelaySecs = 0; // Set later.
 rst.startSet();
 rst.initiate(conf);
 
-var primary = rst.getPrimary(); // Waits for PRIMARY state.
+let primary = rst.getPrimary(); // Waits for PRIMARY state.
 
 // Push some ops through before setting slave delay.
 assert.commandWorked(primary.getCollection(ns).insert([{}, {}, {}], {writeConcern: {w: 2}}));
@@ -42,7 +42,7 @@ assert.soon(
 
 // The secondary apply loop only checks for the delay field changes once per second.
 sleep(2000);
-var secondary = rst.getSecondary();
+let secondary = rst.getSecondary();
 const lastOp = getLatestOp(secondary);
 
 assert.commandWorked(primary.getCollection(ns).insert([{}, {}, {}]));

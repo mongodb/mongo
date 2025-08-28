@@ -81,20 +81,20 @@ export var replShouldFail = function (name, opt1, opt2) {
  * the connections opened between mongos/shards and between the shards themselves.
  */
 export function testShardedLookup(shardingTest) {
-    var st = shardingTest;
+    let st = shardingTest;
     assert(st.adminCommand({enableSharding: "lookupTest"}), "error enabling sharding for this configuration");
     assert(
         st.adminCommand({shardCollection: "lookupTest.foo", key: {_id: "hashed"}}),
         "error sharding collection for this configuration",
     );
 
-    var lookupdb = st.getDB("lookupTest");
+    let lookupdb = st.getDB("lookupTest");
 
     // insert a few docs to ensure there are documents on multiple shards.
-    var fooBulk = lookupdb.foo.initializeUnorderedBulkOp();
-    var barBulk = lookupdb.bar.initializeUnorderedBulkOp();
-    var lookupShouldReturn = [];
-    for (var i = 0; i < 64; i++) {
+    let fooBulk = lookupdb.foo.initializeUnorderedBulkOp();
+    let barBulk = lookupdb.bar.initializeUnorderedBulkOp();
+    let lookupShouldReturn = [];
+    for (let i = 0; i < 64; i++) {
         fooBulk.insert({_id: i});
         barBulk.insert({_id: i});
         lookupShouldReturn.push({_id: i, bar_docs: [{_id: i}]});
@@ -102,7 +102,7 @@ export function testShardedLookup(shardingTest) {
     assert.commandWorked(fooBulk.execute());
     assert.commandWorked(barBulk.execute());
 
-    var docs = lookupdb.foo
+    let docs = lookupdb.foo
         .aggregate([
             {$sort: {_id: 1}},
             {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}},
@@ -159,21 +159,21 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         testShardedLookup(st);
 
         // Test mongos talking to config servers
-        var r = st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
+        let r = st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
         r = st.adminCommand({movePrimary: "test", to: st.shard1.shardName});
         assert.eq(r, true, "error movePrimary failed for this configuration");
 
-        var db1 = st.getDB("test");
+        let db1 = st.getDB("test");
         r = st.adminCommand({shardCollection: "test.col", key: {_id: 1}});
         assert.eq(r, true, "error sharding collection for this configuration");
 
         // Test mongos talking to shards
-        var bigstr = "#".repeat(1024 * 1024);
+        let bigstr = "#".repeat(1024 * 1024);
 
-        var bulk = db1.col.initializeUnorderedBulkOp();
-        for (var i = 0; i < 128; i++) {
+        let bulk = db1.col.initializeUnorderedBulkOp();
+        for (let i = 0; i < 128; i++) {
             bulk.insert({_id: i, string: bigstr});
         }
         assert.commandWorked(bulk.execute());

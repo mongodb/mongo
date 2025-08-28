@@ -38,7 +38,7 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
         const numConfigs = this.configRS.nodes.length;
 
         for (var i = 0; i < numConfigs; i++) {
-            var configSvr = this.configRS.nodes[i];
+            let configSvr = this.configRS.nodes[i];
 
             MongoRunner.stopMongod(configSvr);
             // Must copy the nodeOptions since they are modified by callee.
@@ -73,10 +73,10 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
 
     if (upgradeOptions.upgradeMongos) {
         // Upgrade all mongos hosts if specified
-        var numMongoses = this._mongos.length;
+        let numMongoses = this._mongos.length;
 
         for (var i = 0; i < numMongoses; i++) {
-            var mongos = this._mongos[i];
+            let mongos = this._mongos[i];
             MongoRunner.stopMongos(mongos);
 
             // Must copy the nodeOptions since they are modified by callee.
@@ -111,10 +111,10 @@ ShardingTest.prototype.downgradeCluster = function (binVersion, downgradeOptions
 
     if (downgradeOptions.downgradeMongos) {
         // Downgrade all mongos hosts if specified
-        var numMongoses = this._mongos.length;
+        let numMongoses = this._mongos.length;
 
         for (var i = 0; i < numMongoses; i++) {
-            var mongos = this._mongos[i];
+            let mongos = this._mongos[i];
             MongoRunner.stopMongos(mongos);
 
             // Must copy the nodeOptions since they are modified by callee.
@@ -157,7 +157,7 @@ ShardingTest.prototype.downgradeCluster = function (binVersion, downgradeOptions
         const numConfigs = this.configRS.nodes.length;
 
         for (var i = 0; i < numConfigs; i++) {
-            var configSvr = this.configRS.nodes[i];
+            let configSvr = this.configRS.nodes[i];
 
             // Must copy the nodeOptions since they are modified by callee.
             const configSvrOptions = copyJSON(nodeOptions);
@@ -193,10 +193,10 @@ ShardingTest.prototype.waitUntilStable = function () {
 };
 
 ShardingTest.prototype.restartMongoses = function () {
-    var numMongoses = this._mongos.length;
+    let numMongoses = this._mongos.length;
 
-    for (var i = 0; i < numMongoses; i++) {
-        var mongos = this._mongos[i];
+    for (let i = 0; i < numMongoses; i++) {
+        let mongos = this._mongos[i];
 
         MongoRunner.stopMongos(mongos);
         mongos = MongoRunner.runMongos({restart: mongos});
@@ -210,10 +210,10 @@ ShardingTest.prototype.restartMongoses = function () {
 };
 
 ShardingTest.prototype.getMongosAtVersion = function (binVersion) {
-    var mongoses = this._mongos;
-    for (var i = 0; i < mongoses.length; i++) {
+    let mongoses = this._mongos;
+    for (let i = 0; i < mongoses.length; i++) {
         try {
-            var version = mongoses[i].getDB("admin").runCommand("serverStatus").version;
+            let version = mongoses[i].getDB("admin").runCommand("serverStatus").version;
             if (version.indexOf(binVersion) == 0) {
                 return mongoses[i];
             }

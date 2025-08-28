@@ -47,9 +47,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // Diagram for partitionSize = 5, iterations = 1 ==> innerChunkSize = 5:
         // [----------] ==> [-|----]
         // 0          5     0 1    5
-        var innerChunkSize = Math.floor(this.partitionSize / this.iterations);
-        for (var i = 0; i < this.iterations; ++i) {
-            var splitPoint = (i + 1) * innerChunkSize + partition.lower;
+        let innerChunkSize = Math.floor(this.partitionSize / this.iterations);
+        for (let i = 0; i < this.iterations; ++i) {
+            let splitPoint = (i + 1) * innerChunkSize + partition.lower;
             assert.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, splitPoint));
         }
     };
@@ -63,9 +63,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         this.partition = this.makePartition(db[collName].getFullName(), this.tid, this.partitionSize);
         Object.freeze(this.partition);
 
-        var config = ChunkHelper.getPrimary(connCache.config);
+        let config = ChunkHelper.getPrimary(connCache.config);
 
-        var numChunksInPartition = ChunkHelper.getNumChunks(
+        let numChunksInPartition = ChunkHelper.getNumChunks(
             config,
             db[collName].getFullName(),
             this.partition.chunkLower,
@@ -85,11 +85,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     // Merge a random chunk in this thread's partition with its upper neighbor.
     $config.states.mergeChunks = function mergeChunks(db, collName, connCache) {
-        var ns = db[collName].getFullName();
-        var config = ChunkHelper.getPrimary(connCache.config);
+        let ns = db[collName].getFullName();
+        let config = ChunkHelper.getPrimary(connCache.config);
 
-        var chunk1, chunk2;
-        var configDB = config.getDB("config");
+        let chunk1, chunk2;
+        let configDB = config.getDB("config");
 
         // Skip this iteration if our data partition contains less than 2 chunks.
         if (
@@ -115,7 +115,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // operation. This will be used to verify that the same number of documents in that
         // range are still found after the mergeChunks.
         // Choose the mongos randomly to distribute load.
-        var numDocsBefore = ChunkHelper.getNumDocs(
+        let numDocsBefore = ChunkHelper.getNumDocs(
             ChunkHelper.getRandomMongos(connCache.mongos),
             ns,
             chunk1.min._id,
@@ -129,15 +129,15 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         }
 
         // Verify that no docs were lost in the moveChunk.
-        var shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk1.shard]);
-        var shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
-        var msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
+        let shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk1.shard]);
+        let shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
+        let msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
         assert.eq(shardNumDocsAfter, numDocsBefore, msg);
 
         // Save the number of chunks before the mergeChunks operation. This will be used
         // to verify that the number of chunks after a successful mergeChunks decreases
         // by one, or after a failed mergeChunks stays the same.
-        var numChunksBefore = ChunkHelper.getNumChunks(
+        let numChunksBefore = ChunkHelper.getNumChunks(
             config,
             ns,
             this.partition.chunkLower,
@@ -146,9 +146,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Use chunk_helper.js's mergeChunks wrapper to tolerate acceptable failures
         // and to use a limited number of retries with exponential backoff.
-        var bounds = [{_id: chunk1.min._id}, {_id: chunk2.max._id}];
-        var mergeChunksRes = ChunkHelper.mergeChunks(db, collName, bounds);
-        var chunks = ChunkHelper.getChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+        let bounds = [{_id: chunk1.min._id}, {_id: chunk2.max._id}];
+        let mergeChunksRes = ChunkHelper.mergeChunks(db, collName, bounds);
+        let chunks = ChunkHelper.getChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
         var msgBase = tojson({
             mergeChunksResult: mergeChunksRes,
             chunksInPartition: chunks,
@@ -165,15 +165,15 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Verify that all config servers have the correct after-state.
         // (see comments below for specifics).
-        for (var conn of connCache.config) {
-            var res = conn.adminCommand({hello: 1});
+        for (let conn of connCache.config) {
+            let res = conn.adminCommand({hello: 1});
             assert.commandWorked(res);
             if (res.isWritablePrimary) {
                 // If the mergeChunks operation succeeded, verify that there is now one chunk
                 // between the original chunks' lower and upper bounds. If the operation failed,
                 // verify that there are still two chunks between the original chunks' lower and
                 // upper bounds.
-                var numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(
+                let numChunksBetweenOldChunksBounds = ChunkHelper.getNumChunks(
                     conn,
                     ns,
                     chunk1.min._id,
@@ -196,7 +196,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 // If the mergeChunks operation succeeded, verify that the total number
                 // of chunks in our partition has decreased by 1. If it failed, verify
                 // that it has stayed the same.
-                var numChunksAfter = ChunkHelper.getNumChunks(
+                let numChunksAfter = ChunkHelper.getNumChunks(
                     config,
                     ns,
                     this.partition.chunkLower,
@@ -220,11 +220,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Verify that all mongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
-        for (var mongos of connCache.mongos) {
+        for (let mongos of connCache.mongos) {
             // Regardless of if the mergeChunks operation succeeded or failed, verify that each
             // mongos sees as many documents in the original chunks' range after the move as there
             // were before.
-            var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk1.min._id, chunk2.max._id);
+            let numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk1.min._id, chunk2.max._id);
             msg =
                 "Mongos sees a different amount of documents between chunk bounds after " + "mergeChunks.\n" + msgBase;
             assert.eq(numDocsAfter, numDocsBefore, msg);
@@ -232,7 +232,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // Regardless of if the mergeChunks operation succeeded or failed, verify that each
             // mongos sees all data in the original chunks' range only on the shard the original
             // chunk was on.
-            var shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk1.min._id, chunk2.max._id);
+            let shardsForChunk = ChunkHelper.getShardsForRange(mongos, ns, chunk1.min._id, chunk2.max._id);
             msg =
                 "Mongos does not see exactly 1 shard for chunk after mergeChunks.\n" +
                 msgBase +

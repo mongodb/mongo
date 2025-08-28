@@ -44,15 +44,15 @@ function testGeoNearStageOutput({geoNearSpec, limit, batchSize}) {
 }
 
 // We use this to generate points. Using a single global to avoid reseting RNG in each pass.
-var pointMaker = new GeoNearRandomTest(coll);
+let pointMaker = new GeoNearRandomTest(coll);
 
 function test(db, indexType) {
     db[coll].drop();
 
     // insert points
-    var numPts = 5000;
-    var bulk = db[coll].initializeUnorderedBulkOp();
-    for (var i = 0; i < numPts; i++) {
+    let numPts = 5000;
+    let bulk = db[coll].initializeUnorderedBulkOp();
+    for (let i = 0; i < numPts; i++) {
         bulk.insert({rand: Math.random(), loc: pointMaker.mkPt()});
     }
     assert.commandWorked(bulk.execute());

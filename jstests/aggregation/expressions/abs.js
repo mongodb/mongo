@@ -4,7 +4,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.abs_expr;
+let coll = db.abs_expr;
 coll.drop();
 
 // Valid types (numeric and null):
@@ -30,7 +30,7 @@ assert.commandWorked(coll.insert({_id: 16, a: undefined}));
 assert.commandWorked(coll.insert({_id: 17, a: NaN}));
 assert.commandWorked(coll.insert({_id: 18}));
 
-var results = coll.aggregate([{$project: {a: {$abs: "$a"}}}, {$sort: {_id: 1}}]).toArray();
+let results = coll.aggregate([{$project: {a: {$abs: "$a"}}}, {$sort: {_id: 1}}]).toArray();
 assert.eq(results, [
     {_id: 0, a: 5},
     {_id: 1, a: 5},

@@ -11,22 +11,22 @@
 let port = "27017";
 
 if (db.getMongo().host.indexOf(":") >= 0) {
-    var idx = db.getMongo().host.indexOf(":");
+    let idx = db.getMongo().host.indexOf(":");
     port = db.getMongo().host.substring(idx + 1);
 }
 
-var goodStrings = ["localhost:" + port + "/test", "127.0.0.1:" + port + "/test", "127.0.0.1:" + port + "/"];
+let goodStrings = ["localhost:" + port + "/test", "127.0.0.1:" + port + "/test", "127.0.0.1:" + port + "/"];
 
-var missingConnString = /^Missing connection string$/;
-var incorrectType = /^Incorrect type/;
-var emptyConnString = /^Empty connection string$/;
-var badHost = /^Failed to parse mongodb/;
-var emptyHost = /^Empty host component/;
-var noPort = /^No digits/;
-var invalidPort = /^Port number \d+ out of range/;
-var multipleColon = /^More than one ':' detected./;
-var noReplSet = /^connect failed to replica set/;
-var badStrings = [
+let missingConnString = /^Missing connection string$/;
+let incorrectType = /^Incorrect type/;
+let emptyConnString = /^Empty connection string$/;
+let badHost = /^Failed to parse mongodb/;
+let emptyHost = /^Empty host component/;
+let noPort = /^No digits/;
+let invalidPort = /^Port number \d+ out of range/;
+let multipleColon = /^More than one ':' detected./;
+let noReplSet = /^connect failed to replica set/;
+let badStrings = [
     {s: undefined, r: missingConnString},
     {s: 7, r: incorrectType},
     {s: null, r: incorrectType},
@@ -52,11 +52,11 @@ var badStrings = [
 function testGoodAsURI(i, uri) {
     uri = "mongodb://" + uri;
     print("\nTesting good uri " + i + ' ("' + uri + '") ...');
-    var gotException = false;
-    var exception;
+    let gotException = false;
+    let exception;
     try {
-        var m_uri = MongoURI(uri);
-        var connectDB = connect(uri);
+        let m_uri = MongoURI(uri);
+        let connectDB = connect(uri);
         connectDB = null;
     } catch (e) {
         gotException = true;
@@ -66,19 +66,19 @@ function testGoodAsURI(i, uri) {
         print("Good uri " + i + ' ("' + uri + '") correctly validated');
         return;
     }
-    var message =
+    let message =
         "FAILED to correctly validate goodString " + i + ' ("' + uri + '"):  exception was "' + tojson(exception) + '"';
     doassert(message);
 }
 
 function testBad(i, connectionString, errorRegex, errorCode) {
     print("\nTesting bad connection string " + i + ' ("' + connectionString + '") ...');
-    var gotException = false;
-    var gotCorrectErrorText = false;
-    var gotCorrectErrorCode = false;
-    var exception;
+    let gotException = false;
+    let gotCorrectErrorText = false;
+    let gotCorrectErrorCode = false;
+    let exception;
     try {
-        var connectDB = connect(connectionString);
+        let connectDB = connect(connectionString);
         connectDB = null;
     } catch (e) {
         gotException = true;
@@ -94,7 +94,7 @@ function testBad(i, connectionString, errorRegex, errorCode) {
         print("Bad connection string " + i + ' ("' + connectionString + '") correctly rejected:\n' + tojson(exception));
         return;
     }
-    var message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
+    let message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
     if (gotException) {
         message += 'exception was "' + tojson(exception) + '", it should have matched "' + errorRegex.toString() + '"';
     } else {
@@ -103,7 +103,7 @@ function testBad(i, connectionString, errorRegex, errorCode) {
     doassert(message);
 }
 
-var i;
+let i;
 jsTest.log("TESTING " + goodStrings.length + " good connection strings");
 for (i = 0; i < goodStrings.length; ++i) {
     testGoodAsURI(i, goodStrings[i]);

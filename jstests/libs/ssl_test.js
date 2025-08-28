@@ -16,8 +16,8 @@
  * "jstests/libs/ca.pem").
  */
 export function TLSTest(serverOpts, clientOpts) {
-    var canonicalServerOpts = function (userProvidedOpts) {
-        var canonical = Object.extend({}, userProvidedOpts || {});
+    let canonicalServerOpts = function (userProvidedOpts) {
+        let canonical = Object.extend({}, userProvidedOpts || {});
 
         if (!canonical.hasOwnProperty("tlsMode")) {
             canonical.tlsMode = "preferTLS";
@@ -66,12 +66,12 @@ TLSTest.prototype.noTLSClientOptions = {
  * was successfully established.
  */
 TLSTest.prototype.connectWorked = function () {
-    var connectTimeoutMillis = 3 * 60 * 1000;
+    let connectTimeoutMillis = 3 * 60 * 1000;
 
-    var serverArgv = MongoRunner.arrOptions("mongod", this.serverOpts);
-    var clientArgv = MongoRunner.arrOptions("mongo", this.clientOpts);
+    let serverArgv = MongoRunner.arrOptions("mongod", this.serverOpts);
+    let clientArgv = MongoRunner.arrOptions("mongo", this.clientOpts);
 
-    var serverPID = _startMongoProgram.apply(null, serverArgv);
+    let serverPID = _startMongoProgram.apply(null, serverArgv);
     try {
         // Don't run the hang analyzer because we don't expect connectWorked() to always succeed.
         assert.soon(

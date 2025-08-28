@@ -5,10 +5,10 @@
 // ]
 
 // Tests that explicitly invoke the find and getMore commands.
-var cmdRes;
-var cursorId;
-var collName = "find_getmore_cmd";
-var coll = db[collName];
+let cmdRes;
+let cursorId;
+let collName = "find_getmore_cmd";
+let coll = db[collName];
 
 const findCommandBatchSize = assert.commandWorked(
     db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
@@ -18,7 +18,7 @@ const findCommandBatchSize = assert.commandWorked(
 const kLimit = Math.min(10, Math.max(1, findCommandBatchSize - 1));
 
 coll.drop();
-for (var i = 0; i < findCommandBatchSize + 50; i++) {
+for (let i = 0; i < findCommandBatchSize + 50; i++) {
     assert.commandWorked(coll.insert({a: i}));
 }
 

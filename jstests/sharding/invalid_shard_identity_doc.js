@@ -16,9 +16,9 @@ const rs = new ReplSetTest({name: "new-shard-rs", nodes: 1, nodeOptions: {shards
 rs.startSet();
 rs.initiate();
 
-var configConnStr = st.configRS.getURL();
+let configConnStr = st.configRS.getURL();
 
-var shardIdentityDoc = {
+let shardIdentityDoc = {
     _id: "shardIdentity",
     configsvrConnectionString: configConnStr,
     shardName: "config",
@@ -31,7 +31,7 @@ const updateErrorMsgPrefix = "Plan executor error during update :: caused by :: 
 // default.
 //
 // Insert with shard name "config" on shard server should fail
-var res = assert.commandFailedWithCode(
+let res = assert.commandFailedWithCode(
     rs
         .getPrimary()
         .getDB("admin")

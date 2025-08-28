@@ -594,7 +594,7 @@ export class BulkWriteMetricChecker {
     _findNsIndicesInRequest(bulkWriteOps) {
         const nsIndicesInRequest = new Set();
         for (const op of bulkWriteOps) {
-            var idx = op.insert;
+            let idx = op.insert;
             if (op.update != undefined) {
                 idx = op.update;
             } else if (op.delete != undefined) {

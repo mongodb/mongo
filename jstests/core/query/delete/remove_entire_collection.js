@@ -10,7 +10,7 @@ t.drop();
 const N = 1000;
 
 function fill() {
-    for (var i = 0; i < N; i++) {
+    for (let i = 0; i < N; i++) {
         assert.commandWorked(t.save({x: i}));
     }
 }

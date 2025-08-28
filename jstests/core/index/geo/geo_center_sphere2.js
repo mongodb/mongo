@@ -32,50 +32,50 @@ function pointIsOK(startPoint, radius) {
     );
 }
 
-var numTests = 30;
+let numTests = 30;
 
-for (var test = 0; test < numTests; test++) {
+for (let test = 0; test < numTests; test++) {
     Random.srand(1337 + test);
 
-    var radius = 5000 * Random.rand(); // km
+    let radius = 5000 * Random.rand(); // km
     radius = radius / 6378.1; // radians; earth radius from geoconstants.h
-    var numDocs = Math.floor(400 * Random.rand());
+    let numDocs = Math.floor(400 * Random.rand());
     // TODO: Wrapping uses the error value to figure out what would overlap...
-    var bits = Math.floor(5 + Random.rand() * 28);
-    var maxPointsPerDoc = 50;
+    let bits = Math.floor(5 + Random.rand() * 28);
+    let maxPointsPerDoc = 50;
 
-    var t = db.sphere;
+    let t = db.sphere;
 
-    var randomPoint = function () {
+    let randomPoint = function () {
         return [Random.rand() * 360 - 180, Random.rand() * 180 - 90];
     };
 
     // Get a start point that doesn't require wrapping
     // TODO: Are we a bit too aggressive with wrapping issues?
     var startPoint;
-    var ex = null;
+    let ex = null;
     do {
         t.drop();
         startPoint = randomPoint();
         t.createIndex({loc: "2d"}, {bits: bits});
     } while (!pointIsOK(startPoint, radius));
 
-    var pointsIn = 0;
-    var pointsOut = 0;
-    var docsIn = 0;
-    var docsOut = 0;
-    var totalPoints = 0;
+    let pointsIn = 0;
+    let pointsOut = 0;
+    let docsIn = 0;
+    let docsOut = 0;
+    let totalPoints = 0;
 
-    var bulk = t.initializeUnorderedBulkOp();
+    let bulk = t.initializeUnorderedBulkOp();
     for (var i = 0; i < numDocs; i++) {
-        var numPoints = Math.floor(Random.rand() * maxPointsPerDoc + 1);
-        var docIn = false;
-        var multiPoint = [];
+        let numPoints = Math.floor(Random.rand() * maxPointsPerDoc + 1);
+        let docIn = false;
+        let multiPoint = [];
 
         totalPoints += numPoints;
 
-        for (var p = 0; p < numPoints; p++) {
-            var point = randomPoint();
+        for (let p = 0; p < numPoints; p++) {
+            let point = randomPoint();
             multiPoint.push(point);
 
             if (Geo.sphereDistance(startPoint, point) <= radius) {
@@ -111,14 +111,14 @@ for (var test = 0; test < numTests; test++) {
     assert.eq(docsIn, t.find({loc: {$within: {$centerSphere: [startPoint, radius]}}}).count());
 
     // $nearSphere
-    var cursor = t.find({loc: {$nearSphere: startPoint, $maxDistance: radius}});
-    var results = cursor.limit(2 * pointsIn).toArray();
+    let cursor = t.find({loc: {$nearSphere: startPoint, $maxDistance: radius}});
+    let results = cursor.limit(2 * pointsIn).toArray();
 
     assert.eq(docsIn, results.length);
 
     var distance = 0;
     for (var i = 0; i < results.length; i++) {
-        var minNewDistance = radius + 1;
+        let minNewDistance = radius + 1;
         for (var j = 0; j < results[i].loc.length; j++) {
             var newDistance = Geo.sphereDistance(startPoint, results[i].loc[j]);
             if (newDistance < minNewDistance && newDistance >= distance) {
@@ -149,9 +149,9 @@ for (var test = 0; test < numTests; test++) {
 
     var distance = 0;
     for (var i = 0; i < results.length; i++) {
-        var retDistance = results[i].dis;
+        let retDistance = results[i].dis;
 
-        var distInObj = false;
+        let distInObj = false;
         for (var j = 0; j < results[i].loc.length && distInObj == false; j++) {
             var newDistance = Geo.sphereDistance(startPoint, results[i].loc[j]);
             distInObj = newDistance >= retDistance - 0.0001 && newDistance <= retDistance + 0.0001;

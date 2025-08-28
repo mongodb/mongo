@@ -20,15 +20,15 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({}); // For startParallelOps.
+let staticMongod = MongoRunner.runMongod({}); // For startParallelOps.
 
-var st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
+let st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
 st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
 st.adminCommand({shardCollection: "test.user", key: {x: 1}});
 assert.commandWorked(st.s.adminCommand({split: "test.user", middle: {x: 0}}));
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
-var joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, "test.user", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, "test.user", st.shard1.shardName);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -53,7 +53,7 @@ const insertCmd = {
     txnNumber: NumberLong(34),
 };
 
-var testDB = st.getDB("test");
+let testDB = st.getDB("test");
 const insertResult = assert.commandWorked(testDB.runCommand(insertCmd));
 
 const findAndModCmd = {
@@ -110,7 +110,7 @@ joinMoveChunk();
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Retry phase
 
-var insertRetryResult = assert.commandWorked(testDB.runCommand(insertCmd));
+let insertRetryResult = assert.commandWorked(testDB.runCommand(insertCmd));
 
 assert.eq(insertResult.ok, insertRetryResult.ok);
 assert.eq(insertResult.n, insertRetryResult.n);
@@ -120,7 +120,7 @@ assert.eq(insertResult.writeConcernErrors, insertRetryResult.writeConcernErrors)
 assert.eq(1, testDB.user.find({x: 10}).itcount());
 assert.eq(1, testDB.user.find({x: 30}).itcount());
 
-var findAndModifyRetryResult = assert.commandWorked(testDB.runCommand(findAndModCmd));
+let findAndModifyRetryResult = assert.commandWorked(testDB.runCommand(findAndModCmd));
 
 assert.eq(findAndModifyResult.ok, findAndModifyRetryResult.ok);
 assert.eq(findAndModifyResult.value, findAndModifyRetryResult.value);

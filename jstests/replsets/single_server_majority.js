@@ -1,7 +1,7 @@
 // This test checks that w:"majority" works correctly on a lone mongod
 
 // set up a mongod and connect
-var mongod = MongoRunner.runMongod({});
+let mongod = MongoRunner.runMongod({});
 
 // get db and collection, then perform a trivial insert
 const db = mongod.getDB("test");

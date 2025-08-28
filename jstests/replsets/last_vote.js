@@ -15,8 +15,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp, reconfig} from "jstests/replsets/rslib.js";
 
-var name = "last_vote";
-var rst = new ReplSetTest({
+let name = "last_vote";
+let rst = new ReplSetTest({
     name: name,
     nodes: 2,
 });
@@ -32,28 +32,28 @@ function getLastVoteDoc(conn) {
 }
 
 function setLastVoteDoc(conn, term, candidate) {
-    var newLastVote = {term: term, candidateIndex: rst.getNodeId(candidate)};
+    let newLastVote = {term: term, candidateIndex: rst.getNodeId(candidate)};
     return assert.commandWorked(conn.getCollection(lastVoteNS).update({}, newLastVote));
 }
 
 function assertNodeHasLastVote(node, term, candidate) {
-    var lastVoteDoc = getLastVoteDoc(node);
+    let lastVoteDoc = getLastVoteDoc(node);
     assert.eq(lastVoteDoc.term, term, node.host + " had wrong last vote term.");
     assert.eq(lastVoteDoc.candidateIndex, rst.getNodeId(candidate), node.host + " had wrong last vote candidate.");
 }
 
 function assertCurrentTerm(node, term) {
-    var stat = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+    let stat = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
     assert.eq(stat.term, term, "Term changed when it should not have");
 }
 
 jsTestLog("Test that last vote is set on successive elections");
 
 // Run a few successive elections, alternating who becomes primary.
-var numElections = 3;
-for (var i = 0; i < numElections; i++) {
+let numElections = 3;
+for (let i = 0; i < numElections; i++) {
     var primary = rst.getPrimary();
-    var secondary = rst.getSecondary();
+    let secondary = rst.getSecondary();
     var term = getLatestOp(primary).t;
 
     // SERVER-20844 ReplSetTest starts up a single node replica set then reconfigures to the
@@ -102,7 +102,7 @@ reconfig(rst, conf);
 rst.awaitNodesAgreeOnConfigVersion();
 
 jsTestLog("Restarting node 0 as a standalone");
-var node0 = rst.restart(0, {noReplSet: true}); // Restart as a standalone node.
+let node0 = rst.restart(0, {noReplSet: true}); // Restart as a standalone node.
 jsTestLog("Stopping node 1");
 rst.stop(1); // Stop node 1 so that node 0 controls the term by itself.
 jsTestLog("Setting the lastVote on node 0 to term: " + term + " candidate: " + rst.nodes[0].host + ", index: 0");
@@ -118,7 +118,7 @@ assert.soonNoExcept(function () {
 });
 
 jsTestLog("Manually sending node 0 a dryRun replSetRequestVotes command, " + "expecting failure in old term");
-var response = assert.commandWorked(
+let response = assert.commandWorked(
     node0.adminCommand({
         replSetRequestVotes: 1,
         setName: name,

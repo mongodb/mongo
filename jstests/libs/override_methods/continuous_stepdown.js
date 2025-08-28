@@ -194,10 +194,10 @@ function makeReplSetTestWithContinuousPrimaryStepdown(stepdownOptions, verbosity
             // Helper function to convert a string representation of setParameter to object form.
             function setParamToObj(setParam) {
                 if (typeof setParam === "string") {
-                    var eqIdx = setParam.indexOf("=");
+                    let eqIdx = setParam.indexOf("=");
                     if (eqIdx != -1) {
-                        var param = setParam.substring(0, eqIdx);
-                        var value = setParam.substring(eqIdx + 1);
+                        let param = setParam.substring(0, eqIdx);
+                        let value = setParam.substring(eqIdx + 1);
                         return {[param]: value};
                     }
                 }

@@ -12,10 +12,10 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var w = 0;
-var wait = function (f) {
+let w = 0;
+let wait = function (f) {
     w++;
-    var n = 0;
+    let n = 0;
     while (!f()) {
         if (n % 4 == 0) print("toostale.js waiting " + w);
         if (++n == 4) {
@@ -26,7 +26,7 @@ var wait = function (f) {
     }
 };
 
-var reconnect = function (a) {
+let reconnect = function (a) {
     wait(function () {
         try {
             a.getDB("foo").bar.stats();
@@ -39,10 +39,10 @@ var reconnect = function (a) {
 };
 
 jsTestLog("1: initialize set");
-var replTest = new ReplSetTest({name: "unicomplex", nodes: 3});
-var nodes = replTest.nodeList();
-var conns = replTest.startSet();
-var config = {
+let replTest = new ReplSetTest({name: "unicomplex", nodes: 3});
+let nodes = replTest.nodeList();
+let conns = replTest.startSet();
+let config = {
     "_id": "unicomplex",
     "members": [
         {"_id": 0, "host": nodes[0]},
@@ -50,13 +50,13 @@ var config = {
         {"_id": 2, "host": nodes[2], "arbiterOnly": true},
     ],
 };
-var r = replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
+let r = replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
 
 replTest.awaitNodesAgreeOnPrimary();
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
-var secondary = replTest.getSecondary();
+let secondary = replTest.getSecondary();
 jsTestLog("2: freeze secondary " + secondary.host + " so that it does not run for election for the rest of the test");
 
 assert.commandWorked(secondary.getDB("admin").runCommand({replSetFreeze: 600}));
@@ -72,20 +72,20 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 10, for
 printjson(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
 
 jsTestLog("4: freeze stepped down primary " + primary.host + " for 30 seconds");
-var start = new Date().getTime();
+let start = new Date().getTime();
 assert.commandWorked(primary.getDB("admin").runCommand({replSetFreeze: 30}));
 
 jsTestLog("5: check no one is primary for 30 seconds");
 while (new Date().getTime() - start < 28 * 1000) {
     // we need less 30 since it takes some time to return... hacky
-    var result = primary.getDB("admin").runCommand({hello: 1});
+    let result = primary.getDB("admin").runCommand({hello: 1});
     assert.eq(result.isWritablePrimary, false);
     assert.eq(result.primary, undefined);
     sleep(1000);
 }
 
 jsTestLog("6: check for new primary");
-var newPrimary = replTest.getPrimary();
+let newPrimary = replTest.getPrimary();
 assert.eq(primary.host, newPrimary.host, "new primary should be the same node as primary that previously stepped down");
 
 jsTestLog("7: step down new primary " + primary.host);

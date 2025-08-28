@@ -161,7 +161,7 @@ function runTests(collection, isSimpleCollation) {
     // does not go through either IDHACK or express. If the collection is a clustered collection on
     // '_id', then we will skip this assertion since 'isIdHack' returns true if the winning plan was
     // 'CLUSTERED_IXSCAN'.
-    var isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(testDB);
+    let isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(testDB);
     if (collection.getName() != "clustered_collection" && !isClustered) {
         explain = collection.find({_id: {$eq: 1, $lt: 4}}).explain();
         assert(

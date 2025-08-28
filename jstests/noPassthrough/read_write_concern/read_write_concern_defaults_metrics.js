@@ -129,7 +129,7 @@ function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
 
     // Read from the first non-interim file.
     const firstFullFile = ftdcFiles.filter((fileDesc) => fileDesc.baseName.indexOf("interim") == -1)[0];
-    var ftdcData;
+    let ftdcData;
     assert.soon(() => {
         try {
             ftdcData = _readDumpFile(firstFullFile.name);

@@ -15,7 +15,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 TestData.skipCheckDBHashes = true;
 
 // Skip this test if not running with the "wiredTiger" storage engine.
-var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+let storageEngine = jsTest.options().storageEngine || "wiredTiger";
 if (storageEngine !== "wiredTiger") {
     print('Skipping test because storageEngine is not "wiredTiger"');
     quit();
@@ -25,14 +25,14 @@ if (storageEngine !== "wiredTiger") {
     print("WT-3742: Skipping test because we're running with WiredTiger's LSM tree");
     quit();
 } else {
-    var rst = new ReplSetTest({
+    let rst = new ReplSetTest({
         nodes: 2,
         // We are going to insert at least 100 MB of data with a long secondary
         // delay. Configure an appropriately large oplog size.
         oplogSize: 200,
     });
 
-    var conf = rst.getReplSetConfig();
+    let conf = rst.getReplSetConfig();
     conf.members[1].votes = 1;
     conf.members[1].priority = 0;
 
@@ -46,7 +46,7 @@ if (storageEngine !== "wiredTiger") {
         doNotWaitForReplication: true,
         doNotWaitForNewlyAddedRemovals: true,
     });
-    var primary = rst.getPrimary(); // Waits for PRIMARY state.
+    let primary = rst.getPrimary(); // Waits for PRIMARY state.
 
     // The default WC is majority and we want the delayed secondary to fall behind in replication.
     // Retry to make sure the primary is done executing (but not necessarily replicating) the
@@ -62,17 +62,17 @@ if (storageEngine !== "wiredTiger") {
     // inserted to make the cache full while trying to trigger a stall.
     assert.commandWorked(primary.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=100MB"}));
 
-    var coll = primary.getCollection("test.coll");
-    var bigstr = "a".repeat(4000);
+    let coll = primary.getCollection("test.coll");
+    let bigstr = "a".repeat(4000);
 
     // Do not insert with a writeConcern because we want the delayed secondary
     // to fall behind in replication. This is crucial apart from having a
     // readConcern to pin updates in memory on the primary. To prevent the
     // slave from falling off the oplog, we configure the oplog large enough
     // to accomodate all the inserts.
-    for (var i = 0; i < 250; i++) {
+    for (let i = 0; i < 250; i++) {
         let batch = coll.initializeUnorderedBulkOp();
-        for (var j = 0; j < 100; j++) {
+        for (let j = 0; j < 100; j++) {
             batch.insert({a: bigstr});
         }
         assert.commandWorked(batch.execute());

@@ -26,7 +26,7 @@ TestData.skipCheckMetadataConsistency = true;
 // removes the replica set primary from a shard.
 TestData.skipCheckRoutingTableConsistency = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 3,
     other: {
         rs: true,
@@ -39,13 +39,13 @@ var st = new ShardingTest({
     },
 });
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
 
 assert.commandWorked(admin.runCommand({setParameter: 1, traceExceptions: true}));
 
-var collSharded = mongos.getCollection("fooSharded.barSharded");
-var collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
+let collSharded = mongos.getCollection("fooSharded.barSharded");
+let collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
 
 // Create the database for the unsharded collection
 assert.commandWorked(
@@ -66,7 +66,7 @@ assert.commandWorked(admin.runCommand({moveChunk: collSharded.toString(), find: 
 // version is received, and refreshing requires communication with the primary to obtain the
 // newest version. Read from the secondaries once before taking down primaries to ensure they
 // have loaded the routing table into memory.
-var mongosSetupConn = new Mongo(mongos.host);
+let mongosSetupConn = new Mongo(mongos.host);
 mongosSetupConn.setReadPref("secondary");
 assert(!mongosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
 
@@ -80,11 +80,11 @@ st.printShardingStatus();
 
 jsTest.log("Inserting initial data...");
 
-var mongosConnActive = new Mongo(mongos.host);
-var mongosConnIdle = null;
-var mongosConnNew = null;
+let mongosConnActive = new Mongo(mongos.host);
+let mongosConnIdle = null;
+let mongosConnNew = null;
 
-var wc = {writeConcern: {w: 2, wtimeout: 60000}};
+let wc = {writeConcern: {w: 2, wtimeout: 60000}};
 
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}, wc));
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}, wc));
@@ -139,7 +139,7 @@ jsTest.log("Stopping primary of second shard...");
 mongosConnIdle = new Mongo(mongos.host);
 
 // Need to save this node for later
-var rs1Secondary = st.rs1.getSecondary();
+let rs1Secondary = st.rs1.getSecondary();
 
 st.rs1.stop(st.rs1.getPrimary());
 

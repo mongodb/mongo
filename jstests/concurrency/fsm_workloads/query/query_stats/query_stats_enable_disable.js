@@ -94,8 +94,8 @@ export const $config = (function () {
         enableViaRateLimit: {init: 1},
     };
 
-    var internalQueryStatsRateLimit;
-    var internalQueryStatsCacheSize;
+    let internalQueryStatsRateLimit;
+    let internalQueryStatsCacheSize;
 
     const setup = function (db, collName, cluster) {
         // TODO SERVER-85405 Make this pattern easier and repeated throughout multiple workloads,

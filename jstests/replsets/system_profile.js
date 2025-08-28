@@ -9,13 +9,13 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 rst.awaitReplication();
 
 // filter out noop writes
-var getLatestOp = function () {
+let getLatestOp = function () {
     return primaryDB
         .getSiblingDB("local")
         .oplog.rs.find({op: {$ne: "n"}})
@@ -26,7 +26,7 @@ var getLatestOp = function () {
 
 var primaryDB = rst.getPrimary().getDB("test");
 assert.commandWorked(primaryDB.foo.insert({}));
-var op = getLatestOp();
+let op = getLatestOp();
 
 // Enable profiling on the primary
 assert.commandWorked(primaryDB.runCommand({profile: 2}));

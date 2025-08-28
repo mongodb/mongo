@@ -4,11 +4,11 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var configDB = st.s.getDB("config");
+let configDB = st.s.getDB("config");
 const dbNamePrefix = "testDropDB";
-var dbCounter = 0;
+let dbCounter = 0;
 
 function getNewDb() {
     return st.s.getDB(dbNamePrefix + "_" + dbCounter++);
@@ -325,10 +325,10 @@ jsTest.log("Tests that dropping a database doesn't affects other database with t
 
     // Create 3 colls with 3 documents on each database
     databases.forEach((db) => {
-        for (var collID = 0; collID < numColls; collID++) {
-            var coll = db[collPrefix + collID];
+        for (let collID = 0; collID < numColls; collID++) {
+            let coll = db[collPrefix + collID];
             // Create 3 documents for each collection
-            for (var docID = 0; docID < numDocs; docID++) {
+            for (let docID = 0; docID < numDocs; docID++) {
                 coll.insert({_id: docID});
             }
             // shard the collection
@@ -353,7 +353,7 @@ jsTest.log("Tests that dropping a database doesn't affects other database with t
         assert.eq(numColls, configDB.collections.countDocuments({_id: getDbPrefixRegExp(db.getName())}));
 
         // Assert that all the collections still have all the documents
-        for (var collID = 0; collID < numColls; collID++) {
+        for (let collID = 0; collID < numColls; collID++) {
             assert.eq(numDocs, db[collPrefix + collID].countDocuments({}));
         }
     });

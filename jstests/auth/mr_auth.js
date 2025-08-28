@@ -12,8 +12,8 @@ let map = function () {
     emit(this.x, this.y);
 };
 let red = function (k, vs) {
-    var s = 0;
-    for (var i = 0; i < vs.length; i++) s += vs[i];
+    let s = 0;
+    for (let i = 0; i < vs.length; i++) s += vs[i];
     return s;
 };
 let red2 = function (k, vs) {
@@ -23,10 +23,10 @@ let red2 = function (k, vs) {
 // make sure writing is allowed when started without --auth enabled
 
 let dbms = MongoRunner.runMongod({bind_ip: "127.0.0.1"});
-var d = dbms.getDB(dbName);
-var t = d[baseName];
+let d = dbms.getDB(dbName);
+let t = d[baseName];
 
-for (var i = 0; i < 1000; i++) t.insert({_id: i, x: i % 10, y: i % 100});
+for (let i = 0; i < 1000; i++) t.insert({_id: i, x: i % 10, y: i % 100});
 assert.eq(1000, t.count(), "inserts failed");
 
 d.dropAllUsers();

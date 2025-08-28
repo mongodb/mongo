@@ -45,9 +45,9 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // This portion of the test needs to run on a connection without implicit sessions, because
 // writes to `config.transactions` are disallowed under sessions.
 {
-    var conn = new Mongo(db.getMongo().host);
+    let conn = new Mongo(db.getMongo().host);
     conn._setDummyDefaultSession();
-    var configDB = conn.getDB("config");
+    let configDB = conn.getDB("config");
     assert.commandFailed(configDB.transactions.remove({"_id.id": session.getSessionId().id}));
     assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id}, {$set: {extraField: 1}}));
 }

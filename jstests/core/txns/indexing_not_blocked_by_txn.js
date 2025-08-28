@@ -12,8 +12,8 @@
  *   assumes_unsharded_collection
  * ]
  */
-var dbName = "indexing_not_blocked_by_txn";
-var mydb = db.getSiblingDB(dbName);
+let dbName = "indexing_not_blocked_by_txn";
+let mydb = db.getSiblingDB(dbName);
 const wcMajority = {
     writeConcern: {w: "majority"},
 };
@@ -24,8 +24,8 @@ assert.commandWorked(mydb.createCollection("foo", wcMajority));
 assert.commandWorked(mydb.foo.createIndex({x: 1}));
 assert.commandWorked(mydb.createCollection("bar", wcMajority));
 
-var session = db.getMongo().startSession();
-var sessionDb = session.getDatabase(dbName);
+let session = db.getMongo().startSession();
+let sessionDb = session.getDatabase(dbName);
 
 session.startTransaction();
 assert.commandWorked(sessionDb.foo.insert({x: 1}));

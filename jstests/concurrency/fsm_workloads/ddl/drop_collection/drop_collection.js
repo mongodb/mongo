@@ -4,13 +4,13 @@
  * Repeatedly creates and drops a collection.
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
         prefix: "drop_collection",
     };
 
-    var states = (function () {
+    let states = (function () {
         function uniqueCollectionName(prefix, tid, num) {
             return prefix + tid + "_" + num;
         }
@@ -21,7 +21,7 @@ export const $config = (function () {
 
         function createAndDrop(db, collName) {
             // TODO: should we ever do something different?
-            var myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
+            let myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
             assert.commandWorked(db.createCollection(myCollName));
             assert(db[myCollName].drop());
         }
@@ -29,7 +29,7 @@ export const $config = (function () {
         return {init: init, createAndDrop: createAndDrop};
     })();
 
-    var transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};
+    let transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};
 
     return {threadCount: 10, iterations: 10, data: data, states: states, transitions: transitions};
 })();

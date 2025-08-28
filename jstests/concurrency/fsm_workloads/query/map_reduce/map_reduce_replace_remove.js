@@ -27,8 +27,8 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/ma
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.remove = function remove(db, collName) {
-        for (var i = 0; i < 20; ++i) {
-            var res = db[collName].remove({_id: Random.randInt(this.numDocs)}, {justOne: true});
+        for (let i = 0; i < 20; ++i) {
+            let res = db[collName].remove({_id: Random.randInt(this.numDocs)}, {justOne: true});
             assert.commandWorked(res);
             assert.lte(0, res.nRemoved, tojson(res));
         }

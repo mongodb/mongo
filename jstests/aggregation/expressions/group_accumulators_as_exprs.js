@@ -1,13 +1,13 @@
 // SERVER-9625 Making accumulators $sum, $min, $max, $avg, $stdDevSamp, and $stdDevPop available as
 // expressions.
 
-var coll = db.server9625;
+let coll = db.server9625;
 coll.drop();
 assert.commandWorked(coll.insert({}));
 
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {
-    var pipeline = [{$project: {_id: 0, result: op}}];
+    let pipeline = [{$project: {_id: 0, result: op}}];
     assert.eq(coll.aggregate(pipeline).toArray(), [{result: expResult}]);
 }
 

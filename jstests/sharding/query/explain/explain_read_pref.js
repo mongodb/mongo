@@ -7,18 +7,18 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts, reconnect} from "jstests/replsets/rslib.js";
 
-var assertCorrectTargeting = function (explain, isMongos, secExpected) {
+let assertCorrectTargeting = function (explain, isMongos, secExpected) {
     assert.commandWorked(explain);
 
-    var serverInfo;
+    let serverInfo;
     if (isMongos) {
         serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
     } else {
         serverInfo = explain.serverInfo;
     }
 
-    var explainDestConn = new Mongo(serverInfo.host + ":" + serverInfo.port);
-    var hello = explainDestConn.getDB("admin").runCommand({hello: 1});
+    let explainDestConn = new Mongo(serverInfo.host + ":" + serverInfo.port);
+    let hello = explainDestConn.getDB("admin").runCommand({hello: 1});
 
     if (secExpected) {
         assert(hello.secondary);
@@ -27,7 +27,7 @@ var assertCorrectTargeting = function (explain, isMongos, secExpected) {
     }
 };
 
-var testAllModes = function (conn, isMongos) {
+let testAllModes = function (conn, isMongos) {
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
     // a bunch of combinations.
@@ -55,23 +55,23 @@ var testAllModes = function (conn, isMongos) {
         ["nearest", [{tag: "one"}], false],
         ["nearest", [{tag: "two"}], true],
     ].forEach(function (args) {
-        var mode = args[0],
+        let mode = args[0],
             tagSets = args[1],
             secExpected = args[2];
 
-        var testDB = conn.getDB("TestDB");
+        let testDB = conn.getDB("TestDB");
         conn.setSecondaryOk(false); // purely rely on readPref
         jsTest.log("Testing mode: " + mode + ", tag sets: " + tojson(tagSets));
 
         // .explain().find()
-        var explainableQuery = testDB.user.explain().find();
+        let explainableQuery = testDB.user.explain().find();
         explainableQuery.readPref(mode, tagSets);
-        var explain = explainableQuery.finish();
+        let explain = explainableQuery.finish();
         assertCorrectTargeting(explain, isMongos, secExpected);
 
         // Set read pref on the connection.
-        var oldReadPrefMode = testDB.getMongo().getReadPrefMode();
-        var oldReadPrefTagSet = testDB.getMongo().getReadPrefTagSet();
+        let oldReadPrefMode = testDB.getMongo().getReadPrefMode();
+        let oldReadPrefTagSet = testDB.getMongo().getReadPrefTagSet();
         try {
             testDB.getMongo().setReadPref(mode, tagSets);
 
@@ -89,18 +89,18 @@ var testAllModes = function (conn, isMongos) {
     });
 };
 
-var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
+let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 st.stopBalancer();
 
 awaitRSClientHosts(st.s, st.rs0.nodes);
 
 // Tag primary with { dc: 'ny', tag: 'one' }, secondary with { dc: 'ny', tag: 'two' }
-var primary = st.rs0.getPrimary();
-var secondary = st.rs0.getSecondary();
-var PRIMARY_TAG = {dc: "ny", tag: "one"};
-var SECONDARY_TAG = {dc: "ny", tag: "two"};
+let primary = st.rs0.getPrimary();
+let secondary = st.rs0.getSecondary();
+let PRIMARY_TAG = {dc: "ny", tag: "one"};
+let SECONDARY_TAG = {dc: "ny", tag: "two"};
 
-var rsConfig = primary.getDB("local").system.replset.findOne();
+let rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log("got rsconf " + tojson(rsConfig));
 rsConfig.members.forEach(function (member) {
     if (member.host == primary.host) {
@@ -140,7 +140,7 @@ reconnect(secondary);
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log("got rsconf " + tojson(rsConfig));
 
-var replConn = new Mongo(st.rs0.getURL());
+let replConn = new Mongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);

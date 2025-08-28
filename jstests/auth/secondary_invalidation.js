@@ -6,15 +6,15 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var NUM_NODES = 3;
-var rsTest = new ReplSetTest({nodes: NUM_NODES});
+let NUM_NODES = 3;
+let rsTest = new ReplSetTest({nodes: NUM_NODES});
 rsTest.startSet({oplogSize: 10, keyFile: "jstests/libs/key1"});
 rsTest.initiate();
 rsTest.awaitSecondaryNodes();
 
-var primary = rsTest.getPrimary();
-var secondary = rsTest.getSecondary();
-var admin = primary.getDB("admin");
+let primary = rsTest.getPrimary();
+let secondary = rsTest.getSecondary();
+let admin = primary.getDB("admin");
 
 // Setup initial data
 admin.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});

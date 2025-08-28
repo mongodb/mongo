@@ -10,24 +10,24 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
-var st = new ShardingTest({mongos: 1, shards: 2});
+let st = new ShardingTest({mongos: 1, shards: 2});
 assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
 
-var testDB = st.s0.getDB("TestDB");
+let testDB = st.s0.getDB("TestDB");
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.Coll0", key: {Key: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: "TestDB.Coll0", middle: {Key: 0}}));
 
-var coll0 = testDB.Coll0;
+let coll0 = testDB.Coll0;
 assert.commandWorked(coll0.insert({Key: -1, Value: "-1"}));
 assert.commandWorked(coll0.insert({Key: 1, Value: "1"}));
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.Coll1", key: {Key: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: "TestDB.Coll1", middle: {Key: 0}}));
 
-var coll1 = testDB.Coll1;
+let coll1 = testDB.Coll1;
 assert.commandWorked(coll1.insert({Key: -1, Value: "-1"}));
 assert.commandWorked(coll1.insert({Key: 1, Value: "1"}));
 
@@ -38,7 +38,7 @@ assert.commandWorked(st.s0.adminCommand({moveChunk: "TestDB.Coll0", find: {Key: 
 // Pause the move chunk operation just before it leaves the critical section
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
-var joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {Key: 1}, null, "TestDB.Coll1", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {Key: 1}, null, "TestDB.Coll1", st.shard1.shardName);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
@@ -55,7 +55,7 @@ assert.eq(1, coll1.find({Key: {$lte: -1}}).itcount());
 assert.eq(1, coll1.find({Key: {$gte: 1}}).itcount());
 
 // Ensure that all operations for non-sharded collections are not stalled
-var collUnsharded = testDB.CollUnsharded;
+let collUnsharded = testDB.CollUnsharded;
 assert.eq(0, collUnsharded.find({}).itcount());
 assert.commandWorked(collUnsharded.insert({TestKey: 0, Value: "Zero"}));
 assert.eq(1, collUnsharded.find({}).itcount());

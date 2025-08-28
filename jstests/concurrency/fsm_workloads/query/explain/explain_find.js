@@ -12,35 +12,35 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = Object.extend(
         {
             explainLimit: function explainLimit(db, collName) {
-                var res = db[collName].find().limit(3).explain();
+                let res = db[collName].find().limit(3).explain();
                 assert.commandWorked(res);
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "LIMIT"));
             },
             explainBatchSize: function explainBatchSize(db, collName) {
-                var res = db[collName].find().batchSize(3).explain();
+                let res = db[collName].find().batchSize(3).explain();
                 assert.commandWorked(res);
             },
             explainAddOption: function explainAddOption(db, collName) {
-                var res = db[collName].explain().find().addOption(DBQuery.Option.exhaust).finish();
+                let res = db[collName].explain().find().addOption(DBQuery.Option.exhaust).finish();
                 assert.commandWorked(res);
             },
             explainSkip: function explainSkip(db, collName) {
-                var res = db[collName].explain().find().skip(3).finish();
+                let res = db[collName].explain().find().skip(3).finish();
                 assert.commandWorked(res);
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "SKIP"));
             },
             explainSort: function explainSort(db, collName) {
-                var res = db[collName].find().sort({i: -1}).explain();
+                let res = db[collName].find().sort({i: -1}).explain();
                 assert.commandWorked(res);
                 assert(planHasStage(db, res.queryPlanner.winningPlan, "SORT"));
             },
             explainHint: function explainHint(db, collName) {
-                var res = db[collName].find().hint({j: 1}).explain();
+                let res = db[collName].find().hint({j: 1}).explain();
                 assert.commandWorked(res);
                 assert(isIxscan(db, res.queryPlanner.winningPlan));
             },
             explainMaxTimeMS: function explainMaxTimeMS(db, collName) {
-                var res = db[collName].find().maxTimeMS(2000).explain();
+                let res = db[collName].find().maxTimeMS(2000).explain();
                 assert.commandWorked(res);
             },
         },

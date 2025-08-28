@@ -25,7 +25,7 @@ function longToTs(i) {
 
 // The first object is just a dummy element in order to make both index and id match in the tests
 // and avoid off-by-1 errors
-var timestamps = [{}];
+let timestamps = [{}];
 
 for (let i = 1; i <= 100; i++) {
     let res = testDB.runCommand({insert: jsTestName(), documents: [{_id: i, ts: makeTS(i)}]});
@@ -37,7 +37,7 @@ for (let i = 1; i <= 100; i++) {
 const collNs = `test.${jsTestName()}`;
 
 // A $gt query on just the 'ts' field should return the next document after the timestamp.
-var cursor = oplog.find({ns: collNs, ts: {$gt: timestamps[20]}});
+let cursor = oplog.find({ns: collNs, ts: {$gt: timestamps[20]}});
 assert.eq(21, cursor.next().o["_id"]);
 assert.eq(22, cursor.next().o["_id"]);
 

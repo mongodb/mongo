@@ -18,13 +18,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * Issue a query with an or stage as the root.
      */
     $config.states.query = function rootedOr(db, collName) {
-        var nMatches = 100;
+        let nMatches = 100;
 
-        var cursor = db[collName]
+        let cursor = db[collName]
             .find({$or: [{c: {$lte: nMatches / 2}}, {d: {$lte: nMatches / 2}}]})
             .batchSize(this.batchSize);
 
-        var verifier = function rootedOrVerifier(doc, prevDoc) {
+        let verifier = function rootedOrVerifier(doc, prevDoc) {
             return doc.c <= nMatches / 2 || doc.d <= nMatches / 2;
         };
 
@@ -32,8 +32,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var newC = Random.randInt(this.nDocs);
-        var newD = Random.randInt(this.nDocs);
+        let newC = Random.randInt(this.nDocs);
+        let newD = Random.randInt(this.nDocs);
         return {$set: {c: newC, d: newD}};
     };
 

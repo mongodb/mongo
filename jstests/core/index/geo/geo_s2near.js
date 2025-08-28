@@ -22,8 +22,8 @@ assert.eq(resNear[0].loc, goldenPoint);
 let lat = 0;
 let lng = 0;
 let points = 10;
-for (var x = -points; x < points; x += 1) {
-    for (var y = -points; y < points; y += 1) {
+for (let x = -points; x < points; x += 1) {
+    for (let y = -points; y < points; y += 1) {
         t.insert({geo: {"type": "Point", "coordinates": [lng + x / 1000.0, lat + y / 1000.0]}});
     }
 }
@@ -137,7 +137,7 @@ function testRadAndDegreesOK(distance) {
         `$geoNear using meter distances returned ${tojson(resGNMeters)}, but ` +
         `$geoNear using radian distances returned ${tojson(resGNRadians)}`;
     assert.eq(resGNRadians.length, resGNMeters.length, errmsg);
-    for (var i = 0; i < resGNRadians.length; ++i) {
+    for (let i = 0; i < resGNRadians.length; ++i) {
         // Radius of earth * radians = distance in meters.
         assert.close(resGNRadians[i].dis * 6378.1 * 1000, resGNMeters[i].dis);
     }

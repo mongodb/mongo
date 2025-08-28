@@ -41,8 +41,8 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {
     }
 
     this.awaitReplicationOnShards = function () {
-        var timeout = 1 * 60 * 1000;
-        for (var i = 0; i < this._rs.length; i++) {
+        let timeout = 1 * 60 * 1000;
+        for (let i = 0; i < this._rs.length; i++) {
             // If this shard is standalone, the replica set object will be null. In that case, we
             // will just skip.
             if (!this._rs[i]) {
@@ -50,7 +50,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {
             }
             var rs = this._rs[i].test;
 
-            var keyFile = this.keyFile;
+            let keyFile = this.keyFile;
             if (keyFile) {
                 authutil.asCluster(rs.nodes, keyFile, function () {
                     rs.awaitLastOpCommitted(timeout);

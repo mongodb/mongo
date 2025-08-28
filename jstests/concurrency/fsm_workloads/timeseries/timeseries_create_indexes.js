@@ -31,9 +31,9 @@ function getRandomCollection(db) {
 }
 
 export const $config = (function () {
-    var data = {nsPrefix: "create_idx_", numCollections: 5};
+    let data = {nsPrefix: "create_idx_", numCollections: 5};
 
-    var states = {
+    let states = {
         createNormalColl: function (db, collname) {
             const coll = getRandomCollection(db);
             assert.commandWorkedOrFailedWithCode(db.createCollection(coll.getName()), [ErrorCodes.NamespaceExists]);

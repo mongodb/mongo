@@ -12,11 +12,11 @@ if (jsTest.options().storageEngine !== "inMemory") {
 
 // Start a 2-node replica set with no journal.
 // Allows testing immediate write concern failures and wc application failures
-var rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
-var mongod = rst.getPrimary();
-var coll = mongod.getCollection("test.bulk_api_wc");
+let mongod = rst.getPrimary();
+let coll = mongod.getCollection("test.bulk_api_wc");
 
 // Create a unique index, legacy writes validate too early to use invalid documents for write error
 // testing

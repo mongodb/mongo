@@ -24,7 +24,7 @@ t.insert({
         {loc: [50, 50], type: "work"},
     ],
 });
-var res = t.insert({
+let res = t.insert({
     zip: "10003",
     data: [
         {loc: [30, 30], type: "home"},

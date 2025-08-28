@@ -4,11 +4,11 @@ let t = db.jstests_nin;
 t.drop();
 
 function checkEqual(name, key, value) {
-    var o = {};
+    let o = {};
     o[key] = {$in: [value]};
-    var i = t.find(o).count();
+    let i = t.find(o).count();
     o[key] = {$nin: [value]};
-    var n = t.find(o).count();
+    let n = t.find(o).count();
 
     assert.eq(
         t.find().count(),

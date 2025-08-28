@@ -42,7 +42,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             ],
         };
 
-        var res = db.runCommand(updateCmd);
+        let res = db.runCommand(updateCmd);
         if (isMongod(db)) {
             if (res.hasOwnProperty("upserted") && res.upserted.length != 0) {
                 // Case 1: The _id value is not yet present, so a new document is added to the
@@ -57,7 +57,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.teardown = function (db, collName) {
-        var docs = db[collName].find().toArray();
+        let docs = db[collName].find().toArray();
 
         // Assert that when 2 threads attempt an updateOne with an upsert on a query with the same
         // _id value (unique key), the earlier thread successfully upserts the document when it is
@@ -66,7 +66,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // document and updates the field 'sortField', updating the document to {_id: 2, sortField:
         // 2}.
         assert.eq(docs.length, 2);
-        var modifiedDoc = db[collName].find({_id: 2}).toArray();
+        let modifiedDoc = db[collName].find({_id: 2}).toArray();
         assert.eq(modifiedDoc[0].sortField, this.numDocs);
     };
 

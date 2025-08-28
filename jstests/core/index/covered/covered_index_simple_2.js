@@ -10,7 +10,7 @@
 // Include helpers for analyzing explain output.
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.getCollection("covered_simple_2");
+let coll = db.getCollection("covered_simple_2");
 coll.drop();
 for (let i = 0; i < 10; i++) {
     coll.insert({foo: i});

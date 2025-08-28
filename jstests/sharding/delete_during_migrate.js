@@ -10,23 +10,23 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     mongos: 1,
     rs: {nodes: 2, setParameter: {defaultConfigCommandTimeoutMS: 5 * 60 * 1000}},
 });
 
-var dbname = "test";
-var coll = "foo";
-var ns = dbname + "." + coll;
+let dbname = "test";
+let coll = "foo";
+let ns = dbname + "." + coll;
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: dbname, primaryShard: st.shard1.shardName}));
 
-var t = st.s0.getDB(dbname).getCollection(coll);
+let t = st.s0.getDB(dbname).getCollection(coll);
 
-var bulk = t.initializeUnorderedBulkOp();
+let bulk = t.initializeUnorderedBulkOp();
 const numDocs = 200000;
-for (var i = 0; i < numDocs; i++) {
+for (let i = 0; i < numDocs; i++) {
     bulk.insert({a: i});
 }
 assert.commandWorked(bulk.execute());
@@ -37,7 +37,7 @@ t.createIndex({a: 1});
 assert.commandWorked(st.s0.adminCommand({shardcollection: ns, key: {a: 1}}));
 
 // start a parallel shell that deletes things
-var join = startParallelShell("db." + coll + ".remove({});", st.s0.port);
+let join = startParallelShell("db." + coll + ".remove({});", st.s0.port);
 
 // migrate while deletions are happening
 const res = st.s0.adminCommand({moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name});

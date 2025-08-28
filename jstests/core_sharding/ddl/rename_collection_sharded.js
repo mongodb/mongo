@@ -93,7 +93,7 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 2}, max: {x: 4}, zone: "y"}));
     assert.commandWorked(testDB.adminCommand({shardCollection: fromNs, key: {x: 1}}));
 
-    var fromTags = testDB.getSiblingDB("config").tags.find({ns: fromNs}).toArray();
+    let fromTags = testDB.getSiblingDB("config").tags.find({ns: fromNs}).toArray();
 
     const fromColl = testDB.getCollection(fromCollName);
     fromColl.insert({x: 1});

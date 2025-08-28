@@ -3,7 +3,7 @@
 // @tags: [featureFlagRankFusionFull, requires_fcv_83]
 
 const kUnavailableMetadataErrCode = 40218;
-var coll = db.sort_with_metadata;
+let coll = db.sort_with_metadata;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, text: "apple", words: 1}));
 assert.commandWorked(coll.insert({_id: 2, text: "banana", words: 1}));

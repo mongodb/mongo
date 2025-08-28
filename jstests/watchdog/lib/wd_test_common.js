@@ -9,7 +9,7 @@ export function testMongoDHang(control, mongod_options) {
         resetDbpath(mongod_options.dbPath);
     }
 
-    var options = {
+    let options = {
         setParameter: "watchdogPeriodSeconds=" + control.getWatchdogPeriodSeconds(),
         verbose: 1,
     };

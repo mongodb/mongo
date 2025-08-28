@@ -19,7 +19,7 @@ import {
  * Test replication metrics
  */
 function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten) {
-    var ss = secondary.getDB("test").serverStatus();
+    let ss = secondary.getDB("test").serverStatus();
     jsTestLog(`Secondary ${secondary.host} metrics: ${tojson(ss.metrics)}`);
 
     assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created");
@@ -87,7 +87,7 @@ function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceive
     });
 }
 
-var rt = new ReplSetTest({
+let rt = new ReplSetTest({
     name: "server_status_metrics",
     nodes: 2,
     oplogSize: 100,
@@ -106,9 +106,9 @@ rt.initiate();
 
 rt.awaitSecondaryNodes();
 
-var secondary = rt.getSecondary();
-var primary = rt.getPrimary();
-var testDB = primary.getDB("test");
+let secondary = rt.getSecondary();
+let primary = rt.getPrimary();
+let testDB = primary.getDB("test");
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -123,13 +123,13 @@ const secondaryBaseGetMoresNum = secondary.getDB("test").serverStatus().metrics.
 assert.commandWorked(testDB.createCollection("a"));
 assert.commandWorked(testDB.b.insert({}, {writeConcern: {w: 2}}));
 
-var ss = secondary.getDB("test").serverStatus();
+let ss = secondary.getDB("test").serverStatus();
 // The number of ops received  and the number of ops applied are not guaranteed to be the same
 // during initial sync oplog application as we apply received operations only if the operation's
 // optime is greater than OplogApplier::Options::beginApplyingOpTime.
-var secondaryBaseOplogOpsApplied = ss.metrics.repl.apply.ops;
-var secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
-var secondaryBaseOplogOpsWritten = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")
+let secondaryBaseOplogOpsApplied = ss.metrics.repl.apply.ops;
+let secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
+let secondaryBaseOplogOpsWritten = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")
     ? ss.metrics.repl.write.batchSize
     : undefined;
 
@@ -137,7 +137,7 @@ var secondaryBaseOplogOpsWritten = FeatureFlagUtil.isPresentAndEnabled(secondary
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
 
 // add test docs
-var bulk = testDB.a.initializeUnorderedBulkOp();
+let bulk = testDB.a.initializeUnorderedBulkOp();
 for (let x = 0; x < 1000; x++) {
     bulk.insert({});
 }
@@ -151,7 +151,7 @@ testSecondaryMetrics(
     secondaryBaseOplogOpsWritten,
 );
 
-var options = {writeConcern: {w: 2}, multi: true, upsert: true};
+let options = {writeConcern: {w: 2}, multi: true, upsert: true};
 assert.commandWorked(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
 testSecondaryMetrics(
@@ -181,8 +181,8 @@ assert.gt(
 );
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
-var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
-var startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
+let startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
+let startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
 
 jsTestLog(`Primary ${primary.host} metrics #1: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
 
@@ -206,13 +206,13 @@ assert.writeError(testDB.a.insert({x: 1}, {writeConcern: {w: 3, wtimeout: 50}}))
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 
 // Test metrics related to writeConcern timeouts and default writeConcern.
-var startGLEMetrics = testDB.serverStatus().metrics.getLastError;
+let startGLEMetrics = testDB.serverStatus().metrics.getLastError;
 
 // Set the default WC to timeout.
 assert.commandWorked(
     testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 2, wtimeout: 1000}, writeConcern: {w: 1}}),
 );
-var stopReplProducer = configureFailPoint(secondary, "stopReplProducer");
+let stopReplProducer = configureFailPoint(secondary, "stopReplProducer");
 stopReplProducer.wait();
 
 // Explicit timeout - increments wtimeouts.
@@ -247,7 +247,7 @@ assert.commandWorked(
 );
 
 // Validate counters.
-var endGLEMetrics = testDB.serverStatus().metrics.getLastError;
+let endGLEMetrics = testDB.serverStatus().metrics.getLastError;
 assert.eq(endGLEMetrics.wtimeouts.floatApprox, startGLEMetrics.wtimeouts + 2);
 assert.eq(endGLEMetrics.default.wtimeouts.floatApprox, startGLEMetrics.default.wtimeouts + 1);
 assert.eq(endGLEMetrics.default.unsatisfiable.floatApprox, startGLEMetrics.default.unsatisfiable + 1);

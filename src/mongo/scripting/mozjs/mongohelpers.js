@@ -41,7 +41,7 @@ globalThis.exportToMongoHelpers = {
             fnSrc = fnSrc.slice(0, -1).trimRight();
         }
 
-        var parseTree;
+        let parseTree;
         try {
             parseTree = this.Reflect.parse(fnSrc);
         } catch (e) {
@@ -54,11 +54,11 @@ globalThis.exportToMongoHelpers = {
             }
         }
         // Input source is a series of expressions. we should prepend the last one with return
-        var lastStatement = parseTree.body.length - 1;
-        var lastStatementType = parseTree.body[lastStatement].type;
+        let lastStatement = parseTree.body.length - 1;
+        let lastStatementType = parseTree.body[lastStatement].type;
         if (lastStatementType == "ExpressionStatement") {
-            var prevExprEnd = 0;
-            var loc = parseTree.body[lastStatement].loc.start;
+            let prevExprEnd = 0;
+            let loc = parseTree.body[lastStatement].loc.start;
 
             // When we're actually doing the pre-pending of return later on we need to know
             // whether we've reached the beginning of the line, or the end of the 2nd-to-last
@@ -75,18 +75,18 @@ globalThis.exportToMongoHelpers = {
                 }
             }
 
-            var lines = fnSrc.split("\n");
+            let lines = fnSrc.split("\n");
             // Adjust for 1-indexed column number by substracting 1.
-            var col = loc.column - 1;
+            let col = loc.column - 1;
             var fnSrc;
-            var tmpTree;
-            var origLine = lines[loc.line - 1];
+            let tmpTree;
+            let origLine = lines[loc.line - 1];
 
             // The parser has a weird behavior where sometimes if you have an expression like
             // ((x == 5)), it says that the expression string is "x == 5))", so we may need to
             // adjust where we prepend "return".
             while (col >= prevExprEnd) {
-                var modLine = origLine.substr(0, col) + "return " + origLine.substr(col);
+                let modLine = origLine.substr(0, col) + "return " + origLine.substr(col);
                 lines[loc.line - 1] = modLine;
                 fnSrc = "{ " + lines.join("\n") + " }";
                 try {

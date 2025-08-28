@@ -34,7 +34,7 @@ let threads = [];
 for (var t = 0; t < numThreads; t++) {
     let thread = new Thread(
         function (connStr, t) {
-            var conn = new Mongo(connStr);
+            let conn = new Mongo(connStr);
             conn.getDB("test").runCommand({insert: "test", documents: [{counter: t}]});
         },
         st.s.host,

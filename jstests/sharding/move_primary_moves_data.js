@@ -1,11 +1,11 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 2});
+let s = new ShardingTest({shards: 2});
 
 assert.commandWorked(s.getDB("test1").runCommand({dropDatabase: 1}));
 var db = s.getDB("test1");
-var c = db.foo;
+let c = db.foo;
 c.save({a: 1});
 c.save({a: 2});
 c.save({a: 3});
@@ -13,8 +13,8 @@ assert.eq(3, c.count());
 
 assert.commandWorked(db.runCommand({create: "view", viewOn: "foo", pipeline: [{$match: {a: 3}}]}));
 
-var fromShard = s.getPrimaryShard("test1");
-var toShard = s.getOther(fromShard);
+let fromShard = s.getPrimaryShard("test1");
+let toShard = s.getOther(fromShard);
 
 assert.eq(3, fromShard.getDB("test1").foo.count(), "from doesn't have data before move");
 assert.eq(0, toShard.getDB("test1").foo.count(), "to has data before move");
@@ -27,7 +27,7 @@ assert.eq(
     "not in db correctly to start",
 );
 
-var oldShardName = s.config.databases.findOne({_id: "test1"}).primary;
+let oldShardName = s.config.databases.findOne({_id: "test1"}).primary;
 
 assert.commandWorked(s.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
 s.printShardingStatus();

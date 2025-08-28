@@ -63,10 +63,10 @@ try {
 
     testDb.foo.findOne();
 
-    var profileItems = profileCursor(testDb).toArray();
+    let profileItems = profileCursor(testDb).toArray();
 
     // create a msg for later if there is a failure.
-    var msg = "";
+    let msg = "";
     profileItems.forEach(function (d) {
         msg += "profile doc: " + d.ns + " " + d.op + " " + tojson(d.query ? d.query : d.command) + "\n";
     });
@@ -104,10 +104,10 @@ try {
 
     resetProfile(testDb, 2);
     testDb.profile1.drop();
-    var q = {_id: 5};
-    var u = {$inc: {x: 1}};
+    let q = {_id: 5};
+    let u = {$inc: {x: 1}};
     testDb.profile1.update(q, u);
-    var r = profileCursor(testDb, {ns: testDb.profile1.getFullName()}).sort({$natural: -1})[0];
+    let r = profileCursor(testDb, {ns: testDb.profile1.getFullName()}).sort({$natural: -1})[0];
     assert.eq({q: q, u: u, multi: false, upsert: false}, r.command, tojson(r));
     assert.eq("update", r.op, tojson(r));
     assert.eq("profile1.profile1", r.ns, tojson(r));

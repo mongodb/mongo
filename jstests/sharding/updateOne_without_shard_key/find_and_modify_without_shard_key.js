@@ -73,8 +73,8 @@ function verifyResult(testCase, res) {
 // When more than one document matches the command query, ensure that a single document is modified
 // and that the remaining documents are unchanged.
 function verifySingleModification(testCase, res) {
-    var modifiedDocId;
-    var modifiedDoc;
+    let modifiedDocId;
+    let modifiedDoc;
     if (testCase.errorCode) {
         assert.commandFailedWithCode(res, testCase.errorCode);
         modifiedDocId = -1; // No document should be modified, none will match on -1.

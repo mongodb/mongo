@@ -55,8 +55,8 @@ function assertWildcardIndexAnswersQuery(query, expectedResults, projection) {
 
 // Confirms that the index matching the given keyPattern has the specified collation.
 function assertIndexHasCollation(keyPattern, collation) {
-    var indexSpecs = coll.getIndexes();
-    var found = IndexCatalogHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
+    let indexSpecs = coll.getIndexes();
+    let found = IndexCatalogHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
     assert.neq(
         null,
         found,

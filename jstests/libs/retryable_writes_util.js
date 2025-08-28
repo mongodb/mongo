@@ -88,8 +88,8 @@ export var RetryableWritesUtil = (function () {
      * was started with `retryWrites: false` to mimic the retry functionality manually.
      */
     function runRetryableWrite(conn, command, expectedErrorCode = ErrorCodes.OK, nTimes = 2) {
-        var res;
-        for (var i = 0; i < nTimes; i++) {
+        let res;
+        for (let i = 0; i < nTimes; i++) {
             jsTestLog(
                 "Executing command: " + tojson(command) + "\nIteration: " + i + "\nExpected Code: " + expectedErrorCode,
             );

@@ -2,19 +2,19 @@
 
 import {Thread} from "jstests/libs/parallelTester.js";
 
-var makeDoc = function (keyLimit, valueLimit) {
+let makeDoc = function (keyLimit, valueLimit) {
     return {_id: ObjectId(), key: Random.randInt(keyLimit), value: Random.randInt(valueLimit)};
 };
 
-var main = function () {
+let main = function () {
     function mapper() {
-        var obj = {};
+        let obj = {};
         obj[this.value] = 1;
         emit(this.key, obj);
     }
 
     function reducer(key, values) {
-        var res = {};
+        let res = {};
 
         values.forEach(function (obj) {
             Object.keys(obj).forEach(function (value) {
@@ -28,32 +28,32 @@ var main = function () {
         return res;
     }
 
-    for (var i = 0; i < 10; i++) {
+    for (let i = 0; i < 10; i++) {
         // Have all threads combine their results into the same collection
-        var res = db.source.mapReduce(mapper, reducer, {out: {reduce: "dest"}});
+        let res = db.source.mapReduce(mapper, reducer, {out: {reduce: "dest"}});
         assert.commandWorked(res);
     }
 };
 
 Random.setRandomSeed();
 
-var numDocs = 200;
-var bulk = db.source.initializeUnorderedBulkOp();
-var i;
+let numDocs = 200;
+let bulk = db.source.initializeUnorderedBulkOp();
+let i;
 for (i = 0; i < numDocs; ++i) {
-    var doc = makeDoc(numDocs / 100, numDocs / 10);
+    let doc = makeDoc(numDocs / 100, numDocs / 10);
     bulk.insert(doc);
 }
 
-var res = bulk.execute();
+let res = bulk.execute();
 assert.commandWorked(res);
 assert.eq(numDocs, res.nInserted);
 
 db.dest.drop();
 assert.commandWorked(db.createCollection("dest"));
 
-var numThreads = 6;
-var t = [];
+let numThreads = 6;
+let t = [];
 for (i = 0; i < numThreads - 1; ++i) {
     t[i] = new Thread(main);
     t[i].start();

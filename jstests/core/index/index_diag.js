@@ -14,8 +14,8 @@ let ids = [];
 let xs = [];
 
 function r(a) {
-    var n = [];
-    for (var x = a.length - 1; x >= 0; x--) n.push(a[x]);
+    let n = [];
+    for (let x = a.length - 1; x >= 0; x--) n.push(a[x]);
     return n;
 }
 

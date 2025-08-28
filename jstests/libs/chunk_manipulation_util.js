@@ -41,7 +41,7 @@ export function moveChunkParallel(
             "Specify either findCriteria or bounds, but not both.",
         );
 
-        var mongos = new Mongo(mongosURL),
+        let mongos = new Mongo(mongosURL),
             admin = mongos.getDB("admin"),
             cmd = {moveChunk: ns};
 
@@ -66,7 +66,7 @@ export function moveChunkParallel(
         cmd.forceJumbo = forceJumbo;
 
         jsTest.log.info({cmd});
-        var result = admin.runCommand(cmd);
+        let result = admin.runCommand(cmd);
         jsTest.log.info({result});
         if (expectSuccess) {
             assert(result.ok);
@@ -99,7 +99,7 @@ export var moveChunkStepNames = {
 };
 
 export function numberToName(names, stepNumber) {
-    for (var name in names) {
+    for (let name in names) {
         if (names.hasOwnProperty(name) && names[name] == stepNumber) {
             return name;
         }
@@ -154,7 +154,7 @@ export function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
 // moveChunk running in shardConnection.
 //
 export function waitForMoveChunkStep(shardConnection, stepNumber) {
-    var searchString = "step " + stepNumber,
+    let searchString = "step " + stepNumber,
         admin = shardConnection.getDB("admin");
 
     assert.between(
@@ -165,7 +165,7 @@ export function waitForMoveChunkStep(shardConnection, stepNumber) {
         true,
     );
 
-    var msg =
+    let msg =
         "moveChunk on " +
         shardConnection.shardName +
         ' never reached step "' +
@@ -173,7 +173,7 @@ export function waitForMoveChunkStep(shardConnection, stepNumber) {
         '".';
 
     assert.soon(function () {
-        var inProgressStr = "";
+        let inProgressStr = "";
         let in_progress = admin.aggregate([{$currentOp: {allUsers: true, idleConnections: true}}]);
 
         while (in_progress.hasNext()) {
@@ -240,7 +240,7 @@ export function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
         true,
     );
 
-    var admin = shardConnection.getDB("admin");
+    let admin = shardConnection.getDB("admin");
     assert.commandWorked(admin.runCommand({configureFailPoint: "migrateThreadHangAtStep" + stepNumber, mode: mode}));
 }
 
@@ -248,7 +248,7 @@ export function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
 // Wait for moveChunk to reach a step (1 through 7).
 //
 export function waitForMigrateStep(shardConnection, stepNumber) {
-    var searchString = "step " + stepNumber,
+    let searchString = "step " + stepNumber,
         admin = shardConnection.getDB("admin");
 
     assert.between(
@@ -259,7 +259,7 @@ export function waitForMigrateStep(shardConnection, stepNumber) {
         true,
     );
 
-    var msg =
+    let msg =
         "Migrate thread on " +
         shardConnection.shardName +
         ' never reached step "' +
@@ -268,9 +268,9 @@ export function waitForMigrateStep(shardConnection, stepNumber) {
 
     assert.soon(function () {
         // verbose = True so we see the migration thread.
-        var in_progress = admin.currentOp(true).inprog;
-        for (var i = 0; i < in_progress.length; ++i) {
-            var op = in_progress[i];
+        let in_progress = admin.currentOp(true).inprog;
+        for (let i = 0; i < in_progress.length; ++i) {
+            let op = in_progress[i];
             if (op.desc && op.desc === "migrateThread") {
                 if (op.hasOwnProperty("msg")) {
                     return op.msg.startsWith(searchString);
@@ -312,7 +312,7 @@ export function runCommandDuringTransferMods(
 
 export function killRunningMoveChunk(admin) {
     let inProgressOps = admin.aggregate([{$currentOp: {"allUsers": true}}]);
-    var abortedMigration = false;
+    let abortedMigration = false;
     let inProgressStr = "";
     let opIdsToKill = {};
     while (inProgressOps.hasNext()) {

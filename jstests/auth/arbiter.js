@@ -69,7 +69,7 @@ function _runTestCommandOnConn(conn, command, expectedCode) {
     }
 }
 
-for (var testCase of testCases) {
+for (let testCase of testCases) {
     _runTestCommandOnConn(primary, testCase.command, testCase.expectedPrimaryCode);
     _runTestCommandOnConn(arbiter, testCase.command, testCase.expectedArbiterCode);
 }

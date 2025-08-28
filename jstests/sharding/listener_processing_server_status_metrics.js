@@ -13,7 +13,7 @@ const st = new ShardingTest({shards: 1, mongos: 1});
 const admin = st.s.getDB("admin");
 
 let previous = 0;
-for (var i = 0; i < numConnections; i++) {
+for (let i = 0; i < numConnections; i++) {
     const conn = new Mongo(admin.getMongo().host);
     const t = assert.commandWorked(admin.serverStatus()).network.listenerProcessingTime["durationMicros"];
     assert.gte(t, previous);

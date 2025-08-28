@@ -13,8 +13,8 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1, mongos: 1});
-var mongos = st.s;
+let st = new ShardingTest({shards: 1, mongos: 1});
+let mongos = st.s;
 var db = mongos.getDB("test");
 
 const doesRewrite = ErrorCodes.probeMongosRewrite(mongos);
@@ -36,7 +36,7 @@ function runInsertScenarios(injectCodeField, extractCode, message) {
 
         jsTestLog(summary);
 
-        var fpData = {failCommands: ["insert"]};
+        let fpData = {failCommands: ["insert"]};
 
         injectCodeField(fpData, injected);
         merge(fpData, allowConfigFields);

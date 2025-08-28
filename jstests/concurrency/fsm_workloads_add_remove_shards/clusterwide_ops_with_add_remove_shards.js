@@ -33,7 +33,7 @@ export const $config = (function () {
         }
     }
 
-    var states = {
+    let states = {
         runChangeStream: function (db, collName) {
             const res = db.adminCommand({
                 aggregate: 1,
@@ -78,7 +78,7 @@ export const $config = (function () {
     };
 
     const transitionProbabilities = {runChangeStream: 0.25, runCurrentOp: 0.25, removeShard: 0.25, addShard: 0.25};
-    var transitions = {
+    let transitions = {
         init: transitionProbabilities,
         runChangeStream: transitionProbabilities,
         runCurrentOp: transitionProbabilities,

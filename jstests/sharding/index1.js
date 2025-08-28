@@ -1,15 +1,15 @@
 // SERVER-2326 - make sure that sharding only works with unique indices
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({name: "shard_index", shards: 2, mongos: 1});
+let s = new ShardingTest({name: "shard_index", shards: 2, mongos: 1});
 
 // Regenerate fully because of SERVER-2782
-for (var i = 0; i < 22; i++) {
-    var coll = s.admin._mongo.getDB("test").getCollection("foo" + i);
+for (let i = 0; i < 22; i++) {
+    let coll = s.admin._mongo.getDB("test").getCollection("foo" + i);
     coll.drop();
 
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var j = 0; j < 300; j++) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let j = 0; j < 300; j++) {
         bulk.insert({num: j, x: 1});
     }
     assert.commandWorked(bulk.execute());

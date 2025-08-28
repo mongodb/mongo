@@ -18,7 +18,7 @@
 import "jstests/libs/parallelTester.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         oldShardKeyField: "a",
         newShardKeyFields: ["a", "b"],
         oldShardKey: {a: 1},

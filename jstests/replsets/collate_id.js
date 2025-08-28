@@ -19,17 +19,17 @@ const caseInsensitive = {
     collation: {locale: "en_US", strength: 2},
 };
 
-var replTest = new ReplSetTest({name: "testSet", nodes: 2});
-var nodes = replTest.startSet();
+let replTest = new ReplSetTest({name: "testSet", nodes: 2});
+let nodes = replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var primaryDB = primary.getDB("test");
-var primaryColl = primaryDB.collate_id;
+let primary = replTest.getPrimary();
+let primaryDB = primary.getDB("test");
+let primaryColl = primaryDB.collate_id;
 
-var secondary = replTest.getSecondary();
-var secondaryDB = secondary.getDB("test");
-var secondaryColl = secondaryDB.collate_id;
+let secondary = replTest.getSecondary();
+let secondaryDB = secondary.getDB("test");
+let secondaryColl = secondaryDB.collate_id;
 
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
@@ -46,10 +46,10 @@ assert.commandWorked(primaryDB.createCollection(primaryColl.getName(), caseInsen
 // A string of the character 'b' repeated.
 const baseStr = "b".repeat(49);
 
-for (var i = 0; i < 1000; i++) {
+for (let i = 0; i < 1000; i++) {
     // Make an _id by uppercasing each character in "baseStr" with 0.5 probability.
-    var strId = baseStr;
-    for (var charIdx = 0; charIdx < baseStr.length; charIdx++) {
+    let strId = baseStr;
+    for (let charIdx = 0; charIdx < baseStr.length; charIdx++) {
         if (Random.rand() < 0.5) {
             strId = uppercaseIth(strId, charIdx);
         }

@@ -85,7 +85,7 @@ assert.commandFailedWithCode(
 );
 
 // Assert APIStrictError message for unsupported commands contains link to docs site
-var err = assert.commandFailedWithCode(
+let err = assert.commandFailedWithCode(
     testDb.runCommand({buildInfo: 1, apiStrict: true, apiVersion: "1"}),
     ErrorCodes.APIStrictError,
 );

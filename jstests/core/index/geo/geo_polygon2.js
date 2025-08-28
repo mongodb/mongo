@@ -9,21 +9,21 @@
 // using turtle graphics.  Basically, will look like a very contorted octopus (quad-pus?) shape.
 // There are no holes, but some edges will probably touch.
 
-var numTests = 4;
+let numTests = 4;
 
-for (var test = 0; test < numTests; test++) {
+for (let test = 0; test < numTests; test++) {
     Random.srand(1337 + test);
 
-    var numTurtles = 4;
-    var gridSize = [20, 20];
-    var turtleSteps = 500;
+    let numTurtles = 4;
+    let gridSize = [20, 20];
+    let turtleSteps = 500;
     var bounds = [Random.rand() * -1000000 + 0.00001, Random.rand() * 1000000 + 0.00001];
     var rotation = Math.PI * Random.rand();
-    var bits = Math.floor(Random.rand() * 32);
+    let bits = Math.floor(Random.rand() * 32);
 
     printjson({test: test, rotation: rotation, bits: bits});
 
-    var rotatePoint = function (x, y) {
+    let rotatePoint = function (x, y) {
         if (y == undefined) {
             y = x[1];
             x = x[0];
@@ -32,8 +32,8 @@ for (var test = 0; test < numTests; test++) {
         let xp = x * Math.cos(rotation) - y * Math.sin(rotation);
         let yp = y * Math.cos(rotation) + x * Math.sin(rotation);
 
-        var scaleX = (bounds[1] - bounds[0]) / 360;
-        var scaleY = (bounds[1] - bounds[0]) / 360;
+        let scaleX = (bounds[1] - bounds[0]) / 360;
+        let scaleY = (bounds[1] - bounds[0]) / 360;
 
         x *= scaleX;
         y *= scaleY;
@@ -47,9 +47,9 @@ for (var test = 0; test < numTests; test++) {
     }
 
     grid.toString = function () {
-        var gridStr = "";
-        for (var j = grid[0].length - 1; j >= -1; j--) {
-            for (var i = 0; i < grid.length; i++) {
+        let gridStr = "";
+        for (let j = grid[0].length - 1; j >= -1; j--) {
+            for (let i = 0; i < grid.length; i++) {
                 if (i == 0) gridStr += (j == -1 ? " " : j % 10) + ": ";
                 if (j != -1) gridStr += "[" + (grid[i][j] != undefined ? grid[i][j] : " ") + "]";
                 else gridStr += " " + (i % 10) + " ";
@@ -60,7 +60,7 @@ for (var test = 0; test < numTests; test++) {
         return gridStr;
     };
 
-    var turtles = [];
+    let turtles = [];
     for (var i = 0; i < numTurtles; i++) {
         var up = i % 2 == 0 ? i - 1 : 0;
         var left = i % 2 == 1 ? i - 1 - 1 : 0;
@@ -77,8 +77,8 @@ for (var test = 0; test < numTests; test++) {
 
     // print( grid.toString() )
 
-    var pickDirections = function () {
-        var up = Math.floor(Random.rand() * 3);
+    let pickDirections = function () {
+        let up = Math.floor(Random.rand() * 3);
         if (up == 2) up = -1;
 
         if (up == 0) {
@@ -87,7 +87,7 @@ for (var test = 0; test < numTests; test++) {
         } else left = 0;
 
         if (Random.rand() < 0.5) {
-            var swap = left;
+            let swap = left;
             left = up;
             up = swap;
         }
@@ -97,12 +97,12 @@ for (var test = 0; test < numTests; test++) {
 
     for (var s = 0; s < turtleSteps; s++) {
         for (var t = 0; t < numTurtles; t++) {
-            var dirs = pickDirections();
+            let dirs = pickDirections();
             var up = dirs[0];
             var left = dirs[1];
 
             var lastTurtle = turtles[t][turtles[t].length - 1];
-            var nextTurtle = [lastTurtle[0] + left, lastTurtle[1] + up];
+            let nextTurtle = [lastTurtle[0] + left, lastTurtle[1] + up];
 
             if (nextTurtle[0] >= gridSize[0] || nextTurtle[1] >= gridSize[1] || nextTurtle[0] < 0 || nextTurtle[1] < 0)
                 continue;
@@ -118,8 +118,8 @@ for (var test = 0; test < numTests; test++) {
     for (var t = 0; t < numTurtles; t++) {
         let turtlePath = [];
 
-        var nextSeg = function (currTurtle, prevTurtle) {
-            var pathX = currTurtle[0];
+        let nextSeg = function (currTurtle, prevTurtle) {
+            let pathX = currTurtle[0];
             let pathY;
 
             if (currTurtle[1] < prevTurtle[1]) {
@@ -170,8 +170,8 @@ for (var test = 0; test < numTests; test++) {
             }
 
             var up = turtlePath[s][1] - turtlePath[s - 1][1];
-            var right = turtlePath[s][0] - turtlePath[s - 1][0];
-            var addPoint = up != 0 && right != 0;
+            let right = turtlePath[s][0] - turtlePath[s - 1][0];
+            let addPoint = up != 0 && right != 0;
 
             if (addPoint && up != right) {
                 fixedTurtlePath.push([turtlePath[s][0], turtlePath[s - 1][1]]);
@@ -190,7 +190,7 @@ for (var test = 0; test < numTests; test++) {
     // Uncomment to print polygon shape
     // print( grid.toString() )
 
-    var polygon = [];
+    let polygon = [];
     for (var t = 0; t < turtlePaths.length; t++) {
         for (var s = 0; s < turtlePaths[t].length; s++) {
             polygon.push(rotatePoint(turtlePaths[t][s]));
@@ -204,14 +204,14 @@ for (var test = 0; test < numTests; test++) {
     t.drop();
 
     // Test single and multi-location documents
-    var pointsIn = 0;
-    var pointsOut = 0;
-    var allPointsIn = [];
-    var allPointsOut = [];
+    let pointsIn = 0;
+    let pointsOut = 0;
+    let allPointsIn = [];
+    let allPointsOut = [];
 
-    for (var j = grid[0].length - 1; j >= 0; j--) {
+    for (let j = grid[0].length - 1; j >= 0; j--) {
         for (var i = 0; i < grid.length; i++) {
-            var point = rotatePoint([i + 0.5, j + 0.5]);
+            let point = rotatePoint([i + 0.5, j + 0.5]);
 
             t.insert({loc: point});
             if (grid[i][j] != undefined) {
@@ -224,7 +224,7 @@ for (var test = 0; test < numTests; test++) {
         }
     }
 
-    var res = t.createIndex({loc: "2d"}, {bits: 1 + bits, max: bounds[1], min: bounds[0]});
+    let res = t.createIndex({loc: "2d"}, {bits: 1 + bits, max: bounds[1], min: bounds[0]});
     assert.commandWorked(res);
 
     t.insert({loc: allPointsIn});

@@ -38,7 +38,7 @@ let options = getQueryStatsServerParameters();
 
 const conn = MongoRunner.runMongod(options);
 const testDB = conn.getDB("test");
-var coll = testDB[jsTestName()];
+let coll = testDB[jsTestName()];
 coll.drop();
 
 const bulk = coll.initializeUnorderedBulkOp();

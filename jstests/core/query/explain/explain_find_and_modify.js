@@ -17,13 +17,13 @@
  * ]
  */
 
-var cName = "explain_find_and_modify";
-var t = db.getCollection(cName);
+let cName = "explain_find_and_modify";
+let t = db.getCollection(cName);
 
 // Different types of findAndModify explain requests.
-var explainRemove = {explain: {findAndModify: cName, remove: true, query: {_id: 0}}};
-var explainUpdate = {explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}}};
-var explainUpsert = {
+let explainRemove = {explain: {findAndModify: cName, remove: true, query: {_id: 0}}};
+let explainUpdate = {explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}}};
+let explainUpsert = {
     explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}, upsert: true},
 };
 
@@ -31,10 +31,10 @@ var explainUpsert = {
 
 // Make sure this one doesn't exist before we start.
 assert.commandWorked(db.getSiblingDB(cName).runCommand({dropDatabase: 1}));
-var newDB = db.getSiblingDB(cName);
+let newDB = db.getSiblingDB(cName);
 
 // Explain the command, ensuring the database is not created.
-var err_msg = "Explaining findAndModify on a non-existent database should return an error.";
+let err_msg = "Explaining findAndModify on a non-existent database should return an error.";
 assert.commandFailed(newDB.runCommand(explainRemove), err_msg);
 assertDBDoesNotExist(newDB, "Explaining a remove should not create a database.");
 
@@ -67,32 +67,32 @@ assertCollDoesNotExist(cName, "explaining an upsert should not create a new coll
 assert.commandFailed(db.runCommand({remove: true, new: true}));
 
 // 4. Explaining findAndModify should not modify any contents of the collection.
-var onlyDoc = {_id: 0, i: 1};
+let onlyDoc = {_id: 0, i: 1};
 assert.commandWorked(t.insert(onlyDoc));
 
 // Explaining a delete should not delete anything.
-var matchingRemoveCmd = {findAndModify: cName, remove: true, query: {_id: onlyDoc._id}};
+let matchingRemoveCmd = {findAndModify: cName, remove: true, query: {_id: onlyDoc._id}};
 var res = db.runCommand({explain: matchingRemoveCmd});
 assert.commandWorked(res);
 assert.eq(t.find().itcount(), 1, "Explaining a remove should not remove any documents.");
 
 // Explaining an update should not update anything.
-var matchingUpdateCmd = {findAndModify: cName, update: {x: "x"}, query: {_id: onlyDoc._id}};
+let matchingUpdateCmd = {findAndModify: cName, update: {x: "x"}, query: {_id: onlyDoc._id}};
 var res = db.runCommand({explain: matchingUpdateCmd});
 assert.commandWorked(res);
 assert.eq(t.findOne(), onlyDoc, "Explaining an update should not update any documents.");
 
 // Explaining an upsert should not insert anything.
-var matchingUpsertCmd = {findAndModify: cName, update: {x: "x"}, query: {_id: "non-match"}, upsert: true};
+let matchingUpsertCmd = {findAndModify: cName, update: {x: "x"}, query: {_id: "non-match"}, upsert: true};
 var res = db.runCommand({explain: matchingUpsertCmd});
 assert.commandWorked(res);
 assert.eq(t.find().itcount(), 1, "Explaining an upsert should not insert any documents.");
 
 // 5. The reported stats should reflect how it would execute and what it would modify.
-var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+let isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
 
 // List out the command to be explained, and the expected results of that explain.
-var testCases = [
+let testCases = [
     // -------------------------------------- Removes ----------------------------------------
     {
         // Non-matching remove command.
@@ -242,7 +242,7 @@ function transformIfSharded(explainOut) {
         assert(explainOut.hasOwnProperty(outerKey));
         assert(explainOut[outerKey].hasOwnProperty(innerKey));
 
-        var shardStage = explainOut[outerKey][innerKey];
+        let shardStage = explainOut[outerKey][innerKey];
         assert.eq("SINGLE_SHARD", shardStage.stage);
         assert.eq(1, shardStage.shards.length);
         Object.extend(explainOut[outerKey], shardStage.shards[0], false);
@@ -265,9 +265,9 @@ function transformIfSharded(explainOut) {
  */
 function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentPath) {
     // This is only used recursively, to keep track of where we are in the document.
-    var isRootLevel = typeof currentPath === "undefined";
+    let isRootLevel = typeof currentPath === "undefined";
     Object.keys(expectedMatches).forEach(function (key) {
-        var totalFieldName = isRootLevel ? key : currentPath + "." + key;
+        let totalFieldName = isRootLevel ? key : currentPath + "." + key;
         assert(
             explainOut.hasOwnProperty(key),
             preMsg + "Explain's output does not have a value for " + key + "\n" + tojson(explainOut),
@@ -338,12 +338,12 @@ function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentP
  */
 function assertExplainMatchedAllVerbosities(findAndModifyArgs, expectedResult) {
     ["queryPlanner", "executionStats", "allPlansExecution"].forEach(function (verbosityMode) {
-        var cmd = {
+        let cmd = {
             explain: Object.merge({findAndModify: cName}, findAndModifyArgs),
             verbosity: verbosityMode,
         };
-        var msg = "Error after running command: " + tojson(cmd) + ": ";
-        var explainOut = db.runCommand(cmd);
+        let msg = "Error after running command: " + tojson(cmd) + ": ";
+        let explainOut = db.runCommand(cmd);
         assert.commandWorked(explainOut, "command: " + tojson(cmd));
         // Don't check explain results for queryPlanner mode, as that doesn't have any of the
         // interesting stats.

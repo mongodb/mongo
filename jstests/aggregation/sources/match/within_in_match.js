@@ -3,8 +3,8 @@
 let c = db.s6531;
 c.drop();
 
-for (var x = 0; x < 10; x++) {
-    for (var y = 0; y < 10; y++) {
+for (let x = 0; x < 10; x++) {
+    for (let y = 0; y < 10; y++) {
         c.insert({loc: [x, y]});
     }
 }

@@ -22,7 +22,7 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
     const coll = testDB[collName];
 
-    var doc = {
+    let doc = {
         t: ISODate(),
         m: "meta",
         a: "foo",
@@ -42,9 +42,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, doc));
     assert.eq(3, coll.find({"m": "meta"}).toArray().length);
     assert.eq(2, getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
-    var schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"control.min.a": 1}).rawData().toArray();
+    let schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"control.min.a": 1}).rawData().toArray();
     assert.eq(1, schemaChangedBucket.length);
-    var schemaChangedBucketId = schemaChangedBucket[0]._id;
+    let schemaChangedBucketId = schemaChangedBucket[0]._id;
 
     // new measurement, schema changed back, necessitating a different bucket
     doc.a = "bam";
@@ -65,7 +65,7 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
     const coll = testDB[collName];
 
-    var doc = {t: ISODate(), m: "meta", a: 1, payload: "small"};
+    let doc = {t: ISODate(), m: "meta", a: 1, payload: "small"};
     assert.commandWorked(insert(coll, doc));
     assert.eq(1, coll.find({"m": "meta"}).toArray().length);
     assert.eq(1, getTimeseriesCollForRawOps(coll).find({}).rawData().toArray().length);
@@ -77,9 +77,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, doc));
     assert.eq(2, coll.find({"m": "meta"}).toArray().length);
     assert.eq(2, getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
-    var schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"control.min.a": "foo"}).rawData().toArray();
+    let schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"control.min.a": "foo"}).rawData().toArray();
     assert.eq(1, schemaChangedBucket.length);
-    var schemaChangedBucketId = schemaChangedBucket[0]._id;
+    let schemaChangedBucketId = schemaChangedBucket[0]._id;
 
     // new measurement, schema changed back, necessitating a different bucket
     doc.a = 2;

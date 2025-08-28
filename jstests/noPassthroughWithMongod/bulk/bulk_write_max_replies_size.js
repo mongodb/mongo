@@ -12,7 +12,7 @@
  */
 import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
 
-var coll = db.getCollection("coll");
+let coll = db.getCollection("coll");
 coll.drop();
 
 assert.commandWorked(db.adminCommand({"setParameter": 1, "bulkWriteMaxRepliesSize": NumberInt(20)}));

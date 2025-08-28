@@ -6,14 +6,14 @@
  * ]
  */
 
-var kDbName = db.getName();
+let kDbName = db.getName();
 
 db.dropDatabase();
 
 function testAndClenaupWithKeyNoIndexFailed(keyDoc) {
     assert.commandWorked(db.adminCommand({enableSharding: kDbName}));
 
-    var ns = db.getName() + ".foo";
+    let ns = db.getName() + ".foo";
     assert.commandFailed(db.adminCommand({shardCollection: ns, key: keyDoc}));
 
     assert.eq(db.getSiblingDB("config").collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 0);
@@ -24,7 +24,7 @@ function testAndClenaupWithKeyOK(keyDoc) {
     assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
     assert.commandWorked(db.foo.createIndex(keyDoc));
 
-    var ns = kDbName + ".foo";
+    let ns = kDbName + ".foo";
     assert.eq(db.getSiblingDB("config").collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 0);
 
     assert.commandWorked(db.adminCommand({shardCollection: ns, key: keyDoc}));
@@ -36,7 +36,7 @@ function testAndClenaupWithKeyOK(keyDoc) {
 function testAndClenaupWithKeyNoIndexOK(keyDoc) {
     assert.commandWorked(db.adminCommand({enableSharding: kDbName}));
 
-    var ns = kDbName + ".foo";
+    let ns = kDbName + ".foo";
     assert.eq(db.getSiblingDB("config").collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 0);
 
     assert.commandWorked(db.adminCommand({shardCollection: ns, key: keyDoc}));
@@ -46,7 +46,7 @@ function testAndClenaupWithKeyNoIndexOK(keyDoc) {
 }
 
 function getIndexSpecByName(coll, indexName) {
-    var indexes = coll.getIndexes().filter(function (spec) {
+    let indexes = coll.getIndexes().filter(function (spec) {
         return spec.name === indexName;
     });
     assert.eq(1, indexes.length, 'index "' + indexName + '" not found"');
@@ -331,7 +331,7 @@ jsTestLog(
 db.foo.drop();
 assert.commandWorked(db.createCollection("foo", {collation: {locale: "en_US"}}));
 assert.commandWorked(db.adminCommand({shardCollection: kDbName + ".foo", key: {a: 1}, collation: {locale: "simple"}}));
-var indexSpec = getIndexSpecByName(db.foo, "a_1");
+let indexSpec = getIndexSpecByName(db.foo, "a_1");
 assert(!indexSpec.hasOwnProperty("collation"));
 
 jsTestLog(

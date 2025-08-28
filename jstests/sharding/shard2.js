@@ -15,7 +15,7 @@ function printAll() {
     print("---------------------");
 }
 
-var s = new ShardingTest({shards: 2});
+let s = new ShardingTest({shards: 2});
 var db = s.getDB("test");
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
@@ -24,7 +24,7 @@ assert.eq(1, findChunksUtil.countChunksForNs(s.config, "test.foo"), "sanity chec
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 0}}));
 assert.eq(2, findChunksUtil.countChunksForNs(s.config, "test.foo"), "should be 2 shards");
-var chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
+let chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
 assert.eq(chunks[0].shard, chunks[1].shard, "server should be the same after a split");
 
 assert.commandWorked(db.foo.save({num: 1, name: "eliot"}));
@@ -86,7 +86,7 @@ assert.eq("funny man", db.foo.findOne({num: -2}).name);
 
 // getAll
 function sumQuery(c) {
-    var sum = 0;
+    let sum = 0;
     c.toArray().forEach(function (z) {
         sum += z.num;
     });
@@ -116,7 +116,7 @@ function getNames(c) {
         return z.name;
     });
 }
-var correct = getNames(db.foo.find()).sort();
+let correct = getNames(db.foo.find()).sort();
 assert.eq(correct, getNames(db.foo.find().sort({name: 1})));
 correct = correct.reverse();
 assert.eq(correct, getNames(db.foo.find().sort({name: -1})));
@@ -146,7 +146,7 @@ db.foo
         print(z._id);
     });
 
-var zzz = db.foo.find().explain("executionStats").executionStats;
+let zzz = db.foo.find().explain("executionStats").executionStats;
 assert.eq(0, zzz.totalKeysExamined, "EX1a");
 assert.eq(6, zzz.nReturned, "EX1b");
 assert.eq(6, zzz.totalDocsExamined, "EX1c");
@@ -159,7 +159,7 @@ assert.eq(6, zzz.totalDocsExamined, "EX2c");
 // getMore
 assert.eq(4, db.foo.find().limit(-4).toArray().length, "getMore 1");
 function countCursor(c) {
-    var num = 0;
+    let num = 0;
     while (c.hasNext()) {
         c.next();
         num++;
@@ -171,13 +171,13 @@ assert.eq(6, countCursor(db.foo.find().batchSize(1)._exec()), "getMore 3");
 
 // find by non-shard-key
 db.foo.find().forEach(function (z) {
-    var y = db.foo.findOne({_id: z._id});
+    let y = db.foo.findOne({_id: z._id});
     assert(y, "_id check 1 : " + tojson(z));
     assert.eq(z.num, y.num, "_id check 2 : " + tojson(z));
 });
 
 // update
-var person = db.foo.findOne({num: 3});
+let person = db.foo.findOne({num: 3});
 assert.eq("bob", person.name, "update setup 1");
 person.name = "bob is gone";
 db.foo.update({num: 3}, person);
@@ -202,8 +202,8 @@ placeCheck(8);
 // more update stuff
 
 printAll();
-var total = db.foo.find().count();
-var res = assert.commandWorked(db.foo.update({}, {$inc: {x: 1}}, false, true));
+let total = db.foo.find().count();
+let res = assert.commandWorked(db.foo.update({}, {$inc: {x: 1}}, false, true));
 printAll();
 assert.eq(total, res.nModified, res.toString());
 

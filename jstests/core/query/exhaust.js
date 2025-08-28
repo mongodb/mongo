@@ -11,7 +11,7 @@ const coll = db.exhaustColl;
 coll.drop();
 
 const docCount = 4;
-for (var i = 0; i < docCount; i++) {
+for (let i = 0; i < docCount; i++) {
     assert.commandWorked(coll.insert({a: i}));
 }
 

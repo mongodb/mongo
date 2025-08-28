@@ -5,7 +5,7 @@ t.drop();
 
 // Self-intersecting polygon, triggers
 // "Exterior shell of polygon is invalid".
-var geometry = {
+let geometry = {
     type: "Polygon",
     coordinates: [
         [
@@ -19,7 +19,7 @@ var geometry = {
 };
 
 t.insert({_id: 42, geometry: geometry});
-var err = t.createIndex({geometry: "2dsphere"});
+let err = t.createIndex({geometry: "2dsphere"});
 assert.commandFailed(err);
 
 // Document's _id should be in error message.

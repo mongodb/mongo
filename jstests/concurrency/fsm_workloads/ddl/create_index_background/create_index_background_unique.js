@@ -16,7 +16,7 @@
 import {assertWorkedOrFailedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         prefix: "create_index_background_unique_",
         numDocsToLoad: 5000,
         iterationCount: 0,
@@ -34,7 +34,7 @@ export const $config = (function () {
         },
     };
 
-    var states = (function () {
+    let states = (function () {
         function buildIndex(db, collName) {
             this.iterationCount++;
 
@@ -77,7 +77,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         buildIndex: {dropIndex: 1.0},
         dropIndex: {buildIndex: 1.0},
     };
@@ -86,7 +86,7 @@ export const $config = (function () {
         for (let j = 0; j < this.threadCount; ++j) {
             const collectionName = this.getCollectionNameForThread(j);
             assert.commandWorked(db.createCollection(collectionName, this.getCollectionOptions()));
-            var bulk = db[collectionName].initializeUnorderedBulkOp();
+            let bulk = db[collectionName].initializeUnorderedBulkOp();
 
             // Preload documents for each thread's collection. This ensures that the index build and
             // drop have meaningful work to do.

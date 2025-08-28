@@ -32,7 +32,7 @@ const searchCmd = {
 };
 
 // Give mongotmock some stuff to return.
-var cursorId = NumberLong(123);
+let cursorId = NumberLong(123);
 
 function setupMocks(searchMetaValue) {
     const history = [

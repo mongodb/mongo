@@ -21,11 +21,11 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 // gossip that time later in setup.
 //
 
-var adminUser = {db: "admin", username: "foo", password: "bar"};
+let adminUser = {db: "admin", username: "foo", password: "bar"};
 
-var testUser = {db: "test", username: "bar", password: "baz"};
+let testUser = {db: "test", username: "bar", password: "baz"};
 
-var testUserReadOnly = {db: "test", username: "sad", password: "bat"};
+let testUserReadOnly = {db: "test", username: "sad", password: "bat"};
 
 function login(userObj, thingToUse) {
     if (!thingToUse) {
@@ -42,9 +42,9 @@ function logout(userObj, thingToUse) {
 }
 
 function getShardName(rsTest) {
-    var primary = rsTest.getPrimary();
-    var config = primary.getDB("local").system.replset.findOne();
-    var members = config.members.map(function (elem) {
+    let primary = rsTest.getPrimary();
+    let config = primary.getDB("local").system.replset.findOne();
+    let members = config.members.map(function (elem) {
         return elem.host;
     });
     return config._id + "/" + members.join(",");
@@ -83,26 +83,26 @@ print("Restart mongos with different auth options");
 s.restartMongos(0);
 login(adminUser);
 
-var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true, waitForKeys: false});
+let d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true, waitForKeys: false});
 d1.startSet({keyFile: "jstests/libs/key2", shardsvr: ""});
 d1.initiate();
 
 print("d1 initiated");
-var shardName = authutil.asCluster(d1.nodes, "jstests/libs/key2", function () {
+let shardName = authutil.asCluster(d1.nodes, "jstests/libs/key2", function () {
     return getShardName(d1);
 });
 
 print("adding shard w/out auth " + shardName);
 logout(adminUser);
 
-var result = s.getDB("admin").runCommand({addShard: shardName});
+let result = s.getDB("admin").runCommand({addShard: shardName});
 assert.commandFailedWithCode(result, ErrorCodes.Unauthorized);
 
 login(adminUser);
 
 print("adding shard w/wrong key " + shardName);
 
-var thrown = false;
+let thrown = false;
 try {
     result = s.adminCommand({addShard: shardName});
 } catch (e) {
@@ -124,7 +124,7 @@ if (jsTest.options().storageEngine == "inMemory") {
     d1.startSet({keyFile: "jstests/libs/key1", restart: true});
 }
 
-var primary = d1.getPrimary();
+let primary = d1.getPrimary();
 
 print("adding shard w/auth " + shardName);
 
@@ -146,7 +146,7 @@ s.getDB(testUserReadOnly.db).createUser({
 logout(adminUser);
 
 print("query try");
-var e = assert.throws(function () {
+let e = assert.throws(function () {
     s.s.getDB("foo").bar.findOne();
 });
 printjson(e);
@@ -166,7 +166,7 @@ assert.eq(1, s.getDB("test").foo.find().itcount(), tojson(result));
 
 logout(testUser);
 
-var d2 = new ReplSetTest({name: "d2", nodes: 3, useHostName: true, waitForKeys: false});
+let d2 = new ReplSetTest({name: "d2", nodes: 3, useHostName: true, waitForKeys: false});
 d2.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 d2.initiate();
 d2.awaitSecondaryNodes();
@@ -186,10 +186,10 @@ awaitRSClientHosts(s.s, d2.nodes, {ok: true});
 
 s.getDB("test").foo.remove({});
 
-var num = 10;
+let num = 10;
 assert.commandWorked(s.s.adminCommand({split: "test.foo", middle: {x: num / 2}}));
 const bigString = "X".repeat(1024 * 1024); // 1MB
-var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
+let bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
 for (i = 0; i < num; i++) {
     bulk.insert({_id: i, x: i, abc: "defg", date: new Date(), str: bigString});
 }
@@ -199,19 +199,19 @@ s.startBalancer(60000);
 
 // SERVER-33753: count() without predicate can be wrong on sharded collections.
 // assert.eq(s.getDB("test").foo.count(), num+1);
-var numDocs = s.getDB("test").foo.find().itcount();
+let numDocs = s.getDB("test").foo.find().itcount();
 if (numDocs != num) {
     // Missing documents. At this point we're already in a failure mode, the code in this
     // statement
     // is to get a better idea how/why it's failing.
 
-    var numDocsSeen = 0;
-    var lastDocNumber = -1;
-    var missingDocNumbers = [];
-    var docs = s.getDB("test").foo.find().sort({x: 1}).toArray();
+    let numDocsSeen = 0;
+    let lastDocNumber = -1;
+    let missingDocNumbers = [];
+    let docs = s.getDB("test").foo.find().sort({x: 1}).toArray();
     for (var i = 0; i < docs.length; i++) {
         if (docs[i].x != lastDocNumber + 1) {
-            for (var missing = lastDocNumber + 1; missing < docs[i].x; missing++) {
+            for (let missing = lastDocNumber + 1; missing < docs[i].x; missing++) {
                 missingDocNumbers.push(missing);
             }
         }
@@ -233,9 +233,9 @@ if (numDocs != num) {
 // This call also waits for any ongoing balancing to stop
 s.stopBalancer(60000);
 
-var cursor = s.getDB("test").foo.find({x: {$lt: 5}});
+let cursor = s.getDB("test").foo.find({x: {$lt: 5}});
 
-var count = 0;
+let count = 0;
 while (cursor.hasNext()) {
     cursor.next();
     count++;
@@ -275,7 +275,7 @@ print("testing map reduce");
 // Sharded map reduce can be tricky since all components talk to each other. For example
 // SERVER-4114 is triggered when 1 mongod connects to another for final reduce it's not
 // properly tested here since addresses are localhost, which is more permissive.
-var res = s.getDB("test").runCommand({
+let res = s.getDB("test").runCommand({
     mapreduce: "foo",
     map: function () {
         emit(this.x, 1);
@@ -291,8 +291,8 @@ assert.commandWorked(res);
 // Test read only users
 print("starting read only tests");
 
-var readOnlyS = new Mongo(s.getDB("test").getMongo().host);
-var readOnlyDB = readOnlyS.getDB("test");
+let readOnlyS = new Mongo(s.getDB("test").getMongo().host);
+let readOnlyDB = readOnlyS.getDB("test");
 
 print("   testing find that should fail");
 assert.throws(function () {

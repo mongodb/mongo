@@ -1,6 +1,6 @@
 // check that constructor also works without "new"
-var a;
-var b;
+let a;
+let b;
 a = new ObjectId();
 b = ObjectId(a.valueOf());
 printjson(a);
@@ -93,8 +93,8 @@ assert.eq(tojson(a), tojson(b), "int");
 // ObjectId.fromDate
 
 a = new ObjectId();
-var timestampA = a.getTimestamp();
-var dateA = new Date(timestampA.getTime());
+let timestampA = a.getTimestamp();
+let dateA = new Date(timestampA.getTime());
 
 // ObjectId.fromDate - invalid input types
 assert.throws(
@@ -122,8 +122,8 @@ assert.throws(
 );
 
 // SERVER-14623 dates less than or equal to 1978-07-04T21:24:15Z fail
-var checkFromDate = function (millis, expected, comment) {
-    var oid = ObjectId.fromDate(new Date(millis));
+let checkFromDate = function (millis, expected, comment) {
+    let oid = ObjectId.fromDate(new Date(millis));
     assert.eq(oid.valueOf(), expected, comment);
 };
 checkFromDate(Math.pow(2, 28) * 1000, "100000000000000000000000", "1978-07-04T21:24:16Z");

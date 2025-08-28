@@ -25,7 +25,7 @@ let collectionNameIndex = 0;
 // Generate a collection name not already present in the log.
 do {
     var testCollectionName = "jstests_queryoptimizera__" + collectionNameIndex++;
-    var warningMatchString = "unindexed _id query on capped collection.*collection: test." + testCollectionName;
+    let warningMatchString = "unindexed _id query on capped collection.*collection: test." + testCollectionName;
     var warningMatchRegexp = new RegExp(warningMatchString);
 } while (numWarnings() > 0);
 

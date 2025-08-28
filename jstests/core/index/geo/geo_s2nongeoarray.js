@@ -8,7 +8,7 @@ let t = db.geo_s2nongeoarray;
 
 let oldPoint = [40, 5];
 
-var data = {geo: oldPoint, nonGeo: [123, 456], otherNonGeo: [{b: [1, 2]}, {b: [3, 4]}]};
+let data = {geo: oldPoint, nonGeo: [123, 456], otherNonGeo: [{b: [1, 2]}, {b: [3, 4]}]};
 
 t.drop();
 assert.commandWorked(t.insert(data));

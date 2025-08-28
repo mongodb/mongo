@@ -24,7 +24,7 @@ function getMillis() {
     return d.getTime();
 }
 function runtimeMillis(f) {
-    var start = getMillis();
+    let start = getMillis();
     f();
     return getMillis() - start;
 }

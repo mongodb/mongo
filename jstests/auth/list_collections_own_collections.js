@@ -216,19 +216,19 @@ function runNoAuthTestOnConnection(conn) {
     assert.commandWorked(db.createView("bar", "foo", []));
     assert.commandWorked(db.createCollection("ts_foo", {timeseries: {timeField: "date"}}));
 
-    var resFull = db.runCommand({listCollections: 1});
+    let resFull = db.runCommand({listCollections: 1});
     assert.commandWorked(resFull);
-    var resAuthColls = db.runCommand({listCollections: 1, authorizedCollections: true});
+    let resAuthColls = db.runCommand({listCollections: 1, authorizedCollections: true});
     assert.commandWorked(resAuthColls);
     assert.eq(resFull.cursor.firstBatch.sort(nameSort), resAuthColls.cursor.firstBatch.sort(nameSort));
 
-    var resNameOnly = db.runCommand({listCollections: 1, nameOnly: true});
+    let resNameOnly = db.runCommand({listCollections: 1, nameOnly: true});
     assert.commandWorked(resNameOnly);
-    var resNameOnlyAuthColls = db.runCommand({listCollections: 1, nameOnly: true, authorizedCollections: true});
+    let resNameOnlyAuthColls = db.runCommand({listCollections: 1, nameOnly: true, authorizedCollections: true});
     assert.commandWorked(resNameOnlyAuthColls);
     assert.eq(resNameOnly.cursor.firstBatch.sort(nameSort), resNameOnlyAuthColls.cursor.firstBatch.sort(nameSort));
 
-    var resWithFilter = db.runCommand({
+    let resWithFilter = db.runCommand({
         listCollections: 1,
         nameOnly: true,
         authorizedCollections: true,

@@ -24,7 +24,7 @@
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.
         uniqueDBName: jsTestName(),
@@ -40,7 +40,7 @@ export const $config = (function () {
         opName: "updated",
     };
 
-    var states = (function () {
+    let states = (function () {
         function updateOne(db, collName) {
             const updateCmd = {
                 update: collName,
@@ -55,7 +55,7 @@ export const $config = (function () {
             };
 
             // Update field 'sortField' to avoid matching the same document again.
-            var res = db.runCommand(updateCmd);
+            let res = db.runCommand(updateCmd);
 
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
@@ -72,16 +72,16 @@ export const $config = (function () {
         return {updateOne: updateOne};
     })();
 
-    var transitions = {updateOne: {updateOne: 1}};
+    let transitions = {updateOne: {updateOne: 1}};
 
     function setup(db, collName) {
         // Each thread should update exactly one document per iteration.
         this.numDocsToMatch = this.iterations * this.threadCount;
         this.numDocsTotal = 2 * this.numDocsToMatch;
 
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 1; i <= this.numDocsTotal; ++i) {
-            var doc = this.newDocForInsert(i);
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 1; i <= this.numDocsTotal; ++i) {
+            let doc = this.newDocForInsert(i);
             // Require that documents inserted by this workload use _id values that can be compared
             // using the default JS comparator.
             assert.neq(
@@ -91,7 +91,7 @@ export const $config = (function () {
             );
             bulk.insert(doc);
         }
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(this.numDocsTotal, res.nInserted);
 
@@ -101,15 +101,15 @@ export const $config = (function () {
     }
 
     function teardown(db, collName) {
-        var numNewDocs = db[collName].countDocuments({sortField: -1, queryField: -1});
+        let numNewDocs = db[collName].countDocuments({sortField: -1, queryField: -1});
         assert.eq(numNewDocs, this.numDocsToMatch);
 
         // Ensure that the modified documents were those that came first in the sort order (for a
         // descending sort, the documents that had the highest sortField values). While sortField is
         // modified by the update, the document's _id value is the same as its old sortField value,
         // so we check the value at _id instead.
-        var docs = db[collName].find({sortField: -1, queryField: -1}).sort({_id: -1}).toArray();
-        for (var i = 0; i < numNewDocs; ++i) {
+        let docs = db[collName].find({sortField: -1, queryField: -1}).sort({_id: -1}).toArray();
+        for (let i = 0; i < numNewDocs; ++i) {
             assert.eq(docs[i]._id, this.numDocsTotal - i);
         }
     }

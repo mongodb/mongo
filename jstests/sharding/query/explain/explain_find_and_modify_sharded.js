@@ -4,19 +4,19 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var collName = "explain_find_and_modify";
+let collName = "explain_find_and_modify";
 
 // Create a cluster with 2 shards.
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var testDB = st.s.getDB("test");
-var shardKey = {a: 1};
+let testDB = st.s.getDB("test");
+let shardKey = {a: 1};
 
 // Use "st.shard0.shardName" as the primary shard.
 assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Create a collection with an index on the intended shard key.
-var shardedColl = testDB.getCollection(collName);
+let shardedColl = testDB.getCollection(collName);
 shardedColl.drop();
 assert.commandWorked(testDB.createCollection(collName));
 assert.commandWorked(shardedColl.createIndex(shardKey));
@@ -33,7 +33,7 @@ assert.commandWorked(
     testDB.adminCommand({moveChunk: shardedColl.getFullName(), find: {a: 10}, to: st.shard1.shardName}),
 );
 
-var res;
+let res;
 
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
@@ -70,7 +70,7 @@ function assertExplainResult(explainOut, outerKey, innerKey, shardName, expected
     assert(explainOut.hasOwnProperty(outerKey));
     assert(explainOut[outerKey].hasOwnProperty(innerKey));
 
-    var shardStage = explainOut[outerKey][innerKey];
+    let shardStage = explainOut[outerKey][innerKey];
     assert.eq("SINGLE_SHARD", shardStage.stage);
     assert.eq(1, shardStage.shards.length);
     assert.eq(shardName, shardStage.shards[0].shardName);

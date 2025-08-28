@@ -18,14 +18,14 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = Object.extend(
         {
             explainMatch: function explainMatch(db, collName) {
-                var res = db[collName].explain().aggregate([{$match: {i: this.nInserted / 2}}]);
+                let res = db[collName].explain().aggregate([{$match: {i: this.nInserted / 2}}]);
                 assert.commandWorked(res);
 
                 // stages reported: $cursor
                 assertCursorStages(1, res);
             },
             explainMatchProject: function explainMatchProject(db, collName) {
-                var res = db[collName].explain().aggregate([{$match: {i: this.nInserted / 3}}, {$project: {i: 1}}]);
+                let res = db[collName].explain().aggregate([{$match: {i: this.nInserted / 3}}, {$project: {i: 1}}]);
                 assert.commandWorked(res);
 
                 // stages reported: $cursor, $project

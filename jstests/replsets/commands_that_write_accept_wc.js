@@ -12,7 +12,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: "WCSet",
     // Set priority of secondaries to zero to prevent spurious elections.
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
@@ -21,11 +21,11 @@ var replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var dbName = "wc-test";
+let primary = replTest.getPrimary();
+let dbName = "wc-test";
 var db = primary.getDB(dbName);
-var collName = "leaves";
-var coll = db[collName];
+let collName = "leaves";
+let coll = db[collName];
 
 function dropTestCollection() {
     replTest.awaitReplication();
@@ -35,7 +35,7 @@ function dropTestCollection() {
 
 dropTestCollection();
 
-var commands = [];
+let commands = [];
 
 commands.push({
     req: {insert: collName, documents: [{type: "maple"}]},
@@ -180,7 +180,7 @@ function testValidWriteConcern(cmd) {
 
     dropTestCollection();
     cmd.setupFunc();
-    var res = db.runCommand(cmd.req);
+    let res = db.runCommand(cmd.req);
     assert.commandWorked(res);
     assert(!res.writeConcernError, "command on a full replicaset had writeConcernError: " + tojson(res));
     cmd.confirmFunc();
@@ -192,7 +192,7 @@ function testInvalidWriteConcern(cmd) {
 
     dropTestCollection();
     cmd.setupFunc();
-    var res = coll.runCommand(cmd.req);
+    let res = coll.runCommand(cmd.req);
     assert.commandFailedWithCode(res, ErrorCodes.UnknownReplWriteConcern);
     cmd.confirmFunc();
 }

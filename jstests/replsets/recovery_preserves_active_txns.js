@@ -47,7 +47,7 @@ function doTest(commitOrAbort) {
     PrepareHelpers.growOplogPastMaxSize(replSet);
 
     // Oplog grew past maxSize, and it includes the oldest active transaction's entry.
-    var secondary = replSet.getSecondary();
+    let secondary = replSet.getSecondary();
     function checkSecondaryOplog() {
         const secondaryOplog = secondary.getDB("local").oplog.rs;
         assert.soon(

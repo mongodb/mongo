@@ -2,7 +2,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.reverseArray;
+let coll = db.reverseArray;
 coll.drop();
 
 // We need a document to flow through the pipeline, even though we don't care what fields it
@@ -23,8 +23,8 @@ coll.insert({
 assertErrorCode(coll, [{$project: {reversed: {$reverseArray: 1}}}], 34435);
 assertErrorCode(coll, [{$project: {reversed: {$reverseArray: "$num"}}}], 34435);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [1, 2]}}}}]);
-var output = res.toArray();
+let res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [1, 2]}}}}]);
+let output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [2, 1]);
 

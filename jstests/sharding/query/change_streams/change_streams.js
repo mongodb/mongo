@@ -57,13 +57,13 @@ function runTest(collName, shardKey) {
     //
 
     function makeShardKey(value) {
-        var obj = {};
+        let obj = {};
         obj[shardKey] = value;
         return obj;
     }
 
     function makeShardKeyDocument(value, optExtraFields) {
-        var obj = {};
+        let obj = {};
         if (shardKey !== "_id") obj["_id"] = value;
         obj[shardKey] = value;
         return Object.assign(obj, optExtraFields);

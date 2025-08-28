@@ -16,8 +16,8 @@ let t = db.jstests_rename_operator;
 t.drop();
 
 function bad(f) {
-    var docsBeforeUpdate = t.find().toArray();
-    var res = eval(f);
+    let docsBeforeUpdate = t.find().toArray();
+    let res = eval(f);
 
     // Ensure error
     if (!res.hasWriteError()) {
@@ -73,9 +73,9 @@ bad("t.update( {}, {$rename:{'a':'f.g'}} )");
 function good(start, mod, expected) {
     t.remove({});
     t.save(start);
-    var res = t.update({}, mod);
+    let res = t.update({}, mod);
     assert.commandWorked(res);
-    var got = t.findOne();
+    let got = t.findOne();
     delete got._id;
     assert.docEq(expected, got);
 }
@@ -137,9 +137,9 @@ t.createIndex({a: 1});
 function l(start, mod, query, expected) {
     t.remove({});
     t.save(start);
-    var res = t.update({}, mod);
+    let res = t.update({}, mod);
     assert.commandWorked(res);
-    var got = t.find(query).hint({a: 1}).next();
+    let got = t.find(query).hint({a: 1}).next();
     delete got._id;
     assert.docEq(expected, got);
 }

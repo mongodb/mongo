@@ -10,24 +10,24 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 function doCommittedRead(coll) {
-    var res = coll.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
+    let res = coll.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
     assert.commandWorked(res, "reading from " + coll.getFullName() + " on " + coll.getMongo().host);
     return new DBCommandCursor(coll.getDB(), res).toArray()[0].state;
 }
 
 function doDirtyRead(coll) {
-    var res = coll.runCommand("find", {"readConcern": {"level": "local"}});
+    let res = coll.runCommand("find", {"readConcern": {"level": "local"}});
     assert.commandWorked(res, "reading from " + coll.getFullName() + " on " + coll.getMongo().host);
     return new DBCommandCursor(coll.getDB(), res).toArray()[0].state;
 }
 
 // Set up a set and grab things for later.
-var name = "read_committed_after_rollback";
-var replTest = new ReplSetTest({name: name, nodes: 5, useBridge: true});
+let name = "read_committed_after_rollback";
+let replTest = new ReplSetTest({name: name, nodes: 5, useBridge: true});
 replTest.startSet({setParameter: {allowMultipleArbiters: true}});
 
-var nodes = replTest.nodeList();
-var config = {
+let nodes = replTest.nodeList();
+let config = {
     "_id": name,
     "members": [
         {"_id": 0, "host": nodes[0]},
@@ -44,8 +44,8 @@ var config = {
 replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
 
 // Get connections.
-var oldPrimary = replTest.getPrimary();
-var [newPrimary, pureSecondary, ...arbiters] = replTest.getSecondaries();
+let oldPrimary = replTest.getPrimary();
+let [newPrimary, pureSecondary, ...arbiters] = replTest.getSecondaries();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -53,9 +53,9 @@ assert.commandWorked(
 );
 replTest.awaitReplication();
 // This is the collection that all of the tests will use.
-var collName = name + ".collection";
-var oldPrimaryColl = oldPrimary.getCollection(collName);
-var newPrimaryColl = newPrimary.getCollection(collName);
+let collName = name + ".collection";
+let oldPrimaryColl = oldPrimary.getCollection(collName);
+let newPrimaryColl = newPrimary.getCollection(collName);
 
 // Set up initial state.
 assert.commandWorked(oldPrimaryColl.insert({_id: 1, state: "old"}, {writeConcern: {w: "majority", wtimeout: 30000}}));

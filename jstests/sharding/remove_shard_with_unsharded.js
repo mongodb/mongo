@@ -5,8 +5,8 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
-var config = st.s.getDB("config");
+let st = new ShardingTest({shards: 2});
+let config = st.s.getDB("config");
 const adminDB = st.s.getDB("admin");
 
 const db0 = st.s.getDB("db0");
@@ -42,7 +42,7 @@ assert.commandWorked(st.s.adminCommand({moveCollection: "db1.collOutOfPrimary", 
 assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
 
 // Check the ongoing status and unsharded collection, that cannot be moved
-var removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
+let removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
 assert.eq("ongoing", removeResult.state, "Shard should stay in ongoing state: " + tojson(removeResult));
 assert.eq(3, removeResult.remaining.collectionsToMove);
 assert.eq(1, removeResult.remaining.dbs);
@@ -79,7 +79,7 @@ adminDB.adminCommand({movePrimary: "db1", to: st.shard0.shardName});
 removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
 assert.eq("completed", removeResult.state, "Shard was not removed: " + tojson(removeResult));
 
-var existingShards = config.shards.find({}).toArray();
+let existingShards = config.shards.find({}).toArray();
 assert.eq(1, existingShards.length, "Removed server still appears in count: " + tojson(existingShards));
 
 // TODO (SERVER-97816): remove multiversion check

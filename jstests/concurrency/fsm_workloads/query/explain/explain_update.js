@@ -11,21 +11,21 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = Object.extend(
         {
             explainBasicUpdate: function explainBasicUpdate(db, collName) {
-                var res = db[collName].explain("executionStats").update({i: this.nInserted}, {$set: {j: 49}});
+                let res = db[collName].explain("executionStats").update({i: this.nInserted}, {$set: {j: 49}});
                 assert.commandWorked(res);
                 // eslint-disable-next-line
                 assert.eq(1, explain.executionStats.totalDocsExamined);
 
                 // document should not have been updated.
-                var doc = db[collName].findOne({i: this.nInserted});
+                let doc = db[collName].findOne({i: this.nInserted});
                 assert.eq(2 * this.nInserted, doc.j);
             },
             explainUpdateUpsert: function explainUpdateUpsert(db, collName) {
-                var res = db[collName]
+                let res = db[collName]
                     .explain("executionStats")
                     .update({i: 2 * this.nInserted + 1}, {$set: {j: 81}}, /* upsert */ true);
                 assert.commandWorked(res);
-                var stage = res.executionStats.executionStages;
+                let stage = res.executionStats.executionStages;
 
                 // if explaining a write command through mongos
                 if (isMongos(db)) {
@@ -38,11 +38,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
                 assert.eq(this.nInserted, db[collName].find().itcount());
             },
             explainUpdateMulti: function explainUpdateMulti(db, collName) {
-                var res = db[collName]
+                let res = db[collName]
                     .explain("executionStats")
                     .update({i: {$lte: 2}}, {$set: {b: 3}}, /* upsert */ false, /* multi */ true);
                 assert.commandWorked(res);
-                var stage = res.executionStats.executionStages;
+                let stage = res.executionStats.executionStages;
 
                 // if explaining a write command through mongos
                 if (isMongos(db)) {

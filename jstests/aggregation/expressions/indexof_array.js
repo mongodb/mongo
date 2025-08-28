@@ -4,7 +4,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.indexofarray;
+let coll = db.indexofarray;
 coll.drop();
 
 // Insert a dummy document to ensure something flows through the pipeline.
@@ -36,7 +36,7 @@ testExpression(coll, {$indexOfArray: [[1, 2, 3], 2, 3, 5]}, -1);
 
 testExpression(coll, {$indexOfArray: [[], 1]}, -1);
 
-var pipeline = {
+let pipeline = {
     $project: {
         output: {
             $indexOfArray: ["string", "s"],

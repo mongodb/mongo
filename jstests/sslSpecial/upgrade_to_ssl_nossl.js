@@ -9,7 +9,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {CA_CERT, CLIENT_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     name: "tlsSet",
     nodes: [{}, {}, {rsConfig: {priority: 0}}],
     nodeOptions: {
@@ -19,7 +19,7 @@ var rst = new ReplSetTest({
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-var rstConn1 = rst.getPrimary();
+let rstConn1 = rst.getPrimary();
 rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});
 assert.eq(1, rstConn1.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
@@ -30,7 +30,7 @@ rst.upgradeSet({
     tlsCertificateKeyFile: SERVER_CERT,
     tlsAllowInvalidHostnames: "",
 });
-var rstConn2 = rst.getPrimary();
+let rstConn2 = rst.getPrimary();
 rstConn2.getDB("test").a.insert({a: 2, str: "TESTTESTTEST"});
 assert.eq(2, rstConn2.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
@@ -40,12 +40,12 @@ rst.upgradeSet({
     tlsCAFile: CA_CERT,
     tlsCertificateKeyFile: SERVER_CERT,
 });
-var rstConn3 = rst.getPrimary();
+let rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a: 3, str: "TESTTESTTEST"});
 assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 print("===== Ensure SSL Connectable =====");
-var canConnectSSL = runMongoProgram(
+let canConnectSSL = runMongoProgram(
     "mongo",
     "--port",
     rst.ports[0],

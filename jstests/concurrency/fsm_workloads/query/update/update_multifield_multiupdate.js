@@ -32,7 +32,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         assert.eq(res.nMatched, res.nModified, tojson(res));
 
         if (TestData.runningWithBalancer !== true) {
-            var docs = db[collName].find().toArray();
+            let docs = db[collName].find().toArray();
             docs.forEach(function (doc) {
                 assert.eq(
                     "number",

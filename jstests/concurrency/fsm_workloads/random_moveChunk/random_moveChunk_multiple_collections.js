@@ -30,10 +30,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.init = function init(db, collName, connCache) {
-        for (var i = 0; i < dbNames.length; i++) {
+        for (let i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
             db = db.getSiblingDB(dbName);
-            for (var j = 0; j < collNames.length; j++) {
+            for (let j = 0; j < collNames.length; j++) {
                 collName = collNames[j];
                 if (TestData.runningWithShardStepdowns) {
                     fsm.forceRunningOutsideTransaction(this);
@@ -56,12 +56,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const shards = Object.keys(cluster.getSerializedCluster().shards);
         const numShards = shards.length;
         // Initialize `dbNames.length` databases
-        for (var i = 0; i < dbNames.length; i++) {
+        for (let i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
             db = db.getSiblingDB(dbName);
             db.adminCommand({enablesharding: dbName, primaryShard: shards[i % numShards]});
             // Initialize `collNames.length` sharded collections per db
-            for (var j = 0; j < collNames.length; j++) {
+            for (let j = 0; j < collNames.length; j++) {
                 collName = collNames[j];
                 const ns = dbName + "." + collName;
                 assert.commandWorked(db.adminCommand({shardCollection: ns, key: this.shardKey}));

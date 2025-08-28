@@ -1,11 +1,11 @@
 // Tests for command line option canonicalization.  See SERVER-13379.
 import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
 
-var baseName = "jstests_core_network_options";
+let baseName = "jstests_core_network_options";
 
 // Object Check
 jsTest.log('Testing "objcheck" command line option');
-var expectedResult = {"parsed": {"net": {"wireObjectCheck": true}}};
+let expectedResult = {"parsed": {"net": {"wireObjectCheck": true}}};
 testGetCmdLineOptsMongod({objcheck: ""}, expectedResult);
 
 jsTest.log('Testing "noobjcheck" command line option');

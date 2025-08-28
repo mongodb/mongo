@@ -19,8 +19,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.query = function query(db, collName) {
-        var otherCollName = this.getOutputCollPrefix(collName) + this.tid;
-        var cursor = db[collName].aggregate([{$match: {flag: true}}, {$sort: {rand: 1}}, {$out: otherCollName}]);
+        let otherCollName = this.getOutputCollPrefix(collName) + this.tid;
+        let cursor = db[collName].aggregate([{$match: {flag: true}}, {$sort: {rand: 1}}, {$out: otherCollName}]);
         assert.eq(0, cursor.itcount());
         assert.eq(db[collName].find().itcount() / 2, db[otherCollName].find().itcount());
     };

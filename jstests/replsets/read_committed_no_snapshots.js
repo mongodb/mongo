@@ -11,8 +11,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 // Set up a set and grab things for later.
-var name = "read_committed_no_snapshots";
-var replTest = new ReplSetTest({
+let name = "read_committed_no_snapshots";
+let replTest = new ReplSetTest({
     name: name,
     nodes: [
         {},
@@ -34,15 +34,15 @@ replTest.initiate(null, "replSetInitiate", {
 });
 
 // Get connections and collection.
-var primary = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
-var healthySecondary = secondaries[0];
+let primary = replTest.getPrimary();
+let secondaries = replTest.getSecondaries();
+let healthySecondary = secondaries[0];
 healthySecondary.setSecondaryOk();
-var noSnapshotSecondary = secondaries[1];
+let noSnapshotSecondary = secondaries[1];
 noSnapshotSecondary.setSecondaryOk();
 
 // Do a write, wait for it to replicate, and ensure it is visible.
-var res = primary.getDB(name).runCommand(
+let res = primary.getDB(name).runCommand(
     //
     {
         insert: "foo",
@@ -55,7 +55,7 @@ assert.commandWorked(res);
 
 // We need to propagate the lastOpVisible from the primary as afterOpTime in the secondaries to
 // ensure we wait for the write to be in the majority committed view.
-var lastOp = res["$replData"].lastOpVisible;
+let lastOp = res["$replData"].lastOpVisible;
 
 // Timeout is based on heartbeat timeout.
 assert.commandWorked(
@@ -71,7 +71,7 @@ assert.commandFailedWithCode(
 );
 
 // Reconfig to make the no-snapshot secondary the primary
-var config = primary.getDB("local").system.replset.findOne();
+let config = primary.getDB("local").system.replset.findOne();
 config.members[0].priority = 0;
 config.members[2].priority = 1;
 config.version++;

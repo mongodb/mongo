@@ -1,16 +1,16 @@
 // check replica set authentication
 
-var name = "logpath";
-var token = "logpath_token";
+let name = "logpath";
+let token = "logpath_token";
 
-var dbdir = MongoRunner.dataPath + name + "/"; // this will work under windows as well as linux
-var basedir = MongoRunner.dataPath + name + "files" + "/";
-var logdir = basedir + "logdir/";
-var testdir = basedir + "testdir/";
-var sfile = _isWindows() ? "NUL" : "/dev/null";
+let dbdir = MongoRunner.dataPath + name + "/"; // this will work under windows as well as linux
+let basedir = MongoRunner.dataPath + name + "files" + "/";
+let logdir = basedir + "logdir/";
+let testdir = basedir + "testdir/";
+let sfile = _isWindows() ? "NUL" : "/dev/null";
 
-var logs = [token + "1", token + "2"];
-var port = allocatePorts(6);
+let logs = [token + "1", token + "2"];
+let port = allocatePorts(6);
 
 print("------ Creating directories");
 
@@ -19,11 +19,11 @@ assert(mkdir(basedir));
 assert(mkdir(logdir));
 assert(mkdir(testdir));
 
-var cleanupFiles = function () {
-    var files = listFiles(logdir);
+let cleanupFiles = function () {
+    let files = listFiles(logdir);
 
     for (let f in files) {
-        var name = files[f].name;
+        let name = files[f].name;
 
         // mostly here for safety
         if (name.indexOf(token) != -1) {
@@ -32,10 +32,10 @@ var cleanupFiles = function () {
     }
 };
 
-var logCount = function (fpattern, prefix) {
-    var files = listFiles(logdir);
-    var pat = RegExp(fpattern + (prefix ? "" : "$"));
-    var cnt = 0;
+let logCount = function (fpattern, prefix) {
+    let files = listFiles(logdir);
+    let pat = RegExp(fpattern + (prefix ? "" : "$"));
+    let cnt = 0;
 
     for (let f in files) {
         if (pat.test(files[f].name)) {

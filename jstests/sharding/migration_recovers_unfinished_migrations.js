@@ -25,7 +25,7 @@ const nodeOptions = {
 
 // Disable balancer in order to prevent balancing rounds from triggering shard version refreshes on
 // the shards that would interfere with the migration recovery interleaving this test requires.
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 1}},
     config: 3,
     other: {configOptions: nodeOptions, enableBalancer: false},
@@ -44,7 +44,7 @@ assert.commandWorked(st.s.adminCommand({shardCollection: nsB, key: {_id: 1}}));
 
 // Hang before commit migration
 let moveChunkHangAtStep5Failpoint = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep5");
-var joinMoveChunk1 = moveChunkParallel(
+let joinMoveChunk1 = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {_id: 0},
@@ -89,7 +89,7 @@ skipShardFilteringMetadataRefreshFailpoint.off();
 // document.
 let moveChunkHangAtStep3Failpoint = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep3");
 
-var joinMoveChunk2 = moveChunkParallel(
+let joinMoveChunk2 = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {_id: 0},

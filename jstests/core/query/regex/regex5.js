@@ -7,7 +7,7 @@ t.drop();
 
 // Add filler data to make sure that indexed solutions are
 // chosen over collection scans.
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.save({filler: "filler"});
 }
 

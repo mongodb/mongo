@@ -13,7 +13,7 @@
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
-var testDB = db.getSiblingDB("profile_list_collections");
+let testDB = db.getSiblingDB("profile_list_collections");
 assert.commandWorked(testDB.dropDatabase());
 const numCollections = 5;
 for (let i = 0; i < numCollections; ++i) {

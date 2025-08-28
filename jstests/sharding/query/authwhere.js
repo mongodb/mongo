@@ -7,13 +7,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // User document declarations.  All users in this test are added to the admin database.
 //
 
-var adminUser = {
+let adminUser = {
     user: "admin",
     pwd: "a",
     roles: ["readWriteAnyDatabase", "dbAdminAnyDatabase", "userAdminAnyDatabase", "clusterAdmin"],
 };
 
-var test1Reader = {
+let test1Reader = {
     user: "test",
     pwd: "a",
     roles: [{role: "read", db: "test1", hasRole: true, canDelegate: false}],
@@ -27,14 +27,14 @@ function assertInsert(collection, obj) {
     assert.commandWorked(collection.insert(obj));
 }
 
-var cluster = new ShardingTest({name: "authwhere", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
+let cluster = new ShardingTest({name: "authwhere", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
 
 // Set up the test data.
 (function () {
-    var adminDB = cluster.getDB("admin");
-    var test1DB = adminDB.getSiblingDB("test1");
-    var test2DB = adminDB.getSiblingDB("test2");
-    var ex;
+    let adminDB = cluster.getDB("admin");
+    let test1DB = adminDB.getSiblingDB("test1");
+    let test2DB = adminDB.getSiblingDB("test2");
+    let ex;
     try {
         adminDB.createUser(adminUser);
         assert(adminDB.auth(adminUser.user, adminUser.pwd));
@@ -50,9 +50,9 @@ var cluster = new ShardingTest({name: "authwhere", shards: 1, mongos: 1, other: 
 })();
 
 (function () {
-    var adminDB = cluster.getDB("admin");
-    var test1DB;
-    var test2DB;
+    let adminDB = cluster.getDB("admin");
+    let test1DB;
+    let test2DB;
     assert(adminDB.auth(test1Reader.user, test1Reader.pwd));
     try {
         test1DB = adminDB.getSiblingDB("test1");

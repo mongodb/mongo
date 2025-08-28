@@ -5,7 +5,7 @@
 //    does_not_support_stepdowns,
 // ]
 
-var t = db.dbadmin;
+let t = db.dbadmin;
 t.save({x: 1});
 t.save({x: 1});
 
@@ -18,21 +18,21 @@ assert(
     "listDatabases nameOnly: " + tojson(res),
 );
 
-var now = new Date();
-var x = db._adminCommand("hello");
+let now = new Date();
+let x = db._adminCommand("hello");
 assert(x.isWritablePrimary, "hello failed: " + tojson(x));
 assert(x.localTime, "hello didn't include time: " + tojson(x));
 
-var localTimeSkew = x.localTime - now;
+let localTimeSkew = x.localTime - now;
 if (localTimeSkew >= 50) {
     print("Warning: localTimeSkew " + localTimeSkew + " > 50ms.");
 }
 assert.lt(localTimeSkew, 60 * 60 * 1000 /* one minute */, "hello.localTime");
 
-var before = db.runCommand("serverStatus");
+let before = db.runCommand("serverStatus");
 print(before.uptimeMillis);
 sleep(100);
 
-var after = db.runCommand("serverStatus");
+let after = db.runCommand("serverStatus");
 print(after.uptimeMillis);
 assert.gte(after.uptimeMillis, before.uptimeMillis, "uptime estimate should be non-decreasing");

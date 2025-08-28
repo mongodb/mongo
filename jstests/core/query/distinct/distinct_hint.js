@@ -10,7 +10,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-var isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
+let isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
 const collName = "jstests_explain_distinct_hint";
 const coll = db[collName];
@@ -84,7 +84,7 @@ assert.throws(function () {
 
 let cmdRes = coll.runCommand("distinct", {"key": "a", query: {a: 1, b: 2}, hint: {bad: 1, hint: 1}});
 assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue, cmdRes);
-var regex = new RegExp("hint provided does not correspond to an existing index");
+let regex = new RegExp("hint provided does not correspond to an existing index");
 assert(regex.test(cmdRes.errmsg));
 
 // Make sure $natural hints are applied to distinct.

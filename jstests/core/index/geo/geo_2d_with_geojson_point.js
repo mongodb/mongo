@@ -2,11 +2,11 @@
  * Use of GeoJSON points should be prohibited with a 2d index, SERVER-10636.
  */
 
-var t = db.geo_2d_with_geojson_point;
+let t = db.geo_2d_with_geojson_point;
 t.drop();
 t.createIndex({loc: "2d"});
 
-var geoJSONPoint = {type: "Point", coordinates: [0, 0]};
+let geoJSONPoint = {type: "Point", coordinates: [0, 0]};
 
 print(
     assert.throws(

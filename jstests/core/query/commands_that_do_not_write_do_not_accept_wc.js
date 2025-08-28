@@ -11,9 +11,9 @@
  * ]
  */
 
-var collName = "leaves";
+let collName = "leaves";
 
-var commands = [];
+let commands = [];
 
 commands.push({find: collName, filter: {_id: 1}});
 
@@ -42,13 +42,13 @@ function assertWriteConcernNotSupportedError(res) {
 
 // Test a variety of valid and invalid writeConcerns to confirm that they still all get
 // the correct error.
-var writeConcerns = [{w: "invalid"}, {w: 1}];
+let writeConcerns = [{w: "invalid"}, {w: 1}];
 
 function testUnsupportedWriteConcern(wc, cmd) {
     cmd.writeConcern = wc;
     jsTest.log("Testing " + tojson(cmd));
 
-    var res = db.runCommand(cmd);
+    let res = db.runCommand(cmd);
     assertWriteConcernNotSupportedError(res);
 }
 

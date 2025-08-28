@@ -2,14 +2,14 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
 
-var testDocMissing = function (useReplicaSet) {
-    var options = {rs: useReplicaSet, rsOptions: {nodes: 1, oplogSize: 10}};
+let testDocMissing = function (useReplicaSet) {
+    let options = {rs: useReplicaSet, rsOptions: {nodes: 1, oplogSize: 10}};
 
-    var st = new ShardingTest({shards: 2, mongos: 1, other: options});
+    let st = new ShardingTest({shards: 2, mongos: 1, other: options});
 
-    var mongos = st.s0;
-    var coll = mongos.getCollection("foo.bar");
-    var admin = mongos.getDB("admin");
+    let mongos = st.s0;
+    let coll = mongos.getCollection("foo.bar");
+    let admin = mongos.getDB("admin");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 
@@ -26,7 +26,7 @@ var testDocMissing = function (useReplicaSet) {
 
     st.printShardingStatus();
 
-    var ops = traceMissingDoc(coll, {_id: 12345, sk: 67890});
+    let ops = traceMissingDoc(coll, {_id: 12345, sk: 67890});
 
     assert.eq(ops[0].op, "i");
     assert.eq(ops.length, 5);

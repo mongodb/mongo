@@ -1,6 +1,6 @@
 // This tests that $setOnInsert works and allow setting the _id
 const t = db[jsTestName()];
-var res;
+let res;
 
 function dotest(useIndex) {
     t.drop();

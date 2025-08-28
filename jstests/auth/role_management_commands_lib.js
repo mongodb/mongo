@@ -3,18 +3,18 @@
  * forms of input.
  */
 export function runAllRoleManagementCommandsTests(conn, writeConcern) {
-    var hasAuthzError = function (result) {
+    let hasAuthzError = function (result) {
         assert(result instanceof WriteCommandError);
         assert.eq(ErrorCodes.Unauthorized, result.code);
     };
 
-    var userAdminConn = new Mongo(conn.host);
-    var testUserAdmin = userAdminConn.getDB("test");
-    var adminUserAdmin = userAdminConn.getDB("admin");
+    let userAdminConn = new Mongo(conn.host);
+    let testUserAdmin = userAdminConn.getDB("test");
+    let adminUserAdmin = userAdminConn.getDB("admin");
     adminUserAdmin.createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]}, writeConcern);
     adminUserAdmin.auth("userAdmin", "pwd");
     testUserAdmin.createUser({user: "testUser", pwd: "pwd", roles: []}, writeConcern);
-    var db = conn.getDB("test");
+    let db = conn.getDB("test");
     assert(db.auth("testUser", "pwd"));
 
     // At this point there are 3 databases handles in use. - "testUserAdmin" and "adminUserAdmin"
@@ -252,7 +252,7 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
     (function testRolesInfo() {
         jsTestLog("Testing rolesInfo");
 
-        var res = testUserAdmin.runCommand({rolesInfo: "testRole1"});
+        let res = testUserAdmin.runCommand({rolesInfo: "testRole1"});
         assert.eq(1, res.roles.length);
         assert.eq("testRole1", res.roles[0].role);
         assert.eq("test", res.roles[0].db);

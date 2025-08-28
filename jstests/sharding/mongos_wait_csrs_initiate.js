@@ -3,11 +3,11 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
+let configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: "", storageEngine: "wiredTiger"});
-var replConfig = configRS.getReplSetConfig();
+let replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
-var mongos = MongoRunner.runMongos({configdb: configRS.getURL(), waitForConnect: false});
+let mongos = MongoRunner.runMongos({configdb: configRS.getURL(), waitForConnect: false});
 
 assert.throws(function () {
     new Mongo(mongos.host);
@@ -21,7 +21,7 @@ configRS.initiate(replConfig);
 assert.commandWorked(configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 jsTestLog("getting mongos");
-var e;
+let e;
 let mongos2;
 assert.soon(
     function () {

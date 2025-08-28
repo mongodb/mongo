@@ -152,7 +152,7 @@ export var EncryptedClient = class {
             schemaMap: {},
         };
 
-        var shell = conn;
+        let shell = conn;
 
         // Detatch existing auto encryption options
         // This forces us to drop the schema cache which is important as some tests repeatedly
@@ -164,7 +164,7 @@ export var EncryptedClient = class {
         assert(shell.setAutoEncryption(clientSideFLEOptions));
 
         shell.toggleAutoEncryption(true);
-        var keyVault = shell.getKeyVault();
+        let keyVault = shell.getKeyVault();
         shell.toggleAutoEncryption(false);
 
         this._admindb = conn.getDB("admin");

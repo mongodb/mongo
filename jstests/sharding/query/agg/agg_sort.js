@@ -16,7 +16,7 @@ assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFull
 const nDocs = 10;
 const yValues = ["abc", "ABC", null, 1, NumberLong(2), NumberDecimal(-20), MinKey, MaxKey, BinData(0, ""), [3, 4]];
 const bulkOp = coll.initializeOrderedBulkOp();
-for (var i = 0; i < nDocs; ++i) {
+for (let i = 0; i < nDocs; ++i) {
     bulkOp.insert({_id: i, x: Math.floor(i / 2), y: yValues[i]});
 }
 assert.commandWorked(bulkOp.execute());

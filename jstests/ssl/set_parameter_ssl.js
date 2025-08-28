@@ -2,8 +2,8 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var SERVER_CERT = "jstests/libs/server.pem";
-var CA_CERT = "jstests/libs/ca.pem";
+let SERVER_CERT = "jstests/libs/server.pem";
+let CA_CERT = "jstests/libs/ca.pem";
 
 class TransportMode {
     constructor(sslName, tlsName) {
@@ -27,12 +27,12 @@ const prefered = new TransportMode("preferSSL", "preferTLS");
 const required = new TransportMode("requireSSL", "requireTLS");
 
 function testTransportTransitionStandalone(scheme, oldMode, newMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
+    let conn = MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
 
-    var adminDB = conn.getDB("admin");
+    let adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
     adminDB.auth("root", "pwd");
-    var res = adminDB.runCommand({"setParameter": 1, [scheme]: newMode[scheme]});
+    let res = adminDB.runCommand({"setParameter": 1, [scheme]: newMode[scheme]});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
     if (!shouldSucceed) {
@@ -52,7 +52,7 @@ function testTransportTransitionStandalone(scheme, oldMode, newMode, shouldSucce
 }
 
 function testTransportTransitionCluster(scheme, oldMode, newMode) {
-    var rst = new ReplSetTest({
+    let rst = new ReplSetTest({
         name: "switch",
         nodes: 3,
         nodeOptions: {
@@ -114,7 +114,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
         assert(authAsKeyFileCluster());
     }
 
-    var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
+    let res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
     assert(res["ok"] == shouldSucceed, tojson(res));
 
     if (shouldSucceed && oldMode != "x509") {

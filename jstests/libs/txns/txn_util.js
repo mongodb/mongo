@@ -57,12 +57,12 @@ export var TxnUtil = (function () {
                 if (!ns["ns"]) {
                     return false;
                 }
-                var db = ns["ns"].split(".", 1)[0];
+                let db = ns["ns"].split(".", 1)[0];
                 if (db === "local" || db === "config" || db === "system") {
                     return false;
                 }
                 // Make sure no namespaces are system. collections
-                var coll = ns["ns"].substring(ns["ns"].indexOf(".") + 1);
+                let coll = ns["ns"].substring(ns["ns"].indexOf(".") + 1);
                 if (coll.startsWith("system.")) {
                     return false;
                 }
@@ -102,8 +102,8 @@ export var TxnUtil = (function () {
     // modified before a transaction aborts. This function is adapted from the implementation of
     // Object.extend() in src/mongo/shell/types.js.
     function deepCopyObject(dst, src) {
-        for (var k in src) {
-            var v = src[k];
+        for (let k in src) {
+            let v = src[k];
             if (typeof v == "object" && v !== null) {
                 if (v.constructor === ObjectId) {
                     // convert ObjectId properly
@@ -127,7 +127,7 @@ export var TxnUtil = (function () {
                     v = new Map(v);
                 }
             }
-            var desc = Object.getOwnPropertyDescriptor(src, k);
+            let desc = Object.getOwnPropertyDescriptor(src, k);
             desc.value = v;
             Object.defineProperty(dst, k, desc);
         }

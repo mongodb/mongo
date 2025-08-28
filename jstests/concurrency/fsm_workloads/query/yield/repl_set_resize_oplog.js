@@ -6,7 +6,7 @@
  */
 
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function resizeOplog(db, collName) {
             const oplogSizeBytes = (20 + Math.floor(50 * Math.random())) * 1024 * 1024;
             jsTest.log.info("Setting", {oplogSizeBytes});
@@ -42,7 +42,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         resizeOplog: {resizeOplog: 0.1, insertDocs: 0.2, scanOplog: 0.7},
         insertDocs: {resizeOplog: 0.1, insertDocs: 0.2, scanOplog: 0.7},
         scanOplog: {resizeOplog: 0.1, insertDocs: 0.2, scanOplog: 0.7},

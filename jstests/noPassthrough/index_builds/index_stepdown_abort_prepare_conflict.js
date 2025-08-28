@@ -40,7 +40,7 @@ const primaryColl = primaryDB[collName];
 assert.commandWorked(primaryColl.insert({_id: 1, x: [1, 2], y: [1, 2]}, {"writeConcern": {"w": 1}}));
 
 // Enable fail point which makes hybrid index build to hang before it aborts.
-var failPoint;
+let failPoint;
 
 // Index builds fail immediately instead of suppressing errors until the commit phase, and always
 // signal the primary for abort (even if it is itself). Abort is only ever performed in the command

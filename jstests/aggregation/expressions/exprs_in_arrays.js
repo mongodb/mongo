@@ -1,11 +1,11 @@
 // SERVER-8141 Avoid treating arrays as literals in aggregation pipeline.
-var coll = db.exprs_in_arrays;
+let coll = db.exprs_in_arrays;
 coll.drop();
 
 assert.commandWorked(coll.insert({_id: 0, a: ["foo", "bar", "baz"], b: "bar", c: "Baz"}));
 
 // An array of constants should still evaluate to an array of constants.
-var pipeline = [{$project: {_id: 0, d: ["constant", 1]}}];
+let pipeline = [{$project: {_id: 0, d: ["constant", 1]}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{d: ["constant", 1]}]);
 
 // A field name inside an array should take on the value of that field.

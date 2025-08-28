@@ -7,7 +7,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.disableImplicitSessions = true;
 
 function runTest(conn) {
-    for (var i = 0; i < 10; ++i) {
+    for (let i = 0; i < 10; ++i) {
         conn.getDB("test").test.save({a: i});
     }
 
@@ -31,7 +31,7 @@ function runTest(conn) {
     assert.eq(0, countSessions(conn, origSessTime));
 
     // Calling startSession in the shell doesn't initiate the session
-    var session = conn.startSession();
+    let session = conn.startSession();
     assert.eq(0, countSessions(conn, origSessTime));
 
     // running a command that doesn't require auth does touch
@@ -53,7 +53,7 @@ function runTest(conn) {
 
     // verify that reading from a cursor updates last use
     {
-        var cursor = session.getDatabase("test").test.find({}).batchSize(1);
+        let cursor = session.getDatabase("test").test.find({}).batchSize(1);
         cursor.next();
         var lastUse = getLatestSessionTime(conn);
         sleep(200);
@@ -66,13 +66,13 @@ function runTest(conn) {
 }
 
 {
-    var mongod = MongoRunner.runMongod();
+    let mongod = MongoRunner.runMongod();
     runTest(mongod);
     MongoRunner.stopMongod(mongod);
 }
 
 {
-    var st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+    let st = new ShardingTest({shards: 1, mongos: 1, config: 1});
     st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
 
     runTest(st.s0);

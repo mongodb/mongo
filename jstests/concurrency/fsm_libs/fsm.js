@@ -37,12 +37,12 @@ export var fsm = (function () {
             await import("jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js");
             await import("jstests/libs/txns/txn_util.js");
         }
-        var currentState = args.startState;
+        let currentState = args.startState;
 
         // We build a cache of connections that can be used in workload states. This cache
         // allows state functions to access arbitrary cluster nodes for verification checks.
         // See fsm_libs/cluster.js for the format of args.cluster.
-        var connCache;
+        let connCache;
         if (args.passConnectionCache) {
             // In order to ensure that all operations performed by a worker thread happen on the
             // same session, we override the "_defaultSession" property of the connections in the
@@ -101,7 +101,7 @@ export var fsm = (function () {
             // concurrency suite may be running with a 1-node CSRS.
             connCache.rsConns.config._isConfigServer = true;
 
-            var shardNames = Object.keys(args.cluster.shards);
+            let shardNames = Object.keys(args.cluster.shards);
 
             shardNames.forEach((name) => {
                 connCache.shards[name] = args.cluster.shards[name]
@@ -114,7 +114,7 @@ export var fsm = (function () {
             });
         }
 
-        for (var i = 0; i < args.iterations; ++i) {
+        for (let i = 0; i < args.iterations; ++i) {
             if (args.errorLatch.getCount() < args.numThreads) {
                 break;
             }
@@ -206,17 +206,17 @@ export var fsm = (function () {
         assert.gte(randVal, 0);
         assert.lt(randVal, 1);
 
-        var states = Object.keys(doc);
+        let states = Object.keys(doc);
         assert.gt(states.length, 0, "transition must have at least one state to transition to");
 
         // weights = [ 0.25, 0.5, 0.25 ]
         // => accumulated = [ 0.25, 0.75, 1 ]
-        var weights = states.map(function (k) {
+        let weights = states.map(function (k) {
             return doc[k];
         });
 
-        var accumulated = [];
-        var sum = weights.reduce(function (a, b, i) {
+        let accumulated = [];
+        let sum = weights.reduce(function (a, b, i) {
             accumulated[i] = a + b;
             return accumulated[i];
         }, 0);
@@ -225,7 +225,7 @@ export var fsm = (function () {
         randVal *= sum; // ~ U[0, sum)
 
         // Find the state corresponding to randVal
-        for (var i = 0; i < accumulated.length; ++i) {
+        for (let i = 0; i < accumulated.length; ++i) {
             if (randVal < accumulated[i]) {
                 return states[i];
             }

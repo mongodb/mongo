@@ -82,7 +82,7 @@ unshardedColl.drop();
 
 assert.commandWorked(unshardedColl.insert([{b: 1}, {b: 2}, {b: 3}]));
 
-var uid = NumberLong(1432);
+let uid = NumberLong(1432);
 function uniqueCursorId() {
     return uid++;
 }

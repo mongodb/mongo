@@ -293,7 +293,7 @@ export function shardKeyValidationTests(mongosConn, dbName) {
     dropAndReshardColl(mongosConn, dbName, collName, {_id: 1});
     assert.commandWorked(mongosConn.getCollection(kNsName).createIndex({_id: 1, aKey: 1}, {sparse: true}));
 
-    var result = mongosConn.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+    let result = mongosConn.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
     assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
     assert(result.errmsg.includes("Index key is sparse."));
 

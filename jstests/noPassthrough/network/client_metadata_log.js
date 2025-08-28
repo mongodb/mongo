@@ -80,7 +80,7 @@ let testMongoS = function (options) {
     let curOp = st.s0.adminCommand({currentOp: 1});
     print(tojson(curOp));
 
-    var inprogSample = null;
+    let inprogSample = null;
     for (let inprog of curOp.inprog) {
         if (inprog.hasOwnProperty("clientMetadata") && inprog.clientMetadata.hasOwnProperty("mongos")) {
             inprogSample = inprog;

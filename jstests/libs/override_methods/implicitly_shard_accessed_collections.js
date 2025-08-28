@@ -21,11 +21,11 @@ globalThis.ImplicitlyShardAccessCollSettings = ImplicitlyShardAccessCollSettings
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
-var originalGetCollection = DB.prototype.getCollection;
-var originalCreateCollection = DB.prototype.createCollection;
-var originalDBCollectionDrop = DBCollection.prototype.drop;
-var originalStartParallelShell = startParallelShell;
-var originalRunCommand = Mongo.prototype.runCommand;
+let originalGetCollection = DB.prototype.getCollection;
+let originalCreateCollection = DB.prototype.createCollection;
+let originalDBCollectionDrop = DBCollection.prototype.drop;
+let originalStartParallelShell = startParallelShell;
+let originalRunCommand = Mongo.prototype.runCommand;
 
 DB.prototype.createCollection = function () {
     const createCollResult = originalCreateCollection.apply(this, arguments);
@@ -55,7 +55,7 @@ DB.prototype.createCollection = function () {
 };
 
 DB.prototype.getCollection = function () {
-    var collection = originalGetCollection.apply(this, arguments);
+    let collection = originalGetCollection.apply(this, arguments);
 
     // The following "collStats" command can behave unexpectedly when running in a causal
     // consistency suite with secondary read preference. "collStats" does not support causal
@@ -98,7 +98,7 @@ DB.prototype.getCollection = function () {
 };
 
 DBCollection.prototype.drop = function () {
-    var dropResult = originalDBCollectionDrop.apply(this, arguments);
+    let dropResult = originalDBCollectionDrop.apply(this, arguments);
 
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {

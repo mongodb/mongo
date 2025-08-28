@@ -1,6 +1,6 @@
 // check neg direction index and negation
 
-var t = db.jstests_orb;
+let t = db.jstests_orb;
 t.drop();
 
 t.save({a: 1});

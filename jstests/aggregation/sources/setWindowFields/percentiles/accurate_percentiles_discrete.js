@@ -37,7 +37,7 @@ const origParamValue = assert.commandWorked(
 assert.gte(origParamValue, 0);
 let paramValues = [1, 2, origParamValue];
 
-for (var paramValue of paramValues) {
+for (let paramValue of paramValues) {
     // Set the percentile sorting threshold to test pre-sorting before calculating percentiles
     // as well sorting on each percentile calculation.
     db.adminCommand({setParameter: 1, internalQueryPercentileExprSelectToSortThreshold: paramValue});

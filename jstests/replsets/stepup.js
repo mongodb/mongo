@@ -4,14 +4,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {verifyServerStatusElectionReasonCounterChange} from "jstests/replsets/libs/election_metrics.js";
 
-var name = "stepup";
-var rst = new ReplSetTest({name: name, nodes: 2});
+let name = "stepup";
+let rst = new ReplSetTest({name: name, nodes: 2});
 
 rst.startSet();
 rst.initiate();
 
-var primary = rst.getPrimary();
-var secondary = rst.getSecondary();
+let primary = rst.getPrimary();
+let secondary = rst.getSecondary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
     primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
@@ -20,7 +20,7 @@ assert.commandWorked(
 const initialSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
 
 // Step up the primary. Return OK because it's already the primary.
-var res = primary.adminCommand({replSetStepUp: 1});
+let res = primary.adminCommand({replSetStepUp: 1});
 assert.commandWorked(res);
 assert.eq(primary, rst.getPrimary());
 

@@ -1,10 +1,10 @@
 // Test decimal updates
 
-var col = db.decimal_updates;
+let col = db.decimal_updates;
 col.drop();
 
 // Insert some sample data.
-var docs = [
+let docs = [
     {"a": NumberDecimal("1.0")},
     {"a": NumberDecimal("0.0")},
     {"a": NumberDecimal("1.00")},

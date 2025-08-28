@@ -5,7 +5,7 @@
 //   requires_getmore,
 // ]
 
-var coll = db.getCollection("jstests_geo_poly_edge");
+let coll = db.getCollection("jstests_geo_poly_edge");
 coll.drop();
 
 coll.createIndex({loc: "2d"});

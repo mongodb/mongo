@@ -6,7 +6,7 @@ const maxEstablishing = "ingressConnectionEstablishmentRateLimiterBypass";
 
 function runTest(args, testFunc) {
     // Run tests in isolation to make sure we always start with a clean slate.
-    var mongo = MongoRunner.runMongod(args);
+    let mongo = MongoRunner.runMongod(args);
     testFunc(mongo, maxIncoming);
     testFunc(mongo, maxEstablishing);
     MongoRunner.stopMongod(mongo);

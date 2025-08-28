@@ -56,7 +56,7 @@ let origPinTs = result["pinTs"];
 jsTestLog({"First pin result": result});
 
 // Do some additional writes that would traditionally advance the oldest timestamp.
-for (var idx = 0; idx < 10; ++idx) {
+for (let idx = 0; idx < 10; ++idx) {
     assert.commandWorked(primary.getDB("test")["coll"].insert({}));
 }
 assert.commandWorked(primary.getDB("test")["coll"].insert({}, {writeConcern: {w: "majority"}}));

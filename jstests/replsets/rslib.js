@@ -30,8 +30,8 @@ export var reconnectSecondaries;
 export var createRstArgs;
 export var createRst;
 
-var count = 0;
-var w = 0;
+let count = 0;
+let w = 0;
 
 /**
  * A wrapper around `replSetSyncFrom` to ensure that the desired sync source is ahead of the
@@ -45,7 +45,7 @@ syncFrom = function (syncingNode, desiredSyncSource, rst) {
 
     // Ensure that 'desiredSyncSource' doesn't already have the dummy write sitting around from
     // a previous syncFrom attempt.
-    var dummyName = "dummyForSyncFrom";
+    let dummyName = "dummyForSyncFrom";
     rst.getPrimary().getDB(dummyName).getCollection(dummyName).drop();
     assert.soonNoExcept(function () {
         return desiredSyncSource.getDB(dummyName).getCollection(dummyName).findOne() == null;
@@ -73,9 +73,9 @@ syncFrom = function (syncingNode, desiredSyncSource, rst) {
  */
 wait = function (f, msg, retries) {
     w++;
-    var n = 0;
-    var default_retries = 200;
-    var delay_interval_ms = 1000;
+    let n = 0;
+    let default_retries = 200;
+    let delay_interval_ms = 1000;
 
     // Set default value if 'retries' was not given.
     if (retries === undefined) {
@@ -105,7 +105,7 @@ wait = function (f, msg, retries) {
  * </pre>
  */
 occasionally = function (f, n) {
-    var interval = n || 4;
+    let interval = n || 4;
     if (count % interval == 0) {
         f();
     }
@@ -122,9 +122,9 @@ occasionally = function (f, n) {
  * @param conn - a Mongo connection object or DB object.
  */
 reconnect = function (conn) {
-    var retries = 200;
+    let retries = 200;
     wait(function () {
-        var db;
+        let db;
         try {
             // Make this work with either dbs or connections.
             if (typeof conn.getDB == "function") {
@@ -150,8 +150,8 @@ reconnect = function (conn) {
 
 getLatestOp = function (server) {
     server.getDB("admin").getMongo().setSecondaryOk();
-    var log = server.getDB("local")["oplog.rs"];
-    var cursor = log.find({}).sort({"$natural": -1}).limit(1);
+    let log = server.getDB("local")["oplog.rs"];
+    let cursor = log.find({}).sort({"$natural": -1}).limit(1);
     if (cursor.hasNext()) {
         return cursor.next();
     }
@@ -159,11 +159,11 @@ getLatestOp = function (server) {
 };
 
 waitForAllMembers = function (master, timeout) {
-    var failCount = 0;
+    let failCount = 0;
 
     assert.soon(
         function () {
-            var state = null;
+            let state = null;
             try {
                 state = master.getSiblingDB("admin").runCommand({replSetGetStatus: 1});
                 failCount = 0;
@@ -177,7 +177,7 @@ waitForAllMembers = function (master, timeout) {
                 printjson(state);
             }, 10);
 
-            for (var m in state.members) {
+            for (let m in state.members) {
                 if (
                     state.members[m].state != 1 && // PRIMARY
                     state.members[m].state != 2 && // SECONDARY
@@ -417,7 +417,7 @@ function autoReconfig(rst, targetConfig) {
  *     secondary, or arbiter states
  */
 reconfig = function (rst, config, force, doNotWaitForMembers) {
-    var primary = rst.getPrimary();
+    let primary = rst.getPrimary();
     config = rst._updateConfigIfNotDurable(config);
 
     // If this is a non 'force' reconfig, execute the reconfig as a series of reconfigs. Safe
@@ -431,7 +431,7 @@ reconfig = function (rst, config, force, doNotWaitForMembers) {
         reconfigWithRetry(primary, config, force);
     }
 
-    var primaryAdminDB = rst.getPrimary().getDB("admin");
+    let primaryAdminDB = rst.getPrimary().getDB("admin");
     if (!doNotWaitForMembers) {
         waitForAllMembers(primaryAdminDB);
     }
@@ -453,7 +453,7 @@ safeReconfigShouldFail = function (rst, config, force, errCode, errMsg) {
 };
 
 awaitOpTime = function (catchingUpNode, latestOpTimeNode) {
-    var ts, ex, opTime;
+    let ts, ex, opTime;
     assert.soon(
         function () {
             try {
@@ -472,7 +472,7 @@ awaitOpTime = function (catchingUpNode, latestOpTimeNode) {
             }
         },
         function () {
-            var message = "Node " + catchingUpNode + " only reached optime " + tojson(ts) + " not " + tojson(opTime);
+            let message = "Node " + catchingUpNode + " only reached optime " + tojson(ts) + " not " + tojson(opTime);
             if (ex) {
                 message += "; last attempt failed with exception " + tojson(ex);
             }
@@ -488,10 +488,10 @@ awaitOpTime = function (catchingUpNode, latestOpTimeNode) {
  * don't have a ReplSetTest object to use, otherwise ReplSetTest.awaitReplication is preferred.
  */
 waitUntilAllNodesCaughtUp = function (rs, timeout) {
-    var rsStatus;
-    var firstConflictingIndex;
-    var ot;
-    var otherOt;
+    let rsStatus;
+    let firstConflictingIndex;
+    let ot;
+    let otherOt;
     assert.soon(
         function () {
             rsStatus = rs[0].adminCommand("replSetGetStatus");
@@ -500,8 +500,8 @@ waitUntilAllNodesCaughtUp = function (rs, timeout) {
             }
             assert.eq(rs.length, rsStatus.members.length, tojson(rsStatus));
             ot = rsStatus.members[0].optime;
-            for (var i = 1; i < rsStatus.members.length; ++i) {
-                var otherNode = rsStatus.members[i];
+            for (let i = 1; i < rsStatus.members.length; ++i) {
+                let otherNode = rsStatus.members[i];
 
                 // Must be in PRIMARY or SECONDARY state.
                 if (otherNode.state != ReplSetTest.State.PRIMARY && otherNode.state != ReplSetTest.State.SECONDARY) {
@@ -573,9 +573,9 @@ reInitiateWithoutThrowingOnAbortedMember = function (replSetTest) {
  * Waits for the specified hosts to enter a certain state.
  */
 awaitRSClientHosts = function (conn, host, hostOk, rs, timeout) {
-    var hostCount = host.length;
+    let hostCount = host.length;
     if (hostCount) {
-        for (var i = 0; i < hostCount; i++) {
+        for (let i = 0; i < hostCount; i++) {
             awaitRSClientHosts(conn, host[i], hostOk, rs);
         }
 
@@ -590,25 +590,25 @@ awaitRSClientHosts = function (conn, host, hostOk, rs, timeout) {
 
     print("Awaiting " + host + " to be " + tojson(hostOk) + " for " + conn + " (rs: " + rs + ")");
 
-    var tests = 0;
+    let tests = 0;
 
     assert.soon(
         function () {
-            var rsClientHosts = conn.adminCommand("connPoolStats").replicaSets;
+            let rsClientHosts = conn.adminCommand("connPoolStats").replicaSets;
             if (tests++ % 10 == 0) {
                 printjson(rsClientHosts);
             }
 
-            for (var rsName in rsClientHosts) {
+            for (let rsName in rsClientHosts) {
                 if (rs && rs != rsName) continue;
 
-                for (var i = 0; i < rsClientHosts[rsName].hosts.length; i++) {
-                    var clientHost = rsClientHosts[rsName].hosts[i];
+                for (let i = 0; i < rsClientHosts[rsName].hosts.length; i++) {
+                    let clientHost = rsClientHosts[rsName].hosts[i];
                     if (clientHost.addr != host) continue;
 
                     // Check that *all* host properties are set correctly
-                    var propOk = true;
-                    for (var prop in hostOk) {
+                    let propOk = true;
+                    for (let prop in hostOk) {
                         // Use special comparator for tags because hello can return the fields in
                         // different order. The fields of the tags should be treated like a set of
                         // strings and 2 tags should be considered the same if the set is equal.
@@ -618,14 +618,14 @@ awaitRSClientHosts = function (conn, host, hostOk, rs, timeout) {
                                 break;
                             }
 
-                            for (var hostTag in hostOk.tags) {
+                            for (let hostTag in hostOk.tags) {
                                 if (clientHost.tags[hostTag] != hostOk.tags[hostTag]) {
                                     propOk = false;
                                     break;
                                 }
                             }
 
-                            for (var clientTag in clientHost.tags) {
+                            for (let clientTag in clientHost.tags) {
                                 if (clientHost.tags[clientTag] != hostOk.tags[clientTag]) {
                                     propOk = false;
                                     break;
@@ -664,8 +664,8 @@ awaitRSClientHosts = function (conn, host, hostOk, rs, timeout) {
  * be used on replica set nodes.
  */
 getLastOpTime = function (conn) {
-    var replSetStatus = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-    var connStatus = replSetStatus.members.filter((m) => m.self)[0];
+    let replSetStatus = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
+    let connStatus = replSetStatus.members.filter((m) => m.self)[0];
     return connStatus.optime;
 };
 
@@ -703,7 +703,7 @@ getFirstOplogEntry = function (server, opts = {}) {
  * e.g. setLogVerbosity(replTest.nodes, { "replication": {"verbosity": 3} });
  */
 setLogVerbosity = function (nodes, logVerbosity) {
-    var verbosity = {
+    let verbosity = {
         "setParameter": 1,
         "logComponentVerbosity": logVerbosity,
     };
@@ -823,7 +823,7 @@ isMemberNewlyAdded = function (node, memberIndex) {
         "memberIndex should be between 0 and " + (config.members.length - 1) + ", but memberIndex is " + memberIndex,
     );
 
-    var hasNewlyAdded = (index) => {
+    let hasNewlyAdded = (index) => {
         const memberConfig = config.members[index];
         if (memberConfig.hasOwnProperty("newlyAdded")) {
             assert(memberConfig["newlyAdded"] === true, config);

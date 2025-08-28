@@ -4,10 +4,10 @@ const options = {
 const conn = MongoRunner.runMongod(options);
 
 // verify JSHeapLimitMB set from the shell
-var assertLimit = function () {
+let assertLimit = function () {
     assert.eq(999, getJSHeapLimitMB());
 };
-var exitCode = runMongoProgram(
+let exitCode = runMongoProgram(
     "mongo",
     conn.host,
     "--jsHeapLimitMB",

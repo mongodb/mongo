@@ -12,7 +12,7 @@ let options = {
 
 const conn = MongoRunner.runMongod(options);
 const testDB = conn.getDB("test");
-var coll = testDB[jsTestName()];
+let coll = testDB[jsTestName()];
 coll.drop();
 
 // Bulk insert documents to reduces roundtrips and make timeout on a slow machine less likely.

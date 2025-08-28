@@ -19,7 +19,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
 // This test assumes that the client is using a direct shard connection _without_ the replica set
 // endpoint. Since when the replica set endpoint is active the system will behave as though you

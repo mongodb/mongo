@@ -34,8 +34,8 @@ const dbName = "operationalLatencyHistogramTest";
 const collName = dbName + "_coll_temp";
 const afterTestCollName = dbName + "_coll";
 
-var testDB = db.getSiblingDB(dbName);
-var testColl = testDB[collName];
+let testDB = db.getSiblingDB(dbName);
+let testColl = testDB[collName];
 
 testColl.drop();
 
@@ -54,8 +54,8 @@ var commandResult = testDB.runCommand({
 assert.commandWorked(commandResult);
 assert(commandResult.cursor.firstBatch.length == 1);
 
-var stats = commandResult.cursor.firstBatch[0];
-var histogramTypes = ["reads", "writes", "commands"];
+let stats = commandResult.cursor.firstBatch[0];
+let histogramTypes = ["reads", "writes", "commands"];
 
 assert(stats.hasOwnProperty("localTime"));
 assert(stats.hasOwnProperty("latencyStats"));
@@ -66,10 +66,10 @@ histogramTypes.forEach(function (key) {
     assert(stats.latencyStats[key].hasOwnProperty("latency"));
 });
 
-var lastHistogram = getHistogramStats(testColl);
+let lastHistogram = getHistogramStats(testColl);
 
 // Insert
-var numRecords = 100;
+let numRecords = 100;
 for (var i = 0; i < numRecords; i++) {
     assert.commandWorked(testColl.insert({_id: i}));
 }
@@ -82,7 +82,7 @@ for (var i = 0; i < numRecords; i++) {
 lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, numRecords, 0);
 
 // Find
-var cursors = [];
+let cursors = [];
 for (var i = 0; i < numRecords; i++) {
     cursors[i] = testColl.find({x: {$gte: i}}).batchSize(2);
     assert.eq(cursors[i].next()._id, i);

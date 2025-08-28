@@ -6,7 +6,7 @@ function eq(one, two) {
 }
 
 function check(indexed) {
-    var hint;
+    let hint;
     if (indexed) {
         hint = {a: 1, b: -1};
     } else {

@@ -50,7 +50,7 @@ let conns = [];
 let expectedCurrentCount = 1;
 let expectedRejectedCount = 0;
 
-for (var i = 0; i < configuredMaxConns * 2; i++) {
+for (let i = 0; i < configuredMaxConns * 2; i++) {
     try {
         conns.push(new Mongo(db.getMongo().host));
         ++expectedCurrentCount;

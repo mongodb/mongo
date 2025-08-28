@@ -3,7 +3,7 @@ let c = db[jsTestName()];
 c.drop();
 c.save({key: 4, v: 3, x: 2});
 
-var r = c.aggregate({
+let r = c.aggregate({
     "$project": {
         "_id": 0,
         "key": NumberLong(1),

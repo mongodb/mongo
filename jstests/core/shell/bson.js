@@ -2,15 +2,15 @@
  * This tests mongo shell functions bsonWoCompare & bsonBinaryEqual.
  */
 
-var t = db.getCollection("bson");
+let t = db.getCollection("bson");
 t.drop();
 function testObjectsAreEqual(obj1, obj2, equalityFunc, func_name) {
-    var assert_msg = func_name + " " + tojson(obj1) + " " + tojson(obj2);
+    let assert_msg = func_name + " " + tojson(obj1) + " " + tojson(obj2);
     assert(equalityFunc(obj1, obj2), assert_msg);
 }
 
 function testObjectsAreNotEqual(obj1, obj2, equalityFunc, func_name) {
-    var assert_msg = func_name + " " + tojson(obj1) + " " + tojson(obj2);
+    let assert_msg = func_name + " " + tojson(obj1) + " " + tojson(obj2);
     assert(!equalityFunc(obj1, obj2), assert_msg);
 }
 
@@ -21,8 +21,8 @@ function runTests(func, testFunc) {
     testObjectsAreEqual(1.1, 1.1, func, testFunc);
     testObjectsAreEqual(1, 1, func, testFunc);
     testObjectsAreEqual(1.1, 1.1, func, testFunc);
-    var nl0 = new NumberLong("18014398509481984");
-    var nl1 = new NumberLong("18014398509481985");
+    let nl0 = new NumberLong("18014398509481984");
+    let nl1 = new NumberLong("18014398509481985");
     testObjectsAreEqual(nl0, nl0, func, testFunc);
     testObjectsAreNotEqual(nl0, nl1, func, testFunc);
 
@@ -40,10 +40,10 @@ function runTests(func, testFunc) {
     testObjectsAreEqual(false, false, func, testFunc);
 
     // Tests on date & timestamp.
-    var d0 = new Date(0);
-    var d1 = new Date(1);
-    var ts0 = new Timestamp(0, 1);
-    var ts1 = new Timestamp(1, 1);
+    let d0 = new Date(0);
+    let d1 = new Date(1);
+    let ts0 = new Timestamp(0, 1);
+    let ts1 = new Timestamp(1, 1);
     testObjectsAreEqual(d0, d0, func, testFunc);
     testObjectsAreNotEqual(d0, d1, func, testFunc);
     testObjectsAreNotEqual(d1, ts1, func, testFunc);
@@ -55,14 +55,14 @@ function runTests(func, testFunc) {
     testObjectsAreNotEqual(/3/, /3/i, func, testFunc);
 
     // Tests on DBPointer.
-    var dbp0 = new DBPointer("test", new ObjectId());
-    var dbp1 = new DBPointer("test", new ObjectId());
+    let dbp0 = new DBPointer("test", new ObjectId());
+    let dbp1 = new DBPointer("test", new ObjectId());
     testObjectsAreEqual(dbp0, dbp0, func, testFunc);
     testObjectsAreNotEqual(dbp0, dbp1, func, testFunc);
 
     // Tests on JavaScript.
-    var js0 = Function.prototype;
-    var js1 = function () {};
+    let js0 = Function.prototype;
+    let js1 = function () {};
     testObjectsAreEqual(js0, Function.prototype, func, testFunc);
     testObjectsAreNotEqual(js0, js1, func, testFunc);
 
@@ -112,7 +112,7 @@ function runTests(func, testFunc) {
 }
 
 // Create wrapper function for bsonWoCompare, such that it returns boolean result.
-var bsonWoCompareWrapper = function (obj1, obj2) {
+let bsonWoCompareWrapper = function (obj1, obj2) {
     return bsonWoCompare(obj1, obj2) === 0;
 };
 
@@ -261,7 +261,7 @@ function runBuildInvalidBsonTest() {
     // We want to ensure that fieldnames in BSONObj can't contain null terminators.
     assert.throws(
         function () {
-            var invalidBson = _buildBsonObj("_id", 2, "\0\0", 3);
+            let invalidBson = _buildBsonObj("_id", 2, "\0\0", 3);
         },
         [],
         "BSON field name must not contain null terminators.",

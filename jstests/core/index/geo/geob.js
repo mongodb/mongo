@@ -2,13 +2,13 @@
 //   requires_getmore,
 // ]
 
-var t = db.geob;
+let t = db.geob;
 t.drop();
 
-var a = {p: [0, 0]};
-var b = {p: [1, 0]};
-var c = {p: [3, 4]};
-var d = {p: [0, 6]};
+let a = {p: [0, 0]};
+let b = {p: [1, 0]};
+let c = {p: [3, 4]};
+let d = {p: [0, 6]};
 
 t.save(a);
 t.save(b);

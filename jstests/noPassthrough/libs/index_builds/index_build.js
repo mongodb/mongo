@@ -268,7 +268,7 @@ export var IndexBuildTest = class {
     }
 
     static assertIndexesSoon(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
-        var indexMap;
+        let indexMap;
         assert.soonNoExcept(function () {
             indexMap = IndexBuildTest.assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options);
             return true;

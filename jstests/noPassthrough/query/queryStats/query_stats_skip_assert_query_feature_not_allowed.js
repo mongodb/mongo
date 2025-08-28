@@ -37,7 +37,7 @@ const options = {
 
 const conn = MongoRunner.runMongod(options);
 const testDB = conn.getDB("test");
-var coll = testDB[collName];
+let coll = testDB[collName];
 coll.drop();
 
 // Run a simple query that does not need a particular FCV to run,

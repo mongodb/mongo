@@ -7,7 +7,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 
@@ -16,13 +16,13 @@ const collName = "getmore";
 
 // We create our own replica set connection because 'rst.nodes' is an array of direct
 // connections to each individual node.
-var conn = new Mongo(rst.getURL());
+let conn = new Mongo(rst.getURL());
 
-var coll = conn.getDB(dbName)[collName];
+let coll = conn.getDB(dbName)[collName];
 coll.drop();
 
 // Insert several document so that we can use a cursor to fetch them in multiple batches.
-var res = coll.insert([{}, {}, {}, {}, {}]);
+let res = coll.insert([{}, {}, {}, {}, {}]);
 assert.commandWorked(res);
 assert.eq(5, res.nInserted);
 
@@ -30,7 +30,7 @@ assert.eq(5, res.nInserted);
 rst.awaitReplication();
 
 // Establish a cursor on the secondary and verify that the getMore operations are routed to it.
-var cursor = coll.find().readPref("secondary").batchSize(2);
+let cursor = coll.find().readPref("secondary").batchSize(2);
 assert.eq(5, cursor.itcount(), "failed to read the documents from the secondary");
 
 rst.stopSet();

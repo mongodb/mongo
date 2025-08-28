@@ -3,7 +3,7 @@
 // and that indexes cannot be created on field paths that contain empty
 // fields.
 
-var coll = db.jstests_indexp;
+let coll = db.jstests_indexp;
 
 // Empty field checks.
 assert.commandFailed(coll.createIndex({"a..b": 1}));

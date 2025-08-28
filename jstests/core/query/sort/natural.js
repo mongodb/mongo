@@ -3,9 +3,9 @@
 //   requires_getmore,
 // ]
 
-var results;
+let results;
 
-var coll = db.jstests_natural;
+let coll = db.jstests_natural;
 coll.drop();
 
 assert.commandWorked(coll.createIndex({a: 1}));

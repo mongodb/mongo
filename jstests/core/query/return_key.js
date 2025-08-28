@@ -10,10 +10,10 @@
  */
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var results;
-var explain;
+let results;
+let explain;
 
-var coll = db.jstests_returnkey;
+let coll = db.jstests_returnkey;
 coll.drop();
 
 assert.commandWorked(coll.insert({a: 1, b: 3}));

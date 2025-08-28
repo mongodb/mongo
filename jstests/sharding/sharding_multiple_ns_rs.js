@@ -9,7 +9,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({
+let s = new ShardingTest({
     shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}},
     mongos: 1,
     other: {rs: true, chunkSize: 1},
@@ -25,9 +25,9 @@ assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 
 
 var db = s.getDB("test");
 
-var bulk = db.foo.initializeUnorderedBulkOp();
-var bulk2 = db.bar.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
+let bulk = db.foo.initializeUnorderedBulkOp();
+let bulk2 = db.bar.initializeUnorderedBulkOp();
+for (let i = 0; i < 100; i++) {
     bulk.insert({_id: i, x: i});
     bulk2.insert({_id: i, x: i});
 }
@@ -36,8 +36,8 @@ assert.commandWorked(bulk2.execute());
 
 s.splitAt("test.foo", {_id: 50});
 
-var other = new Mongo(s.s0.name);
-var dbother = other.getDB("test");
+let other = new Mongo(s.s0.name);
+let dbother = other.getDB("test");
 
 assert.eq(5, db.foo.findOne({_id: 5}).x);
 assert.eq(5, dbother.foo.findOne({_id: 5}).x);
@@ -58,7 +58,7 @@ assert.eq(5, db.bar.findOne({_id: 5}).x);
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.bar", key: {_id: 1}}));
 s.splitAt("test.bar", {_id: 50});
 
-var yetagain = new Mongo(s.s.name);
+let yetagain = new Mongo(s.s.name);
 assert.eq(5, yetagain.getDB("test").bar.findOne({_id: 5}).x);
 assert.eq(5, yetagain.getDB("test").foo.findOne({_id: 5}).x);
 

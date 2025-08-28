@@ -46,7 +46,7 @@ function getDropDbStateResults(db) {
 }
 
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {}
 
         function enableSharding(db, collName) {
@@ -67,7 +67,7 @@ export const $config = (function () {
         function dropDatabase(db, collName) {
             let myDb = getRandomDb(db);
             jsTestLog("Executing dropDatabase state: " + myDb.getName());
-            var resOK;
+            let resOK;
             try {
                 assert.commandWorked(myDb.dropDatabase());
                 resOK = true;
@@ -89,7 +89,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         init: {enableSharding: 0.35, dropDatabase: 0.35, shardCollection: 0.3},
         enableSharding: {enableSharding: 0.35, dropDatabase: 0.35, shardCollection: 0.3},
         dropDatabase: {enableSharding: 0.35, dropDatabase: 0.35, shardCollection: 0.3},

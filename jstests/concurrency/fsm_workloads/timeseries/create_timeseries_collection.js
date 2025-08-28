@@ -11,9 +11,9 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 export const $config = (function () {
-    var data = {prefix: "create_timeseries_collection"};
+    let data = {prefix: "create_timeseries_collection"};
 
-    var states = (function () {
+    let states = (function () {
         function getCollectionName(prefix, collName, tid) {
             return prefix + "_" + collName + "_" + tid;
         }
@@ -50,7 +50,7 @@ export const $config = (function () {
         return {init: init, create: create, insert: insert, drop: drop};
     })();
 
-    var transitions = {
+    let transitions = {
         init: {create: 1},
         create: {insert: 0.8, drop: 0.2},
         insert: {insert: 0.8, drop: 0.2},

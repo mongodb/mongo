@@ -8,15 +8,15 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {assertExplainCount, getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-var collName = "jstests_explain_count";
-var t = db[collName];
+let collName = "jstests_explain_count";
+let t = db[collName];
 t.drop();
 
 /**
  * Given an explain output from a COUNT_SCAN stage, check that a indexBounds field is present.
  */
 function checkCountScanIndexExplain(explain, startKey, endKey, startInclusive, endInclusive) {
-    var countStage = getPlanStage(explain.executionStats.executionStages, "COUNT_SCAN");
+    let countStage = getPlanStage(explain.executionStats.executionStages, "COUNT_SCAN");
 
     assert.eq(countStage.stage, "COUNT_SCAN");
     assert("indexBounds" in countStage);
@@ -75,11 +75,11 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
 
 // Collection does not exist.
 assert.eq(0, t.count());
-var explain = assert.commandWorked(db.runCommand({explain: {count: collName}, verbosity: "executionStats"}));
+let explain = assert.commandWorked(db.runCommand({explain: {count: collName}, verbosity: "executionStats"}));
 assertExplainCount({explainResults: explain, expectedCount: 0});
 
 // Collection does not exist with skip, limit, and/or query.
-var result = assert.commandWorked(db.runCommand({count: collName, skip: 3}));
+let result = assert.commandWorked(db.runCommand({count: collName, skip: 3}));
 assert.eq(0, result.n);
 explain = assert.commandWorked(db.runCommand({explain: {count: collName, skip: 3}, verbosity: "executionStats"}));
 assertExplainCount({explainResults: explain, expectedCount: 0});
@@ -112,7 +112,7 @@ assertExplainCount({explainResults: explain, expectedCount: 0});
 // On sharded clusters, we'll want the shard key to be indexed, so we make _id part of the index.
 // This means counts will not have to fetch from the document in order to get the shard key.
 t.createIndex({a: 1, _id: 1});
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.insert({_id: i, a: 1});
 }
 

@@ -26,11 +26,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.insert = function insert(db, collName) {
-        var doc = this.getDoc();
+        let doc = this.getDoc();
         doc.counter = this.counter++; // ensure doc is unique to guarantee an upsert occurs
         doc._id = new ObjectId(); // _id is required for shard targeting
 
-        var res = db[collName].update(doc, {$inc: {unused: 0}}, {upsert: true});
+        let res = db[collName].update(doc, {$inc: {unused: 0}}, {upsert: true});
         assert.eq(0, res.nMatched, tojson(res));
         assert.eq(1, res.nUpserted, tojson(res));
         assert.eq(0, res.nModified, tojson(res));

@@ -26,9 +26,9 @@ function testCRUD(conn) {
     assert.commandWorked(db.foo.insert({x: -1}));
     assert.commandWorked(db.foo.update({x: 1}, {$set: {y: 1}}));
     assert.commandWorked(db.foo.update({x: -1}, {$set: {y: 1}}));
-    var doc1 = db.foo.findOne({x: 1});
+    let doc1 = db.foo.findOne({x: 1});
     assert.eq(1, doc1.y);
-    var doc2 = db.foo.findOne({x: -1});
+    let doc2 = db.foo.findOne({x: -1});
     assert.eq(1, doc2.y);
 
     assert.commandWorked(db.foo.remove({x: 1}, true));

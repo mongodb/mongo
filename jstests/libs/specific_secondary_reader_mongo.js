@@ -3,8 +3,8 @@
 // readPreference "secondary", they are sent to the specific secondary node.
 
 export function SpecificSecondaryReaderMongo(host, secondary) {
-    var defaultMongo = new Mongo(host);
-    var secondaryMongo = new Mongo(secondary);
+    let defaultMongo = new Mongo(host);
+    let secondaryMongo = new Mongo(secondary);
 
     // This overrides the default runCommand() in Mongo
     this.runCommand = function runCommand(dbName, commandObj, options) {
@@ -25,7 +25,7 @@ export function SpecificSecondaryReaderMongo(host, secondary) {
             if (target.hasOwnProperty(property)) {
                 return target[property];
             }
-            var value = defaultMongo[property];
+            let value = defaultMongo[property];
             if (typeof value === "function") {
                 if (property === "getDB" || property === "startSession") {
                     // 'receiver' is the Proxy object.

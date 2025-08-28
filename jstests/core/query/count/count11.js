@@ -11,7 +11,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var t = db.count11;
+let t = db.count11;
 
 t.drop();
 
@@ -22,8 +22,8 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }
 
-var validQuery = {a: 1};
-var invalidQuery = {a: {$invalid: 1}};
+let validQuery = {a: 1};
+let invalidQuery = {a: {$invalid: 1}};
 
 // Query non-existing collection with empty query.
 assert.eq(0, t.find().count());

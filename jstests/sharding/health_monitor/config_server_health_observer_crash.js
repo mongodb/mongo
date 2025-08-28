@@ -123,20 +123,20 @@ try {
     // Refresh PIDs to force de-registration of the crashed mongos.
     assert.soon(
         () => {
-            var numPidsNow = _runningMongoChildProcessIds().length;
+            let numPidsNow = _runningMongoChildProcessIds().length;
             return numPidsBefore - numPidsNow == 1;
         },
         () => {
-            var pids = _runningMongoChildProcessIds();
+            let pids = _runningMongoChildProcessIds();
             return `Encountered incorrect number of running processes. Expected: 11. Running processes: ${tojson(
                 pids,
             )}`;
         },
     );
-    var pidsNow = _runningMongoChildProcessIds();
+    let pidsNow = _runningMongoChildProcessIds();
     pidsBefore = pidsBefore.map((e) => e.toNumber());
     pidsNow = pidsNow.map((e) => e.toNumber());
-    var difference = pidsBefore.filter((element) => !pidsNow.includes(element));
+    let difference = pidsBefore.filter((element) => !pidsNow.includes(element));
     waitProgram(difference[0]);
     st.stop({skipValidatingExitCode: true, skipValidation: true});
 } catch (e) {

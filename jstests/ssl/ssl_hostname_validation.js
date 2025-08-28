@@ -2,20 +2,20 @@
 // for client-server and server-server connections
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var CA_CERT = "jstests/libs/ca.pem";
-var SERVER_CERT = "jstests/libs/server.pem";
-var CN_CERT = "jstests/libs/localhostnameCN.pem";
-var SAN_CERT = "jstests/libs/localhostnameSAN.pem";
-var CLIENT_CERT = "jstests/libs/client.pem";
-var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
-var NOSUBJ_CERT = "jstests/libs/server_no_subject.pem";
-var NOSUBJ_NOSAN_CERT = "jstests/libs/server_no_subject_no_SAN.pem";
+let CA_CERT = "jstests/libs/ca.pem";
+let SERVER_CERT = "jstests/libs/server.pem";
+let CN_CERT = "jstests/libs/localhostnameCN.pem";
+let SAN_CERT = "jstests/libs/localhostnameSAN.pem";
+let CLIENT_CERT = "jstests/libs/client.pem";
+let BAD_SAN_CERT = "jstests/libs/badSAN.pem";
+let NOSUBJ_CERT = "jstests/libs/server_no_subject.pem";
+let NOSUBJ_NOSAN_CERT = "jstests/libs/server_no_subject_no_SAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     jsTestLog("Testing certificate: " + JSON.stringify(arguments));
-    var mongod = MongoRunner.runMongod({tlsMode: "requireTLS", tlsCertificateKeyFile: certPath, tlsCAFile: CA_CERT});
+    let mongod = MongoRunner.runMongod({tlsMode: "requireTLS", tlsCertificateKeyFile: certPath, tlsCAFile: CA_CERT});
 
-    var mongo;
+    let mongo;
     if (allowInvalidCert) {
         mongo = runMongoProgram(
             "mongo",

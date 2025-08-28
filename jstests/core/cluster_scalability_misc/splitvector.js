@@ -35,7 +35,7 @@ let assertChunkSizes = function (splitVec, numDocs, maxChunkSize, msg) {
     for (let i = 0; i < splitVec.length - 1; i++) {
         let min = splitVec[i];
         let max = splitVec[i + 1];
-        var avgObjSize = db.jstests_splitvector.stats().avgObjSize;
+        let avgObjSize = db.jstests_splitvector.stats().avgObjSize;
         let size = db.runCommand({datasize: "test.jstests_splitvector", min: min, max: max}).size;
 
         // It is okay for the last chunk to be  smaller. A collection's size does not
@@ -53,7 +53,7 @@ let assertChunkSizes = function (splitVec, numDocs, maxChunkSize, msg) {
 // This is useful for checking that splitPoints have the same format as the original key pattern,
 // even when sharding on a prefix key.
 // Not very efficient, so only call when # of field names is small
-var assertFieldNamesMatch = function (splitPoint, keyPattern) {
+let assertFieldNamesMatch = function (splitPoint, keyPattern) {
     for (var p in splitPoint) {
         if (splitPoint.hasOwnProperty(p)) {
             assert(keyPattern.hasOwnProperty(p), "property " + p + " not in keyPattern");
@@ -66,7 +66,7 @@ var assertFieldNamesMatch = function (splitPoint, keyPattern) {
     }
 };
 
-var resetCollection = function () {
+let resetCollection = function () {
     f.drop();
 };
 
@@ -123,7 +123,7 @@ resetCollection();
 f.createIndex({x: 1});
 
 let filler;
-var case4 = function () {
+let case4 = function () {
     // Get baseline document size
     filler = "";
     while (filler.length < 500) filler += "a";
@@ -155,7 +155,7 @@ case4();
 resetCollection();
 f.createIndex({x: 1});
 
-var case5 = function () {
+let case5 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 4499, filler);
     let res = db.runCommand({
@@ -179,7 +179,7 @@ case5();
 resetCollection();
 f.createIndex({x: 1});
 
-var case6 = function () {
+let case6 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 1999, filler);
     let res = db.runCommand({
@@ -204,7 +204,7 @@ case6();
 resetCollection();
 f.createIndex({x: 1});
 
-var case7 = function () {
+let case7 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocsFixedX(f, 2099, filler, 1);
     bulkInsertDocsFixedX(f, 9, filler, 2);
@@ -225,7 +225,7 @@ case7();
 resetCollection();
 f.createIndex({x: 1});
 
-var case8 = function () {
+let case8 = function () {
     bulkInsertDocsFixedX(f, 9, filler, 1);
     bulkInsertDocsFixedX(f, 2099, filler, 2);
     bulkInsertDocsFixedX(f, 9, filler, 3);
@@ -248,7 +248,7 @@ case8();
 resetCollection();
 f.createIndex({x: 1});
 
-var case9 = function () {
+let case9 = function () {
     f.save({x: 1});
     f.save({x: 2});
     f.save({x: 3});

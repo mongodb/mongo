@@ -39,11 +39,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var P = Math.floor(Math.sqrt(this.nDocs));
+        let P = Math.floor(Math.sqrt(this.nDocs));
 
         // Move the point to another location within the PxP grid.
-        var newX = Random.randInt(P) - P / 2;
-        var newY = Random.randInt(P) - P / 2;
+        let newX = Random.randInt(P) - P / 2;
+        let newY = Random.randInt(P) - P / 2;
         return {$set: {geo: [newX, newY]}};
     };
 
@@ -61,13 +61,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        var P = Math.floor(Math.sqrt(this.nDocs));
-        var i = 0;
+        let P = Math.floor(Math.sqrt(this.nDocs));
+        let i = 0;
         // Set up some points to query (in a PxP grid around 0,0).
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var x = 0; x < P; x++) {
-            for (var y = 0; y < P; y++) {
-                var coords = [x - P / 2, y - P / 2];
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let x = 0; x < P; x++) {
+            for (let y = 0; y < P; y++) {
+                let coords = [x - P / 2, y - P / 2];
                 bulk.find({_id: i}).upsert().replaceOne(this.getReplaceSpec(i, coords));
                 i++;
             }

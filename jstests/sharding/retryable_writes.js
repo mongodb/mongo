@@ -128,7 +128,7 @@ function handleSessionsCollection(mainConn, priConn, configConn) {
 }
 
 function runTests(mainConn, priConn, configConn) {
-    var lsid = UUID();
+    let lsid = UUID();
     assert.commandWorked(mainConn.getDB("test").createCollection("user"));
 
     ////////////////////////////////////////////////////////////////////////
@@ -137,7 +137,7 @@ function runTests(mainConn, priConn, configConn) {
     let initialStatus = priConn.adminCommand({serverStatus: 1});
     verifyServerStatusFields(initialStatus);
 
-    var cmd = {
+    let cmd = {
         insert: "user",
         documents: [{_id: 10}, {_id: 30}],
         ordered: false,
@@ -145,18 +145,18 @@ function runTests(mainConn, priConn, configConn) {
         txnNumber: NumberLong(34),
     };
 
-    var testDBMain = mainConn.getDB("test");
-    var result = assert.commandWorked(testDBMain.runCommand(cmd));
+    let testDBMain = mainConn.getDB("test");
+    let result = assert.commandWorked(testDBMain.runCommand(cmd));
 
-    var oplog = priConn.getDB("local").oplog.rs;
-    var insertOplogEntries = oplog.find({ns: "test.user", op: "i"}).itcount();
+    let oplog = priConn.getDB("local").oplog.rs;
+    let insertOplogEntries = oplog.find({ns: "test.user", op: "i"}).itcount();
 
-    var testDBPri = priConn.getDB("test");
+    let testDBPri = priConn.getDB("test");
     assert.eq(2, testDBPri.user.find().itcount());
 
     let createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
 
-    var retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
+    let retryResult = assert.commandWorked(testDBMain.runCommand(cmd));
     assert.eq(result.ok, retryResult.ok);
     assert.eq(result.n, retryResult.n);
     assert.eq(result.writeErrors, retryResult.writeErrors);
@@ -342,7 +342,7 @@ function runTests(mainConn, priConn, configConn) {
     };
 
     result = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
-    var oplogEntries = oplog.find({ns: "test.user", op: "u"}).itcount();
+    let oplogEntries = oplog.find({ns: "test.user", op: "u"}).itcount();
     assert.eq({_id: 60, x: 2}, testDBPri.user.findOne({_id: 60}));
 
     createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
@@ -422,7 +422,7 @@ function runTests(mainConn, priConn, configConn) {
 
     result = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     oplogEntries = oplog.find({ns: "test.user", op: "d"}).itcount();
-    var docCount = testDBPri.user.find().itcount();
+    let docCount = testDBPri.user.find().itcount();
 
     createdCollectionInTxn = handleSessionsCollection(mainConn, priConn, configConn);
 
@@ -446,8 +446,8 @@ function runTests(mainConn, priConn, configConn) {
 
 function runFailpointTests(mainConn, priConn) {
     // Test the 'onPrimaryTransactionalWrite' failpoint
-    var lsid = UUID();
-    var testDb = mainConn.getDB("TestDB");
+    let lsid = UUID();
+    let testDb = mainConn.getDB("TestDB");
     assert.commandWorked(testDb.createCollection("user"));
 
     // Test connection close (default behaviour). The connection will get closed, but the
@@ -458,7 +458,7 @@ function runFailpointTests(mainConn, priConn) {
         // Set skipRetryOnNetworkError so the shell doesn't automatically retry, since the
         // command has a txnNumber.
         TestData.skipRetryOnNetworkError = true;
-        var res = assert.commandWorked(
+        let res = assert.commandWorked(
             testDb.runCommand({
                 insert: "user",
                 documents: [{x: 0}, {x: 1}],
@@ -473,7 +473,7 @@ function runFailpointTests(mainConn, priConn) {
         assert.eq(2, res.n);
         assert.eq(false, res.hasOwnProperty("writeErrors"));
     } catch (e) {
-        var exceptionMsg = e.toString();
+        let exceptionMsg = e.toString();
         assert(isNetworkError(e), "Incorrect exception thrown: " + exceptionMsg);
     } finally {
         TestData.skipRetryOnNetworkError = false;
@@ -497,7 +497,7 @@ function runFailpointTests(mainConn, priConn) {
         }),
     );
 
-    var cmd = {
+    let cmd = {
         update: "user",
         updates: [
             {q: {x: 0}, u: {$inc: {y: 1}}},
@@ -508,7 +508,7 @@ function runFailpointTests(mainConn, priConn) {
         txnNumber: NumberLong(2),
     };
 
-    var writeResult = testDb.runCommand(cmd);
+    let writeResult = testDb.runCommand(cmd);
 
     assert.eq(1, writeResult.nModified);
     assert.eq(1, writeResult.writeErrors.length);
@@ -520,7 +520,7 @@ function runFailpointTests(mainConn, priConn) {
     writeResult = testDb.runCommand(cmd);
     assert.eq(2, writeResult.nModified);
 
-    var collContents = testDb.user.find({}).sort({x: 1}).toArray();
+    let collContents = testDb.user.find({}).sort({x: 1}).toArray();
     assert.eq(2, collContents.length);
     assert.eq(0, collContents[0].x);
     assert.eq(1, collContents[0].y);
@@ -555,11 +555,11 @@ function runRetryableWriteErrorTest(mainConn) {
 
 function runMultiTests(mainConn) {
     // Test the behavior of retryable writes with multi=true / limit=0
-    var lsid = {id: UUID()};
-    var testDb = mainConn.getDB("test_multi");
+    let lsid = {id: UUID()};
+    let testDb = mainConn.getDB("test_multi");
 
     // Only the update statements with multi=true in a batch fail.
-    var cmd = {
+    let cmd = {
         update: "user",
         updates: [
             {q: {x: 1}, u: {y: 1}},
@@ -569,7 +569,7 @@ function runMultiTests(mainConn) {
         lsid: lsid,
         txnNumber: NumberLong(1),
     };
-    var res = assert.commandWorkedIgnoringWriteErrors(testDb.runCommand(cmd));
+    let res = assert.commandWorkedIgnoringWriteErrors(testDb.runCommand(cmd));
     assert.eq(1, res.writeErrors.length, "expected only one write error, received: " + tojson(res.writeErrors));
     assert.eq(
         1,
@@ -608,8 +608,8 @@ function runMultiTests(mainConn) {
 }
 
 function runInvalidTests(mainConn) {
-    var lsid = {id: UUID()};
-    var localDB = mainConn.getDB("local");
+    let lsid = {id: UUID()};
+    let localDB = mainConn.getDB("local");
 
     let cmd = {
         insert: "user",
@@ -668,11 +668,11 @@ function runInvalidTests(mainConn) {
 }
 
 // Tests for replica set
-var replTest = new ReplSetTest({nodes: 2});
+let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet({verbose: 5});
 replTest.initiate();
 
-var priConn = replTest.getPrimary();
+let priConn = replTest.getPrimary();
 
 runTests(priConn, priConn, priConn);
 runFailpointTests(priConn, priConn);
@@ -683,7 +683,7 @@ runInvalidTests(priConn);
 replTest.stopSet();
 
 // Tests for sharded cluster
-var st = new ShardingTest({shards: {rs0: {nodes: 1, verbose: 5}}});
+let st = new ShardingTest({shards: {rs0: {nodes: 1, verbose: 5}}});
 
 runTests(st.s0, st.rs0.getPrimary(), st.configRS.getPrimary());
 runFailpointTests(st.s0, st.rs0.getPrimary());

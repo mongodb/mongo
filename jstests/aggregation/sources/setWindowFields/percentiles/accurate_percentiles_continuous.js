@@ -52,7 +52,7 @@ const origParamValue = assert.commandWorked(
 assert.gte(origParamValue, 0);
 let paramValues = [1, 2, origParamValue];
 
-for (var paramValue of paramValues) {
+for (let paramValue of paramValues) {
     // The following tests run $percentile for window functions using the continuous method.
 
     // Run the suite of partition and bounds tests against the $percentile function. Will run

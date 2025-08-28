@@ -441,7 +441,7 @@ function testConfigurableAutoMergerIntervalSecs(st, testDB) {
     const coll = newShardedColl(st, testDB);
 
     // Repeatedly split the only chunk and expect the auto-merger to merge it back right away
-    for (var i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
         assert.soonNoExcept(() => {
             // Split may fail if mongos doesn't see the previous merge (SERVER-54979)
             splitChunk(st, coll, 0 /* middle */);

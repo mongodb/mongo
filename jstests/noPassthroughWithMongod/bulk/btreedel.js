@@ -4,22 +4,22 @@
 let t = db.foo;
 t.remove({});
 
-var bulk = t.initializeUnorderedBulkOp();
-for (var i = 0; i < 1000000; i++) {
+let bulk = t.initializeUnorderedBulkOp();
+for (let i = 0; i < 1000000; i++) {
     bulk.insert({_id: i, x: "a                                                              b"});
 }
 assert.commandWorked(bulk.execute());
 
 print("1 insert done count: " + t.count());
 
-var c = t.find({y: null}).sort({_id: 1});
-for (var j = 0; j < 400000; j++) {
+let c = t.find({y: null}).sort({_id: 1});
+for (let j = 0; j < 400000; j++) {
     c.next();
     if (j % 200000 == 0) printjson(c.next());
 }
 printjson(c.next());
 
-var d = t.find({_id: {$gt: 300000}}).sort({_id: -1});
+let d = t.find({_id: {$gt: 300000}}).sort({_id: -1});
 d.next();
 
 print("2");

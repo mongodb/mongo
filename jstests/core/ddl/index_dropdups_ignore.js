@@ -4,7 +4,7 @@
 
 // SERVER-14710 dropDups is ignored and stripped from the spec when building an index.
 
-var t = db.index_dropdups_ignore;
+let t = db.index_dropdups_ignore;
 t.drop();
 
 t.insert({_id: 1, a: "dup"});

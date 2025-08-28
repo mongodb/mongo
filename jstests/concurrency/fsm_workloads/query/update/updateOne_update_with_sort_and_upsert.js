@@ -38,7 +38,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         };
 
         // Update field 'a' to avoid matching the same document again.
-        var res = db.runCommand(updateCmd);
+        let res = db.runCommand(updateCmd);
         if (isMongod(db)) {
             if (res.hasOwnProperty("upserted") && res.upserted.length != 0) {
                 assert.eq(res.nModified, 0, tojson(res));
@@ -51,8 +51,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.setup = function (db, collName) {
         this.numDocs = this.iterations * this.threadCount;
 
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        var doc = this.newDocForInsert(1);
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        let doc = this.newDocForInsert(1);
         // Require that documents inserted by this workload use _id values that can be compared
         // using the default JS comparator.
         assert.neq(
@@ -61,7 +61,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             "default comparator of" + " Array.prototype.sort() is not well-ordered for JS objects",
         );
         bulk.insert(doc);
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         // Insert a single document into the collection.
         assert.eq(1, res.nInserted);
@@ -72,7 +72,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.teardown = function (db, collName) {
-        var docs = db[collName].find().toArray();
+        let docs = db[collName].find().toArray();
         // Assert that while 10 threads attempted an updateOne on a single matching document, it was
         // only updated once with the correct update. All updateOne operations look for a document
         // with sortField==1, and then increment 'sortField' by 1. One should win the race and set
@@ -82,8 +82,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // the product of upserts and have unique _id values.
         assert.eq(docs.length, this.numDocs);
 
-        var seenIds = new Set();
-        for (var i = 0; i < docs.length; i++) {
+        let seenIds = new Set();
+        for (let i = 0; i < docs.length; i++) {
             assert.eq(docs[i].sortField, 2);
             assert.eq(seenIds.has(docs[i]._id), false);
             seenIds.add(docs[i]._id);

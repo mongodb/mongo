@@ -5,13 +5,13 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({name: "sync_conn_cmd", shards: TestData.configShard ? 1 : 0, config: 3});
+let st = new ShardingTest({name: "sync_conn_cmd", shards: TestData.configShard ? 1 : 0, config: 3});
 st.s.setSecondaryOk();
 
-var configDB = st.config;
-var coll = configDB.test;
+let configDB = st.config;
+let coll = configDB.test;
 
-for (var x = 0; x < 10; x++) {
+for (let x = 0; x < 10; x++) {
     assert.commandWorked(coll.insert({v: x}));
 }
 
@@ -20,21 +20,21 @@ if (st.configRS) {
     st.configRS.awaitReplication();
 }
 
-var testNormalCount = function () {
-    var cmdRes = configDB.runCommand({count: coll.getName()});
+let testNormalCount = function () {
+    let cmdRes = configDB.runCommand({count: coll.getName()});
     assert(cmdRes.ok);
     assert.eq(10, cmdRes.n);
 };
 
-var testCountWithQuery = function () {
-    var cmdRes = configDB.runCommand({count: coll.getName(), query: {v: {$gt: 6}}});
+let testCountWithQuery = function () {
+    let cmdRes = configDB.runCommand({count: coll.getName(), query: {v: {$gt: 6}}});
     assert(cmdRes.ok);
     assert.eq(3, cmdRes.n);
 };
 
 // Use invalid query operator to make the count return error
-var testInvalidCount = function () {
-    var cmdRes = configDB.runCommand({count: coll.getName(), query: {$c: {$abc: 3}}});
+let testInvalidCount = function () {
+    let cmdRes = configDB.runCommand({count: coll.getName(), query: {$c: {$abc: 3}}});
     assert(!cmdRes.ok);
     assert(cmdRes.errmsg.length > 0);
 };

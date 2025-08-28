@@ -37,8 +37,8 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
     // Insert some docs into the collection so that the migration leaves orphans on either the
     // donor or recipient, depending on the decision.
     const numDocs = 1000;
-    var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; i++) {
+    let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
     }
     assert.commandWorked(bulk.execute());

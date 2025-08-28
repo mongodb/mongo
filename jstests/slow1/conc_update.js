@@ -8,8 +8,8 @@ db.dropDatabase();
 const NRECORDS = 3 * 1024 * 1024;
 
 print("loading " + NRECORDS + " documents (progress msg every 1024*1024 documents)");
-var bulk = db.conc.initializeUnorderedBulkOp();
-for (var i = 0; i < NRECORDS; i++) {
+let bulk = db.conc.initializeUnorderedBulkOp();
+for (let i = 0; i < NRECORDS; i++) {
     bulk.insert({x: i});
 }
 assert.commandWorked(bulk.execute());
@@ -17,7 +17,7 @@ assert.commandWorked(bulk.execute());
 print("making an index (this will take a while)");
 db.conc.createIndex({x: 1});
 
-var c1 = db.conc.count({x: {$lt: NRECORDS}});
+let c1 = db.conc.count({x: {$lt: NRECORDS}});
 
 const updater = startParallelShell(
     funWithArgs(function (numRecords) {
@@ -33,7 +33,7 @@ const updater = startParallelShell(
 
 assert.soon(
     function () {
-        var x = db.concflag.findOne();
+        let x = db.concflag.findOne();
         return x && x.inprog;
     },
     "wait for fork",

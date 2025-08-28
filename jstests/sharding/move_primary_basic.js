@@ -5,12 +5,12 @@ function collectionExists(shard, dbName, collName) {
     return Array.contains(shard.getDB(dbName).getCollectionNames(), collName);
 }
 
-var st = new ShardingTest({mongos: 1, shards: 2});
+let st = new ShardingTest({mongos: 1, shards: 2});
 
-var mongos = st.s0;
-var shard0 = st.shard0;
-var shard1 = st.shard1;
-var config = st.config;
+let mongos = st.s0;
+let shard0 = st.shard0;
+let shard1 = st.shard1;
+let config = st.config;
 
 const dbName = "test_db";
 const coll1Name = "test_coll_1";

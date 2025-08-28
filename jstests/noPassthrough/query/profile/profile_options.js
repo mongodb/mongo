@@ -2,7 +2,7 @@
 
 import {testGetCmdLineOptsMongod, testGetCmdLineOptsMongos} from "jstests/libs/command_line/test_parsed_options.js";
 
-var baseName = "jstests_core_profile_options";
+let baseName = "jstests_core_profile_options";
 
 jsTest.log('Testing "profile" command line option with profiling off');
 var expectedResult = {"parsed": {"operationProfiling": {"mode": "off"}}};

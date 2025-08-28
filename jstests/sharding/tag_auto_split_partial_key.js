@@ -2,7 +2,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var s = new ShardingTest({shards: 2, mongos: 1});
+let s = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1, a: 1}}));
@@ -30,8 +30,8 @@ s.printShardingStatus(true);
 assert.eq(4, findChunksUtil.findChunksByNs(s.config, "test.foo").itcount(), "Split points changed");
 
 findChunksUtil.findChunksByNs(s.config, "test.foo").forEach(function (chunk) {
-    var numFields = 0;
-    for (var x in chunk.min) {
+    let numFields = 0;
+    for (let x in chunk.min) {
         numFields++;
         assert(x == "_id" || x == "a", tojson(chunk));
     }

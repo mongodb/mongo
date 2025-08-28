@@ -25,10 +25,10 @@ t.insert({x: 5000000000});
 t.insert({x: NaN});
 t.insert({x: Infinity});
 t.insert({x: -Infinity});
-var good = [NaN, -Infinity, 1, 5000000000, Infinity];
+let good = [NaN, -Infinity, 1, 5000000000, Infinity];
 for (var pass = 0; pass < 2; pass++) {
     var res = t.find({}, {_id: 0}).sort({x: 1}).toArray();
-    for (var i = 0; i < good.length; i++) {
+    for (let i = 0; i < good.length; i++) {
         assert(good[i].toString() == res[i].x.toString());
     }
     t.createIndex({x: 1});

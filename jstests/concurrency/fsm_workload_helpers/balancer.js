@@ -19,8 +19,8 @@ export var BalancerHelper = (function () {
     function joinBalancerRound(db, timeout) {
         timeout = timeout || 60000;
 
-        var initialStatus = db.adminCommand({balancerStatus: 1});
-        var currentStatus;
+        let initialStatus = db.adminCommand({balancerStatus: 1});
+        let currentStatus;
         assert.soon(
             function () {
                 currentStatus = db.adminCommand({balancerStatus: 1});

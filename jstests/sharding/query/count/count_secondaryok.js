@@ -13,32 +13,32 @@ TestData.skipCheckShardFilteringMetadata = true;
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
-var rst = st.rs0;
+let st = new ShardingTest({shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
+let rst = st.rs0;
 
 // Insert data into replica set
-var conn = new Mongo(st.s.host);
+let conn = new Mongo(st.s.host);
 
-var coll = conn.getCollection("test.countSecondaryOk");
+let coll = conn.getCollection("test.countSecondaryOk");
 coll.drop();
 
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < 300; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = 0; i < 300; i++) {
     bulk.insert({i: i % 10});
 }
 assert.commandWorked(bulk.execute());
 
-var connA = conn;
-var connB = new Mongo(st.s.host);
-var connC = new Mongo(st.s.host);
+let connA = conn;
+let connB = new Mongo(st.s.host);
+let connC = new Mongo(st.s.host);
 
 st.printShardingStatus();
 
 // Wait for client to update itself and replication to finish
 rst.awaitReplication();
 
-var primary = rst.getPrimary();
-var sec = rst.getSecondary();
+let primary = rst.getPrimary();
+let sec = rst.getSecondary();
 
 // Need to check secondaryOk=true first, since secondaryOk=false will destroy conn in pool when
 // primary is down.

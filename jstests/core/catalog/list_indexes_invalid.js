@@ -4,13 +4,13 @@
 
 // Test for invalid values of "cursor" and "cursor.batchSize".
 
-var coll = db.list_indexes_invalid;
+let coll = db.list_indexes_invalid;
 coll.drop();
 
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
 
-var getListIndexesCursor = function (coll, options, subsequentBatchSize) {
+let getListIndexesCursor = function (coll, options, subsequentBatchSize) {
     return new DBCommandCursor(coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
 };
 

@@ -1,7 +1,7 @@
 // this tests all points using $near
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
-var test = new GeoNearRandomTest("nightly.geo_near_random1");
+let test = new GeoNearRandomTest("nightly.geo_near_random1");
 
 test.insertPts(200);
 

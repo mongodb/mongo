@@ -29,7 +29,7 @@ if (HOST_TYPE == "windows") {
 }
 
 try {
-    var replTest = new ReplSetTest({
+    let replTest = new ReplSetTest({
         name: "TLSTest",
         nodes: 1,
         nodeOptions: {
@@ -49,12 +49,12 @@ try {
 
     replTest.initiate();
 
-    var nodeList = replTest.nodeList().join();
+    let nodeList = replTest.nodeList().join();
 
-    var checkShell = function (url) {
+    let checkShell = function (url) {
         // Should not be able to authenticate with x509.
         // Authenticate call will return 1 on success, 0 on error.
-        var argv = ["mongo", url, "--eval", "db.runCommand({replSetGetStatus: 1})"];
+        let argv = ["mongo", url, "--eval", "db.runCommand({replSetGetStatus: 1})"];
 
         if (url.endsWith("&ssl=true")) {
             argv.push("--tls", "--tlsCertificateKeyFile", "jstests/libs/trusted-client.pem");
@@ -65,20 +65,20 @@ try {
             // system CA. On Windows, this CA will have been added to the user's trusted CA list
             argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
         }
-        var ret = runMongoProgram(...argv);
+        let ret = runMongoProgram(...argv);
         return ret;
     };
 
     jsTest.log("Testing with no ssl specification...");
-    var noMentionSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}`;
+    let noMentionSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}`;
     assert.neq(checkShell(noMentionSSLURL), 0, "shell correctly failed to connect without SSL");
 
     jsTest.log("Testing with ssl specified false...");
-    var disableSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=false`;
+    let disableSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=false`;
     assert.neq(checkShell(disableSSLURL), 0, "shell correctly failed to connect without SSL");
 
     jsTest.log("Testing with ssl specified true...");
-    var useSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=true`;
+    let useSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=true`;
     assert.eq(checkShell(useSSLURL), 0, "successfully connected with SSL");
 
     replTest.stopSet();

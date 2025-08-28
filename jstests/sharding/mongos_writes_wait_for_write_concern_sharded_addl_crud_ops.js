@@ -18,7 +18,7 @@ import {
     precmdShardKey,
 } from "jstests/libs/write_concern_all_commands.js";
 
-var st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
+let st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
 
 assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
 

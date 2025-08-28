@@ -9,15 +9,15 @@ Random.setRandomSeed();
 // Return array of approximately 680 bytes worth of random numbers.
 // This size was chosen to make `randomDoc()` ~10kB.
 function randomArray() {
-    var arr = [];
-    for (var j = 0; j < 85; j++) arr[j] = Random.rand();
+    let arr = [];
+    for (let j = 0; j < 85; j++) arr[j] = Random.rand();
     return arr;
 }
 
 // Return a document of approximately 10kB in size with arrays of random numbers.
 function randomDoc() {
-    var doc = {};
-    for (var c of "abcdefghij") doc[c] = randomArray();
+    let doc = {};
+    for (let c of "abcdefghij") doc[c] = randomArray();
     const docSizeKB = Object.bsonsize(doc) / 1024;
     assert.lte(9.9, docSizeKB, "randomDoc() should be at least 9.9kB");
     assert.gte(10, docSizeKB, "randomDoc() should be no more than 10kB");
@@ -26,14 +26,14 @@ function randomDoc() {
 
 // Return an array with random documents totalling about 1Mb.
 function randomBatch(batchSize) {
-    var batch = [];
-    for (var j = 0; j < batchSize; j++) batch[j] = randomDoc();
+    let batch = [];
+    for (let j = 0; j < batchSize; j++) batch[j] = randomDoc();
     return batch;
 }
 
 function randomBlob(sizeInKB) {
-    var s = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    var b = Array(sizeInKB * 1024)
+    let s = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let b = Array(sizeInKB * 1024)
         .join()
         .split(",")
         .map(function () {
@@ -49,19 +49,19 @@ const docSizeKB = Object.bsonsize(randomDoc()) / 1024;
 const batchSize = 100;
 const batch = randomBatch(batchSize);
 
-var mongod = MongoRunner.runMongod({
+let mongod = MongoRunner.runMongod({
     storageEngine: "inMemory",
     inMemoryEngineConfigString: "cache_size=" + cacheMB + "M,",
 });
 assert.neq(null, mongod, "mongod failed to started up with --inMemoryEngineConfigString");
 var db = mongod.getDB("test");
-var t = db.large;
+let t = db.large;
 
 // Insert documents until full.
-var res;
-var count = 0;
+let res;
+let count = 0;
 for (
-    var j = 0;
+    let j = 0;
     j < (2 /* The size should never be off by more than a factor of 2. */ * cacheKB) / (docSizeKB * batchSize);
     j++
 ) {

@@ -26,7 +26,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckMetadataConsistency = true;
 TestData.skipCheckRoutingTableConsistency = true;
 
-var testServer = MongoRunner.runMongod();
+let testServer = MongoRunner.runMongod();
 var db = testServer.getDB("test");
 if (!db.serverStatus().storageEngine.supportsCommittedReads) {
     print("Skipping read_majority.js since storageEngine doesn't support it.");
@@ -41,7 +41,7 @@ function makeCursor(db, result) {
 
 // These test cases are functions that return a cursor of the documents in collections without
 // fetching them yet.
-var cursorTestCases = {
+let cursorTestCases = {
     find: function (coll) {
         return makeCursor(
             coll.getDB(),
@@ -75,10 +75,10 @@ var cursorTestCases = {
 // contain a 2dsphere index to enable testing commands that depend on it. The return value from the
 // run method is expected to be the value of expectedBefore or expectedAfter depending on the state
 // of the state field.
-var nonCursorTestCases = {
+let nonCursorTestCases = {
     count_before: {
         run: function (coll) {
-            var res = coll.runCommand("count", {readConcern: {level: "majority"}, query: {state: "before"}});
+            let res = coll.runCommand("count", {readConcern: {level: "majority"}, query: {state: "before"}});
             assert.commandWorked(res);
             return res.n;
         },
@@ -87,7 +87,7 @@ var nonCursorTestCases = {
     },
     count_after: {
         run: function (coll) {
-            var res = coll.runCommand("count", {readConcern: {level: "majority"}, query: {state: "after"}});
+            let res = coll.runCommand("count", {readConcern: {level: "majority"}, query: {state: "after"}});
             assert.commandWorked(res);
             return res.n;
         },
@@ -96,7 +96,7 @@ var nonCursorTestCases = {
     },
     distinct: {
         run: function (coll) {
-            var res = coll.runCommand("distinct", {readConcern: {level: "majority"}, key: "state"});
+            let res = coll.runCommand("distinct", {readConcern: {level: "majority"}, key: "state"});
             assert.commandWorked(res);
             assert.eq(res.values.length, 1, tojson(res));
             return res.values[0];
@@ -117,7 +117,7 @@ function runTests(coll, mongodConnection) {
     assert.commandWorked(coll.createIndex({point: "2dsphere"}, {}, 0));
     for (var testName in cursorTestCases) {
         jsTestLog("Running " + testName + " against " + coll.toString());
-        var getCursor = cursorTestCases[testName];
+        let getCursor = cursorTestCases[testName];
 
         // Setup initial state.
         assert.commandWorked(coll.remove({}));
@@ -134,7 +134,7 @@ function runTests(coll, mongodConnection) {
         assert.eq(getCursor(coll).next().state, "before");
 
         // Create a cursor before the update is visible.
-        var oldCursor = getCursor(coll);
+        let oldCursor = getCursor(coll);
 
         // Making a snapshot doesn't make the update visible yet.
         var snapshot = makeSnapshot();
@@ -148,9 +148,9 @@ function runTests(coll, mongodConnection) {
 
     for (var testName in nonCursorTestCases) {
         jsTestLog("Running " + testName + " against " + coll.toString());
-        var getResult = nonCursorTestCases[testName].run;
-        var expectedBefore = nonCursorTestCases[testName].expectedBefore;
-        var expectedAfter = nonCursorTestCases[testName].expectedAfter;
+        let getResult = nonCursorTestCases[testName].run;
+        let expectedBefore = nonCursorTestCases[testName].expectedBefore;
+        let expectedAfter = nonCursorTestCases[testName].expectedAfter;
 
         // Setup initial state.
         assert.commandWorked(coll.remove({}));
@@ -176,7 +176,7 @@ function runTests(coll, mongodConnection) {
     }
 }
 
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     nodes: 1,
     oplogSize: 2,
     nodeOptions: {setParameter: "testingSnapshotBehaviorInIsolation=true", shardsvr: ""},
@@ -185,7 +185,7 @@ replTest.startSet();
 // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation' set.
 replTest.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
-var mongod = replTest.getPrimary();
+let mongod = replTest.getPrimary();
 
 // Do a majority write to wait for a valid committed snapshot before starting the test. This is
 // needed to make sure no oplog holes behind the clusterTime and all internal writes as part of the
@@ -195,31 +195,31 @@ var mongod = replTest.getPrimary();
 assert.commandWorked(mongod.getDB("test")["coll"].insert({x: 1}, {writeConcern: {w: "majority"}}));
 
 (function testSingleNode() {
-    var db = mongod.getDB("singleNode");
+    let db = mongod.getDB("singleNode");
     runTests(db.collection, mongod);
 })();
 
-var shardingTest = new ShardingTest({
+let shardingTest = new ShardingTest({
     shards: 0,
     mongos: 1,
 });
 assert(shardingTest.adminCommand({addShard: replTest.getURL()}));
 
 (function testUnshardedDBThroughMongos() {
-    var db = shardingTest.getDB("throughMongos");
+    let db = shardingTest.getDB("throughMongos");
     runTests(db.unshardedDB, mongod);
 })();
 
 shardingTest.adminCommand({enableSharding: "throughMongos"});
 
 (function testUnshardedCollectionThroughMongos() {
-    var db = shardingTest.getDB("throughMongos");
+    let db = shardingTest.getDB("throughMongos");
     runTests(db.unshardedCollection, mongod);
 })();
 
 (function testShardedCollectionThroughMongos() {
-    var db = shardingTest.getDB("throughMongos");
-    var collection = db.shardedCollection;
+    let db = shardingTest.getDB("throughMongos");
+    let collection = db.shardedCollection;
     shardingTest.adminCommand({shardCollection: collection.getFullName(), key: {_id: 1}});
     runTests(collection, mongod);
 })();

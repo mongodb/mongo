@@ -1,7 +1,7 @@
 // Returns non-localhost ipaddr of host running the mongo shell process
 export function get_ipaddr() {
     // set temp path, if it exists
-    var path = "";
+    let path = "";
     try {
         path = TestData.tmpPath;
         if (typeof path == "undefined") {
@@ -12,11 +12,11 @@ export function get_ipaddr() {
         }
     } catch (err) {}
 
-    var ipFile = path + "ipaddr-" + Random.srand() + ".log";
-    var windowsCmd = "ipconfig > " + ipFile;
-    var unixCmd = "(/sbin/ifconfig || /usr/sbin/ip addr) | grep 'inet ' | grep -v '127.0.0.1' > " + ipFile;
-    var ipAddr = null;
-    var hostType = null;
+    let ipFile = path + "ipaddr-" + Random.srand() + ".log";
+    let windowsCmd = "ipconfig > " + ipFile;
+    let unixCmd = "(/sbin/ifconfig || /usr/sbin/ip addr) | grep 'inet ' | grep -v '127.0.0.1' > " + ipFile;
+    let ipAddr = null;
+    let hostType = null;
 
     try {
         hostType = getBuildInfo().buildEnvironment.target_os;

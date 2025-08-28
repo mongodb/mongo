@@ -34,7 +34,7 @@ assert(
 );
 
 // getParameter to confirm the value was set
-var result = mongo.getDB("admin").runCommand({getParameter: 1, replWriterThreadCount: 1});
+let result = mongo.getDB("admin").runCommand({getParameter: 1, replWriterThreadCount: 1});
 assert.eq(24, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
 
 // setParameter to ensure it is not possible

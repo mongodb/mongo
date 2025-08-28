@@ -5,26 +5,26 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // start up a new sharded cluster
-var st = new ShardingTest({shards: 2, mongos: 1, other: {enableBalancer: false}});
+let st = new ShardingTest({shards: 2, mongos: 1, other: {enableBalancer: false}});
 
-var mongos = st.s;
-var coll = mongos.getCollection("foo.bar");
+let mongos = st.s;
+let coll = mongos.getCollection("foo.bar");
 
 // Enable sharding of the collection
 assert.commandWorked(mongos.adminCommand({enablesharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
 
-var numChunks = 30;
+let numChunks = 30;
 
 // Create a bunch of chunks
-for (var i = 0; i < numChunks; i++) {
+for (let i = 0; i < numChunks; i++) {
     assert.commandWorked(mongos.adminCommand({split: coll + "", middle: {_id: i}}));
 }
 
 jsTest.log("Inserting a lot of small documents...");
 
 // Insert a lot of small documents to make multiple cursor batches
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 10 * 1000; i++) {
     bulk.insert({_id: i});
 }
@@ -33,7 +33,7 @@ assert.commandWorked(bulk.execute());
 jsTest.log("Opening a mongod cursor...");
 
 // Open a new cursor on the mongod
-var cursor = coll.find();
+let cursor = coll.find();
 cursor.next();
 
 jsTest.log("Moving a bunch of chunks to stack cleanup...");

@@ -12,9 +12,9 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 // Shard key index does not exactly match shard key, so it is not compatible with $min/$max.
 TestData.skipCheckOrphans = true;
 
-var checkDocCounts = function (expectedShardCount) {
-    for (var shardName in expectedShardCount) {
-        var shard = shardName == s.shard0.shardName ? s.shard0 : s.shard1;
+let checkDocCounts = function (expectedShardCount) {
+    for (let shardName in expectedShardCount) {
+        let shard = shardName == s.shard0.shardName ? s.shard0 : s.shard1;
         assert.eq(expectedShardCount[shardName], shard.getDB("test").user.find().count());
     }
 };
@@ -22,20 +22,20 @@ var checkDocCounts = function (expectedShardCount) {
 var s = new ShardingTest({shards: 2});
 
 var db = s.getDB("test");
-var admin = s.getDB("admin");
-var config = s.getDB("config");
+let admin = s.getDB("admin");
+let config = s.getDB("config");
 
 assert.commandWorked(s.s0.adminCommand({enableSharding: "test", primaryShard: s.shard0.shardName}));
 
 //******************Part 1********************
 
-var coll = db.foo;
+let coll = db.foo;
 
-var longStr = "a";
+let longStr = "a";
 while (longStr.length < 1024 * 128) {
     longStr += longStr;
 }
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 for (i = 0; i < 100; i++) {
     bulk.insert({num: i, str: longStr});
     bulk.insert({num: i + 100, x: i, str: longStr});
@@ -89,19 +89,19 @@ assert.commandWorked(
 db.user.createIndex({num: 1, x: 1});
 db.adminCommand({shardCollection: "test.user", key: {num: 1}});
 
-var indexCount = db.user.getIndexes().length;
+let indexCount = db.user.getIndexes().length;
 assert.eq(
     2,
     indexCount, // indexes for _id_ and num_1_x_1
     "index count not expected: " + tojson(db.user.getIndexes()),
 );
 
-var array = [];
-for (var item = 0; item < 50; item++) {
+let array = [];
+for (let item = 0; item < 50; item++) {
     array.push(item);
 }
 
-for (var docs = 0; docs < 1000; docs++) {
+for (let docs = 0; docs < 1000; docs++) {
     db.user.insert({num: docs, x: array});
 }
 
@@ -116,10 +116,10 @@ assert.commandWorked(
     }),
 );
 
-var expectedShardCount = {};
+let expectedShardCount = {};
 findChunksUtil.findChunksByNs(config, "test.user").forEach(function (chunkDoc) {
-    var min = chunkDoc.min.num;
-    var max = chunkDoc.max.num;
+    let min = chunkDoc.min.num;
+    let max = chunkDoc.max.num;
 
     if (min < 0 || min == MinKey) {
         min = 0;
@@ -163,25 +163,25 @@ for (i = 0; i < 3; i++) {
     }
 
     // then shard collection on prefix
-    var shardRes = admin.runCommand({shardCollection: coll2 + "", key: {skey: 1}});
+    let shardRes = admin.runCommand({shardCollection: coll2 + "", key: {skey: 1}});
     assert.eq(shardRes.ok, 1, "collection not sharded");
 
     // insert docs with same value for skey
     bulk = coll2.initializeUnorderedBulkOp();
     for (var i = 0; i < 5; i++) {
-        for (var j = 0; j < 5; j++) {
+        for (let j = 0; j < 5; j++) {
             bulk.insert({skey: 0, extra: i, superfluous: j});
         }
     }
     assert.commandWorked(bulk.execute());
 
     // split on that key, and check it makes 2 chunks
-    var splitRes = admin.runCommand({split: coll2 + "", middle: {skey: 0}});
+    let splitRes = admin.runCommand({split: coll2 + "", middle: {skey: 0}});
     assert.eq(splitRes.ok, 1, "split didn't work");
     assert.eq(findChunksUtil.findChunksByNs(config, coll2.getFullName()).count(), 2);
 
     // movechunk should move ALL docs since they have same value for skey
-    var moveRes = admin.runCommand({
+    let moveRes = admin.runCommand({
         moveChunk: coll2 + "",
         find: {skey: 0},
         to: s.shard1.shardName,

@@ -89,7 +89,7 @@ function run_test(name, granter, verifier, privileges, collections, rst) {
     const verifierDB = verifier.getSiblingDB("admin");
     assert(verifierDB.auth("test_user", "password"));
 
-    for (var key in collections) {
+    for (let key in collections) {
         const parts = key.split(".");
         const testdb = verifier.getSiblingDB(parts[0]);
         const col = testdb.getCollection(parts[1]);
@@ -193,7 +193,7 @@ function run_tests(granter, verifier, rst) {
         [{resource: {db: "$", collection: "cmd"}, actions: ["find"]}],
         {
             "a.a": function (testdb, testcol) {
-                var r = testdb.stats();
+                let r = testdb.stats();
 
                 if (r["ok"]) throw "db.$.cmd shouldn't give a.stats()";
             },

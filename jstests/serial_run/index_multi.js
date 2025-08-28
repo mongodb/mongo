@@ -2,16 +2,16 @@
 
 Random.setRandomSeed();
 
-var coll = db.index_multi;
+let coll = db.index_multi;
 coll.drop();
 db.results.drop();
 
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 print("Populate the collection with random data");
 for (var i = 0; i < 1e4; i++) {
-    var doc = {"_id": i};
+    let doc = {"_id": i};
 
-    for (var j = 0; j < 100; j++) {
+    for (let j = 0; j < 100; j++) {
         // Skip some of the fields
         if (Random.rand() < 0.1) {
             continue;
@@ -29,10 +29,10 @@ for (var i = 0; i < 1e4; i++) {
 assert.commandWorked(bulk.execute());
 
 // Array of all index specs
-var specs = [];
-var multikey = [];
+let specs = [];
+let multikey = [];
 
-var setupDBStr =
+let setupDBStr =
     "var conn = null;" +
     "assert.soon(function() {" +
     "  try {" +
@@ -48,7 +48,7 @@ var setupDBStr =
     db.getName() +
     "');";
 
-var indexJobs = [];
+let indexJobs = [];
 print("Create 3 triple indexes");
 for (var i = 90; i < 93; i++) {
     var spec = {};
@@ -121,8 +121,8 @@ for (var i = 0; i < 30; i++) {
 print("Do some sets and unsets");
 bulk = coll.initializeUnorderedBulkOp();
 for (i = 0; i < 1e4; i++) {
-    var criteria = {_id: Random.randInt(1e5)};
-    var mod = {};
+    let criteria = {_id: Random.randInt(1e5)};
+    let mod = {};
     if (Random.rand() < 0.5) {
         mod["$set"] = {};
         mod["$set"]["field" + Random.randInt(100)] = Random.rand();
@@ -144,7 +144,7 @@ printjson(db.results.find().toArray());
 
 print("Make sure we end up with 64 indexes");
 for (var i in specs) {
-    var explain = coll.find().hint(specs[i]).explain();
+    let explain = coll.find().hint(specs[i]).explain();
     assert("queryPlanner" in explain, tojson(explain));
 }
 

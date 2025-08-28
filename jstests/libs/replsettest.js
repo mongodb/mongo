@@ -129,15 +129,15 @@ export class ReplSetTest {
         jsTest.log.info({states});
         jsTest.log.info("ReplSetTest waitForIndicator from node " + node);
 
-        var lastTime = null;
-        var currTime = new Date().getTime();
-        var status;
+        let lastTime = null;
+        let currTime = new Date().getTime();
+        let status;
 
         let foundState;
         assert.soon(
             () => {
                 try {
-                    var conn = _callHello(this);
+                    let conn = _callHello(this);
                     if (!conn) {
                         conn = this._liveNodes[0];
                     }
@@ -162,7 +162,7 @@ export class ReplSetTest {
                     assert.commandWorked(status); // throws
                 }
 
-                var printStatus = false;
+                let printStatus = false;
                 if (lastTime == null || (currTime = new Date().getTime()) - 1000 * 5 > lastTime) {
                     if (lastTime == null) {
                         jsTest.log.info("ReplSetTest waitForIndicator Initial status (timeout : " + timeout + ") :");
@@ -177,7 +177,7 @@ export class ReplSetTest {
                     return false;
                 }
 
-                for (var i = 0; i < status.members.length; i++) {
+                for (let i = 0; i < status.members.length; i++) {
                     if (printStatus) {
                         jsTest.log.info(
                             "Status for : " + status.members[i].name + ", checking " + node.host + "/" + node.name,
@@ -185,7 +185,7 @@ export class ReplSetTest {
                     }
 
                     if (status.members[i].name == node.host || status.members[i].name == node.name) {
-                        for (var j = 0; j < states.length; j++) {
+                        for (let j = 0; j < states.length; j++) {
                             if (printStatus) {
                                 jsTest.log.info(
                                     "Status -- " +
@@ -267,8 +267,8 @@ export class ReplSetTest {
      * Returns list of nodes as host:port strings.
      */
     nodeList() {
-        var list = [];
-        for (var i = 0; i < this.ports.length; i++) {
+        let list = [];
+        for (let i = 0; i < this.ports.length; i++) {
             list.push(this.host + ":" + this.ports[i]);
         }
 
@@ -322,14 +322,14 @@ export class ReplSetTest {
     }
 
     getReplSetConfig() {
-        var cfg = {};
+        let cfg = {};
         cfg._id = this.name;
         cfg.protocolVersion = 1;
 
         cfg.members = [];
 
-        for (var i = 0; i < this.ports.length; i++) {
-            var member = {};
+        for (let i = 0; i < this.ports.length; i++) {
+            let member = {};
             member._id = i;
 
             member.host = this.host;
@@ -337,7 +337,7 @@ export class ReplSetTest {
                 member.host += ":" + this.ports[i];
             }
 
-            var nodeOpts = this.nodeOptions["n" + i];
+            let nodeOpts = this.nodeOptions["n" + i];
             if (nodeOpts) {
                 if (nodeOpts.arbiter) {
                     member.arbiterOnly = true;
@@ -359,7 +359,7 @@ export class ReplSetTest {
     }
 
     getURL() {
-        var hosts = [];
+        let hosts = [];
 
         // If the replica set uses mongobridge, use the hostname specified for the replica set.
         // If the hostname specified for the replica set or nodes is like 'primary', 'secondary0',
@@ -367,7 +367,7 @@ export class ReplSetTest {
         // ip-10-122-7-63)), then this replica set is started by antithesis. In this
         // case, use the node's host for url so that the hostnames on the logs would be
         // different for each node. Otherwise, use the hostname specified for the replica set.
-        for (var i = 0; i < this.ports.length; i++) {
+        for (let i = 0; i < this.ports.length; i++) {
             if (!this._useBridge && this.host !== "localhost" && !this.host.includes("-") && !this.host.includes(".")) {
                 hosts.push(this.nodes[i].host);
             } else {
@@ -517,11 +517,11 @@ export class ReplSetTest {
                     // Reload who the current secondaries are
                     _callHello(this);
 
-                    var secondariesToCheck = secondaries || this._secondaries;
-                    var len = secondariesToCheck.length;
-                    for (var i = 0; i < len; i++) {
-                        var hello = secondariesToCheck[i].getDB("admin")._helloOrLegacyHello();
-                        var arbiter = hello.arbiterOnly === undefined ? false : hello.arbiterOnly;
+                    let secondariesToCheck = secondaries || this._secondaries;
+                    let len = secondariesToCheck.length;
+                    for (let i = 0; i < len; i++) {
+                        let hello = secondariesToCheck[i].getDB("admin")._helloOrLegacyHello();
+                        let arbiter = hello.arbiterOnly === undefined ? false : hello.arbiterOnly;
                         if (!hello.secondary && !arbiter) {
                             awaitingSecondaries.push(secondariesToCheck[i]);
                         }
@@ -571,13 +571,13 @@ export class ReplSetTest {
      */
     awaitSyncSource(node, upstreamNode, timeout) {
         jsTest.log.info("Waiting for node " + node.name + " to start syncing from " + upstreamNode.name);
-        var status = null;
+        let status = null;
         assert(this !== undefined);
         assert.soonNoExcept(
             function () {
                 status = asCluster(this, node, () => assert.commandWorked(node.adminCommand({replSetGetStatus: 1})));
 
-                for (var j = 0; j < status.members.length; j++) {
+                for (let j = 0; j < status.members.length; j++) {
                     if (status.members[j].self) {
                         return status.members[j].syncSourceHost === upstreamNode.host;
                     }
@@ -754,11 +754,11 @@ export class ReplSetTest {
 
         assert.soonNoExcept(
             function () {
-                var primary;
+                let primary;
 
-                for (var i = 0; i < nodes.length; i++) {
-                    var hello = assert.commandWorked(nodes[i].getDB("admin")._helloOrLegacyHello());
-                    var nodesPrimary = hello.primary;
+                for (let i = 0; i < nodes.length; i++) {
+                    let hello = assert.commandWorked(nodes[i].getDB("admin")._helloOrLegacyHello());
+                    let nodesPrimary = hello.primary;
                     // Node doesn't see a primary.
                     if (!nodesPrimary) {
                         jsTest.log.info(
@@ -816,15 +816,15 @@ export class ReplSetTest {
 
         assert.soonNoExcept(
             () => {
-                var primary = expectedPrimaryNodeIdx;
+                let primary = expectedPrimaryNodeIdx;
 
-                for (var i = 0; i < nodes.length; i++) {
+                for (let i = 0; i < nodes.length; i++) {
                     let node = nodes[i];
                     let replSetGetStatus = asCluster(this, node, () =>
                         assert.commandWorked(node.adminCommand({replSetGetStatus: 1})),
                     );
-                    var nodesPrimary = -1;
-                    for (var j = 0; j < replSetGetStatus.members.length; j++) {
+                    let nodesPrimary = -1;
+                    for (let j = 0; j < replSetGetStatus.members.length; j++) {
                         if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
                             // Node sees two primaries.
                             if (nodesPrimary !== -1) {
@@ -895,7 +895,7 @@ export class ReplSetTest {
     getPrimary(timeout, retryIntervalMS) {
         timeout = timeout || this.timeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
-        var primary = null;
+        let primary = null;
 
         assert.soonNoExcept(
             () => {
@@ -942,9 +942,9 @@ export class ReplSetTest {
     }
 
     getSecondaries(timeout) {
-        var primary = this.getPrimary(timeout);
-        var secs = [];
-        for (var i = 0; i < this.nodes.length; i++) {
+        let primary = this.getPrimary(timeout);
+        let secs = [];
+        for (let i = 0; i < this.nodes.length; i++) {
             if (this.nodes[i] != primary) {
                 secs.push(this.nodes[i]);
             }
@@ -986,7 +986,7 @@ export class ReplSetTest {
     }
 
     status(timeout) {
-        var primary = _callHello(this);
+        let primary = _callHello(this);
         if (!primary) {
             primary = this._liveNodes[0];
         }
@@ -997,7 +997,7 @@ export class ReplSetTest {
      * Adds a node to the replica set managed by this instance.
      */
     add(config) {
-        var nextPort = this._allocatePortForNode();
+        let nextPort = this._allocatePortForNode();
         jsTest.log.info("ReplSetTest Next port: " + nextPort);
 
         this.ports.push(nextPort);
@@ -1015,7 +1015,7 @@ export class ReplSetTest {
             jsTest.log.info({grpcPorts: this.grpcPorts});
         }
 
-        var nextId = this.nodes.length;
+        let nextId = this.nodes.length;
         jsTest.log.info({nodes: this.nodes});
 
         jsTest.log.info("ReplSetTest nextId: " + nextId);
@@ -1048,7 +1048,7 @@ export class ReplSetTest {
      */
     _updateConfigIfNotDurable(config) {
         // Get a replica set node (check for use of bridge).
-        var replNode = this._useBridge ? this._unbridgedNodes[0] : this.nodes[0];
+        let replNode = this._useBridge ? this._unbridgedNodes[0] : this.nodes[0];
 
         // Don't update replset config for sharding config servers since config servers always
         // require durable storage.
@@ -1057,7 +1057,7 @@ export class ReplSetTest {
         }
 
         // Don't override existing value.
-        var wcMajorityJournalField = "writeConcernMajorityJournalDefault";
+        let wcMajorityJournalField = "writeConcernMajorityJournalDefault";
         if (config.hasOwnProperty(wcMajorityJournalField)) {
             return config;
         }
@@ -1228,10 +1228,10 @@ export class ReplSetTest {
         } = {},
     ) {
         let startTime = new Date(); // Measure the execution time of this function.
-        var primary = this.nodes[0].getDB("admin");
-        var config = cfg || this.getReplSetConfig();
-        var cmd = {};
-        var cmdKey = initCmd || "replSetInitiate";
+        let primary = this.nodes[0].getDB("admin");
+        let config = cfg || this.getReplSetConfig();
+        let cmd = {};
+        let cmdKey = initCmd || "replSetInitiate";
 
         // Throw an exception if nodes[0] is unelectable in the given config.
         if (!_isElectable(config.members[0])) {
@@ -1240,7 +1240,7 @@ export class ReplSetTest {
 
         // Start up a single node replica set then reconfigure to the correct size (if the config
         // contains more than 1 node), so the primary is elected more quickly.
-        var originalMembers, originalSettings;
+        let originalMembers, originalSettings;
         if (config.members && config.members.length > 1) {
             originalMembers = config.members.slice();
             config.members = config.members.slice(0, 1);
@@ -1451,7 +1451,7 @@ export class ReplSetTest {
                 jsTest.log.info("Waiting for keys to sign $clusterTime to be generated");
                 assert.soonNoExcept(
                     (timeout) => {
-                        var keyCnt = this.getPrimary(timeout)
+                        let keyCnt = this.getPrimary(timeout)
                             .getCollection("admin.system.keys")
                             .find({purpose: "HMAC"})
                             .itcount();
@@ -1921,8 +1921,8 @@ export class ReplSetTest {
     }
 
     reInitiate() {
-        var config = this.getReplSetConfigFromNode();
-        var newConfig = this.getReplSetConfig();
+        let config = this.getReplSetConfigFromNode();
+        let newConfig = this.getReplSetConfig();
         // Only reset members.
         config.members = newConfig.members;
         config.version += 1;
@@ -1944,10 +1944,10 @@ export class ReplSetTest {
 
         assert.soonNoExcept(
             () => {
-                var primaryVersion = this.getPrimary().getDB("admin")._helloOrLegacyHello().setVersion;
+                let primaryVersion = this.getPrimary().getDB("admin")._helloOrLegacyHello().setVersion;
 
-                for (var i = 0; i < this.nodes.length; i++) {
-                    var version = this.nodes[i].getDB("admin")._helloOrLegacyHello().setVersion;
+                for (let i = 0; i < this.nodes.length; i++) {
+                    let version = this.nodes[i].getDB("admin")._helloOrLegacyHello().setVersion;
                     assert.eq(
                         version,
                         primaryVersion,
@@ -1976,8 +1976,8 @@ export class ReplSetTest {
      */
     awaitLastOpCommitted(timeout, members) {
         let rst = this;
-        var primary = rst.getPrimary();
-        var primaryOpTime = _getLastOpTime(this, primary);
+        let primary = rst.getPrimary();
+        let primaryOpTime = _getLastOpTime(this, primary);
 
         let membersToCheck;
         if (members !== undefined) {
@@ -1992,7 +1992,7 @@ export class ReplSetTest {
 
         assert.soonNoExcept(
             function () {
-                for (var i = 0; i < membersToCheck.length; i++) {
+                for (let i = 0; i < membersToCheck.length; i++) {
                     var node = membersToCheck[i];
                     // Continue if we're connected to an arbiter
                     const res = asCluster(rst, node, () =>
@@ -2002,7 +2002,7 @@ export class ReplSetTest {
                     if (res.myState == ReplSetTest.State.ARBITER) {
                         continue;
                     }
-                    var rcmOpTime = rst.getReadConcernMajorityOpTime(node);
+                    let rcmOpTime = rst.getReadConcernMajorityOpTime(node);
                     if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
                         return false;
                     }
@@ -2144,11 +2144,11 @@ export class ReplSetTest {
 
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
-        var targetLatestOpTime;
+        let targetLatestOpTime;
 
         // Blocking call, which will wait for the last optime written on the target to be available
-        var awaitLastOpTimeWrittenFn = function (rst) {
-            var target = targetNode || rst.getPrimary();
+        let awaitLastOpTimeWrittenFn = function (rst) {
+            let target = targetNode || rst.getPrimary();
             assert.soonNoExcept(
                 function () {
                     try {
@@ -2167,10 +2167,10 @@ export class ReplSetTest {
         awaitLastOpTimeWrittenFn(this);
 
         // get the latest config version from target (with a few retries in case of error)
-        var targetConfigVersion;
-        var targetName;
-        var target;
-        var num_attempts = 3;
+        let targetConfigVersion;
+        let targetName;
+        let target;
+        let num_attempts = 3;
 
         assert.retryNoExcept(
             () => {
@@ -2203,10 +2203,10 @@ export class ReplSetTest {
         });
 
         function checkProgressSingleNode(rst, index, secondaryCount) {
-            var secondary = secondariesToCheck[index];
-            var secondaryName = secondary.host;
+            let secondary = secondariesToCheck[index];
+            let secondaryName = secondary.host;
 
-            var secondaryConfigVersion = asCluster(
+            let secondaryConfigVersion = asCluster(
                 rst,
                 secondary,
                 () => secondary.getDB("local")["system.replset"].find().readConcern("local").limit(1).next().version,
@@ -2242,7 +2242,7 @@ export class ReplSetTest {
                 return Progress.ConfigMismatch;
             }
             // Skip this node if we're connected to an arbiter
-            var res = asCluster(rst, secondary, () =>
+            let res = asCluster(rst, secondary, () =>
                 assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1})),
             );
             if (res.myState == ReplSetTest.State.ARBITER) {
@@ -2255,7 +2255,7 @@ export class ReplSetTest {
 
             secondary.getDB("admin").getMongo().setSecondaryOk();
 
-            var secondaryOpTime;
+            let secondaryOpTime;
             if (secondaryOpTimeType == ReplSetTest.OpTimeType.LAST_DURABLE) {
                 secondaryOpTime = _getDurableOpTime(rst, secondary);
             } else {
@@ -2339,9 +2339,9 @@ export class ReplSetTest {
                             "ReplSetTest awaitReplication: checking secondaries against latest target optime",
                             {targetLatestOpTime},
                         );
-                        var secondaryCount = 0;
+                        let secondaryCount = 0;
 
-                        for (var i = 0; i < secondariesToCheck.length; i++) {
+                        for (let i = 0; i < secondariesToCheck.length; i++) {
                             const action = checkProgressSingleNode(this, i, secondaryCount);
 
                             switch (action) {
@@ -2449,7 +2449,7 @@ export class ReplSetTest {
     }
 
     dumpOplog(conn, query = {}, limit = 10) {
-        var log =
+        let log =
             "Dumping the latest " +
             limit +
             " documents that match " +
@@ -2475,7 +2475,7 @@ export class ReplSetTest {
         assert(secondaries, "must pass list of live nodes to checkReplicaSet");
 
         // Call getPrimary to populate rst with information about the nodes.
-        var primary = this.getPrimary();
+        let primary = this.getPrimary();
         assert(primary, "calling getPrimary() failed");
 
         // Ensure that the current primary isn't in the secondaries list from a stale
@@ -2544,7 +2544,7 @@ export class ReplSetTest {
         // Return items that are in either Array `a` or `b` but not both. Note that this will
         // not work with arrays containing NaN. Array.indexOf(NaN) will always return -1.
 
-        var collectionPrinted = new Set();
+        let collectionPrinted = new Set();
 
         function checkDBHashesForReplSet(rst, dbDenylist = [], msgPrefix, ignoreUUIDs, secondaries) {
             // We don't expect the local database to match because some of its
@@ -2664,17 +2664,17 @@ export class ReplSetTest {
     }
 
     checkOplogs(msgPrefix) {
-        var liveSecondaries = _determineLiveSecondaries(this);
+        let liveSecondaries = _determineLiveSecondaries(this);
         this.checkReplicaSet(checkOplogs, liveSecondaries, this, msgPrefix);
     }
 
     checkPreImageCollection(msgPrefix) {
-        var liveSecondaries = _determineLiveSecondaries(this);
+        let liveSecondaries = _determineLiveSecondaries(this);
         this.checkReplicaSet(checkPreImageCollection, liveSecondaries, this, msgPrefix);
     }
 
     checkChangeCollection(msgPrefix) {
-        var liveSecondaries = _determineLiveSecondaries(this);
+        let liveSecondaries = _determineLiveSecondaries(this);
         this.checkReplicaSet(checkChangeCollection, liveSecondaries, this, msgPrefix);
     }
 
@@ -2757,7 +2757,7 @@ export class ReplSetTest {
         n = resolveToNodeId(this, n);
         jsTest.log.info("ReplSetTest n is : " + n);
 
-        var defaults = {
+        let defaults = {
             useHostName: this.useHostName,
             oplogSize: this.oplogSize,
             keyFile: this.keyFile,
@@ -2800,7 +2800,7 @@ export class ReplSetTest {
         }
 
         // If restarting a node, use its existing options as the defaults unless remember is false.
-        var baseOptions;
+        let baseOptions;
         if ((options && options.restart) || restart) {
             if (options && options.remember === false) {
                 baseOptions = defaults;
@@ -2831,16 +2831,16 @@ export class ReplSetTest {
 
         options.restart = options.restart || restart;
 
-        var pathOpts = {node: n, set: this.name};
+        let pathOpts = {node: n, set: this.name};
         options.pathOpts = Object.merge(options.pathOpts || {}, pathOpts);
 
         // Turn off periodic noop writes for replica sets by default.
         options.setParameter = options.setParameter || {};
         if (typeof options.setParameter === "string") {
-            var eqIdx = options.setParameter.indexOf("=");
+            let eqIdx = options.setParameter.indexOf("=");
             if (eqIdx != -1) {
-                var param = options.setParameter.substring(0, eqIdx);
-                var value = options.setParameter.substring(eqIdx + 1);
+                let param = options.setParameter.substring(0, eqIdx);
+                let value = options.setParameter.substring(eqIdx + 1);
                 options.setParameter = {};
                 options.setParameter[param] = value;
             }
@@ -2917,7 +2917,7 @@ export class ReplSetTest {
         if (this._useBridge && (restart === undefined || !restart)) {
             // We leave the mongobridge process running when the mongod process is restarted so we
             // don't need to start a new one.
-            var bridgeOptions = Object.merge(this._bridgeOptions, options.bridgeOptions || {});
+            let bridgeOptions = Object.merge(this._bridgeOptions, options.bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: this.host,
                 port: this.ports[n],
@@ -2934,11 +2934,11 @@ export class ReplSetTest {
         }
 
         // Save this property since it may be deleted inside 'runMongod'.
-        var waitForConnect = options.waitForConnect;
+        let waitForConnect = options.waitForConnect;
 
         // Never wait for a connection inside runMongod. We will do so below if needed.
         options.waitForConnect = false;
-        var conn = MongoRunner.runMongod(options);
+        let conn = MongoRunner.runMongod(options);
         if (!conn) {
             throw new Error("Failed to start node " + n);
         }
@@ -3016,7 +3016,7 @@ export class ReplSetTest {
 
         this.stop(n, signal, options, {forRestart: true});
 
-        var started = this.start(n, options, true, wait);
+        let started = this.start(n, options, true, wait);
 
         // We should not attempt to reauthenticate the connection if we did not wait for it
         // to be reestablished in the first place.
@@ -3024,7 +3024,7 @@ export class ReplSetTest {
         if (jsTestOptions().keyFile && !skipWaitForConnection) {
             if (started.length) {
                 // if n was an array of conns, start will return an array of connections
-                for (var i = 0; i < started.length; i++) {
+                for (let i = 0; i < started.length; i++) {
                     assert(jsTest.authenticate(started[i]), "Failed authentication during restart");
                 }
             } else {
@@ -3085,8 +3085,8 @@ export class ReplSetTest {
     }
 
     stopPrimary(signal, opts) {
-        var primary = this.getPrimary();
-        var primary_id = this.getNodeId(primary);
+        let primary = this.getPrimary();
+        let primary_id = this.getNodeId(primary);
         return this.stop(primary_id, signal, opts);
     }
 
@@ -3115,7 +3115,7 @@ export class ReplSetTest {
             signal = undefined;
         }
 
-        var conn = this._useBridge ? this._unbridgedNodes[n] : this.nodes[n];
+        let conn = this._useBridge ? this._unbridgedNodes[n] : this.nodes[n];
 
         jsTest.log.info(
             "ReplSetTest stop *** Shutting down mongod in port " +
@@ -3124,7 +3124,7 @@ export class ReplSetTest {
                 waitPid +
                 " ***",
         );
-        var ret = MongoRunner.stopMongod(conn, signal, opts, waitPid);
+        let ret = MongoRunner.stopMongod(conn, signal, opts, waitPid);
 
         // We only expect the process to have terminated if we actually called 'waitpid'.
         if (waitPid) {
@@ -3335,7 +3335,7 @@ export class ReplSetTest {
 
         if (!opts.noCleanData && this._alldbpaths) {
             jsTest.log.info("ReplSetTest stopSet deleting all dbpaths");
-            for (var i = 0; i < this._alldbpaths.length; i++) {
+            for (let i = 0; i < this._alldbpaths.length; i++) {
                 jsTest.log.info("ReplSetTest stopSet deleting dbpath: " + this._alldbpaths[i]);
                 resetDbpath(this._alldbpaths[i]);
             }
@@ -3380,7 +3380,7 @@ export class ReplSetTest {
      * Waits until there is a primary node.
      */
     waitForPrimary(timeout) {
-        var primary;
+        let primary;
         assert.soonNoExcept(
             () => {
                 return (primary = this.getPrimary());
@@ -3517,15 +3517,15 @@ function _constructStartNewInstances(rst, opts) {
 
     rst.nodeOptions = {};
 
-    var numNodes;
+    let numNodes;
 
     if (isObject(opts.nodes)) {
-        var len = 0;
+        let len = 0;
         for (var i in opts.nodes) {
             // opts.nodeOptions and opts.nodes[i] may contain nested objects that have
             // the same key, e.g. setParameter. So we need to recursively merge them.
             // Object.assign and Object.merge do not merge nested objects of the same key.
-            var options = (rst.nodeOptions["n" + len] = _deepObjectMerge(opts.nodeOptions, opts.nodes[i]));
+            let options = (rst.nodeOptions["n" + len] = _deepObjectMerge(opts.nodeOptions, opts.nodes[i]));
             if (i.startsWith("a")) {
                 options.arbiter = true;
             }
@@ -3620,10 +3620,10 @@ function _constructFromExistingSeedNode(rst, seedNode) {
     if (jsTest.options().keyFile) {
         rst.keyFile = jsTest.options().keyFile;
     }
-    var conf = asCluster(rst, conn, () => _replSetGetConfig(conn));
+    let conf = asCluster(rst, conn, () => _replSetGetConfig(conn));
     jsTest.log.info("Recreating replica set from config", {conf});
 
-    var existingNodes = conf.members.map((member) => member.host);
+    let existingNodes = conf.members.map((member) => member.host);
     rst.ports = existingNodes.map((node) => node.split(":")[1]);
     rst.nodes = existingNodes.map((node) => {
         // Note: the seed node is required to be operational in order for the Mongo
@@ -3698,13 +3698,13 @@ function _callHello(rst) {
     rst._primary = null;
     rst._secondaries = [];
 
-    var twoPrimaries = false;
+    let twoPrimaries = false;
     let canAcceptWrites = false;
     // Ensure that only one node is in primary state.
     rst.nodes.forEach(function (node) {
         try {
             node.setSecondaryOk();
-            var n = node.getDB("admin")._helloOrLegacyHello();
+            let n = node.getDB("admin")._helloOrLegacyHello();
             rst._liveNodes.push(node);
             // We verify that the node has a valid config by checking if n.me exists. Then, we
             // check to see if the node is in primary state.
@@ -3789,9 +3789,9 @@ function asCluster(rst, conn, fn, keyFileParam = undefined) {
  * Returns 'true' if the "conn" has been configured to run without journaling enabled.
  */
 function _isRunningWithoutJournaling(rst, conn) {
-    var result = asCluster(rst, conn, function () {
+    let result = asCluster(rst, conn, function () {
         // Persistent storage engines (WT) can only run with journal enabled.
-        var serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
+        let serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
         if (serverStatus.storageEngine.hasOwnProperty("persistent")) {
             if (serverStatus.storageEngine.persistent) {
                 return false;
@@ -3833,11 +3833,11 @@ function _isEmptyOpTime(opTime) {
  * Returns the OpTime for the specified host by issuing replSetGetStatus.
  */
 function _getLastOpTime(rst, conn) {
-    var replSetStatus = asCluster(rst, conn, () =>
+    let replSetStatus = asCluster(rst, conn, () =>
         assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1})),
     );
-    var connStatus = replSetStatus.members.filter((m) => m.self)[0];
-    var opTime = connStatus.optime;
+    let connStatus = replSetStatus.members.filter((m) => m.self)[0];
+    let opTime = connStatus.optime;
     if (_isEmptyOpTime(opTime)) {
         throw new Error("last OpTime is empty -- connection: " + conn);
     }
@@ -3849,15 +3849,15 @@ function _getLastOpTime(rst, conn) {
  * Returns the last applied OpTime otherwise.
  */
 function _getDurableOpTime(rst, conn) {
-    var replSetStatus = asCluster(rst, conn, () =>
+    let replSetStatus = asCluster(rst, conn, () =>
         assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1})),
     );
 
-    var opTimeType = "durableOpTime";
+    let opTimeType = "durableOpTime";
     if (_isRunningWithoutJournaling(rst, conn)) {
         opTimeType = "appliedOpTime";
     }
-    var opTime = replSetStatus.optimes[opTimeType];
+    let opTime = replSetStatus.optimes[opTimeType];
     if (_isEmptyOpTime(opTime)) {
         throw new Error("last durable OpTime is empty -- connection: " + conn);
     }

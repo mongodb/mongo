@@ -4,10 +4,10 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.switch;
+let coll = db.switch;
 coll.drop();
 
-var pipeline = {"$project": {"output": {"$switch": "not an object"}}};
+let pipeline = {"$project": {"output": {"$switch": "not an object"}}};
 assertErrorCode(coll, pipeline, 40060, "$switch requires an object as an argument.");
 
 pipeline = {

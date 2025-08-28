@@ -5,9 +5,9 @@ assert(db.getName() == "test");
 let t = db.bg1;
 t.drop();
 
-var a = new Mongo(db.getMongo().host).getDB(db.getName());
+let a = new Mongo(db.getMongo().host).getDB(db.getName());
 
-var bulk = t.initializeUnorderedBulkOp();
+let bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 100000; i++) {
     bulk.insert({y: "aaaaaaaaaaaa", i: i});
     if (i % 10000 == 0) {
@@ -42,5 +42,5 @@ for (var i = 0; i < 40; i++) {
     sleep(1000);
 }
 
-var idx = t.getIndexes();
+let idx = t.getIndexes();
 assert(idx[1].key.i == 1);

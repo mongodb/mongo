@@ -19,14 +19,14 @@ function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType
     );
 }
 
-var name = "command_response_operation_time";
+let name = "command_response_operation_time";
 
-var replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
+let replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
 replTest.startSet();
 replTest.initiate();
 
-var res, statusRes;
-var testDB = replTest.getPrimary().getDB(name);
+let res, statusRes;
+let testDB = replTest.getPrimary().getDB(name);
 
 jsTestLog("Executing majority write.");
 res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}], writeConcern: {w: "majority"}}));

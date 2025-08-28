@@ -40,7 +40,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             return;
         }
 
-        var cursor = new DBCommandCursor(db, aggResult);
+        let cursor = new DBCommandCursor(db, aggResult);
         try {
             cursor.itcount();
         } catch (e) {

@@ -1,6 +1,6 @@
 // Vaildate input to distinct command. SERVER-12642
 
-var t = db.distinct4;
+let t = db.distinct4;
 
 t.drop();
 t.save({a: null});
@@ -32,7 +32,7 @@ assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a", "query": "a"}
 // empty query clause should not cause error
 
 // from shell helper
-var a = assert.doesNotThrow(function () {
+let a = assert.doesNotThrow(function () {
     return t.distinct("a");
 });
 // [ null, 1, 2, 3 ]

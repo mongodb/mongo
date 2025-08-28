@@ -10,7 +10,7 @@
 //   uses_compact,
 // ]
 
-var coll = db.compact_keeps_indexes;
+let coll = db.compact_keeps_indexes;
 
 coll.drop();
 coll.insert({_id: 1, x: 1});
@@ -19,7 +19,7 @@ coll.createIndex({x: 1});
 assert.eq(coll.getIndexes().length, 2);
 
 // force:true is for replset passthroughs
-var res = coll.runCommand("compact", {force: true});
+let res = coll.runCommand("compact", {force: true});
 // Some storage engines (for example, inMemoryExperiment) do not support the compact command.
 if (res.code == 115) {
     quit();
@@ -30,15 +30,15 @@ assert.eq(coll.getIndexes().length, 2);
 assert.eq(coll.find({_id: 1}).itcount(), 1);
 assert.eq(coll.find({x: 1}).itcount(), 1);
 
-var dropCollectionShell = startParallelShell(function () {
-    var t = db.getSiblingDB("test_compact_keeps_indexes_drop").testcoll;
+let dropCollectionShell = startParallelShell(function () {
+    let t = db.getSiblingDB("test_compact_keeps_indexes_drop").testcoll;
     t.drop();
-    for (var i = 0; i < 100; i++) {
+    for (let i = 0; i < 100; i++) {
         t.save({a: 1});
         t.drop();
     }
 });
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     coll.runCommand("compact");
 }
 dropCollectionShell();

@@ -32,7 +32,7 @@ assert(db.auth(longUserName, "pass"));
 
 // 20k * 1k = 20mb which is greater than 16mb
 const numSessions = 20000;
-for (var i = 0; i < numSessions; i++) {
+for (let i = 0; i < numSessions; i++) {
     assert.commandWorked(admin.runCommand(startSession), "unable to start session");
 }
 

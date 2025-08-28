@@ -8,14 +8,14 @@
 
 import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
 
-var assertCmdNotFound = function (db, cmdName) {
-    var res = db.runCommand(cmdName);
+let assertCmdNotFound = function (db, cmdName) {
+    let res = db.runCommand(cmdName);
     assert.eq(0, res.ok);
     assert.eq(59, res.code, "expected CommandNotFound(59) error code for test command " + cmdName);
 };
 
-var assertCmdFound = function (db, cmdName) {
-    var res = db.runCommand(cmdName);
+let assertCmdFound = function (db, cmdName) {
+    let res = db.runCommand(cmdName);
     if (!res.ok) {
         assert.neq(
             59,

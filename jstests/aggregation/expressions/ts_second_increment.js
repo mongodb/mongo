@@ -1,11 +1,11 @@
 import "jstests/libs/query/sbe_assert_error_override.js";
 
-var testDB = db.getSiblingDB("expression_ts_second_increment");
+let testDB = db.getSiblingDB("expression_ts_second_increment");
 
 assert.commandWorked(testDB.dropDatabase());
 
 const collName = jsTestName();
-var coll = testDB.getCollection(collName);
+let coll = testDB.getCollection(collName);
 
 assert.commandWorked(coll.insert({_id: 0, bsonTime: Timestamp(1622731060, 10), invalidBsonTime: 1622731060}));
 

@@ -1,6 +1,6 @@
 // Test that on a text index that matches all fields does not use a weight from a named field.
 // This test was designed to reproduce SERVER-45363.
-var coll = db.getCollection(jsTestName());
+let coll = db.getCollection(jsTestName());
 coll.drop();
 
 assert.commandWorked(
@@ -8,7 +8,7 @@ assert.commandWorked(
 );
 assert.commandWorked(coll.insert({name: "Spot", guardian: "Kevin"}));
 assert.commandWorked(coll.insert({name: "Kevin", guardian: "Spot"}));
-var results = coll
+let results = coll
     .aggregate([
         {$match: {$text: {$search: "Kevin"}}},
         {$sort: {score: {$meta: "textScore"}}},

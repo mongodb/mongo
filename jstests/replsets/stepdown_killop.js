@@ -10,9 +10,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-var name = "interruptStepDown";
-var replSet = new ReplSetTest({name: name, nodes: 3});
-var nodes = replSet.nodeList();
+let name = "interruptStepDown";
+let replSet = new ReplSetTest({name: name, nodes: 3});
+let nodes = replSet.nodeList();
 replSet.startSet();
 replSet.initiate({
     "_id": name,
@@ -32,11 +32,11 @@ assert.commandWorked(
 );
 replSet.awaitReplication();
 
-var secondary = replSet.getSecondary();
+let secondary = replSet.getSecondary();
 jsTestLog("Disable replication on the SECONDARY " + secondary.host);
 stopServerReplication(secondary);
 
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
 
 // do a write then ask the PRIMARY to stepdown
@@ -46,18 +46,18 @@ assert.commandWorked(
         .getDB(name)
         .foo.insert({myDoc: true, x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
 );
-var stepDownCmd = function () {
-    var res = db.getSiblingDB("admin").runCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});
+let stepDownCmd = function () {
+    let res = db.getSiblingDB("admin").runCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});
     assert.commandFailedWithCode(res, 11601 /*interrupted*/);
 };
-var stepDowner = startParallelShell(stepDownCmd, primary.port);
-var stepDownOpID = -1;
+let stepDowner = startParallelShell(stepDownCmd, primary.port);
+let stepDownOpID = -1;
 
 jsTestLog("Looking for stepdown in currentOp() output");
 assert.soon(function () {
-    var res = primary.getDB("admin").currentOp(true);
-    for (var index in res.inprog) {
-        var entry = res.inprog[index];
+    let res = primary.getDB("admin").currentOp(true);
+    for (let index in res.inprog) {
+        let entry = res.inprog[index];
         if (entry["command"] && entry["command"]["replSetStepDown"] === 60) {
             stepDownOpID = entry.opid;
             return true;
@@ -82,7 +82,7 @@ assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand("replSetGetStatus").my
 jsTestLog("Killing stepdown");
 primary.getDB("admin").killOp(stepDownOpID);
 
-var exitCode = stepDowner();
+let exitCode = stepDowner();
 assert.eq(0, exitCode);
 
 assert.commandWorked(primary.getDB(name).foo.remove({}));

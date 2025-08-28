@@ -29,13 +29,13 @@ function buildTestCase(i) {
 }
 
 function setTestCaseField(i, field, value) {
-    var res = buildTestCase(i);
+    let res = buildTestCase(i);
     res[field] = value;
     return {_id: i, test: res};
 }
 
 function unsetTestCaseField(i, field) {
-    var res = buildTestCase(i);
+    let res = buildTestCase(i);
     delete res[field];
     return {_id: i, test: res};
 }

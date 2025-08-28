@@ -19,11 +19,11 @@
  * ]
  */
 
-var t = db[jsTestName()];
+let t = db[jsTestName()];
 t.drop();
 
-var max = 10;
-var maxSize = 64 * 1024;
+let max = 10;
+let maxSize = 64 * 1024;
 db.createCollection(t.getName(), {capped: true, size: maxSize, max: max});
 assert.eq(max, t.stats().max);
 assert.eq(maxSize, t.stats().maxSize);
@@ -36,10 +36,10 @@ for (var i = 0; i < max * 2; i++) {
 assert.eq(max, t.count());
 
 // Test invalidation of cursors
-var cursor = t.find().batchSize(4);
+let cursor = t.find().batchSize(4);
 assert(cursor.hasNext());
-var myX = cursor.next();
-for (var j = 0; j < max * 2; j++) {
+let myX = cursor.next();
+for (let j = 0; j < max * 2; j++) {
     t.insert({x: j + i});
 }
 

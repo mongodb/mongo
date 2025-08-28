@@ -5,7 +5,7 @@
 // ]
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
-var coll = db[jsTestName()];
+let coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 assert.commandWorked(coll.insert({loc: [0, 0], str: "A"}));

@@ -10,12 +10,12 @@ function assertHasClusterTimeAndOperationTime(res) {
     assert.hasFields(res.$clusterTime, ["clusterTime", "signature"]);
 }
 
-var st = new ShardingTest({shards: {rs0: {nodes: 3}}});
+let st = new ShardingTest({shards: {rs0: {nodes: 3}}});
 st.s.adminCommand({enableSharding: "test"});
 
-var db = st.s.getDB("test");
+let db = st.s.getDB("test");
 
-var res = db.runCommand({insert: "user", documents: [{x: 10}]});
+let res = db.runCommand({insert: "user", documents: [{x: 10}]});
 assert.commandWorked(res);
 assertHasClusterTimeAndOperationTime(res);
 
@@ -33,8 +33,8 @@ res = st.rs0.getPrimary().adminCommand({replSetGetStatus: 1});
 // time metadata is computed, in which case the response's $clusterTime will be greater than the
 // appliedOpTime timestamp in its body. Assert the timestamp is <= $clusterTime to account for
 // this.
-var appliedTime = res.optimes.appliedOpTime.ts;
-var logicalTimeMetadata = res.$clusterTime;
+let appliedTime = res.optimes.appliedOpTime.ts;
+let logicalTimeMetadata = res.$clusterTime;
 assert.lte(
     timestampCmp(appliedTime, logicalTimeMetadata.clusterTime),
     0,

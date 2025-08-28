@@ -215,7 +215,7 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
 
     const testCommitProtocolWithRetry = function (makeAParticipantAbort, failpointData, expectAbortResponse) {
         const maxIterations = 5;
-        var numIterations = 0;
+        let numIterations = 0;
 
         while (numIterations < maxIterations) {
             try {

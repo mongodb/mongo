@@ -84,7 +84,7 @@ function reconfigBackground(primary, numNodes) {
     });
     assert.neq(null, conn, `Failed to connect to primary '${primary}' for background reconfigs`);
 
-    var config = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetConfig: 1})).config;
+    let config = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetConfig: 1})).config;
 
     // Find the correct host in the member config
     const primaryHostIndex = (cfg, pHost) => cfg.members.findIndex((m) => m.host === pHost);
@@ -99,7 +99,7 @@ function reconfigBackground(primary, numNodes) {
 
     // Randomly change the vote of a node to 1 or 0 depending on its current value. Do not
     // change the primary's votes.
-    var indexToChange = primaryIndex;
+    let indexToChange = primaryIndex;
     while (indexToChange === primaryIndex) {
         // randInt is exclusive of the upper bound.
         indexToChange = Random.randInt(numNodes);

@@ -8,7 +8,7 @@
 // Picking 2^54 because it's representable as a double (as a power of
 // two), but big enough that the NumberLong code doesn't know it (numbers
 // over 2^53 can lose precision)
-var number = NumberLong("18014398509481984");
+let number = NumberLong("18014398509481984");
 
 {
     // Make sure all elements in a new NumberLong are valid

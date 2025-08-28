@@ -31,7 +31,7 @@ export const $config = (function () {
         return readConcernLevel;
     }
 
-    var states = {
+    let states = {
         init: function (db, unusedCollName) {
             this.session = db.getMongo().startSession({causalConsistency: true});
             this.sessionDb = this.session.getDatabase(db.getName());
@@ -66,7 +66,7 @@ export const $config = (function () {
         },
     };
 
-    var setup = function setup(db, unusedCollName, cluster) {
+    let setup = function setup(db, unusedCollName, cluster) {
         this.expectedDocuments = Array.from({length: this.nDocumentsToInsert}).map((_, i) => ({_id: i, x: i}));
         assert.commandWorked(db[this.collName].insertMany(this.expectedDocuments));
         if (cluster.isReplication()) {

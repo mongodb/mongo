@@ -45,9 +45,9 @@ assert.commandWorked(
 // Issue a 'dropDatabase' command.
 let dropDatabaseFn = function () {
     const rollbackDb = "olddatabase";
-    var primary = db.getMongo();
+    let primary = db.getMongo();
     jsTestLog("Dropping database " + rollbackDb + " on primary node " + primary.host);
-    var dbToDrop = db.getSiblingDB(rollbackDb);
+    let dbToDrop = db.getSiblingDB(rollbackDb);
     assert.commandWorked(dbToDrop.dropDatabase({w: 1}));
 };
 let waitForDropDatabaseToFinish = startParallelShell(dropDatabaseFn, rollbackNode.port);

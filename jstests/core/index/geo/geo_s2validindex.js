@@ -2,7 +2,7 @@
 // Tests valid cases for creation of 2dsphere index
 //
 
-var coll = db.getCollection("twodspherevalid");
+let coll = db.getCollection("twodspherevalid");
 
 // Valid index
 coll.drop();

@@ -1,4 +1,4 @@
-var res;
+let res;
 const t = db[jsTestName()];
 t.drop();
 

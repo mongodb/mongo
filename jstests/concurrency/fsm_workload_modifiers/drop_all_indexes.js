@@ -8,7 +8,7 @@
 
 export function dropAllIndexes($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
-        var oldIndexes = db[collName].getIndexes().map(function (ixSpec) {
+        let oldIndexes = db[collName].getIndexes().map(function (ixSpec) {
             return ixSpec.name;
         });
 
@@ -16,9 +16,9 @@ export function dropAllIndexes($config, $super) {
 
         // drop each index that wasn't present before calling super
         db[collName].getIndexes().forEach(function (ixSpec) {
-            var name = ixSpec.name;
+            let name = ixSpec.name;
             if (name !== "_id_" && !Array.contains(oldIndexes, name)) {
-                var res = db[collName].dropIndex(name);
+                let res = db[collName].dropIndex(name);
                 assert.commandWorked(res);
             }
         });

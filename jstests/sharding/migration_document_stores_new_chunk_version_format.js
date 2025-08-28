@@ -27,7 +27,7 @@ let fp = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep3");
 
 let moveChunkThread = new Thread(
     (mongosConnString, nss, shard1Name) => {
-        var mongos = new Mongo(mongosConnString);
+        let mongos = new Mongo(mongosConnString);
         mongos.adminCommand({moveChunk: nss, find: {x: 0}, to: shard1Name});
     },
     host,

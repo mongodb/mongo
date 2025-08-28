@@ -14,7 +14,7 @@
 
 function assertHasRole(rolesArray, roleName, roleDB) {
     for (let i in rolesArray) {
-        var curRole = rolesArray[i];
+        let curRole = rolesArray[i];
         if (curRole.role == roleName && curRole.db == roleDB) {
             return;
         }
@@ -24,7 +24,7 @@ function assertHasRole(rolesArray, roleName, roleDB) {
 
 function assertHasPrivilege(privilegeArray, privilege) {
     for (let i in privilegeArray) {
-        var curPriv = privilegeArray[i];
+        let curPriv = privilegeArray[i];
         if (
             curPriv.resource.cluster == privilege.resource.cluster &&
             curPriv.resource.anyResource == privilege.resource.anyResource &&
@@ -55,7 +55,7 @@ db.createRole({role: "roleB", privileges: [], roles: ["roleA"]});
 db.createRole({role: "roleC", privileges: [], roles: []});
 
 // Test getRole
-var roleObj = db.getRole("roleA");
+let roleObj = db.getRole("roleA");
 assert.eq(0, roleObj.roles.length);
 assert.eq(null, roleObj.privileges);
 roleObj = db.getRole("roleA", {showPrivileges: true});

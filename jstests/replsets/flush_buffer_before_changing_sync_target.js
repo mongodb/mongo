@@ -8,10 +8,10 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 import {syncFrom} from "jstests/replsets/rslib.js";
 
 // helper to ensure two nodes are at the same place in the oplog
-var waitForSameOplogPosition = function (db1, db2, errmsg) {
+let waitForSameOplogPosition = function (db1, db2, errmsg) {
     assert.soon(function () {
-        var last1 = db1.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
-        var last2 = db2.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        let last1 = db1.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        let last2 = db2.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
         jsTest.log("primary: " + tojson(last1) + " secondary: " + tojson(last2));
 
         return last1.ts.t === last2.ts.t && last1.ts.i === last2.ts.i;
@@ -19,7 +19,7 @@ var waitForSameOplogPosition = function (db1, db2, errmsg) {
 };
 
 // start set
-var replSet = new ReplSetTest({name: "testSet", nodes: 3});
+let replSet = new ReplSetTest({name: "testSet", nodes: 3});
 replSet.startSet();
 replSet.initiate({
     _id: "testSet",
@@ -32,12 +32,12 @@ replSet.initiate({
 });
 
 // set up common points of access
-var primary = replSet.getPrimary();
-var primaryDB = primary.getDB("foo");
+let primary = replSet.getPrimary();
+let primaryDB = primary.getDB("foo");
 replSet.nodes[1].setSecondaryOk();
 replSet.nodes[2].setSecondaryOk();
-var member2 = replSet.nodes[1].getDB("admin");
-var member3 = replSet.nodes[2].getDB("admin");
+let member2 = replSet.nodes[1].getDB("admin");
+let member3 = replSet.nodes[2].getDB("admin");
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -93,9 +93,9 @@ jsTest.log("Do some writes - 2 & 3 should have up to write #75 in their buffers,
 for (var i = 50; i < 75; i++) {
     primaryDB.bar.insert({x: i});
 }
-var primaryCollectionSize = primaryDB.bar.find().itcount();
+let primaryCollectionSize = primaryDB.bar.find().itcount();
 jsTest.log("primary collection size: " + primaryCollectionSize);
-var last = primaryDB.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+let last = primaryDB.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
 
 jsTest.log("waiting a bit for the secondaries to get the write");
 sleep(10000);
@@ -108,7 +108,7 @@ replSet.stop(0);
 // which would check for 30 seconds that node 3 didn't try to sync from 2
 sleep(30 * 1000);
 jsTest.log("3 should not attempt to sync from 2, as it cannot clear its buffer");
-var syncSourceHost = member3.adminCommand({replSetGetStatus: 1}).syncSourceHost;
+let syncSourceHost = member3.adminCommand({replSetGetStatus: 1}).syncSourceHost;
 assert(syncSourceHost !== getHostName() + ":" + replSet.ports[1], "node 3 is syncing from node 2 :(");
 
 jsTest.log("Pause 3's bgsync thread");
@@ -128,7 +128,7 @@ assert.commandWorked(
 );
 
 assert.soon(function () {
-    var last3 = member3.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    let last3 = member3.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
     jsTest.log("primary: " + tojson(last, "", true) + " secondary: " + tojson(last3, "", true));
     jsTest.log("member 3 collection size: " + member3.getSiblingDB("foo").bar.find().itcount());
     jsTest.log("curop: ");
@@ -140,7 +140,7 @@ jsTest.log("Start 3's bgsync thread");
 restartServerReplication(member3.getMongo());
 
 jsTest.log("Node 3 shouldn't hit rollback");
-var end = new Date().getTime() + 10000;
+let end = new Date().getTime() + 10000;
 while (new Date().getTime() < end) {
     assert("ROLLBACK" !== member3.runCommand({replSetGetStatus: 1}).members[2].stateStr);
     sleep(30);

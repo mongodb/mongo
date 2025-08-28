@@ -2,21 +2,21 @@
 //
 // @tags: [requires_fastcount]
 
-var coll = db.bulkInsertTest;
+let coll = db.bulkInsertTest;
 coll.drop();
 
-var seed = new Date().getTime();
+let seed = new Date().getTime();
 Random.srand(seed);
 print("Seed for randomized test is " + seed);
 
-var bulkSize = Math.floor(Random.rand() * 200) + 1;
-var numInserts = Math.floor(Random.rand() * 300) + 1;
+let bulkSize = Math.floor(Random.rand() * 200) + 1;
+let numInserts = Math.floor(Random.rand() * 300) + 1;
 
 print("Inserting " + numInserts + " bulks of " + bulkSize + " documents.");
 
-for (var i = 0; i < numInserts; i++) {
-    var bulk = [];
-    for (var j = 0; j < bulkSize; j++) {
+for (let i = 0; i < numInserts; i++) {
+    let bulk = [];
+    for (let j = 0; j < bulkSize; j++) {
         bulk.push({hi: "there", i: i, j: j});
     }
 

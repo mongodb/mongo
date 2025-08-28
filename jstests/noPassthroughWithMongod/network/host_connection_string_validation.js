@@ -8,12 +8,12 @@ if ("undefined" == typeof inner_mode) {
     // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
     // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
     // with that address.
-    var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
+    let mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
     if (mongod == null) {
         jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
         quit();
     }
-    var args = [
+    let args = [
         "mongo",
         "--nodb",
         "--ipv6",
@@ -25,7 +25,7 @@ if ("undefined" == typeof inner_mode) {
         "inner_mode=true;port=" + mongod.port + ";",
         "jstests/noPassthroughWithMongod/network/host_connection_string_validation.js",
     ];
-    var exitCode = _runMongoProgram.apply(null, args);
+    let exitCode = _runMongoProgram.apply(null, args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
     MongoRunner.stopMongod(mongod);
@@ -36,8 +36,8 @@ if ("undefined" == typeof inner_mode) {
     quit();
 }
 
-var testHost = function (host, shouldSucceed) {
-    var exitCode = runMongoProgram("mongo", "--ipv6", "--eval", ";", "--host", host);
+let testHost = function (host, shouldSucceed) {
+    let exitCode = runMongoProgram("mongo", "--ipv6", "--eval", ";", "--host", host);
     if (shouldSucceed) {
         if (exitCode !== 0) {
             doassert("failed to connect with `--host " + host + "`, but expected success. Exit code: " + exitCode);
@@ -49,7 +49,7 @@ var testHost = function (host, shouldSucceed) {
     }
 };
 
-var goodStrings = [
+let goodStrings = [
     "[::1]:27999",
     "localhost:27999",
     "127.0.0.1:27999",
@@ -57,9 +57,9 @@ var goodStrings = [
     "[0000:0000:0000:0000:0000:0000:0000:0001]:27999",
 ];
 
-var goodSocketStrings = ["/tmp/mongodb-27999.sock"];
+let goodSocketStrings = ["/tmp/mongodb-27999.sock"];
 
-var badStrings = [
+let badStrings = [
     "::1:27999",
     "::1:65536",
     "::1]:27999",
@@ -93,7 +93,7 @@ function runUriTestFor(i, connectionString, isGood) {
     testHost("mongodb://" + encodeURIComponent(connectionString), isGood);
 }
 
-var i;
+let i;
 jsTest.log("TESTING " + goodStrings.length + " good uri strings");
 for (i = 0; i < goodStrings.length; ++i) {
     runUriTestFor(i, goodStrings[i], true);

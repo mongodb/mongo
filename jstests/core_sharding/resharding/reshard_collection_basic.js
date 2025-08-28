@@ -306,7 +306,7 @@ assert.commandWorked(
 );
 assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {b: "hashed"}}));
 
-var configDB = db.getSiblingDB("config");
+let configDB = db.getSiblingDB("config");
 shardNames.forEach((shardName) => {
     let chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: shardName});
     assert.eq(chunks.itcount(), 1);

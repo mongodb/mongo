@@ -1,14 +1,14 @@
 // SERVER-4656 optimize $sort followed by $limit
 
-var c = db[jsTestName()];
+let c = db[jsTestName()];
 c.drop();
 
 let NUM_OBJS = 100;
 
-var randoms = {};
+let randoms = {};
 function generateRandom() {
     // we want unique randoms since $sort isn't guaranteed stable
-    var random;
+    let random;
     do {
         random = Math.round(Math.random() * 1000 * NUM_OBJS);
     } while (randoms[random]);
@@ -16,28 +16,28 @@ function generateRandom() {
     return random;
 }
 
-for (var i = 0; i < NUM_OBJS; i++) {
+for (let i = 0; i < NUM_OBJS; i++) {
     c.insert({inc: i, dec: NUM_OBJS - i, rnd: generateRandom()});
 }
 
-var inc_sorted = c.aggregate({$sort: {inc: 1}}).toArray();
-var dec_sorted = c.aggregate({$sort: {dec: 1}}).toArray();
-var rnd_sorted = c.aggregate({$sort: {rnd: 1}}).toArray();
+let inc_sorted = c.aggregate({$sort: {inc: 1}}).toArray();
+let dec_sorted = c.aggregate({$sort: {dec: 1}}).toArray();
+let rnd_sorted = c.aggregate({$sort: {rnd: 1}}).toArray();
 
 function test(limit, direction) {
     try {
-        var res_inc = c.aggregate({$sort: {inc: direction}}, {$limit: limit}).toArray();
-        var res_dec = c.aggregate({$sort: {dec: direction}}, {$limit: limit}).toArray();
-        var res_rnd = c.aggregate({$sort: {rnd: direction}}, {$limit: limit}).toArray();
+        let res_inc = c.aggregate({$sort: {inc: direction}}, {$limit: limit}).toArray();
+        let res_dec = c.aggregate({$sort: {dec: direction}}, {$limit: limit}).toArray();
+        let res_rnd = c.aggregate({$sort: {rnd: direction}}, {$limit: limit}).toArray();
 
-        var expectedLength = Math.min(limit, NUM_OBJS);
+        let expectedLength = Math.min(limit, NUM_OBJS);
 
         assert.eq(res_inc.length, expectedLength);
         assert.eq(res_dec.length, expectedLength);
         assert.eq(res_rnd.length, expectedLength);
 
         if (direction > 0) {
-            for (var i = 0; i < expectedLength; i++) {
+            for (let i = 0; i < expectedLength; i++) {
                 assert.eq(res_inc[i], inc_sorted[i]);
                 assert.eq(res_dec[i], dec_sorted[i]);
                 assert.eq(res_rnd[i], rnd_sorted[i]);

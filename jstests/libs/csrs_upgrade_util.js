@@ -8,15 +8,15 @@
 import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
 export var CSRSUpgradeCoordinator = function () {
-    var testDBName = jsTestName();
-    var dataCollectionName = testDBName + ".data";
-    var csrsName = jsTestName() + "-csrs";
-    var numCsrsMembers;
-    var st;
-    var shardConfigs;
-    var csrsConfig;
-    var csrs;
-    var csrs0Opts;
+    let testDBName = jsTestName();
+    let dataCollectionName = testDBName + ".data";
+    let csrsName = jsTestName() + "-csrs";
+    let numCsrsMembers;
+    let st;
+    let shardConfigs;
+    let csrsConfig;
+    let csrs;
+    let csrs0Opts;
 
     this.getTestDBName = function () {
         return testDBName;
@@ -44,7 +44,7 @@ export var CSRSUpgradeCoordinator = function () {
      * Returns a copy of the options used for starting a mongos in the coordinator's cluster.
      */
     this.getMongosConfig = function () {
-        var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
+        let sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
         delete sconfig.port;
         return sconfig;
     };
@@ -68,8 +68,8 @@ export var CSRSUpgradeCoordinator = function () {
      * Private helper method for waiting for a given node to return ismaster:true in its ismaster
      * command response.
      */
-    var _waitUntilMaster = function (dnode) {
-        var isMasterReply;
+    let _waitUntilMaster = function (dnode) {
+        let isMasterReply;
         assert.soon(
             function () {
                 isMasterReply = dnode.adminCommand({ismaster: 1});
@@ -106,7 +106,7 @@ export var CSRSUpgradeCoordinator = function () {
      */
     this.startNewCSRSNodes = function () {
         jsTest.log("Starting new CSRS nodes");
-        for (var i = 1; i < numCsrsMembers; ++i) {
+        for (let i = 1; i < numCsrsMembers; ++i) {
             csrs.push(MongoRunner.runMongod({replSet: csrsName, configsvr: "", storageEngine: "wiredTiger"}));
             csrsConfig.members.push({_id: i, host: csrs[i].name, votes: 0, priority: 0});
         }
@@ -157,7 +157,7 @@ export var CSRSUpgradeCoordinator = function () {
         assert.commandWorked(csrs[0].adminCommand({replSetStepDown: 60}));
         MongoRunner.stopMongod(csrs[0]);
         csrs[0] = MongoRunner.runMongod(csrs0Opts);
-        var csrsStatus;
+        let csrsStatus;
         assert.soon(
             function () {
                 csrsStatus = csrs[0].adminCommand({replSetGetStatus: 1});
@@ -172,12 +172,12 @@ export var CSRSUpgradeCoordinator = function () {
                     return false;
                 }
 
-                var i;
+                let i;
                 for (i = 0; i < csrsStatus.members.length; ++i) {
                     if (csrsStatus.members[i].name == csrs[0].name) {
-                        var supportsCommitted = csrs[0].getDB("admin").serverStatus()
+                        let supportsCommitted = csrs[0].getDB("admin").serverStatus()
                             .storageEngine.supportsCommittedReads;
-                        var stateIsRemoved = csrsStatus.members[i].stateStr == "REMOVED";
+                        let stateIsRemoved = csrsStatus.members[i].stateStr == "REMOVED";
                         // If the storage engine supports committed reads, it shouldn't go into
                         // REMOVED
                         // state, but if it does not then it should.

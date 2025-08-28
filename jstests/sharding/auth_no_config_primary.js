@@ -19,11 +19,11 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 
-var st = new ShardingTest({shards: 1, other: {keyFile: "jstests/libs/key1"}});
+let st = new ShardingTest({shards: 1, other: {keyFile: "jstests/libs/key1"}});
 
 st.s.getDB("admin").createUser({user: "root", pwd: "pass", roles: ["root"]});
 st.s.getDB("admin").auth("root", "pass");
-var testDB = st.s.getDB("test");
+let testDB = st.s.getDB("test");
 testDB.user.insert({hello: "world"});
 
 // Kill all secondaries, forcing the current primary to step down.
@@ -32,7 +32,7 @@ st.configRS.getSecondaries().forEach(function (secondaryConn) {
 });
 
 // Test authenticate through a fresh connection.
-var newConn = new Mongo(st.s.host);
+let newConn = new Mongo(st.s.host);
 
 assert.commandFailedWithCode(newConn.getDB("test").runCommand({find: "user"}), ErrorCodes.Unauthorized);
 
@@ -43,7 +43,7 @@ assert.neq(null, res);
 assert.eq("world", res.hello);
 
 // Test authenticate through new mongos.
-var otherMongos = MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.configRS.getURL()});
+let otherMongos = MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.configRS.getURL()});
 
 assert.commandFailedWithCode(otherMongos.getDB("test").runCommand({find: "user"}), ErrorCodes.Unauthorized);
 

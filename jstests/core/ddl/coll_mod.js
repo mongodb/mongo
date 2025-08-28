@@ -18,16 +18,16 @@ function debug(x) {
     // printjson( x );
 }
 
-var coll = "collModTest";
-var t = db.getCollection(coll);
+let coll = "collModTest";
+let t = db.getCollection(coll);
 t.drop();
 
-var isMongos = "isdbgrid" == db.runCommand("hello").msg;
+let isMongos = "isdbgrid" == db.runCommand("hello").msg;
 
 db.createCollection(coll);
 
 function findTTL(key, expireAfterSeconds) {
-    var all = t.getIndexes();
+    let all = t.getIndexes();
     all = all.filter(function (z) {
         return z.expireAfterSeconds == expireAfterSeconds && friendlyEqual(z.key, key);
     });
@@ -35,7 +35,7 @@ function findTTL(key, expireAfterSeconds) {
 }
 
 function findTTLByName(name, expireAfterSeconds) {
-    var all = t.getIndexes();
+    let all = t.getIndexes();
     all = all.filter(function (z) {
         return z.expireAfterSeconds == expireAfterSeconds && z.name == name;
     });
@@ -43,7 +43,7 @@ function findTTLByName(name, expireAfterSeconds) {
 }
 
 function findCollectionInfo() {
-    var all = db.getCollectionInfos();
+    let all = db.getCollectionInfos();
     all = all.filter(function (z) {
         return z.name == t.getName();
     });

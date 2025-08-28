@@ -4,14 +4,14 @@
  * that these default values do not lead to command failure.
  */
 
-var standalone = MongoRunner.runMongod();
+let standalone = MongoRunner.runMongod();
 var db = standalone.getDB("test");
 
-var coll = db.getCollection("apply_ops_mode1");
+let coll = db.getCollection("apply_ops_mode1");
 
 // ------------ Testing normal updates ---------------
 
-var id = ObjectId();
+let id = ObjectId();
 for (let updateOp of [
     // An update with a modifier.
     {op: "u", ns: coll.getFullName(), o: {$v: 2, diff: {u: {x: 1}}}, o2: {_id: id}},
@@ -42,10 +42,10 @@ for (let updateOp of [
 
 // ------------ Testing fCV updates ---------------
 
-var adminDB = db.getSiblingDB("admin");
+let adminDB = db.getSiblingDB("admin");
 const systemVersionColl = adminDB.getCollection("system.version");
 
-var updateOp = {
+let updateOp = {
     op: "u",
     ns: systemVersionColl.getFullName(),
     o: {_id: "featureCompatibilityVersion", version: lastLTSFCV},
@@ -65,7 +65,7 @@ assert.commandWorked(
 
 // ------------ Testing commands on the fCV collection ---------------
 
-var collModOp = {
+let collModOp = {
     op: "c",
     ns: systemVersionColl.getDB() + ".$cmd",
     o: {collMod: systemVersionColl.getName(), validationLevel: "off"},

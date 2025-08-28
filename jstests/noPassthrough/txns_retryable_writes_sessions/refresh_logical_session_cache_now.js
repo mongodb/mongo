@@ -2,14 +2,14 @@
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-var res;
-var refresh = {refreshLogicalSessionCacheNow: 1};
-var startSession = {startSession: 1};
+let res;
+let refresh = {refreshLogicalSessionCacheNow: 1};
+let startSession = {startSession: 1};
 
 // Start up a standalone server.
-var conn = MongoRunner.runMongod();
-var admin = conn.getDB("admin");
-var config = conn.getDB("config");
+let conn = MongoRunner.runMongod();
+let admin = conn.getDB("admin");
+let config = conn.getDB("config");
 
 // Trigger an initial refresh, as a sanity check.
 res = admin.runCommand(refresh);
@@ -28,8 +28,8 @@ assert.commandWorked(res, "failed to refresh");
 assert.eq(config.system.sessions.count(), 1, "should have written session records");
 
 // Start some new sessions. Should not be in the collection yet.
-var numSessions = 100;
-for (var i = 0; i < numSessions; i++) {
+let numSessions = 100;
+for (let i = 0; i < numSessions; i++) {
     res = admin.runCommand(startSession);
     assert.commandWorked(res, "unable to start session");
 }

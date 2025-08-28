@@ -7,7 +7,7 @@
  *
  * @tags: [requires_fastcount]
  */
-var coll = db.jstests_count_hint;
+let coll = db.jstests_count_hint;
 coll.drop();
 
 assert.commandWorked(coll.insert({i: 1}));
@@ -54,5 +54,5 @@ assert.throws(function () {
 // Test that a bad hint fails with the correct error code.
 let cmdRes = db.runCommand({count: coll.getName(), hint: {bad: 1, hint: 1}});
 assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue, tojson(cmdRes));
-var regex = new RegExp("hint provided does not correspond to an existing index");
+let regex = new RegExp("hint provided does not correspond to an existing index");
 assert(regex.test(cmdRes.errmsg));

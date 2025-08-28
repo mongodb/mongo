@@ -3,9 +3,9 @@ export var testCRUDAndAgg = function (db) {
     assert.commandWorked(db.foo.insert({x: -1}));
     assert.commandWorked(db.foo.update({x: 1}, {$set: {y: 1}}));
     assert.commandWorked(db.foo.update({x: -1}, {$set: {y: 1}}));
-    var doc1 = db.foo.findOne({x: 1});
+    let doc1 = db.foo.findOne({x: 1});
     assert.eq(1, doc1.y);
-    var doc2 = db.foo.findOne({x: -1});
+    let doc2 = db.foo.findOne({x: -1});
     assert.eq(1, doc2.y);
 
     assert.commandWorked(db.foo.remove({x: 1}, true));
@@ -14,20 +14,20 @@ export var testCRUDAndAgg = function (db) {
 };
 
 export var testDDLOps = function (st) {
-    var shard0Name = st.shard0.shardName;
-    var shard1Name = st.shard1.shardName;
-    var db = st.s.getDB("sharded");
-    var configDB = st.s.getDB("config");
+    let shard0Name = st.shard0.shardName;
+    let shard1Name = st.shard1.shardName;
+    let db = st.s.getDB("sharded");
+    let configDB = st.s.getDB("config");
     assert.commandWorked(db.foo.insert({x: 1}));
 
     // moveChunk
-    var shard0NumChunks = configDB.chunks.find({shard: shard0Name}).toArray().length;
-    var shard1NumChunks = configDB.chunks.find({shard: shard1Name}).toArray().length;
+    let shard0NumChunks = configDB.chunks.find({shard: shard0Name}).toArray().length;
+    let shard1NumChunks = configDB.chunks.find({shard: shard1Name}).toArray().length;
 
     assert.commandWorked(st.s.adminCommand({moveChunk: "sharded.foo", find: {x: 1}, to: shard0Name}));
 
-    var newShard0NumChunks = configDB.chunks.find({shard: shard0Name}).toArray().length;
-    var newShard1NumChunks = configDB.chunks.find({shard: shard1Name}).toArray().length;
+    let newShard0NumChunks = configDB.chunks.find({shard: shard0Name}).toArray().length;
+    let newShard1NumChunks = configDB.chunks.find({shard: shard1Name}).toArray().length;
     assert.eq(newShard0NumChunks, shard0NumChunks + 1);
     assert.eq(newShard1NumChunks, shard1NumChunks - 1);
 

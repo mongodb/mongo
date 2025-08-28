@@ -9,10 +9,10 @@
 import {anyEq, assertErrorCode, collectionExists} from "jstests/aggregation/extras/utils.js";
 
 const testDb = db.getSiblingDB("unsharded_out");
-var input = testDb.unsharded_out_in;
-var inputDoesntExist = testDb.unsharded_out_doesnt_exist;
-var output = testDb.unsharded_out_out;
-var cappedOutput = testDb.unsharded_out_out_capped;
+let input = testDb.unsharded_out_in;
+let inputDoesntExist = testDb.unsharded_out_doesnt_exist;
+let output = testDb.unsharded_out_out;
+let cappedOutput = testDb.unsharded_out_out_capped;
 
 input.drop();
 inputDoesntExist.drop(); // never created
@@ -30,15 +30,15 @@ function getOutputIndexes() {
 
 function test(input, pipeline, expected) {
     pipeline.push({$out: output.getName()});
-    var indexes = getOutputIndexes();
+    let indexes = getOutputIndexes();
 
-    var cursor = input.aggregate(pipeline);
+    let cursor = input.aggregate(pipeline);
 
     assert.eq(cursor.itcount(), 0); // empty cursor returned
     assert(anyEq(output.find().toArray(), expected)); // correct results
-    var outputIndexes = getOutputIndexes();
+    let outputIndexes = getOutputIndexes();
     assert.eq(outputIndexes.length, indexes.length); // number of indexes maintained
-    for (var i = 0; i < outputIndexes.length; i++) {
+    for (let i = 0; i < outputIndexes.length; i++) {
         assert.docEq(outputIndexes[i], indexes[i]);
     }
 
@@ -46,7 +46,7 @@ function test(input, pipeline, expected) {
 }
 
 function listCollections(name) {
-    var collectionInfosCursor = testDb.runCommand("listCollections", {filter: {name: name}});
+    let collectionInfosCursor = testDb.runCommand("listCollections", {filter: {name: name}});
     return new DBCommandCursor(testDb, collectionInfosCursor).toArray();
 }
 

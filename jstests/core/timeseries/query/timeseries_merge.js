@@ -46,19 +46,19 @@ let runSimpleMergeTestCase = () => {
     assert.eq(actualResults.length, expectedResults.length, actualResults);
 
     // Verifies that every measurement is same as expected.
-    for (var i = 0; i < expectedResults.length; ++i) {
+    for (let i = 0; i < expectedResults.length; ++i) {
         assert.eq(actualResults[i], expectedResults[i], actualResults);
     }
 };
 
 let runMergeOnErrorTestCase = () => {
-    var outColl = TimeseriesAggTests.getOutputCollection("out");
+    let outColl = TimeseriesAggTests.getOutputCollection("out");
     prepareOutputCollectionForMergeOn(outColl);
 
     // This must fail because source '_id' field will try to replace target '_id' field which is
     // immutable. This verifies that source '_id' is materialized.
     jsTestLog("'ImmutableField' error expected below!");
-    var err = assert.throws(() =>
+    let err = assert.throws(() =>
         inColl.aggregate([
             {
                 $merge: {
@@ -76,7 +76,7 @@ let runMergeOnErrorTestCase = () => {
  * Verifies that $merge "on" field works as expected with time-series source collection.
  */
 let runMergeOnTestCase = () => {
-    var mergePipeline = [
+    let mergePipeline = [
         {$project: {_id: 0, cpu: 1, idle_user: 1, "tags.hostid": 1, time: 1}},
         {$sort: {time: 1}},
         {
@@ -107,7 +107,7 @@ let runMergeOnTestCase = () => {
     assert.eq(actualResults.length, expectedResults.length, actualResults);
 
     // Verifies that every measurement is same as expected.
-    for (var i = 0; i < expectedResults.length; ++i) {
+    for (let i = 0; i < expectedResults.length; ++i) {
         assert.eq(actualResults[i], expectedResults[i], actualResults);
     }
 };

@@ -10,9 +10,9 @@ export const $config = (function () {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
     function makeDocWithSize(targetSize) {
-        var doc = {_id: new ObjectId(), field: ""};
+        let doc = {_id: new ObjectId(), field: ""};
 
-        var size = Object.bsonsize(doc);
+        let size = Object.bsonsize(doc);
         assert.gte(targetSize, size);
 
         // Set 'field' as a string with enough characters
@@ -26,9 +26,9 @@ export const $config = (function () {
     // Inserts a document of a certain size into the specified collection
     // and returns its _id field.
     function insert(db, collName, targetSize) {
-        var doc = makeDocWithSize(targetSize);
+        let doc = makeDocWithSize(targetSize);
 
-        var res = db[collName].insert(doc);
+        let res = db[collName].insert(doc);
         assert.commandWorked(res);
         assert.eq(1, res.nInserted);
 
@@ -46,7 +46,7 @@ export const $config = (function () {
             });
     }
 
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
         prefix: "create_capped_collection",
@@ -56,22 +56,22 @@ export const $config = (function () {
         // Define this function in data so that it can be used by workloads inheriting this one
         verifySizeTruncation: function verifySizeTruncation(db, myCollName, options) {
             // Define a large document to be half the size of the capped collection.
-            var largeDocSize = Math.floor(options.size / 2) - 1;
+            let largeDocSize = Math.floor(options.size / 2) - 1;
 
             // Truncation of capped collections is generally unreliable. Instead of relying on it
             // to occur after a certain size document is inserted we test its occurrence. We set a
             // reasonable threshold of documents to insert before a user might expect truncation to
             // occur and verify truncation occurred for the right documents.
 
-            var threshold = 1000;
+            let threshold = 1000;
 
-            var insertedIds = [];
-            for (var i = 0; i < threshold; ++i) {
+            let insertedIds = [];
+            for (let i = 0; i < threshold; ++i) {
                 insertedIds.push(this.insert(db, myCollName, largeDocSize));
             }
 
-            var foundIds = this.getObjectIds(db, myCollName);
-            var count = foundIds.length;
+            let foundIds = this.getObjectIds(db, myCollName);
+            let count = foundIds.length;
 
             assert.lt(count, threshold, "expected at least one truncation to occur");
             assert.eq(
@@ -82,8 +82,8 @@ export const $config = (function () {
         },
     };
 
-    var states = (function () {
-        var options = {
+    let states = (function () {
+        let options = {
             capped: true,
             size: 8192, // multiple of 256; larger than 4096 default
         };
@@ -98,7 +98,7 @@ export const $config = (function () {
 
         // TODO: how to avoid having too many files open?
         function create(db, collName) {
-            var myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
+            let myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
             assert.commandWorked(db.createCollection(myCollName, options));
 
             this.verifySizeTruncation(db, myCollName, options);
@@ -107,7 +107,7 @@ export const $config = (function () {
         return {init: init, create: create};
     })();
 
-    var transitions = {init: {create: 1}, create: {create: 1}};
+    let transitions = {init: {create: 1}, create: {create: 1}};
 
     return {
         threadCount: 5,

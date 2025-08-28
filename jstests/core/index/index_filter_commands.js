@@ -61,7 +61,7 @@ import {
 import {checkSbeFullFeatureFlagEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
-var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
+let isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
 const coll = db.jstests_index_filter_commands;
 coll.drop();
@@ -79,18 +79,18 @@ assert.commandWorked(coll.insert({_id: 1}));
 // Add 2 indexes.
 // 1st index is more efficient.
 // 2nd and 3rd indexes will be used to test index filters.
-var indexA1 = {a: 1};
-var indexA1B1 = {a: 1, b: 1};
-var indexA1C1 = {a: 1, c: 1};
+let indexA1 = {a: 1};
+let indexA1B1 = {a: 1, b: 1};
+let indexA1C1 = {a: 1, c: 1};
 assert.commandWorked(coll.createIndex(indexA1));
 assert.commandWorked(coll.createIndex(indexA1B1));
 assert.commandWorked(coll.createIndex(indexA1C1));
 
-var queryAA = {a: "A"};
-var queryA1 = {a: 1, b: 1};
-var projectionA1 = {_id: 0, a: 1};
-var sortA1 = {a: -1};
-var queryID = {_id: 1};
+let queryAA = {a: "A"};
+let queryA1 = {a: 1, b: 1};
+let projectionA1 = {_id: 0, a: 1};
+let sortA1 = {a: -1};
+let queryID = {_id: 1};
 
 //
 // Tests for planCacheListFilters, planCacheClearFilters, planCacheSetFilter
@@ -101,7 +101,7 @@ function getFilters(collection) {
     if (collection == undefined) {
         collection = coll;
     }
-    var res = collection.runCommand("planCacheListFilters");
+    let res = collection.runCommand("planCacheListFilters");
     assert.commandWorked(res, "planCacheListFilters failed");
     assert(res.hasOwnProperty("filters"), "filters missing from planCacheListFilters result");
     return res.filters;
@@ -163,7 +163,7 @@ function planCacheEntryForPipeline(pipeline, collection) {
 // Utility function to list plans for a query.
 // Attempting to retrieve index filters on a non-existent collection
 // will return empty results.
-var missingCollection = db.jstests_index_filter_commands_missing;
+let missingCollection = db.jstests_index_filter_commands_missing;
 missingCollection.drop();
 assert.eq(
     0,
@@ -177,8 +177,8 @@ assert.eq(0, filters.length, "unexpected number of index filters in planCacheLis
 
 // Check details of winning plan in plan cache before setting index filter.
 assert.eq(1, coll.find(queryA1, projectionA1).sort(sortA1).itcount(), "unexpected document count");
-var shape = {query: queryA1, sort: sortA1, projection: projectionA1};
-var planBeforeSetFilter = planCacheEntryForQuery(shape);
+let shape = {query: queryA1, sort: sortA1, projection: projectionA1};
+let planBeforeSetFilter = planCacheEntryForQuery(shape);
 assert.neq(null, planBeforeSetFilter, coll.getPlanCache().list());
 // Check 'indexFilterSet' field in plan details
 assert.eq(false, planBeforeSetFilter.indexFilterSet, planBeforeSetFilter);
@@ -229,7 +229,7 @@ coll.find(queryA1, projectionA1).sort(sortA1).hint(indexA1).itcount();
 
 // Test that index filters are ignored for idhack queries.
 assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: queryID, indexes: [indexA1]}));
-var explain = coll.explain("executionStats").find(queryID).finish();
+let explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
 
 explain = getSingleNodeExplain(explain);
@@ -294,7 +294,7 @@ if (!FixtureHelpers.isMongos(db)) {
 
 assert(coll.drop());
 
-var collationEN = {locale: "en_US"};
+let collationEN = {locale: "en_US"};
 assert.commandWorked(coll.createIndex(indexA1, {collation: collationEN, name: "a_1:en_US"}));
 assert.commandWorked(coll.createIndex(indexA1, {name: "a_1"}));
 

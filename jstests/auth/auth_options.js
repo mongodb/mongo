@@ -1,9 +1,9 @@
 import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
 
-var baseName = "jstests_auth_auth_options";
+let baseName = "jstests_auth_auth_options";
 
 jsTest.log('Testing "auth" command line option');
-var expectedResult = {"parsed": {"security": {"authorization": "enabled"}}};
+let expectedResult = {"parsed": {"security": {"authorization": "enabled"}}};
 
 testGetCmdLineOptsMongod({auth: ""}, expectedResult);
 

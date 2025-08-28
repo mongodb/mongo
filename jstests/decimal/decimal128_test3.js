@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var data = [
+let data = [
     {
         "description": "[basx066] strings without E cannot generate E in result",
         "input": "-00345678.5432",
@@ -570,7 +570,7 @@ var data = [
 
 data.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
-    var output = NumberDecimal(testCase.input).toString();
+    let output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {
         assert.eq(output, `NumberDecimal("${testCase.expected}")`);
     } else {

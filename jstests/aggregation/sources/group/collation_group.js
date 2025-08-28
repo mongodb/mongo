@@ -2,14 +2,14 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Test that the $group stage and all accumulators respect the collation.
-var coll = db.collation_group;
+let coll = db.collation_group;
 coll.drop();
 
-var results;
-var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
-var diacriticInsensitive = {collation: {locale: "en_US", strength: 1, caseLevel: true}};
-var numericOrdering = {collation: {locale: "en_US", numericOrdering: true}};
-var caseAndDiacriticInsensitive = {collation: {locale: "en_US", strength: 1}};
+let results;
+let caseInsensitive = {collation: {locale: "en_US", strength: 2}};
+let diacriticInsensitive = {collation: {locale: "en_US", strength: 1, caseLevel: true}};
+let numericOrdering = {collation: {locale: "en_US", numericOrdering: true}};
+let caseAndDiacriticInsensitive = {collation: {locale: "en_US", strength: 1}};
 
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
 

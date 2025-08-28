@@ -4,13 +4,13 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.agg_array_elem_at_expr;
+let coll = db.agg_array_elem_at_expr;
 coll.drop();
 
 assert.commandWorked(coll.insert({a: [1, 2, 3, 4, 5]}));
 
 // Normal indexing.
-var pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ["$a", 2]}}}];
+let pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ["$a", 2]}}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{x: 3}]);
 
 // Indexing with a float.

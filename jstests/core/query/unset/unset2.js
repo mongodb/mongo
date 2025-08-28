@@ -1,4 +1,4 @@
-var res;
+let res;
 
 let t = db.unset2;
 t.drop();

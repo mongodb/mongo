@@ -28,8 +28,8 @@ assert.commandWorked(
     }),
 );
 
-var mapFunction = "function() {emit(this._id, this.price);}";
-var reduceFunction = "function(keyCustId, valuesPrices) {return Array.sum(valuesPrices);}";
+let mapFunction = "function() {emit(this._id, this.price);}";
+let reduceFunction = "function(keyCustId, valuesPrices) {return Array.sum(valuesPrices);}";
 out.drop();
 assert.commandWorked(col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
 
@@ -40,7 +40,7 @@ out.drop();
 assert.commandWorked(col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
 
 // $where exhibits the same behavior
-var whereFunction = "function() {return this.price === 25;}";
+let whereFunction = "function() {return this.price === 25;}";
 assert.eq(1, col.find({$where: whereFunction}).itcount());
 
 whereFunction += ";";

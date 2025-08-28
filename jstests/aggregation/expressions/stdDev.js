@@ -2,7 +2,7 @@
  * Additional tests for $stdDevPop and $stdDevSamp when used as aggregation expressions.
  */
 
-var coll = db.collection;
+let coll = db.collection;
 assert(coll.drop());
 
 coll.insertOne({

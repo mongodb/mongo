@@ -1,11 +1,11 @@
 // Test creating and authenticating users with special characters.
 
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 
-var adminDB = conn.getDB("admin");
+let adminDB = conn.getDB("admin");
 adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 
-var testUserSpecialCharacters = function () {
+let testUserSpecialCharacters = function () {
     // Create a user with special characters, make sure it can auth.
     assert(adminDB.auth("admin", "pass"));
     adminDB.createUser({user: '~`!@#$%^&*()-_+={}[]||;:",.//><', pwd: "pass", roles: jsTest.adminUserRoles});
@@ -16,15 +16,15 @@ var testUserSpecialCharacters = function () {
 };
 testUserSpecialCharacters();
 
-var testUserAndDatabaseAtSymbolConflation = function () {
+let testUserAndDatabaseAtSymbolConflation = function () {
     // Create a pair of users and databases such that their string representations are
     // identical.
     assert(adminDB.auth("admin", "pass"));
 
-    var bcDB = conn.getDB("b@c");
+    let bcDB = conn.getDB("b@c");
     bcDB.createUser({user: "a", pwd: "pass2", roles: [{role: "readWrite", db: "b@c"}]});
 
-    var cDB = conn.getDB("c");
+    let cDB = conn.getDB("c");
     cDB.createUser({user: "a@b", pwd: "pass1", roles: [{role: "readWrite", db: "c"}]});
 
     assert(adminDB.logout());

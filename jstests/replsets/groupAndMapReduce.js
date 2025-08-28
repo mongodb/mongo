@@ -13,11 +13,11 @@ let doTest = function (signal) {
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest({name: "testSet", nodes: 3});
+    let replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
-    var nodes = replTest.startSet();
+    let nodes = replTest.startSet();
 
     // Call initiate() to send the replSetInitiate command
     // This will wait for initiation
@@ -25,11 +25,11 @@ let doTest = function (signal) {
 
     // Call getPrimary to return a reference to the node that's been
     // elected primary.
-    var primary = replTest.getPrimary();
+    let primary = replTest.getPrimary();
 
     // save some records
-    var len = 100;
-    for (var i = 0; i < len; ++i) {
+    let len = 100;
+    for (let i = 0; i < len; ++i) {
         primary.getDB("foo").foo.save({a: i});
     }
 
@@ -43,12 +43,12 @@ let doTest = function (signal) {
     secondaries.forEach(function (secondary) {
         // try to read from secondary
         secondary.setSecondaryOk();
-        var count = secondary.getDB("foo").foo.find().itcount();
+        let count = secondary.getDB("foo").foo.find().itcount();
         printjson(count);
         assert.eq(len, count, "secondary count wrong: " + secondary);
 
         print("Doing a findOne to verify we can get a row");
-        var one = secondary.getDB("foo").foo.findOne();
+        let one = secondary.getDB("foo").foo.findOne();
         printjson(one);
 
         print("Calling inline mr() with secondaryOk=true, must succeed");
@@ -57,8 +57,8 @@ let doTest = function (signal) {
             emit(this.a, 1);
         };
         let reduce = function (key, vals) {
-            var sum = 0;
-            for (var i = 0; i < vals.length; ++i) {
+            let sum = 0;
+            for (let i = 0; i < vals.length; ++i) {
                 sum += vals[i];
             }
             return sum;

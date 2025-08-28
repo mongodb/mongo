@@ -8,16 +8,16 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
-var name = "writeConcernStepDownAndBackUp";
-var dbName = "wMajorityCheck";
-var collName = "stepdownAndBackUp";
+let name = "writeConcernStepDownAndBackUp";
+let dbName = "wMajorityCheck";
+let collName = "stepdownAndBackUp";
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     name: name,
     nodes: [{}, {}, {rsConfig: {priority: 0}}],
     useBridge: true,
 });
-var nodes = rst.startSet();
+let nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 function waitForPrimary(node) {
@@ -27,7 +27,7 @@ function waitForPrimary(node) {
 }
 
 function stepUp(node) {
-    var primary = rst.getPrimary();
+    let primary = rst.getPrimary();
     if (primary != node) {
         assert.commandWorked(primary.adminCommand({replSetStepDown: 60 * 5}));
     }
@@ -36,8 +36,8 @@ function stepUp(node) {
 
 jsTestLog("Make sure node 0 is primary.");
 stepUp(nodes[0]);
-var primary = rst.getPrimary();
-var secondaries = rst.getSecondaries();
+let primary = rst.getPrimary();
+let secondaries = rst.getSecondaries();
 assert.eq(nodes[0], primary);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
@@ -62,13 +62,13 @@ const hangBeforeWaitingForWriteConcern = configureFailPoint(nodes[0], "hangBefor
 jsTestLog(
     "Do w:majority write that won't enter awaitReplication() until after the primary " + "has stepped down and back up",
 );
-var doMajorityWrite = function () {
+let doMajorityWrite = function () {
     // Run hello command with 'hangUpOnStepDown' set to false to mark this connection as
     // one that shouldn't be closed when the node steps down.  This simulates the scenario where
     // the write was coming from a mongos.
     assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
 
-    var res = db.getSiblingDB("wMajorityCheck").stepdownAndBackUp.insert(
+    let res = db.getSiblingDB("wMajorityCheck").stepdownAndBackUp.insert(
         {a: 2},
         {
             writeConcern: {w: "majority"},
@@ -77,7 +77,7 @@ var doMajorityWrite = function () {
     assert.writeErrorWithCode(res, ErrorCodes.InterruptedDueToReplStateChange);
 };
 
-var joinMajorityWriter = startParallelShell(doMajorityWrite, nodes[0].port);
+let joinMajorityWriter = startParallelShell(doMajorityWrite, nodes[0].port);
 // Ensure the parallel shell hangs on the majority write before stepping the primary down.
 hangBeforeWaitingForWriteConcern.wait();
 

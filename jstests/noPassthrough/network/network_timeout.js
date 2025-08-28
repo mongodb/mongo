@@ -28,7 +28,7 @@ assert.commandWorked(admin.runCommand({shardCollection: testNS, key: {_id: 1}}))
 let coll = conn.getCollection(testNS);
 
 // Make sure insert occurs on both nodes.
-var wc = {writeConcern: {w: 2, wtimeout: 60000}};
+let wc = {writeConcern: {w: 2, wtimeout: 60000}};
 assert.commandWorked(coll.insert({_id: 1}, wc));
 
 assert.neq(null, coll.findOne({_id: 1}));

@@ -1,12 +1,12 @@
 // This tests that we can successfully profile queries on secondaries.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 rst.awaitReplication();
 
-var secondaryDB = rst.getSecondary().getDB("test");
+let secondaryDB = rst.getSecondary().getDB("test");
 
 jsTestLog("Enable profiling on the secondary");
 assert.commandWorked(secondaryDB.runCommand({profile: 2}));

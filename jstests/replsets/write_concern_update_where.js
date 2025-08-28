@@ -14,7 +14,7 @@ rst.startSet();
 rst.initiate();
 const db = rst.getPrimary().getDB(jsTestName());
 
-for (var i = 0; i < 3000; i++) {
+for (let i = 0; i < 3000; i++) {
     db.system.js.insertOne({
         _id: "test" + i,
         value: function (x) {

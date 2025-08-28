@@ -51,7 +51,7 @@ print("* B");
 assert.eq(7, s.s0.getDB("test").foo.find().toArray().length, "normal B 3");
 assert.eq(7, s2.getDB("test").foo.find().toArray().length, "other B 4");
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     print("* C " + i);
     assert.eq(7, s2.getDB("test").foo.find().toArray().length, "other B " + i);
 }

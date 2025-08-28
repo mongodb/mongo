@@ -111,7 +111,7 @@ assert.throws(function () {
 });
 
 // sharded find requires projecting the score to sort, but sharded agg does not.
-var findRes = coll
+let findRes = coll
     .find({$text: {$search: "apple banana"}}, {textScore: {$meta: "textScore"}})
     .sort({textScore: {$meta: "textScore"}})
     .map(function (obj) {

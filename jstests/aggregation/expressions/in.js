@@ -16,13 +16,13 @@ const caseInsensitive = {
     locale: "en_US",
     strength: 2,
 };
-var coll = db.in;
+let coll = db.in;
 coll.drop();
 
 // To call testExpressionWithIntersection, the options must have a array1 and array2 field.
 function testExpressionWithIntersection(options) {
     coll.drop();
-    var pipeline = {
+    let pipeline = {
         $project: {
             included: {
                 $in: ["$elementField", {$setIntersection: [{$literal: options.array1}, {$literal: options.array2}]}],
@@ -30,7 +30,7 @@ function testExpressionWithIntersection(options) {
         },
     };
     assert.commandWorked(coll.insert({elementField: options.element}));
-    var res = coll.aggregate(pipeline).toArray();
+    let res = coll.aggregate(pipeline).toArray();
     testExpressionEquivalence(res, options);
     testQueryFormEquivalence(res, options);
 }
@@ -53,9 +53,9 @@ function testExpressionCollectionCollation(options, collationSpec) {
 }
 
 function testExpressionInternal(options) {
-    var pipeline = {$project: {included: {$in: ["$elementField", {$literal: options.array}]}}};
+    let pipeline = {$project: {included: {$in: ["$elementField", {$literal: options.array}]}}};
     assert.commandWorked(coll.insert({elementField: options.element}));
-    var res = coll.aggregate(pipeline).toArray();
+    let res = coll.aggregate(pipeline).toArray();
     testExpressionEquivalence(res, options);
     testQueryFormEquivalence(res, options);
 }
@@ -67,7 +67,7 @@ function testExpressionEquivalence(res, options) {
 
 function testQueryFormEquivalence(res, options) {
     if (options.queryFormShouldBeEquivalent) {
-        var query = {elementField: {$in: options.array}};
+        let query = {elementField: {$in: options.array}};
         res = coll.find(query).toArray();
 
         if (options.elementIsIncluded) {
@@ -276,7 +276,7 @@ coll.insert({});
 
 /* ------------------------ Assertion Failure Tests ------------------------ */
 
-var pipeline = {$project: {included: {$in: [[1, 2], 1]}}};
+let pipeline = {$project: {included: {$in: [[1, 2], 1]}}};
 assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
 pipeline = {

@@ -24,7 +24,7 @@ t.insert({
         {loc: [39, 39], type: "work"},
     ],
 });
-var res = t.insert({
+let res = t.insert({
     zip: "10003",
     data: [
         {loc: [30, 30], type: "home"},
@@ -47,14 +47,14 @@ assert.commandWorked(res);
 
 // test normal access
 
-var result = t.find({"data.loc": {$near: [0, 0]}}).toArray();
+let result = t.find({"data.loc": {$near: [0, 0]}}).toArray();
 
 printjson(result);
 
 assert.eq(4, result.length);
 
-var order = [1, 2, 3, 4];
+let order = [1, 2, 3, 4];
 
-for (var i = 0; i < result.length; i++) {
+for (let i = 0; i < result.length; i++) {
     assert.eq("1000" + order[i], result[i].zip);
 }

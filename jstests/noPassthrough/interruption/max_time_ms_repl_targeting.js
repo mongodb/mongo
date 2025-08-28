@@ -4,11 +4,11 @@
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2}});
-var kDbName = "test";
-var ns = "test.foo";
-var mongos = st.s0;
-var testColl = mongos.getCollection(ns);
+let st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2}});
+let kDbName = "test";
+let ns = "test.foo";
+let mongos = st.s0;
+let testColl = mongos.getCollection(ns);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 

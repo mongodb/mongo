@@ -8,8 +8,8 @@ function doIt() {
     t.drop();
 
     function sort() {
-        var sort = {};
-        for (var i = 0; i < n; ++i) {
+        let sort = {};
+        for (let i = 0; i < n; ++i) {
             sort[fields[i]] = Random.rand() > 0.5 ? 1 : -1;
         }
         return sort;
@@ -17,10 +17,10 @@ function doIt() {
 
     var fields = ["a", "b", "c", "d", "e"];
     let n = Random.randInt(5) + 1;
-    var idx = sort();
+    let idx = sort();
 
-    var chars = "abcdefghijklmnopqrstuvwxyz";
-    var alphas = [];
+    let chars = "abcdefghijklmnopqrstuvwxyz";
+    let alphas = [];
     for (var i = 0; i < n; ++i) {
         alphas.push(Random.rand() > 0.5);
     }
@@ -28,8 +28,8 @@ function doIt() {
     t.createIndex(idx);
 
     function obj() {
-        var ret = {};
-        for (var i = 0; i < n; ++i) {
+        let ret = {};
+        for (let i = 0; i < n; ++i) {
             ret[fields[i]] = r(alphas[i]);
         }
         return ret;
@@ -39,9 +39,9 @@ function doIt() {
         if (!alpha) {
             return Random.randInt(10);
         } else {
-            var len = Random.randInt(10);
+            let len = Random.randInt(10);
             let buf = "";
-            for (var i = 0; i < len; ++i) {
+            for (let i = 0; i < len; ++i) {
                 buf += chars.charAt(Random.randInt(chars.length));
             }
             return buf;
@@ -49,17 +49,17 @@ function doIt() {
     }
 
     function check() {
-        var v = t.validate();
+        let v = t.validate();
         if (!t.valid) {
             printjson(t);
             assert(t.valid);
         }
-        var spec = {};
-        for (var i = 0; i < n; ++i) {
-            var predicateType = Random.randInt(4);
+        let spec = {};
+        for (let i = 0; i < n; ++i) {
+            let predicateType = Random.randInt(4);
             switch (predicateType) {
                 case 0 /* range */: {
-                    var bounds = [r(alphas[i]), r(alphas[i])];
+                    let bounds = [r(alphas[i]), r(alphas[i])];
                     if (bounds[0] > bounds[1]) {
                         bounds.reverse();
                     }
@@ -78,9 +78,9 @@ function doIt() {
                     break;
                 }
                 case 1 /* $in */: {
-                    var vals = [];
-                    var inLength = Random.randInt(15);
-                    for (var j = 0; j < inLength; ++j) {
+                    let vals = [];
+                    let inLength = Random.randInt(15);
+                    for (let j = 0; j < inLength; ++j) {
                         vals.push(r(alphas[i]));
                     }
                     spec[fields[i]] = {$in: vals};
@@ -102,7 +102,7 @@ function doIt() {
         assert.eq(c2.length, count);
     }
 
-    var bulk = t.initializeUnorderedBulkOp();
+    let bulk = t.initializeUnorderedBulkOp();
     for (var i = 0; i < 10000; ++i) {
         bulk.insert(obj());
         if (Random.rand() > 0.999) {
@@ -132,6 +132,6 @@ function doIt() {
     check();
 }
 
-for (var z = 0; z < 5; ++z) {
+for (let z = 0; z < 5; ++z) {
     doIt();
 }

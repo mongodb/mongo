@@ -3,19 +3,19 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.disableImplicitSessions = true;
 
-var replTest = new ReplSetTest({nodes: 3, useHostName: false, keyFile: "jstests/libs/key1"});
+let replTest = new ReplSetTest({nodes: 3, useHostName: false, keyFile: "jstests/libs/key1"});
 replTest.startSet({oplogSize: 10});
 replTest.initiate();
 replTest.awaitSecondaryNodes();
 
-var nodeCount = replTest.nodes.length;
-var primary = replTest.getPrimary();
+let nodeCount = replTest.nodes.length;
+let primary = replTest.getPrimary();
 
 // Setup the database using replSet connection before setting the authentication
-var conn = new Mongo(replTest.getURL());
-var testDB = conn.getDB("test");
-var adminDB = conn.getDB("admin");
-var testColl = testDB.user;
+let conn = new Mongo(replTest.getURL());
+let testDB = conn.getDB("test");
+let adminDB = conn.getDB("admin");
+let testColl = testDB.user;
 
 // Setup the cached connection for primary and secondary in DBClientReplicaSet
 // before setting up authentication
@@ -25,11 +25,11 @@ conn.setSecondaryOk();
 assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
 
 // Add admin user using direct connection to primary to simulate connection from remote host
-var priAdminDB = primary.getDB("admin");
+let priAdminDB = primary.getDB("admin");
 priAdminDB.createUser({user: "user", pwd: "user", roles: jsTest.adminUserRoles}, {w: nodeCount, wtimeout: 30000});
 priAdminDB.auth("user", "user");
 
-var priTestDB = primary.getDB("test");
+let priTestDB = primary.getDB("test");
 priTestDB.createUser({user: "a", pwd: "a", roles: jsTest.basicUserRoles}, {w: nodeCount, wtimeout: 30000});
 
 // Authenticate the replSet connection
@@ -49,7 +49,7 @@ conn.setSecondaryOk(false);
 doc = testColl.findOne();
 assert(doc != null);
 
-var queryToPriShouldFail = function () {
+let queryToPriShouldFail = function () {
     conn.setSecondaryOk(false);
 
     assert.throws(function () {
@@ -62,7 +62,7 @@ var queryToPriShouldFail = function () {
     });
 };
 
-var queryToSecShouldFail = function () {
+let queryToSecShouldFail = function () {
     conn.setSecondaryOk();
 
     assert.throws(function () {
@@ -105,12 +105,12 @@ assert.eq(1, testDB.auth("a", "a"));
 
 // Find out the current cached secondary in the repl connection
 conn.setSecondaryOk();
-var serverInfo = testColl.find().readPref("secondary").explain().serverInfo;
-var secNodeIdx = -1;
-var secPortStr = serverInfo.port.toString();
+let serverInfo = testColl.find().readPref("secondary").explain().serverInfo;
+let secNodeIdx = -1;
+let secPortStr = serverInfo.port.toString();
 
-for (var x = 0; x < nodeCount; x++) {
-    var nodePortStr = replTest.nodes[x].host.split(":")[1];
+for (let x = 0; x < nodeCount; x++) {
+    let nodePortStr = replTest.nodes[x].host.split(":")[1];
 
     if (nodePortStr == secPortStr) {
         secNodeIdx = x;

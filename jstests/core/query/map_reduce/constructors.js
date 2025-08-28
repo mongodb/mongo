@@ -19,11 +19,11 @@ function addConstructorsWithNew(constructorList) {
         return "new " + constructor;
     }
 
-    var valid = constructorList.valid;
-    var invalid = constructorList.invalid;
+    let valid = constructorList.valid;
+    let invalid = constructorList.invalid;
     // We use slice(0) here to make a copy of our lists
-    var validWithNew = valid.concat(valid.slice(0).map(prependNew));
-    var invalidWithNew = invalid.concat(invalid.slice(0).map(prependNew));
+    let validWithNew = valid.concat(valid.slice(0).map(prependNew));
+    let invalidWithNew = invalid.concat(invalid.slice(0).map(prependNew));
     return {"valid": validWithNew, "invalid": invalidWithNew};
 }
 
@@ -115,7 +115,7 @@ function whereConstructorTest(constructorList) {
     });
 }
 
-var dbrefConstructors = {
+let dbrefConstructors = {
     "valid": [
         'DBRef("namespace", 0)',
         'DBRef("namespace", "test")',
@@ -134,7 +134,7 @@ var dbrefConstructors = {
     ],
 };
 
-var dbpointerConstructors = {
+let dbpointerConstructors = {
     "valid": ['DBPointer("namespace", ObjectId())', 'DBPointer("namespace", ObjectId("000000000000000000000000"))'],
     "invalid": [
         "DBPointer()",
@@ -146,12 +146,12 @@ var dbpointerConstructors = {
     ],
 };
 
-var objectidConstructors = {
+let objectidConstructors = {
     "valid": ["ObjectId()", 'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")'],
     "invalid": ["ObjectId(5)", 'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")'],
 };
 
-var timestampConstructors = {
+let timestampConstructors = {
     "valid": ["Timestamp()", "Timestamp(0,0)", "Timestamp(1.0,1.0)"],
     "invalid": [
         "Timestamp(0)",
@@ -171,7 +171,7 @@ var timestampConstructors = {
     ],
 };
 
-var bindataConstructors = {
+let bindataConstructors = {
     "valid": ['BinData(0,"test")'],
     "invalid": [
         'BinData(0,"test", "test")',
@@ -188,7 +188,7 @@ var bindataConstructors = {
     ],
 };
 
-var uuidConstructors = {
+let uuidConstructors = {
     "valid": [
         'UUID("0123456789abcdef0123456789ABCDEF")',
         'UUID("0a1A2b3B-4c5C-6d7D-8e9E-AfBFC0D1E3F4")',
@@ -212,7 +212,7 @@ var uuidConstructors = {
     ],
 };
 
-var md5Constructors = {
+let md5Constructors = {
     "valid": ['MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")'],
     "invalid": [
         'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
@@ -229,7 +229,7 @@ var md5Constructors = {
     ],
 };
 
-var hexdataConstructors = {
+let hexdataConstructors = {
     "valid": [
         'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
         'HexData(0, "")',
@@ -255,7 +255,7 @@ var hexdataConstructors = {
     ],
 };
 
-var dateConstructors = {
+let dateConstructors = {
     "valid": ["Date()", "Date(0)", "Date(0,0)", "Date(0,0,0)", 'Date("foo")'],
     "invalid": [],
 };

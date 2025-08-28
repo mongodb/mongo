@@ -7,13 +7,13 @@
 
 // Tests for invalidation during a getmore. This behavior is storage-engine dependent.
 // See SERVER-16675.
-var t = db.getmore_invalidated_documents;
+let t = db.getmore_invalidated_documents;
 
-var count;
-var cursor;
-var nextDoc;
-var x;
-var y;
+let count;
+let cursor;
+let nextDoc;
+let x;
+let y;
 
 // Case #1: Text search with deletion invalidation.
 t.drop();

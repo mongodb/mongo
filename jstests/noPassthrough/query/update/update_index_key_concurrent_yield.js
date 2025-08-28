@@ -13,7 +13,7 @@ t.drop();
 
 const N = 10000;
 
-var bulk = t.initializeUnorderedBulkOp();
+let bulk = t.initializeUnorderedBulkOp();
 for (let i = 0; i < N; i++) {
     bulk.insert({_id: i, x: 1});
 }

@@ -28,7 +28,7 @@ assert.eq(6, t.find({$or: [{a: 6}, {b: 3}, {c: 4}]}).toArray().length);
 assert.eq(6, t.find({$or: [{a: 2}, {b: 6}, {c: 4}]}).toArray().length);
 assert.eq(6, t.find({$or: [{a: 2}, {b: 3}, {c: 6}]}).toArray().length);
 
-for (var i = 2; i <= 7; ++i) {
+for (let i = 2; i <= 7; ++i) {
     assert.eq(
         7,
         t

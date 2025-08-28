@@ -60,7 +60,7 @@ checkResults(
 
 // Test that $unionWith works with $indexStats
 // $match removes all real documents from the pipeline, so we can just check the index documents.
-var resObj = testDB.runCommand({
+let resObj = testDB.runCommand({
     aggregate: collA.getName(),
     pipeline: [
         {$match: {val: {$exists: false}}},
@@ -69,7 +69,7 @@ var resObj = testDB.runCommand({
     ],
     cursor: {},
 });
-var docArray = resObj.cursor.firstBatch;
+let docArray = resObj.cursor.firstBatch;
 if (FixtureHelpers.isMongos(testDB) && FixtureHelpers.isSharded(collA)) {
     // We expect each shard to have an _id_, _id_hashed, and str_text index
     const numShards = FixtureHelpers.numberOfShardsForCollection(collA);

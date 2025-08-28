@@ -15,7 +15,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Configure 'internalQueryExecYieldIterations' on both shards such that operations will yield on
 // each 10th PlanExecuter iteration.
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     rs: {setParameter: {internalQueryExecYieldIterations: 10}},
     other: {enableBalancer: false},

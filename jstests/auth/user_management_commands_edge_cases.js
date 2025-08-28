@@ -7,8 +7,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
-    var db = conn.getDB("test");
-    var admin = conn.getDB("admin");
+    let db = conn.getDB("test");
+    let admin = conn.getDB("admin");
     admin.createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
     admin.auth("userAdmin", "pwd");
 
@@ -276,11 +276,11 @@ function runTest(conn) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
+let st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s);
 st.stop();

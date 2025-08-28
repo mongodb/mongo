@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var data = [
+let data = [
     {"description": "[decq021] Normality", "input": "-1234567890123456789012345678901234"},
     {
         "description": "[decq823] values around [u]int32 edges (zeros done earlier)",
@@ -293,7 +293,7 @@ var data = [
 
 data.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
-    var output = NumberDecimal(testCase.input).toString();
+    let output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {
         assert.eq(output, `NumberDecimal("${testCase.expected}")`);
     } else {

@@ -7,7 +7,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
     const testDB = conn.getDB("test");
-    var coll = testDB[jsTestName()];
+    let coll = testDB[jsTestName()];
     coll.drop();
 
     const bulk = coll.initializeUnorderedBulkOp();

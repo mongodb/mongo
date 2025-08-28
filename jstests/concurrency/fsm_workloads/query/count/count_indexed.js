@@ -21,7 +21,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.shardKey = {tid: 1, i: 1};
 
     $config.data.getCount = function getCount(db, predicate) {
-        var query = Object.extend({tid: this.tid}, predicate);
+        let query = Object.extend({tid: this.tid}, predicate);
         return db[this.threadCollName].find(query).hint({tid: 1, i: 1}).count();
     };
 

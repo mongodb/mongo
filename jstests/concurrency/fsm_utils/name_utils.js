@@ -9,10 +9,10 @@
 // Returns a unique database name:
 //   <dbNamePrefix>fsmdb0, <dbNamePrefix>fsmdb1, ...
 export var uniqueDBName = (function (dbNamePrefix) {
-    var i = 0;
+    let i = 0;
 
     return function (dbNamePrefix) {
-        var prefix = dbNamePrefix || "";
+        let prefix = dbNamePrefix || "";
         return prefix + "fsmdb" + i++;
     };
 })();
@@ -20,7 +20,7 @@ export var uniqueDBName = (function (dbNamePrefix) {
 // Returns a unique collection name:
 //   fsmcoll0, fsmcoll1, ...
 export var uniqueCollName = (function () {
-    var i = 0;
+    let i = 0;
 
     return function () {
         return "fsmcoll" + i++;

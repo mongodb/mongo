@@ -18,16 +18,16 @@ export const $config = (function () {
         },
     };
 
-    var states = {
+    let states = {
         init: function init(db, collName) {
             this.fieldName = "t" + this.tid;
             this.count = 0;
         },
 
         update: function update(db, collName) {
-            var updateDoc = this.getUpdateArgument(this.fieldName);
+            let updateDoc = this.getUpdateArgument(this.fieldName);
 
-            var res = db.runCommand({findAndModify: collName, query: {_id: "findAndModify_inc"}, update: updateDoc});
+            let res = db.runCommand({findAndModify: collName, query: {_id: "findAndModify_inc"}, update: updateDoc});
             assert.commandWorked(res);
 
             // If the document was invalidated during a yield, then we wouldn't have modified it.
@@ -47,9 +47,9 @@ export const $config = (function () {
         },
 
         find: function find(db, collName) {
-            var docs = db[collName].find().toArray();
+            let docs = db[collName].find().toArray();
             assert.eq(1, docs.length);
-            var doc = docs[0];
+            let doc = docs[0];
             if (doc.hasOwnProperty(this.fieldName)) {
                 assert.eq(this.count, doc[this.fieldName]);
             } else {
@@ -58,7 +58,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
+    let transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
 
     function setup(db, collName, cluster) {
         const doc = {_id: "findAndModify_inc"};

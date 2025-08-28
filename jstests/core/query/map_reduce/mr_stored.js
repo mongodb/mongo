@@ -43,10 +43,10 @@ let map = function (obj) {
 let notStoredMap = `function() {(${map.toString()})(this);}`;
 
 const reduce = function (k, v) {
-    var stats = [];
-    var total = 0;
-    for (var i = 0; i < v.length; i++) {
-        for (var j in v[i].stats) {
+    let stats = [];
+    let total = 0;
+    for (let i = 0; i < v.length; i++) {
+        for (let j in v[i].stats) {
             stats.push(v[i].stats[j]);
             total += v[i].stats[j];
         }

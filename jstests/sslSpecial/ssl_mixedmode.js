@@ -11,11 +11,11 @@ function testCombination(tlsMode, sslShell, shouldSucceed) {
             (sslShell ? "true" : "false" + " (should " + (shouldSucceed ? "" : "not ") + "succeed)"),
     );
 
-    var serverOptionOverrides = {tlsMode: tlsMode, setParameter: {enableTestCommands: 1}};
+    let serverOptionOverrides = {tlsMode: tlsMode, setParameter: {enableTestCommands: 1}};
 
-    var clientOptions = sslShell ? TLSTest.prototype.defaultTLSClientOptions : TLSTest.prototype.noTLSClientOptions;
+    let clientOptions = sslShell ? TLSTest.prototype.defaultTLSClientOptions : TLSTest.prototype.noTLSClientOptions;
 
-    var fixture = new TLSTest(serverOptionOverrides, clientOptions);
+    let fixture = new TLSTest(serverOptionOverrides, clientOptions);
 
     if (shouldSucceed) {
         assert(fixture.connectWorked());

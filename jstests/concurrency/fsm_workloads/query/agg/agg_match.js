@@ -21,8 +21,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.states.query = function query(db, collName) {
         // note that all threads output to the same collection
-        var otherCollName = this.getOutCollName(collName);
-        var cursor = db[collName].aggregate([{$match: {flag: true}}, {$out: otherCollName}]);
+        let otherCollName = this.getOutCollName(collName);
+        let cursor = db[collName].aggregate([{$match: {flag: true}}, {$out: otherCollName}]);
         assert.eq(0, cursor.itcount(), "cursor returned by $out should always be empty");
         // NOTE: This relies on the fast-path for .count().
         // NOTE: There's a bug, SERVER-33753, where "fast" .count() is wrong on sharded

@@ -1,7 +1,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
-var startTime = Date.now();
+let startTime = Date.now();
 assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a mongod?");
 
 let runCheckOnReplSet = function (db) {
@@ -30,5 +30,5 @@ if (db.getMongo().isMongos()) {
     runCheckOnReplSet(db);
 }
 
-var totalTime = Date.now() - startTime;
+let totalTime = Date.now() - startTime;
 print("Finished consistency oplog checks of cluster in " + totalTime + " ms.");

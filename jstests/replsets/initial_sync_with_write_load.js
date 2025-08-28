@@ -7,12 +7,12 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var testName = "initialsync_with_write_load";
-var replTest = new ReplSetTest({name: testName, nodes: 3, oplogSize: 100});
-var nodes = replTest.nodeList();
+let testName = "initialsync_with_write_load";
+let replTest = new ReplSetTest({name: testName, nodes: 3, oplogSize: 100});
+let nodes = replTest.nodeList();
 
-var conns = replTest.startSet();
-var config = {
+let conns = replTest.startSet();
+let config = {
     "_id": testName,
     "members": [
         {"_id": 0, "host": nodes[0], priority: 4},
@@ -20,18 +20,18 @@ var config = {
         {"_id": 2, "host": nodes[2]},
     ],
 };
-var r = replTest.initiate(config);
+let r = replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 // Make sure we have a primary
-var primary = replTest.getPrimary();
-var a_conn = conns[0];
-var b_conn = conns[1];
+let primary = replTest.getPrimary();
+let a_conn = conns[0];
+let b_conn = conns[1];
 a_conn.setSecondaryOk();
 b_conn.setSecondaryOk();
-var A = a_conn.getDB("test");
-var B = b_conn.getDB("test");
-var AID = replTest.getNodeId(a_conn);
-var BID = replTest.getNodeId(b_conn);
+let A = a_conn.getDB("test");
+let B = b_conn.getDB("test");
+let AID = replTest.getNodeId(a_conn);
+let BID = replTest.getNodeId(b_conn);
 
 assert(primary == conns[0], "conns[0] assumed to be primary");
 assert(a_conn.host == primary.host);
@@ -41,9 +41,9 @@ assert.commandWorked(A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: ReplSe
 replTest.stop(BID);
 
 print("******************** starting load for 30 secs *********************");
-var work = function () {
+let work = function () {
     print("starting loadgen");
-    var start = new Date().getTime();
+    let start = new Date().getTime();
 
     assert.commandWorked(db.timeToStartTrigger.insert({_id: 1}));
 
@@ -52,7 +52,7 @@ var work = function () {
             db["a" + x].insert({a: x});
         }
 
-        var runTime = new Date().getTime() - start;
+        let runTime = new Date().getTime() - start;
         if (runTime > 30000) break;
         else if (runTime < 5000)
             // back-off more during first 2 seconds
@@ -62,7 +62,7 @@ var work = function () {
     print("finishing loadgen");
 };
 // insert enough that resync node has to go through oplog replay in each step
-var loadGen = startParallelShell(work, replTest.ports[0]);
+let loadGen = startParallelShell(work, replTest.ports[0]);
 
 // wait for document to appear to continue
 assert.soon(
@@ -83,7 +83,7 @@ replTest.start(BID);
 // check that it is up
 assert.soon(function () {
     try {
-        var result = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
+        let result = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
         return true;
     } catch (e) {
         print(e);

@@ -7,13 +7,13 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var sendLinearizableReadOnFailpoint = function () {
+let sendLinearizableReadOnFailpoint = function () {
     // Linearizable read concern is not allowed on secondaries. But set this flag so we can start
     // the operation during the transition from secondary to primary. The read sent at this state
     // should be handled gracefully with appropriate response from the server and not crash.
     db.getMongo().setSecondaryOk();
 
-    var coll = db.getSiblingDB("test").foo;
+    let coll = db.getSiblingDB("test").foo;
 
     try {
         jsTestLog(
@@ -43,10 +43,10 @@ var sendLinearizableReadOnFailpoint = function () {
     }
 };
 
-var num_nodes = 3;
-var name = "stepup_with_linearizable_read";
-var replTest = new ReplSetTest({name: name, nodes: num_nodes});
-var config = replTest.getReplSetConfig();
+let num_nodes = 3;
+let name = "stepup_with_linearizable_read";
+let replTest = new ReplSetTest({name: name, nodes: num_nodes});
+let config = replTest.getReplSetConfig();
 
 // Increased election timeout to avoid having unrelated primary step down while we are
 // testing linearizable functionality on a specific node.
@@ -58,8 +58,8 @@ replTest.startSet();
 replTest.initiate(config);
 replTest.awaitReplication();
 
-var primary = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
+let primary = replTest.getPrimary();
+let secondaries = replTest.getSecondaries();
 
 // Do a write to have something to read, make sure it is replicated to all nodes so the step up will
 // succeed.
@@ -69,7 +69,7 @@ assert.commandWorked(
         .foo.insert({"number": 7}, {"writeConcern": {"w": num_nodes, "wtimeout": ReplSetTest.kDefaultTimeoutMS}}),
 );
 
-var newPrimary = secondaries[0];
+let newPrimary = secondaries[0];
 
 jsTestLog("Set failpoint so we hang during stepup when drain mode is complete but before we are writable.");
 
@@ -79,7 +79,7 @@ assert.commandWorked(
 
 jsTestLog("Starting parallel reader");
 
-var parallelShell = startParallelShell(sendLinearizableReadOnFailpoint, newPrimary.port);
+let parallelShell = startParallelShell(sendLinearizableReadOnFailpoint, newPrimary.port);
 
 jsTestLog(
     "Stepping up secondary, which will hang before step-up completion so that the parallel linearizable read can run, and then it will finish.",

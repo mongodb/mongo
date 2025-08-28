@@ -114,7 +114,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * dropped an index.
      */
     $config.states.createIndexes = function createIndexes(db, unusedCollName) {
-        for (var i = 0; i < this.indexSpecs; ++i) {
+        for (let i = 0; i < this.indexSpecs; ++i) {
             const indexSpecs = this.indexSpecs[i];
             jsTestLog(`Running createIndex: coll=${this.outputCollName} indexSpec=${indexSpecs}`);
             assert.commandWorkedOrFailedWithCode(

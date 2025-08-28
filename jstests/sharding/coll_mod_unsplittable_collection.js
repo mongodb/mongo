@@ -43,8 +43,8 @@ let collId = 1;
 function createUnsplittableCollection(db, opts) {
     const collName = "coll" + collId++;
 
-    var options = opts || {};
-    var cmd = {createUnsplittableCollection: collName};
+    let options = opts || {};
+    let cmd = {createUnsplittableCollection: collName};
     Object.extend(cmd, options);
 
     assert.commandWorked(db.runCommand(cmd));

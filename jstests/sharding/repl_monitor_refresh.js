@@ -11,8 +11,8 @@ TestData.skipCheckDBHashes = true;
 TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-var NODE_COUNT = 3;
-var st = new ShardingTest({
+let NODE_COUNT = 3;
+let st = new ShardingTest({
     shards: {rs0: {nodes: NODE_COUNT, oplogSize: 10}},
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
@@ -20,10 +20,10 @@ var st = new ShardingTest({
     // electionTimeoutMillis to its default value.
     initiateWithDefaultElectionTimeout: true,
 });
-var replTest = st.rs0;
-var mongos = st.s;
+let replTest = st.rs0;
+let mongos = st.s;
 
-var shardDoc;
+let shardDoc;
 assert.soon(() => {
     shardDoc = mongos.getDB("config").shards.findOne();
     return NODE_COUNT == shardDoc.host.split(",").length; // seed list should contain all nodes
@@ -42,10 +42,10 @@ confDoc.version++;
 reconfig(replTest, confDoc);
 
 jsTest.log("Waiting for mongos to reflect change in shard replica set membership.");
-var replView;
+let replView;
 assert.soon(
     function () {
-        var connPoolStats = mongos.getDB("admin").runCommand("connPoolStats");
+        let connPoolStats = mongos.getDB("admin").runCommand("connPoolStats");
         replView = connPoolStats.replicaSets[replTest.name].hosts;
         return replView.length == confDoc.members.length;
     },

@@ -48,20 +48,20 @@ try {
     rst.initiate();
 
     const subShellCommand = function (hosts) {
-        var Ms = [];
+        let Ms = [];
         for (let i = 0; i < 10; i++) {
             Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] + "/?ssl=true&replicaSet=tlsSet"));
         }
 
         for (let i = 0; i < 10; i++) {
-            var db = Ms[i].getDB("test");
+            let db = Ms[i].getDB("test");
             db.setSecondaryOk();
             db.col.find().readPref("secondary").toArray();
         }
     };
 
     const subShellCommandFormatter = function (replSet) {
-        var hosts = [];
+        let hosts = [];
         replSet.nodes.forEach((node) => {
             hosts.push("localhost:" + node.port);
         });

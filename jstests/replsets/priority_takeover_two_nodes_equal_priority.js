@@ -7,17 +7,17 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "priority_takeover_two_nodes_equal_priority";
-var replTest = new ReplSetTest({name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}]});
+let name = "priority_takeover_two_nodes_equal_priority";
+let replTest = new ReplSetTest({name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}]});
 replTest.startSet();
 // We use the default electionTimeoutMillis to allow a priority takeover to occur in
 // case a lower priority node gets elected.
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 jsTestLog("Waiting for one of the high priority nodes to become PRIMARY.");
-var primary;
-var primaryIndex = -1;
-var defaultPriorityNodeIndex = 2;
+let primary;
+let primaryIndex = -1;
+let defaultPriorityNodeIndex = 2;
 assert.soon(
     function () {
         primary = replTest.getPrimary();
@@ -42,9 +42,9 @@ assert.commandWorked(primary.adminCommand({replSetStepDown: 10 * 60 * 3, seconda
 assert.neq(primary, replTest.getPrimary());
 
 // We expect the other high priority node to eventually become primary.
-var expectedNewPrimaryIndex = primaryIndex === 0 ? 1 : 0;
+let expectedNewPrimaryIndex = primaryIndex === 0 ? 1 : 0;
 
 jsTestLog("Waiting for the other high priority node to become PRIMARY.");
-var expectedNewPrimary = replTest.nodes[expectedNewPrimaryIndex];
+let expectedNewPrimary = replTest.nodes[expectedNewPrimaryIndex];
 replTest.waitForState(expectedNewPrimary, ReplSetTest.State.PRIMARY);
 replTest.stopSet();

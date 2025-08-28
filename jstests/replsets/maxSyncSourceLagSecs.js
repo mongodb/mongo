@@ -5,8 +5,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 
-var name = "maxSyncSourceLagSecs";
-var replTest = new ReplSetTest({
+let name = "maxSyncSourceLagSecs";
+let replTest = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {priority: 3}},
@@ -15,12 +15,12 @@ var replTest = new ReplSetTest({
     ],
     oplogSize: 5,
 });
-var nodes = replTest.nodeList();
+let nodes = replTest.nodeList();
 replTest.startSet();
 replTest.initiate();
 replTest.awaitNodesAgreeOnPrimary();
-var primary = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
+let primary = replTest.getPrimary();
+let secondaries = replTest.getSecondaries();
 
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
@@ -49,7 +49,7 @@ assert.commandWorked(secondaries[0].getDB("admin").runCommand({fsync: 1, lock: 1
 assert.soon(
     function () {
         primary.getDB("foo").bar.insert({a: 2});
-        var res = secondaries[1].getDB("admin").runCommand({"replSetGetStatus": 1});
+        let res = secondaries[1].getDB("admin").runCommand({"replSetGetStatus": 1});
         return res.syncSourceHost === primary.name;
     },
     "sync target not changed back to primary",

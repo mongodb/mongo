@@ -3,7 +3,7 @@
 //   requires_getmore,
 // ]
 
-var t = db.jstests_arrayfindb;
+let t = db.jstests_arrayfindb;
 t.drop();
 
 // Case #1: Ensure correct matching for $elemMatch with an embedded $and (SERVER-13664).

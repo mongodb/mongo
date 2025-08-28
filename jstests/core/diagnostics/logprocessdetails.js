@@ -16,8 +16,8 @@
  * Returns true if regex matches a string in the array
  */
 let doesLogMatchRegex = function (logArray, regex) {
-    for (var i = logArray.length - 1; i >= 0; i--) {
-        var regexInLine = regex.exec(logArray[i]);
+    for (let i = logArray.length - 1; i >= 0; i--) {
+        let regexInLine = regex.exec(logArray[i]);
         if (regexInLine != null) {
             return true;
         }
@@ -26,22 +26,22 @@ let doesLogMatchRegex = function (logArray, regex) {
 };
 
 let doTest = function () {
-    var log = db.adminCommand({getLog: "global"});
+    let log = db.adminCommand({getLog: "global"});
     // this regex will need to change if output changes
-    var re = new RegExp(".*conn.*options.*");
+    let re = new RegExp(".*conn.*options.*");
 
     assert.neq(null, log);
-    var lineCount = log.totalLinesWritten;
+    let lineCount = log.totalLinesWritten;
     assert.neq(0, lineCount);
 
-    var result = db.adminCommand({logRotate: 1});
+    let result = db.adminCommand({logRotate: 1});
     assert.eq(1, result.ok);
 
-    var log2 = db.adminCommand({getLog: "global"});
+    let log2 = db.adminCommand({getLog: "global"});
     assert.neq(null, log2);
     assert.gte(log2.totalLinesWritten, lineCount);
 
-    var informationIsLogged = doesLogMatchRegex(log2.log, re);
+    let informationIsLogged = doesLogMatchRegex(log2.log, re);
     assert.eq(informationIsLogged, true, "Process details not present in RAM log");
 };
 

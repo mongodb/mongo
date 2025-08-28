@@ -26,7 +26,7 @@ for (i = 0; i < 110; ++i) {
 
 function memoryException(sortSpec, querySpec) {
     querySpec = querySpec || {};
-    var ex = assert.throwsWithCode(
+    let ex = assert.throwsWithCode(
         () => t.find(querySpec).sort(sortSpec).allowDiskUse(false).batchSize(1000).itcount(),
         ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     );

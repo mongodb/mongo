@@ -8,19 +8,19 @@
 //   uses_compact
 // ]
 
-var adminDB = db.getSiblingDB("admin");
-var noDB = function (db) {
-    var dbName = db.getName();
-    var dbsRes = assert.commandWorked(adminDB.runCommand("listDatabases"));
+let adminDB = db.getSiblingDB("admin");
+let noDB = function (db) {
+    let dbName = db.getName();
+    let dbsRes = assert.commandWorked(adminDB.runCommand("listDatabases"));
     dbsRes.databases.forEach(function (e) {
         assert.neq(dbName, e.name, "Found db which shouldn't exist:" + dbName + "; " + tojson(dbsRes));
     });
 };
-var mydb = db.getSiblingDB("neverCreated");
+let mydb = db.getSiblingDB("neverCreated");
 mydb.dropDatabase();
 noDB(mydb);
 
-var coll = mydb.fake;
+let coll = mydb.fake;
 
 // force:true is for replset passthroughs
 assert.commandFailed(coll.runCommand("compact", {force: true}));

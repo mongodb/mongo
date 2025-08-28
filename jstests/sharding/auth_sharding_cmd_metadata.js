@@ -9,12 +9,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 function getConfigOpTime() {
-    var srvStatus = assert.commandWorked(shardTestDB.serverStatus());
+    let srvStatus = assert.commandWorked(shardTestDB.serverStatus());
     assert.hasFields(srvStatus, ["sharding"]);
     return srvStatus.sharding.lastSeenConfigServerOpTime.ts;
 }
 
-var st = new ShardingTest({shards: 1, other: {keyFile: "jstests/libs/key1"}});
+let st = new ShardingTest({shards: 1, other: {keyFile: "jstests/libs/key1"}});
 
 const mongosAdminDB = st.s.getDB("admin");
 mongosAdminDB.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});

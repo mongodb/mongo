@@ -4,11 +4,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Replica set testing API
 // Create a new replica set test. Specify set name and the number of nodes you want.
-var replTest = new ReplSetTest({name: "testSet", nodes: 3});
+let replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
 // call startSet() to start each mongod in the replica set
 // this returns a list of nodes
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 
 // Call initiate() to send the replSetInitiate command
 // This will wait for initiation
@@ -16,11 +16,11 @@ replTest.initiate();
 
 // Call getPrimary to return a reference to the node that's been
 // elected primary.
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // save some records
-var len = 100;
-for (var i = 0; i < len; ++i) {
+let len = 100;
+for (let i = 0; i < len; ++i) {
     primary.getDB("foo").foo.save({a: i});
 }
 
@@ -28,14 +28,14 @@ for (var i = 0; i < len; ++i) {
 // and secondaries in the set and wait until the change has replicated.
 // replTest.awaitReplication();
 
-var secondaries = replTest.getSecondaries();
+let secondaries = replTest.getSecondaries();
 assert.eq(2, secondaries.length, "Expected 2 secondaries but length was " + secondaries.length);
 
 secondaries.forEach(function (secondary) {
     // put secondary into maintenance (recovery) mode
     assert.commandWorked(secondary.getDB("foo").adminCommand({replSetMaintenance: 1}));
 
-    var stats = secondary.getDB("foo").adminCommand({replSetGetStatus: 1});
+    let stats = secondary.getDB("foo").adminCommand({replSetGetStatus: 1});
     assert.eq(stats.myState, 3, "Secondary should be in recovering state.");
 
     print("count should fail in recovering state...");

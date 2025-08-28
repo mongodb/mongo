@@ -1,6 +1,6 @@
 // This test verifies writeConcern behavior on a standalone mongod.
 
-var col = db.write_concern;
+let col = db.write_concern;
 col.drop();
 
 // Supported writeConcern on standalone

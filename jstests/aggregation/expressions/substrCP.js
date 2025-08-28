@@ -4,7 +4,7 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.substrCP;
+let coll = db.substrCP;
 coll.drop();
 
 // Need an empty document for pipeline.

@@ -15,7 +15,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     other: {
         enableBalancer: true,

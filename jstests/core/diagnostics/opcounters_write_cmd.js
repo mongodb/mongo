@@ -11,17 +11,17 @@
 //   does_not_support_repeated_reads,
 // ]
 
-var mongo = new Mongo(db.getMongo().host);
+let mongo = new Mongo(db.getMongo().host);
 
-var newdb = mongo.getDB(db.toString());
+let newdb = mongo.getDB(db.toString());
 
 // Deletes in the system.profile collection can interfere with the opcounters tests below.
 newdb.setProfilingLevel(0);
 newdb.system.profile.drop();
 
-var t = newdb.opcounters;
-var opCounters;
-var res;
+let t = newdb.opcounters;
+let opCounters;
+let res;
 
 //
 // Count ops attempted in write commands in mongod and mongos
@@ -64,7 +64,7 @@ assert.writeError(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, unordered.
-var continueOnErrorFlag = 1;
+let continueOnErrorFlag = 1;
 opCounters = newdb.serverStatus().opcounters;
 res = t.insert([{_id: 5}, {_id: 5}, {_id: 6}], continueOnErrorFlag);
 assert.writeError(res);
@@ -182,9 +182,9 @@ t.insert({_id: 0});
 assert.commandWorked(newdb.runCommand({listCollections: 1}));
 
 // Command, recognized, no error.
-var serverStatus = newdb.runCommand({serverStatus: 1});
+let serverStatus = newdb.runCommand({serverStatus: 1});
 opCounters = serverStatus.opcounters;
-var metricsObj = serverStatus.metrics.commands;
+let metricsObj = serverStatus.metrics.commands;
 assert.eq(opCounters.command + 1, newdb.serverStatus().opcounters.command); // "serverStatus" counted
 // Count this and the last run of "serverStatus"
 assert.eq(
@@ -199,7 +199,7 @@ assert.eq(
 ); // "serverStatus" counted
 
 // Command, recognized, with error.
-var countVal = {"total": 0, "failed": 0};
+let countVal = {"total": 0, "failed": 0};
 if (metricsObj.count != null) {
     countVal = metricsObj.count;
 }

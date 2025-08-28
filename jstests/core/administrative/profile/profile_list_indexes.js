@@ -13,8 +13,8 @@
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
-var testDB = db.getSiblingDB("profile_list_indexes");
-var testColl = testDB.testColl;
+let testDB = db.getSiblingDB("profile_list_indexes");
+let testColl = testDB.testColl;
 assert.commandWorked(testDB.dropDatabase());
 const numIndexes = 5;
 for (let i = 0; i < numIndexes; ++i) {

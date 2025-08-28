@@ -11,12 +11,12 @@ if ("undefined" == typeof inner_mode) {
     // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
     // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
     // with that address.
-    var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
+    let mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
     if (mongod == null) {
         jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
         quit();
     }
-    var args = [
+    let args = [
         "mongo",
         "--nodb",
         "--ipv6",
@@ -28,7 +28,7 @@ if ("undefined" == typeof inner_mode) {
         "inner_mode=true;port=" + mongod.port + ";",
         "jstests/noPassthroughWithMongod/network/ipv6_connection_string_validation.js",
     ];
-    var exitCode = _runMongoProgram.apply(null, args);
+    let exitCode = _runMongoProgram.apply(null, args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
     // Pass the inner test's exit code back as the outer test's exit code
@@ -39,7 +39,7 @@ if ("undefined" == typeof inner_mode) {
     quit();
 }
 
-var goodStrings = [
+let goodStrings = [
     "localhost:27999/test",
     "[::1]:27999/test",
     "[0:0:0:0:0:0:0:1]:27999/test",
@@ -50,19 +50,19 @@ var goodStrings = [
     "[0000:0000:0000:0000:0000:0000:0000:0001]:27999",
 ];
 
-var missingConnString = /^Missing connection string$/;
-var incorrectType = /^Incorrect type/;
-var emptyConnString = /^Empty connection string$/;
-var badHost = /^Failed to parse mongodb/;
-var emptyHost = /^Empty host component/;
-var noPort = /^No digits/;
-var invalidPort = /^Port number \d+ out of range/;
-var moreThanOneColon = /^More than one ':' detected/;
-var charBeforeSquareBracket = /^'\[' present, but not first character/;
-var noCloseBracket = /^ipv6 address is missing closing '\]'/;
-var noOpenBracket = /^'\]' present without '\['/;
-var noColonPrePort = /^missing colon after '\]' before the port/;
-var badStrings = [
+let missingConnString = /^Missing connection string$/;
+let incorrectType = /^Incorrect type/;
+let emptyConnString = /^Empty connection string$/;
+let badHost = /^Failed to parse mongodb/;
+let emptyHost = /^Empty host component/;
+let noPort = /^No digits/;
+let invalidPort = /^Port number \d+ out of range/;
+let moreThanOneColon = /^More than one ':' detected/;
+let charBeforeSquareBracket = /^'\[' present, but not first character/;
+let noCloseBracket = /^ipv6 address is missing closing '\]'/;
+let noOpenBracket = /^'\]' present without '\['/;
+let noColonPrePort = /^missing colon after '\]' before the port/;
+let badStrings = [
     {s: undefined, r: missingConnString},
     {s: 7, r: incorrectType},
     {s: null, r: incorrectType},
@@ -92,7 +92,7 @@ var badStrings = [
     {s: "::1]:27999/", r: noOpenBracket},
 ];
 
-var substitutePort = function (connectionString) {
+let substitutePort = function (connectionString) {
     // This will be called with non-strings as well as strings, so we need to catch exceptions
     try {
         return connectionString.replace("27999", "" + port);
@@ -101,12 +101,12 @@ var substitutePort = function (connectionString) {
     }
 };
 
-var testGood = function (i, connectionString) {
+let testGood = function (i, connectionString) {
     print("\n---\nTesting good connection string " + i + ' ("' + connectionString + '") ...');
-    var gotException = false;
-    var exception;
+    let gotException = false;
+    let exception;
     try {
-        var connectDB = connect(connectionString);
+        let connectDB = connect(connectionString);
         connectDB = null;
     } catch (e) {
         gotException = true;
@@ -116,7 +116,7 @@ var testGood = function (i, connectionString) {
         print("Good connection string " + i + ' ("' + connectionString + '") correctly validated');
         return;
     }
-    var message =
+    let message =
         "FAILED to correctly validate goodString " +
         i +
         ' ("' +
@@ -127,14 +127,14 @@ var testGood = function (i, connectionString) {
     doassert(message);
 };
 
-var testBad = function (i, connectionString, errorRegex, errorCode) {
+let testBad = function (i, connectionString, errorRegex, errorCode) {
     print("\n---\nTesting bad connection string " + i + ' ("' + connectionString + '") ...');
-    var gotException = false;
-    var gotCorrectErrorText = false;
-    var gotCorrectErrorCode = false;
-    var exception;
+    let gotException = false;
+    let gotCorrectErrorText = false;
+    let gotCorrectErrorCode = false;
+    let exception;
     try {
-        var connectDB = connect(connectionString);
+        let connectDB = connect(connectionString);
         connectDB = null;
     } catch (e) {
         gotException = true;
@@ -150,7 +150,7 @@ var testBad = function (i, connectionString, errorRegex, errorCode) {
         print("Bad connection string " + i + ' ("' + connectionString + '") correctly rejected:\n' + tojson(exception));
         return;
     }
-    var message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
+    let message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
     if (gotException) {
         message += 'exception was "' + tojson(exception) + '", it should have matched "' + errorRegex.toString() + '"';
     } else {
@@ -159,7 +159,7 @@ var testBad = function (i, connectionString, errorRegex, errorCode) {
     doassert(message);
 };
 
-var i;
+let i;
 jsTest.log("TESTING " + goodStrings.length + " good connection strings");
 for (i = 0; i < goodStrings.length; ++i) {
     testGood(i, substitutePort(goodStrings[i]));

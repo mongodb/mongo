@@ -32,7 +32,7 @@ assert.commandWorked(coll.insert(initialDoc, {writeConcern: {w: "majority"}}));
 
 // Start many transactions, each inserting two documents.
 jsTest.log("Start " + numTxns + " transactions, each inserting two documents");
-var sessions = [];
+let sessions = [];
 for (let txnNr = 0; txnNr < numTxns; ++txnNr) {
     const session = testDB.getMongo().startSession(sessionOptions);
     sessions[txnNr] = session;

@@ -13,9 +13,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const NUM_SHARDS = 3;
 assert(NUM_SHARDS >= 3);
 
-var st = new ShardingTest({shards: NUM_SHARDS});
-var s = st.s;
-var testDb = st.getDB("test");
+let st = new ShardingTest({shards: NUM_SHARDS});
+let s = st.s;
+let testDb = st.getDB("test");
 assert.commandWorked(s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
 
 function setup() {
@@ -28,20 +28,20 @@ function setup() {
 }
 
 function validate(valid) {
-    var res = testDb.runCommand({validate: "test"});
+    let res = testDb.runCommand({validate: "test"});
     assert.commandWorked(res);
     assert.eq(res.valid, valid, tojson(res));
 }
 
 function setFailValidateFailPointOnShard(enabled, shard) {
-    var mode;
+    let mode;
     if (enabled) {
         mode = "alwaysOn";
     } else {
         mode = "off";
     }
 
-    var res = shard.adminCommand({configureFailPoint: "validateCmdCollectionNotValid", mode: mode});
+    let res = shard.adminCommand({configureFailPoint: "validateCmdCollectionNotValid", mode: mode});
     assert.commandWorked(res);
 }
 
@@ -70,7 +70,7 @@ assert.eq(st.onNumShards("test", "dummy"), NUM_SHARDS);
 validate(true);
 
 // 4. Fail validation on one of the shards.
-var primaryShard = st.getPrimaryShard("test");
+let primaryShard = st.getPrimaryShard("test");
 setFailValidateFailPointOnShard(true, primaryShard);
 validate(false);
 setFailValidateFailPointOnShard(false, primaryShard);

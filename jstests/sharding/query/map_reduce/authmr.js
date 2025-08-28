@@ -7,13 +7,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // User document declarations.  All users in this test are added to the admin database.
 //
 
-var adminUser = {
+let adminUser = {
     user: "admin",
     pwd: "a",
     roles: ["readWriteAnyDatabase", "dbAdminAnyDatabase", "userAdminAnyDatabase", "clusterAdmin"],
 };
 
-var test1User = {
+let test1User = {
     user: "test",
     pwd: "a",
     roles: [{role: "readWrite", db: "test1", hasRole: true, canDelegate: false}],
@@ -27,14 +27,14 @@ function assertInsert(collection, obj) {
     assert.commandWorked(collection.insert(obj));
 }
 
-var cluster = new ShardingTest({name: "authmr", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
+let cluster = new ShardingTest({name: "authmr", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
 
 // Set up the test data.
 (function () {
-    var adminDB = cluster.getDB("admin");
-    var test1DB = adminDB.getSiblingDB("test1");
-    var test2DB = adminDB.getSiblingDB("test2");
-    var ex;
+    let adminDB = cluster.getDB("admin");
+    let test1DB = adminDB.getSiblingDB("test1");
+    let test2DB = adminDB.getSiblingDB("test2");
+    let ex;
     try {
         adminDB.createUser(adminUser);
         assert(adminDB.auth(adminUser.user, adminUser.pwd));
@@ -53,9 +53,9 @@ var cluster = new ShardingTest({name: "authmr", shards: 1, mongos: 1, other: {ke
 })();
 
 assert.throws(function () {
-    var adminDB = cluster.getDB("admin");
-    var test1DB;
-    var test2DB;
+    let adminDB = cluster.getDB("admin");
+    let test1DB;
+    let test2DB;
     assert(adminDB.auth(test1User.user, test1User.pwd));
     try {
         test1DB = adminDB.getSiblingDB("test1");
@@ -68,11 +68,11 @@ assert.throws(function () {
         test1DB.foo.mapReduce(
             function () {
                 emit(0, this.a);
-                var t2 = new Mongo().getDB("test2");
+                let t2 = new Mongo().getDB("test2");
                 t2.ad.insert(this);
             },
             function (k, vs) {
-                var t2 = new Mongo().getDB("test2");
+                let t2 = new Mongo().getDB("test2");
                 t2.reductio.insert(this);
 
                 return Array.sum(vs);
@@ -83,7 +83,7 @@ assert.throws(function () {
                     for (k in this) {
                         if (this.hasOwnProperty(k)) print(k + "=" + v);
                     }
-                    var t2 = new Mongo().getDB("test2");
+                    let t2 = new Mongo().getDB("test2");
                     t2.absurdum.insert({key: k, value: v});
                 },
             },
@@ -94,10 +94,10 @@ assert.throws(function () {
 });
 
 (function () {
-    var adminDB = cluster.getDB("admin");
+    let adminDB = cluster.getDB("admin");
     assert(adminDB.auth(adminUser.user, adminUser.pwd));
     try {
-        var test2DB = cluster.getDB("test2");
+        let test2DB = cluster.getDB("test2");
         assert.eq(test2DB.reductio.count(), 0, "reductio");
         assert.eq(test2DB.ad.count(), 0, "ad");
         assert.eq(test2DB.absurdum.count(), 0, "absurdum");

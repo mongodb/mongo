@@ -1,14 +1,14 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {testMoveChunkWithSession} from "jstests/sharding/move_chunk_with_session_helper.js";
 
-var checkFindAndModifyResult = function (expected, toCheck) {
+let checkFindAndModifyResult = function (expected, toCheck) {
     assert.eq(expected.ok, toCheck.ok);
     assert.eq(expected.value, toCheck.value);
     assert.eq(expected.lastErrorObject, toCheck.lastErrorObject);
 };
 
-var lsid = UUID();
-var tests = [
+let lsid = UUID();
+let tests = [
     {
         coll: "findAndMod-upsert",
         cmd: {
@@ -80,7 +80,7 @@ var tests = [
             txnNumber: NumberLong(40),
         },
         setup: function (coll) {
-            var bulk = coll.initializeUnorderedBulkOp();
+            let bulk = coll.initializeUnorderedBulkOp();
             for (let i = 0; i < 10; i++) {
                 bulk.insert({x: 10});
             }
@@ -97,7 +97,7 @@ var tests = [
 
 // Prevent unnecessary elections in the first shard replica set. Shard 'rs1' shard will need its
 // secondary to get elected, so we don't give it a zero priority.
-var st = new ShardingTest({
+let st = new ShardingTest({
     mongos: 2,
     shards: {
         rs0: {nodes: [{rsConfig: {}}, {rsConfig: {priority: 0}}]},

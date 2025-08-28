@@ -2,18 +2,18 @@
 // mongoses
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 3, mongos: 3, causallyConsistent: true});
+let st = new ShardingTest({shards: 3, mongos: 3, causallyConsistent: true});
 
-var config = st.s0.getDB("config");
-var admin = st.s0.getDB("admin");
-var coll = st.s0.getCollection("foo.bar");
+let config = st.s0.getDB("config");
+let admin = st.s0.getDB("admin");
+let coll = st.s0.getCollection("foo.bar");
 
 // Use separate mongoses for admin, inserting data, and validating results, so no single-mongos
 // tricks will work
-var staleMongos = st.s1;
-var insertMongos = st.s2;
+let staleMongos = st.s1;
+let insertMongos = st.s2;
 
-var shards = [st.shard0, st.shard1, st.shard2];
+let shards = [st.shard0, st.shard1, st.shard2];
 
 //
 // Test that inserts and queries go to the correct shard even when the collection has been
@@ -25,7 +25,7 @@ jsTest.log("Enabling sharding for the first time...");
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
-var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+let bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, test: "a"});
 }

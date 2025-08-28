@@ -19,7 +19,7 @@ import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded
 const st = new ShardingTest({shards: 2});
 const dbName = jsTestName();
 const collName = "foo";
-var chunksCollName;
+let chunksCollName;
 
 const shard0DB = st.shard0.getDB(dbName);
 const shard1DB = st.shard1.getDB(dbName);

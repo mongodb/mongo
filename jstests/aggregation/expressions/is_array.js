@@ -1,5 +1,5 @@
 // SERVER-18222: Add $isArray aggregation expression.
-var coll = db.is_array_expr;
+let coll = db.is_array_expr;
 coll.drop();
 
 // Non-array types.
@@ -18,8 +18,8 @@ assert.commandWorked(coll.insert({_id: 9, x: [0]}));
 assert.commandWorked(coll.insert({_id: 10, x: ["0"]}));
 
 // Project field is_array to represent whether the field x was an array.
-var results = coll.aggregate([{$sort: {_id: 1}}, {$project: {isArray: {$isArray: "$x"}}}]).toArray();
-var expectedResults = [
+let results = coll.aggregate([{$sort: {_id: 1}}, {$project: {isArray: {$isArray: "$x"}}}]).toArray();
+let expectedResults = [
     {_id: 0, isArray: false},
     {_id: 1, isArray: false},
     {_id: 2, isArray: false},

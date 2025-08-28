@@ -97,7 +97,7 @@ assert.commandFailed(
 
 // Assert that the results of getClusterParameter: '*' all have an _id element, and that they are
 // consistent with individual gets.
-for (var retry = 0, completed = 0; retry < 2 && completed == 0; retry++) {
+for (let retry = 0, completed = 0; retry < 2 && completed == 0; retry++) {
     completed = 1;
     const allParameters = assert.commandWorked(adminDB.runCommand({getClusterParameter: "*"})).clusterParameters;
     jsTest.log(allParameters);

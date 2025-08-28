@@ -18,7 +18,7 @@ function doFailInjectionCleanup(db) {
 }
 
 assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
-var cmdLineOpts = db.adminCommand("getCmdLineOpts");
+let cmdLineOpts = db.adminCommand("getCmdLineOpts");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 jsTestLog(`Run Hello test suite cleanup in ${JSON.stringify(topology)},
                Invoked with ${JSON.stringify(cmdLineOpts)},

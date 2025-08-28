@@ -1,6 +1,6 @@
 // Tests doing simple round-trip operations from the shell.
 
-var col = db.roundtrip_basic;
+let col = db.roundtrip_basic;
 col.drop();
 
 // Insert some sample data.
@@ -31,8 +31,8 @@ function checkDecimals(queryValue, expectedValues) {
     expectedValues = expectedValues.map(function (string) {
         return NumberDecimal(string);
     });
-    var docs = col.find({decimal: queryValue}, {_id: 0}).sort({decimal: 1, _id: 1}).toArray();
-    var actualValues = docs.map(function (item) {
+    let docs = col.find({decimal: queryValue}, {_id: 0}).sort({decimal: 1, _id: 1}).toArray();
+    let actualValues = docs.map(function (item) {
         return item.decimal;
     });
     assert.eq(actualValues, expectedValues, "problem retrieving " + queryValue.toString());

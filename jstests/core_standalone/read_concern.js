@@ -3,7 +3,7 @@
 // For isWiredTiger.
 import {isEphemeral, isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-var t = db.read_concern;
+let t = db.read_concern;
 t.drop();
 
 assert.commandWorked(t.runCommand({insert: "read_concern", documents: [{x: 1}]}));
@@ -20,7 +20,7 @@ assert.commandWorked(
     "expected available readConcern to succeed on standalone mongod",
 );
 
-var majority_result = t.runCommand({find: "read_concern", readConcern: {level: "majority"}});
+let majority_result = t.runCommand({find: "read_concern", readConcern: {level: "majority"}});
 if (isWiredTiger(db) || isEphemeral(db)) {
     // Majority readConcern succeed.
     assert.commandWorked(majority_result, "expected majority readConcern to succeed on standalone mongod");

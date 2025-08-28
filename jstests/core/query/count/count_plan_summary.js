@@ -19,16 +19,16 @@
 //   assumes_balancer_off,
 // ]
 
-var t = db.jstests_count_plan_summary;
+let t = db.jstests_count_plan_summary;
 t.drop();
 
-for (var i = 0; i < 1000; i++) {
+for (let i = 0; i < 1000; i++) {
     t.insert({x: 1});
 }
 
 // Mock a long-running count operation by sleeping for each of
 // the documents in the collection.
-var awaitShell = startParallelShell(() => {
+let awaitShell = startParallelShell(() => {
     jsTest.log("Starting long-running count in parallel shell");
     db.jstests_count_plan_summary.find({x: 1, $where: "sleep(100); return true;"}).count();
     jsTest.log("Finished long-running count in parallel shell");
@@ -36,7 +36,7 @@ var awaitShell = startParallelShell(() => {
 
 // Find the count op in db.currentOp() and check for the plan summary.
 assert.soon(function () {
-    var currentCountOps = db
+    let currentCountOps = db
         .getSiblingDB("admin")
         .aggregate([
             {$currentOp: {}},
@@ -59,7 +59,7 @@ assert.soon(function () {
         return false;
     }
 
-    var countOp = currentCountOps[0];
+    let countOp = currentCountOps[0];
     if (!("planSummary" in countOp)) {
         jsTest.log("Count op does not yet contain planSummary.");
         printjson(countOp);
@@ -77,7 +77,7 @@ assert.soon(function () {
     return true;
 }, "Did not find count operation in current operation log");
 
-var exitCode = awaitShell({checkExitSuccess: false});
+let exitCode = awaitShell({checkExitSuccess: false});
 
 // Suites that remove shards in the background can trigger migrations during draining.
 // This can make killOp commands overlap with a concurrent placement version mismatch,

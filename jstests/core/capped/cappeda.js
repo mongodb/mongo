@@ -19,7 +19,7 @@ function q() {
 }
 
 function u() {
-    var res = t.update({_id: 5}, {$set: {x: 2}});
+    let res = t.update({_id: 5}, {$set: {x: 2}});
     if (res.hasWriteError()) throw res;
 }
 

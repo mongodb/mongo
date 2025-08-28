@@ -45,8 +45,8 @@ function runTest(m) {
     );
 
     print("make sure we can't run certain commands w/out auth");
-    var codeUnauthorized = 13;
-    var rslt = db.runCommand({getLog: "global"});
+    let codeUnauthorized = 13;
+    let rslt = db.runCommand({getLog: "global"});
     assert.eq(rslt.code, codeUnauthorized, tojson(rslt));
 
     assert(!db.auth("eliot", "eliot2"), "auth succeeded with wrong password");
@@ -85,6 +85,6 @@ function runTest(m) {
     print("SUCCESS auth1.js");
 }
 
-var m = setupTest();
+let m = setupTest();
 runTest(m);
 MongoRunner.stopMongod(m, null, {user: "root", pwd: "root"});

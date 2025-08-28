@@ -15,10 +15,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTest.log("Creating a sharded cluster with one shard");
-var st = new ShardingTest({name: "st", shards: 1});
+let st = new ShardingTest({name: "st", shards: 1});
 
 jsTest.log("Creating a single node replica set");
-var rs0 = new ReplSetTest({name: "rs0", nodes: 1});
+let rs0 = new ReplSetTest({name: "rs0", nodes: 1});
 rs0.startSet({shardsvr: ""});
 rs0.initiate();
 

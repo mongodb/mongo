@@ -4,13 +4,13 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.agg_concat_arrays_expr;
+let coll = db.agg_concat_arrays_expr;
 coll.drop();
 
 assert.commandWorked(coll.insert({a: [1, 2], b: ["three"], c: [], d: [[3], 4], e: null, str: "x"}));
 
 // Basic concatenation.
-var pipeline = [{$project: {_id: 0, all: {$concatArrays: ["$a", "$b", "$c"]}}}];
+let pipeline = [{$project: {_id: 0, all: {$concatArrays: ["$a", "$b", "$c"]}}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{all: [1, 2, "three"]}]);
 
 // Concatenation with nested arrays.

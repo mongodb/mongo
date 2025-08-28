@@ -2,24 +2,24 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({nodes: 2});
+let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
-var config = replTest.getReplSetConfigFromNode();
+let config = replTest.getReplSetConfigFromNode();
 
-var runTest = function (testDB, primaryConn) {
-    var dbName = testDB.getName();
+let runTest = function (testDB, primaryConn) {
+    let dbName = testDB.getName();
     assert.commandWorked(primaryConn.getDB(dbName).user.insert({x: 1}, {writeConcern: {w: 2}}));
 
-    var localDB = primaryConn.getDB("local");
+    let localDB = primaryConn.getDB("local");
 
-    var oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
-    var twoKSecTS = new Timestamp(oplogTS.ts.getTime() + 2000, 0);
+    let oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    let twoKSecTS = new Timestamp(oplogTS.ts.getTime() + 2000, 0);
 
-    var term = oplogTS.t;
+    let term = oplogTS.t;
 
     // Test timeout with maxTimeMS
-    var runTimeoutTest = function () {
+    let runTimeoutTest = function () {
         assert.commandFailedWithCode(
             testDB.runCommand({
                 find: "user",
@@ -57,13 +57,13 @@ var runTest = function (testDB, primaryConn) {
     // Test read on future afterOpTime that will eventually occur.
     primaryConn.getDB(dbName).parallelShellStarted.drop();
     oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
-    var insertFunc = startParallelShell(
+    let insertFunc = startParallelShell(
         'let testDB = db.getSiblingDB("' + dbName + '"); ' + "sleep(3000); " + "testDB.user.insert({y: 1});",
         primaryConn.port,
     );
 
-    var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
-    var res = assert.commandWorked(
+    let twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
+    let res = assert.commandWorked(
         testDB.runCommand({
             find: "user",
             filter: {y: 1},
@@ -79,7 +79,7 @@ var runTest = function (testDB, primaryConn) {
     insertFunc();
 };
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 jsTest.log("test1");
 runTest(primary.getDB("test1"), primary);
 jsTest.log("test2");

@@ -15,13 +15,13 @@ function assertStartupFails(fun) {
     assert.throws(fun, [], "Server started, when it was expected to fail");
 }
 
-var validFailpointPayload = {"mode": "alwaysOn"};
-var validFailpointPayloadWithData = {"mode": "alwaysOn", "data": {x: 1}};
-var invalidFailpointPayload = "notJSON";
+let validFailpointPayload = {"mode": "alwaysOn"};
+let validFailpointPayloadWithData = {"mode": "alwaysOn", "data": {x: 1}};
+let invalidFailpointPayload = "notJSON";
 
 // In order to be able connect to a mongos that starts up successfully, start a config replica
 // set so that we can provide a valid config connection string to the mongos.
-var configRS = new ReplSetTest({nodes: 3});
+let configRS = new ReplSetTest({nodes: 3});
 configRS.startSet({configsvr: "", storageEngine: "wiredTiger"});
 configRS.initiate();
 
@@ -46,11 +46,11 @@ assertStartupFails(() =>
 );
 
 // Valid startup configurations succeed.
-var mongod = MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)});
+let mongod = MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)});
 assertStartupSucceeds(mongod);
 MongoRunner.stopMongod(mongod);
 
-var mongos = MongoRunner.runMongos({
+let mongos = MongoRunner.runMongos({
     setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
     configdb: configRS.getURL(),
 });
@@ -68,7 +68,7 @@ assertStartupSucceeds(mongos);
 
 // The failpoint shows up with the correct data in the results of getParameter.
 
-var res = mongod.adminCommand({getParameter: "*"});
+let res = mongod.adminCommand({getParameter: "*"});
 assert.neq(null, res);
 assert.neq(null, res["failpoint.dummy"]);
 assert.eq(1, res["failpoint.dummy"].mode); // the 'mode' is an enum internally; 'alwaysOn' is 1
@@ -87,7 +87,7 @@ assert.commandFailed(mongos.adminCommand({setParameter: 1, "dummy": validFailpoi
 // After changing the failpoint's state through the configureFailPoint command, the changes are
 // reflected in the output of the getParameter command.
 
-var newData = {x: 2};
+let newData = {x: 2};
 
 mongod.adminCommand({configureFailPoint: "dummy", mode: "alwaysOn", data: newData});
 res = mongod.adminCommand({getParameter: 1, "failpoint.dummy": 1});

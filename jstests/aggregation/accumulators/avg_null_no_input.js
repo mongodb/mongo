@@ -1,5 +1,5 @@
 // SERVER-14691: $avg aggregator should return null when it receives no input.
-var coll = db.accumulate_avg_sum_null;
+let coll = db.accumulate_avg_sum_null;
 
 // Test the $avg aggregator.
 coll.drop();
@@ -8,7 +8,7 @@ coll.drop();
 assert.commandWorked(coll.insert({a: 1, b: 2, c: "string", d: null}));
 
 // Missing field.
-var pipeline = [{$group: {_id: "$a", avg: {$avg: "$missing"}}}];
+let pipeline = [{$group: {_id: "$a", avg: {$avg: "$missing"}}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{_id: 1, avg: null}]);
 
 // Non-numeric field.

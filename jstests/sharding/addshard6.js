@@ -4,11 +4,11 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var addShardRes;
+let addShardRes;
 
 // Note: this method expects that the failure is *not* that the specified shardName is already
 // the shardName of an existing shard.
-var assertAddShardFailed = function (res, shardName) {
+let assertAddShardFailed = function (res, shardName) {
     assert.commandFailed(res);
 
     // If a shard name was specified in the addShard, make sure no shard with its name shows up
@@ -27,7 +27,7 @@ var st = new ShardingTest({
     mongos: 1,
 });
 
-var configRS = new ReplSetTest({name: "configsvrReplicaSet", nodes: 1});
+let configRS = new ReplSetTest({name: "configsvrReplicaSet", nodes: 1});
 configRS.startSet({configsvr: "", storageEngine: "wiredTiger"});
 configRS.initiate();
 

@@ -18,7 +18,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
-var s = new ShardingTest({
+let s = new ShardingTest({
     shards: 2,
     other: {
         chunkSize: 1,
@@ -32,7 +32,7 @@ var s = new ShardingTest({
 });
 
 var db = s.getDB("test");
-var t = db.foo;
+let t = db.foo;
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard0.shardName}));
 // The default WC is 'majority' and fsyncLock will prevent satisfying any majority writes.
@@ -93,7 +93,7 @@ assert.soon(
 );
 
 // cleanup after adding node
-for (var i = 0; i < 5; i++) {
+for (let i = 0; i < 5; i++) {
     try {
         db.foo.findOne();
     } catch (e) {
@@ -115,10 +115,10 @@ rs.awaitSecondaryNodes(180 * 1000);
 
 // --- not sharded ----
 
-var m = new Mongo(s.s.name);
-var ts = m.getDB("test").foo;
+let m = new Mongo(s.s.name);
+let ts = m.getDB("test").foo;
 
-var before = rs.getPrimary().adminCommand("serverStatus").opcounters;
+let before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
 for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B1");
@@ -130,7 +130,7 @@ for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B2");
 }
 
-var after = rs.getPrimary().adminCommand("serverStatus").opcounters;
+let after = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
 printjson(before);
 printjson(after);
@@ -141,7 +141,7 @@ assert.lte(before.query + 10, after.query, "B3");
 
 db.foo.createIndex({x: 1});
 
-var bulk = db.foo.initializeUnorderedBulkOp();
+let bulk = db.foo.initializeUnorderedBulkOp();
 for (let i = 0; i < 100; i++) {
     if (i == 17) continue;
     bulk.insert({x: i});
@@ -156,7 +156,7 @@ assert.eq(100, ts.count(), "B4");
 assert.eq(100, ts.find().itcount(), "B5");
 assert.eq(100, ts.find().batchSize(5).itcount(), "B6");
 
-var cursor = t.find().batchSize(3);
+let cursor = t.find().batchSize(3);
 cursor.next();
 cursor.close();
 
@@ -174,7 +174,7 @@ assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 50}}));
 
 s.printShardingStatus();
 
-var other = s.config.shards.findOne({_id: {$ne: s.shard0.shardName}});
+let other = s.config.shards.findOne({_id: {$ne: s.shard0.shardName}});
 assert.commandWorked(
     s.getDB("admin").runCommand({
         moveChunk: "test.foo",

@@ -177,7 +177,7 @@ const kLargeMaxTimeMS = 100000000;
 
 /* Verify a reasonable distribution of mirrored reads for various secondary counts. */
 {
-    for (var secondaries = 2; secondaries <= 4; secondaries++) {
+    for (let secondaries = 2; secondaries <= 4; secondaries++) {
         const rst = new ReplSetTest({
             nodes: secondaries + 1,
             nodeOptions: {

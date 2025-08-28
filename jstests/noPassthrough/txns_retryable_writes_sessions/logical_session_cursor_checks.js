@@ -5,10 +5,10 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runFixture(Fixture) {
-    var fixture = new Fixture();
-    var conn = fixture.getConn();
-    var admin = conn.getDB("admin");
-    var data = conn.getDB("data_storage");
+    let fixture = new Fixture();
+    let conn = fixture.getConn();
+    let admin = conn.getDB("admin");
+    let data = conn.getDB("data_storage");
 
     admin.createUser({user: "admin", pwd: "admin", roles: jsTest.adminUserRoles});
     admin.auth("admin", "admin");
@@ -48,7 +48,7 @@ function runFixture(Fixture) {
     {
         var session1 = conn.startSession();
         var session2 = conn.startSession();
-        var cursor = session1.getDatabase("data_storage").test.find({}).batchSize(1);
+        let cursor = session1.getDatabase("data_storage").test.find({}).batchSize(1);
         cursor.next();
         cursor.next();
         cursor.close();

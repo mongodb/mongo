@@ -35,7 +35,7 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
         throw Error("Unrecognized TLS implementation!");
     }
 
-    var md = MongoRunner.runMongod({
+    let md = MongoRunner.runMongod({
         tlsMode: "requireTLS",
         tlsCAFile: "jstests/libs/ca.pem",
         tlsCertificateKeyFile: "jstests/libs/server.pem",

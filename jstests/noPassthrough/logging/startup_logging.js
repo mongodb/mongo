@@ -14,7 +14,7 @@ function testStartupLogging(launcher, matchFn, expectedExitCode) {
 
 function validateWaitingMessage(launcher) {
     clearRawMongoProgramOutput();
-    var conn = launcher.start({});
+    let conn = launcher.start({});
     launcher.stop(conn, undefined, {});
     testStartupLogging(
         launcher,

@@ -8,19 +8,19 @@ const rs = new ReplSetTest({name: "testSet", nodes: 3, nodeOptions: {verbose: 2}
 rs.startSet();
 rs.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-var primary = rs.getPrimary();
+let primary = rs.getPrimary();
 
-var everyoneOkSoon = function () {
-    var status;
+let everyoneOkSoon = function () {
+    let status;
     assert.soon(function () {
-        var ok = true;
+        let ok = true;
         status = primary.adminCommand({replSetGetStatus: 1});
 
         if (!status.members) {
             return false;
         }
 
-        for (var i in status.members) {
+        for (let i in status.members) {
             if (status.members[i].health == 0) {
                 continue;
             }
@@ -30,14 +30,14 @@ var everyoneOkSoon = function () {
     }, tojson(status));
 };
 
-var checkPrimaryIs = function (node) {
+let checkPrimaryIs = function (node) {
     print("nreplsets_priority1.js checkPrimaryIs(" + node.host + ")");
 
-    var status;
+    let status;
 
     assert.soon(
         function () {
-            var ok = true;
+            let ok = true;
 
             try {
                 status = primary.adminCommand({replSetGetStatus: 1});
@@ -48,7 +48,7 @@ var checkPrimaryIs = function (node) {
                 status = primary.adminCommand({replSetGetStatus: 1});
             }
 
-            var str = "goal: " + node.host + "==1 states: ";
+            let str = "goal: " + node.host + "==1 states: ";
             if (!status || !status.members) {
                 return false;
             }
@@ -91,8 +91,8 @@ rs.awaitReplication();
 
 jsTestLog("replsets_priority1.js starting loop");
 
-var n = 5;
-for (var i = 0; i < n; i++) {
+let n = 5;
+for (let i = 0; i < n; i++) {
     jsTestLog("Round " + i + ": FIGHT!");
 
     var max = null;
@@ -101,8 +101,8 @@ for (var i = 0; i < n; i++) {
     var config = primary.getDB("local").system.replset.findOne();
     config.version++;
 
-    for (var j = 0; j < config.members.length; j++) {
-        var priority = Math.random() * 100;
+    for (let j = 0; j < config.members.length; j++) {
+        let priority = Math.random() * 100;
         print("random priority : " + priority);
         config.members[j].priority = priority;
 
@@ -142,8 +142,8 @@ for (var i = 0; i < n; i++) {
     jsTestLog("replsets_priority1.js wait for new config version " + config.version);
 
     assert.soon(function () {
-        var versions = [0, 0];
-        var secondaries = rs.getSecondaries();
+        let versions = [0, 0];
+        let secondaries = rs.getSecondaries();
         secondaries[0].setSecondaryOk();
         versions[0] = secondaries[0].getDB("local").system.replset.findOne().version;
         secondaries[1].setSecondaryOk();

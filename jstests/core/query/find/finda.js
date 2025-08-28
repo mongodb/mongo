@@ -74,7 +74,7 @@ function checkCursorWithBatchSize(query, sort, batchSize, expectedLeftInBatch) {
     if (expectedLeftInBatch > 110) {
         let cursor = makeCursor(query, {}, sort, batchSize, true);
         let lastNonAIndexResult = -1;
-        for (var i = 0; i < expectedLeftInBatch; ++i) {
+        for (let i = 0; i < expectedLeftInBatch; ++i) {
             let next = cursor.next();
             // Identify the query plan used by checking the fields of a returnKey query.
             if (!friendlyEqual(["a", "_id"], Object.keySet(next))) {
@@ -88,7 +88,7 @@ function checkCursorWithBatchSize(query, sort, batchSize, expectedLeftInBatch) {
 
 function queryWithPlanTypes(withDups) {
     t.drop();
-    for (var i = 1; i < numDocs; ++i) {
+    for (let i = 1; i < numDocs; ++i) {
         t.save({_id: i, a: i, b: 0});
     }
     if (withDups) {

@@ -7,16 +7,16 @@ const caseInsensitive = {
     strength: 2,
 };
 
-var explain;
-var writeRes;
+let explain;
+let writeRes;
 
 // Create a cluster with 3 shards.
-var st = new ShardingTest({shards: 3});
-var testDB = st.s.getDB("test");
+let st = new ShardingTest({shards: 3});
+let testDB = st.s.getDB("test");
 assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}));
 
 // Create a collection sharded on {a: 1}. Add 2dsphere index to test $geoNear.
-var coll = testDB.getCollection("simple_collation");
+let coll = testDB.getCollection("simple_collation");
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
@@ -38,10 +38,10 @@ assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {
 // st.shard1.shardName: {a: 100}, {a: "FOO"}
 // shard0002: {a: "foo"}
 // Include geo field to test $geoNear.
-var a_1 = {_id: 0, a: 1, geo: {type: "Point", coordinates: [0, 0]}};
-var a_100 = {_id: 1, a: 100, geo: {type: "Point", coordinates: [0, 0]}};
-var a_FOO = {_id: 2, a: "FOO", geo: {type: "Point", coordinates: [0, 0]}};
-var a_foo = {_id: 3, a: "foo", geo: {type: "Point", coordinates: [0, 0]}};
+let a_1 = {_id: 0, a: 1, geo: {type: "Point", coordinates: [0, 0]}};
+let a_100 = {_id: 1, a: 100, geo: {type: "Point", coordinates: [0, 0]}};
+let a_FOO = {_id: 2, a: "FOO", geo: {type: "Point", coordinates: [0, 0]}};
+let a_foo = {_id: 3, a: "foo", geo: {type: "Point", coordinates: [0, 0]}};
 assert.commandWorked(coll.insert(a_1));
 assert.commandWorked(coll.insert(a_100));
 assert.commandWorked(coll.insert(a_FOO));

@@ -9,12 +9,12 @@ let options = {
 
 const conn = MongoRunner.runMongod(options);
 const testDB = conn.getDB("test");
-var collA = testDB[jsTestName()];
-var collB = testDB[jsTestName() + "Two"];
+let collA = testDB[jsTestName()];
+let collB = testDB[jsTestName() + "Two"];
 collA.drop();
 collB.drop();
 
-for (var i = 0; i < 200; i++) {
+for (let i = 0; i < 200; i++) {
     collA.insert({foo: 0, bar: Math.floor(Math.random() * 3)});
     collA.insert({foo: 1, bar: Math.floor(Math.random() * -2)});
     collB.insert({foo: Math.floor(Math.random() * 2), bar: Math.floor(Math.random() * 2)});

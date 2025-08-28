@@ -9,7 +9,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {rs0: {nodes: 2}},
     config: TestData.configShard ? 2 : 1,
     mongos: 1,

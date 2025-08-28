@@ -7,13 +7,13 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
-var replTest = new ReplSetTest({nodes: 2, useBridge: true});
+let replTest = new ReplSetTest({nodes: 2, useBridge: true});
 replTest.startSet();
 // Initiating with a high election timeout prevents unnecessary elections and also prevents
 // the primary from stepping down if it cannot communicate with the secondary.
 replTest.initiate();
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
 // Disconnect the secondary from the primary.
 secondary.disconnect(primary);

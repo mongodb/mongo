@@ -10,17 +10,17 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var mongos = st.s0,
+let mongos = st.s0,
     admin = mongos.getDB("admin"),
     dbName = "testDB",
     ns1 = dbName + ".foo";
 assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-var coll1 = mongos.getCollection(ns1),
+let coll1 = mongos.getCollection(ns1),
     shard0 = st.shard0,
     shard1 = st.shard1,
     shard0Coll1 = shard0.getCollection(ns1),
@@ -40,7 +40,7 @@ jsTest.log("Set up complete, now proceeding to test that migration interruption 
 
 // Start a migration between shard0 and shard1 on coll1, pause in steady state before commit.
 pauseMoveChunkAtStep(shard0, moveChunkStepNames.reachedSteadyState);
-var joinMoveChunk = moveChunkParallel(
+let joinMoveChunk = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {a: 0},
@@ -55,7 +55,7 @@ jsTest.log("Sending false commit command....");
 assert.commandFailed(shard1.adminCommand({"_recvChunkCommit": 1, "sessionId": "fake-migration-session-id"}));
 
 jsTest.log("Checking migration recipient is still in steady state, waiting for commit....");
-var res = shard1.adminCommand("_recvChunkStatus");
+let res = shard1.adminCommand("_recvChunkStatus");
 assert.commandWorked(res);
 assert.eq(true, res.state === "steady", "False commit command succeeded.");
 

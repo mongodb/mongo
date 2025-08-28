@@ -21,7 +21,7 @@ function countMatching(arr, func) {
 function runQueryStatsAndVerifyLogs({pipeline, transformed, logLevel}) {
     const conn = MongoRunner.runMongod(options);
     const db = conn.getDB("test");
-    var coll = db[jsTestName()];
+    let coll = db[jsTestName()];
     coll.drop();
 
     // Set the logLevel.

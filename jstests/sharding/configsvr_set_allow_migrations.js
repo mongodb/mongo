@@ -2,7 +2,7 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allowMigrations) {
-    var res;
+    let res;
     assert.soon(() => {
         res = st.configRS.getPrimary().adminCommand({
             _configsvrSetAllowMigrations: ns,

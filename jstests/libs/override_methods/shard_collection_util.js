@@ -71,16 +71,16 @@ export var ShardingOverrideCommon = (function () {
             return;
         }
 
-        var dbName = db.getName();
-        var fullName = dbName + "." + collName;
+        let dbName = db.getName();
+        let fullName = dbName + "." + collName;
 
-        for (var ns of denylistedNamespaces) {
+        for (let ns of denylistedNamespaces) {
             if (fullName.match(ns)) {
                 return;
             }
         }
 
-        var res = db.adminCommand({enableSharding: dbName});
+        let res = db.adminCommand({enableSharding: dbName});
 
         // enableSharding may only be called once for a database.
         if (res.code !== ErrorCodes.AlreadyInitialized) {

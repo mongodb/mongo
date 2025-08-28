@@ -8,7 +8,7 @@ const db = replTest.getPrimary().getDB("test");
 
 const uuid = UUID();
 // Two applyOps to create a foo collection with given uuid, one each for 'test' and 'test2' dbs.
-var ops = ((uuid) =>
+let ops = ((uuid) =>
     ["test", "test2"].map((db) => {
         return {op: "c", ns: db + ".$cmd", ui: uuid, o: {create: "foo"}};
     }))(uuid);

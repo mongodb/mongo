@@ -6,14 +6,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 4, other: {chunkSize: 1}});
-var config = st.s0.getDB("config");
+let config = st.s0.getDB("config");
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
 
 function prepareCollectionForBalance(collName) {
     assert.commandWorked(st.s0.adminCommand({shardCollection: collName, key: {Key: 1}}));
 
-    var coll = st.s0.getCollection(collName);
+    let coll = st.s0.getCollection(collName);
 
     const bigString = "X".repeat(1024 * 1024); // 1MB
     // Create 6 chunks initially and ensure they get balanced within 1 balancer round

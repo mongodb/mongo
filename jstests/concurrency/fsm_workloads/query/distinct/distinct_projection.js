@@ -13,7 +13,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.prefix = "distinct_projection_fsm";
 
     $config.states.distinct = function distinct(db, collName) {
-        var query = {i: {$lt: this.numDocs / 2}};
+        let query = {i: {$lt: this.numDocs / 2}};
         assert.eq(this.numDocs / 2, db[this.threadCollName].distinct("i", query).length);
     };
 

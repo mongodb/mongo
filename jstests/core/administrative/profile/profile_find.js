@@ -14,10 +14,10 @@ import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/cluste
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
-var testDB = db.getSiblingDB("profile_find");
+let testDB = db.getSiblingDB("profile_find");
 assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();
-var coll = testDB.getCollection(collName);
+let coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
@@ -31,7 +31,7 @@ const profileEntryFilter = {
 //
 // Confirm most metrics on single document read.
 //
-var i;
+let i;
 for (i = 0; i < 3; ++i) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
@@ -40,7 +40,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr"}}));
 // Use batchSize to avoid express path.
 assert.eq(coll.find({a: 1}).collation({locale: "fr"}).limit(1).batchSize(2).itcount(), 1);
 
-var profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+let profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
 assert.eq(profileObj.ns, coll.getFullName(), profileObj);
 assert.eq(profileObj.keysExamined, 1, profileObj);
@@ -192,7 +192,7 @@ assert.eq(coll.find().comment("a comment").itcount(), 1);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 assert.eq(profileObj.command.comment, "a comment", profileObj);
 
-var maxTimeMS = 100000;
+let maxTimeMS = 100000;
 assert.eq(coll.find().maxTimeMS(maxTimeMS).itcount(), 1);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 assert.eq(profileObj.command.maxTimeMS, maxTimeMS, profileObj);

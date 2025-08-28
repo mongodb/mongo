@@ -11,8 +11,8 @@ if (typeof _threadInject != "undefined") {
             if (arg instanceof Code) {
                 return eval("(" + arg.code + ")");
             } else if (arg !== null && isObject(arg) && !(arg instanceof Date)) {
-                var newArg = arg instanceof Array ? [] : {};
-                for (var prop in arg) {
+                let newArg = arg instanceof Array ? [] : {};
+                for (let prop in arg) {
                     if (arg.hasOwnProperty(prop)) {
                         newArg[prop] = evalCodeArgs(arg[prop]);
                     }
@@ -21,11 +21,11 @@ if (typeof _threadInject != "undefined") {
             }
             return arg;
         }
-        var realStartFn;
-        var newArgs = [];
+        let realStartFn;
+        let newArgs = [];
         // We skip the first argument, which is always TestData.
         TestData = evalCodeArgs(testData);
-        for (var i = 1, l = arguments.length; i < l; i++) {
+        for (let i = 1, l = arguments.length; i < l; i++) {
             newArgs.push(evalCodeArgs(arguments[i]));
         }
         if (TestData && TestData["shellGRPC"]) {
@@ -36,7 +36,7 @@ if (typeof _threadInject != "undefined") {
     }
 
     Thread = function () {
-        var args = Array.prototype.slice.call(arguments);
+        let args = Array.prototype.slice.call(arguments);
         // Always pass TestData as the first argument.
         args.unshift(TestData);
         args.unshift(_threadStartWrapper);

@@ -24,13 +24,13 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.upsert = function upsert(db, collName) {
-        var res = db[collName].update(
+        let res = db[collName].update(
             {$where: "this.x === " + this.randomBound + " && this.tid === " + this.tid},
             {$set: {x: Random.randInt(this.randomBound), tid: this.tid}},
             {upsert: true},
         );
         assert.eq(res.nUpserted, 1);
-        var upsertedDocument = db[collName].findOne({_id: res.getUpsertedId()._id});
+        let upsertedDocument = db[collName].findOne({_id: res.getUpsertedId()._id});
         assert.eq(upsertedDocument.tid, this.tid);
         this.insertedDocuments += res.nUpserted;
     };

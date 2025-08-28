@@ -23,7 +23,7 @@
 import {getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-var coll = db.collation_plan_cache;
+let coll = db.collation_plan_cache;
 coll.drop();
 
 function dumpPlanCacheState() {
@@ -56,7 +56,7 @@ assert.commandWorked(
 );
 
 // The query shape should have been added.
-var shapes = coll.aggregate([{$planCacheStats: {}}]).toArray();
+let shapes = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(1, shapes.length, "unexpected cache size after running query");
 
 const isSbeEnabled = checkSbeFullyEnabled(db);
@@ -203,7 +203,7 @@ assert.commandWorked(
 );
 
 // Check the plan cache filter was added.
-var res = coll.runCommand("planCacheListFilters");
+let res = coll.runCommand("planCacheListFilters");
 assert.commandWorked(res, "planCacheListFilters failed");
 assert.eq(1, res.filters.length, "unexpected number of plan cache filters");
 assert.eq(

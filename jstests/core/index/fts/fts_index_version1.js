@@ -1,5 +1,5 @@
 // Test basic usage of "textIndexVersion:1" indexes.
-var coll = db.fts_index_version1;
+let coll = db.fts_index_version1;
 
 // Test basic English search.
 coll.drop();

@@ -10,7 +10,7 @@ const testName = "readOpsDuringStepDown";
 const dbName = "test";
 const collName = "coll";
 
-var rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});
+let rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
 
@@ -60,7 +60,7 @@ const joinFindThread = startParallelShell(() => {
     // inside a parallel shell).
     assert.commandWorked(db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}));
 
-    var findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+    let findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
     assert.docEq([{_id: 0}], findRes.cursor.firstBatch);
 }, primary.port);
 

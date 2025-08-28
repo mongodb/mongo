@@ -6,13 +6,13 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var authzErrorCode = 13;
-var hasAuthzError = function (result) {
+let authzErrorCode = 13;
+let hasAuthzError = function (result) {
     assert(result instanceof WriteCommandError);
     assert.eq(authzErrorCode, result.code);
 };
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     config: 3,
     mongos: [
@@ -26,7 +26,7 @@ var st = new ShardingTest({
 st.s1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["__system"]});
 st.s1.getDB("admin").auth("root", "pwd");
 
-var res = st.s1.getDB("admin").runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 0});
+let res = st.s1.getDB("admin").runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 0});
 assert.commandFailed(res, "Setting the invalidation interval to an disallowed value should fail");
 
 res = st.s1.getDB("admin").runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 100000});
@@ -118,7 +118,7 @@ assert(db3.auth("spencer", "pwd"));
     sleep(10000);
     assert.soon(
         function () {
-            var res = db2.foo.update({}, {$inc: {a: 1}});
+            let res = db2.foo.update({}, {$inc: {a: 1}});
             if (res instanceof WriteCommandError) {
                 return false;
             }
@@ -149,7 +149,7 @@ assert(db3.auth("spencer", "pwd"));
     sleep(10000);
     assert.soon(
         function () {
-            var res = db2.foo.update({}, {$inc: {a: 1}});
+            let res = db2.foo.update({}, {$inc: {a: 1}});
             return res instanceof WriteCommandError && res.code == authzErrorCode;
         },
         "Mongos did not update its user cache after 10 seconds",

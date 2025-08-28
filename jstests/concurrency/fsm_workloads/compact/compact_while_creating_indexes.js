@@ -19,18 +19,18 @@ const skipTest = true;
 // const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
 
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             insertDocuments.call(this, db, collName);
         }
 
         function insertDocuments(db, collName) {
             const nDocumentsToInsert = 100;
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < nDocumentsToInsert; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = 0; i < nDocumentsToInsert; ++i) {
                 bulk.insert({x: i});
             }
-            var res = bulk.execute();
+            let res = bulk.execute();
             assert.commandWorked(res);
             assert.eq(nDocumentsToInsert, res.nInserted);
         }
@@ -69,7 +69,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         init: {compact: 0.5, createIndex: 0.5},
         insertDocuments: {compact: 0.3, createIndex: 0.3, validate: 0.2, dropIndex: 0.2},
         compact: {insertDocuments: 0.3, createIndex: 0.3, validate: 0.2, dropIndex: 0.2},

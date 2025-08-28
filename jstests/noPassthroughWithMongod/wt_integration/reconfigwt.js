@@ -5,15 +5,15 @@
 //
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-var ss = db.serverStatus();
+let ss = db.serverStatus();
 
 // Test is only valid in the WT suites which run against a mongod with WiredTiger enabled
 if (ss.storageEngine.name !== "wiredTiger") {
     print("Skipping reconfigwt.js since this server does not have WiredTiger enabled");
 } else {
-    var conn = MongoRunner.runMongod();
+    let conn = MongoRunner.runMongod();
 
-    var admin = conn.getDB("admin");
+    let admin = conn.getDB("admin");
 
     function runTestForParam(paramName) {
         function reconfigure(str) {

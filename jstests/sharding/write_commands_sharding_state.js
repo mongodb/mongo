@@ -6,10 +6,10 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
+let st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 
-var dbTestName = "WriteCommandsTestDB";
-var collName = dbTestName + ".TestColl";
+let dbTestName = "WriteCommandsTestDB";
+let collName = dbTestName + ".TestColl";
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: dbTestName, primaryShard: st.shard0.shardName}));
 

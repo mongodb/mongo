@@ -12,7 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function expectState(rst, state) {
     assert.soon(function () {
-        var status = rst.status();
+        let status = rst.status();
         if (status.myState != state) {
             print("Waiting for state " + state + " in replSetGetStatus output: " + tojson(status));
         }
@@ -24,9 +24,9 @@ assert.throws(() => MongoRunner.runMongod({configsvr: "", setParameter: "skipSha
 
 assert.throws(() => MongoRunner.runMongod({shardsvr: "", setParameter: "skipShardingConfigurationChecks=true"}));
 
-var st = new ShardingTest({name: "skipConfig", shards: {rs0: {nodes: 1}}});
-var configRS = st.configRS;
-var shardRS = st.rs0;
+let st = new ShardingTest({name: "skipConfig", shards: {rs0: {nodes: 1}}});
+let configRS = st.configRS;
+let shardRS = st.rs0;
 
 shardRS.stopSet(15, true);
 configRS.stopSet(undefined, true);

@@ -1,14 +1,14 @@
-var runTest = function (compressor) {
-    var mongo = MongoRunner.runMongod({networkMessageCompressors: compressor});
+let runTest = function (compressor) {
+    let mongo = MongoRunner.runMongod({networkMessageCompressors: compressor});
 
     let shell = startParallelShell(
         function () {
-            var collName = "exhaustCollection";
-            var fp = "beforeCompressingExhaustResponse";
+            let collName = "exhaustCollection";
+            let fp = "beforeCompressingExhaustResponse";
             db[collName].drop();
 
             const kDocumentCount = 10;
-            for (var i = 0; i < kDocumentCount; i++) {
+            for (let i = 0; i < kDocumentCount; i++) {
                 assert.commandWorked(db.runCommand({insert: collName, documents: [{a: i}]}));
             }
 

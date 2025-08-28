@@ -73,7 +73,7 @@ export const $config = (function () {
             const dbName = getRandomDbName(this.threadCount);
             db = db.getSiblingDB(dbName);
             collName = getRandomCollName(this.threadCount);
-            var srcColl = db[collName];
+            let srcColl = db[collName];
             const destCollName = getRandomCollName(this.threadCount);
             try {
                 assert.commandWorked(srcColl.renameCollection(destCollName));
@@ -100,7 +100,7 @@ export const $config = (function () {
 
     let setup = function (db, collName, cluster) {
         // Initialize databases
-        for (var i = 0; i < dbNames.length; i++) {
+        for (let i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
             const newDb = db.getSiblingDB(dbName);
 
@@ -117,7 +117,7 @@ export const $config = (function () {
 
         // Check that at most one collection per test DB is present and that no data has been lost
         // upon multiple renames.
-        for (var i = 0; i < dbNames.length; i++) {
+        for (let i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
             db = db.getSiblingDB(dbName);
             const listColl = db.getCollectionNames();

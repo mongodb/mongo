@@ -58,12 +58,12 @@ function dbInfo(dbs) {
     });
 }
 
-var getCollections = (mydb, prefixes) => prefixes.map((prefix) => mydb[prefix]);
+let getCollections = (mydb, prefixes) => prefixes.map((prefix) => mydb[prefix]);
 
 /**
  *  Test functions to run and test using replay of oplog.
  */
-var tests = {
+let tests = {
     crud: (mydb) => {
         let [x, y, z] = getCollections(mydb, ["x", "y", "z"]);
         assert.commandWorked(x.insert({_id: 1}));

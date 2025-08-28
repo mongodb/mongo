@@ -13,7 +13,7 @@
  * ]
  */
 
-var t = db.apply_ops_dups;
+let t = db.apply_ops_dups;
 t.drop();
 
 // Make sure the collection exists and create a unique index.

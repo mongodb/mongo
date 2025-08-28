@@ -33,10 +33,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.data.opName = "updated";
 
-    var states = (function () {
+    let states = (function () {
         function update(db, collName) {
             // Update the counter field to avoid matching the same document again.
-            var res = db.runCommand({
+            let res = db.runCommand({
                 findAndModify: db[collName].getName(),
                 query: {counter: 0},
                 sort: {rand: -1},
@@ -45,7 +45,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             });
             assert.commandWorked(res);
 
-            var doc = res.value;
+            let doc = res.value;
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
                 // return null.
@@ -59,7 +59,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         return {update: update};
     })();
 
-    var transitions = {update: {update: 1}};
+    let transitions = {update: {update: 1}};
 
     $config.startState = "update";
     $config.states = states;

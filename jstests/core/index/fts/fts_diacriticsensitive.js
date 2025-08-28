@@ -2,7 +2,7 @@
 
 import {queryIDS} from "jstests/libs/fts.js";
 
-var coll = db.fts_diacriticsensitive;
+let coll = db.fts_diacriticsensitive;
 
 coll.drop();
 

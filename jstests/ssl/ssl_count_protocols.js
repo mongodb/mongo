@@ -5,9 +5,9 @@ import {
     sslProviderSupportsTLS1_1,
 } from "jstests/ssl/libs/ssl_helpers.js";
 
-var SERVER_CERT = "jstests/libs/server.pem";
-var CLIENT_CERT = "jstests/libs/client.pem";
-var CA_CERT = "jstests/libs/ca.pem";
+let SERVER_CERT = "jstests/libs/server.pem";
+let CLIENT_CERT = "jstests/libs/client.pem";
+let CA_CERT = "jstests/libs/ca.pem";
 
 const protocols = ["TLS1_0", "TLS1_1", "TLS1_2", "TLS1_3"];
 
@@ -21,7 +21,7 @@ function runTestWithoutSubset(client) {
     let disabledProtocols = protocols.slice();
     let expectedCounts = [0, 0, 0, 0, 0];
     expectedCounts[protocols.indexOf(expectedDefaultProtocol)] = 1;
-    var index = disabledProtocols.indexOf(client);
+    let index = disabledProtocols.indexOf(client);
     disabledProtocols.splice(index, 1);
     expectedCounts[index] += 1;
     print(tojson(expectedCounts));

@@ -2,7 +2,7 @@
 import {ReadWriteConcernDefaultsPropagation} from "jstests/libs/read_write_concern_defaults_propagation_common.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 1,
     mongos: 3,
     other: {

@@ -129,7 +129,7 @@ assert.eq(2, new Set(shards).size);
 assert.eq(docs.length, new Set(docChunkBounds).size);
 assert.commandWorked(coll.insert(docs));
 
-var staleCollection = staleMongos.getCollection(ns);
+let staleCollection = staleMongos.getCollection(ns);
 
 jsTest.log("Trying merges that should fail...");
 

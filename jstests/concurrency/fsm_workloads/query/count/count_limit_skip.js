@@ -16,7 +16,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.prefix = "count_fsm_q_l_s";
 
     $config.data.getCount = function getCount(db, predicate) {
-        var query = Object.extend({tid: this.tid}, predicate);
+        let query = Object.extend({tid: this.tid}, predicate);
         return db[this.threadCollName]
             .find(query)
             .skip(this.countPerNum - 1)
@@ -40,7 +40,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             );
         }
 
-        var num = Random.randInt(this.modulus);
+        let num = Random.randInt(this.modulus);
         assert.eq(
             this.getCount(db, {i: num}),
             // having done 'skip(this.countPerNum - 1).limit(10)'

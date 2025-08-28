@@ -4,22 +4,22 @@
 //   incompatible_with_windows_tls,
 // ]
 
-var numPerTypeToCreate = 50;
+let numPerTypeToCreate = 50;
 
 // We need to create a new mongod to ensure no one else is talking to us in the background, and
 // will screw up our stats.
-var mongo = MongoRunner.runMongod({});
+let mongo = MongoRunner.runMongod({});
 var db = mongo.getDB("test");
 
-var availableConnections = db.serverStatus().connections.available;
+let availableConnections = db.serverStatus().connections.available;
 if (availableConnections < numPerTypeToCreate * 10) {
     numPerTypeToCreate = Math.floor(availableConnections / 10);
 }
 
 print("numPerTypeToCreate: " + numPerTypeToCreate);
 
-var testDB = "connectionsOpenedTest";
-var signalCollection = "keepRunning";
+let testDB = "connectionsOpenedTest";
+let signalCollection = "keepRunning";
 
 function createPersistentConnection() {
     assert.soon(
@@ -39,7 +39,7 @@ function createPersistentConnection() {
 
 function createTemporaryConnection() {
     // Retry connecting until you are successful
-    var pollString =
+    let pollString =
         "var conn = null;" +
         "assert.soon(function() {" +
         'try { conn = new Mongo("' +
@@ -62,7 +62,7 @@ function createTemporaryConnection() {
 function waitForConnections(expectedCurrentConnections, expectedTotalConnections) {
     assert.soon(
         function () {
-            var currentConnInfo = db.serverStatus().connections;
+            let currentConnInfo = db.serverStatus().connections;
             return (
                 expectedCurrentConnections == currentConnInfo.current &&
                 (expectedTotalConnections, currentConnInfo.totalCreated)
@@ -83,7 +83,7 @@ function waitForConnections(expectedCurrentConnections, expectedTotalConnections
     );
 }
 
-var originalConnInfo = db.serverStatus().connections;
+let originalConnInfo = db.serverStatus().connections;
 assert.gt(originalConnInfo.current, 0);
 assert.gt(originalConnInfo.totalCreated, 0);
 
@@ -100,7 +100,7 @@ jsTestLog("Creating temporary connections");
 db.getSiblingDB(testDB).dropDatabase();
 db.getSiblingDB(testDB).getCollection(signalCollection).insert({stop: false});
 
-var tempConns = [];
+let tempConns = [];
 for (var i = 0; i < numPerTypeToCreate; i++) {
     tempConns.push(createTemporaryConnection());
 }

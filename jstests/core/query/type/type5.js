@@ -13,7 +13,7 @@ assert.throws(
 );
 assert.throws(
     function () {
-        var x = HexData(0, "aaaa");
+        let x = HexData(0, "aaaa");
         x.hex.apply(10);
     },
     [],
@@ -21,7 +21,7 @@ assert.throws(
 );
 assert.throws(
     function () {
-        var x = HexData(0, "aaaa");
+        let x = HexData(0, "aaaa");
         x.hex.apply(x.__proto__);
     },
     [],

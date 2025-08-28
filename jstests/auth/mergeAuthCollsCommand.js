@@ -16,8 +16,8 @@ function assertUsersAndRolesHaveRole(admin, role) {
     });
 }
 function runTest(conn) {
-    var db = conn.getDB("test");
-    var admin = conn.getDB("admin");
+    let db = conn.getDB("test");
+    let admin = conn.getDB("admin");
 
     jsTestLog("Creating users and roles in temp collections");
     db.createUser({user: "spencer", pwd: "pwd", roles: ["read"]});
@@ -124,11 +124,11 @@ function runTest(conn) {
 }
 
 jsTest.log("Test standalone");
-var conn = MongoRunner.runMongod({});
+let conn = MongoRunner.runMongod({});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Test sharding");
-var st = new ShardingTest({shards: 2, config: 3});
+let st = new ShardingTest({shards: 2, config: 3});
 runTest(st.s);
 st.stop();

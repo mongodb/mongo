@@ -5,29 +5,29 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
-var configDB = st.s.getDB("config");
-var shardName = configDB.shards.findOne()._id;
+let configDB = st.s.getDB("config");
+let shardName = configDB.shards.findOne()._id;
 
 assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: "x"}));
 assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 
-var currentMinBoundary;
-var currentMaxBoundary;
-var currentZone;
+let currentMinBoundary;
+let currentMaxBoundary;
+let currentZone;
 
 function testZoneOnShard(ns, testParameters) {
-    var chunkMinBoundary = testParameters["min"];
-    var chunkMaxBoundary = testParameters["max"];
-    var zone = testParameters["zone"];
-    var errorCodes = testParameters["errorCodes"];
+    let chunkMinBoundary = testParameters["min"];
+    let chunkMaxBoundary = testParameters["max"];
+    let zone = testParameters["zone"];
+    let errorCodes = testParameters["errorCodes"];
 
     if (errorCodes.length === 0) {
         assert.commandWorked(
             st.s.adminCommand({updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
         );
-        var tagDoc = configDB.tags.findOne();
+        let tagDoc = configDB.tags.findOne();
         if (zone === null) {
             // Testing basic remove
             assert.eq(null, tagDoc);
@@ -56,7 +56,7 @@ function verifyChunkBounds(tagDoc, ns, minKey, maxKey, tag) {
     assert.eq(tag, tagDoc.tag);
 }
 
-var basicIntegrationTestCases = [
+let basicIntegrationTestCases = [
     {"min": {x: 0}, "max": {x: 10}, "zone": "x", "errorCodes": []},
     {"min": {x: -10}, "max": {x: 20}, "zone": "x", "errorCodes": [ErrorCodes.RangeOverlapConflict]},
     {
@@ -122,7 +122,7 @@ basicIntegrationTestCases.forEach(function (test) {
  *  Successfully does basic remove of zone by setting zone to null
  */
 
-var compoundKeyTestCases = [
+let compoundKeyTestCases = [
     {"min": {_id: 0, x: 0}, "max": {_id: 100, x: 10}, "zone": "x", "errorCodes": []},
     {
         "min": {_id: 100, x: 10},

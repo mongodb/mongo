@@ -10,13 +10,13 @@
  */
 
 // Part 1
-var t = db.ttl1;
+let t = db.ttl1;
 t.drop();
 t.runCommand("create", {flags: 0});
-var now = new Date().getTime();
+let now = new Date().getTime();
 
 for (let i = 0; i < 24; i++) {
-    var past = new Date(now - 3600 * 1000 * i);
+    let past = new Date(now - 3600 * 1000 * i);
     t.insert({x: past, y: past, z: past});
 }
 t.insert({a: 1}); // no x value

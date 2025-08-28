@@ -6,10 +6,10 @@ import {isClusterNode, isMongos} from "jstests/concurrency/fsm_workload_helpers/
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export function getParameter(adminDb, field) {
-    var q = {getParameter: 1};
+    let q = {getParameter: 1};
     q[field] = 1;
 
-    var ret = adminDb.runCommand(q);
+    let ret = adminDb.runCommand(q);
     return ret[field];
 }
 
@@ -91,7 +91,7 @@ export function verifyGetDiagnosticData(adminDb, logData = true) {
  */
 export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Are we running against MongoS?
-    var isMongos = "isdbgrid" == adminDb.runCommand("ismaster").msg;
+    let isMongos = "isdbgrid" == adminDb.runCommand("ismaster").msg;
 
     // Check the defaults are correct
     //

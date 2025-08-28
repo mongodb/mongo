@@ -16,35 +16,35 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 
-var replSetName = "replsets_server-6591";
-var keyfile = "jstests/libs/key1";
-var numShards = 2;
-var username = "foo";
-var password = "bar";
-var adhocShard = 0;
+let replSetName = "replsets_server-6591";
+let keyfile = "jstests/libs/key1";
+let numShards = 2;
+let username = "foo";
+let password = "bar";
+let adhocShard = 0;
 
-var createUser = function (mongo) {
+let createUser = function (mongo) {
     print("============ adding a user.");
     mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
 };
 
-var addUsersToEachShard = function (st) {
+let addUsersToEachShard = function (st) {
     // In config shard mode skip the first shard because it is also the config server and will
     // already have a user made on it through mongos.
-    for (var i = TestData.configShard ? 1 : 0; i < numShards; i++) {
+    for (let i = TestData.configShard ? 1 : 0; i < numShards; i++) {
         print("============ adding a user to shard " + i);
-        var d = st["shard" + i];
+        let d = st["shard" + i];
         d.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
     }
 };
 
-var addShard = function (st, shouldPass) {
+let addShard = function (st, shouldPass) {
     adhocShard++;
     const rs = new ReplSetTest({nodes: 1, host: "localhost", name: "localhostAuthShard-" + adhocShard});
     rs.startSet({shardsvr: "", keyFile: keyfile, auth: ""});
     rs.initiate();
 
-    var res = st.getDB("admin").runCommand({addShard: rs.getURL()});
+    let res = st.getDB("admin").runCommand({addShard: rs.getURL()});
     if (shouldPass) {
         assert.commandWorked(res, "Add shard");
     } else {
@@ -53,10 +53,10 @@ var addShard = function (st, shouldPass) {
     return rs;
 };
 
-var findEmptyShard = function (st, ns) {
-    var counts = st.chunkCounts("foo");
+let findEmptyShard = function (st, ns) {
+    let counts = st.chunkCounts("foo");
 
-    for (var shard in counts) {
+    for (let shard in counts) {
         if (counts[shard] == 0) {
             return shard;
         }
@@ -65,11 +65,11 @@ var findEmptyShard = function (st, ns) {
     return null;
 };
 
-var assertCannotRunCommands = function (mongo, st) {
+let assertCannotRunCommands = function (mongo, st) {
     print("============ ensuring that commands cannot be run.");
 
     // CRUD
-    var test = mongo.getDB("test");
+    let test = mongo.getDB("test");
     assert.throws(function () {
         test.system.users.findOne();
     });
@@ -98,8 +98,8 @@ var assertCannotRunCommands = function (mongo, st) {
         mongo.getDB("config").shards.findOne();
     });
 
-    var authorizeErrorCode = 13;
-    var res = mongo.getDB("admin").runCommand({
+    let authorizeErrorCode = 13;
+    let res = mongo.getDB("admin").runCommand({
         moveChunk: "test.foo",
         find: {_id: 1},
         to: st.shard0.shardName, // Arbitrary shard.
@@ -112,7 +112,7 @@ var assertCannotRunCommands = function (mongo, st) {
         "createCollection",
     );
     // Set/Get system parameters
-    var params = [
+    let params = [
         {param: "journalCommitInterval", val: 200},
         {param: "logLevel", val: 2},
         {param: "logUserIds", val: 1},
@@ -127,7 +127,7 @@ var assertCannotRunCommands = function (mongo, st) {
         {param: "userCacheInvalidationIntervalSecs", val: 300},
     ];
     params.forEach(function (p) {
-        var cmd = {setParameter: 1};
+        let cmd = {setParameter: 1};
         cmd[p.param] = p.val;
         assert.commandFailedWithCode(
             mongo.getDB("admin").runCommand(cmd),
@@ -136,7 +136,7 @@ var assertCannotRunCommands = function (mongo, st) {
         );
     });
     params.forEach(function (p) {
-        var cmd = {getParameter: 1};
+        let cmd = {getParameter: 1};
         cmd[p.param] = 1;
         assert.commandFailedWithCode(
             mongo.getDB("admin").runCommand(cmd),
@@ -146,11 +146,11 @@ var assertCannotRunCommands = function (mongo, st) {
     });
 };
 
-var assertCanRunCommands = function (mongo, st) {
+let assertCanRunCommands = function (mongo, st) {
     print("============ ensuring that commands can be run.");
 
     // CRUD
-    var test = mongo.getDB("test");
+    let test = mongo.getDB("test");
 
     // this will throw if it fails
     test.system.users.findOne();
@@ -174,30 +174,30 @@ var assertCanRunCommands = function (mongo, st) {
     // this will throw if it fails
     mongo.getDB("config").shards.findOne();
 
-    var to = findEmptyShard(st, "test.foo");
-    var res = mongo.getDB("admin").runCommand({moveChunk: "test.foo", find: {_id: 1}, to: to});
+    let to = findEmptyShard(st, "test.foo");
+    let res = mongo.getDB("admin").runCommand({moveChunk: "test.foo", find: {_id: 1}, to: to});
     assert.commandWorked(res);
 };
 
-var authenticate = function (mongo) {
+let authenticate = function (mongo) {
     print("============ authenticating user.");
     mongo.getDB("admin").auth(username, password);
 };
 
-var setupSharding = function (shardingTest) {
-    var mongo = shardingTest.s;
+let setupSharding = function (shardingTest) {
+    let mongo = shardingTest.s;
 
     print("============ enabling sharding on test.foo.");
     mongo.getDB("admin").runCommand({enableSharding: "test", primaryShard: st.shard1.shardName});
     mongo.getDB("admin").runCommand({shardCollection: "test.foo", key: {_id: 1}});
 
-    var test = mongo.getDB("test");
-    for (var i = 1; i < 20; i++) {
+    let test = mongo.getDB("test");
+    for (let i = 1; i < 20; i++) {
         test.foo.insert({_id: i});
     }
 };
 
-var start = function () {
+let start = function () {
     return new ShardingTest({
         auth: "",
         shards: numShards,
@@ -213,10 +213,10 @@ print("=====================");
 print("starting shards");
 print("=====================");
 var st = start();
-var host = st.s.host;
-var extraShards = [];
+let host = st.s.host;
+let extraShards = [];
 
-var mongo = new Mongo(host);
+let mongo = new Mongo(host);
 
 assertCannotRunCommands(mongo, st);
 

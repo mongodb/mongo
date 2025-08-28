@@ -57,7 +57,7 @@ function getAllChunks(configDB, ns, keyPattern) {
 }
 
 export const $config = (function () {
-    var states = {
+    let states = {
         init: function init(db, collName, connCache) {
             // Initialize defragmentation
             for (let i = 0; i < dbCount; i++) {
@@ -203,7 +203,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {
+    let transitions = {
         init: {moveChunk: 0.25, mergeChunks: 0.25, splitChunks: 0.25, refineShardKey: 0.25},
         moveChunk: {mergeChunks: 0.33, splitChunks: 0.33, refineShardKey: 0.33},
         mergeChunks: {moveChunk: 0.33, splitChunks: 0.33, refineShardKey: 0.33},

@@ -12,13 +12,13 @@
  *   ]
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
         prefix: "rename_capped_collection_dbname_chain",
     };
 
-    var states = (function () {
+    let states = (function () {
         function uniqueDBName(prefix, tid, num) {
             return prefix + tid + "_" + num;
         }
@@ -26,17 +26,17 @@ export const $config = (function () {
         function init(db, collName) {
             this.fromDBName = db.getName() + uniqueDBName(this.prefix, this.tid, 0);
             this.num = 1;
-            var fromDB = db.getSiblingDB(this.fromDBName);
+            let fromDB = db.getSiblingDB(this.fromDBName);
 
-            var options = {capped: true, size: 4096};
+            let options = {capped: true, size: 4096};
 
             assert.commandWorked(fromDB.createCollection(collName, options));
             assert(fromDB[collName].isCapped());
         }
 
         function rename(db, collName) {
-            var toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, this.num++);
-            var renameCommand = {
+            let toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, this.num++);
+            let renameCommand = {
                 renameCollection: this.fromDBName + "." + collName,
                 to: toDBName + "." + collName,
                 dropTarget: false,
@@ -55,7 +55,7 @@ export const $config = (function () {
         return {init: init, rename: rename};
     })();
 
-    var transitions = {init: {rename: 1}, rename: {rename: 1}};
+    let transitions = {init: {rename: 1}, rename: {rename: 1}};
 
     return {
         threadCount: 10,

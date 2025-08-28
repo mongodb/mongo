@@ -54,7 +54,7 @@ function runTimeSeriesExtendedRangeTest(st, testCase) {
     const {createCollectionFn, docsToInsert, moveChunksFn, matchPredicate, parsedQueryPreds, expected} = testCase;
 
     const db = st.getDB(dbName);
-    var coll = db.getCollection(collName);
+    let coll = db.getCollection(collName);
     coll.drop();
     coll = createCollectionFn(db);
 
@@ -79,7 +79,7 @@ function runTimeSeriesExtendedRangeTest(st, testCase) {
 
 (function () {
     "use strict";
-    var st = new ShardingTest({mongos: 1, shards: 3});
+    let st = new ShardingTest({mongos: 1, shards: 3});
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     let createUnshardedOnPrimary = function (db) {

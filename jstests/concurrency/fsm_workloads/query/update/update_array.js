@@ -11,7 +11,7 @@
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         // db: explicitly passed to avoid accidentally using the global `db`
         // res: WriteResult
         // nModifiedPossibilities: array of allowed values for res.nModified
@@ -33,13 +33,13 @@ export const $config = (function () {
         }
 
         function doPush(db, collName, docIndex, value) {
-            var res = db[collName].update({_id: docIndex}, {$push: {arr: value}});
+            let res = db[collName].update({_id: docIndex}, {$push: {arr: value}});
 
             // assert the update reported success
             assertUpdateSuccess(db, res, [1]);
 
             // find the doc and make sure it was updated
-            var doc = db[collName].findOne({_id: docIndex});
+            let doc = db[collName].findOne({_id: docIndex});
             assert.neq(null, doc);
             assert(doc.hasOwnProperty("arr"), 'doc should have contained a field named "arr": ' + tojson(doc));
 
@@ -56,13 +56,13 @@ export const $config = (function () {
         }
 
         function doPull(db, collName, docIndex, value) {
-            var res = db[collName].update({_id: docIndex}, {$pull: {arr: value}});
+            let res = db[collName].update({_id: docIndex}, {$pull: {arr: value}});
 
             // assert the update reported success
             assertUpdateSuccess(db, res, [0, 1]);
 
             // find the doc and make sure it was updated
-            var doc = db[collName].findOne({_id: docIndex});
+            let doc = db[collName].findOne({_id: docIndex});
             assert.neq(null, doc);
 
             // If the document was invalidated during a yield, then we may not have updated
@@ -80,28 +80,28 @@ export const $config = (function () {
 
         return {
             push: function push(db, collName) {
-                var docIndex = Random.randInt(this.numDocs);
-                var value = this.tid;
+                let docIndex = Random.randInt(this.numDocs);
+                let value = this.tid;
 
                 doPush(db, collName, docIndex, value);
             },
 
             pull: function pull(db, collName) {
-                var docIndex = Random.randInt(this.numDocs);
-                var value = this.tid;
+                let docIndex = Random.randInt(this.numDocs);
+                let value = this.tid;
 
                 doPull(db, collName, docIndex, value);
             },
         };
     })();
 
-    var transitions = {push: {push: 0.8, pull: 0.2}, pull: {push: 0.8, pull: 0.2}};
+    let transitions = {push: {push: 0.8, pull: 0.2}, pull: {push: 0.8, pull: 0.2}};
 
     function setup(db, collName, cluster) {
         // index on 'arr', the field being updated
         assert.commandWorked(db[collName].createIndex({arr: 1}));
-        for (var i = 0; i < this.numDocs; ++i) {
-            var res = db[collName].insert({_id: i, arr: []});
+        for (let i = 0; i < this.numDocs; ++i) {
+            let res = db[collName].insert({_id: i, arr: []});
             assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }

@@ -15,8 +15,8 @@ TestData.skipCheckShardFilteringMetadata = true;
 import {allowTLS, mixedShardTest} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Disable auth explicitly
-var noAuthOptions = {noauth: ""};
-var transitionToX509allowTLS = Object.merge(allowTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
+let noAuthOptions = {noauth: ""};
+let transitionToX509allowTLS = Object.merge(allowTLS, {transitionToAuth: "", clusterAuthMode: "x509"});
 
 print("=== Testing no-auth/transitionToAuth cluster ===");
 mixedShardTest(noAuthOptions, transitionToX509allowTLS, true);

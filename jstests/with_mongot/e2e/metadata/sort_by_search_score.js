@@ -21,7 +21,7 @@ function runTest(metadataSortFieldName) {
     );
 
     createSearchIndex(coll, {name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
-    var searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
+    let searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
     assert.eq(searchIndexes.length, 1, searchIndexes);
 
     const searchForHungryHippo = {

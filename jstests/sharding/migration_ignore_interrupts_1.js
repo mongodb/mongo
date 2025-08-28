@@ -12,11 +12,11 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
-var st = new ShardingTest({shards: 3});
+let st = new ShardingTest({shards: 3});
 
-var mongos = st.s0,
+let mongos = st.s0,
     admin = mongos.getDB("admin"),
     dbName = "testDB",
     ns1 = dbName + ".foo",
@@ -53,7 +53,7 @@ jsTest.log("Set up complete, now proceeding to test that migration interruptions
 
 // Start a migration between shard0 and shard1 on coll1 and then pause it
 pauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
-var joinMoveChunk = moveChunkParallel(
+let joinMoveChunk = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {a: 0},

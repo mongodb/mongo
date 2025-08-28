@@ -8,7 +8,7 @@ const caseInsensitive = {
     collation: {locale: "en_US", strength: 2},
 };
 
-var coll = db.collation_geonear;
+let coll = db.collation_geonear;
 coll.drop();
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 assert.commandWorked(coll.insert({loc: [0, 0], str: "A"}));

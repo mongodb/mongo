@@ -1,12 +1,12 @@
-var t = db.create_indexes_shell_helper;
+let t = db.create_indexes_shell_helper;
 t.drop();
 
-var mongo = db.getMongo();
+let mongo = db.getMongo();
 
 try {
-    var commandsRan = [];
-    var insertsRan = [];
-    var mockMongo = {
+    let commandsRan = [];
+    let insertsRan = [];
+    let mockMongo = {
         getSecondaryOk: function () {
             return true;
         },

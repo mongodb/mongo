@@ -4,12 +4,12 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
-var collUnsharded = mongos.getCollection("foo.baz");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
+let coll = mongos.getCollection("foo.bar");
+let collUnsharded = mongos.getCollection("foo.baz");
 
 // Shard collection
 printjson(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
@@ -22,9 +22,9 @@ st.printShardingStatus(true);
 
 jsTest.log("Insert enough data to overwhelm a query batch.");
 
-var bulk = coll.initializeUnorderedBulkOp();
-var bulk2 = collUnsharded.initializeUnorderedBulkOp();
-for (var i = -150; i < 150; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+let bulk2 = collUnsharded.initializeUnorderedBulkOp();
+for (let i = -150; i < 150; i++) {
     bulk.insert({_id: i});
     bulk2.insert({_id: i});
 }
@@ -33,10 +33,10 @@ assert.commandWorked(bulk2.execute());
 
 jsTest.log("Open a cursor to a sharded and unsharded collection.");
 
-var shardedCursor = coll.find();
+let shardedCursor = coll.find();
 assert.neq(null, shardedCursor.next());
 
-var unshardedCursor = collUnsharded.find();
+let unshardedCursor = collUnsharded.find();
 assert.neq(null, unshardedCursor.next());
 
 jsTest.log("Check whether the cursor is registered in the cursor info.");

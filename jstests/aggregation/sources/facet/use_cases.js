@@ -40,11 +40,11 @@ function generateRandomDocument(docId) {
  * have _ids in the range [0, nDocs).
  */
 function populateData(nDocs) {
-    var coll = db.getCollection(collName);
+    let coll = db.getCollection(collName);
     coll.remove({}); // Don't drop the collection, since it might be sharded.
 
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < nDocs; i++) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < nDocs; i++) {
         const doc = generateRandomDocument(i);
         bulk.insert(doc);
     }

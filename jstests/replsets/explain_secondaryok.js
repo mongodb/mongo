@@ -8,13 +8,13 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "explain_secondaryok";
+let name = "explain_secondaryok";
 
 print("Start replica set with two nodes");
-var replTest = new ReplSetTest({name: name, nodes: 2});
-var nodes = replTest.startSet();
+let replTest = new ReplSetTest({name: name, nodes: 2});
+let nodes = replTest.startSet();
 replTest.initiate();
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // Insert a document and let it sync to the secondary.
 print("Initial sync");
@@ -25,7 +25,7 @@ replTest.awaitReplication();
 assert.eq(1, primary.getDB("test").explain_secondaryok.findOne({a: 1})["a"]);
 
 // We shouldn't be able to read from the secondary with secondaryOk off.
-var secondary = replTest.getSecondary();
+let secondary = replTest.getSecondary();
 secondary.getDB("test").getMongo().setSecondaryOk(false);
 assert.throws(function () {
     secondary.getDB("test").explain_secondaryok.findOne({a: 1});
@@ -40,7 +40,7 @@ assert.eq(1, secondary.getDB("test").explain_secondaryok.findOne({a: 1})["a"]);
 //
 
 // Explain a count on the primary.
-var explainOut = primary
+let explainOut = primary
     .getDB("test")
     .runCommand({explain: {count: "explain_secondaryok", query: {a: 1}}, verbosity: "executionStats"});
 assert.commandWorked(explainOut, "explain read op on primary");
@@ -54,7 +54,7 @@ assert.commandWorked(explainOut, "explain write op on primary");
 
 // Plan should have an update stage at its root, reporting that it would
 // modify a single document.
-var stages = explainOut.executionStats.executionStages;
+let stages = explainOut.executionStats.executionStages;
 assert.eq("UPDATE", stages.stage);
 assert.eq(1, stages.nWouldModify);
 
@@ -103,7 +103,7 @@ explainOut = secondary.getDB("test").explain_secondaryok.explain("executionStats
 assert.commandWorked(explainOut, "explain .find() on secondary, secondaryOk set to true");
 
 // Explain .find() on a secondary, setting secondaryOk to false with various read preferences.
-var readPrefModes = ["secondary", "secondaryPreferred", "primaryPreferred", "nearest"];
+let readPrefModes = ["secondary", "secondaryPreferred", "primaryPreferred", "nearest"];
 readPrefModes.forEach(function (prefString) {
     secondary.getDB("test").getMongo().setSecondaryOk(false);
     explainOut = secondary
@@ -127,7 +127,7 @@ readPrefModes.forEach(function (prefString) {
 
 // Fail explain find() on a secondary, setting secondaryOk to false with read preference set to
 // primary.
-var prefStringPrimary = "primary";
+let prefStringPrimary = "primary";
 secondary.getDB("test").getMongo().setSecondaryOk(false);
 explainOut = secondary
     .getDB("test")

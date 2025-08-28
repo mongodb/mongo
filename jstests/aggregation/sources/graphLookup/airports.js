@@ -1,12 +1,12 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test some complex graphs.
 
-var local = db.local;
-var foreign = db.foreign;
+let local = db.local;
+let foreign = db.foreign;
 
 local.drop();
 foreign.drop();
 
-var airports = [
+let airports = [
     {_id: "JFK", connects: ["PWM", "BOS", "LGA", "SFO"]},
     {_id: "PWM", connects: ["BOS", "JFK"]},
     {_id: "BOS", connects: ["PWM", "JFK", "LGA"]},
@@ -17,7 +17,7 @@ var airports = [
     {_id: "MIA", connects: ["ATL", "SFO"]},
 ];
 
-var bulk = foreign.initializeUnorderedBulkOp();
+let bulk = foreign.initializeUnorderedBulkOp();
 airports.forEach(function (a) {
     bulk.insert(a);
 });
@@ -27,7 +27,7 @@ assert.commandWorked(bulk.execute());
 local.insert({});
 
 // Perform a simple $graphLookup and ensure it retrieves every result.
-var res = local
+let res = local
     .aggregate({
         $graphLookup: {
             from: "foreign",
@@ -61,7 +61,7 @@ res = local
     )
     .toArray();
 
-var expectedDistances = {BOS: 0, PWM: 1, JFK: 1, LGA: 1, ORD: 2, SFO: 2, MIA: 3, ATL: 4};
+let expectedDistances = {BOS: 0, PWM: 1, JFK: 1, LGA: 1, ORD: 2, SFO: 2, MIA: 3, ATL: 4};
 
 assert.eq(res.length, airports.length);
 res.forEach(function (c) {

@@ -8,14 +8,14 @@
 // Test of sample big polygon functionality
 //
 
-var coll = db.geo_big_polygon;
+let coll = db.geo_big_polygon;
 coll.drop();
 
 // coll.createIndex({ loc : "2dsphere" });
 
-var bigCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
+let bigCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
 
-var bigPoly20 = {
+let bigPoly20 = {
     type: "Polygon",
     coordinates: [
         [
@@ -29,7 +29,7 @@ var bigPoly20 = {
     crs: bigCRS,
 };
 
-var bigPoly20Comp = {
+let bigPoly20Comp = {
     type: "Polygon",
     coordinates: [
         [
@@ -43,7 +43,7 @@ var bigPoly20Comp = {
     crs: bigCRS,
 };
 
-var poly10 = {
+let poly10 = {
     type: "Polygon",
     coordinates: [
         [
@@ -56,7 +56,7 @@ var poly10 = {
     ],
 };
 
-var line10 = {
+let line10 = {
     type: "LineString",
     coordinates: [
         [5.0, 5.0],
@@ -67,11 +67,11 @@ var line10 = {
     ],
 };
 
-var centerPoint = {type: "Point", coordinates: [0, 0]};
+let centerPoint = {type: "Point", coordinates: [0, 0]};
 
-var polarPoint = {type: "Point", coordinates: [85, 85]};
+let polarPoint = {type: "Point", coordinates: [85, 85]};
 
-var lineEquator = {
+let lineEquator = {
     type: "LineString",
     coordinates: [
         [-20, 0],
@@ -104,7 +104,7 @@ assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20Comp}}}).count()
 assert.commandWorked(coll.dropIndexes());
 
 // 1. Without index, insert succeeds, but query ignores big polygon.
-var bigPoly10 = {
+let bigPoly10 = {
     type: "Polygon",
     coordinates: [
         [
@@ -136,8 +136,8 @@ assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 assert.writeError(coll.insert({_id: "bigPoly10", loc: bigPoly10}));
 
 // Query geometries that don't support big CRS should error out.
-var bigPoint = {type: "Point", coordinates: [0, 0], crs: bigCRS};
-var bigLine = {
+let bigPoint = {type: "Point", coordinates: [0, 0], crs: bigCRS};
+let bigLine = {
     type: "LineString",
     coordinates: [
         [-20, 0],

@@ -14,7 +14,7 @@
  * ]
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         documentsToInsert: 100,
         insertedDocuments: 0,
         generateDocumentToInsert: function generateDocumentToInsert() {
@@ -23,20 +23,20 @@ export const $config = (function () {
         shardKey: {tid: 1},
     };
 
-    var states = {
+    let states = {
         insert: function insert(db, collName) {
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < this.documentsToInsert; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = 0; i < this.documentsToInsert; ++i) {
                 bulk.insert(this.generateDocumentToInsert());
             }
-            var res = bulk.execute();
+            let res = bulk.execute();
             assert.commandWorked(res);
             assert.eq(this.documentsToInsert, res.nInserted);
             this.insertedDocuments += this.documentsToInsert;
         },
 
         query: function query(db, collName) {
-            var count = db[collName].find({$where: "this.tid === " + this.tid}).itcount();
+            let count = db[collName].find({$where: "this.tid === " + this.tid}).itcount();
             assert.eq(
                 count,
                 this.insertedDocuments,
@@ -45,9 +45,9 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {insert: {insert: 0.2, query: 0.8}, query: {insert: 0.8, query: 0.2}};
+    let transitions = {insert: {insert: 0.2, query: 0.8}, query: {insert: 0.8, query: 0.2}};
 
-    var setup = function setup(db, collName, cluster) {
+    let setup = function setup(db, collName, cluster) {
         assert.commandWorked(db[collName].createIndex({tid: 1}));
     };
 

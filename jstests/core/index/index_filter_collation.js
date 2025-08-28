@@ -22,7 +22,7 @@ const collName = "index_filter_collation";
 const coll = db[collName];
 
 // Flag indicating if index filter commands are running through the query settings interface.
-var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
+let isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
 const caseInsensitive = {
     locale: "fr",

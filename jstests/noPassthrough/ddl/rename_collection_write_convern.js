@@ -22,7 +22,7 @@ let st = new ShardingTest({
 });
 let db = st.getDB("test");
 
-var replTest = st.rs0;
+let replTest = st.rs0;
 
 // Kill any node. Don't care if it's a primary or secondary.
 replTest.remove(0);

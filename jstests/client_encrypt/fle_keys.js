@@ -32,7 +32,7 @@ const keyVault = shell.getKeyVault();
 keyVault.createKey("local", ["mongoKey"]);
 assert.eq(1, keyVault.getKeys().itcount());
 
-var result = keyVault.createKey("local", "fake", {});
+let result = keyVault.createKey("local", "fake", {});
 assert.eq("TypeError: key alternate names must be of Array type.", result);
 
 result = keyVault.createKey("local", [1]);
@@ -40,7 +40,7 @@ assert.eq("TypeError: items in key alternate names must be of String type.", res
 
 assert.eq(1, keyVault.getKeyByAltName("mongoKey").itcount());
 
-var keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
+let keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
 keyVault.addKeyAlternateName(keyId, "mongoKey2");
 

@@ -31,7 +31,7 @@ n2.disconnect(primary);
 rst.awaitSyncSource(n2, n1);
 
 // A write with write concern {w:3} should still reach n2.
-var options = {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
+let options = {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
 assert.commandWorked(primary.getDB("admin").foo.insert({x: 1}, options));
 
 rst.stopSet();

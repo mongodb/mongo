@@ -1,7 +1,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({name: "rename_across_mongos", shards: 1, mongos: 2});
-var dbName = "RenameDB";
+let st = new ShardingTest({name: "rename_across_mongos", shards: 1, mongos: 2});
+let dbName = "RenameDB";
 
 st.s0.getDB(dbName).dropDatabase();
 st.s1.getDB(dbName).dropDatabase();

@@ -64,7 +64,7 @@ function testAuthorization(conn, privileges, user, shouldSucceed) {
     if (shouldSucceed) {
         assert.commandWorked(testDb.runCommand(command));
     } else {
-        var res = testDb.runCommand(command);
+        let res = testDb.runCommand(command);
         if (res.ok == 1 || res.code != authErrCode) {
             let msg =
                 "expected authorization failure " +

@@ -15,8 +15,8 @@
 import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var getStringOfLength = (function () {
-        var cache = {};
+    let getStringOfLength = (function () {
+        let cache = {};
         return function getStringOfLength(size) {
             if (!cache[size]) {
                 cache[size] = "x".repeat(size);
@@ -29,21 +29,21 @@ export const $config = (function () {
         // first set doc.padding so that Object.bsonsize will include the field name and other
         // overhead
         doc.padding = "";
-        var paddingLength = size - Object.bsonsize(doc);
+        let paddingLength = size - Object.bsonsize(doc);
         assert.lte(0, paddingLength, "document is already bigger than " + size + " bytes: " + tojson(doc));
         doc.padding = getStringOfLength(paddingLength);
         assert.eq(size, Object.bsonsize(doc));
         return doc;
     }
 
-    var states = {
+    let states = {
         query: function query(db, collName) {
-            var count = db[collName].aggregate([]).itcount();
+            let count = db[collName].aggregate([]).itcount();
             assert.eq(count, this.numDocs);
         },
     };
 
-    var transitions = {query: {query: 1}};
+    let transitions = {query: {query: 1}};
 
     function setup(db, collName, cluster) {
         if (!this.numDocs) {
@@ -68,8 +68,8 @@ export const $config = (function () {
         }
 
         // load example data
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 0; i < this.numDocs; ++i) {
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 0; i < this.numDocs; ++i) {
             // note: padDoc caches the large string after allocating it once, so it's ok to call it
             // in this loop
             bulk.insert(
@@ -83,7 +83,7 @@ export const $config = (function () {
                 ),
             );
         }
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(this.numDocs, res.nInserted);
         assert.eq(this.numDocs, db[collName].find().itcount());

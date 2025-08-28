@@ -9,7 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const kDbName = "test";
 
 const minConns = 4;
-var stepParams = {
+let stepParams = {
     ShardingTaskExecutorPoolMinSize: minConns,
     ShardingTaskExecutorPoolMaxSize: 10,
     ShardingTaskExecutorPoolMaxConnecting: 5,
@@ -34,15 +34,15 @@ const allHosts = cfg.members.map((x) => x.host);
 const mongosDB = mongos.getDB(kDbName);
 const primaryOnly = [primary.name];
 
-var threads = [];
-var currentCheckNum = 0;
+let threads = [];
+let currentCheckNum = 0;
 
 const numPools = assert.commandWorked(mongos.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}))[
     "taskExecutorPoolSize"
 ];
 
 function updateSetParameters(params) {
-    var cmd = Object.assign({"setParameter": 1}, params);
+    let cmd = Object.assign({"setParameter": 1}, params);
     assert.commandWorked(mongos.adminCommand(cmd));
 }
 

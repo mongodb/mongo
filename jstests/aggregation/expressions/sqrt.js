@@ -3,19 +3,19 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.sqrt;
+let coll = db.sqrt;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0}));
 
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {
-    var pipeline = [{$project: {_id: 0, result: op}}];
+    let pipeline = [{$project: {_id: 0, result: op}}];
     assert.eq(coll.aggregate(pipeline).toArray(), [{result: expResult}]);
 }
 
 // Helper for testing that op results in error with code errorCode.
 function testError(op, errorCode) {
-    var pipeline = [{$project: {_id: 0, result: op}}];
+    let pipeline = [{$project: {_id: 0, result: op}}];
     assertErrorCode(coll, pipeline, errorCode);
 }
 

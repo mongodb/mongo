@@ -17,7 +17,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 assert.eq(jsTest.options().enableTestCommands, true);
 
 // we expect this to work just fine given that enableTestCommands is true by default
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {rs0: {nodes: 2}},
     mongos: 1,
     config: 1,

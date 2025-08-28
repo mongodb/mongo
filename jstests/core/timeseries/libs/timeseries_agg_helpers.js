@@ -115,7 +115,7 @@ export var TimeseriesAggTests = class {
         testDB = TimeseriesAggTests.getTestDb(),
     ) {
         // Figures out the output collection name from the last pipeline stage.
-        var outCollName = "out";
+        let outCollName = "out";
         if (pipeline[pipeline.length - 1]["$out"] != undefined) {
             // If the last stage is "$out", gets the output collection name from the string or
             // object input.
@@ -145,7 +145,7 @@ export var TimeseriesAggTests = class {
         assert.eq(actualResults.length, expectedResults.length, actualResults);
 
         // Verifies that every measurement is same as expected.
-        for (var i = 0; i < expectedResults.length; ++i) {
+        for (let i = 0; i < expectedResults.length; ++i) {
             assert.eq(actualResults[i], expectedResults[i], actualResults);
         }
     }

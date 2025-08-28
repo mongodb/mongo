@@ -61,7 +61,7 @@ clearOCSPCache();
 
 // Leave the OCSP responder on so that the other nodes all have valid responses.
 jsTest.log("Test another ShardingTest with MockOCSPServer and expect to have valid OCSP response.");
-var st = new ShardingTest(sharding_config);
+let st = new ShardingTest(sharding_config);
 
 mock_ocsp.stop();
 mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1);

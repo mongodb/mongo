@@ -58,8 +58,8 @@ let insertDataForConn = function (conn, dbs, nodeOptions) {
 
 let recreateUniqueIndexes = function (db, secondary) {
     // Obtain list of all v1 and v2 unique indexes
-    var unique_idx = [];
-    var unique_idx_v1 = [];
+    let unique_idx = [];
+    let unique_idx_v1 = [];
     db.adminCommand("listDatabases").databases.forEach(function (d) {
         if (secondary && !(d.name === "local")) {
             // All replicated indexes will be dropped on the primary, and have that

@@ -3,7 +3,7 @@
  * @tags: [requires_wiredtiger]
  */
 
-var conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 var db = conn.getDB("test");
 
 let coll = db.dropcollection_duplicate_fields;

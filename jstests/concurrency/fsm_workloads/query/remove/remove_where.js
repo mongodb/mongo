@@ -29,7 +29,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.states.remove = function remove(db, collName) {
-        var res = db[collName].remove({
+        let res = db[collName].remove({
             // Server-side JS does not support Random.randInt, so use Math.floor/random instead
             $where: "this.x === Math.floor(Math.random() * " + this.randomBound + ") " + "&& this.tid === " + this.tid,
         });

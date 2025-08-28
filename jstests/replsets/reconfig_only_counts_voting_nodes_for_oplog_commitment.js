@@ -8,14 +8,14 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 
 // Start a 3 node replica set with two non-voting nodes. In this case, only one node is
 // needed to satisfy the oplog commitment check.
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     nodes: [
         {rsConfig: {priority: 1, votes: 1}},
         {rsConfig: {priority: 0, votes: 0}},
         {rsConfig: {priority: 0, votes: 0}},
     ],
 });
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 
 // Stopping replication on secondaries can be very slow with a high election timeout. Set a small
 // oplog getMore timeout so the test runs faster.
@@ -24,7 +24,7 @@ nodes.forEach((node) => {
 });
 
 replTest.initiate();
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(
@@ -38,7 +38,7 @@ assert.commandWorked(primary.getDB("test")["test"].insert({x: 1}));
 // Run a reconfig that changes node1's votes to 1. The reconfig succeeds when it replicates
 // to a majority of nodes.
 jsTestLog("Doing reconfig.");
-var config = primary.getDB("local").system.replset.findOne();
+let config = primary.getDB("local").system.replset.findOne();
 config.version++;
 config.members[1].votes = 1;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));

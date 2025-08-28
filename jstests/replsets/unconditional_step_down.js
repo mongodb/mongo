@@ -56,9 +56,9 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     // Insert command.
     const writeFp = configureFailPoint(primary, writeFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
 
-    var startSafeParallelShell = (func, port) => {
+    let startSafeParallelShell = (func, port) => {
         TestData.func = func;
-        var safeFunc = toRemovedState
+        let safeFunc = toRemovedState
             ? () => {
                   assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
                   TestData.func();
@@ -69,7 +69,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
 
     const joinReadThread = startSafeParallelShell(() => {
         jsTestLog("Start blocking find cmd before step down");
-        var findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+        let findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
         assert.eq(findRes.cursor.firstBatch.length, 1);
     }, primary.port);
 
@@ -111,7 +111,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     );
 
     jsTestLog("Trigger step down");
-    var oldConfig = stepDownFn();
+    let oldConfig = stepDownFn();
 
     // Waits for all threads to join.
     joinUnblockStepDown();
@@ -138,7 +138,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
 }
 
 function runStepsDowntoRemoved(params) {
-    var oldConfigBeforeTest = rst.getReplSetConfigFromNode();
+    let oldConfigBeforeTest = rst.getReplSetConfigFromNode();
 
     // Run the test.
     params["toRemovedState"] = true;
@@ -153,10 +153,10 @@ function runStepsDowntoRemoved(params) {
 runStepDownTest({
     testMsg: "reconfig command",
     stepDownFn: () => {
-        var newConfig = rst.getReplSetConfigFromNode();
+        let newConfig = rst.getReplSetConfigFromNode();
 
-        var oldMasterId = rst.getNodeId(primary);
-        var newMasterId = rst.getNodeId(secondary);
+        let oldMasterId = rst.getNodeId(primary);
+        let newMasterId = rst.getNodeId(secondary);
 
         newConfig.members[oldMasterId].priority = 0;
         newConfig.members[newMasterId].priority = 1;
@@ -170,10 +170,10 @@ runStepDownTest({
 runStepDownTest({
     testMsg: "reconfig via heartbeat",
     stepDownFn: () => {
-        var newConfig = rst.getReplSetConfigFromNode();
+        let newConfig = rst.getReplSetConfigFromNode();
 
-        var oldMasterId = rst.getNodeId(primary);
-        var newMasterId = rst.getNodeId(secondary);
+        let oldMasterId = rst.getNodeId(primary);
+        let newMasterId = rst.getNodeId(secondary);
 
         newConfig.members[oldMasterId].priority = 0;
         newConfig.members[newMasterId].priority = 1;
@@ -187,10 +187,10 @@ runStepDownTest({
 runStepsDowntoRemoved({
     testMsg: "reconfig via heartbeat - primary to removed",
     stepDownFn: () => {
-        var newConfig = rst.getReplSetConfigFromNode();
+        let newConfig = rst.getReplSetConfigFromNode();
 
-        var oldMasterId = rst.getNodeId(primary);
-        var newMasterId = rst.getNodeId(secondary);
+        let oldMasterId = rst.getNodeId(primary);
+        let newMasterId = rst.getNodeId(secondary);
 
         newConfig.members[newMasterId].priority = 1;
         // Remove the current primary from the config
@@ -205,8 +205,8 @@ runStepsDowntoRemoved({
 runStepDownTest({
     testMsg: "stepdown via heartbeat",
     stepDownFn: () => {
-        var newConfig = rst.getReplSetConfigFromNode();
-        var newMasterId = rst.getNodeId(secondary);
+        let newConfig = rst.getReplSetConfigFromNode();
+        let newMasterId = rst.getNodeId(secondary);
 
         newConfig.members[newMasterId].priority = 2;
         newConfig.version++;

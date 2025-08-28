@@ -34,11 +34,11 @@ var fsyncLockDB = db.getSiblingDB("fsyncLockTestDB");
 fsyncLockDB.dropDatabase();
 
 // Tests the db.fsyncLock/fsyncUnlock features.
-var storageEngine = db.serverStatus().storageEngine.name;
+let storageEngine = db.serverStatus().storageEngine.name;
 
 // As of SERVER-18899 fsyncLock/fsyncUnlock will error when called on a storage engine
 // that does not support the begin/end backup commands.
-var supportsFsync = db.fsyncLock();
+let supportsFsync = db.fsyncLock();
 
 if (!supportsFsync.ok) {
     assert.commandFailedWithCode(supportsFsync, ErrorCodes.CommandNotSupported);
@@ -76,7 +76,7 @@ assert(
 // Make sure writes are blocked. Spawn a write operation in a separate shell and make sure it
 // is blocked. There is really no way to do that currently, so just check that the write didn't
 // go through.
-var writeOpHandle = startParallelShell("db.getSiblingDB('fsyncLockTestDB').coll.insert({x:1});");
+let writeOpHandle = startParallelShell("db.getSiblingDB('fsyncLockTestDB').coll.insert({x:1});");
 waitUntilOpCountIs({op: "insert", ns: "fsyncLockTestDB.coll", waitingForLock: true}, 1);
 
 // Make sure reads can still run even though there is a pending write and also that the write

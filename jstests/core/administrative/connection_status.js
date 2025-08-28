@@ -24,9 +24,9 @@ db.logout(); // logout from the current db - anecodtally "test_autocomplete" - t
  * Test that the output of connectionStatus makes sense.
  */
 function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
-    var connectionStatus = myDB.runCommand({"connectionStatus": 1, "showPrivileges": showPrivileges});
+    let connectionStatus = myDB.runCommand({"connectionStatus": 1, "showPrivileges": showPrivileges});
     assert.commandWorked(connectionStatus);
-    var authInfo = connectionStatus.authInfo;
+    let authInfo = connectionStatus.authInfo;
 
     // Test that UUID is properly returned.
     // This UUID is from the runCommand connection, not the user, so it cannot be asserted against
@@ -40,11 +40,11 @@ function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
     assert(parsedUUID["$binary"], "Missing payload for client UUID: " + tojson(uuid));
 
     // Test that authenticated users are properly returned.
-    var users = authInfo.authenticatedUsers;
-    var matches = 0;
-    var infoStr = tojson(authInfo);
+    let users = authInfo.authenticatedUsers;
+    let matches = 0;
+    let infoStr = tojson(authInfo);
     for (var i = 0; i < users.length; i++) {
-        var user = users[i].user;
+        let user = users[i].user;
         var db = users[i].db;
         assert(isString(user), "each authenticatedUsers should have a 'user' string:" + infoStr);
         assert(isString(db), "each authenticatedUsers should have a 'db' string:" + infoStr);
@@ -55,10 +55,10 @@ function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
     assert.eq(matches, 1, "expected user should be present once in authenticatedUsers:" + infoStr);
 
     // Test that authenticated roles are properly returned.
-    var roles = authInfo.authenticatedUserRoles;
+    let roles = authInfo.authenticatedUserRoles;
     matches = 0;
     for (var i = 0; i < roles.length; i++) {
-        var role = roles[i].role;
+        let role = roles[i].role;
         var db = roles[i].db;
         assert(isString(role), "each authenticatedUserRole should have a 'role' string:" + infoStr);
         assert(isString(db), "each authenticatedUserRole should have a 'db' string:" + infoStr);
@@ -69,15 +69,15 @@ function validateConnectionStatus(expectedUser, expectedRole, showPrivileges) {
     // Role will be duplicated when users with the same role are logged in at the same time.
     assert.gte(matches, 1, "expected role should be present in authenticatedUserRoles:" + infoStr);
 
-    var privileges = authInfo.authenticatedUserPrivileges;
+    let privileges = authInfo.authenticatedUserPrivileges;
     if (showPrivileges) {
         for (var i = 0; i < privileges.length; i++) {
             assert(
                 isObject(privileges[i].resource),
                 "each authenticatedUserPrivilege should have a 'resource' object:" + infoStr,
             );
-            var actions = privileges[i].actions;
-            for (var j = 0; j < actions.length; j++) {
+            let actions = privileges[i].actions;
+            for (let j = 0; j < actions.length; j++) {
                 assert(isString(actions[j]), "each authenticatedUserPrivilege action should be a string:" + infoStr);
             }
         }

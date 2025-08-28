@@ -8,7 +8,7 @@ if (db.serverStatus().storageEngine.name !== "wiredTiger") {
     quit();
 }
 
-var collNamePrefix = "wt_roundtrip_creation_string";
+let collNamePrefix = "wt_roundtrip_creation_string";
 
 // Drop the collections used by the test to ensure that the create commands don't fail because
 // the collections already exist.
@@ -18,7 +18,7 @@ db[collNamePrefix].dest.drop();
 assert.commandWorked(db.createCollection(collNamePrefix + ".source"));
 assert.commandWorked(db[collNamePrefix].source.createIndex({a: 1}, {name: "a_1"}));
 
-var collStats = db.runCommand({collStats: collNamePrefix + ".source"});
+let collStats = db.runCommand({collStats: collNamePrefix + ".source"});
 assert.commandWorked(collStats);
 
 const encryptionRegex = /,encryption=\(?[^)]*,?\),/;

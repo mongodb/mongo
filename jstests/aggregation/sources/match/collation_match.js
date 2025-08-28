@@ -4,9 +4,9 @@
 // ]
 
 // Test that the $match stage respects the collation.
-var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
+let caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 
-var coll = db.collation_match;
+let coll = db.collation_match;
 coll.drop();
 assert.commandWorked(coll.insert({a: "a"}));
 

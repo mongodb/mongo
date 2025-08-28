@@ -29,10 +29,10 @@ const nestedCWS = Code("function(){return 1;}", {
         }),
     }),
 });
-var conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=30"});
-var testDB = conn.getDB(jsTestName());
+let conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=30"});
+let testDB = conn.getDB(jsTestName());
 const collName = jsTestName();
-var coll = testDB.getCollection(collName);
+let coll = testDB.getCollection(collName);
 coll.insert({_id: nestedCWS});
 
 MongoRunner.stopMongod(conn);

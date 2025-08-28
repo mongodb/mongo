@@ -4,6 +4,6 @@ import {KillSessionsTestHelper} from "jstests/libs/kill_sessions.js";
 // sent with an implicit session.
 TestData.disableImplicitSessions = true;
 
-var conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 KillSessionsTestHelper.runNoAuth(conn, conn, [conn]);
 MongoRunner.stopMongod(conn);

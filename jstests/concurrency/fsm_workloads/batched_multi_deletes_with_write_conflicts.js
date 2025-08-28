@@ -14,7 +14,7 @@ import {checkNWouldDelete, getPlanStage, getPlanStages} from "jstests/libs/query
 
 export const $config = (function () {
     // 'data' is passed (copied) to each of the worker threads.
-    var data = {
+    let data = {
         // Defines the number of subsets of data, which are randomly picked to create conflicts.
         numInsertSubsets: 5,
         // Docs in each subset. insertSize = subsetSize x numInsertSubsets.
@@ -73,7 +73,7 @@ export const $config = (function () {
     // 'states' are the different functions callable by a worker
     // thread. The 'this' argument of any exposed function is
     // bound as '$config.data'.
-    var states = (function () {
+    let states = (function () {
         // Helpers
         function getRandomInRange({min, max}) {
             return Math.floor(Math.random() * (max - min + 1) + min);

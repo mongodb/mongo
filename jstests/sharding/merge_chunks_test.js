@@ -4,15 +4,15 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+let st = new ShardingTest({shards: 2, mongos: 2});
 
-var mongos = st.s0;
-var staleMongos = st.s1;
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let staleMongos = st.s1;
+let admin = mongos.getDB("admin");
 const kDbName = "foo";
 
 assert.commandWorked(admin.runCommand({enableSharding: kDbName, primaryShard: st.shard0.name}));
-var coll = mongos.getCollection(kDbName + ".bar");
+let coll = mongos.getCollection(kDbName + ".bar");
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 // Create ranges MIN->0,0->10,(hole),20->40,40->50,50->90,(hole),100->110,110->MAX on first
@@ -39,7 +39,7 @@ assert.commandWorked(coll.insert({_id: 10}));
 assert.commandWorked(coll.insert({_id: 40}));
 assert.commandWorked(coll.insert({_id: 110}));
 
-var staleCollection = staleMongos.getCollection(coll + "");
+let staleCollection = staleMongos.getCollection(coll + "");
 
 jsTest.log("Trying merges that should fail...");
 

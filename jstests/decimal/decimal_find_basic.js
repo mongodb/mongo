@@ -1,6 +1,6 @@
 // Tests finding NumberDecimal from the shell.
 
-var col = db.decimal_find_basic;
+let col = db.decimal_find_basic;
 col.drop();
 
 // Insert some sample data.
@@ -28,7 +28,7 @@ assert.eq(col.find({"decimal": NumberDecimal("0")}).count(), "3");
 // NaNs
 assert.eq(col.find({"decimal": NumberDecimal("NaN")}).count(), 2, "NaN find failed");
 
-var theNaNs = [{"decimal": NumberDecimal("NaN")}, {"decimal": NumberDecimal("-NaN")}];
+let theNaNs = [{"decimal": NumberDecimal("NaN")}, {"decimal": NumberDecimal("-NaN")}];
 
 assert(bsonWoCompare(theNaNs[0], theNaNs[1]) == 0, "NaN compares equal");
 

@@ -22,7 +22,7 @@ function validateDocumentKeyInOplogForRemove(ns, _id, docKey) {
     }
 }
 
-var st = new ShardingTest({name: "test", shards: {rs0: {nodes: 1}}});
+let st = new ShardingTest({name: "test", shards: {rs0: {nodes: 1}}});
 var db = st.s.getDB("test");
 
 assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
@@ -58,10 +58,10 @@ assert.commandWorked(db.un.update({_id: 30, x: 70}, {y: 75})); // replacement
 
 // unsharded, only _id appears in o2:
 
-var a = oplog.findOne({ns: "test.un", op: "u", "o2._id": 10});
+let a = oplog.findOne({ns: "test.un", op: "u", "o2._id": 10});
 assert.eq(a.o2, {_id: 10});
 
-var b = oplog.findOne({ns: "test.un", op: "u", "o2._id": 30});
+let b = oplog.findOne({ns: "test.un", op: "u", "o2._id": 30});
 assert.eq(b.o2, {_id: 30});
 
 ////////////////////////////////////////////////////////////////////////

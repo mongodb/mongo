@@ -11,7 +11,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     }
 
     function getObjectKeys(obj) {
-        var values = [];
+        let values = [];
         if (typeof obj !== "object") {
             return values;
         }
@@ -19,7 +19,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             if (key.indexOf(".") > -1) {
                 throw new Error("illegal key specified " + key);
             }
-            var subKeys = getObjectKeys(obj[key]);
+            let subKeys = getObjectKeys(obj[key]);
             if (subKeys.length === 0) {
                 values.push(key);
             } else {
@@ -32,7 +32,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     }
 
     function validateClusterOptions(options) {
-        var allowedKeys = [
+        let allowedKeys = [
             "replication.enabled",
             "replication.numNodes",
             "sameCollection",
@@ -171,25 +171,25 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         );
     }
 
-    var conn;
-    var session;
-    var secondaryConns;
+    let conn;
+    let session;
+    let secondaryConns;
 
-    var st;
+    let st;
 
-    var initialized = false;
-    var clusterStartTime;
+    let initialized = false;
+    let clusterStartTime;
 
-    var _conns = {mongos: [], mongod: []};
-    var nextConn = 0;
-    var replSets = [];
-    var rst;
+    let _conns = {mongos: [], mongod: []};
+    let nextConn = 0;
+    let replSets = [];
+    let rst;
 
     validateClusterOptions(clusterOptions);
     Object.freeze(clusterOptions);
 
     this.setup = async function setup() {
-        var verbosityLevel = 0;
+        let verbosityLevel = 0;
 
         if (initialized) {
             throw new Error("cluster has already been initialized");
@@ -216,7 +216,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             };
 
             // Save all mongos, mongod, and ReplSet connections (if any).
-            var i;
+            let i;
 
             i = 0;
             while (st.s(i)) {
@@ -451,10 +451,10 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             return "";
         }
 
-        var cluster = {mongos: [], config: [], shards: {}};
+        let cluster = {mongos: [], config: [], shards: {}};
 
-        var i = 0;
-        var mongos = st.s(0);
+        let i = 0;
+        let mongos = st.s(0);
         while (mongos) {
             cluster.mongos.push(mongos.name);
             ++i;
@@ -462,7 +462,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         }
 
         i = 0;
-        var config = st.c(0);
+        let config = st.c(0);
         while (config) {
             cluster.config.push(config.name);
             ++i;
@@ -470,7 +470,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         }
 
         i = 0;
-        var shard = st.shard(0);
+        let shard = st.shard(0);
         while (shard) {
             if (TestData.shardsAddedRemoved && shard.shardName === "config") {
                 // Skip the config shard if it's transitioning in and out of being a shard to avoid
@@ -478,7 +478,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             } else if (shard.name.includes("/")) {
                 // If the shard is a replica set, the format of st.shard(0).name in ShardingTest is
                 // "test-rs0/localhost:20006,localhost:20007,localhost:20008".
-                var [_, shards] = shard.name.split("/");
+                let [_, shards] = shard.name.split("/");
                 cluster.shards[shard.shardName] = shards.split(",");
             } else {
                 // If the shard is a standalone mongod, the format of st.shard(0).name in
@@ -504,9 +504,9 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     this.validateAllCollections = function validateAllCollections(phase) {
         assert(initialized, "cluster must be initialized first");
 
-        var _validateCollections = function _validateCollections(db, isMongos = false) {
+        let _validateCollections = function _validateCollections(db, isMongos = false) {
             // Validate all the collections on each node.
-            var res = db.adminCommand({listDatabases: 1});
+            let res = db.adminCommand({listDatabases: 1});
             assert.commandWorked(res);
             res.databases.forEach((dbInfo) => {
                 const validateOptions = {full: true, enforceFastCount: true};
@@ -523,11 +523,11 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             });
         };
 
-        var startTime = Date.now();
+        let startTime = Date.now();
         jsTest.log("Starting to validate collections " + phase);
         this.executeOnMongodNodes(_validateCollections);
         this.executeOnMongosNodes(_validateCollections);
-        var totalTime = Date.now() - startTime;
+        let totalTime = Date.now() - startTime;
         jsTest.log("Finished validating collections in " + totalTime + " ms, " + phase);
     };
 
@@ -538,11 +538,11 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             return;
         }
 
-        var shouldCheckDBHashes = !this.isBalancerEnabled();
+        let shouldCheckDBHashes = !this.isBalancerEnabled();
 
         replSets.forEach((rst) => {
-            var startTime = Date.now();
-            var primary = rst.getPrimary();
+            let startTime = Date.now();
+            let primary = rst.getPrimary();
 
             if (shouldCheckDBHashes) {
                 jsTest.log(
@@ -554,7 +554,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
 
                 // Compare the dbhashes of the primary and secondaries.
                 rst.checkReplicatedDataHashes(phase, dbDenylist);
-                var totalTime = Date.now() - startTime;
+                let totalTime = Date.now() - startTime;
                 jsTest.log(
                     "Finished consistency checks of replica set with " +
                         primary.host +
@@ -573,10 +573,10 @@ export const Cluster = function (clusterOptions, sessionOptions) {
                 );
 
                 // Get the latest optime from the primary.
-                var replSetStatus = primary.adminCommand({replSetGetStatus: 1});
+                let replSetStatus = primary.adminCommand({replSetGetStatus: 1});
                 assert.commandWorked(replSetStatus, phase + ", error getting replication status");
 
-                var primaryInfo = replSetStatus.members.find((memberInfo) => memberInfo.self);
+                let primaryInfo = replSetStatus.members.find((memberInfo) => memberInfo.self);
                 assert(
                     primaryInfo !== undefined,
                     phase + ", failed to find self in replication status: " + tojson(replSetStatus),
@@ -589,7 +589,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     };
 
     this.isRunningWiredTigerLSM = function isRunningWiredTigerLSM() {
-        var adminDB = this.getDB("admin");
+        let adminDB = this.getDB("admin");
 
         if (this.isSharded()) {
             // Get the storage engine the sharded cluster is configured to use from one of the
@@ -597,15 +597,15 @@ export const Cluster = function (clusterOptions, sessionOptions) {
             adminDB = st.shard(0).getDB("admin");
         }
 
-        var res = adminDB.runCommand({getCmdLineOpts: 1});
+        let res = adminDB.runCommand({getCmdLineOpts: 1});
         assert.commandWorked(res, "failed to get command line options");
 
-        var wiredTigerOptions = {};
+        let wiredTigerOptions = {};
         if (res.parsed && res.parsed.storage) {
             wiredTigerOptions = res.parsed.storage.wiredTiger || {};
         }
-        var wiredTigerCollectionConfig = wiredTigerOptions.collectionConfig || {};
-        var wiredTigerConfigString = wiredTigerCollectionConfig.configString || "";
+        let wiredTigerCollectionConfig = wiredTigerOptions.collectionConfig || {};
+        let wiredTigerConfigString = wiredTigerCollectionConfig.configString || "";
 
         return wiredTigerConfigString === "type=lsm";
     };

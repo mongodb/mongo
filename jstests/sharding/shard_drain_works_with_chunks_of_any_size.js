@@ -41,8 +41,8 @@ assert.commandWorked(st.s.adminCommand({moveRange: ns, min: {x: 0}, max: {x: Max
 // and ~10MB of docs with the same shard key (jumbo chunk)
 const big = "X".repeat(1024 * 1024); // 1MB
 const jumboKey = 100;
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = -10; i < 10; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = -10; i < 10; i++) {
     bulk.insert({x: i, big: big});
     bulk.insert({x: jumboKey, big: big});
 }

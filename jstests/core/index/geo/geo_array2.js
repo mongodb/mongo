@@ -6,8 +6,8 @@
 let t = db.geoarray2;
 t.drop();
 
-var numObjs = 10;
-var numLocs = 100;
+let numObjs = 10;
+let numLocs = 100;
 
 Random.setRandomSeed();
 
@@ -31,23 +31,23 @@ assert.commandWorked(t.createIndex({loc: "2d", type: 1}));
 print("Starting testing phase... ");
 
 for (let t = 0; t < 2; t++) {
-    var type = t == 0 ? "A" : "B";
+    let type = t == 0 ? "A" : "B";
 
     for (var i = -1; i < 2; i++) {
         for (var j = -1; j < 2; j++) {
-            var center = [i * 50, j * 50];
+            let center = [i * 50, j * 50];
             var count = i == 0 && j == 0 ? 9 : 1;
             var objCount = 1;
 
             // Do near check
 
-            var nearResults = db.geoarray2
+            let nearResults = db.geoarray2
                 .find({loc: {$near: center}, type: type}, {dis: {$meta: "geoNearDistance"}})
                 .limit(count)
                 .toArray();
 
-            var objsFound = {};
-            var lastResult = 0;
+            let objsFound = {};
+            let lastResult = 0;
             for (var k = 0; k < nearResults.length; k++) {
                 // All distances should be small, for the # of results
                 assert.gt(1.5, nearResults[k].dis);
@@ -71,7 +71,7 @@ for (let t = 0; t < 2; t++) {
             // Do nearSphere check
 
             // Earth Radius from geoconstants.h
-            var eRad = 6378.1;
+            let eRad = 6378.1;
 
             nearResults = db.geoarray2
                 .find({loc: {$nearSphere: center, $maxDistance: 500 /* km */ / eRad}, type: type})
@@ -100,14 +100,14 @@ for (let t = 0; t < 2; t++) {
             // Do within check
             objsFound = {};
 
-            var box = [
+            let box = [
                 [center[0] - 1, center[1] - 1],
                 [center[0] + 1, center[1] + 1],
             ];
 
             // printjson( box )
 
-            var withinResults = db.geoarray2.find({loc: {$within: {$box: box}}, type: type}).toArray();
+            let withinResults = db.geoarray2.find({loc: {$within: {$box: box}}, type: type}).toArray();
 
             assert.eq(withinResults.length, count);
 

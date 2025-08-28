@@ -25,7 +25,7 @@ assert(shardAdminDB.auth("admin", "x"), "Authentication failed");
 shardAdminDB.getSiblingDB(dbName).createUser({user: "user", pwd: "y", roles: ["readWrite"]});
 
 // Set up shard to be added and mongoS connection to add the shard through.
-var newShard = new ReplSetTest({name: "additionalShard", nodes: 1});
+let newShard = new ReplSetTest({name: "additionalShard", nodes: 1});
 newShard.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 newShard.initiate();
 let mongosAdminUser = st.s.getDB("admin");

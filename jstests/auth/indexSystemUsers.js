@@ -1,9 +1,9 @@
 // SERVER-8802: Test that you can't build indexes on system.users and use that to drop users with
 // dropDups.
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 
-var adminDB = conn.getDB("admin");
-var testDB = conn.getDB("test");
+let adminDB = conn.getDB("admin");
+let testDB = conn.getDB("test");
 adminDB.createUser({user: "admin", pwd: "x", roles: ["userAdminAnyDatabase"]});
 adminDB.auth("admin", "x");
 adminDB.createUser({user: "mallory", pwd: "x", roles: ["readWriteAnyDatabase"]});
@@ -12,11 +12,11 @@ assert.eq(3, adminDB.system.users.count());
 adminDB.logout();
 
 adminDB.auth("mallory", "x");
-var res = adminDB.system.users.createIndex({haxx: 1}, {unique: true, dropDups: true});
+let res = adminDB.system.users.createIndex({haxx: 1}, {unique: true, dropDups: true});
 assert(!res.ok);
 assert.eq(13, res.code); // unauthorized
 // Make sure that no indexes were built.
-var collectionInfosCursor = adminDB.runCommand("listCollections", {
+let collectionInfosCursor = adminDB.runCommand("listCollections", {
     filter: {
         $and: [
             {name: /^admin\.system\.users\.\$/},

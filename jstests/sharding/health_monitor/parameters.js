@@ -9,7 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let CUSTOM_INTERVAL = 1337;
 let CUSTOM_DEADLINE = 5;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     mongos: [
         {
             setParameter: {

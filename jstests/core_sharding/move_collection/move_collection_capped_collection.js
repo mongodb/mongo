@@ -44,8 +44,8 @@ assert(stats.sharded != true);
 
 // Insert more than one document to it. This tests that capped collections can clone multiple docs.
 const numDocs = 1000;
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < numDocs; i++) {
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = 0; i < numDocs; i++) {
     bulk.insert({x: i});
 }
 assert.commandWorked(bulk.execute());

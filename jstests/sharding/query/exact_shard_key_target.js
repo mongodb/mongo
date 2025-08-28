@@ -6,11 +6,11 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, verbose: 4});
+let st = new ShardingTest({shards: 2, verbose: 4});
 
-var mongos = st.s0;
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let coll = mongos.getCollection("foo.bar");
+let admin = mongos.getDB("admin");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {"a.b": 1}}));
@@ -31,7 +31,7 @@ st.printShardingStatus();
 coll.remove({});
 assert.commandWorked(coll.insert({_id: 1, a: {b: -1}}));
 assert.commandWorked(coll.insert({_id: 2, a: {b: 1}}));
-var explainOutput = coll.explain().remove({a: {b: 1}}, {justOne: true});
+let explainOutput = coll.explain().remove({a: {b: 1}}, {justOne: true});
 assert.eq(1, explainOutput.queryPlanner.winningPlan.shards.length);
 
 //

@@ -1,6 +1,6 @@
 // don't allow regex as _id: SERVER-9502
 
-var testColl = db.regex_not_id;
+let testColl = db.regex_not_id;
 testColl.drop();
 
 assert.commandWorked(testColl.insert({_id: "ABCDEF1"}));

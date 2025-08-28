@@ -9,23 +9,23 @@
  * ]
  */
 export const $config = (function () {
-    var states = (function () {
+    let states = (function () {
         function multiUpdate(db, collName) {
             // Set 'c' to some random value.
-            var newC = Random.randInt(1000);
+            let newC = Random.randInt(1000);
             db[collName].update({a: 1, b: 1}, {$set: {c: newC}}, {multi: true});
         }
 
         return {multiUpdate: multiUpdate};
     })();
 
-    var transitions = {multiUpdate: {multiUpdate: 1.0}};
+    let transitions = {multiUpdate: {multiUpdate: 1.0}};
 
     function setup(db, collName, cluster) {
         assert.commandWorked(db[collName].createIndexes([{a: 1}, {b: 1}, {c: 1}]));
 
         let docs = [];
-        for (var i = 0; i < 10; i++) {
+        for (let i = 0; i < 10; i++) {
             docs.push({a: 1, b: 1, c: 1});
         }
         assert.commandWorked(db[collName].insert(docs));
@@ -35,8 +35,8 @@ export const $config = (function () {
     // in the collection. This condition should always be true for non-multikey indices. If it is
     // not true, then the index has been corrupted.
     function teardown(db, collName, cluster) {
-        var numIndexKeys = db[collName].find({}, {_id: 0, a: 1}).hint({a: 1}).itcount();
-        var numDocs = db[collName].find().itcount();
+        let numIndexKeys = db[collName].find({}, {_id: 0, a: 1}).hint({a: 1}).itcount();
+        let numDocs = db[collName].find().itcount();
         assert.eq(numIndexKeys, numDocs, "index {a: 1} has wrong number of index keys");
 
         numIndexKeys = db[collName].find({}, {_id: 0, b: 1}).hint({b: 1}).itcount();

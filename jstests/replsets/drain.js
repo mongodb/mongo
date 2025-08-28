@@ -12,8 +12,8 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replSet = new ReplSetTest({name: "testSet", nodes: 3});
-var nodes = replSet.nodeList();
+let replSet = new ReplSetTest({name: "testSet", nodes: 3});
+let nodes = replSet.nodeList();
 replSet.startSet();
 replSet.initiate(
     {
@@ -30,8 +30,8 @@ replSet.initiate(
     {initiateWithDefaultElectionTimeout: true},
 );
 
-var primary = replSet.getPrimary();
-var secondary = replSet.getSecondary();
+let primary = replSet.getPrimary();
+let secondary = replSet.getSecondary();
 
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
@@ -40,9 +40,9 @@ assert.commandWorked(
 );
 
 // Do an initial insert to prevent the secondary from going into recovery
-var numDocuments = 20;
-var bulk = primary.getDB("foo").foo.initializeUnorderedBulkOp();
-var bigString = Array(1024 * 1024).toString();
+let numDocuments = 20;
+let bulk = primary.getDB("foo").foo.initializeUnorderedBulkOp();
+let bigString = Array(1024 * 1024).toString();
 assert.commandWorked(primary.getDB("foo").foo.insert({big: bigString}));
 replSet.awaitReplication();
 assert.commandWorked(
@@ -53,10 +53,10 @@ assert.commandWorked(
 checkLog.contains(secondary, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
 const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
-var bufferCountBefore = reduceMajorityWriteLatency
+let bufferCountBefore = reduceMajorityWriteLatency
     ? secondary.getDB("foo").serverStatus().metrics.repl.buffer.write.count
     : secondary.getDB("foo").serverStatus().metrics.repl.buffer.count;
-for (var i = 1; i < numDocuments; ++i) {
+for (let i = 1; i < numDocuments; ++i) {
     bulk.insert({big: bigString});
 }
 assert.commandWorked(bulk.execute());
@@ -65,11 +65,11 @@ assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());
 
 assert.soon(
     function () {
-        var serverStatus = secondary.getDB("foo").serverStatus();
-        var bufferCount = reduceMajorityWriteLatency
+        let serverStatus = secondary.getDB("foo").serverStatus();
+        let bufferCount = reduceMajorityWriteLatency
             ? serverStatus.metrics.repl.buffer.write.count
             : serverStatus.metrics.repl.buffer.count;
-        var bufferCountChange = bufferCount - bufferCountBefore;
+        let bufferCountChange = bufferCount - bufferCountBefore;
         jsTestLog("Number of operations buffered on secondary since stopping applier: " + bufferCountChange);
         return bufferCountChange >= numDocuments - 1;
     },
@@ -91,7 +91,7 @@ assert(!secondary.getDB("admin").runCommand({"hello": 1}).isWritablePrimary);
 // Ensure new primary is not yet readable without secondaryOk bit.
 secondary.setSecondaryOk(false);
 jsTestLog("New primary should not be readable yet, without secondaryOk bit");
-var res = secondary.getDB("foo").runCommand({find: "foo"});
+let res = secondary.getDB("foo").runCommand({find: "foo"});
 assert.commandFailed(res);
 assert.eq(ErrorCodes.NotPrimaryNoSecondaryOk, res.code, "find failed with unexpected error code: " + tojson(res));
 // Nor should it be readable with the secondaryOk bit.

@@ -16,14 +16,14 @@
 // Ensures that mongod respects the batch write protocol for inserts
 //
 
-var coll = db.getCollection("batch_write_insert");
+let coll = db.getCollection("batch_write_insert");
 coll.drop();
 
-var request;
-var result;
-var batch;
+let request;
+let result;
+let batch;
 
-var maxWriteBatchSize = db.hello().maxWriteBatchSize;
+let maxWriteBatchSize = db.hello().maxWriteBatchSize;
 
 function resultOK(result) {
     return (
@@ -237,8 +237,8 @@ request = {
 result = coll.runCommand(request);
 assert.eq(2, coll.count());
 coll.find().forEach(function (doc) {
-    var firstKey = null;
-    for (var key in doc) {
+    let firstKey = null;
+    for (let key in doc) {
         firstKey = key;
         break;
     }
@@ -250,7 +250,7 @@ coll.find().forEach(function (doc) {
 coll.drop();
 coll.insert({_id: 50}); // Create a document to force a duplicate key exception.
 
-var bulk = coll.initializeOrderedBulkOp();
+let bulk = coll.initializeOrderedBulkOp();
 for (i = 1; i < 100; i++) {
     bulk.insert({_id: i});
 }

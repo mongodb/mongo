@@ -18,7 +18,7 @@ const baseMergeCommand = {
 };
 
 // Test with command level override.
-var withReadConcern = baseMergeCommand;
+let withReadConcern = baseMergeCommand;
 withReadConcern.readConcern = {
     level: "majority",
 };

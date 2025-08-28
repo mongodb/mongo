@@ -15,7 +15,7 @@ jsTest.log("Starting test");
 replSet.startSet();
 replSet.initiate();
 
-var secondary = replSet.getSecondary();
+let secondary = replSet.getSecondary();
 
 // Start and restart secondary with fail point that throws exception enabled.
 jsTest.log("Stopping secondary");

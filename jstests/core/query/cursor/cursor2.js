@@ -7,7 +7,7 @@
  * @tags: [requires_fastcount, requires_getmore]
  */
 function testCursorCountVsArrLen(dbConn) {
-    var coll = dbConn.ed_db_cursor2_ccvsal;
+    let coll = dbConn.ed_db_cursor2_ccvsal;
 
     coll.drop();
 
@@ -15,8 +15,8 @@ function testCursorCountVsArrLen(dbConn) {
     coll.save({a: 2, b: 1});
     coll.save({a: 3});
 
-    var fromCount = coll.find({}, {b: 1}).count();
-    var fromArrLen = coll.find({}, {b: 1}).toArray().length;
+    let fromCount = coll.find({}, {b: 1}).count();
+    let fromArrLen = coll.find({}, {b: 1}).toArray().length;
 
     assert(fromCount == fromArrLen, "count from cursor [" + fromCount + "] !=  count from arrlen [" + fromArrLen + "]");
 }

@@ -39,7 +39,7 @@ const isUnifiedWriteExecutor = st.s.adminCommand({
 function checkErrorCode(res, expectedErrorCodes, isWCError) {
     // Rewrite each element of the `expectedErrorCodes` array.
     // If it's not an array, just rewrite the scalar.
-    var rewrite = (ec) => ErrorCodes.doMongosRewrite(st.s, ec);
+    let rewrite = (ec) => ErrorCodes.doMongosRewrite(st.s, ec);
     if (Array.isArray(expectedErrorCodes)) {
         expectedErrorCodes = expectedErrorCodes.map(rewrite);
     } else {
@@ -251,7 +251,7 @@ function testMongosError() {
     let timesEntered = commitTxnFailPoint.count;
     const shutdownThread = new Thread(
         (mongos, shard0PrimaryHost, timesEntered) => {
-            var primary = new Mongo(shard0PrimaryHost);
+            let primary = new Mongo(shard0PrimaryHost);
             const kDefaultWaitForFailPointTimeout = 10 * 60 * 1000;
             assert.commandWorked(
                 primary.getDB("admin").runCommand({

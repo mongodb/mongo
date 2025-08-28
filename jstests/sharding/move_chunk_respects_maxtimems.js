@@ -8,7 +8,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
 const dbName = "test";
 const collName = "foo";
@@ -48,8 +48,8 @@ jsTestLog("Waiting for moveChunk to succeed in the background");
 // The moveChunk should eventually succeed in the background even though the client thread was
 // interrupted.
 assert.soon(() => {
-    var numChunksOnShard0 = findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard0.shardName}).itcount();
-    var numChunksOnShard1 = findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard1.shardName}).itcount();
+    let numChunksOnShard0 = findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard0.shardName}).itcount();
+    let numChunksOnShard1 = findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard1.shardName}).itcount();
     return numChunksOnShard0 == 0 && numChunksOnShard1 == 1;
 });
 

@@ -4,13 +4,13 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 st.stopBalancer();
-var mongos = st.s0;
-var shards = [st.shard0, st.shard1];
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
-var cursor;
+let mongos = st.s0;
+let shards = [st.shard0, st.shard1];
+let coll = mongos.getCollection("foo.bar");
+let admin = mongos.getDB("admin");
+let cursor;
 
 //
 // Pre-split collection: shard 0 takes {_id: {$lt: 0}}, shard 1 takes {_id: {$gte: 0}}.
@@ -130,7 +130,7 @@ assert.eq(results[3]._id, 2, results);
 // Repeat the query with an aggregation pipeline and verify that the result is the same.
 //
 
-var aggResults = coll
+let aggResults = coll
     .aggregate([
         {$match: {$text: {$search: "pizza"}}},
         {$addFields: {s: {$meta: "textScore"}}},

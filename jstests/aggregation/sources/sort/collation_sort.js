@@ -6,9 +6,9 @@
 // For example, côte < coté, since the last accent difference is "e" < "é". Without the reverse
 // accent weighting turned on, these two words would sort in the opposite order, since "ô" >
 // "o".
-var frenchAccentOrdering = {collation: {locale: "fr", backwards: true}};
+let frenchAccentOrdering = {collation: {locale: "fr", backwards: true}};
 
-var coll = db.collation_sort;
+let coll = db.collation_sort;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, word1: "pêche", word2: "côté"}));
 assert.commandWorked(coll.insert({_id: 2, word1: "pêche", word2: "coté"}));

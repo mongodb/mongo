@@ -9,9 +9,9 @@ TestData.skipCheckDBHashes = true;
 import {stopReplicationOnSecondaries, restartReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "operation_time_read_and_write_concern";
+let name = "operation_time_read_and_write_concern";
 
-var replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
+let replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
 replTest.startSet();
 replTest.initiate();
 
@@ -23,15 +23,15 @@ assert.commandWorked(
 );
 replTest.awaitReplication();
 
-var res;
-var testDB = replTest.getPrimary().getDB(name);
-var collectionName = "foo";
+let res;
+let testDB = replTest.getPrimary().getDB(name);
+let collectionName = "foo";
 
 // readConcern level majority:
 // operationTime is the cluster time of the last committed op in the oplog.
 jsTestLog("Testing operationTime for readConcern level majority with afterClusterTime.");
-var majorityDoc = {_id: 10, x: 1};
-var localDoc = {_id: 15, x: 2};
+let majorityDoc = {_id: 10, x: 1};
+let localDoc = {_id: 15, x: 2};
 
 res = assert.commandWorked(
     testDB.runCommand({insert: collectionName, documents: [majorityDoc], writeConcern: {w: "majority"}}),
@@ -41,7 +41,7 @@ var majorityWriteOperationTime = res.operationTime;
 stopReplicationOnSecondaries(replTest, false /* changeReplicaSetDefaultWCToLocal */);
 
 res = assert.commandWorked(testDB.runCommand({insert: collectionName, documents: [localDoc], writeConcern: {w: 1}}));
-var localWriteOperationTime = res.operationTime;
+let localWriteOperationTime = res.operationTime;
 
 assert.gt(localWriteOperationTime, majorityWriteOperationTime);
 
@@ -51,7 +51,7 @@ res = assert.commandWorked(
         readConcern: {level: "majority", afterClusterTime: majorityWriteOperationTime},
     }),
 );
-var majorityReadOperationTime = res.operationTime;
+let majorityReadOperationTime = res.operationTime;
 
 assert.eq(
     res.cursor.firstBatch,
@@ -81,7 +81,7 @@ res = assert.commandWorked(
         readConcern: {level: "majority", afterClusterTime: majorityWriteOperationTime},
     }),
 );
-var secondMajorityReadOperationTime = res.operationTime;
+let secondMajorityReadOperationTime = res.operationTime;
 
 assert.eq(
     res.cursor.firstBatch,
@@ -116,8 +116,8 @@ res = assert.commandFailedWithCode(
 // operationTime is the cluster time of the write if it succeeds, or of the previous successful
 // write at the time the write was determined to have failed, or a no-op.
 jsTestLog("Testing operationTime for writeConcern level majority.");
-var successfulDoc = {_id: 1000, y: 1};
-var failedDoc = {_id: 1000, y: 2};
+let successfulDoc = {_id: 1000, y: 1};
+let failedDoc = {_id: 1000, y: 2};
 
 res = assert.commandWorked(
     testDB.runCommand({insert: collectionName, documents: [successfulDoc], writeConcern: {w: "majority"}}),
@@ -132,7 +132,7 @@ res = testDB.runCommand({
     writeConcern: {w: "majority", wtimeout: 1000},
 });
 assert.eq(res.writeErrors[0].code, ErrorCodes.DuplicateKey);
-var failedWriteOperationTime = res.operationTime;
+let failedWriteOperationTime = res.operationTime;
 
 assert.eq(
     failedWriteOperationTime,

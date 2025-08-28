@@ -209,7 +209,7 @@ function executeTest(db, isMongos) {
     //
     (function manyBatchNegativeGetMore() {
         const t = db.many_batch_negative_get_more;
-        for (var i = 0; i < 5; i++) {
+        for (let i = 0; i < 5; i++) {
             assert.commandWorked(t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]));
         }
         cursor = t
@@ -300,7 +300,7 @@ function executeTest(db, isMongos) {
 
         // Verify upper boundary for acceptable input (2^31-1 is acceptable, 2^31 isn't).
 
-        var maxValue = Math.pow(2, 31) - 1;
+        let maxValue = Math.pow(2, 31) - 1;
 
         assert.doesNotThrow(function () {
             t.find().maxTimeMS(maxValue).itcount();

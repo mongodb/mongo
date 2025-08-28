@@ -13,9 +13,9 @@ t.save({a: 5});
 t.save({a: 4.9});
 t.save({a: 2.91});
 
-for (var pass = 0; pass < 2; pass++) {
-    var c = t.find().sort({a: 1});
-    var last = 0;
+for (let pass = 0; pass < 2; pass++) {
+    let c = t.find().sort({a: 1});
+    let last = 0;
     while (c.hasNext()) {
         let current = c.next();
         assert(current.a > last);

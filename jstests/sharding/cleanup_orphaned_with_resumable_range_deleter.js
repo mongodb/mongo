@@ -15,7 +15,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
 jsTest.log("Shard and split a collection");
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
@@ -25,8 +25,8 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 1}}));
 
 jsTest.log("Insert some documents");
 const numDocs = 100;
-var bulk = st.s.getCollection(ns).initializeUnorderedBulkOp();
-for (var i = 0; i < numDocs; i++) {
+let bulk = st.s.getCollection(ns).initializeUnorderedBulkOp();
+for (let i = 0; i < numDocs; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());

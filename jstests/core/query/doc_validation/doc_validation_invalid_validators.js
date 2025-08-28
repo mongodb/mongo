@@ -12,8 +12,8 @@
 
 // Verify invalid validator statements won't work and that we
 // can't create validated collections on restricted databases.
-var collName = "doc_validation_invalid_validators";
-var coll = db[collName];
+let collName = "doc_validation_invalid_validators";
+let coll = db[collName];
 coll.drop();
 
 // Check a few invalid match statements for validator.

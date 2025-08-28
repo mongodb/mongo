@@ -4,17 +4,17 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
 // Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
 assert.commandWorked(
     st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
 );
 
-var replTest = new ReplSetTest({nodes: 3});
+let replTest = new ReplSetTest({nodes: 3});
 replTest.startSet({shardsvr: ""});
 
-var nodes = replTest.nodeList();
+let nodes = replTest.nodeList();
 replTest.initiate(
     {
         _id: replTest.name,
@@ -28,9 +28,9 @@ replTest.initiate(
     {initiateWithDefaultElectionTimeout: true},
 );
 
-var primaryConn = replTest.getPrimary();
+let primaryConn = replTest.getPrimary();
 
-var shardIdentityDoc = {
+let shardIdentityDoc = {
     _id: "shardIdentity",
     configsvrConnectionString: st.configRS.getURL(),
     shardName: "newShard",
@@ -38,12 +38,12 @@ var shardIdentityDoc = {
 };
 
 // Simulate the upsert that is performed by a config server on addShard.
-var shardIdentityQuery = {
+let shardIdentityQuery = {
     _id: shardIdentityDoc._id,
     shardName: shardIdentityDoc.shardName,
     clusterId: shardIdentityDoc.clusterId,
 };
-var shardIdentityUpdate = {
+let shardIdentityUpdate = {
     $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString},
 };
 assert.commandWorked(
@@ -57,7 +57,7 @@ replTest.waitForPrimary(30000);
 
 primaryConn = replTest.getPrimary();
 
-var res = primaryConn.getDB("admin").runCommand({shardingState: 1});
+let res = primaryConn.getDB("admin").runCommand({shardingState: 1});
 
 assert(res.enabled);
 assert.eq(shardIdentityDoc.shardName, res.shardName);

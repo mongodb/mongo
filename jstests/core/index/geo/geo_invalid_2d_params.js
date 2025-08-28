@@ -1,4 +1,4 @@
-var t = db.geo_invalid_2d_params;
+let t = db.geo_invalid_2d_params;
 t.drop();
 
 assert.commandFailed(t.createIndex({loc: "2d"}, {bits: 33}));

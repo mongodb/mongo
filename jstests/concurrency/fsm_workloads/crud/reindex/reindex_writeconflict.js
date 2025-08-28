@@ -11,17 +11,17 @@
  * ]
  */
 export const $config = (function () {
-    var states = {
+    let states = {
         reIndex: function reIndex(db, collName) {
-            var res = db[collName].reIndex();
+            let res = db[collName].reIndex();
             assert.commandWorked(res);
         },
     };
 
-    var transitions = {reIndex: {reIndex: 1}};
+    let transitions = {reIndex: {reIndex: 1}};
 
     function setup(db, collName, cluster) {
-        for (var i = 0; i < 1000; ++i) {
+        for (let i = 0; i < 1000; ++i) {
             db[collName].insert({_id: i});
         }
         // Log traces for each WriteConflictException encountered in case they are not handled

@@ -6,28 +6,28 @@
 //   requires_fastcount,
 // ]
 
-var t = db.geo_s2twofields;
+let t = db.geo_s2twofields;
 t.drop();
 
 Random.setRandomSeed();
-var random = Random.rand;
-var PI = Math.PI;
+let random = Random.rand;
+let PI = Math.PI;
 
 function randomCoord(center, minDistDeg, maxDistDeg) {
-    var dx = random() * (maxDistDeg - minDistDeg) + minDistDeg;
-    var dy = random() * (maxDistDeg - minDistDeg) + minDistDeg;
+    let dx = random() * (maxDistDeg - minDistDeg) + minDistDeg;
+    let dy = random() * (maxDistDeg - minDistDeg) + minDistDeg;
     return [center[0] + dx, center[1] + dy];
 }
 
-var nyc = {type: "Point", coordinates: [-74.0064, 40.7142]};
-var miami = {type: "Point", coordinates: [-80.1303, 25.7903]};
-var maxPoints = 10000;
-var degrees = 5;
+let nyc = {type: "Point", coordinates: [-74.0064, 40.7142]};
+let miami = {type: "Point", coordinates: [-80.1303, 25.7903]};
+let maxPoints = 10000;
+let degrees = 5;
 
-var arr = [];
-for (var i = 0; i < maxPoints; ++i) {
-    var fromCoord = randomCoord(nyc.coordinates, 0, degrees);
-    var toCoord = randomCoord(miami.coordinates, 0, degrees);
+let arr = [];
+for (let i = 0; i < maxPoints; ++i) {
+    let fromCoord = randomCoord(nyc.coordinates, 0, degrees);
+    let toCoord = randomCoord(miami.coordinates, 0, degrees);
 
     arr.push({from: {type: "Point", coordinates: fromCoord}, to: {type: "Point", coordinates: toCoord}});
 }
@@ -36,10 +36,10 @@ assert.commandWorked(res);
 assert.eq(t.count(), maxPoints);
 
 function semiRigorousTime(func) {
-    var lowestTime = func();
-    var iter = 2;
-    for (var i = 0; i < iter; ++i) {
-        var run = func();
+    let lowestTime = func();
+    let iter = 2;
+    for (let i = 0; i < iter; ++i) {
+        let run = func();
         if (run < lowestTime) {
             lowestTime = run;
         }
@@ -49,18 +49,18 @@ function semiRigorousTime(func) {
 
 function timeWithoutAndWithAnIndex(index, query) {
     t.dropIndex(index);
-    var withoutTime = semiRigorousTime(function () {
+    let withoutTime = semiRigorousTime(function () {
         return t.find(query).explain("executionStats").executionStats.executionTimeMillis;
     });
     t.createIndex(index);
-    var withTime = semiRigorousTime(function () {
+    let withTime = semiRigorousTime(function () {
         return t.find(query).explain("executionStats").executionStats.executionTimeMillis;
     });
     t.dropIndex(index);
     return [withoutTime, withTime];
 }
 
-var maxQueryRad = (0.5 * PI) / 180.0;
+let maxQueryRad = (0.5 * PI) / 180.0;
 // When we're not looking at ALL the data, anything indexed should beat not-indexed.
 var smallQuery = timeWithoutAndWithAnIndex(
     {to: "2dsphere", from: "2dsphere"},

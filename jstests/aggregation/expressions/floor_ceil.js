@@ -4,14 +4,14 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.server19548;
+let coll = db.server19548;
 coll.drop();
 // We need at least one document in the collection in order to test expressions, add it here.
 assert.commandWorked(coll.insert({}));
 
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {
-    var pipeline = [{$project: {_id: 0, result: op}}];
+    let pipeline = [{$project: {_id: 0, result: op}}];
     assert.eq(coll.aggregate(pipeline).toArray(), [{result: expResult}]);
 }
 

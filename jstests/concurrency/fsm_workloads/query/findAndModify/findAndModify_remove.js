@@ -5,15 +5,15 @@
  * the findAndModify command to remove it.
  */
 export const $config = (function () {
-    var data = {shardKey: {tid: 1}};
+    let data = {shardKey: {tid: 1}};
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.iter = 0;
         }
 
         function insertAndRemove(db, collName) {
-            var res = db[collName].insert({tid: this.tid, value: this.iter});
+            let res = db[collName].insert({tid: this.tid, value: this.iter});
             assert.commandWorked(res);
             assert.eq(1, res.nInserted);
 
@@ -25,7 +25,7 @@ export const $config = (function () {
             });
             assert.commandWorked(res);
 
-            var doc = res.value;
+            let doc = res.value;
             assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
             if (doc !== null) {
@@ -39,7 +39,7 @@ export const $config = (function () {
         return {init: init, insertAndRemove: insertAndRemove};
     })();
 
-    var transitions = {init: {insertAndRemove: 1}, insertAndRemove: {insertAndRemove: 1}};
+    let transitions = {init: {insertAndRemove: 1}, insertAndRemove: {insertAndRemove: 1}};
 
     return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};
 })();

@@ -11,15 +11,15 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-var name = "removeNodes";
-var host = getHostName();
+let name = "removeNodes";
+let host = getHostName();
 
 print("Start set with two nodes");
-var replTest = new ReplSetTest({name: name, nodes: 2});
-var nodes = replTest.startSet();
+let replTest = new ReplSetTest({name: name, nodes: 2});
+let nodes = replTest.startSet();
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
-var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
+let primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
 print("Initial sync");
 primary.getDB("foo").bar.baz.insert({x: 1});
@@ -27,14 +27,14 @@ primary.getDB("foo").bar.baz.insert({x: 1});
 replTest.awaitReplication();
 
 print("Remove secondary");
-var config = replTest.getReplSetConfigFromNode(0);
-for (var i = 0; i < config.members.length; i++) {
+let config = replTest.getReplSetConfigFromNode(0);
+for (let i = 0; i < config.members.length; i++) {
     if (config.members[i].host == secondary.host) {
         config.members.splice(i, 1);
         break;
     }
 }
-var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
+let nextVersion = replTest.getReplSetConfigFromNode().version + 1;
 config.version = nextVersion;
 
 assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok, 1, "we should be connected to the secondary");
@@ -61,7 +61,7 @@ assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok, 1, "we aren't conne
 reconnect(primary);
 
 assert.soon(function () {
-    var c = primary.getDB("local").system.replset.findOne();
+    let c = primary.getDB("local").system.replset.findOne();
     return c.version == nextVersion;
 });
 
@@ -87,7 +87,7 @@ replTest.waitForAllNewlyAddedRemovals();
 
 secondary = replTest.getSecondary();
 printjson(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
-var newConfig = primary.getDB("local").system.replset.findOne();
+let newConfig = primary.getDB("local").system.replset.findOne();
 print("newConfig: " + tojson(newConfig));
 assert.eq(newConfig.version, nextVersion);
 

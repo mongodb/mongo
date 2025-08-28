@@ -4,10 +4,10 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var runTest = function (writeFunc) {
-    var st = new ShardingTest({shards: 2, mongos: 2});
+let runTest = function (writeFunc) {
+    let st = new ShardingTest({shards: 2, mongos: 2});
 
-    var testDB = st.s.getDB("test");
+    let testDB = st.s.getDB("test");
 
     assert.commandWorked(testDB.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
 
@@ -17,7 +17,7 @@ var runTest = function (writeFunc) {
         testDB.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
     );
 
-    var testDB2 = st.s1.getDB("test");
+    let testDB2 = st.s1.getDB("test");
     testDB2.user.insert({x: 123456});
 
     // Move chunk to bump version on a different mongos.

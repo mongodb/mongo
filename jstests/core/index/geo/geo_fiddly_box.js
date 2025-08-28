@@ -49,8 +49,8 @@ let numItems = 0;
 t.drop();
 t.createIndex({loc: "2d"}, {max: max + epsilon / 2, min: min - epsilon / 2});
 
-for (var x = min; x <= max; x += step) {
-    for (var y = min; y <= max; y += step) {
+for (let x = min; x <= max; x += step) {
+    for (let y = min; y <= max; y += step) {
         t.insert({"loc": {x: x, y: y}});
         numItems++;
     }

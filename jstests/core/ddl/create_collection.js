@@ -78,7 +78,7 @@ assert.commandFailedWithCode(
 // The name of an _id index gets corrected to "_id_".
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
 assert.commandWorked(db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "a_1"}}));
-var indexSpec = IndexCatalogHelpers.findByKeyPattern(db.create_collection.getIndexes(), {_id: 1});
+let indexSpec = IndexCatalogHelpers.findByKeyPattern(db.create_collection.getIndexes(), {_id: 1});
 assert.neq(indexSpec, null);
 assert.eq(indexSpec.name, "_id_", tojson(indexSpec));
 

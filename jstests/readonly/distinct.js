@@ -9,21 +9,21 @@ runReadOnlyTest(
             nums: [1, 2, 3, 4, 5, 6],
 
             load: function (writableCollection) {
-                var N = 1000;
+                let N = 1000;
 
                 this.colors.sort();
                 this.nums.sort();
 
-                var bulk = writableCollection.initializeUnorderedBulkOp();
+                let bulk = writableCollection.initializeUnorderedBulkOp();
 
-                for (var [color, num] of zip2(cycleN(this.colors, N), cycleN(this.nums, N))) {
+                for (let [color, num] of zip2(cycleN(this.colors, N), cycleN(this.nums, N))) {
                     bulk.insert({color, num});
                 }
                 assert.commandWorked(bulk.execute());
             },
             exec: function (readableCollection) {
-                var distinctColors = readableCollection.distinct("color");
-                var distinctNums = readableCollection.distinct("num");
+                let distinctColors = readableCollection.distinct("color");
+                let distinctNums = readableCollection.distinct("num");
 
                 distinctColors.sort();
                 distinctNums.sort();

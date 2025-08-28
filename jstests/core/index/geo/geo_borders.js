@@ -18,8 +18,8 @@ let max = 1;
 let step = 1;
 let numItems = 0;
 
-for (var x = min; x <= max; x += step) {
-    for (var y = min; y <= max; y += step) {
+for (let x = min; x <= max; x += step) {
+    for (let y = min; y <= max; y += step) {
         t.insert({loc: {x: x, y: y}});
         numItems++;
     }
@@ -29,7 +29,7 @@ let overallMin = -1;
 let overallMax = 1;
 
 // Create a point index slightly smaller than the points we have
-var res = t.createIndex({loc: "2d"}, {max: overallMax - epsilon / 2, min: overallMin + epsilon / 2});
+let res = t.createIndex({loc: "2d"}, {max: overallMax - epsilon / 2, min: overallMin + epsilon / 2});
 assert.commandFailed(res);
 
 // Create a point index only slightly bigger than the points we have

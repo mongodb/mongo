@@ -131,7 +131,7 @@ if (isLinux()) {
 assert.eq(profileUpdate.appName, "MongoDB Shell", tojson(profileUpdate));
 
 // Verify delete profile output.
-var profileDelete = profileEntries[3];
+let profileDelete = profileEntries[3];
 assert.eq(profileDelete.ns, coll2.getFullName(), tojson(profileDelete));
 assert.eq(profileDelete.op, "bulkWrite", tojson(profileDelete));
 assert.eq(profileDelete.command.delete, 1, tojson(profileDelete));

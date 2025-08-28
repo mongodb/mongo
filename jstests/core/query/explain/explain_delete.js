@@ -12,11 +12,11 @@
  */
 import {checkNWouldDelete} from "jstests/libs/query/analyze_plan.js";
 
-var collName = "jstests_explain_delete";
-var t = db[collName];
+let collName = "jstests_explain_delete";
+let t = db[collName];
 t.drop();
 
-var explain;
+let explain;
 
 // Explain delete against an empty collection.
 assert.commandWorked(db.createCollection(t.getName()));
@@ -29,7 +29,7 @@ explain = db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit
 checkNWouldDelete(explain, 0);
 
 // Add some copies of the same document.
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.insert({a: 1});
 }
 assert.eq(10, t.count());
@@ -42,6 +42,6 @@ checkNWouldDelete(explain, 10);
 assert.eq(10, t.count());
 
 // If we run the same thing without the explain, then all 10 docs should be deleted.
-var deleteResult = db.runCommand({delete: collName, deletes: [{q: {a: 1}, limit: 0}]});
+let deleteResult = db.runCommand({delete: collName, deletes: [{q: {a: 1}, limit: 0}]});
 assert.commandWorked(deleteResult);
 assert.eq(0, t.count());

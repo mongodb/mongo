@@ -2,13 +2,13 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({name: "addshard4", shards: 2, mongos: 1, other: {useHostname: true}});
+let s = new ShardingTest({name: "addshard4", shards: 2, mongos: 1, other: {useHostname: true}});
 
-var r = new ReplSetTest({name: "addshard4", nodes: 3, nodeOptions: {shardsvr: ""}});
+let r = new ReplSetTest({name: "addshard4", nodes: 3, nodeOptions: {shardsvr: ""}});
 
 r.startSet();
 
-var config = r.getReplSetConfig();
+let config = r.getReplSetConfig();
 config.members[2].priority = 0;
 
 r.initiate(config);
@@ -16,11 +16,11 @@ r.initiate(config);
 // to pre-allocate files on slow systems
 r.awaitReplication();
 
-var members = config.members.map(function (elem) {
+let members = config.members.map(function (elem) {
     return elem.host;
 });
-var shardName = "addshard4/" + members.join(",");
-var invalidShardName = "addshard4/foobar";
+let shardName = "addshard4/" + members.join(",");
+let invalidShardName = "addshard4/foobar";
 
 print("adding shard " + shardName);
 
@@ -31,12 +31,12 @@ assert.throws(function () {
     s.adminCommand({"addshard": invalidShardName});
 });
 
-var result = s.adminCommand({"addshard": shardName});
+let result = s.adminCommand({"addshard": shardName});
 
 printjson(result);
 assert.eq(result, true);
 
-var r42 = new ReplSetTest({name: "addshard42", nodes: 3, nodeOptions: {shardsvr: ""}});
+let r42 = new ReplSetTest({name: "addshard42", nodes: 3, nodeOptions: {shardsvr: ""}});
 r42.startSet();
 
 config = r42.getReplSetConfig();

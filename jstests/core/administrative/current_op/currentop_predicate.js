@@ -2,7 +2,7 @@
 
 // Tests the use of a match predicate with the currentOp command.
 // Test a predicate that matches the currentOp operation we are running.
-var res = db.adminCommand("currentOp", {command: {$exists: true}});
+let res = db.adminCommand("currentOp", {command: {$exists: true}});
 assert.commandWorked(res);
 assert.gt(res.inprog.length, 0, tojson(res));
 

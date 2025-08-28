@@ -22,7 +22,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
     function createTemporaryConnection(uri, dbName, collectionName) {
         // Retry connecting until you are successful
-        var pollString =
+        let pollString =
             "var conn = null;" +
             "assert.soon(function() {" +
             'try { conn = new Mongo("' +
@@ -57,22 +57,22 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     let proxy_server = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
     proxy_server.start();
 
-    var st = new ShardingTest({
+    let st = new ShardingTest({
         shards: 1,
         mongos: 1,
         mongosOptions: {setParameter: {"loadBalancerPort": kProxyEgressPort}},
     });
     let admin = st.s.getDB("admin");
 
-    var uri = `mongodb://127.0.0.1:${kProxyIngressPort}/?loadBalanced=true`;
+    let uri = `mongodb://127.0.0.1:${kProxyIngressPort}/?loadBalanced=true`;
 
-    var testDB = "connectionsOpenedTest";
-    var signalCollection = "keepRunning";
+    let testDB = "connectionsOpenedTest";
+    let signalCollection = "keepRunning";
 
     admin.getSiblingDB(testDB).dropDatabase();
     admin.getSiblingDB(testDB).getCollection(signalCollection).insert({stop: false});
 
-    var connections = [];
+    let connections = [];
     for (var i = 0; i < numConnections; i++) {
         connections.push(createTemporaryConnection(uri, testDB, signalCollection));
         waitForConnections(admin, i + 1);

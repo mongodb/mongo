@@ -6,7 +6,7 @@
 //
 // Tests that the correct CRSes are used for geo queries (based on input geometry)
 //
-var coll = db.geo_operator_crs;
+let coll = db.geo_operator_crs;
 coll.drop();
 
 //
@@ -15,15 +15,15 @@ coll.drop();
 
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 
-var legacyZeroPt = [0, 0];
-var jsonZeroPt = {type: "Point", coordinates: [0, 0]};
-var legacy90Pt = [90, 0];
-var json90Pt = {type: "Point", coordinates: [90, 0]};
+let legacyZeroPt = [0, 0];
+let jsonZeroPt = {type: "Point", coordinates: [0, 0]};
+let legacy90Pt = [90, 0];
+let json90Pt = {type: "Point", coordinates: [90, 0]};
 
 assert.commandWorked(coll.insert({geo: json90Pt}));
 
-var earthRadiusMeters = 6378.1 * 1000;
-var result = null;
+let earthRadiusMeters = 6378.1 * 1000;
+let result = null;
 
 const runQuery = (point) => coll.find({geo: {$nearSphere: point}}, {dis: {$meta: "geoNearDistance"}}).toArray();
 

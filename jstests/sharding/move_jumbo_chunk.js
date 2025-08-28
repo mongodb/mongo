@@ -39,7 +39,7 @@ function shardCollectionCreateJumboChunk() {
 }
 
 function diff() {
-    var x = st.chunkCounts("foo");
+    let x = st.chunkCounts("foo");
     printjson(x);
     return (
         Math.max(x[st.shard0.shardName], x[st.shard1.shardName]) -

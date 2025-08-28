@@ -12,17 +12,17 @@
 import {assertWorkedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         nIndexes: 4 + 1, // 4 created and 1 for _id.
         nDocumentsToInsert: 1000,
         maxInteger: 100, // Used for document values. Must be a factor of nDocumentsToInsert.
         prefix: "reindex", // Use filename for prefix because filename is assumed unique.
     };
 
-    var states = (function () {
+    let states = (function () {
         function insertDocuments(db, collName) {
-            var bulk = db[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < this.nDocumentsToInsert; ++i) {
+            let bulk = db[collName].initializeUnorderedBulkOp();
+            for (let i = 0; i < this.nDocumentsToInsert; ++i) {
                 bulk.insert({
                     text:
                         "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do" +
@@ -31,7 +31,7 @@ export const $config = (function () {
                     integer: i % this.maxInteger,
                 });
             }
-            var res = bulk.execute();
+            let res = bulk.execute();
             assert.commandWorked(res);
             assert.eq(this.nDocumentsToInsert, res.nInserted);
         }
@@ -51,16 +51,16 @@ export const $config = (function () {
         }
 
         function query(db, collName) {
-            var coll = db[this.threadCollName];
-            var nInsertedDocuments = this.nDocumentsToInsert;
-            var count = coll.find({integer: Random.randInt(this.maxInteger)}).itcount();
+            let coll = db[this.threadCollName];
+            let nInsertedDocuments = this.nDocumentsToInsert;
+            let count = coll.find({integer: Random.randInt(this.maxInteger)}).itcount();
             assert.eq(
                 nInsertedDocuments / this.maxInteger,
                 count,
                 "number of " + "documents returned by integer query should match the number " + "inserted",
             );
 
-            var coords = [
+            let coords = [
                 [
                     [-26, -26],
                     [-26, 26],
@@ -69,7 +69,7 @@ export const $config = (function () {
                     [-26, -26],
                 ],
             ];
-            var geoQuery = {geo: {$geoWithin: {$geometry: {type: "Polygon", coordinates: coords}}}};
+            let geoQuery = {geo: {$geoWithin: {$geometry: {type: "Polygon", coordinates: coords}}}};
 
             // We can only perform a geo query when we own the collection and are sure a geo index
             // is present. The same is true of text queries.
@@ -87,19 +87,19 @@ export const $config = (function () {
                 "number of documents returned by" + " text query should match number inserted",
             );
 
-            var indexCount = db[this.threadCollName].getIndexes().length;
+            let indexCount = db[this.threadCollName].getIndexes().length;
             assert.eq(indexCount, this.nIndexes);
         }
 
         function reIndex(db, collName) {
-            var res = db[this.threadCollName].reIndex();
+            let res = db[this.threadCollName].reIndex();
             assert.commandWorked(res);
         }
 
         return {init: init, createIndexes: createIndexes, reIndex: reIndex, query: query};
     })();
 
-    var transitions = {
+    let transitions = {
         init: {createIndexes: 1},
         createIndexes: {reIndex: 0.5, query: 0.5},
         reIndex: {reIndex: 0.5, query: 0.5},

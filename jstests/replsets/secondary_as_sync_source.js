@@ -19,8 +19,8 @@ const timeseriesCollName = "tscoll";
 function addTestDocuments(coll) {
     let size = 100;
     jsTest.log("Creating " + size + " test documents.");
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < size; ++i) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }
     assert.commandWorked(bulk.execute());

@@ -18,7 +18,7 @@ function testBatchSize(coll) {
  * running the queries against collection 'coll'.
  */
 function testLimit(coll) {
-    var cursor = coll.find().sort({x: 1}).limit(3);
+    let cursor = coll.find().sort({x: 1}).limit(3);
     assert.eq(-10, cursor.next()["_id"]);
     assert.eq(-9, cursor.next()["_id"]);
     assert.eq(-8, cursor.next()["_id"]);
@@ -42,11 +42,11 @@ function testLimit(coll) {
     assert(!cursor.hasNext());
 
     // Ensure that in the limit 1 case the server does not leave a cursor open.
-    var openCursorsBefore = assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+    let openCursorsBefore = assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
     cursor = coll.find().sort({x: 1}).limit(1);
     assert(cursor.hasNext());
     assert.eq(-10, cursor.next()["_id"]);
-    var openCursorsAfter = assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+    let openCursorsAfter = assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
     assert.eq(openCursorsBefore, openCursorsAfter);
 }
 
@@ -56,8 +56,8 @@ function testLimit(coll) {
 function testSingleBatch(coll, numShards) {
     // Ensure that singleBatch queries that require multiple batches from individual shards
     // return complete results.
-    var batchSize = 5;
-    var res = assert.commandWorked(
+    let batchSize = 5;
+    let res = assert.commandWorked(
         coll.getDB().runCommand({
             find: coll.getName(),
             filter: {x: {$lte: 10}},
@@ -68,7 +68,7 @@ function testSingleBatch(coll, numShards) {
     );
     assert.eq(batchSize, res.cursor.firstBatch.length);
     assert.eq(0, res.cursor.id);
-    var cursor = coll
+    let cursor = coll
         .find()
         .skip(numShards * batchSize)
         .limit(-1 * batchSize);
@@ -84,11 +84,11 @@ function testSingleBatch(coll, numShards) {
 // Create a two-shard cluster. Have an unsharded collection and a sharded collection.
 //
 
-var st = new ShardingTest({shards: 2, other: {rsOptions: {setParameter: {"enableTestCommands": 1}}}});
+let st = new ShardingTest({shards: 2, other: {rsOptions: {setParameter: {"enableTestCommands": 1}}}});
 
 var db = st.s.getDB("test");
-var shardedCol = db.getCollection("sharded_limit_batchsize");
-var unshardedCol = db.getCollection("unsharded_limit_batchsize");
+let shardedCol = db.getCollection("sharded_limit_batchsize");
+let unshardedCol = db.getCollection("unsharded_limit_batchsize");
 shardedCol.drop();
 unshardedCol.drop();
 
@@ -100,7 +100,7 @@ assert.commandWorked(db.adminCommand({moveChunk: shardedCol.getFullName(), find:
 
 // Write 10 documents to shard 0, and 10 documents to shard 1 inside the sharded collection.
 // Write 20 documents which all go to the primary shard in the unsharded collection.
-for (var i = 1; i <= 10; ++i) {
+for (let i = 1; i <= 10; ++i) {
     // These go to shard 1.
     assert.commandWorked(shardedCol.insert({_id: i, x: i}));
 

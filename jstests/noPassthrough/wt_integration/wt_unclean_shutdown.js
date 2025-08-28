@@ -15,10 +15,10 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
     quit();
 }
 
-var dbpath = MongoRunner.dataPath + "wt_unclean_shutdown";
+let dbpath = MongoRunner.dataPath + "wt_unclean_shutdown";
 resetDbpath(dbpath);
 
-var conn = MongoRunner.runMongod({
+let conn = MongoRunner.runMongod({
     dbpath: dbpath,
     noCleanData: true,
     // Modify some WT settings:
@@ -31,16 +31,16 @@ var conn = MongoRunner.runMongod({
 });
 assert.neq(null, conn, "mongod was unable to start up");
 
-var insertWorkload = function (host, start, end) {
-    var conn = new Mongo(host);
-    var testDB = conn.getDB("test");
+let insertWorkload = function (host, start, end) {
+    let conn = new Mongo(host);
+    let testDB = conn.getDB("test");
 
     // Create a record larger than 128K which is the threshold to doing an unbuffered log
     // write in WiredTiger.
-    var largeString = "a".repeat(1024 * 128);
+    let largeString = "a".repeat(1024 * 128);
 
     for (var i = start; i < end; i++) {
-        var doc = {_id: i, x: 0};
+        let doc = {_id: i, x: 0};
         // One of the bugs, WT-2696, was related to large records that used the unbuffered
         // log code.  Periodically insert the large record to stress that code path.
         if (i % 30 === 0) {
@@ -62,11 +62,11 @@ var insertWorkload = function (host, start, end) {
 
 // Start the insert workload threads with partitioned input spaces.
 // We don't run long enough for threads to overlap.  Adjust the per thread value if needed.
-var max_per_thread = 1000000;
-var num_threads = 8;
-var threads = [];
+let max_per_thread = 1000000;
+let num_threads = 8;
+let threads = [];
 for (var i = 0; i < num_threads; i++) {
-    var t = new Thread(insertWorkload, conn.host, i * max_per_thread, max_per_thread + i * max_per_thread);
+    let t = new Thread(insertWorkload, conn.host, i * max_per_thread, max_per_thread + i * max_per_thread);
     threads.push(t);
     t.start();
 }
@@ -81,7 +81,7 @@ sleep(40000);
 MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
 // Retrieve the start and end data from each thread.
-var retData = [];
+let retData = [];
 threads.forEach(function (t) {
     t.join();
     retData.push(t.returnData());
@@ -97,14 +97,14 @@ assert.neq(null, conn, "mongod should have restarted");
 
 // Verify that every item between start and end for every thread exists in the collection now
 // that recovery has completed.
-var coll = conn.getDB("test").coll;
+let coll = conn.getDB("test").coll;
 for (var i = 0; i < retData.length; i++) {
     // For each start and end, verify every data item exists.
-    var thread_data = retData[i];
-    var absent = null;
-    var missing = null;
-    for (var j = thread_data.start; j <= thread_data.end; j++) {
-        var idExists = coll.find({_id: j}).count() > 0;
+    let thread_data = retData[i];
+    let absent = null;
+    let missing = null;
+    for (let j = thread_data.start; j <= thread_data.end; j++) {
+        let idExists = coll.find({_id: j}).count() > 0;
         // The verification is a bit complex.  We only want to fail if records in the middle
         // of the range are missing.  Records at the end may be missing due to when mongod
         // was killed and records in memory are lost.  It is only a bug if a record is missing

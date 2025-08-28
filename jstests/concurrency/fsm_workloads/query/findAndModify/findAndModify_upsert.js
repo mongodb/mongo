@@ -7,13 +7,13 @@
  * $push operator.
  */
 export const $config = (function () {
-    var data = {sort: false, shardKey: {tid: 1}};
+    let data = {sort: false, shardKey: {tid: 1}};
 
-    var states = (function () {
+    let states = (function () {
         // Returns true if the specified array is sorted in ascending order,
         // and false otherwise.
         function isSorted(arr) {
-            for (var i = 0; i < arr.length - 1; ++i) {
+            for (let i = 0; i < arr.length - 1; ++i) {
                 if (arr[i] > arr[i + 1]) {
                     return false;
                 }
@@ -31,12 +31,12 @@ export const $config = (function () {
         }
 
         function upsert(db, collName) {
-            var updatedValue = this.iter++;
+            let updatedValue = this.iter++;
 
             // Use a query specification that does not match any existing documents
-            var query = {_id: new ObjectId(), tid: this.tid};
+            let query = {_id: new ObjectId(), tid: this.tid};
 
-            var cmdObj = {
+            let cmdObj = {
                 findandmodify: db[collName].getName(),
                 query: query,
                 update: {$setOnInsert: {values: [updatedValue]}},
@@ -48,11 +48,11 @@ export const $config = (function () {
                 cmdObj.sort = this.sort;
             }
 
-            var res = db.runCommand(cmdObj);
+            let res = db.runCommand(cmdObj);
             assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             if (res.ok === 1) {
-                var doc = res.value;
+                let doc = res.value;
                 assert(doc !== null, "a document should have been inserted");
 
                 assert.eq(this.tid, doc.tid);
@@ -63,9 +63,9 @@ export const $config = (function () {
         }
 
         function update(db, collName) {
-            var updatedValue = this.iter++;
+            let updatedValue = this.iter++;
 
-            var cmdObj = {
+            let cmdObj = {
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 update: {$push: {values: updatedValue}},
@@ -77,11 +77,11 @@ export const $config = (function () {
                 cmdObj.sort = this.sort;
             }
 
-            var res = db.runCommand(cmdObj);
+            let res = db.runCommand(cmdObj);
             assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             if (res.ok === 1) {
-                var doc = res.value;
+                let doc = res.value;
                 assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
                 assert.eq(this.tid, doc.tid);
@@ -95,7 +95,7 @@ export const $config = (function () {
         return {init: init, upsert: upsert, update: update};
     })();
 
-    var transitions = {
+    let transitions = {
         init: {upsert: 0.1, update: 0.9},
         upsert: {upsert: 0.1, update: 0.9},
         update: {upsert: 0.1, update: 0.9},

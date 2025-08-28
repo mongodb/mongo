@@ -6,8 +6,8 @@
 // 1.) tests that it can be set on each level and is inherited
 // 2.) tests that each operation (update/insert/remove/save) take and ensure a write concern
 
-var collA = db.shell_wc_a;
-var collB = db.shell_wc_b;
+let collA = db.shell_wc_a;
+let collB = db.shell_wc_b;
 collA.drop();
 collB.drop();
 

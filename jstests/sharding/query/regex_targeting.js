@@ -1,20 +1,20 @@
 // This checks to make sure that sharded regex queries behave the same as unsharded regex queries.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
 
 //
 // Set up multiple collections to target with regex shard keys on two shards
 //
 
-var coll = mongos.getCollection("foo.bar");
-var collSharded = mongos.getCollection("foo.barSharded");
-var collCompound = mongos.getCollection("foo.barCompound");
-var collNested = mongos.getCollection("foo.barNested");
-var collHashed = mongos.getCollection("foo.barHashed");
+let coll = mongos.getCollection("foo.bar");
+let collSharded = mongos.getCollection("foo.barSharded");
+let collCompound = mongos.getCollection("foo.barCompound");
+let collNested = mongos.getCollection("foo.barNested");
+let collHashed = mongos.getCollection("foo.barHashed");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard0.shardName}));
 

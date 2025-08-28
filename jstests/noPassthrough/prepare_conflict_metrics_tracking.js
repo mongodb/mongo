@@ -24,8 +24,8 @@ let testDB = primary.getDB("test");
 testDB.dropDatabase();
 const testColl = testDB.getCollection(collName);
 
-var basePrepareConflictWaitTime;
-var baseNumberOfPrepareConflicts;
+let basePrepareConflictWaitTime;
+let baseNumberOfPrepareConflicts;
 
 // Establishing a baseline makes this test robust against prepare conflicts that may have occurred
 // prior to (but not during) it.

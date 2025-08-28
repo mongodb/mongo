@@ -1,8 +1,8 @@
 // check the insertMulti path works, including the error handling
 
 function makeDocument(docSize) {
-    var doc = {"fieldName": ""};
-    var longString = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    let doc = {"fieldName": ""};
+    let longString = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
     while (Object.bsonsize(doc) < docSize) {
         if (Object.bsonsize(doc) < docSize - longString.length) {
             doc.fieldName += longString;
@@ -13,7 +13,7 @@ function makeDocument(docSize) {
     return doc;
 }
 
-var t = db.foo;
+let t = db.foo;
 
 t.drop();
 assert.commandWorked(t.insert([{_id: 1}, {_id: 2}]));
@@ -39,9 +39,9 @@ assert.eq(t.count({"_id": 4}), 1);
 
 // Push a large vector in bigger than the subset size we'll break it up into
 assert(t.drop());
-var doc = makeDocument(16 * 1024);
-var docs = [];
-for (var i = 0; i < 1000; i++) docs.push(Object.extend({}, doc));
+let doc = makeDocument(16 * 1024);
+let docs = [];
+for (let i = 0; i < 1000; i++) docs.push(Object.extend({}, doc));
 assert.commandWorked(t.insert(docs));
 assert.eq(t.count(), docs.length);
 

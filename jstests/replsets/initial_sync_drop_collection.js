@@ -9,7 +9,7 @@ import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uu
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_drop_collection";
 const dbName = testName;
-var replTest = new ReplSetTest({
+let replTest = new ReplSetTest({
     name: testName,
     nodes: [{}, {rsConfig: {priority: 0}}],
     settings: {chainingAllowed: false},
@@ -17,14 +17,14 @@ var replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var primaryDB = primary.getDB(dbName);
-var secondary = replTest.getSecondary();
-var secondaryDB = secondary.getDB(dbName);
+let primary = replTest.getPrimary();
+let primaryDB = primary.getDB(dbName);
+let secondary = replTest.getSecondary();
+let secondaryDB = secondary.getDB(dbName);
 const collName = "testcoll";
-var primaryColl = primaryDB[collName];
-var secondaryColl = secondaryDB[collName];
-var nss = primaryColl.getFullName();
+let primaryColl = primaryDB[collName];
+let secondaryColl = secondaryDB[collName];
+let nss = primaryColl.getFullName();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
@@ -165,7 +165,7 @@ runDropTest({
 
 // Add another node to the set, so when we drop the collection it can commit.  This other
 // secondary will be finished with initial sync when the drop happens.
-var secondary2 = replTest.add({rsConfig: {priority: 0}});
+let secondary2 = replTest.add({rsConfig: {priority: 0}});
 replTest.reInitiate();
 replTest.awaitSecondaryNodes(null, [secondary2]);
 

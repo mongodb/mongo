@@ -1,7 +1,7 @@
 db.otherthings.drop();
 db.things.drop();
 
-var other = {s: "other thing", n: 1};
+let other = {s: "other thing", n: 1};
 db.otherthings.save(other);
 
 // Verify that the DBPointer prototype is not serializable
@@ -21,11 +21,11 @@ db.otherthings.save(other);
 assert(db.things.findOne().o.fetch().n == 2, "dbrefs broken");
 
 db.getSiblingDB("otherdb").dropDatabase();
-var objid = new ObjectId();
+let objid = new ObjectId();
 db.getSiblingDB("otherdb").getCollection("othercoll").insert({_id: objid, field: "value"});
-var subdoc = db.getSiblingDB("otherdb").getCollection("othercoll").findOne({_id: objid});
+let subdoc = db.getSiblingDB("otherdb").getCollection("othercoll").findOne({_id: objid});
 
 db.mycoll.drop();
 db.mycoll.insert({_id: "asdf", asdf: new DBRef("othercoll", objid, "otherdb")});
-var doc = db.mycoll.findOne({_id: "asdf"}, {_id: 0, asdf: 1});
+let doc = db.mycoll.findOne({_id: "asdf"}, {_id: 0, asdf: 1});
 assert.eq(tojson(doc.asdf.fetch()), tojson(subdoc), "otherdb dbref");

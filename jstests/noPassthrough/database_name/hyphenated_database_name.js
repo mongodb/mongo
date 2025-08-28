@@ -3,7 +3,7 @@
  *
  * @tags: [requires_persistence]
  */
-var isDirectoryPerDBSupported = jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
+let isDirectoryPerDBSupported = jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 if (!isDirectoryPerDBSupported) quit();
 
 const dbName = "test-hyphen";

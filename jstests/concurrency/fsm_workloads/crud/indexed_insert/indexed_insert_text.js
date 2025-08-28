@@ -7,17 +7,17 @@
  * ]
  */
 export const $config = (function () {
-    var states = {
+    let states = {
         init: function init(db, collName) {
             // noop
             // other workloads that extend this workload use this method
         },
 
         insert: function insert(db, collName) {
-            var doc = {};
-            var snippet = this.getRandomTextSnippet();
+            let doc = {};
+            let snippet = this.getRandomTextSnippet();
             doc[this.indexedField] = snippet;
-            var res = db[collName].insert(doc);
+            let res = db[collName].insert(doc);
             assert.commandWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
             // TODO: what else can we assert? should that go in a read test?
@@ -32,7 +32,7 @@ export const $config = (function () {
         },
     };
 
-    var transitions = {init: {insert: 1}, insert: {insert: 1}};
+    let transitions = {init: {insert: 1}, insert: {insert: 1}};
 
     function setup(db, collName, cluster) {
         const ixSpec = {name: `${this.indexedField}_text`, key: {}};
@@ -45,7 +45,7 @@ export const $config = (function () {
         assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [ixSpec], writeConcern: wcMajority}));
     }
 
-    var text = [
+    let text = [
         "We’re truly excited to announce the availability of the first MongoDB",
         "2.8 release candidate (rc0), headlined by improved concurrency (including",
         "document-level locking), compression, and pluggable storage engines.",

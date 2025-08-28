@@ -335,7 +335,7 @@ function validateCmdNetworkErrorCompatibility(cmdName, cmdObj) {
                 logSuffix,
         );
     } else if (cmdName === "aggregate") {
-        var stages = cmdObj.pipeline;
+        let stages = cmdObj.pipeline;
 
         // $listLocalSessions must be the first stage in the pipeline.
         const firstStage = stages && Array.isArray(stages) && stages.length > 0 ? stages[0] : undefined;

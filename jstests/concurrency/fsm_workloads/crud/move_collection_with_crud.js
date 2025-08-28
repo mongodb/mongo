@@ -35,29 +35,29 @@ export const $config = (function () {
     }
 
     function calculateToShard(conn, ns) {
-        var config = conn.rsConns.config.getDB("config");
-        var unshardedColl = config.collections.findOne({_id: ns});
+        let config = conn.rsConns.config.getDB("config");
+        let unshardedColl = config.collections.findOne({_id: ns});
         // In case the collection is untracked the current shard is the primary shard.
         let currentShardFn = () => {
             if (unshardedColl === null) {
                 return data.primaryShard;
             } else {
-                var chunk = config.chunks.findOne({uuid: unshardedColl.uuid});
+                let chunk = config.chunks.findOne({uuid: unshardedColl.uuid});
                 if (chunk === null) {
                     return data.primaryShard;
                 }
                 return chunk.shard;
             }
         };
-        var currentShard = currentShardFn();
-        var shards = Object.keys(conn.shards);
-        var destinationShards = shards.filter(function (shard) {
+        let currentShard = currentShardFn();
+        let shards = Object.keys(conn.shards);
+        let destinationShards = shards.filter(function (shard) {
             if (shard !== currentShard) {
                 return shard;
             }
         });
 
-        var toShard = destinationShards[Random.randInt(destinationShards.length)];
+        let toShard = destinationShards[Random.randInt(destinationShards.length)];
         return toShard;
     }
 
@@ -136,8 +136,8 @@ export const $config = (function () {
         print(`Finished unshardCollection on ${ns}`);
 
         // Calculate the primary shard
-        var unshardedColl = db.getSiblingDB("config").collections.findOne({_id: ns});
-        var chunk = db.getSiblingDB("config").chunks.findOne({uuid: unshardedColl.uuid});
+        let unshardedColl = db.getSiblingDB("config").collections.findOne({_id: ns});
+        let chunk = db.getSiblingDB("config").chunks.findOne({uuid: unshardedColl.uuid});
         this.primaryShard = chunk.shard;
 
         const coll = db.getCollection(collName);

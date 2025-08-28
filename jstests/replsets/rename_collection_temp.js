@@ -6,11 +6,11 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function checkCollectionTemp(db, collName, expectedTempValue) {
-    var collectionInformation = db.getCollectionInfos();
+    let collectionInformation = db.getCollectionInfos();
 
-    var hasSeenCollection = false;
-    for (var i = 0; i < collectionInformation.length; i++) {
-        var collection = collectionInformation[i];
+    let hasSeenCollection = false;
+    for (let i = 0; i < collectionInformation.length; i++) {
+        let collection = collectionInformation[i];
 
         if (collection.name === collName) {
             hasSeenCollection = true;
@@ -27,15 +27,15 @@ function checkCollectionTemp(db, collName, expectedTempValue) {
     }
 }
 
-var replTest = new ReplSetTest({name: "renameCollectionTest", nodes: 2});
-var nodes = replTest.startSet();
+let replTest = new ReplSetTest({name: "renameCollectionTest", nodes: 2});
+let nodes = replTest.startSet();
 
 replTest.initiate();
 
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // Create a temporary collection.
-var dbFoo = primary.getDB("foo");
+let dbFoo = primary.getDB("foo");
 
 assert.commandWorked(
     dbFoo.runCommand({applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}),
@@ -50,8 +50,8 @@ checkCollectionTemp(dbFoo, "permanentColl", false);
 
 replTest.awaitReplication();
 
-var secondary = replTest.getSecondary();
-var secondaryFoo = secondary.getDB("foo");
+let secondary = replTest.getSecondary();
+let secondaryFoo = secondary.getDB("foo");
 
 secondaryFoo.permanentColl.setSecondaryOk();
 

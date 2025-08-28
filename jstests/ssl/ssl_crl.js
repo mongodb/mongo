@@ -8,7 +8,7 @@ import {TLSTest} from "jstests/libs/ssl_test.js";
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider(["openssl", "windows"], function () {
-    var testUnrevoked = new TLSTest(
+    let testUnrevoked = new TLSTest(
         // Server option overrides
         {
             tlsMode: "requireTLS",
@@ -19,7 +19,7 @@ requireSSLProvider(["openssl", "windows"], function () {
 
     assert(testUnrevoked.connectWorked());
 
-    var testRevoked = new TLSTest(
+    let testRevoked = new TLSTest(
         // Server option overrides
         {
             tlsMode: "requireTLS",

@@ -6,8 +6,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {verifyServerStatusElectionReasonCounterChange} from "jstests/replsets/libs/election_metrics.js";
 
-var name = "priority_takeover_one_node_higher_priority";
-var replSet = new ReplSetTest({
+let name = "priority_takeover_one_node_higher_priority";
+let replSet = new ReplSetTest({
     name: name,
     nodes: [{rsConfig: {priority: 3}}, {}, {rsConfig: {arbiterOnly: true}}],
 });
@@ -15,7 +15,7 @@ replSet.startSet();
 replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 
 const initialPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 
@@ -23,7 +23,7 @@ replSet.awaitSecondaryNodes();
 replSet.awaitReplication();
 
 // Primary should step down long enough for election to occur on secondary.
-var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+let config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
 assert.commandWorked(primary.adminCommand({replSetStepDown: replSet.timeoutMS / 1000}));
 
 // Step down primary and wait for node 1 to be promoted to primary.

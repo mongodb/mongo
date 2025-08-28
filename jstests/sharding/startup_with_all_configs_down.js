@@ -13,7 +13,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
@@ -24,7 +24,7 @@ var st = new ShardingTest({
 
 jsTestLog("Setting up initial data");
 assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
-for (var i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     assert.commandWorked(st.s.getDB("test").foo.insert({_id: i}));
 }
 
@@ -41,7 +41,7 @@ st.configRS.nodes.forEach((config) => {
 });
 
 jsTestLog("Starting a new mongos when there are no config servers up");
-var newMongosInfo = MongoRunner.runMongos({configdb: st._configDB, waitForConnect: false});
+let newMongosInfo = MongoRunner.runMongos({configdb: st._configDB, waitForConnect: false});
 // The new mongos won't accept any new connections, but it should stay up and continue trying
 // to contact the config servers to finish startup.
 assert.throws(function () {
@@ -53,7 +53,7 @@ st.rs1.stopSet(undefined, true);
 st.rs1.startSet({waitForConnect: false}, true);
 
 jsTestLog("Queries should fail because the shard can't initialize sharding state");
-var error = assert.throws(function () {
+let error = assert.throws(function () {
     st.s.getDB("test").foo.find().itcount();
 });
 
@@ -76,8 +76,8 @@ jsTestLog("Queries against the original mongos should work again");
 assert.eq(100, st.s.getDB("test").foo.find().itcount());
 
 jsTestLog("Should now be possible to connect to the mongos that was started while the config " + "servers were down");
-var newMongosConn = null;
-var caughtException = null;
+let newMongosConn = null;
+let caughtException = null;
 assert.soon(
     function () {
         try {

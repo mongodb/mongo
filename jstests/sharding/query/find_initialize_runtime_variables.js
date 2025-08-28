@@ -16,12 +16,12 @@ const numIterations = 5;
 const st = new ShardingTest({shards: 5});
 const db = st.s.getDB("find_initialize_runtime_variables");
 st.s.adminCommand({shardCollection: "find_initialize_runtime_variables.c", key: {a: "hashed"}});
-var coll = db.getCollection("find_initialize_runtime_variables");
+let coll = db.getCollection("find_initialize_runtime_variables");
 
 coll.insert([{a: 1}, {a: 2}, {a: 3}]);
 
 for (let i = 0; i < numIterations; ++i) {
-    var res = coll.find({}, {a: 1, b: "$$NOW"}).toArray();
+    let res = coll.find({}, {a: 1, b: "$$NOW"}).toArray();
     for (const e of res) {
         // Check consistency of the returned $$NOW values.
         assert.eq(res[0].b, e.b);

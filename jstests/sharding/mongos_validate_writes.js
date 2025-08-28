@@ -4,18 +4,18 @@
 // Note that this is *unsafe* with broadcast removes and updates
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 3, other: {rsOptions: {verbose: 2}}});
+let st = new ShardingTest({shards: 2, mongos: 3, other: {rsOptions: {verbose: 2}}});
 
-var mongos = st.s0;
-var staleMongosA = st.s1;
-var staleMongosB = st.s2;
+let mongos = st.s0;
+let staleMongosA = st.s1;
+let staleMongosB = st.s2;
 
-var admin = mongos.getDB("admin");
+let admin = mongos.getDB("admin");
 const kDbName = "foo";
 assert.commandWorked(admin.runCommand({enableSharding: kDbName, primaryShard: st.shard1.shardName}));
-var coll = mongos.getCollection(kDbName + ".bar");
-var staleCollA = staleMongosA.getCollection(coll + "");
-var staleCollB = staleMongosB.getCollection(coll + "");
+let coll = mongos.getCollection(kDbName + ".bar");
+let staleCollA = staleMongosA.getCollection(coll + "");
+let staleCollB = staleMongosB.getCollection(coll + "");
 
 coll.createIndex({a: 1});
 

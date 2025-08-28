@@ -16,7 +16,7 @@
  * ]
  */
 
-var t = db.apply_ops2;
+let t = db.apply_ops2;
 t.drop();
 
 assert.eq(0, t.find().count(), "test collection not empty");
@@ -25,7 +25,7 @@ t.insert({_id: 1, x: "init"});
 
 print("Testing applyOps with alwaysUpsert explicity set to true");
 
-var res = db.runCommand({
+let res = db.runCommand({
     applyOps: [
         {
             op: "u",

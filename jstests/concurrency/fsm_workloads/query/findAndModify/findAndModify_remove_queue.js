@@ -17,7 +17,7 @@
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.
         uniqueDBName: jsTestName(),
@@ -34,12 +34,12 @@ export const $config = (function () {
 
         saveDocId: function saveDocId(db, collName, id) {
             // Use a separate database to avoid conflicts with other FSM workloads.
-            var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
+            let ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
-            var updateDoc = {$push: {}};
+            let updateDoc = {$push: {}};
             updateDoc.$push[this.opName] = id;
 
-            var res = ownedDB[collName].update({_id: this.tid}, updateDoc, {upsert: true});
+            let res = ownedDB[collName].update({_id: this.tid}, updateDoc, {upsert: true});
             assert.commandWorked(res);
 
             assert.contains(res.nMatched, [0, 1], tojson(res));
@@ -53,12 +53,12 @@ export const $config = (function () {
         },
     };
 
-    var states = (function () {
+    let states = (function () {
         function remove(db, collName) {
-            var res = db.runCommand({findAndModify: db[collName].getName(), query: {}, sort: {rand: -1}, remove: true});
+            let res = db.runCommand({findAndModify: db[collName].getName(), query: {}, sort: {rand: -1}, remove: true});
             assert.commandWorked(res);
 
-            var doc = res.value;
+            let doc = res.value;
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
                 // return null.
@@ -72,15 +72,15 @@ export const $config = (function () {
         return {remove: remove};
     })();
 
-    var transitions = {remove: {remove: 1}};
+    let transitions = {remove: {remove: 1}};
 
     function setup(db, collName, cluster) {
         // Each thread should remove exactly one document per iteration.
         this.numDocs = this.iterations * this.threadCount;
 
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 0; i < this.numDocs; ++i) {
-            var doc = this.newDocForInsert(i);
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 0; i < this.numDocs; ++i) {
+            let doc = this.newDocForInsert(i);
             // Require that documents inserted by this workload use _id values that can be compared
             // using the default JS comparator.
             assert.neq(
@@ -90,7 +90,7 @@ export const $config = (function () {
             );
             bulk.insert(doc);
         }
-        var res = bulk.execute();
+        let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(this.numDocs, res.nInserted);
 
@@ -100,7 +100,7 @@ export const $config = (function () {
     }
 
     function teardown(db, collName, cluster) {
-        var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
+        let ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
         if (this.opName === "removed") {
             // Each findAndModify should be internally retried until it removes exactly one
@@ -114,10 +114,10 @@ export const $config = (function () {
             assert.eq(db[collName].find({counter: 0}).itcount(), 0, "Expected all documents to have been updated");
         }
 
-        var docs = ownedDB[collName].find().toArray();
-        var ids = [];
+        let docs = ownedDB[collName].find().toArray();
+        let ids = [];
 
-        for (var i = 0; i < docs.length; ++i) {
+        for (let i = 0; i < docs.length; ++i) {
             ids.push(docs[i][this.opName].sort());
         }
 
@@ -126,18 +126,18 @@ export const $config = (function () {
         assert.commandWorked(ownedDB.dropDatabase());
 
         function checkForDuplicateIds(ids, opName) {
-            var indices = new Array(ids.length);
-            for (var i = 0; i < indices.length; ++i) {
+            let indices = new Array(ids.length);
+            for (let i = 0; i < indices.length; ++i) {
                 indices[i] = 0;
             }
 
             while (true) {
-                var smallest = findSmallest(ids, indices);
+                let smallest = findSmallest(ids, indices);
                 if (smallest === null) {
                     break;
                 }
 
-                var msg =
+                let msg =
                     "threads " +
                     tojson(smallest.indices) +
                     " claim to have " +
@@ -151,16 +151,16 @@ export const $config = (function () {
         }
 
         function findSmallest(arrays, indices) {
-            var smallestValueIsSet = false;
-            var smallestValue;
-            var smallestIndices;
+            let smallestValueIsSet = false;
+            let smallestValue;
+            let smallestIndices;
 
-            for (var i = 0; i < indices.length; ++i) {
+            for (let i = 0; i < indices.length; ++i) {
                 if (indices[i] >= arrays[i].length) {
                     continue;
                 }
 
-                var value = arrays[i][indices[i]];
+                let value = arrays[i][indices[i]];
                 if (!smallestValueIsSet || value < smallestValue) {
                     smallestValueIsSet = true;
                     smallestValue = value;

@@ -59,7 +59,7 @@ runTest(
 );
 
 // Exercise the optimization of constant arguments.
-var unionConstantArray = [3, 900, 3];
+let unionConstantArray = [3, 900, 3];
 runTest(
     [{$project: {union: {$setUnion: ["$arr1", unionConstantArray]}}}],
     [
@@ -102,7 +102,7 @@ runTest(
 );
 
 // Exercise the optimization of constant arguments.
-var intersectionConstantArray = [1, 2, 1, 890, "long constant string"];
+let intersectionConstantArray = [1, 2, 1, 890, "long constant string"];
 runTest(
     [{$project: {intersection: {$setIntersection: ["$arr1", intersectionConstantArray]}}}],
     [
@@ -159,7 +159,7 @@ runTest(
 );
 
 // Exercise the optimization of constant arguments.
-var differenceConstantArray = [3, 780];
+let differenceConstantArray = [3, 780];
 runTest(
     [{$project: {difference: {$setDifference: ["$arr1", differenceConstantArray]}}}],
     [
@@ -202,7 +202,7 @@ runTest(
 );
 
 // Exercise the optimization of constant arguments.
-var equalConstantArray = [1, 2, 3, 2, 1];
+let equalConstantArray = [1, 2, 3, 2, 1];
 runTest(
     [{$project: {equals: {$setEquals: ["$arr1", equalConstantArray]}}}],
     [

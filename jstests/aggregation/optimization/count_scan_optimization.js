@@ -13,18 +13,18 @@
 // ]
 import {aggPlanHasStage, getAggPlanStage, getQueryPlanner, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.countscan;
+let coll = db.countscan;
 coll.drop();
 
-for (var i = 0; i < 3; i++) {
-    for (var j = 0; j < 10; j += 2) {
+for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 10; j += 2) {
         coll.insert({foo: i, bar: j});
     }
 }
 
 coll.createIndex({foo: 1});
 
-var simpleGroup = coll.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).toArray();
+let simpleGroup = coll.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).toArray();
 
 assert.eq(simpleGroup.length, 1);
 assert.eq(simpleGroup[0]["count"], 15);
@@ -37,7 +37,7 @@ const getQueryPlan = function (explain) {
     return winningPlan.queryPlan ? winningPlan.queryPlan : winningPlan;
 };
 
-var explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
+let explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
 assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 

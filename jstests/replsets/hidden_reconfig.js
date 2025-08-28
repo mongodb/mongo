@@ -2,12 +2,12 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
-var replTest = new ReplSetTest({name: "testSet", nodes: 3});
+let replTest = new ReplSetTest({name: "testSet", nodes: 3});
 replTest.startSet();
 replTest.initiate();
 
 print("replset5.js reconfigure with priority=0");
-var config = replTest.getReplSetConfigFromNode();
+let config = replTest.getReplSetConfigFromNode();
 config.version++;
 config.settings = {};
 config.settings.heartbeatTimeoutSecs = 15;
@@ -16,7 +16,7 @@ config.members[2].priority = 0;
 reconfig(replTest, config);
 
 print("replset5.js reconfigure with hidden=1");
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 config = primary.getDB("local").system.replset.findOne();
 
 assert.eq(15, config.settings.heartbeatTimeoutSecs);

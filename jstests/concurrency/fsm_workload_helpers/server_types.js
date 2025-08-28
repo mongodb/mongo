@@ -24,7 +24,7 @@ export function isMongodConfigsvr(db) {
     if (!isMongod(db)) {
         return false;
     }
-    var res = db.adminCommand("getCmdLineOpts");
+    let res = db.adminCommand("getCmdLineOpts");
     assert.commandWorked(res);
 
     return res.parsed && res.parsed.sharding && res.parsed.sharding.clusterRole === "configsvr";
@@ -38,7 +38,7 @@ export function isClusterNode(db) {
     if (!isMongod(db)) {
         return false;
     }
-    var res = db.adminCommand("getCmdLineOpts");
+    let res = db.adminCommand("getCmdLineOpts");
     assert.commandWorked(res);
 
     return res.parsed && res.parsed.hasOwnProperty("sharding");
@@ -50,7 +50,7 @@ export function isClusterNode(db) {
  * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
  */
 export function getStorageEngineName(db) {
-    var status = db.serverStatus();
+    let status = db.serverStatus();
     assert.commandWorked(status);
 
     assert(isMongod(db), "no storage engine is reported when connected to mongos");
@@ -70,7 +70,7 @@ export function isWiredTiger(db) {
  * Returns true if the current storage engine is ephemeral, and false otherwise.
  */
 export function isEphemeral(db) {
-    var engine = getStorageEngineName(db);
+    let engine = getStorageEngineName(db);
     return engine === "inMemory";
 }
 
@@ -80,7 +80,7 @@ export function isEphemeral(db) {
  * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
  */
 export function supportsCommittedReads(db) {
-    var status = db.serverStatus();
+    let status = db.serverStatus();
     assert.commandWorked(status);
 
     assert(isMongod(db), "no storage engine is reported when connected to mongos");

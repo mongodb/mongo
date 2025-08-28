@@ -24,13 +24,13 @@ const currVersion = serverStatus.version;
 const is82OrHigher =
     MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor(currVersion), MongoRunner.getBinVersionFor("8.2")) >= 1;
 
-var coll = db.getCollection("coll");
-var coll1 = db.getCollection("coll1");
+let coll = db.getCollection("coll");
+let coll1 = db.getCollection("coll1");
 coll.drop();
 coll1.drop();
 
-var maxWriteBatchSize = db.hello().maxWriteBatchSize;
-var insertOp = {insert: 0, document: {_id: 1, skey: "MongoDB"}};
+let maxWriteBatchSize = db.hello().maxWriteBatchSize;
+let insertOp = {insert: 0, document: {_id: 1, skey: "MongoDB"}};
 
 // Make sure bulkWrite at maxWriteBatchSize is okay
 let ops = [];
@@ -38,7 +38,7 @@ for (var i = 0; i < maxWriteBatchSize; ++i) {
     ops.push(insertOp);
 }
 
-var res = db.adminCommand({
+let res = db.adminCommand({
     bulkWrite: 1,
     ops: ops,
     nsInfo: [{ns: "test.coll"}],
@@ -160,7 +160,7 @@ assert.commandFailedWithCode(
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
-var coll2 = db.getCollection("coll2");
+let coll2 = db.getCollection("coll2");
 coll2.drop();
 
 // Test update continues on error with ordered:false.
@@ -207,10 +207,10 @@ coll.drop();
 coll2.drop();
 
 // Test fixDocumentForInsert works properly by erroring out on >16MB size insert.
-var targetSize = 16 * 1024 * 1024 + 1;
-var doc = {_id: new ObjectId(), value: ""};
+let targetSize = 16 * 1024 * 1024 + 1;
+let doc = {_id: new ObjectId(), value: ""};
 
-var size = Object.bsonsize(doc);
+let size = Object.bsonsize(doc);
 assert.gte(targetSize, size);
 
 // Set 'value' as a string with enough characters to make the whole document 'targetSize'

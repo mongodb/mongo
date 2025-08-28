@@ -18,7 +18,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 // because this test removes the config server primary.
 TestData.skipCheckRoutingTableConsistency = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     config: 3,
     // By default, our test infrastructure sets the election timeout to a very high value (24
@@ -30,7 +30,7 @@ var st = new ShardingTest({
 
 jsTest.log("Starting sharding batch write tests...");
 
-var request;
+let request;
 var result;
 
 // NOTE: ALL TESTS BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
@@ -39,7 +39,7 @@ var result;
 //
 // Mongos _id autogeneration tests for sharded collections
 
-var coll = st.s.getCollection("foo.bar");
+let coll = st.s.getCollection("foo.bar");
 assert.commandWorked(st.s.adminCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.toString(), key: {_id: 1}}));
 
@@ -74,14 +74,14 @@ assert.eq(1, coll.count({_id: 0}));
 
 //
 // Ensure generating many _ids don't push us over limits
-var maxDocSize = (16 * 1024 * 1024) / 1000;
-var baseDocSize = Object.bsonsize({a: 1, data: ""});
-var dataSize = maxDocSize - baseDocSize;
+let maxDocSize = (16 * 1024 * 1024) / 1000;
+let baseDocSize = Object.bsonsize({a: 1, data: ""});
+let dataSize = maxDocSize - baseDocSize;
 
-var data = "";
+let data = "";
 for (var i = 0; i < dataSize; i++) data += "x";
 
-var documents = [];
+let documents = [];
 for (var i = 0; i < 1000; i++) documents.push({a: i, data: data});
 
 assert.commandWorked(coll.getMongo().adminCommand({setParameter: 1, logLevel: 4}));
@@ -98,7 +98,7 @@ assert.eq(1000, coll.count());
 //
 //
 // Config server upserts (against admin db, for example) require _id test
-var adminColl = st.s.getDB("admin")[coll.getName()];
+let adminColl = st.s.getDB("admin")[coll.getName()];
 
 //
 // Without _id
@@ -130,7 +130,7 @@ assert.eq(1, adminColl.count());
 //
 //
 // Tests against config server
-var configColl = st.s.getCollection("config.batch_write_protocol_sharded");
+let configColl = st.s.getCollection("config.batch_write_protocol_sharded");
 
 //
 // Basic config server insert

@@ -14,20 +14,20 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig, waitForAllMembers} from "jstests/replsets/rslib.js";
 
 let doTest = function (signal) {
-    var name = "secondaryDelaySecs";
-    var host = getHostName();
+    let name = "secondaryDelaySecs";
+    let host = getHostName();
 
-    var replTest = new ReplSetTest({name: name, nodes: 3});
+    let replTest = new ReplSetTest({name: name, nodes: 3});
 
-    var nodes = replTest.startSet();
+    let nodes = replTest.startSet();
     /* set secondaryDelaySecs to 30 seconds */
-    var config = replTest.getReplSetConfig();
+    let config = replTest.getReplSetConfig();
     config.members[2].priority = 0;
     config.members[2].secondaryDelaySecs = 30;
 
     replTest.initiate(config);
 
-    var primary = replTest.getPrimary().getDB(name);
+    let primary = replTest.getPrimary().getDB(name);
 
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(
@@ -35,10 +35,10 @@ let doTest = function (signal) {
     );
     replTest.awaitReplication();
 
-    var secondaryConns = replTest.getSecondaries();
-    var secondaries = [];
+    let secondaryConns = replTest.getSecondaries();
+    let secondaries = [];
     for (var i in secondaryConns) {
-        var d = secondaryConns[i].getDB(name);
+        let d = secondaryConns[i].getDB(name);
         secondaries.push(d);
     }
 
@@ -63,7 +63,7 @@ let doTest = function (signal) {
     // within 120 seconds delayed secondary should have it
     assert.soon(
         function () {
-            var z = secondaries[1].foo.findOne();
+            let z = secondaries[1].foo.findOne();
             return z && z.x == 1;
         },
         "waiting for inserted document " + tojson(doc) + " on delayed secondary",
@@ -98,7 +98,7 @@ let doTest = function (signal) {
     }
 
     assert.soon(function () {
-        var z = conn.getDB(name).foo.findOne({_id: 123});
+        let z = conn.getDB(name).foo.findOne({_id: 123});
         return z != null && z.x == "foo";
     });
 
@@ -117,7 +117,7 @@ let doTest = function (signal) {
 
     // wait for node to become secondary
     assert.soon(function () {
-        var result = conn.getDB("admin").hello();
+        let result = conn.getDB("admin").hello();
         printjson(result);
         return result.secondary;
     });

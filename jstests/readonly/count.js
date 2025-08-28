@@ -11,7 +11,7 @@ runReadOnlyTest(
             countGte10: 90,
 
             load: function (writableCollection) {
-                var bulk = writableCollection.initializeUnorderedBulkOp();
+                let bulk = writableCollection.initializeUnorderedBulkOp();
 
                 for (var i = 0; i < this.countLt10; ++i) {
                     bulk.insert({x: 5});

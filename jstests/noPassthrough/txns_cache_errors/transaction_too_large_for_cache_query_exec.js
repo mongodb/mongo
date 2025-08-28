@@ -18,7 +18,7 @@ const doc = {
     x: [],
 };
 // Approximate the max BSON object size (16MB)
-for (var j = 0; j < 334000; j++) {
+for (let j = 0; j < 334000; j++) {
     doc.x.push("" + Math.random() + Math.random());
 }
 

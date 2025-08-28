@@ -9,18 +9,18 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
  * replica set to 'fcv' before adding the third node.
  */
 export var multversionInitialSyncTest = function (name, replSetVersion, newNodeVersion, configSettings, fcv) {
-    var nodes = {n1: {binVersion: replSetVersion}, n2: {binVersion: replSetVersion}};
+    let nodes = {n1: {binVersion: replSetVersion}, n2: {binVersion: replSetVersion}};
 
     jsTestLog("Starting up a two-node '" + replSetVersion + "' version replica set.");
-    var rst = new ReplSetTest({name: name, nodes: nodes});
+    let rst = new ReplSetTest({name: name, nodes: nodes});
     rst.startSet();
 
-    var conf = rst.getReplSetConfig();
+    let conf = rst.getReplSetConfig();
     conf.settings = configSettings;
     rst.initiate(conf);
 
     // Wait for a primary node.
-    var primary = rst.getPrimary();
+    let primary = rst.getPrimary();
 
     // Set 'featureCompatibilityVersion' if given.
     if (fcv) {
@@ -30,7 +30,7 @@ export var multversionInitialSyncTest = function (name, replSetVersion, newNodeV
     }
 
     // Insert some data and wait for replication.
-    for (var i = 0; i < 25; i++) {
+    for (let i = 0; i < 25; i++) {
         primary.getDB("foo").foo.insert({_id: i});
     }
     rst.awaitReplication();

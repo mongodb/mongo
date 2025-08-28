@@ -7,13 +7,13 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Shards a collection with 'numDocs' documents and creates 2 chunks, one on each of two shards.
 export function shardCollectionWithChunks(st, coll, numDocs) {
-    var _db = coll.getDB();
-    var numberDoc = numDocs || 20;
+    let _db = coll.getDB();
+    let numberDoc = numDocs || 20;
     coll.createIndex({x: 1}, {unique: true});
 
     st.shardColl(coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);
 
-    for (var i = 0; i < numberDoc; i++) {
+    for (let i = 0; i < numberDoc; i++) {
         coll.insert({x: i});
     }
     assert.eq(coll.count(), numberDoc);
@@ -69,7 +69,7 @@ export function restartServerReplication(conn) {
         return;
     }
 
-    var errMsg = "Failed to disable stopReplProducer failpoint.";
+    let errMsg = "Failed to disable stopReplProducer failpoint.";
     assert.commandWorked(conn.getDB("admin").runCommand({configureFailPoint: "stopReplProducer", mode: "off"}), errMsg);
 }
 

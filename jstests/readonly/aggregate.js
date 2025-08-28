@@ -66,7 +66,7 @@ runReadOnlyTest(
             },
             exec: function (readableCollection) {
                 // Find titles nominated for the most awards.
-                var mostAwardsPipeline = [
+                let mostAwardsPipeline = [
                     {$unwind: "$nominations"},
                     {$group: {_id: "$nominations.title", count: {$sum: 1}}},
                     {$sort: {count: -1, _id: 1}},

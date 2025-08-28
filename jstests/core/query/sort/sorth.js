@@ -5,13 +5,13 @@
 // ]
 
 // Tests for the $in/sort/limit optimization combined with inequality bounds.  SERVER-5777
-var t = db.jstests_sorth;
+let t = db.jstests_sorth;
 t.drop();
 
 // These can be set to modify the query run by the helper find().
-var _sort;
-var _limit;
-var _hint;
+let _sort;
+let _limit;
+let _hint;
 
 /**
  * Generate a cursor using global parameters '_sort', '_hint', and '_limit'.
@@ -32,7 +32,7 @@ function resultsMatch(expectedMatches, actualMatches) {
         return false;
     }
 
-    for (var i = 0; i < expectedMatches.length; ++i) {
+    for (let i = 0; i < expectedMatches.length; ++i) {
         if (expectedMatches[i].a !== actualMatches[i].a || expectedMatches[i].b !== actualMatches[i].b) {
             return false;
         }
@@ -53,7 +53,7 @@ function assertMatches(options) {
     const results = find(options.query).toArray();
     const acceptableQueryResults = options.acceptableQueryResults || [options.expectedQueryResults];
     assert.gte(acceptableQueryResults.length, 1);
-    for (var i = 0; i < acceptableQueryResults.length; ++i) {
+    for (let i = 0; i < acceptableQueryResults.length; ++i) {
         const validResultSet = acceptableQueryResults[i];
 
         // All results should have the same number of results.

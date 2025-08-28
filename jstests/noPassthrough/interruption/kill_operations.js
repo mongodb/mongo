@@ -89,7 +89,7 @@ function killOpKey(conn, opKeys) {
 }
 
 function threadRoutine({connStr, dbName, collName, opKey}) {
-    var client = new Mongo(connStr);
+    let client = new Mongo(connStr);
 
     const uuidOpKey = UUID(opKey);
     jsTestLog(`Launching find at "${connStr}" with clientOpKey: ${tojson(uuidOpKey)}`);

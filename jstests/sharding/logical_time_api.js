@@ -23,7 +23,7 @@ function containsValidLogicalTimeBson(obj) {
         return false;
     }
 
-    var logicalTime = obj.$clusterTime;
+    let logicalTime = obj.$clusterTime;
     return (
         logicalTime &&
         isType(logicalTime, "BSON") &&
@@ -45,10 +45,10 @@ function isType(val, typeString) {
 
 // A mongos that talks to a non-sharded collection on a sharded replica set returns a
 // logicalTime BSON object that matches the expected format.
-var st = new ShardingTest({name: "logical_time_api", shards: {rs0: {nodes: 1}}});
+let st = new ShardingTest({name: "logical_time_api", shards: {rs0: {nodes: 1}}});
 
-var testDB = st.s.getDB("test");
-var res = assert.commandWorked(testDB.runCommand("insert", {insert: "foo", documents: [{x: 1}]}));
+let testDB = st.s.getDB("test");
+let res = assert.commandWorked(testDB.runCommand("insert", {insert: "foo", documents: [{x: 1}]}));
 assert(
     containsValidLogicalTimeBson(res),
     "Expected command body from a mongos talking to a non-sharded collection on a sharded " +
@@ -94,7 +94,7 @@ if (jsTestOptions().useAutoBootstrapProcedure) {
 }
 
 // A mongod from a non-sharded replica set does not return logicalTime.
-var replTest = new ReplSetTest({name: "logical_time_api_non_sharded_replset", nodes: 1});
+let replTest = new ReplSetTest({name: "logical_time_api_non_sharded_replset", nodes: 1});
 replTest.startSet();
 replTest.initiate();
 
@@ -110,7 +110,7 @@ assert(
 replTest.stopSet();
 
 // A standalone mongod does not return logicalTime.
-var standalone = MongoRunner.runMongod();
+let standalone = MongoRunner.runMongod();
 
 testDB = standalone.getDB("test");
 res = assert.commandWorked(testDB.runCommand("insert", {insert: "foo", documents: [{x: 5}]}));

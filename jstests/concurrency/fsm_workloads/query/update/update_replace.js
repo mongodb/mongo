@@ -31,25 +31,25 @@ export const $config = (function () {
 
     // returns an update doc
     function getRandomUpdateDoc() {
-        var choices = [{}, {x: 1, y: 1, z: 1}, {a: 1, b: 1, c: 1}];
+        let choices = [{}, {x: 1, y: 1, z: 1}, {a: 1, b: 1, c: 1}];
         return choices[Random.randInt(choices.length)];
     }
 
-    var states = {
+    let states = {
         update: function update(db, collName) {
             // choose a doc to update
-            var docIndex = Random.randInt(this.numDocs);
+            let docIndex = Random.randInt(this.numDocs);
 
             // choose an update to apply
-            var updateDoc = getRandomUpdateDoc();
+            let updateDoc = getRandomUpdateDoc();
 
             // apply the update
-            var res = db[collName].update({_id: docIndex}, updateDoc);
+            let res = db[collName].update({_id: docIndex}, updateDoc);
             assertResult(db, res);
         },
     };
 
-    var transitions = {update: {update: 1}};
+    let transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         assert.commandWorked(db[collName].createIndex({a: 1}));
@@ -64,8 +64,8 @@ export const $config = (function () {
         this.numDocs = Math.floor(this.threadCount / 3);
         assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
-        for (var i = 0; i < this.numDocs; ++i) {
-            var res = db[collName].insert({_id: i});
+        for (let i = 0; i < this.numDocs; ++i) {
+            let res = db[collName].insert({_id: i});
             assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }

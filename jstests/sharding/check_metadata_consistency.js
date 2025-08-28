@@ -24,7 +24,7 @@ const mongosSession = mongos.startSession({retryWrites: true});
 const configDB = mongosSession.getDatabase("config");
 
 const dbName = "testCheckMetadataConsistencyDB";
-var dbCounter = 0;
+let dbCounter = 0;
 
 function getNewDb() {
     return mongos.getDB(dbName + dbCounter++);

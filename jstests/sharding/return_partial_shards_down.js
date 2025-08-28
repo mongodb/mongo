@@ -12,20 +12,20 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
-var checkDocCount = function (coll, returnPartialFlag, shardsDown, expectedCount) {
+let checkDocCount = function (coll, returnPartialFlag, shardsDown, expectedCount) {
     assert.eq(expectedCount, coll.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 };
 
-var st = new ShardingTest({shards: 3, mongos: 1, other: {mongosOptions: {verbose: 2}}});
+let st = new ShardingTest({shards: 3, mongos: 1, other: {mongosOptions: {verbose: 2}}});
 
 // Stop balancer, we're doing our own manual chunk distribution
 st.stopBalancer();
 
-var mongos = st.s;
-var admin = mongos.getDB("admin");
+let mongos = st.s;
+let admin = mongos.getDB("admin");
 
-var collOneShard = mongos.getCollection("foo.collOneShard");
-var collAllShards = mongos.getCollection("foo.collAllShards");
+let collOneShard = mongos.getCollection("foo.collOneShard");
+let collAllShards = mongos.getCollection("foo.collAllShards");
 
 assert.commandWorked(admin.runCommand({enableSharding: collOneShard.getDB() + "", primaryShard: st.shard0.shardName}));
 
@@ -43,12 +43,12 @@ assert.commandWorked(admin.runCommand({moveChunk: collAllShards + "", find: {_id
 jsTest.log("Collections now distributed correctly.");
 st.printShardingStatus();
 
-var inserts = [{_id: -1}, {_id: 1}, {_id: 1000}];
+let inserts = [{_id: -1}, {_id: 1}, {_id: 1000}];
 
 assert.commandWorked(collOneShard.insert(inserts));
 assert.commandWorked(collAllShards.insert(inserts));
 
-var returnPartialFlag = 1 << 7;
+let returnPartialFlag = 1 << 7;
 
 jsTest.log("All shards up!");
 

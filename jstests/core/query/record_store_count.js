@@ -9,7 +9,7 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.record_store_count;
+let coll = db.record_store_count;
 coll.drop();
 
 assert.commandWorked(coll.insert({x: 0}));
@@ -23,7 +23,7 @@ assert.commandWorked(coll.createIndex({x: 1}));
 // If the collection is sharded, however, then we can't use fast count, since we need to perform
 // shard filtering to avoid counting data that is not logically owned by the shard.
 //
-var explain = coll.explain().count({});
+let explain = coll.explain().count({});
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
 if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));

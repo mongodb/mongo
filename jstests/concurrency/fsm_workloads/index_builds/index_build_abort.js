@@ -57,16 +57,16 @@ export const $config = (function () {
     const states = {
         dropCollAndCreateIndexBuild: function dropCollAndCreateIndexBuild(db, collName) {
             const randomColl = getRandCollectionName();
-            var coll = db[randomColl];
+            let coll = db[randomColl];
             if (mutexTryLock(db, randomColl)) {
                 try {
                     // Having the collection drop outside the lock to allow a drop concurrent to an
                     // index build might be more interesting, but we'd also be allowing a drop in
                     // the middle of bulk insert, or before the createIndexes starts.
                     coll.drop();
-                    var bulk = coll.initializeUnorderedBulkOp();
+                    let bulk = coll.initializeUnorderedBulkOp();
                     const failDocumentIndex = randInt(this.nDocuments);
-                    for (var i = 0; i < this.nDocuments; ++i) {
+                    for (let i = 0; i < this.nDocuments; ++i) {
                         if (failDocumentIndex == i) {
                             bulk.insert({a: [0, "a"]});
                         } else {

@@ -14,21 +14,21 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("migration_server_status.coll");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
+let coll = mongos.getCollection("migration_server_status.coll");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
 // Mimic inserts for a retryable-write session
-var documents = [];
-for (var x = -2600; x < 2400; x++) {
+let documents = [];
+for (let x = -2600; x < 2400; x++) {
     documents.push({_id: x});
 }
 assert.commandWorked(
@@ -40,7 +40,7 @@ assert.commandWorked(
 // Pause the migration once it starts on both shards -- somewhat arbitrary pause point.
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.startedMoveChunk);
 
-var joinMoveChunk = moveChunkParallel(
+let joinMoveChunk = moveChunkParallel(
     staticMongod,
     st.s0.host,
     {_id: 1},
@@ -49,7 +49,7 @@ var joinMoveChunk = moveChunkParallel(
     st.shard1.shardName,
 );
 
-var assertMigrationStatusOnServerStatus = function (
+let assertMigrationStatusOnServerStatus = function (
     serverStatusResult,
     sourceShard,
     destinationShard,
@@ -58,7 +58,7 @@ var assertMigrationStatusOnServerStatus = function (
     maxKey,
     collectionName,
 ) {
-    var migrationResult = serverStatusResult.sharding.migrations;
+    let migrationResult = serverStatusResult.sharding.migrations;
     assert.eq(sourceShard, migrationResult.source);
     assert.eq(destinationShard, migrationResult.destination);
     assert.eq(isDonorShard, migrationResult.isDonorShard);
@@ -67,12 +67,12 @@ var assertMigrationStatusOnServerStatus = function (
     assert.eq(collectionName, migrationResult.collection);
 };
 
-var assertSessionMigrationStatusSource = function (
+let assertSessionMigrationStatusSource = function (
     serverStatusResult,
     expectedEntriesToBeMigrated,
     expectedEntriesSkippedLowerBound,
 ) {
-    var migrationResult = serverStatusResult.sharding.migrations;
+    let migrationResult = serverStatusResult.sharding.migrations;
 
     // If the expected value is null, just check that the field exists
     if (expectedEntriesToBeMigrated == null) {
@@ -89,8 +89,8 @@ var assertSessionMigrationStatusSource = function (
     }
 };
 
-var assertSessionMigrationStatusDestination = function (serverStatusResult, expectedEntriesMigrated) {
-    var migrationResult = serverStatusResult.sharding.migrations;
+let assertSessionMigrationStatusDestination = function (serverStatusResult, expectedEntriesMigrated) {
+    let migrationResult = serverStatusResult.sharding.migrations;
 
     // If the expected value is null, just check that the field exists
     if (expectedEntriesMigrated == null) {
@@ -103,7 +103,7 @@ var assertSessionMigrationStatusDestination = function (serverStatusResult, expe
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.startedMoveChunk);
 
 // Source shard should return a migration status.
-var shard0ServerStatus = st.shard0.getDB("admin").runCommand({serverStatus: 1});
+let shard0ServerStatus = st.shard0.getDB("admin").runCommand({serverStatus: 1});
 assert(shard0ServerStatus.sharding.migrations);
 assertMigrationStatusOnServerStatus(
     shard0ServerStatus,
@@ -131,7 +131,7 @@ assertMigrationStatusOnServerStatus(
 assertSessionMigrationStatusDestination(shard1ServerStatus, null);
 
 // Mongos should never return a migration status.
-var mongosServerStatus = st.s0.getDB("admin").runCommand({serverStatus: 1});
+let mongosServerStatus = st.s0.getDB("admin").runCommand({serverStatus: 1});
 assert(!mongosServerStatus.sharding.migrations);
 
 // Pause the migration once chunk data is comitted. At this point we know that the sessions

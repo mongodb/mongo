@@ -32,7 +32,7 @@ function parseLogFile(file) {
 }
 
 // Run MongoD successfully so we populate the data directory
-var m = MongoRunner.runMongod({});
+let m = MongoRunner.runMongod({});
 
 assert.commandWorked(m.getDB("test").foo.insert({x: 1}));
 

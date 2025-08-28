@@ -2,10 +2,10 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
+let st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
 
-var rsA = new ReplSetTest({nodes: 2, name: "rsA", nodeOptions: {shardsvr: ""}});
-var rsB = new ReplSetTest({nodes: 2, name: "rsB", nodeOptions: {shardsvr: ""}});
+let rsA = new ReplSetTest({nodes: 2, name: "rsA", nodeOptions: {shardsvr: ""}});
+let rsB = new ReplSetTest({nodes: 2, name: "rsB", nodeOptions: {shardsvr: ""}});
 
 rsA.startSet();
 rsB.startSet();
@@ -14,8 +14,8 @@ rsB.initiate();
 rsA.getPrimary();
 rsB.getPrimary();
 
-var mongos = st.s;
-var config = mongos.getDB("config");
+let mongos = st.s;
+let config = mongos.getDB("config");
 
 assert.commandWorked(mongos.adminCommand({addShard: rsA.getURL(), name: rsB.name}));
 printjson(config.shards.find().toArray());
@@ -29,7 +29,7 @@ assert.eq(rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong h
 
 // Remove shard
 assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}), "failed to start draining shard");
-var res = assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}), "failed to remove shard");
+let res = assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}), "failed to remove shard");
 
 assert.eq(
     TestData.configShard ? 2 : 1,

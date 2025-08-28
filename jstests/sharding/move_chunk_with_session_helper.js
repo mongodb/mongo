@@ -20,14 +20,14 @@ export var testMoveChunkWithSession = function (
     checkDocumentsFunc,
     useAdminCommand = false,
 ) {
-    var ns = "test." + collName;
-    var testDB = st.s.getDB("test");
-    var coll = testDB.getCollection(collName);
+    let ns = "test." + collName;
+    let testDB = st.s.getDB("test");
+    let coll = testDB.getCollection(collName);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
     setupFunc(coll);
-    var result = assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj));
+    let result = assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj));
 
     jsTestLog("MOVECHUNK");
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));

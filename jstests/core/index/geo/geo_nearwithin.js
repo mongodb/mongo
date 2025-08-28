@@ -11,8 +11,8 @@ assert.commandWorked(t.createIndex({geo: "2d"}));
 let docs = [];
 let docId = 0;
 const points = 10;
-for (var x = -points; x < points; x += 1) {
-    for (var y = -points; y < points; y += 1) {
+for (let x = -points; x < points; x += 1) {
+    for (let y = -points; y < points; y += 1) {
         docs.push({_id: docId++, geo: [x, y]});
     }
 }

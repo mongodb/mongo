@@ -9,7 +9,7 @@ import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js
 
 export const $config = (function () {
     function makeQuery(options) {
-        var query = {};
+        let query = {};
         if (!options.multi) {
             query._id = Random.randInt(options.numDocs);
         }
@@ -19,14 +19,14 @@ export const $config = (function () {
 
     // returns an update doc
     function makeRandomUpdateDoc() {
-        var x = Random.randInt(5);
-        var y = Random.randInt(5);
+        let x = Random.randInt(5);
+        let y = Random.randInt(5);
         // ensure z is never 0, so the $inc is never 0, so we can assert nModified === nMatched
-        var z = Random.randInt(5) + 1;
-        var set = Random.rand() > 0.5;
-        var push = Random.rand() > 0.2;
+        let z = Random.randInt(5) + 1;
+        let set = Random.rand() > 0.5;
+        let push = Random.rand() > 0.2;
 
-        var updateDoc = {};
+        let updateDoc = {};
         updateDoc[set ? "$set" : "$unset"] = {x: x};
         updateDoc[push ? "$push" : "$pull"] = {y: y};
         updateDoc.$inc = {z: z};
@@ -34,19 +34,19 @@ export const $config = (function () {
         return updateDoc;
     }
 
-    var states = {
+    let states = {
         update: function update(db, collName) {
             // choose an update to apply
-            var updateDoc = makeRandomUpdateDoc();
+            let updateDoc = makeRandomUpdateDoc();
 
             // apply this update
-            var query = makeQuery({multi: this.multi, numDocs: this.numDocs});
-            var res = db[collName].update(query, updateDoc, {multi: this.multi});
+            let query = makeQuery({multi: this.multi, numDocs: this.numDocs});
+            let res = db[collName].update(query, updateDoc, {multi: this.multi});
             this.assertResult(res, db, collName, query);
         },
     };
 
-    var transitions = {update: {update: 1}};
+    let transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         assert.commandWorked(db[collName].createIndex({x: 1}));
@@ -58,8 +58,8 @@ export const $config = (function () {
         this.numDocs = Math.floor(this.threadCount / 3);
         assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
-        for (var i = 0; i < this.numDocs; ++i) {
-            var res = db[collName].insert({_id: i});
+        for (let i = 0; i < this.numDocs; ++i) {
+            let res = db[collName].insert({_id: i});
             assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }

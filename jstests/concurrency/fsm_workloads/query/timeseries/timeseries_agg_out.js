@@ -162,7 +162,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             [ErrorCodes.NamespaceExists],
         );
 
-        for (var i = 0; i < this.indexSpecs; ++i) {
+        for (let i = 0; i < this.indexSpecs; ++i) {
             const indexSpecs = this.indexSpecs[i];
             jsTestLog(`Running createIndex: coll=${this.outputCollName} indexSpec=${indexSpecs}`);
             assert.commandWorkedOrFailedWithCode(

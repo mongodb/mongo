@@ -59,7 +59,7 @@ outColl.drop();
     );
 
     const mapFn = function () {
-        for (var i = 0; i < this.tags.length; i++) emit(this.tags[i], 1);
+        for (let i = 0; i < this.tags.length; i++) emit(this.tags[i], 1);
     };
 
     const reduceFn = function (key, values) {

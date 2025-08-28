@@ -5,7 +5,7 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1, config: 2});
+let st = new ShardingTest({shards: 1, config: 2});
 
 let coll = st.config.settings;
 

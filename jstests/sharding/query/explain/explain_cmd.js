@@ -8,16 +8,16 @@ import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Create a cluster with 3 shards.
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
 var db = st.s.getDB("test");
-var explain;
+let explain;
 
 assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
 
 // Setup a collection that will be sharded. The shard key will be 'a'. There's also an index on
 // 'b'.
-var collSharded = db.getCollection("mongos_explain_cmd");
+let collSharded = db.getCollection("mongos_explain_cmd");
 collSharded.drop();
 collSharded.createIndex({a: 1});
 collSharded.createIndex({b: 1});
@@ -33,7 +33,7 @@ assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: 
 printjson(db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: 2}, to: st.shard1.shardName}));
 
 // Put data on each shard.
-for (var i = 0; i < 3; i++) {
+for (let i = 0; i < 3; i++) {
     collSharded.insert({_id: i, a: i, b: 1});
 }
 
@@ -63,7 +63,7 @@ assert.commandFailed(explain);
 // -------
 
 // Setup a collection that is not sharded.
-var collUnsharded = db.getCollection("mongos_explain_cmd_unsharded");
+let collUnsharded = db.getCollection("mongos_explain_cmd_unsharded");
 collUnsharded.drop();
 collUnsharded.createIndex({a: 1});
 collUnsharded.createIndex({b: 1});

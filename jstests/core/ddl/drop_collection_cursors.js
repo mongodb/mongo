@@ -12,13 +12,13 @@ let sub = t.sub;
 t.drop();
 sub.drop();
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.insert({});
     sub.insert({});
 }
 
-var cursor = t.find().batchSize(2);
-var subcursor = sub.find().batchSize(2);
+let cursor = t.find().batchSize(2);
+let subcursor = sub.find().batchSize(2);
 
 cursor.next();
 subcursor.next();

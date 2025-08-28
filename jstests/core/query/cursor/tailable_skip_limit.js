@@ -9,8 +9,8 @@
 
 // Test that tailable cursors work correctly with skip and limit.
 // Setup the capped collection.
-var collname = "jstests_tailable_skip_limit";
-var t = db[collname];
+let collname = "jstests_tailable_skip_limit";
+let t = db[collname];
 t.drop();
 assert.commandWorked(db.createCollection(collname, {capped: true, size: 1024}));
 
@@ -76,7 +76,7 @@ assert.eq(1, t.find().addOption(2).limit(1).itcount());
 t.drop();
 assert.commandWorked(db.createCollection(t.getName(), {capped: true, size: 1024}));
 
-var cmdRes = db.runCommand({find: t.getName(), tailable: true});
+let cmdRes = db.runCommand({find: t.getName(), tailable: true});
 assert.commandWorked(cmdRes);
 assert.eq(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, t.getFullName());

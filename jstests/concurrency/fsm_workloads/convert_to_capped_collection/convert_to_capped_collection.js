@@ -21,9 +21,9 @@
  */
 export const $config = (function () {
     // TODO: This workload may fail if an iteration multiplier is specified.
-    var data = {prefix: "convert_to_capped_collection"};
+    let data = {prefix: "convert_to_capped_collection"};
 
-    var states = (function () {
+    let states = (function () {
         function uniqueCollectionName(prefix, tid) {
             return prefix + "_" + tid;
         }
@@ -31,12 +31,12 @@ export const $config = (function () {
         function init(db, collName) {
             this.threadCollName = uniqueCollectionName(this.prefix, this.tid);
 
-            var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
-            for (var i = 0; i < (this.tid + 1) * 200; i++) {
+            let bulk = db[this.threadCollName].initializeUnorderedBulkOp();
+            for (let i = 0; i < (this.tid + 1) * 200; i++) {
                 bulk.insert({i: i, rand: Random.rand()});
             }
 
-            var res = bulk.execute();
+            let res = bulk.execute();
             assert.commandWorked(res);
             assert.eq((this.tid + 1) * 200, res.nInserted);
 
@@ -54,7 +54,7 @@ export const $config = (function () {
             assert(db[this.threadCollName].isCapped());
 
             // only the _id index should remain after running convertToCapped
-            var indexKeys = db[this.threadCollName].getIndexKeys();
+            let indexKeys = db[this.threadCollName].getIndexKeys();
             assert.eq(1, indexKeys.length);
             assert.docEq({_id: 1}, indexKeys[0]);
         }
@@ -62,7 +62,7 @@ export const $config = (function () {
         return {init: init, convertToCapped: convertToCapped};
     })();
 
-    var transitions = {init: {convertToCapped: 1}, convertToCapped: {convertToCapped: 1}};
+    let transitions = {init: {convertToCapped: 1}, convertToCapped: {convertToCapped: 1}};
 
     function setup(db, collName, cluster) {
         // Initial size should not be a power of 256.

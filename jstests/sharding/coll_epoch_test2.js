@@ -5,22 +5,22 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
+let st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 
 // Use separate mongos for reading, updating, inserting, removing data
-var readMongos = st.s1;
-var updateMongos = st.s2;
-var insertMongos = st.s3;
-var removeMongos = st.s4;
+let readMongos = st.s1;
+let updateMongos = st.s2;
+let insertMongos = st.s3;
+let removeMongos = st.s4;
 
-var config = st.s.getDB("config");
-var admin = st.s.getDB("admin");
-var coll = st.s.getCollection("foo.bar");
+let config = st.s.getDB("config");
+let admin = st.s.getDB("admin");
+let coll = st.s.getCollection("foo.bar");
 
 assert.commandWorked(insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
 
-var shards = [st.shard0, st.shard1];
+let shards = [st.shard0, st.shard1];
 
 //
 // Set up a sharded collection
@@ -74,7 +74,7 @@ coll.drop();
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 

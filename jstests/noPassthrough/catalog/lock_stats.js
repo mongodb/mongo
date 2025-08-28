@@ -5,9 +5,9 @@
 function testBlockTime(blockTimeMillis) {
     // Lock the database, and in parallel start an operation that needs the lock, so it blocks.
     assert.commandWorked(db.fsyncLock());
-    var startStats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
-    var startTime = new Date();
-    var minBlockedMillis = blockTimeMillis;
+    let startStats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
+    let startTime = new Date();
+    let minBlockedMillis = blockTimeMillis;
 
     let awaitSleepCmd = startParallelShell(() => {
         assert.commandWorked(db.adminCommand({sleep: 1, millis: 100, lock: "w", $comment: "Lock sleep"}));
@@ -15,7 +15,7 @@ function testBlockTime(blockTimeMillis) {
 
     // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
     assert.soon(function () {
-        var stats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
+        let stats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
         if (!stats.acquireWaitCount || !stats.acquireWaitCount.W) return false;
         if (!stats.timeAcquiringMicros || !stats.timeAcquiringMicros.W) return false;
         if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) return true;
@@ -29,8 +29,8 @@ function testBlockTime(blockTimeMillis) {
     awaitSleepCmd();
 
     // The fsync command from the shell cannot have possibly been blocked longer than this.
-    var maxBlockedMillis = new Date() - startTime;
-    var endStats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
+    let maxBlockedMillis = new Date() - startTime;
+    let endStats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
 
     //  The server was just started, so initial stats may be missing.
     if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) {
@@ -40,8 +40,8 @@ function testBlockTime(blockTimeMillis) {
         startStats.timeAcquiringMicros = {W: 0};
     }
 
-    var acquireWaitCount = endStats.acquireWaitCount.W - startStats.acquireWaitCount.W;
-    var blockedMillis = Math.floor((endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000);
+    let acquireWaitCount = endStats.acquireWaitCount.W - startStats.acquireWaitCount.W;
+    let blockedMillis = Math.floor((endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000);
 
     // Require that no other commands run (and maybe acquire locks) in parallel.
     assert.eq(acquireWaitCount, 1, "other commands ran in parallel, can't check timing");

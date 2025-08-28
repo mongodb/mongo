@@ -8,11 +8,11 @@ let st = new ShardingTest({shards: 1});
 let mongos = st.s0;
 
 let config = mongos.getDB("config");
-var shardName = st.shard0.shardName;
+let shardName = st.shard0.shardName;
 
 // Test adding shard with no zone to a new zone.
 assert.commandWorked(mongos.adminCommand({addShardToZone: shardName, zone: "x"}));
-var shardDoc = config.shards.findOne();
+let shardDoc = config.shards.findOne();
 assert.eq(["x"], shardDoc.tags);
 
 // Test adding zone to a shard with existing zones.

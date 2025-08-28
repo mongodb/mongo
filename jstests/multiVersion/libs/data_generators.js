@@ -18,10 +18,10 @@
 // }
 //
 function DataGenerator() {
-    var hexChars = "0123456789abcdefABCDEF";
-    var regexOptions = "igm";
-    var stringChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    var base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let hexChars = "0123456789abcdefABCDEF";
+    let regexOptions = "igm";
+    let stringChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     // Generator functions
     // BSON Type: -1
@@ -38,9 +38,9 @@ function DataGenerator() {
     // BSON Type: 2
     function GenString(seed) {
         var seed = seed || 0;
-        var text = "";
+        let text = "";
 
-        for (var i = 0; i < (seed % 1000) + 1; i++) {
+        for (let i = 0; i < (seed % 1000) + 1; i++) {
             text += stringChars.charAt((seed + (i % 10)) % stringChars.length);
         }
 
@@ -68,9 +68,9 @@ function DataGenerator() {
     function GenBinData(seed) {
         var seed = seed || 0;
 
-        var text = "";
+        let text = "";
 
-        for (var i = 0; i < (seed % 1000) + 1; i++) {
+        for (let i = 0; i < (seed % 1000) + 1; i++) {
             text += base64Chars.charAt((seed + (i % 10)) % base64Chars.length);
         }
 
@@ -93,9 +93,9 @@ function DataGenerator() {
     // BSON Type: 7
     function GenObjectId(seed) {
         var seed = seed || 0;
-        var hexString = "";
+        let hexString = "";
 
-        for (var i = 0; i < 24; i++) {
+        for (let i = 0; i < 24; i++) {
             hexString += hexChars.charAt((seed + (i % 10)) % hexChars.length);
         }
 
@@ -112,16 +112,16 @@ function DataGenerator() {
     function GenISODate(seed) {
         var seed = seed || 0;
 
-        var year = (seed % (2037 - 1970)) + 1970;
-        var month = (seed % 12) + 1;
-        var day = (seed % 27) + 1;
-        var hour = seed % 24;
-        var minute = seed % 60;
-        var second = seed % 60;
-        var millis = seed % 1000;
+        let year = (seed % (2037 - 1970)) + 1970;
+        let month = (seed % 12) + 1;
+        let day = (seed % 27) + 1;
+        let hour = seed % 24;
+        let minute = seed % 60;
+        let second = seed % 60;
+        let millis = seed % 1000;
 
         function pad(number, length) {
-            var str = "" + number;
+            let str = "" + number;
 
             while (str.length < length) {
                 str = "0" + str;
@@ -153,9 +153,9 @@ function DataGenerator() {
     // BSON Type: 11
     function GenRegExp(seed) {
         var seed = seed || 0;
-        var options = "";
+        let options = "";
 
-        for (var i = 0; i < (seed % 3) + 1; i++) {
+        for (let i = 0; i < (seed % 3) + 1; i++) {
             options += regexOptions.charAt((seed + (i % 10)) % regexOptions.length);
         }
 
@@ -326,7 +326,7 @@ function DataGenerator() {
     ];
 
     // Cursor interface
-    var i = 0;
+    let i = 0;
     return {
         "hasNext": function () {
             return i < testData.length;
@@ -388,7 +388,7 @@ function IndexDataGenerator(options) {
     // "aa"
     // "ba"
     // ...
-    var currentKey = "";
+    let currentKey = "";
     function getNextUniqueKey() {
         function setCharAt(str, index, chr) {
             if (index > str.length - 1) {
@@ -398,8 +398,8 @@ function IndexDataGenerator(options) {
         }
 
         // Index of the letter we are advancing in our current key
-        var currentKeyIndex = 0;
-        var keyChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let currentKeyIndex = 0;
+        let keyChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         do {
             // If we are advancing a letter that does not exist yet, append a new character and
@@ -428,14 +428,14 @@ function IndexDataGenerator(options) {
     //
 
     function GenSingleFieldIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = seed % 2 == 1 ? 1 : -1;
         return index;
     }
 
     function GenCompoundIndex(seed) {
-        var index = {};
-        var i;
+        let index = {};
+        let i;
         for (i = 0; i < (seed % 2) + 2; i++) {
             index[getNextUniqueKey()] = (seed + i) % 2 == 1 ? 1 : -1;
         }
@@ -443,9 +443,9 @@ function IndexDataGenerator(options) {
     }
 
     function GenNestedIndex(seed) {
-        var index = {};
-        var i;
-        var key = getNextUniqueKey();
+        let index = {};
+        let i;
+        let key = getNextUniqueKey();
         for (i = 0; i < (seed % 2) + 1; i++) {
             key += "." + getNextUniqueKey();
         }
@@ -454,35 +454,35 @@ function IndexDataGenerator(options) {
     }
 
     function Gen2dsphereIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "2dsphere";
         return index;
     }
 
     function Gen2dIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "2d";
         return index;
     }
 
     function GenTextIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "text";
         return index;
     }
 
     function GenHashedIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "hashed";
         return index;
     }
 
     function GenIndexOptions(seed) {
-        var attributes = {};
-        var i;
+        let attributes = {};
+        let i;
         for (i = 0; i < (seed % 2) + 1; i++) {
             // Mod 3 first to make sure the property type doesn't correlate with (seed % 2)
-            var propertyType = ((seed % 3) + i) % 2;
+            let propertyType = ((seed % 3) + i) % 2;
             if (propertyType == 0) {
                 attributes["expireAfterSeconds"] = (((seed + i) * 10000) % 9999) + 1000;
             }
@@ -498,11 +498,11 @@ function IndexDataGenerator(options) {
     }
 
     function Gen2dIndexOptions(seed) {
-        var attributes = GenIndexOptions(seed);
-        var i;
+        let attributes = GenIndexOptions(seed);
+        let i;
         for (i = 0; i < (seed % 2) + 1; i++) {
             // Mod 3 first to make sure the property type doesn't correlate with (seed % 2)
-            var propertyType = (seed + i) % 3;
+            let propertyType = (seed + i) % 3;
             // When using a 2d index, the following additional index properties are supported:
             // { "bits" : <bit precision>, "min" : <lower bound>, "max" : <upper bound> }
             if (propertyType == 0) {
@@ -567,7 +567,7 @@ function IndexDataGenerator(options) {
     ];
 
     // Cursor interface
-    var i = 0;
+    let i = 0;
     return {
         "hasNext": function () {
             return i < testIndexes.length;
@@ -600,10 +600,10 @@ function IndexDataGenerator(options) {
 // var metadata = generator.get();
 //
 function CollectionMetadataGenerator(options) {
-    var capped = true;
+    let capped = true;
     var options = options || {};
 
-    for (var option in options) {
+    for (let option in options) {
         if (options.hasOwnProperty(option)) {
             if (option === "capped") {
                 if (typeof options["capped"] !== "boolean") {
@@ -618,7 +618,7 @@ function CollectionMetadataGenerator(options) {
 
     // Collection metadata we are using as a source for testing
     // db.createCollection(name, {capped: <Boolean>, size: <number>, max <number>} )
-    var cappedCollectionMetadata = {
+    let cappedCollectionMetadata = {
         "capped": true,
         "size": 100000,
         "max": 2000,

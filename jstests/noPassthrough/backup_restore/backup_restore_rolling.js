@@ -25,7 +25,7 @@ if (_isWindows()) {
 }
 
 // Grab the storage engine, default is wiredTiger
-var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+let storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
 // if rsync is not available on the host, then this test is skipped
 if (!runProgram("bash", "-c", "which rsync")) {

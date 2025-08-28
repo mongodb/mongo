@@ -35,7 +35,7 @@ assert(myid !== undefined);
 
 // Sync cache to collection and ensure it arrived.
 assert.commandWorked(admin.runCommand({refreshLogicalSessionCacheNow: 1}));
-var resultArrayMine;
+let resultArrayMine;
 assert.soon(function () {
     const resultArray = listSessions().toArray();
     if (resultArray.length < 1) {

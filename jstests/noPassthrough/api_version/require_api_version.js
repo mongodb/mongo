@@ -228,7 +228,7 @@ function requireApiVersionDropConnectionTest() {
     );
 
     // Check that internal "hello"s triggered by `replSetUpdatePosition` were processed.
-    var logs = assert.commandWorked(db.adminCommand({getLog: "global", apiVersion: "1"})).log;
+    let logs = assert.commandWorked(db.adminCommand({getLog: "global", apiVersion: "1"})).log;
     assert(checkLogsForHelloFromReplCoordExternNetwork(logs));
 
     assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));

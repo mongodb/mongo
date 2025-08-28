@@ -31,7 +31,7 @@ assert.commandWorked(sessionColl.insertOne({}));
 jsTestLog("Start dropDatabase in parallel shell");
 
 // Wait for global X lock while blocked behind transaction with global IX lock.
-var awaitShell = startParallelShell(function () {
+let awaitShell = startParallelShell(function () {
     db.getSiblingDB("test2").dropDatabase();
 });
 

@@ -11,18 +11,18 @@
 //   requires_getmore,
 // ]
 
-var testDB = db.getSiblingDB("grow_hash_table");
+let testDB = db.getSiblingDB("grow_hash_table");
 
-var doTest = function (count) {
+let doTest = function (count) {
     print("Testing with count of " + count);
     testDB.dropDatabase();
-    var id = {data: 1};
-    var doc = {_id: id};
-    var projection = {};
+    let id = {data: 1};
+    let doc = {_id: id};
+    let projection = {};
 
     // Create a document and a projection with fields r1, r2, r3 ...
-    for (var i = 1; i <= count; ++i) {
-        var r = "r" + i;
+    for (let i = 1; i <= count; ++i) {
+        let r = "r" + i;
         doc[r] = i;
         projection[r] = 1;
     }
@@ -32,7 +32,7 @@ var doTest = function (count) {
 
     // Try to read the document using a large projection
     try {
-        var findCount = testDB.collection.find({_id: id}, projection).itcount();
+        let findCount = testDB.collection.find({_id: id}, projection).itcount();
         assert(findCount == 1, "Failed to find single stored document, find().itcount() == " + findCount);
     } catch (e) {
         testDB.dropDatabase();

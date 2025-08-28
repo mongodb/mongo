@@ -54,7 +54,7 @@ function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
 }
 
 function makeWorkerFilterWithAction(session, action, txnNumber, txnRetryCounter) {
-    var filter = {
+    let filter = {
         "twoPhaseCommitCoordinator.lsid.id": session.getSessionId().id,
         "twoPhaseCommitCoordinator.txnNumber": NumberLong(txnNumber),
         "twoPhaseCommitCoordinator.action": action,
@@ -80,7 +80,7 @@ function enableFailPoints(shard, failPointNames) {
 function startTransaction(session, collectionName, insertValue) {
     const dbName = session.getDatabase("test");
     jsTest.log(`Starting a new transaction on ${dbName}.${collectionName}`);
-    var insertCmdObj = {
+    let insertCmdObj = {
         insert: collectionName,
         documents: [{_id: -1 * insertValue}, {_id: insertValue}],
         lsid: session.getSessionId(),
@@ -130,7 +130,7 @@ jsTest.log("Testing that coordinator threads show up in currentOp for a commit d
     let lsid = session.getSessionId();
     let commitJoin = commitTxn(st, lsid, txnNumber);
 
-    var coordinateCommitFilter = {
+    let coordinateCommitFilter = {
         active: true,
         "command.coordinateCommitTransaction": 1,
         "command.lsid.id": session.getSessionId().id,
@@ -193,7 +193,7 @@ jsTest.log("Testing that coordinator threads show up in currentOp for an abort d
     let txnRetryCounter = NumberInt(0);
     // Manually abort the transaction on one of the participants, so that the participant fails to
     // prepare and failpoint is triggered on the coordinator.
-    var abortTransactionCmd = {
+    let abortTransactionCmd = {
         abortTransaction: 1,
         lsid: lsid,
         txnNumber: txnNumber,

@@ -25,7 +25,7 @@ export const $config = (function () {
     }
 
     function countDocuments(coll, query) {
-        var count;
+        let count;
         assert.soon(() => {
             try {
                 count = coll.countDocuments(query);
@@ -288,7 +288,7 @@ export const $config = (function () {
                 });
             }
 
-            var bulkWriteCmd = {
+            let bulkWriteCmd = {
                 bulkWrite: 1,
                 ops: bulkWriteOps,
                 nsInfo: [{ns: fullNs1}, {ns: fullNs2}],
@@ -306,7 +306,7 @@ export const $config = (function () {
                 bulkWriteCmd = session._serverSession.assignTransactionNumber(bulkWriteCmd);
 
                 // Check if insert succeeded
-                var res = db.adminCommand(bulkWriteCmd);
+                let res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
                 assert.eq(res.nErrors, 0, "BulkWrite - Insert errored when not expected to: " + tojson(res));
 
@@ -332,7 +332,7 @@ export const $config = (function () {
                 res = db.adminCommand(bulkWriteCmd);
                 if (res.nErrors != 0) {
                     // Should only be possible for the first namespace to be renamed.
-                    var err = res.cursor.firstBatch[0].code;
+                    let err = res.cursor.firstBatch[0].code;
                     if (err == ErrorCodes.QueryPlanKilled) {
                         // Update is expected to throw ErrorCodes::QueryPlanKilled if performed
                         // concurrently with a rename (SERVER-31695).

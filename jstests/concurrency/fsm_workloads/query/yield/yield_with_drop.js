@@ -63,7 +63,7 @@ export const $config = (function () {
         },
     };
 
-    var states = {
+    let states = {
         query: function query(db, collName) {
             let cmdRes = db.runCommand({find: collName, filter: {c: {$lt: this.nDocs}}, batchSize: this.nDocs});
             assert.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);

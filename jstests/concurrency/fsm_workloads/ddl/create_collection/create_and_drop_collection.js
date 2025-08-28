@@ -6,9 +6,9 @@
  * @tags: [requires_sharding]
  */
 export const $config = (function () {
-    var data = {};
+    let data = {};
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.docNum = 0;
             assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
@@ -52,7 +52,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         init: {dropCollection: 0.5, dropDatabase: 0.5},
         createShardedCollection: {dropCollection: 0.5, dropDatabase: 0.5},
         createUnshardedCollection: {dropCollection: 0.5, dropDatabase: 0.5},

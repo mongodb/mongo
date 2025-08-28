@@ -16,7 +16,7 @@ import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/ch
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTestLog("creating sharding test");
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });

@@ -12,7 +12,7 @@ Array.from({length: 20}, (_, i) => ({x: 4, y: i})).forEach((doc) => bulk.insert(
 assert.commandWorked(bulk.execute());
 
 // Test pipelines with $skip before $limit.
-var count = coll.aggregate([{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]).itcount();
+let count = coll.aggregate([{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]).itcount();
 assert.eq(count, 5);
 
 count = coll.aggregate([{$match: {x: 4}}, {$skip: 7}, {$skip: 3}, {$limit: 5}]).itcount();

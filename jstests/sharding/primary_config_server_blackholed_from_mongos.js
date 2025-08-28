@@ -17,7 +17,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     mongos: 1,
     useBridge: true,
@@ -27,14 +27,14 @@ var st = new ShardingTest({
     other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}},
 });
 
-var testDB = st.s.getDB("BlackHoleDB");
-var configDB = st.s.getDB("config");
+let testDB = st.s.getDB("BlackHoleDB");
+let configDB = st.s.getDB("config");
 
 assert.commandWorked(testDB.adminCommand({enableSharding: "BlackHoleDB"}));
 assert.commandWorked(testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
 
-var bulk = testDB.ShardedColl.initializeUnorderedBulkOp();
-for (var i = 0; i < 1000; i++) {
+let bulk = testDB.ShardedColl.initializeUnorderedBulkOp();
+for (let i = 0; i < 1000; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());

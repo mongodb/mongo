@@ -452,7 +452,7 @@ function runTestCase(test, testCase, forceWriteConcernError, testFixture) {
             `\nEnv: sharded=${isSharded}, forceWriteConcernError=${forceWriteConcernError}`,
     );
 
-    var ctx;
+    let ctx;
     const db = testFixture.db;
     if (!testCase.skipSetup && test.setup) {
         ctx = test.setup(db);

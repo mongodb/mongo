@@ -21,20 +21,20 @@ TestData.skipCheckShardFilteringMetadata = true;
 // removes the replica set primary from a shard.
 TestData.skipCheckRoutingTableConsistency = true;
 
-var numDocs = 2000;
-var baseName = "shard_insert_getlasterror_w2";
-var testDBName = baseName;
-var testCollName = "coll";
-var replNodes = 3;
+let numDocs = 2000;
+let baseName = "shard_insert_getlasterror_w2";
+let testDBName = baseName;
+let testCollName = "coll";
+let replNodes = 3;
 
 // ~1KB string
-var textString = "";
-for (var i = 0; i < 40; i++) {
+let textString = "";
+for (let i = 0; i < 40; i++) {
     textString += "abcdefghijklmnopqrstuvwxyz";
 }
 
 // Spin up a sharded cluster, but do not add the shards
-var shardingTestConfig = {
+let shardingTestConfig = {
     name: baseName,
     mongos: 1,
     shards: 1,
@@ -46,22 +46,22 @@ var shardingTestConfig = {
     // electionTimeoutMillis to its default value.
     initiateWithDefaultElectionTimeout: true,
 };
-var shardingTest = new ShardingTest(shardingTestConfig);
+let shardingTest = new ShardingTest(shardingTestConfig);
 
 // Get connection to the individual shard
-var replSet1 = shardingTest.rs0;
+let replSet1 = shardingTest.rs0;
 
 // Add data to it
-var testDBReplSet1 = replSet1.getPrimary().getDB(testDBName);
-var bulk = testDBReplSet1.foo.initializeUnorderedBulkOp();
+let testDBReplSet1 = replSet1.getPrimary().getDB(testDBName);
+let bulk = testDBReplSet1.foo.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocs; i++) {
     bulk.insert({x: i, text: textString});
 }
 assert.commandWorked(bulk.execute());
 
 // Get connection to mongos for the cluster
-var mongosConn = shardingTest.s;
-var testDB = mongosConn.getDB(testDBName);
+let mongosConn = shardingTest.s;
+let testDB = mongosConn.getDB(testDBName);
 
 // Add replSet1 as only shard
 assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
@@ -85,8 +85,8 @@ for (let i = numDocs; i < 2 * numDocs; i++) {
 assert.commandWorked(bulk.execute({w: replNodes, wtimeout: 30000}));
 
 // Take down two nodes and make sure secondaryOk reads still work
-var primary = replSet1.getPrimary();
-var [secondary1, secondary2] = replSet1.getSecondaries();
+let primary = replSet1.getPrimary();
+let [secondary1, secondary2] = replSet1.getSecondaries();
 replSet1.stop(secondary1);
 replSet1.stop(secondary2);
 replSet1.awaitSecondaryNodes(null, [primary]);

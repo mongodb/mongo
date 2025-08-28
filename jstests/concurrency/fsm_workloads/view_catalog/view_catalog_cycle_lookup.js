@@ -18,7 +18,7 @@ export const $config = (function () {
     // to be unique.
     const prefix = "view_catalog_cycle_lookup_";
 
-    var data = {
+    let data = {
         viewList: ["viewA", "viewB", "viewC", "viewD", "viewE"].map((viewName) => prefix + viewName),
         getRandomView: function (viewList) {
             return viewList[Random.randInt(viewList.length)];
@@ -80,7 +80,7 @@ export const $config = (function () {
         },
     };
 
-    var states = (function () {
+    let states = (function () {
         /**
          * Redefines a view definition by changing the namespace it is a view on. This may lead to
          * a failed command if the given collMod would introduce a cycle. We ignore this error as it
@@ -160,7 +160,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         remapViewToView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
         remapViewToCollection: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
         readFromView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},

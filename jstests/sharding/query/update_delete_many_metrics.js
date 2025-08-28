@@ -61,7 +61,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     assert.commandWorked(unshardedColl.updateMany({}, {$set: {array: "string", doc: "string"}}));
 
     // batch update: 2 more, so 7 updates in total
-    var request = {
+    let request = {
         update: shardedColl.getName(),
         updates: [
             {q: {}, u: {$set: {c: 3}}, multi: true},

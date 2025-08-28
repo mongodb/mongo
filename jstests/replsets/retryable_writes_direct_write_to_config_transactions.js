@@ -4,13 +4,13 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.disableImplicitSessions = true;
 
-var replTest = new ReplSetTest({nodes: 2});
+let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
-var priConn = replTest.getPrimary();
+let priConn = replTest.getPrimary();
 var db = priConn.getDB("TestDB");
-var config = priConn.getDB("config");
+let config = priConn.getDB("config");
 
 assert.commandWorked(db.user.insert({_id: 0}));
 assert.commandWorked(db.user.insert({_id: 1}));
@@ -74,7 +74,7 @@ assert.eq(1, db.user.find({_id: 2}).toArray()[0].x);
 // Ensure dropping the `config.transactions` collection breaks the retryable writes feature, but
 // doesn't crash the server
 assert(config.transactions.drop());
-var res = assert.commandWorkedIgnoringWriteErrors(db.runCommand(cmdObj2));
+let res = assert.commandWorkedIgnoringWriteErrors(db.runCommand(cmdObj2));
 assert.eq(0, res.nModified);
 assert.eq(1, db.user.find({_id: 1}).toArray()[0].x);
 

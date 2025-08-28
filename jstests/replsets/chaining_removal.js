@@ -3,13 +3,13 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 
-var numNodes = 5;
-var host = getHostName();
-var name = "chaining_removal";
+let numNodes = 5;
+let host = getHostName();
+let name = "chaining_removal";
 
-var replTest = new ReplSetTest({name: name, nodes: numNodes});
-var nodes = replTest.startSet();
-var port = replTest.ports;
+let replTest = new ReplSetTest({name: name, nodes: numNodes});
+let nodes = replTest.startSet();
+let port = replTest.ports;
 replTest.initiate({
     _id: name,
     members: [
@@ -21,7 +21,7 @@ replTest.initiate({
     ],
 });
 replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, nodes, nodes[0]);
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
 assert.commandWorked(
@@ -48,8 +48,8 @@ syncFrom(nodes[1], nodes[0], replTest);
 syncFrom(nodes[4], nodes[1], replTest);
 
 // write that should reach all nodes
-var timeout = ReplSetTest.kDefaultTimeoutMS;
-var options = {writeConcern: {w: numNodes, wtimeout: timeout}};
+let timeout = ReplSetTest.kDefaultTimeoutMS;
+let options = {writeConcern: {w: numNodes, wtimeout: timeout}};
 assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, options));
 
 // Re-enable 'maxSyncSourceLagSecs' checking on sync source.
@@ -60,7 +60,7 @@ assert.commandWorked(
     nodes[4].getDB("admin").runCommand({configureFailPoint: "disableMaxSyncSourceLagSecs", mode: "off"}),
 );
 
-var config = primary.getDB("local").system.replset.findOne();
+let config = primary.getDB("local").system.replset.findOne();
 config.members.pop();
 config.version++;
 // remove node 4

@@ -779,7 +779,7 @@ const session = shardAdminDB.getMongo().startSession();
 
 // Run an operation prior to starting the transaction and save its operation time.
 const sessionDB = session.getDatabase(shardTestDB.getName());
-var operationTime = undefined;
+let operationTime = undefined;
 assert.soonNoExcept(() => {
     const res = assert.commandWorked(sessionDB.runCommand({insert: "test", documents: [{x: 1}]}));
     operationTime = res.operationTime;

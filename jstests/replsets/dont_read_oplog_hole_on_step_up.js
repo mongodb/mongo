@@ -11,7 +11,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest({
+let rst = new ReplSetTest({
     name: TestData.testName,
     // The long election timeout results in a 30-second getMore, plenty of time to hit bugs.
     settings: {chainingAllowed: true, electionTimeoutMillis: 60 * 1000},

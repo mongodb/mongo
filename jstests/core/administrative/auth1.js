@@ -9,7 +9,7 @@
 //   requires_non_retryable_commands,
 // ]
 
-var mydb = db.getSiblingDB("auth1_db");
+let mydb = db.getSiblingDB("auth1_db");
 mydb.dropAllUsers();
 
 let pass = "a" + Math.random();
@@ -30,7 +30,7 @@ assert(mydb.auth("eliot", pass2), "what?");
 mydb.dropUser("eliot");
 assert(!mydb.auth("eliot", pass2), "didn't drop user");
 
-var a = mydb.getMongo().getDB("admin");
+let a = mydb.getMongo().getDB("admin");
 a.dropAllUsers();
 pass = "c" + Math.random();
 a.createUser({user: "super", pwd: pass, roles: jsTest.adminUserRoles});
@@ -47,7 +47,7 @@ assert.commandFailed(mydb.runCommand({authenticate: 1, user: "eliot", nonce: "fo
 
 // check sanity check SERVER-3003
 
-var before = a.system.users.count({db: mydb.getName()});
+let before = a.system.users.count({db: mydb.getName()});
 
 assert.throws(
     function () {
@@ -64,7 +64,7 @@ assert.throws(
     "C2",
 );
 
-var after = a.system.users.count({db: mydb.getName()});
+let after = a.system.users.count({db: mydb.getName()});
 assert(before > 0, "C3");
 assert.eq(before, after, "C4");
 

@@ -14,7 +14,7 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     };
 
     StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
-        var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
+        let options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
         this.mongod = MongoRunner.runMongod(options);
         assert.neq(this.mongod, null);
         test.exec(this.mongod.getDB("test")[test.name]);
@@ -172,9 +172,9 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
         assert.eq(typeof test.load, "function");
         assert.eq(typeof test.name, "string");
 
-        var fixtureType = TestData.fixture || "standalone";
+        let fixtureType = TestData.fixture || "standalone";
 
-        var fixture = null;
+        let fixture = null;
         if (fixtureType === "standalone") {
             fixture = new StandaloneFixture();
         } else if (fixtureType === "sharded") {
@@ -191,16 +191,16 @@ export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     };
 
     cycleN = function* (arr, N) {
-        for (var i = 0; i < N; ++i) {
+        for (let i = 0; i < N; ++i) {
             yield arr[i % arr.length];
         }
     };
 
     zip2 = function* (iter1, iter2) {
-        var n1 = iter1.next();
-        var n2 = iter2.next();
+        let n1 = iter1.next();
+        let n2 = iter2.next();
         while (!n1.done || !n2.done) {
-            var res = [];
+            let res = [];
             if (!n1.done) {
                 res.push(n1.value);
                 n1 = iter1.next();

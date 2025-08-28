@@ -14,15 +14,15 @@
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         shardKey: {tid: 1},
     };
 
-    var states = (function () {
+    let states = (function () {
         // Use the workload name as the field name (since it is assumed
         // to be unique) to avoid any potential issues with large keys
         // and indexes on the collection.
-        var uniqueFieldName = "findAndModify_update_grow";
+        let uniqueFieldName = "findAndModify_update_grow";
 
         function makeStringOfLength(length) {
             return "x".repeat(length);
@@ -31,17 +31,17 @@ export const $config = (function () {
         function makeDoc(tid) {
             // Use 32-bit integer for representing 'length' property
             // to ensure $mul does integer multiplication
-            var doc = {_id: new ObjectId(), tid: tid, length: new NumberInt(1)};
+            let doc = {_id: new ObjectId(), tid: tid, length: new NumberInt(1)};
             doc[uniqueFieldName] = makeStringOfLength(doc.length);
             return doc;
         }
 
         function insert(db, collName) {
-            var doc = makeDoc(this.tid);
+            let doc = makeDoc(this.tid);
             this.length = doc.length;
             this.bsonsize = Object.bsonsize(doc);
 
-            var res = db[collName].insert(doc);
+            let res = db[collName].insert(doc);
             assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }
@@ -54,7 +54,7 @@ export const $config = (function () {
             }
 
             // Get the DiskLoc of the document before its potential move
-            var before = db[collName]
+            let before = db[collName]
                 .find({tid: this.tid})
                 .showDiskLoc()
                 .sort({length: 1}) // fetch document of smallest size
@@ -63,14 +63,14 @@ export const $config = (function () {
 
             // Increase the length of the 'findAndModify_update_grow' string
             // to double the size of the overall document
-            var factor = Math.ceil((2 * this.bsonsize) / this.length);
-            var updatedLength = factor * this.length;
-            var updatedValue = makeStringOfLength(updatedLength);
+            let factor = Math.ceil((2 * this.bsonsize) / this.length);
+            let updatedLength = factor * this.length;
+            let updatedValue = makeStringOfLength(updatedLength);
 
-            var update = {$set: {}, $mul: {length: factor}};
+            let update = {$set: {}, $mul: {length: factor}};
             update.$set[uniqueFieldName] = updatedValue;
 
-            var res = db.runCommand({
+            let res = db.runCommand({
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {length: 1}, // fetch document of smallest size
@@ -79,7 +79,7 @@ export const $config = (function () {
             });
             assert.commandWorked(res);
 
-            var doc = res.value;
+            let doc = res.value;
             assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
             if (doc === null) {
@@ -94,7 +94,7 @@ export const $config = (function () {
             this.bsonsize = Object.bsonsize(doc);
 
             // Get the DiskLoc of the document after its potential move
-            var after = db[collName].find({_id: before._id}).showDiskLoc().next();
+            let after = db[collName].find({_id: before._id}).showDiskLoc().next();
 
             if (isMongod(db)) {
                 // Even though the document has at least doubled in size, the document
@@ -109,7 +109,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {insert: {findAndModify: 1}, findAndModify: {findAndModify: 1}};
+    let transitions = {insert: {findAndModify: 1}, findAndModify: {findAndModify: 1}};
 
     return {
         threadCount: 20,

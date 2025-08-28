@@ -10,12 +10,12 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
-var numDocs = 10000;
-var baseName = "moveprimary-replset";
-var testDBName = baseName;
-var testCollName = "coll";
+let numDocs = 10000;
+let baseName = "moveprimary-replset";
+let testDBName = baseName;
+let testCollName = "coll";
 
-var shardingTestConfig = {
+let shardingTestConfig = {
     name: baseName,
     mongos: 1,
     shards: 2,
@@ -24,19 +24,19 @@ var shardingTestConfig = {
     other: {manualAddShard: true},
 };
 
-var shardingTest = new ShardingTest(shardingTestConfig);
+let shardingTest = new ShardingTest(shardingTestConfig);
 
-var replSet1 = shardingTest.rs0;
-var replSet2 = shardingTest.rs1;
+let replSet1 = shardingTest.rs0;
+let replSet2 = shardingTest.rs1;
 
-var repset1DB = replSet1.getPrimary().getDB(testDBName);
-for (var i = 1; i <= numDocs; i++) {
+let repset1DB = replSet1.getPrimary().getDB(testDBName);
+for (let i = 1; i <= numDocs; i++) {
     repset1DB[testCollName].insert({x: i});
 }
 replSet1.awaitReplication();
 
-var mongosConn = shardingTest.s;
-var testDB = mongosConn.getDB(testDBName);
+let mongosConn = shardingTest.s;
+let testDB = mongosConn.getDB(testDBName);
 
 mongosConn.adminCommand({addshard: replSet1.getURL()});
 

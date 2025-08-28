@@ -21,7 +21,7 @@ const topologyVersionField = res.topologyVersion;
 jsTestLog("Running {sleep:1, lock: 'w'} to grab global write lock");
 const sleepCmd = function (topologyVersionField) {
     // Run for 10 minutes if not interrupted.
-    var res = assert.commandFailedWithCode(
+    let res = assert.commandFailedWithCode(
         db.adminCommand({sleep: 1, lock: "w", seconds: 60 * 10}),
         ErrorCodes.InterruptedDueToReplSetStateChange,
     );

@@ -4,12 +4,12 @@
  */
 // @tags: [requires_profiling]
 // Set up namespaces a and b.
-var admin = db.getMongo().getDB("admin");
-var db_a = db.getMongo().getDB("db_a");
-var db_b = db.getMongo().getDB("db_b");
+let admin = db.getMongo().getDB("admin");
+let db_a = db.getMongo().getDB("db_a");
+let db_b = db.getMongo().getDB("db_b");
 
-var a = db_a.rename7;
-var b = db_b.rename7;
+let a = db_a.rename7;
+let b = db_b.rename7;
 
 // Ensure that the databases are created
 db_a.coll.insert({});

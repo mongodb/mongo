@@ -3,21 +3,21 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect, wait} from "jstests/replsets/rslib.js";
 
-var basename = "jstests_initsync4";
+let basename = "jstests_initsync4";
 
 jsTestLog("1. Bring up set");
-var replTest = new ReplSetTest({name: basename, nodes: 1});
+let replTest = new ReplSetTest({name: basename, nodes: 1});
 replTest.startSet();
 replTest.initiate();
 
-var m = replTest.getPrimary();
-var md = m.getDB("d");
-var mc = m.getDB("d")["c"];
+let m = replTest.getPrimary();
+let md = m.getDB("d");
+let mc = m.getDB("d")["c"];
 
 jsTestLog("2. Insert some data");
-var N = 5000;
+let N = 5000;
 mc.createIndex({x: 1});
-var bulk = mc.initializeUnorderedBulkOp();
+let bulk = mc.initializeUnorderedBulkOp();
 for (var i = 0; i < N; ++i) {
     bulk.insert({_id: i, x: i, a: {}});
 }
@@ -27,11 +27,11 @@ jsTestLog("3. Make sure synced");
 replTest.awaitReplication();
 
 jsTestLog("4. Bring up a new node");
-var hostname = getHostName();
+let hostname = getHostName();
 
-var s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
+let s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
 
-var config = replTest.getReplSetConfig();
+let config = replTest.getReplSetConfig();
 config.version = replTest.getReplSetConfigFromNode().version + 1;
 config.members.push({_id: 2, host: hostname + ":" + s.port, priority: 0, votes: 0});
 try {
@@ -45,7 +45,7 @@ assert.eq(m, replTest.getPrimary(), "Primary changed after reconfig");
 jsTestLog("5. Wait for new node to start cloning");
 
 s.setSecondaryOk();
-var sc = s.getDB("d")["c"];
+let sc = s.getDB("d")["c"];
 
 wait(function () {
     printjson(sc.stats());
@@ -67,7 +67,7 @@ assert.eq(N * 2, mc.find().itcount());
 
 jsTestLog("7. Wait for new node to become SECONDARY");
 wait(function () {
-    var status = s.getDB("admin").runCommand({replSetGetStatus: 1});
+    let status = s.getDB("admin").runCommand({replSetGetStatus: 1});
     printjson(status);
     return status.members && status.members[1].state == 2;
 });

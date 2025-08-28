@@ -19,8 +19,8 @@ import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 TestData.disableImplicitSessions = true;
 
 // constants
-var testUser = "userDefinedRolesTestUser";
-var testRole = "userDefinedRolesTestRole";
+let testUser = "userDefinedRolesTestUser";
+let testRole = "userDefinedRolesTestRole";
 
 function doTestSetup(conn, t, testcase, privileges) {
     const admin = conn.getDB("admin");
@@ -145,7 +145,7 @@ function runOneTest(conn, t) {
             (testcase.privileges.length == 1 && testcase.privileges[0].actions.length > 1) ||
             testcase.privileges.length > 1
         ) {
-            for (var j = 0; j < testcase.privileges.length; j++) {
+            for (let j = 0; j < testcase.privileges.length; j++) {
                 const p = testcase.privileges[j];
                 const resource = p.resource;
                 const actions = p.actions;

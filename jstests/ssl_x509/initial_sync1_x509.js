@@ -2,7 +2,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var common_options = {
+let common_options = {
     keyFile: "jstests/libs/key1",
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: "jstests/libs/server.pem",
@@ -12,7 +12,7 @@ var common_options = {
 
 function runInitialSyncTest() {
     print("1. Bring up set");
-    var replTest = new ReplSetTest({
+    let replTest = new ReplSetTest({
         name: "jstests_initsync1_x509",
         nodes: {node0: x509_options1, node1: x509_options2},
         waitForKeys: false,
@@ -20,9 +20,9 @@ function runInitialSyncTest() {
     replTest.startSet();
     replTest.initiate();
 
-    var primary = replTest.getPrimary();
-    var foo = primary.getDB("foo");
-    var admin = primary.getDB("admin");
+    let primary = replTest.getPrimary();
+    let foo = primary.getDB("foo");
+    let admin = primary.getDB("admin");
 
     print("2. Create a root user.");
     admin.createUser({user: "root", pwd: "pass", roles: ["root"]});
@@ -31,8 +31,8 @@ function runInitialSyncTest() {
     });
 
     print("3. Insert some data");
-    var bulk = foo.bar.initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++) {
+    let bulk = foo.bar.initializeUnorderedBulkOp();
+    for (let i = 0; i < 100; i++) {
         bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
     }
     assert.commandWorked(bulk.execute());

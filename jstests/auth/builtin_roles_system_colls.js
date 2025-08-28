@@ -42,8 +42,8 @@ function testBackupSystemCollStats(adminDB) {
 
 // ************************************************************
 
-var conn = MongoRunner.runMongod({auth: ""});
-var adminDB = conn.getDB("admin");
+let conn = MongoRunner.runMongod({auth: ""});
+let adminDB = conn.getDB("admin");
 adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
 
 testUserAdminAnyDatabaseSystemCollIndexing(adminDB);

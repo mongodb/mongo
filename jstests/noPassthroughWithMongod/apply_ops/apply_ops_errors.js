@@ -12,7 +12,7 @@
  * This is all in accordance with SERVER-10771.
  */
 
-var coll = db.apply_ops_errors;
+let coll = db.apply_ops_errors;
 coll.drop();
 
 // Scenario 1: only one operation

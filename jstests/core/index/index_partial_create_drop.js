@@ -14,13 +14,13 @@
 
 // Test partial index creation and drops.
 
-var coll = db.index_partial_create_drop;
+let coll = db.index_partial_create_drop;
 
-var getNumKeys = function (idxName) {
-    var res = assert.commandWorked(coll.validate({full: true}));
-    var kpi;
+let getNumKeys = function (idxName) {
+    let res = assert.commandWorked(coll.validate({full: true}));
+    let kpi;
 
-    var isShardedNS = res.hasOwnProperty("raw");
+    let isShardedNS = res.hasOwnProperty("raw");
     if (isShardedNS) {
         kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
     } else {
@@ -53,7 +53,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
 assert(coll.drop());
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({x: i, a: i}));
 }
 

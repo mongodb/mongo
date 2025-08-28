@@ -409,7 +409,7 @@ export class MongotMock {
         assert(checkProgram(this.pid));
 
         // Wait for connection to be established with server
-        var conn = null;
+        let conn = null;
         const pid = this.pid;
         const useGRPC = this.useGRPC();
 
@@ -432,7 +432,7 @@ export class MongotMock {
                     conn.pid = pid;
                     return true;
                 } catch (e) {
-                    var res = checkProgram(pid);
+                    let res = checkProgram(pid);
                     if (!res.alive) {
                         print(
                             "Could not start mongo program at " +

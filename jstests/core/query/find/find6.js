@@ -31,7 +31,7 @@ function f() {
     assert.eq(0, q.find({"a.0": {$lt: 0}}).count(), "da4");
 }
 
-for (var pass = 0; pass <= 1; pass++) {
+for (let pass = 0; pass <= 1; pass++) {
     f();
     q.createIndex({a: 1});
 }

@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // it has been signed with a dummy key results in an authorization error.
 TestData.skipGossipingClusterTime = true;
 
-var testInvalidAuthStates = function (replSetTest) {
+let testInvalidAuthStates = function (replSetTest) {
     jsTestLog("check that 0 is in recovering");
     replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
 
@@ -25,16 +25,16 @@ var testInvalidAuthStates = function (replSetTest) {
     replSetTest.awaitSecondaryNodes(null, [replSetTest.nodes[0]]);
 };
 
-var name = "rs_auth2";
-var path = "jstests/libs/";
+let name = "rs_auth2";
+let path = "jstests/libs/";
 
 // These keyFiles have their permissions set to 600 later in the test.
-var key1 = path + "key1";
-var key2 = path + "key2";
+let key1 = path + "key1";
+let key2 = path + "key2";
 
-var replSetTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
-var nodes = replSetTest.startSet();
-var hostnames = replSetTest.nodeList();
+let replSetTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
+let nodes = replSetTest.startSet();
+let hostnames = replSetTest.nodeList();
 replSetTest.initiate(
     {
         "_id": name,
@@ -48,7 +48,7 @@ replSetTest.initiate(
     {initiateWithDefaultElectionTimeout: true},
 );
 
-var primary = replSetTest.getPrimary();
+let primary = replSetTest.getPrimary();
 
 jsTestLog("add an admin user");
 primary

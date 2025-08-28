@@ -15,7 +15,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // For startParallelOps to write its state
-var staticMongod = MongoRunner.runMongod({});
+let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
@@ -26,7 +26,7 @@ let serverStatusRes = priConn.adminCommand({serverStatus: 1});
 assert.eq(0, serverStatusRes.shardingStatistics.unfinishedMigrationFromPreviousPrimary, tojson(serverStatusRes));
 
 pauseMoveChunkAtStep(priConn, moveChunkStepNames.reachedSteadyState);
-var joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {x: 0}, null, "test.user", st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {x: 0}, null, "test.user", st.shard1.shardName);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 

@@ -1,11 +1,11 @@
-var c = db[jsTestName()];
+let c = db[jsTestName()];
 
 // A 32 bit overflow spills to 64 bits
 c.drop();
 c.save({a: NumberInt("2147483647")});
-var updateResult = c.update({}, {$inc: {a: NumberInt(1)}});
+let updateResult = c.update({}, {$inc: {a: NumberInt(1)}});
 assert.eq(1, updateResult.nMatched, "Object not modified");
-var res = c.findOne();
+let res = c.findOne();
 assert.eq(
     NumberLong,
     res.a.constructor,

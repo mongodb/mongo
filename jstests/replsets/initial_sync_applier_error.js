@@ -12,22 +12,22 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "initial_sync_applier_error";
-var replSet = new ReplSetTest({
+let name = "initial_sync_applier_error";
+let replSet = new ReplSetTest({
     name: name,
     nodes: [{}, {rsConfig: {arbiterOnly: true}}],
 });
 
 replSet.startSet();
 replSet.initiate();
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 
-var coll = primary.getDB("test").getCollection(name);
+let coll = primary.getDB("test").getCollection(name);
 assert.commandWorked(coll.insert({_id: 0, content: "hi"}));
 
 // Add a secondary node but make it hang after retrieving the last op on the source
 // but before copying databases.
-var secondary = replSet.add({setParameter: "numInitialSyncAttempts=2", rsConfig: {votes: 0, priority: 0}});
+let secondary = replSet.add({setParameter: "numInitialSyncAttempts=2", rsConfig: {votes: 0, priority: 0}});
 secondary.setSecondaryOk();
 
 let failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
@@ -36,7 +36,7 @@ replSet.reInitiate();
 // Wait for fail point message to be logged.
 failPoint.wait();
 
-var newCollName = name + "_2";
+let newCollName = name + "_2";
 assert.commandWorked(coll.renameCollection(newCollName, true));
 failPoint.off();
 

@@ -6,11 +6,11 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 
 const configDB = st.s.getDB("config");
 const dbName = "testDropCollDB";
-var dbCounter = 0;
+let dbCounter = 0;
 
 function getCollectionUUID(ns) {
     return configDB.collections.findOne({_id: ns}).uuid;
@@ -95,7 +95,7 @@ jsTest.log("Drop sharded collection repeated.");
     const coll = db["shardedColl0"];
     // Create the database
     assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
-    for (var i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
         // Create the collection
         assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
         assert.commandWorked(coll.insert({x: 123}));

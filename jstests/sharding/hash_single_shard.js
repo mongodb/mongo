@@ -3,8 +3,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({shards: 1});
-var testDB = st.getDB("test");
+let st = new ShardingTest({shards: 1});
+let testDB = st.getDB("test");
 
 // create hashed shard key and enable sharding
 testDB.adminCommand({enablesharding: "test"});

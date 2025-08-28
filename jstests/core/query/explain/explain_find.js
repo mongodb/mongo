@@ -6,13 +6,13 @@
  * ]
  */
 
-var collName = "jstests_explain_find";
-var t = db[collName];
+let collName = "jstests_explain_find";
+let t = db[collName];
 t.drop();
 
 t.createIndex({a: 1});
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.insert({_id: i, a: i});
 }
 

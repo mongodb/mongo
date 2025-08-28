@@ -25,7 +25,7 @@ import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function () {
     // Use the workload name as the collection name.
-    var uniqueCollectionName = "secondary_reads";
+    let uniqueCollectionName = "secondary_reads";
 
     function isWriterThread() {
         return this.tid === 0;
@@ -98,7 +98,7 @@ export const $config = (function () {
         return readConcernLevels[Random.randInt(readConcernLevels.length)];
     }
 
-    var states = (function () {
+    let states = (function () {
         // One thread is dedicated to writing and other threads perform reads on
         // secondaries with a randomly chosen readConcern level.
         function readFromSecondaries(db, collName) {
@@ -112,9 +112,9 @@ export const $config = (function () {
         return {readFromSecondaries: readFromSecondaries};
     })();
 
-    var transitions = {readFromSecondaries: {readFromSecondaries: 1}};
+    let transitions = {readFromSecondaries: {readFromSecondaries: 1}};
 
-    var setup = function setup(db, collName, cluster) {
+    let setup = function setup(db, collName, cluster) {
         this.nDocumentsInTotal = 0;
         // Start write workloads to activate oplog application on secondaries
         // before any reads.

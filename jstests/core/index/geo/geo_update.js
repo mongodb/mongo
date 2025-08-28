@@ -8,7 +8,7 @@
 // Tests geo queries w/ update & upsert
 // from SERVER-3428
 
-var coll = db.testGeoUpdate;
+let coll = db.testGeoUpdate;
 coll.drop();
 
 coll.createIndex({loc: "2d"});

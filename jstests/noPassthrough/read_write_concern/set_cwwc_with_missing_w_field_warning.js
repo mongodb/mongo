@@ -74,12 +74,12 @@ replTest.initiate();
 runTest(replTest.getPrimary(), replTest.getPrimary(), replTest);
 replTest.stopSet();
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: 2,
     mongos: 1,
     config: 1,
 });
-var mongos = st.s;
-var config = st.config0;
+let mongos = st.s;
+let config = st.config0;
 runTest(mongos, st.configRS.getPrimary(), st.configRS);
 st.stop();

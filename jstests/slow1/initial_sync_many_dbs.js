@@ -6,18 +6,18 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "initial_sync_many_dbs";
-var num_dbs = 32;
-var max_colls = 32;
-var num_docs = 2;
-var replSet = new ReplSetTest({
+let name = "initial_sync_many_dbs";
+let num_dbs = 32;
+let max_colls = 32;
+let num_docs = 2;
+let replSet = new ReplSetTest({
     name: name,
     nodes: 1,
 });
 replSet.startSet();
 replSet.initiate();
 
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 jsTestLog(
     "Seeding primary with " +
         num_dbs +
@@ -27,12 +27,12 @@ jsTestLog(
         num_docs +
         " documents",
 );
-for (var i = 0; i < num_dbs; i++) {
-    var dbname = name + "_db" + i;
-    for (var j = 0; j < (i % max_colls) + 1; j++) {
-        var collname = name + "_coll" + j;
-        var coll = primary.getDB(dbname)[collname];
-        for (var k = 0; k < num_docs; k++) {
+for (let i = 0; i < num_dbs; i++) {
+    let dbname = name + "_db" + i;
+    for (let j = 0; j < (i % max_colls) + 1; j++) {
+        let collname = name + "_coll" + j;
+        let coll = primary.getDB(dbname)[collname];
+        for (let k = 0; k < num_docs; k++) {
             assert.commandWorked(coll.insert({_id: k}));
         }
     }
@@ -44,7 +44,7 @@ replSet.add();
 replSet.reInitiate();
 
 replSet.awaitSecondaryNodes(30 * 60 * 1000);
-var secondary = replSet.getSecondary();
+let secondary = replSet.getSecondary();
 jsTestLog("New node has transitioned to secondary. Checking collection sizes");
 for (let i = 0; i < num_dbs; i++) {
     let dbname = name + "_db" + i;

@@ -21,7 +21,7 @@ function runInTxn({cmd, msg, code, nExpected, expectedErrorIndex}) {
     const session = db.getMongo().startSession();
     session.startTransaction();
     try {
-        var res = session.getDatabase(dbName).runCommand(cmd);
+        let res = session.getDatabase(dbName).runCommand(cmd);
         try {
             // Writes reply with ok: 1 and a writeErrors array
             assert.eq(res.ok, 1, "reply.ok : " + msg);
@@ -61,7 +61,7 @@ function exerciseWriteInTxn({collNames, cmdName, goodOp, badOp, code}) {
 
             // Construct command like {insert: collectionName, documents: [...]}
             let newCmd = () => {
-                var cmd = {};
+                let cmd = {};
                 cmd[cmdName] = collName;
                 if (!ordered) {
                     cmd.ordered = false;
@@ -70,7 +70,7 @@ function exerciseWriteInTxn({collNames, cmdName, goodOp, badOp, code}) {
                 return cmd;
             };
 
-            var cmd = newCmd();
+            let cmd = newCmd();
             cmd[docsField] = [badOp];
             runInTxn({
                 cmd: cmd,

@@ -4,8 +4,8 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 
-var name = TestData.testName;
-var rst = new ReplSetTest({
+let name = TestData.testName;
+let rst = new ReplSetTest({
     name: name,
     nodes: 3,
     // We're not testing catchup takeover in this test, and in the case where primary catchup fails,
@@ -25,8 +25,8 @@ rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();
 
-var primary = rst.getPrimary();
-var primaryColl = primary.getDB("test").coll;
+let primary = rst.getPrimary();
+let primaryColl = primary.getDB("test").coll;
 
 // The default WC is majority and this test can't test catchup properly if it used majority writes.
 assert.commandWorked(

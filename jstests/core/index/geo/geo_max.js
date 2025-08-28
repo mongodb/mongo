@@ -8,7 +8,7 @@
 
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
-var test = new GeoNearRandomTest("geo_near_max");
+let test = new GeoNearRandomTest("geo_near_max");
 
 test.insertPts(/*numPts*/ 1000, /*indexBounds*/ {min: -180, max: 180}, /*scale*/ 0.9);
 
@@ -29,7 +29,7 @@ assert.eq(test.t.count({loc: {$within: {$center: [[-180, 0], 1]}}}), 2);
 test.t.find({loc: {$within: {$center: [[180, 0], 1]}}}).forEach(assertXIsPositive);
 test.t.find({loc: {$within: {$center: [[-180, 0], 1]}}}).forEach(assertXIsNegative);
 
-var oneDegree = Math.PI / 180; // in radians
+let oneDegree = Math.PI / 180; // in radians
 
 // errors out due to SERVER-1760
 if (0) {

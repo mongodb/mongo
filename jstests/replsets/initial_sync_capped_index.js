@@ -32,16 +32,16 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 // Set up replica set.
-var testName = "initial_sync_capped_index";
-var dbName = testName;
-var replTest = new ReplSetTest({name: testName, nodes: 1});
+let testName = "initial_sync_capped_index";
+let dbName = testName;
+let replTest = new ReplSetTest({name: testName, nodes: 1});
 replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var primaryDB = primary.getDB(dbName);
-var cappedCollName = "capped_coll";
-var primaryCappedColl = primaryDB[cappedCollName];
+let primary = replTest.getPrimary();
+let primaryDB = primary.getDB(dbName);
+let cappedCollName = "capped_coll";
+let primaryCappedColl = primaryDB[cappedCollName];
 
 const cappedMaxCount = 5;
 const additionalDocumentCount = 2;
@@ -61,11 +61,11 @@ for (let i = 0; i < cappedMaxCount; ++i) {
 jsTestLog("Adding secondary node.");
 replTest.add({rsConfig: {votes: 0, priority: 0}, setParameter: "collectionClonerBatchSize=3"});
 
-var secondary = replTest.getSecondary();
-var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
+let secondary = replTest.getSecondary();
+let collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
 
 // Make the collection cloner pause after its initial 'find' response on the capped collection.
-var nss = dbName + "." + cappedCollName;
+let nss = dbName + "." + cappedCollName;
 jsTestLog("Enabling collection cloner fail point for " + nss);
 let failPoint = configureFailPoint(secondary, collectionClonerFailPoint, {nss: nss});
 
@@ -94,9 +94,9 @@ replTest.awaitReplication();
 waitForState(secondary, ReplSetTest.State.SECONDARY);
 
 // Make sure the indexes created during initial sync are valid.
-var secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
-var validate_result = secondaryCappedColl.validate({full: true});
-var failMsg = "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
+let secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
+let validate_result = secondaryCappedColl.validate({full: true});
+let failMsg = "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
 assert(validate_result.valid, failMsg);
 
 // Verify that the replicated collection has the expected documents and querying on the indexes

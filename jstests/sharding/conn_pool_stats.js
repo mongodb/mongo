@@ -44,7 +44,7 @@ assert("acquisitionWaitTimes" in stats);
 // Check that connection wait time histograms are consistent.
 function assertHistogramIsSumOfChildren(parentStats, childrenStats) {
     const parentHist = parentStats["acquisitionWaitTimes"];
-    var childHists = [];
+    let childHists = [];
     for (const childKey in childrenStats) {
         const child = childrenStats[childKey];
         if (typeof child === "object" && "acquisitionWaitTimes" in child) {
@@ -53,7 +53,7 @@ function assertHistogramIsSumOfChildren(parentStats, childrenStats) {
     }
 
     for (const bucket in parentHist) {
-        var total = 0;
+        let total = 0;
         let bucketValue = bucket == "totalCount" ? (h) => h[bucket] : (h) => h[bucket].count;
         for (const childHist of childHists) {
             total += bucketValue(childHist);

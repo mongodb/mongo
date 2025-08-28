@@ -3,20 +3,20 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 10, mongos: 3});
+let st = new ShardingTest({shards: 10, mongos: 3});
 
-var mongosA = st.s0;
-var mongosB = st.s1;
-var mongosC = st.s2;
+let mongosA = st.s0;
+let mongosB = st.s1;
+let mongosC = st.s2;
 
-var admin = mongosA.getDB("admin");
-var config = mongosA.getDB("config");
+let admin = mongosA.getDB("admin");
+let config = mongosA.getDB("config");
 
-var collA = mongosA.getCollection("foo.bar");
-var collB = mongosB.getCollection("" + collA);
-var collC = mongosB.getCollection("" + collA);
+let collA = mongosA.getCollection("foo.bar");
+let collB = mongosB.getCollection("" + collA);
+let collC = mongosB.getCollection("" + collA);
 
-var shards = [
+let shards = [
     st.shard0,
     st.shard1,
     st.shard2,

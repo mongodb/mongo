@@ -21,7 +21,7 @@ export const $config = (function () {
     // configuration.
     const skipExplainInErrorMessage = TestData.runInsideTransaction && TestData.runningWithShardStepdowns;
 
-    var data = {
+    let data = {
         // Number of docs to insert at the beginning.
         nDocs: 200,
         // Batch size of queries to introduce more saving and restoring of states.
@@ -42,8 +42,8 @@ export const $config = (function () {
             }
             // Keep track of the previous doc in case the verifier is trying to verify a sorted
             // query.
-            var prevDoc = null;
-            var doc = null;
+            let prevDoc = null;
+            let doc = null;
             while (cursor.hasNext()) {
                 prevDoc = doc;
                 doc = cursor.next();
@@ -69,22 +69,22 @@ export const $config = (function () {
          * the update state should use for the update query.
          */
         genUpdateDoc: function genUpdateDoc() {
-            var newVal = Random.randInt(this.nDocs);
+            let newVal = Random.randInt(this.nDocs);
             return {$set: {a: newVal}};
         },
     };
 
-    var states = {
+    let states = {
         /*
          * Update a random document from the collection.
          */
         update: function update(db, collName) {
-            var id = Random.randInt(this.nDocs);
-            var randDoc = db[collName].findOne({_id: id});
+            let id = Random.randInt(this.nDocs);
+            let randDoc = db[collName].findOne({_id: id});
             if (randDoc === null) {
                 return;
             }
-            var updateDoc = this.genUpdateDoc();
+            let updateDoc = this.genUpdateDoc();
             assert.commandWorked(db[collName].update(randDoc, updateDoc));
         },
 
@@ -93,10 +93,10 @@ export const $config = (function () {
          * documents.
          */
         remove: function remove(db, collName) {
-            var id = Random.randInt(this.nDocs);
-            var doc = db[collName].findOne({_id: id});
+            let id = Random.randInt(this.nDocs);
+            let doc = db[collName].findOne({_id: id});
             if (doc !== null) {
-                var res = db[collName].remove({_id: id});
+                let res = db[collName].remove({_id: id});
                 assert.commandWorked(res);
                 if (res.nRemoved > 0) {
                     assert.commandWorked(db[collName].insert(doc));
@@ -109,9 +109,9 @@ export const $config = (function () {
          * Subclasses will implement this differently
          */
         query: function collScan(db, collName) {
-            var nMatches = 100;
-            var cursor = db[collName].find({a: {$lt: nMatches}}).batchSize(this.batchSize);
-            var collScanVerifier = function collScanVerifier(doc, prevDoc) {
+            let nMatches = 100;
+            let cursor = db[collName].find({a: {$lt: nMatches}}).batchSize(this.batchSize);
+            let collScanVerifier = function collScanVerifier(doc, prevDoc) {
                 return doc.a < nMatches;
             };
 
@@ -134,7 +134,7 @@ export const $config = (function () {
      *     \_/           \_/
      *
      */
-    var transitions = {
+    let transitions = {
         update: {update: 0.334, remove: 0.333, query: 0.333},
         remove: {update: 0.333, remove: 0.334, query: 0.333},
         query: {update: 0.333, remove: 0.333, query: 0.334},
@@ -151,11 +151,11 @@ export const $config = (function () {
             assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
         });
         // Set up some data to query.
-        var N = this.nDocs;
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 0; i < N; i++) {
+        let N = this.nDocs;
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 0; i < N; i++) {
             // Give each doc some word of text
-            var word = this.words[i % this.words.length];
+            let word = this.words[i % this.words.length];
             bulk.find({_id: i})
                 .upsert()
                 .updateOne({$set: {a: i, b: N - i, c: i, d: N - i, yield_text: word}});

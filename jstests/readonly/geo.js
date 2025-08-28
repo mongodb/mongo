@@ -8,7 +8,7 @@ runReadOnlyTest(
             load: function (writableCollection) {
                 assert.commandWorked(writableCollection.createIndex({loc: "2dsphere"}));
 
-                var locDocs = [
+                let locDocs = [
                     {name: "Berry Park", loc: {type: "Point", coordinates: [40.722396, -73.9573645]}},
                     {
                         name: "Northern Territory",

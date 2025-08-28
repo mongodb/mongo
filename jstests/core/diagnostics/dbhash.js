@@ -19,14 +19,14 @@ db.getCollectionNames().forEach(function (x) {
 });
 
 function dbhash(mydb) {
-    var ret = mydb.runCommand("dbhash");
+    let ret = mydb.runCommand("dbhash");
     assert.commandWorked(ret, "dbhash failure");
     return ret;
 }
 
 function gh(coll, mydb) {
     if (!mydb) mydb = db;
-    var x = dbhash(mydb).collections[coll.getName()];
+    let x = dbhash(mydb).collections[coll.getName()];
     if (!x) return "";
     return x;
 }

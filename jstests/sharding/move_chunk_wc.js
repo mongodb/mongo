@@ -9,7 +9,7 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {
         rs0: {nodes: 3, settings: {chainingAllowed: false}},
         rs1: {nodes: 5, settings: {chainingAllowed: false}},
@@ -19,35 +19,35 @@ var st = new ShardingTest({
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
 });
 
-var mongos = st.s;
-var dbName = "move-chunk-wc-test";
-var s0 = st.shard0.shardName;
-var s1 = st.shard1.shardName;
+let mongos = st.s;
+let dbName = "move-chunk-wc-test";
+let s0 = st.shard0.shardName;
+let s1 = st.shard1.shardName;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: s0}));
 
 var db = mongos.getDB(dbName);
-var collName = "leaves";
-var coll = db[collName];
-var numberDoc = 20;
+let collName = "leaves";
+let coll = db[collName];
+let numberDoc = 20;
 
 coll.createIndex({x: 1}, {unique: true});
 st.shardColl(collName, {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, db.toString(), true);
 
-for (var i = 0; i < numberDoc; i++) {
+for (let i = 0; i < numberDoc; i++) {
     coll.insert({x: i});
 }
 assert.eq(coll.count(), numberDoc);
 
 // Checks that each shard has the expected number of chunks.
 function checkChunkCount(s0Count, s1Count) {
-    var chunkCounts = st.chunkCounts(collName, db.toString());
+    let chunkCounts = st.chunkCounts(collName, db.toString());
     assert.eq(chunkCounts[s0], s0Count);
     assert.eq(chunkCounts[s1], s1Count);
 }
 checkChunkCount(1, 1);
 
-var req = {
+let req = {
     moveChunk: coll.toString(),
     find: {x: numberDoc / 2},
     to: s0,
@@ -60,7 +60,7 @@ req.writeConcern = {
     wtimeout: 30000,
 };
 jsTest.log("Testing " + tojson(req));
-var res = db.adminCommand(req);
+let res = db.adminCommand(req);
 assert.commandWorked(res);
 assert(!res.writeConcernError, "moveChunk had writeConcernError: " + tojson(res));
 checkChunkCount(2, 0);

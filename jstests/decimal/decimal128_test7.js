@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var parseErrors = [
+let parseErrors = [
     {
         "description": "[basx572] Near-specials " + "(Conversion_syntax)",
         "string": "-9Inf",

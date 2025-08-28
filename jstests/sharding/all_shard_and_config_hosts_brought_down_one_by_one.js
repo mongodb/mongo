@@ -17,7 +17,7 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 
-var st = new ShardingTest({
+let st = new ShardingTest({
     shards: {
         rs0: {nodes: 2},
     },
@@ -117,7 +117,7 @@ if (!TestData.configShard) {
 assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
 
 // Throws transport error first and subsequent times when loading config data, not no primary
-for (var i = 0; i < 2; i++) {
+for (let i = 0; i < 2; i++) {
     try {
         st.s0.getDB("TestDB").TestColl.findOne();
 

@@ -7,17 +7,17 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Bring up a 2 node replset.
-var name = "bg_index_rename";
-var rst = new ReplSetTest({name: name, nodes: 3});
+let name = "bg_index_rename";
+let rst = new ReplSetTest({name: name, nodes: 3});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Create and populate a collection.
-var primary = rst.getPrimary();
-var coll = primary.getCollection("test.foo");
-var adminDB = primary.getDB("admin");
+let primary = rst.getPrimary();
+let coll = primary.getCollection("test.foo");
+let adminDB = primary.getDB("admin");
 
-for (var i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     assert.commandWorked(coll.insert({_id: i, x: i * 3, str: "hello world"}));
 }
 
@@ -37,15 +37,15 @@ rst.awaitReplication();
 assert.commandWorked(adminDB.runCommand({replSetStepDown: 60, force: true}));
 
 // Wait for new primary.
-var newPrimary = rst.getPrimary();
+let newPrimary = rst.getPrimary();
 assert.neq(primary, newPrimary);
-var barDB = newPrimary.getDB("bar");
+let barDB = newPrimary.getDB("bar");
 coll = newPrimary.getCollection("bar.test");
 coll.insert({_id: 200, x: 600, str: "goodnight moon"});
 
 // Check that the new primary has the index
 // on the renamed collection.
-var indexes = barDB.runCommand({listIndexes: "test"});
+let indexes = barDB.runCommand({listIndexes: "test"});
 assert.eq(indexes.cursor.firstBatch.length, 2);
 
 rst.stopSet();

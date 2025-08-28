@@ -8,15 +8,15 @@
 
 import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
-var coll = db.index_type_change;
+let coll = db.index_type_change;
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 
 assert.commandWorked(coll.insert({a: 2}));
 assert.eq(1, coll.find({a: {$type: "double"}}).itcount());
 
-var newVal = new NumberLong(2);
-var res = coll.update({}, {a: newVal}); // Replacement update.
+let newVal = new NumberLong(2);
+let res = coll.update({}, {a: newVal}); // Replacement update.
 assert.commandWorked(res);
 assert.eq(res.nMatched, 1);
 assert.eq(res.nModified, 1);
@@ -27,9 +27,9 @@ assert.eq(1, coll.find({a: {$type: "long"}}).itcount());
 // Now use a covered query to ensure the index entry has been updated.
 
 // First make sure it's actually using a covered index scan.
-var explain = coll.explain().find({a: 2}, {_id: 0, a: 1});
+let explain = coll.explain().find({a: 2}, {_id: 0, a: 1});
 assert(isIndexOnly(db, explain));
 
-var updated = coll.findOne({a: 2}, {_id: 0, a: 1});
+let updated = coll.findOne({a: 2}, {_id: 0, a: 1});
 
 assert(updated.a instanceof NumberLong, "Index entry did not change type");

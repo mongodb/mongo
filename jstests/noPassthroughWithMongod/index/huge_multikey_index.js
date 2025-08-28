@@ -6,7 +6,7 @@ t.drop();
 
 function doit() {
     let arr = [];
-    for (var i = 0; i < 1000 * 1000; i++) arr.push(i);
+    for (let i = 0; i < 1000 * 1000; i++) arr.push(i);
 
     t.insert({a: arr});
 

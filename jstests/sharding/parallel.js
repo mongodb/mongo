@@ -1,16 +1,16 @@
 // This test fails when run with authentication because benchRun with auth is broken: SERVER-6388
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var numShards = 3;
-var s = new ShardingTest({name: "parallel", shards: numShards, mongos: 2});
+let numShards = 3;
+let s = new ShardingTest({name: "parallel", shards: numShards, mongos: 2});
 
 s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
 var db = s.getDB("test");
 
-var N = 10000;
-var shards = [s.shard0.shardName, s.shard1.shardName, s.shard2.shardName];
+let N = 10000;
+let shards = [s.shard0.shardName, s.shard1.shardName, s.shard2.shardName];
 
 for (var i = 0; i < N; i += N / 10) {
     s.adminCommand({split: "test.foo", middle: {_id: i}});
@@ -21,11 +21,11 @@ for (var i = 0; i < N; i += N / 10) {
 
 s.startBalancer();
 
-var bulk = db.foo.initializeUnorderedBulkOp();
+let bulk = db.foo.initializeUnorderedBulkOp();
 for (i = 0; i < N; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
-var doCommand = function (dbname, cmd) {
+let doCommand = function (dbname, cmd) {
     x = benchRun({
         ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd, readCmd: true}],
         host: db.getMongo().host,

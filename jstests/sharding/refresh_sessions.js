@@ -3,11 +3,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.disableImplicitSessions = true;
 
-var sessionsDb = "config";
-var refresh = {refreshLogicalSessionCacheNow: 1};
-var startSession = {startSession: 1};
+let sessionsDb = "config";
+let refresh = {refreshLogicalSessionCacheNow: 1};
+let startSession = {startSession: 1};
 
-var cluster = new ShardingTest({
+let cluster = new ShardingTest({
     mongos: [{setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}}],
     shards: 2,
     rs: {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
@@ -25,8 +25,8 @@ var cluster = new ShardingTest({
 
 // Test that refreshing on mongos flushes local records to the collection.
 {
-    var mongos = cluster.s.getDB(sessionsDb);
-    var sessionCount = mongos.system.sessions.count();
+    let mongos = cluster.s.getDB(sessionsDb);
+    let sessionCount = mongos.system.sessions.count();
 
     // Start one session.
     assert.commandWorked(mongos.runCommand(startSession));

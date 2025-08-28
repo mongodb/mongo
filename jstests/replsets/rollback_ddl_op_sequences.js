@@ -15,7 +15,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {awaitOpTime} from "jstests/replsets/rslib.js";
 
 // helper function for verifying contents at the end of the test
-var checkFinalResults = function (db) {
+let checkFinalResults = function (db) {
     assert.eq(2, db.b.getIndexes().length);
     assert.eq(2, db.oldname.getIndexes().length);
     assert.eq(2, db.oldname.find().itcount());
@@ -31,15 +31,15 @@ var checkFinalResults = function (db) {
     assert.eq(0, db.getSiblingDB("abc").bar.find().itcount());
 };
 
-var name = "rollback_ddl_op_sequences";
-var replTest = new ReplSetTest({
+let name = "rollback_ddl_op_sequences";
+let replTest = new ReplSetTest({
     name: name,
     nodes: 3,
     useBridge: true,
 });
-var nodes = replTest.nodeList();
+let nodes = replTest.nodeList();
 
-var conns = replTest.startSet();
+let conns = replTest.startSet();
 replTest.initiate(
     {
         "_id": name,
@@ -55,7 +55,7 @@ replTest.initiate(
 
 // Make sure we have a primary and that that primary is node A
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var primary = replTest.getPrimary();
+let primary = replTest.getPrimary();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
@@ -63,18 +63,18 @@ assert.commandWorked(
 );
 replTest.awaitReplication();
 
-var a_conn = conns[0];
+let a_conn = conns[0];
 a_conn.setSecondaryOk();
-var A = a_conn.getDB("admin");
-var b_conn = conns[1];
+let A = a_conn.getDB("admin");
+let b_conn = conns[1];
 b_conn.setSecondaryOk();
-var B = b_conn.getDB("admin");
+let B = b_conn.getDB("admin");
 assert.eq(primary, conns[0], "conns[0] assumed to be primary");
 assert.eq(a_conn, primary);
 
 // Wait for initial replication
-var a = a_conn.getDB("foo");
-var b = b_conn.getDB("foo");
+let a = a_conn.getDB("foo");
+let b = b_conn.getDB("foo");
 
 // This test create indexes with fail point enabled on secondary which prevents secondary from
 // voting. So, disabling index build commit quorum.
@@ -89,7 +89,7 @@ assert.commandWorked(a.bar.insert({q: 1, a: "foo"}));
 assert.commandWorked(a.bar.insert({q: 2, a: "foo", x: 1}));
 assert.commandWorked(a.bar.insert({q: 3, bb: 9, a: "foo"}));
 assert.commandWorked(a.bar.insert({q: 40333333, a: 1}));
-for (var i = 0; i < 200; i++) {
+for (let i = 0; i < 200; i++) {
     assert.commandWorked(a.bar.insert({i: i}));
 }
 assert.commandWorked(a.bar.insert({q: 40, a: 2}));
@@ -134,7 +134,7 @@ assert(b.fooname.find().itcount() > 0, "count rename");
 // create an index - verify that it is removed
 assert.commandWorked(b.fooname.createIndex({q: 1}, {}, 0));
 // test roll back (drop) a whole database
-var abc = b.getSiblingDB("abc");
+let abc = b.getSiblingDB("abc");
 assert.commandWorked(abc.foo.insert({x: 1}));
 assert.commandWorked(abc.bar.insert({y: 999}));
 

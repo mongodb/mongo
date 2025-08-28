@@ -5,7 +5,7 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 // We will only use one collection, the $graphLookup will look up from the same collection.
-var graphColl = db.facetGraphLookup;
+let graphColl = db.facetGraphLookup;
 
 // The graph in ASCII form: 0 --- 1 --- 2    3
 graphColl.drop();

@@ -134,7 +134,7 @@ jsTest.log("Running tests with only one shard.");
 let directWriteCount = runTests(false /* shouldBlockDirectConnections */, 0);
 
 // Adding the second shard will trigger the check for direct shard ops.
-var newShard = new ReplSetTest({name: "additionalShard", nodes: 1});
+let newShard = new ReplSetTest({name: "additionalShard", nodes: 1});
 newShard.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 newShard.initiate();
 let mongosAdminUser = st.s.getDB("admin");

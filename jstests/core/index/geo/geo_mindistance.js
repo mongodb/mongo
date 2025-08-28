@@ -6,7 +6,7 @@
 
 import {deg2rad, metersToRadians} from "jstests/libs/query/geo_math.js";
 
-var t = db.geo_mindistance;
+let t = db.geo_mindistance;
 t.drop();
 
 const km = 1000;
@@ -46,15 +46,15 @@ function n_docs_within(radius_km) {
 /**
  * Make 121 points from long, lat = (0, 0) (in Gulf of Guinea) to (10, 10) (inland Nigeria).
  */
-for (var x = 0; x <= 10; x += 1) {
-    for (var y = 0; y <= 10; y += 1) {
+for (let x = 0; x <= 10; x += 1) {
+    for (let y = 0; y <= 10; y += 1) {
         t.insert({loc: [x, y]});
     }
 }
 
 t.createIndex({loc: "2dsphere"});
 
-var n_docs = t.count(),
+let n_docs = t.count(),
     geoJSONPoint = {type: "Point", coordinates: [0, 0]},
     legacyPoint = [0, 0];
 
@@ -63,7 +63,7 @@ var n_docs = t.count(),
 // in meters.
 //
 
-var n_min1400_count = t.find({loc: {$near: {$geometry: geoJSONPoint, $minDistance: 1400 * km}}}).count();
+let n_min1400_count = t.find({loc: {$near: {$geometry: geoJSONPoint, $minDistance: 1400 * km}}}).count();
 
 assert.eq(
     n_docs - n_docs_within(1400),
@@ -74,7 +74,7 @@ assert.eq(
         n_min1400_count,
 );
 
-var n_bw500_and_1000_count = t
+let n_bw500_and_1000_count = t
     .find({
         loc: {$near: {$geometry: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}},
     })

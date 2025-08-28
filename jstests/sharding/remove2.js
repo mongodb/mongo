@@ -23,7 +23,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckOrphans = true;
 
 function seedString(replTest) {
-    var members = replTest.getReplSetConfig().members.map(function (elem) {
+    let members = replTest.getReplSetConfig().members.map(function (elem) {
         return elem.host;
     });
     return replTest.name + "/" + members.join(",");
@@ -35,7 +35,7 @@ function awaitReplicaSetMonitorRemoval(nodes, rsName) {
         jsTest.log("Awaiting ReplicaSetMonitor removal for " + rsName + " on " + node);
         assert.soon(
             function () {
-                var replicaSets = assert.commandWorked(node.adminCommand("connPoolStats")).replicaSets;
+                let replicaSets = assert.commandWorked(node.adminCommand("connPoolStats")).replicaSets;
                 return !(rsName in replicaSets);
             },
             "Failed waiting for node " + node + "to remove ReplicaSetMonitor of replica set: " + rsName,
@@ -98,7 +98,7 @@ function removeShardAndCleanup(st, coll, replTest) {
 }
 
 function addShard(st, coll, replTest) {
-    var seed = seedString(replTest);
+    let seed = seedString(replTest);
     jsTest.log("Adding shard with seed: " + seed);
     assert.eq(true, st.adminCommand({addshard: seed, name: replTest.name}));
     awaitRSClientHosts(st.s, replTest.getPrimary(), {ok: true, ismaster: true});

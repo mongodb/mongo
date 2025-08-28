@@ -11,15 +11,15 @@ function getNotPrimaryUnackWritesCounter() {
 
 const collName = "not_primary_unacknowledged_write";
 
-var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+let rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
-var primary = rst.getPrimary();
-var secondary = rst.getSecondary();
+let primary = rst.getPrimary();
+let secondary = rst.getSecondary();
 var primaryDB = primary.getDB("test");
-var secondaryDB = secondary.getDB("test");
-var primaryColl = primaryDB[collName];
-var secondaryColl = secondaryDB[collName];
+let secondaryDB = secondary.getDB("test");
+let primaryColl = primaryDB[collName];
+let secondaryColl = secondaryDB[collName];
 
 // Verify that reading from secondaries does not impact `notPrimaryUnacknowledgedWrites`.
 const preReadingCounter = getNotPrimaryUnackWritesCounter();
@@ -46,7 +46,7 @@ jsTestLog("Primary on port " + primary.port + " hangs up on unacknowledged write
     {name: "updateMany", fn: (wc) => secondaryColl.updateMany({}, {$set: {x: 1}}, wc)},
     {name: "replaceOne", fn: (wc) => secondaryColl.replaceOne({}, {}, wc)},
 ].map(({name, fn}) => {
-    var result = assert.throws(
+    let result = assert.throws(
         function () {
             // Provoke the server to hang up.
             fn({writeConcern: {w: 0}});
@@ -69,11 +69,11 @@ assert.commandWorked(
     }),
 );
 
-var command = `
+let command = `
       checkLog.contains(db.getMongo(), "hangAfterCollectionInserts fail point enabled");
       db.adminCommand({replSetStepDown: 60, force: true});`;
 
-var awaitShell = startParallelShell(command, primary.port);
+let awaitShell = startParallelShell(command, primary.port);
 
 let failedUnackWritesBefore = getNotPrimaryUnackWritesCounter();
 
@@ -84,7 +84,7 @@ jsTestLog("Step down primary on port " + primary.port);
 awaitShell({checkExitSuccess: false});
 
 jsTestLog("Unacknowledged insert during stepdown provoked disconnect");
-var result = assert.throws(
+let result = assert.throws(
     function () {
         primary.getDB("admin").hello();
     },

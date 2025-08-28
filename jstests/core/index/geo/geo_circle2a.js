@@ -3,7 +3,7 @@
 // direct position
 // lookups
 
-var coll = db.geo_circle2a;
+let coll = db.geo_circle2a;
 coll.drop();
 coll.insert({
     p: [1112, 3473],

@@ -16,14 +16,14 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 /**
  * Simple representation for wall clock time. Hour and minutes should be integers.
  */
-var HourAndMinute = function (hour, minutes) {
+let HourAndMinute = function (hour, minutes) {
     return {
         /**
          * Returns a new HourAndMinute object with the amount of hours added.
          * Amount can be negative.
          */
         addHour: function (amount) {
-            var newHour = (hour + amount) % 24;
+            let newHour = (hour + amount) % 24;
             if (newHour < 0) {
                 newHour += 24;
             }
@@ -36,8 +36,8 @@ var HourAndMinute = function (hour, minutes) {
          * window settings.
          */
         toString: function () {
-            var minStr = minutes < 10 ? "0" + minutes : "" + minutes;
-            var hourStr = hour < 10 ? "0" + hour : "" + hour;
+            let minStr = minutes < 10 ? "0" + minutes : "" + minutes;
+            let hourStr = hour < 10 ? "0" + hour : "" + hour;
             return hourStr + ":" + minStr;
         },
     };
@@ -53,15 +53,15 @@ assert.commandWorked(configDB.adminCommand({shardCollection: ns, key: {_id: 1}})
 
 const bigString = "X".repeat(1024 * 1024); // 1MB
 const coll = st.s.getDB(dbName).getCollection(collName);
-for (var x = 0; x < 150; x += 10) {
+for (let x = 0; x < 150; x += 10) {
     coll.insert({_id: x, s: bigString});
     configDB.adminCommand({split: ns, middle: {_id: x}});
 }
 
-var shard0Chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
+let shard0Chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
 
-var startDate = new Date();
-var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
+let startDate = new Date();
+let hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
 assert.commandWorked(
     configDB.settings.update(
         {_id: "balancer"},
@@ -80,7 +80,7 @@ st.startBalancer();
 
 st.awaitBalancerRound();
 
-var shard0ChunksAfter = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
+let shard0ChunksAfter = findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
 assert.eq(shard0Chunks, shard0ChunksAfter);
 
 assert.commandWorked(

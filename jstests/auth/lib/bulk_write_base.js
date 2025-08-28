@@ -84,7 +84,7 @@ export function runTest(mongod) {
     // Commands to be used in testing.
 
     // Insert test.coll and test1.coll1 with bypassDocumentValidation.
-    var cmd1 = {
+    let cmd1 = {
         bulkWrite: 1,
         ops: [
             {insert: 0, document: {skey: "MongoDB"}},
@@ -94,7 +94,7 @@ export function runTest(mongod) {
         bypassDocumentValidation: true,
     };
 
-    var cmd2 = {
+    let cmd2 = {
         bulkWrite: 1,
         ops: [
             {update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}},
@@ -104,7 +104,7 @@ export function runTest(mongod) {
         bypassDocumentValidation: true,
     };
 
-    var cmd3 = {
+    let cmd3 = {
         bulkWrite: 1,
         ops: [
             {delete: 0, filter: {skey: "MongoDB"}},
@@ -114,7 +114,7 @@ export function runTest(mongod) {
         bypassDocumentValidation: true,
     };
 
-    var cmd4 = {
+    let cmd4 = {
         bulkWrite: 1,
         ops: [{update: 0, filter: {skey: "MongoDB"}, updateMods: {field1: 1}, upsert: true}],
         nsInfo: [{ns: "test.coll"}],

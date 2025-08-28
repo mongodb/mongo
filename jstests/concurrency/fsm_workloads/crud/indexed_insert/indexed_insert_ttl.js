@@ -11,24 +11,24 @@
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 export const $config = (function () {
-    var states = {
+    let states = {
         init: function init(db, collName) {
-            var res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});
+            let res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});
             assert.commandWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
         },
 
         insert: function insert(db, collName) {
-            var res = db[collName].insert({indexed_insert_ttl: new ISODate()});
+            let res = db[collName].insert({indexed_insert_ttl: new ISODate()});
             assert.commandWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
         },
     };
 
-    var transitions = {init: {insert: 1}, insert: {insert: 1}};
+    let transitions = {init: {insert: 1}, insert: {insert: 1}};
 
     function setup(db, collName, cluster) {
-        var res = db[collName].createIndex({indexed_insert_ttl: 1}, {expireAfterSeconds: this.ttlSeconds});
+        let res = db[collName].createIndex({indexed_insert_ttl: 1}, {expireAfterSeconds: this.ttlSeconds});
         assert.commandWorked(res);
     }
 
@@ -42,18 +42,18 @@ export const $config = (function () {
         }
 
         // By default, the TTL monitor thread runs every 60 seconds.
-        var defaultTTLSecs = 60;
+        let defaultTTLSecs = 60;
 
         // We need to wait for the initial documents to expire. It's possible for this code to run
         // right after the TTL thread has started to sleep, which requires us to wait at least ~60
         // seconds for it to wake up and delete the expired documents. We wait at least another
         // minute just to avoid race-prone tests on overloaded test hosts.
-        var timeoutMS = (TestData.inEvergreen ? 10 : 2) * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
+        let timeoutMS = (TestData.inEvergreen ? 10 : 2) * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
 
         assert.soon(
             function checkTTLCount() {
                 // All initial documents should be removed by the end of the workload.
-                var count = db[collName].find({first: true}).itcount();
+                let count = db[collName].find({first: true}).itcount();
                 return count === 0;
             },
             "Expected oldest documents with TTL fields to be removed",

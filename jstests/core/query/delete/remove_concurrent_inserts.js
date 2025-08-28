@@ -57,7 +57,7 @@ const p = startParallelShell(
 );
 
 // Remove using the a:1 index in ascending direction.
-var res = assert.commandWorked(t.remove({a: {$gte: 0}}));
+let res = assert.commandWorked(t.remove({a: {$gte: 0}}));
 assert(!res.hasWriteError(), "The remove operation failed.");
 
 p();

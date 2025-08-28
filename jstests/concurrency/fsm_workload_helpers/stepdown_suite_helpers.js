@@ -32,7 +32,7 @@ export function runWithManualRetriesIfInNonTransactionalStepdownSuite(fn) {
 }
 
 export function runWithManualRetries(fn) {
-    var result = undefined;
+    let result = undefined;
     assert.soonNoExcept(() => {
         result = withSkipRetryOnNetworkError(fn);
         return true;

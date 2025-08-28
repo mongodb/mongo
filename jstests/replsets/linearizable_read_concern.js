@@ -15,9 +15,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";
 
-var send_linearizable_read = function () {
+let send_linearizable_read = function () {
     // The primary will step down and throw an exception, which is expected.
-    var coll = db.getSiblingDB("test").foo;
+    let coll = db.getSiblingDB("test").foo;
     jsTestLog("Sending in linearizable read in secondary thread");
     // 'hello' ensures that the following command fails (and returns a response rather than
     // an exception) before its connection is cut because of the primary step down. Refer to
@@ -29,10 +29,10 @@ var send_linearizable_read = function () {
     );
 };
 
-var num_nodes = 3;
-var name = "linearizable_read_concern";
-var replTest = new ReplSetTest({name: name, nodes: num_nodes, useBridge: true});
-var config = replTest.getReplSetConfig();
+let num_nodes = 3;
+let name = "linearizable_read_concern";
+let replTest = new ReplSetTest({name: name, nodes: num_nodes, useBridge: true});
+let config = replTest.getReplSetConfig();
 
 // Increased election timeout to avoid having the primary step down while we are
 // testing linearizable functionality on an isolated primary.
@@ -43,8 +43,8 @@ config.settings = {
 replTest.startSet();
 replTest.initiate(config);
 
-var primary = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
+let primary = replTest.getPrimary();
+let secondaries = replTest.getSecondaries();
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(
@@ -64,13 +64,13 @@ assert.commandWorked(
 
 jsTestLog("Testing linearizable readConcern parsing");
 // This command is sent to the primary, and the primary is fully connected so it should work.
-var goodRead = assert.commandWorked(
+let goodRead = assert.commandWorked(
     primary.getDB("test").runCommand({"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}),
 );
 assert.eq(goodRead.cursor.firstBatch[0].number, 7);
 
 // This fails because you cannot have a linearizable read command sent to a secondary.
-var badCmd = assert.commandFailed(
+let badCmd = assert.commandFailed(
     secondaries[0].getDB("test").runCommand({"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}),
 );
 
@@ -78,7 +78,7 @@ assert.eq(badCmd.errmsg, "cannot satisfy linearizable read concern on non-primar
 assert.eq(badCmd.code, ErrorCodes.NotWritablePrimary);
 
 // This fails because you cannot specify 'afterOpTime' for linearizable read.
-var opTimeCmd = assert.commandFailed(
+let opTimeCmd = assert.commandFailed(
     primary.getDB("test").runCommand({
         "find": "foo",
         readConcern: {level: "linearizable", "afterOpTime": {ts: Timestamp(1, 2), t: 1}},
@@ -133,21 +133,21 @@ jsTestLog("Testing to make sure linearizable read command does not block forever
 
 // Get last noop Optime before sending the linearizable read command
 // to ensure that we are waiting for the most recent noop write.
-var lastOpTimestamp = getLatestOp(primary).ts;
+let lastOpTimestamp = getLatestOp(primary).ts;
 
-var parallelShell = startParallelShell(send_linearizable_read, primary.port);
+let parallelShell = startParallelShell(send_linearizable_read, primary.port);
 // Sending a linearizable read implicitly replicates a noop to the secondaries. We need to find
 // the most recently issued noop to ensure that we call stepdown during the recently
 // issued linearizable read and not before the read (in the separate thread) has been called.
 jsTestLog("Checking end of oplog for noop");
 assert.soon(function () {
-    var isEarlierTimestamp = function (ts1, ts2) {
+    let isEarlierTimestamp = function (ts1, ts2) {
         if (ts1.getTime() == ts2.getTime()) {
             return ts1.getInc() < ts2.getInc();
         }
         return ts1.getTime() < ts2.getTime();
     };
-    var latestOp = getLatestOp(primary);
+    let latestOp = getLatestOp(primary);
     if (latestOp.op == "n" && isEarlierTimestamp(lastOpTimestamp, latestOp.ts)) {
         return true;
     }

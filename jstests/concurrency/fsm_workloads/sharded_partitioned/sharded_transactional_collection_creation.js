@@ -22,7 +22,7 @@ export const $config = (function () {
         shardKey: {_id: "hashed"},
     };
 
-    var states = (function () {
+    let states = (function () {
         function init(db, collName) {
             this.seqNum = 0;
             this.session = db.getMongo().startSession();
@@ -117,7 +117,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         init: {
             createCollectionOutsideTxn: 1.0,
             createCollectionExplicitlyViaCreate: 1.0,

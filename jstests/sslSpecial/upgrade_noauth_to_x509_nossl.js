@@ -12,23 +12,23 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {allowTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
-var dbName = "upgradeToX509";
+let dbName = "upgradeToX509";
 
 // Disable auth explicitly
-var noAuth = {noauth: ""};
+let noAuth = {noauth: ""};
 
 // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-var transitionToX509allowTLS = Object.merge(allowTLS, {
+let transitionToX509allowTLS = Object.merge(allowTLS, {
     noauth: undefined,
     transitionToAuth: "",
     clusterAuthMode: "x509",
 });
 
-var rst = new ReplSetTest({name: "noauthSet", nodes: 3, nodeOptions: noAuth});
+let rst = new ReplSetTest({name: "noauthSet", nodes: 3, nodeOptions: noAuth});
 rst.startSet();
 rst.initiate();
 
-var testDB = rst.getPrimary().getDB(dbName);
+let testDB = rst.getPrimary().getDB(dbName);
 assert.commandWorked(testDB.a.insert({a: 1, str: "TESTTESTTEST"}));
 assert.eq(1, testDB.a.find().itcount(), "Error interacting with replSet");
 

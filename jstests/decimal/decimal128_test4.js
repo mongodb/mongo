@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var testData = [
+let testData = [
     {
         "description": "[basx023] conform to rules and exponent will be in permitted range).",
         "input": "-0.1",
@@ -54,7 +54,7 @@ var testData = [
     },
 ];
 
-var parseErrors = [
+let parseErrors = [
     {"description": "[basx564] Near-specials (Conversion_syntax)", "string": "Infi"},
     {"description": "[basx565] Near-specials (Conversion_syntax)", "string": "Infin"},
     {"description": "[basx566] Near-specials (Conversion_syntax)", "string": "Infini"},
@@ -115,7 +115,7 @@ var parseErrors = [
 
 testData.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
-    var output = NumberDecimal(testCase.input).toString();
+    let output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {
         assert.eq(output, `NumberDecimal("${testCase.expected}")`);
     } else {

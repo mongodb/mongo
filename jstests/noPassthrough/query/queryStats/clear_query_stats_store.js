@@ -11,11 +11,11 @@ let options = {
 
 const conn = MongoRunner.runMongod(options);
 const testDB = conn.getDB("test");
-var coll = testDB[jsTestName()];
+let coll = testDB[jsTestName()];
 coll.drop();
 
 let query = {};
-for (var j = 0; j < 10; ++j) {
+for (let j = 0; j < 10; ++j) {
     query["foo.field.xyz." + j] = 1;
     query["bar.field.xyz." + j] = 2;
     query["baz.field.xyz." + j] = 3;

@@ -18,11 +18,11 @@ assert(mkdir(recordingDirGlobal));
 assert(mkdir(recordingDir));
 
 // Create the options and run mongod
-var opts = {auth: "", setParameter: "trafficRecordingDirectory=" + recordingDirGlobal};
+let opts = {auth: "", setParameter: "trafficRecordingDirectory=" + recordingDirGlobal};
 let m = MongoRunner.runMongod(opts);
 
 // Get the port of the host
-var serverPort = m.port;
+let serverPort = m.port;
 
 // Create necessary users
 let adminDB = m.getDB("admin");
@@ -55,13 +55,13 @@ assert.commandWorked(testDB.runCommand({"stopTrafficRecording": 1}));
 MongoRunner.stopMongod(m, null, {user: "admin", pwd: "password"});
 
 // Counters
-var numRequest = 0;
-var numResponse = 0;
-var opTypes = {};
+let numRequest = 0;
+let numResponse = 0;
+let opTypes = {};
 
 jsTest.log("Recording file path: " + recordingFilePath);
 // Pass filepath to traffic_reader helper method to get recorded info in BSON
-var res = convertTrafficRecordingToBSON(recordingFilePath);
+let res = convertTrafficRecordingToBSON(recordingFilePath);
 
 // Iterate through the results and assert the above commands are properly recorded
 res.forEach((obj) => {

@@ -2,7 +2,7 @@ let t = db.set5;
 t.drop();
 
 function check(want, err) {
-    var x = t.findOne();
+    let x = t.findOne();
     delete x._id;
     assert.docEq(want, x, err);
 }

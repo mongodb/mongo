@@ -9,14 +9,14 @@ export const $config = (function () {
     // to be unique.
     const prefix = "view_catalog_cycle_with_drop_";
 
-    var data = {
+    let data = {
         viewList: ["viewA", "viewB", "viewC"].map((viewName) => prefix + viewName),
         getRandomView: function (viewList) {
             return viewList[Random.randInt(viewList.length)];
         },
     };
 
-    var states = (function () {
+    let states = (function () {
         /**
          * Redefines a view definition by changing the namespace it is a view on. We intentionally
          * allow attempting to remap a view to be defined on itself (results in 'GraphContainsCycle'
@@ -75,7 +75,7 @@ export const $config = (function () {
         };
     })();
 
-    var transitions = {
+    let transitions = {
         remapViewToView: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
         recreateViewOnCollection: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
         readFromView: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},

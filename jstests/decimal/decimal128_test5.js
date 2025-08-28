@@ -2,7 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-var testData = [
+let testData = [
     {
         "description": "[decq035] fold-downs (more below) (Clamped)",
         "input": "1.23E+6144",
@@ -308,7 +308,7 @@ var testData = [
 
 testData.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
-    var output = NumberDecimal(testCase.input).toString();
+    let output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {
         assert.eq(output, `NumberDecimal("${testCase.expected}")`);
     } else {

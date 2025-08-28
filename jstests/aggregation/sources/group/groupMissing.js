@@ -9,14 +9,14 @@
 // ]
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
-var coll = db.getCollection(jsTestName());
+let coll = db.getCollection(jsTestName());
 coll.drop();
 
 coll.insert({a: null});
 coll.insert({});
 
-var res = coll.aggregate({$group: {_id: "$a"}});
-var arr = res.toArray();
+let res = coll.aggregate({$group: {_id: "$a"}});
+let arr = res.toArray();
 assert.eq(arr.length, 1);
 assert.eq(arr[0]._id, null);
 

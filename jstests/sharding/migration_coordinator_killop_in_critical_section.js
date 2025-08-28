@@ -40,8 +40,8 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: middle}, to: donorShard.shardName}));
 
     // Insert some docs into the collection.
-    var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; i++) {
+    let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
     }
     assert.commandWorked(bulk.execute());

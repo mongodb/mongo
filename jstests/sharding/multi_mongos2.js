@@ -1,7 +1,7 @@
 // This tests sharding an existing collection that both shards are aware of (SERVER-2828)
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+let st = new ShardingTest({shards: 2, mongos: 2});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
@@ -34,7 +34,7 @@ assert.eq(true, st.s1.getDB("test").existing2.stats().sharded);
 
 assert.commandWorked(st.s1.adminCommand({split: "test.existing2", middle: {_id: 5}}));
 {
-    var res = st.s0.getDB("test").existing2.stats();
+    let res = st.s0.getDB("test").existing2.stats();
     printjson(res);
     assert.eq(true, res.sharded); // SERVER-2828
 }

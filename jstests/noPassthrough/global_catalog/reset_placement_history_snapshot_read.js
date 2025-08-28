@@ -11,13 +11,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 (function () {
     "use strict";
 
-    var st = new ShardingTest({shards: 2});
-    var mongos = st.s;
+    let st = new ShardingTest({shards: 2});
+    let mongos = st.s;
 
-    var dbName = jsTestName();
-    var kNssColl1 = dbName + ".coll1";
-    var kNssColl2 = dbName + ".coll2";
-    var kNssColl3 = dbName + ".coll3";
+    let dbName = jsTestName();
+    let kNssColl1 = dbName + ".coll1";
+    let kNssColl2 = dbName + ".coll2";
+    let kNssColl3 = dbName + ".coll3";
 
     /*The test will attempt to simulate a fresh initialization of the placement history (empty
      * placement history and a non-empty catalog.collections/databases). While this is ok for the

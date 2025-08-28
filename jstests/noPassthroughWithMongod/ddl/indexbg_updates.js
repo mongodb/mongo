@@ -5,15 +5,15 @@
 
 Random.setRandomSeed();
 
-var coll = db.getSiblingDB("indexbg_updates").coll;
+let coll = db.getSiblingDB("indexbg_updates").coll;
 coll.drop();
 
-var numDocs = 10000;
+let numDocs = 10000;
 
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 print("Populate the collection with random data");
 for (var i = 0; i < numDocs; i++) {
-    var doc = {"_id": i, "field0": Random.rand()};
+    let doc = {"_id": i, "field0": Random.rand()};
 
     bulk.insert(doc);
 }
@@ -23,8 +23,8 @@ assert.commandWorked(bulk.execute());
 // field being actively indexed in the background
 bulk = coll.initializeUnorderedBulkOp();
 for (i = 0; i < numDocs; i++) {
-    var criteria = {"_id": 1000};
-    var mod = {};
+    let criteria = {"_id": 1000};
+    let mod = {};
 
     if (Random.rand() < 0.8) {
         mod["$set"] = {};
@@ -38,9 +38,9 @@ for (i = 0; i < numDocs; i++) {
 }
 
 // Build an index in the background on field0
-var backgroundIndexBuildShell = startParallelShell(
+let backgroundIndexBuildShell = startParallelShell(
     function () {
-        var coll = db.getSiblingDB("indexbg_updates").coll;
+        let coll = db.getSiblingDB("indexbg_updates").coll;
         assert.commandWorked(coll.createIndex({"field0": 1}, {"background": true}));
     },
     null, // port -- use default
@@ -53,5 +53,5 @@ assert.commandWorked(bulk.execute());
 print("Start background index build");
 backgroundIndexBuildShell();
 
-var explain = coll.find().hint({"field0": 1}).explain();
+let explain = coll.find().hint({"field0": 1}).explain();
 assert("queryPlanner" in explain, tojson(explain));

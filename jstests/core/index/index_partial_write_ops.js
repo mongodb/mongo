@@ -5,13 +5,13 @@
 //    uses_full_validation,
 // ]
 
-var coll = db.index_partial_write_ops;
+let coll = db.index_partial_write_ops;
 
-var getNumKeys = function (idxName) {
-    var res = assert.commandWorked(coll.validate({full: true}));
-    var kpi;
+let getNumKeys = function (idxName) {
+    let res = assert.commandWorked(coll.validate({full: true}));
+    let kpi;
 
-    var isShardedNS = res.hasOwnProperty("raw");
+    let isShardedNS = res.hasOwnProperty("raw");
     if (isShardedNS) {
         kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
     } else {
@@ -44,8 +44,8 @@ assert.eq(1, getNumKeys("x_1"));
 assert.commandWorked(coll.update({_id: 1}, {$set: {b: 2}}));
 assert.eq(1, getNumKeys("x_1"));
 
-var array = [];
-for (var i = 0; i < 2048; i++) {
+let array = [];
+for (let i = 0; i < 2048; i++) {
     array.push({arbitrary: i});
 }
 

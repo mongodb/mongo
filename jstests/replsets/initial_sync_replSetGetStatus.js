@@ -6,22 +6,22 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "initial_sync_replSetGetStatus";
-var replSet = new ReplSetTest({
+let name = "initial_sync_replSetGetStatus";
+let replSet = new ReplSetTest({
     name: name,
     nodes: 1,
 });
 
 replSet.startSet();
 replSet.initiate();
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 
 const barColl = primary.getDB("pretest").bar;
 assert.commandWorked(barColl.insert({a: 1}));
 assert.commandWorked(barColl.insert({a: 2}));
 assert.commandWorked(barColl.insert({a: 3}));
 
-var coll = primary.getDB("test").foo;
+let coll = primary.getDB("test").foo;
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 2}));
 
@@ -42,7 +42,7 @@ replSet.reInitiate();
 failPointBeforeCopying.wait();
 
 // Test that replSetGetStatus returns the correct results while initial sync is in progress.
-var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert(res.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
 
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 0}));

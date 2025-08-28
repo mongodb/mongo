@@ -4,11 +4,11 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
-var configDB = st.s0.getDB("config");
+let st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
+let configDB = st.s0.getDB("config");
 
-var shard0 = st.shard0.shardName;
-var shard1 = st.shard1.shardName;
+let shard0 = st.shard0.shardName;
+let shard1 = st.shard1.shardName;
 
 // split on invalid ns.
 assert.commandFailed(configDB.adminCommand({split: "user", key: {_id: 1}}));
@@ -44,9 +44,9 @@ assert.commandFailed(configDB.adminCommand({split: "test.user", find: {x: 100}})
 assert.commandFailed(configDB.adminCommand({split: "test.user", bounds: [{x: MinKey}, {x: MaxKey}]}));
 
 // Insert documents large enough to fill up a chunk
-var kiloDoc = "x".repeat(1023);
-var testDB = st.s.getDB("test");
-var bulk = testDB.user.initializeUnorderedBulkOp();
+let kiloDoc = "x".repeat(1023);
+let testDB = st.s.getDB("test");
+let bulk = testDB.user.initializeUnorderedBulkOp();
 for (var x = -1200; x < 1200; x++) {
     bulk.insert({_id: x, val: kiloDoc});
 }

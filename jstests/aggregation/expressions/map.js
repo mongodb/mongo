@@ -1,7 +1,7 @@
 // SERVER-9841 $map expression to map over arrays
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-var t = db.server9841;
+let t = db.server9841;
 t.drop();
 t.insert({
     simple: [1, 2, 3, 4],
@@ -12,7 +12,7 @@ t.insert({
 });
 
 function test(expression, expected) {
-    var result = t.aggregate({$project: {_id: 0, res: expression}}).toArray();
+    let result = t.aggregate({$project: {_id: 0, res: expression}}).toArray();
     assert.eq(result, [{res: expected}]);
 }
 

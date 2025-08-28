@@ -17,7 +17,7 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
-var testDB = primary.getDB(dbName);
+let testDB = primary.getDB(dbName);
 const coll = testDB[collName];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(

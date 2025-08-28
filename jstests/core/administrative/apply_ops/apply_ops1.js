@@ -296,7 +296,7 @@ if (false) {
 }
 
 assert.commandWorked(db.createCollection(t.getName()));
-var a = assert.commandWorked(db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
+let a = assert.commandWorked(db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
 assert.eq(1, t.find().count(), "Valid insert failed");
 assert.eq(true, a.results[0], "Bad result value for valid insert");
 
@@ -307,7 +307,7 @@ if (false) {
     assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 }
 
-var o = {_id: 5, x: 17};
+let o = {_id: 5, x: 17};
 assert.eq(o, t.findOne(), "Mismatching document inserted.");
 
 // 'o' field is an empty array.
@@ -316,7 +316,7 @@ assert.commandFailed(
     "applyOps should fail on insert of object with empty array element",
 );
 
-var res = assert.commandWorked(
+let res = assert.commandWorked(
     db.runCommand({
         applyOps: [
             {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 18}}}},
@@ -597,8 +597,8 @@ assert.eq(t.findOne({_id: 12}), {_id: 12, newField: "foo"});
     );
 }
 
-var insert_op1 = {_id: 14, x: "inserted apply ops1"};
-var insert_op2 = {_id: 15, x: "inserted apply ops2"};
+let insert_op1 = {_id: 14, x: "inserted apply ops1"};
+let insert_op2 = {_id: 15, x: "inserted apply ops2"};
 assert.commandWorked(
     db.adminCommand({
         "applyOps": [

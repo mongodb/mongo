@@ -14,7 +14,7 @@ function f() {
     t.save({x: 19, y: 99});
 
     let x = 2;
-    var lastErr = null;
+    let lastErr = null;
     while (x < 70) {
         let patt = {};
         patt[x] = 1;

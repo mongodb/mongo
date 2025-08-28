@@ -4,8 +4,8 @@
 // Can be merged back into upsert_fields.js in 8.0 or later once it no longer needs to be excluded
 // from multiversion tests.
 
-var res;
-var coll = db[jsTestName()];
+let res;
+let coll = db[jsTestName()];
 coll.drop();
 
 // _id field has special rules

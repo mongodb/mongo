@@ -37,7 +37,7 @@ db.getCollectionNames().forEach(function (x) {
 dd("d");
 
 db.createCollection(collName);
-var found = false;
+let found = false;
 db.getCollectionNames().forEach(function (x) {
     if (x == collName) found = true;
 });
@@ -49,17 +49,17 @@ assert(found, "found test." + collName + " in collection infos");
 // -- must have names that are registered storage engines
 // -- must be objects
 db.getCollection(collName).drop();
-var storageEngineName = db.serverStatus().storageEngine.name;
+let storageEngineName = db.serverStatus().storageEngine.name;
 assert.commandFailed(db.createCollection(collName, {storageEngine: "not a document"}));
 assert.commandWorked(db.createCollection(collName, {storageEngine: {}}));
 assert.commandFailed(db.createCollection(collName, {storageEngine: {unknownStorageEngine: {}}}));
-var invalidStorageEngineOptions = {};
+let invalidStorageEngineOptions = {};
 invalidStorageEngineOptions[storageEngineName] = 12345;
 assert.commandFailed(db.createCollection(collName, {storageEngine: invalidStorageEngineOptions}));
 
 // Test round trip of storageEngine in collection options.
 // Assume that empty document for storageEngine-specific options is acceptable.
-var validStorageEngineOptions = {};
+let validStorageEngineOptions = {};
 validStorageEngineOptions[storageEngineName] = {};
 db.getCollection(collName).drop();
 assert.commandWorked(db.createCollection(collName, {storageEngine: validStorageEngineOptions}));
@@ -104,12 +104,12 @@ assert.commandFailed(
 );
 
 // Tests that a non-active storage engine can be configured so long as it is registered.
-var alternateStorageEngine = db
+let alternateStorageEngine = db
     .getServerBuildInfo()
     .rawData()
     .storageEngines.find((engine) => engine !== storageEngineName);
 if (alternateStorageEngine) {
-    var indexOptions = {storageEngine: {[alternateStorageEngine]: {}}};
+    let indexOptions = {storageEngine: {[alternateStorageEngine]: {}}};
     assert.commandWorked(
         db.createCollection("idxOptions", {indexOptionDefaults: indexOptions}),
         "should have been able to configure a non-active storage engine",

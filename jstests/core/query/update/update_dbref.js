@@ -1,6 +1,6 @@
 // Test that we can update DBRefs, but not dbref fields outside a DBRef
 
-var res;
+let res;
 const t = db[jsTestName()];
 t.drop();
 

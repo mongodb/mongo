@@ -8,7 +8,7 @@ while (big.length < 50000) big += "asdasdasdasdsdsdadsasdasdasD";
 
 let num = Math.ceil(10000000 / big.length);
 
-for (var i = 0; i < num; i++) {
+for (let i = 0; i < num; i++) {
     t.save({num: i, str: big});
 }
 

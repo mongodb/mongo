@@ -9,7 +9,7 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
         timeout = 10 * 60 * 1000; // 10 minutes
     }
 
-    var s;
+    let s;
     let admin;
     if (shardingTestOrConn instanceof ShardingTest) {
         s = shardingTestOrConn.s;

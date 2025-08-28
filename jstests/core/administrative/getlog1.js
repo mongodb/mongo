@@ -8,7 +8,7 @@
 //   ./mongo jstests/<this-file>
 
 let contains = function (arr, obj) {
-    var i = arr.length;
+    let i = arr.length;
     while (i--) {
         if (arr[i] === obj) {
             return true;
@@ -17,7 +17,7 @@ let contains = function (arr, obj) {
     return false;
 };
 
-var resp = db.adminCommand({getLog: "*"});
+let resp = db.adminCommand({getLog: "*"});
 assert(resp.ok == 1, "error executing getLog command");
 assert(resp.names, "no names field");
 assert(resp.names.length > 0, "names array is empty");

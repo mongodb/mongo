@@ -5,24 +5,24 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
-var testDB = st.s.getDB("test");
+let testDB = st.s.getDB("test");
 testDB.adminCommand({enableSharding: "test"});
 testDB.adminCommand({shardCollection: "test.user", key: {_id: 1}});
 
 // Initialize shard metadata in shards
 testDB.user.insert({x: 1});
 
-var checkShardingServerStatus = function (doc, role) {
-    var shardingSection = doc.sharding;
+let checkShardingServerStatus = function (doc, role) {
+    let shardingSection = doc.sharding;
     assert.neq(shardingSection, null);
 
-    var configConnStr = shardingSection.configsvrConnectionString;
-    var configConn = new Mongo(configConnStr);
-    var configHello = configConn.getDB("admin").runCommand({hello: 1});
+    let configConnStr = shardingSection.configsvrConnectionString;
+    let configConn = new Mongo(configConnStr);
+    let configHello = configConn.getDB("admin").runCommand({hello: 1});
 
-    var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
+    let configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
 
     let commitTypesSection = doc.transactions.commitTypes;
     let opCountersReplSection = doc.opcountersRepl;
@@ -51,10 +51,10 @@ var checkShardingServerStatus = function (doc, role) {
     assert.neq(null, shardingSection.maxChunkSizeInBytes);
 };
 
-var mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 checkShardingServerStatus(mongosServerStatus, "router");
 
-var mongodServerStatus = st.rs0.getPrimary().getDB("admin").runCommand({serverStatus: 1});
+let mongodServerStatus = st.rs0.getPrimary().getDB("admin").runCommand({serverStatus: 1});
 checkShardingServerStatus(mongodServerStatus, "shard");
 
 st.stop();

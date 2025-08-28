@@ -14,11 +14,11 @@
  * ]
  */
 
-var testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
+let testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
 assert.neq(null, testServer, "failed to start mongod with --setParameter=javascriptProtection=true");
 
 var db = testServer.getDB("test");
-var t = db.js_protection;
+let t = db.js_protection;
 
 function assertMongoClientCorrect() {
     /* eslint-disable */
@@ -35,7 +35,7 @@ function assertMongoClientCorrect() {
     };
     /* eslint-enable */
 
-    var exitCode = runMongoProgram(
+    let exitCode = runMongoProgram(
         "mongo",
         "--port",
         testServer.port,
@@ -49,10 +49,10 @@ function assertMongoClientCorrect() {
 function assertNoStoredWhere() {
     t.insertOne({name: "testdoc", val: 0, y: 0});
 
-    var res = t.update({$where: "addOne(this.val) === 1"}, {$set: {y: 100}}, false, true);
+    let res = t.update({$where: "addOne(this.val) === 1"}, {$set: {y: 100}}, false, true);
     assert.writeError(res);
 
-    var doc = t.findOne({name: "testdoc"});
+    let doc = t.findOne({name: "testdoc"});
     assert.neq(null, doc);
     assert.eq(0, doc.y, tojson(doc));
 

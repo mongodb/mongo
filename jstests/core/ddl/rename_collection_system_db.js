@@ -6,10 +6,10 @@
 
 // SERVER-12591: prevent renaming to arbitrary system collections.
 
-var testdb = db.getSiblingDB("rename8"); // to avoid breaking other tests when we touch system.users
-var coll = testdb.rename8;
-var systemFoo = testdb.system.foo;
-var systemUsers = testdb.system.users;
+let testdb = db.getSiblingDB("rename8"); // to avoid breaking other tests when we touch system.users
+let coll = testdb.rename8;
+let systemFoo = testdb.system.foo;
+let systemUsers = testdb.system.users;
 
 systemFoo.drop();
 systemUsers.drop();

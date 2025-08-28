@@ -34,8 +34,8 @@ assert.commandWorked(coll.insert({cust_id: "A", amount: 200, status: "B"}));
 assert.commandWorked(coll.insert({cust_id: "B", amount: 50, status: "B"}));
 
 // Assert that deprecation msg is not logged before map reduce command is even run.
-var globalLogs = db.adminCommand({getLog: "global"});
-var matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
+let globalLogs = db.adminCommand({getLog: "global"});
+let matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 assert.commandWorked(

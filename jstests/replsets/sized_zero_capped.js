@@ -3,9 +3,9 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "sized_zero_capped";
-var replTest = new ReplSetTest({name: name, nodes: 3});
-var nodes = replTest.nodeList();
+let name = "sized_zero_capped";
+let replTest = new ReplSetTest({name: name, nodes: 3});
+let nodes = replTest.nodeList();
 replTest.startSet();
 replTest.initiate({
     "_id": name,
@@ -16,12 +16,12 @@ replTest.initiate({
     ],
 });
 
-var testDB = replTest.getPrimary().getDB(name);
+let testDB = replTest.getPrimary().getDB(name);
 testDB.createCollection(name, {capped: true, size: 0});
 replTest.awaitReplication();
 
 // ensure secondary is still up and responsive
-var secondary = replTest.getSecondary();
+let secondary = replTest.getSecondary();
 assert.commandWorked(secondary.getDB(name).runCommand({ping: 1}));
 
 replTest.stopSet();

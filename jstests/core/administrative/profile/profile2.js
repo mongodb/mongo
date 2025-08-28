@@ -7,7 +7,7 @@
 // ]
 
 // Special db so that it can be run in parallel tests.
-var coll = db.getSiblingDB("profile2").profile2;
+let coll = db.getSiblingDB("profile2").profile2;
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.drop();
@@ -35,8 +35,8 @@ function assertContainsTruncatedCommand(results, truncatedCommandRegexp, message
     assert(document, message + ` Retrieved documents: ${tojson(results)}`);
 }
 
-var str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-var hugeStr = str;
+let str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+let hugeStr = str;
 while (hugeStr.length < 2 * 1024 * 1024) {
     hugeStr += str;
 }
@@ -87,8 +87,8 @@ assert.commandWorked(
 );
 
 // Test query with many elements in query portion.
-var doc = {};
-for (var i = 0; i < 100 * 1000; ++i) {
+let doc = {};
+for (let i = 0; i < 100 * 1000; ++i) {
     doc["a" + i] = 1;
 }
 coll.find(doc).itcount();

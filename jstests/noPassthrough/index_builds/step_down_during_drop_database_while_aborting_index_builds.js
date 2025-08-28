@@ -21,8 +21,8 @@ const primary = replSet.getPrimary();
 let testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-var bulk = testColl.initializeUnorderedBulkOp();
-for (var i = 0; i < 5; ++i) {
+let bulk = testColl.initializeUnorderedBulkOp();
+for (let i = 0; i < 5; ++i) {
     bulk.insert({x: i});
 }
 assert.commandWorked(bulk.execute());

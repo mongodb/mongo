@@ -7,10 +7,10 @@
  *  assumes_against_mongod_not_mongos,
  * ]
  */
-var explainMissingDb = db.getSiblingDB("explainMissingDb");
+let explainMissingDb = db.getSiblingDB("explainMissingDb");
 
-var explain;
-var explainColl;
+let explain;
+let explainColl;
 
 // .find()
 explainMissingDb.dropDatabase();

@@ -103,7 +103,7 @@ function runTest(connInfo) {
 }
 
 jsTestLog("Testing against a replica set");
-var rst = new ReplSetTest({nodes: 2});
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 const replSetConn = new Mongo(rst.getURL());

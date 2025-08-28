@@ -1,8 +1,8 @@
 // Tests the reset logic for the periodic query yield timer.  Regression test for SERVER-21341.
-var dbpath = MongoRunner.dataPath + jsTest.name();
+let dbpath = MongoRunner.dataPath + jsTest.name();
 resetDbpath(dbpath);
-var mongod = MongoRunner.runMongod({dbpath: dbpath});
-var coll = mongod.getDB("test").getCollection(jsTest.name());
+let mongod = MongoRunner.runMongod({dbpath: dbpath});
+let coll = mongod.getDB("test").getCollection(jsTest.name());
 
 // Configure the server so that queries are expected to yield after every 10 work cycles, or
 // after every 500 milliseconds (whichever comes first). In addition, enable a failpoint that
@@ -30,10 +30,10 @@ assert.commandWorked(
 // not during query execution, it should never count towards our 500 millisecond threshold for a
 // timing-based yield (incorrect accounting for timing-based yields was the cause for
 // SERVER-21341).
-for (var i = 0; i < 40; ++i) {
+for (let i = 0; i < 40; ++i) {
     assert.commandWorked(coll.insert({}));
 }
-var explainRes = coll.find().explain("executionStats");
+let explainRes = coll.find().explain("executionStats");
 // We expect 4 yields, but we throw in a fudge factor of 2 for test reliability. We also can
 // use "saveState" calls as a proxy for "number of yields" here, because we expect our entire
 // result set to be returned in a single batch.

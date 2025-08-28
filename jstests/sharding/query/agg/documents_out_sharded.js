@@ -9,7 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB("sharded_documents_stage");
-var admin = st.s.getDB("admin");
+let admin = st.s.getDB("admin");
 
 const coll = db.test_coll;
 assert.commandWorked(coll.insert({_id: 0, x: 1, y: 1}));

@@ -24,14 +24,14 @@ import {
     planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
 
-var t = db.jstests_explain_helpers;
+let t = db.jstests_explain_helpers;
 t.drop();
 
-var explain;
+let explain;
 var stage;
 
 t.createIndex({a: 1});
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     t.insert({_id: i, a: i, b: 1});
 }
 
@@ -214,13 +214,13 @@ assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 
 // .hasNext()
-var explainQuery = t.explain().find();
+let explainQuery = t.explain().find();
 assert(explainQuery.hasNext());
 assert.commandWorked(explainQuery.next());
 assert(!explainQuery.hasNext());
 
 // .forEach()
-var results = [];
+let results = [];
 t.explain()
     .find()
     .forEach(function (res) {

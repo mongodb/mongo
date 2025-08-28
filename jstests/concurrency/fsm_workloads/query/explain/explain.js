@@ -8,15 +8,15 @@ import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = (function () {
-    var data = {
+    let data = {
         collNotExist: "donotexist__",
         nInserted: 0,
         shardKey: {j: 1},
         assignEqualProbsToTransitions: function assignEqualProbsToTransitions(statesMap) {
-            var states = Object.keys(statesMap);
+            let states = Object.keys(statesMap);
             assert.gt(states.length, 0);
-            var probs = {};
-            var pr = 1.0 / states.length;
+            let probs = {};
+            let pr = 1.0 / states.length;
             states.forEach(function (s) {
                 probs[s] = pr;
             });
@@ -24,7 +24,7 @@ export const $config = (function () {
         },
     };
 
-    var states = (function () {
+    let states = (function () {
         function insert(db, collName) {
             db[collName].insert({i: this.nInserted, j: 2 * this.nInserted});
             this.nInserted++;
@@ -42,7 +42,7 @@ export const $config = (function () {
 
         function explainNonExistentNS(db, collName) {
             assert(!db[this.collNotExist].exists());
-            var res = db[this.collNotExist].find().explain();
+            let res = db[this.collNotExist].find().explain();
             assert.commandWorked(res);
             assert(res.queryPlanner, tojson(res));
             assert(res.queryPlanner.winningPlan, tojson(res));
@@ -59,7 +59,7 @@ export const $config = (function () {
         return {insert: insert, explain: explain, explainNonExistentNS: explainNonExistentNS};
     })();
 
-    var transitions = {
+    let transitions = {
         insert: {insert: 0.1, explain: 0.8, explainNonExistentNS: 0.1},
         explain: {insert: 0.7, explain: 0.2, explainNonExistentNS: 0.1},
         explainNonExistentNS: {insert: 0.4, explain: 0.5, explainNonExistentNS: 0.1},

@@ -5,14 +5,14 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({name: "stats", shards: 2, mongos: 1});
+let s = new ShardingTest({name: "stats", shards: 2, mongos: 1});
 
 s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 
 const db = s.getDB("test");
 
 function numKeys(o) {
-    var num = 0;
+    let num = 0;
     for (let _ in o) num++;
     return num;
 }
@@ -36,7 +36,7 @@ s.adminCommand({
     _waitForDelete: true,
 });
 
-var bulk = db.foo.initializeUnorderedBulkOp();
+let bulk = db.foo.initializeUnorderedBulkOp();
 for (let i = 0; i < N; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
@@ -86,7 +86,7 @@ function statComp(stat, stat_scaled, scale) {
     /* Because of loss of floating point precision, do not check exact equality */
     if (stat == stat_scaled) return true;
 
-    var msg = "scaled: " + stat_scaled + ", stat: " + stat + ", scale: " + scale;
+    let msg = "scaled: " + stat_scaled + ", stat: " + stat + ", scale: " + scale;
     assert.lte(stat_scaled - 2, stat / scale, msg);
     assert.gte(stat_scaled + 2, stat / scale, msg);
 }
@@ -117,7 +117,7 @@ let db_not_scaled = assert.commandWorked(db.stats());
 let db_scaled_512 = assert.commandWorked(db.stats(512));
 let db_scaled_1024 = assert.commandWorked(db.stats(1024));
 
-for (var shard in db_not_scaled.raw) {
+for (let shard in db_not_scaled.raw) {
     dbStatComp(db_not_scaled.raw[shard], db_scaled_512.raw[shard], 512);
     dbStatComp(db_not_scaled.raw[shard], db_scaled_1024.raw[shard], 1024);
 }
@@ -140,16 +140,16 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
 
 /* db.collection.stats() - indexDetails tests */
 (function () {
-    var t = db.foo;
+    let t = db.foo;
 
     assert.commandWorked(t.createIndex({a: 1}));
     assert.eq(2, t.getIndexes().length);
 
-    var isWiredTiger = !jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger";
+    let isWiredTiger = !jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger";
 
-    var stats = assert.commandWorked(t.stats({indexDetails: true}));
-    var shardName;
-    var shardStats;
+    let stats = assert.commandWorked(t.stats({indexDetails: true}));
+    let shardName;
+    let shardStats;
     for (shardName in stats.shards) {
         shardStats = stats.shards[shardName];
         assert(shardStats.indexDetails, "indexDetails missing for " + shardName + ": " + tojson(shardStats));
@@ -163,7 +163,7 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
     }
 
     function getIndexName(indexKey) {
-        var indexes = t.getIndexes().filter(function (doc) {
+        let indexes = t.getIndexes().filter(function (doc) {
             return friendlyEqual(doc.key, indexKey);
         });
         assert.eq(1, indexes.length, tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()));
@@ -171,7 +171,7 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
     }
 
     function checkIndexDetails(options, indexName) {
-        var stats = assert.commandWorked(t.stats(options));
+        let stats = assert.commandWorked(t.stats(options));
         for (shardName in stats.shards) {
             shardStats = stats.shards[shardName];
             assert(
@@ -206,8 +206,8 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
     }
 
     // indexDetailsKey - show indexDetails results for this index key only.
-    var indexKey = {a: 1};
-    var indexName = getIndexName(indexKey);
+    let indexKey = {a: 1};
+    let indexName = getIndexName(indexKey);
     checkIndexDetails({indexDetails: true, indexDetailsKey: indexKey}, indexName);
 
     // indexDetailsName - show indexDetails results for this index name only.

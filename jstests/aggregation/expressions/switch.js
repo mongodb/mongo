@@ -1,14 +1,14 @@
 // In SERVER-10689, the $switch expression was introduced. In this file, we test the functionality
 // of the expression.
 
-var coll = db.switch;
+let coll = db.switch;
 coll.drop();
 
 // Insert an empty document so that something can flow through the pipeline.
 coll.insert({});
 
 // Ensure that a branch is correctly evaluated.
-var pipeline = {
+let pipeline = {
     "$project": {
         "_id": 0,
         "output": {
@@ -18,7 +18,7 @@ var pipeline = {
         },
     },
 };
-var res = coll.aggregate(pipeline).toArray();
+let res = coll.aggregate(pipeline).toArray();
 
 assert.eq(res.length, 1);
 assert.eq(res[0], {"output": "one is equal to one!"});

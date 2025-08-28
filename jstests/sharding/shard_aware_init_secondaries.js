@@ -7,11 +7,11 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
-var replTest = new ReplSetTest({nodes: 2});
+let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet({shardsvr: ""});
-var nodeList = replTest.nodeList();
+let nodeList = replTest.nodeList();
 replTest.initiate({
     _id: replTest.name,
     members: [
@@ -20,11 +20,11 @@ replTest.initiate({
     ],
 });
 
-var priConn = replTest.getPrimary();
+let priConn = replTest.getPrimary();
 
-var configConnStr = st.configRS.getURL();
+let configConnStr = st.configRS.getURL();
 
-var shardIdentityDoc = {
+let shardIdentityDoc = {
     _id: "shardIdentity",
     configsvrConnectionString: configConnStr,
     shardName: "newShard",
@@ -32,12 +32,12 @@ var shardIdentityDoc = {
 };
 
 // Simulate the upsert that is performed by a config server on addShard.
-var shardIdentityQuery = {
+let shardIdentityQuery = {
     _id: shardIdentityDoc._id,
     shardName: shardIdentityDoc.shardName,
     clusterId: shardIdentityDoc.clusterId,
 };
-var shardIdentityUpdate = {
+let shardIdentityUpdate = {
     $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString},
 };
 assert.commandWorked(
@@ -46,10 +46,10 @@ assert.commandWorked(
         .system.version.update(shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 2}}),
 );
 
-var secConn = replTest.getSecondary();
+let secConn = replTest.getSecondary();
 secConn.setSecondaryOk();
 
-var res = secConn.getDB("admin").runCommand({shardingState: 1});
+let res = secConn.getDB("admin").runCommand({shardingState: 1});
 
 assert(res.enabled, tojson(res));
 assert.eq(shardIdentityDoc.shardName, res.shardName);

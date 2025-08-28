@@ -38,7 +38,7 @@ assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: sha
 const bigString = "X".repeat(1024 * 1024); // 1MB
 
 // Insert 10MB of documents in range [MinKey, 0) on shard0
-var bulk = coll.initializeUnorderedBulkOp();
+let bulk = coll.initializeUnorderedBulkOp();
 for (var i = -1; i > -11; i--) {
     bulk.insert({_id: i, s: bigString});
 }

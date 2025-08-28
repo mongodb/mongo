@@ -15,7 +15,7 @@ globalThis.db = mongo.getDB("admin"); // `startParallelShell` has custom logic f
 assert.eq(url, mongo.host, "replSet.getURL() should match active connection string");
 
 print("* Starting parallel shell on --host " + db.getMongo().host);
-var awaitShell = startParallelShell('db.coll0.insert({test: "connString only"});');
+let awaitShell = startParallelShell('db.coll0.insert({test: "connString only"});');
 assert.soon(function () {
     return db.coll0.find({test: "connString only"}).count() === 1;
 });

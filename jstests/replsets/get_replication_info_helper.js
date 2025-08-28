@@ -4,12 +4,12 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = "getReplicationInfo";
+let name = "getReplicationInfo";
 const replSet = new ReplSetTest({name: name, nodes: 2, oplogSize: 50});
 replSet.startSet();
 replSet.initiate();
 
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 
 // Test that db.printSlaveReplicationInfo() and db.printSecondaryReplicationInfo() both print
 // out initial sync info when called during an initial sync.
@@ -50,8 +50,8 @@ for (var i = 0; i < 100; i++) {
 }
 replSet.awaitReplication();
 
-var replInfo = primary.getDB("admin").getReplicationInfo();
-var replInfoString = tojson(replInfo);
+let replInfo = primary.getDB("admin").getReplicationInfo();
+let replInfoString = tojson(replInfo);
 
 assert.eq(50, replInfo.logSizeMB, replInfoString);
 assert.lt(0, replInfo.usedMB, replInfoString);
@@ -64,14 +64,14 @@ assert(replInfo.now, replInfoString);
 
 // calling this function with and without a primary, should provide sufficient code coverage
 // to catch any JS errors
-var mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
+let mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
 mongo();
 subStr = "behind the primary";
 assert(rawMongoProgramOutput(subStr).match(subStr));
 
 // get to a primaryless state
 for (i in replSet.getSecondaries()) {
-    var secondary = replSet.getSecondaries()[i];
+    let secondary = replSet.getSecondaries()[i];
     secondary.getDB("admin").runCommand({replSetFreeze: 120});
 }
 assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 120, force: true}));

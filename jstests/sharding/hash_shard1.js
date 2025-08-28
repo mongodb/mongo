@@ -4,12 +4,12 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var s = new ShardingTest({name: jsTestName(), shards: 3, mongos: 1, verbose: 1});
-var dbname = "test";
-var coll = "foo";
-var ns = dbname + "." + coll;
+let s = new ShardingTest({name: jsTestName(), shards: 3, mongos: 1, verbose: 1});
+let dbname = "test";
+let coll = "foo";
+let ns = dbname + "." + coll;
 var db = s.getDB(dbname);
-var t = db.getCollection(coll);
+let t = db.getCollection(coll);
 db.adminCommand({enablesharding: dbname, primaryShard: s.shard1.shardName});
 
 // for simplicity start by turning off balancer
@@ -25,7 +25,7 @@ assert.eq(res.ok, 1, "shardcollection didn't work");
 s.printShardingStatus();
 
 // insert stuff
-var numitems = 1000;
+let numitems = 1000;
 for (let i = 0; i < numitems; i++) {
     t.insert({a: i});
 }
@@ -35,7 +35,7 @@ printjson(t.find().explain());
 
 // find a chunk that's not on s.shard0.shardName
 let collEntry = s.config.collections.findOne({_id: ns});
-var chunk = s.config.chunks.findOne({uuid: collEntry.uuid, shard: {$ne: s.shard0.shardName}});
+let chunk = s.config.chunks.findOne({uuid: collEntry.uuid, shard: {$ne: s.shard0.shardName}});
 assert.neq(chunk, null, "all chunks on s.shard0.shardName!");
 printjson(chunk);
 

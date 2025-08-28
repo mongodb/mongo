@@ -36,7 +36,7 @@ let addNodeConfig = function (rst, nodeId, conn, arbiter) {
 
 let removeNodeConfig = function (rst, conn) {
     const config = rst.getReplSetConfigFromNode();
-    for (var i = 0; i < config.members.length; i++) {
+    for (let i = 0; i < config.members.length; i++) {
         if (config.members[i].host == conn.host) {
             config.members.splice(i, 1);
             break;
@@ -95,7 +95,7 @@ const st = new ShardingTest({
     // electionTimeoutMillis to its default value.
     initiateWithDefaultElectionTimeout: true,
 });
-var admin = st.getDB("admin");
+let admin = st.getDB("admin");
 
 jsTestLog("Adding the shard to the cluster should succeed.");
 assert.commandWorked(admin.runCommand({addshard: shardServer.getURL()}));
@@ -131,7 +131,7 @@ testReconfig(
 jsTestLog("Testing when the config server is unreachable.");
 logPrefix = "While config server is unreachable: ";
 jsTestLog("Shutting down all config servers");
-for (var i = 0; i < st.configRS.nodes.length; i++) {
+for (let i = 0; i < st.configRS.nodes.length; i++) {
     st.stopConfigServer(i);
 }
 st.configRS.awaitNoPrimary();

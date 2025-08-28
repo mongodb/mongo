@@ -2,14 +2,14 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rt = new ReplSetTest({name: "replset8", nodes: 1});
+let rt = new ReplSetTest({name: "replset8", nodes: 1});
 
-var nodes = rt.startSet();
+let nodes = rt.startSet();
 rt.initiate();
-var primary = rt.getPrimary();
-var bigstring = "a";
-var md = primary.getDB("d");
-var mdc = md["c"];
+let primary = rt.getPrimary();
+let bigstring = "a";
+let md = primary.getDB("d");
+let mdc = md["c"];
 
 // prep the data
 
@@ -18,17 +18,17 @@ var mdc = md["c"];
 //       documents to be increasing size.
 //       this should result in the updates moving the docs backwards.
 
-var doccount = 5000;
+let doccount = 5000;
 // Avoid empty extent issues
 mdc.insert({_id: -1, x: "dummy"});
 
 jsTestLog("inserting " + doccount + " bigstrings");
-var bulk = mdc.initializeUnorderedBulkOp();
+let bulk = mdc.initializeUnorderedBulkOp();
 for (var i = 0; i < doccount; ++i) {
     bulk.insert({_id: i, x: bigstring});
     bigstring += "a";
 }
-var result = assert.commandWorked(bulk.execute());
+let result = assert.commandWorked(bulk.execute());
 jsTestLog("insert 0-" + (doccount - 1) + " result: " + tojson(result));
 assert.eq(doccount, result.nInserted);
 assert.eq(doccount + 1, mdc.find().itcount());
@@ -62,7 +62,7 @@ assert.eq(doccount, result.nRemoved);
 assert.eq(doccount + 1, mdc.find().itcount());
 
 // add a secondary
-var secondary = rt.add();
+let secondary = rt.add();
 rt.reInitiate();
 jsTestLog("reinitiation complete after adding new node to replicaset");
 rt.awaitSecondaryNodes();

@@ -22,10 +22,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
      * up its value.
      */
     $config.states.query = function idHack(db, collName) {
-        var nQueries = 100;
-        for (var i = 0; i < nQueries; i++) {
+        let nQueries = 100;
+        for (let i = 0; i < nQueries; i++) {
             assert.lte(db[collName].find({_id: i}).itcount(), 1);
-            var res = db[collName].findOne({_id: i});
+            let res = db[collName].findOne({_id: i});
             if (res !== null) {
                 assert.eq(i, res._id);
             }

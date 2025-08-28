@@ -3,10 +3,10 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var cmdRes;
-var cursorId;
+let cmdRes;
+let cursorId;
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 st.stopBalancer();
 
 var db = st.s.getDB("test");

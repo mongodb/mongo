@@ -9,16 +9,16 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var cmdRes;
-var cursorId;
+let cmdRes;
+let cursorId;
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 st.stopBalancer();
 
 // Set up a collection sharded by "_id" with one chunk on each of the two shards.
 var db = st.s.getDB("test");
 assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
-var coll = db.getCollection("find_getmore_cmd");
+let coll = db.getCollection("find_getmore_cmd");
 
 assert.commandWorked(coll.insert({_id: -9, a: 4, b: "foo foo"}));
 assert.commandWorked(coll.insert({_id: -5, a: 8}));

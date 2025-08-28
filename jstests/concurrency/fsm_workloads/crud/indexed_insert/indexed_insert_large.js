@@ -22,11 +22,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         // the
         //  BSON type, must be less than 1024 bytes."
         // http://docs.mongodb.org/manual/reference/limits/
-        var maxIndexedSize = 1023;
+        let maxIndexedSize = 1023;
 
-        var bsonOverhead = Object.bsonsize({"": ""});
+        let bsonOverhead = Object.bsonsize({"": ""});
 
-        var bigstr = "x".repeat(maxIndexedSize);
+        let bigstr = "x".repeat(maxIndexedSize);
 
         // prefix the big string with tid to make it unique,
         // then trim it down so that it plus bson overhead is maxIndexedSize

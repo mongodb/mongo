@@ -20,7 +20,7 @@ import {
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
-var viewsDB = db.getSiblingDB("views_distinct");
+let viewsDB = db.getSiblingDB("views_distinct");
 assert.commandWorked(viewsDB.dropDatabase());
 
 // Populate a collection with some test data.

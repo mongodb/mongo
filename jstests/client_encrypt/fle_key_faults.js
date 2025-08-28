@@ -13,7 +13,7 @@ const conn = MongoRunner.runMongod(x509_options);
 const test = conn.getDB("test");
 const collection = test.coll;
 
-var localKMS = {
+let localKMS = {
     key: BinData(
         0,
         "tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6drp",

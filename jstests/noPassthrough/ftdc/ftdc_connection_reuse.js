@@ -47,14 +47,14 @@ function getDiagnosticData() {
     return stats;
 }
 
-var threads = [];
+let threads = [];
 
 function launchFinds({times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
-    for (var i = 0; i < times; i++) {
-        var thread = new Thread(
+    for (let i = 0; i < times; i++) {
+        let thread = new Thread(
             function (connStr, readPref, dbName, shouldFail, collName) {
-                var client = new Mongo(connStr);
+                let client = new Mongo(connStr);
                 const ret = client
                     .getDB(dbName)
                     .runCommand({find: collName, limit: 1, "$readPreference": {mode: readPref}});

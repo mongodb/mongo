@@ -1,8 +1,8 @@
 // @tags: [requires_profiling]
-var conn = MongoRunner.runMongod({auth: ""});
+let conn = MongoRunner.runMongod({auth: ""});
 
-var adminDb = conn.getDB("admin");
-var testDb = conn.getDB("testdb");
+let adminDb = conn.getDB("admin");
+let testDb = conn.getDB("testdb");
 
 adminDb.createUser({
     user: "admin",

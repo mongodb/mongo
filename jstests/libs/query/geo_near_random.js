@@ -18,8 +18,8 @@ GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds) {
         scale = scale || 1; // scale is good for staying away from edges
         return [(Random.rand() * 359.8 - 179.9) * scale, (Random.rand() * 180 - 90) * scale];
     } else {
-        var range = indexBounds.max - indexBounds.min;
-        var eps = Math.pow(2, -40);
+        let range = indexBounds.max - indexBounds.min;
+        let eps = Math.pow(2, -40);
         // Go very close to the borders but not quite there.
         return [
             Random.rand() * (range - eps) + eps + indexBounds.min,
@@ -32,8 +32,8 @@ GeoNearRandomTest.prototype.insertPts = function (nPts, indexBounds, scale, skip
     assert.eq(this.nPts, 0, "insertPoints already called");
     this.nPts = nPts;
 
-    var bulk = this.t.initializeUnorderedBulkOp();
-    for (var i = 0; i < nPts; i++) {
+    let bulk = this.t.initializeUnorderedBulkOp();
+    for (let i = 0; i < nPts; i++) {
         bulk.insert({_id: i, loc: this.mkPt(scale, indexBounds)});
     }
     assert.commandWorked(bulk.execute());
@@ -45,14 +45,14 @@ GeoNearRandomTest.prototype.insertPts = function (nPts, indexBounds, scale, skip
 };
 
 GeoNearRandomTest.prototype.assertIsPrefix = function (short, long, errmsg) {
-    for (var i = 0; i < short.length; i++) {
-        var xS = short[i] ? short[i].loc[0] : short[i].loc[0];
-        var yS = short[i] ? short[i].loc[1] : short[i].loc[1];
-        var dS = short[i] ? short[i].dis : 1;
+    for (let i = 0; i < short.length; i++) {
+        let xS = short[i] ? short[i].loc[0] : short[i].loc[0];
+        let yS = short[i] ? short[i].loc[1] : short[i].loc[1];
+        let dS = short[i] ? short[i].dis : 1;
 
-        var xL = long[i] ? long[i].loc[0] : long[i].loc[0];
-        var yL = long[i] ? long[i].loc[1] : long[i].loc[1];
-        var dL = long[i] ? long[i].dis : 1;
+        let xL = long[i] ? long[i].loc[0] : long[i].loc[0];
+        let yL = long[i] ? long[i].loc[1] : long[i].loc[1];
+        let dL = long[i] ? long[i].dis : 1;
 
         assert.eq([xS, yS, dS], [xL, yL, dL], errmsg);
     }
@@ -73,7 +73,7 @@ GeoNearRandomTest.prototype.testPt = function (pt, opts) {
     const runQuery = (limit) => this.t.find(query, proj).limit(limit).toArray();
 
     let last = runQuery(1);
-    for (var i = 2; i <= opts.nToTest; i++) {
+    for (let i = 2; i <= opts.nToTest; i++) {
         let ret = runQuery(i);
         this.assertIsPrefix(last, ret, `Unexpected result when comparing ${i - 1} and ${i}`);
 

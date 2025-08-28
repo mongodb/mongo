@@ -16,11 +16,11 @@
 
 // Test db.loadServerScripts()
 
-var testdb = db.getSiblingDB("loadserverscripts");
+let testdb = db.getSiblingDB("loadserverscripts");
 const systemJsColl = testdb.getCollection("system.js");
 
 jsTest.log("testing db.loadServerScripts()");
-var x;
+let x;
 
 // clear out any data from old tests
 systemJsColl.remove({});
@@ -60,7 +60,7 @@ x = myfunc();
 assert.eq(x, "myfunc", "Checking that myfunc() returns the correct value");
 
 // Insert value into collection from another process
-var coproc = startParallelShell(
+let coproc = startParallelShell(
     'db.getSiblingDB("loadserverscripts").getCollection("system.js").insert' +
         '    ( {_id: "myfunc2", "value": function(){ return "myfunc2"; } } );',
 );

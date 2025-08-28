@@ -87,9 +87,9 @@ assert.commandWorked(
     }),
 );
 
-var shardZeroEventsBeforeNewShard = [makeEvent(0, "insert"), makeEvent(20, "insert")];
-var shardZeroEventsAfterNewShard = [makeEvent(20, "delete")];
-var shardOneEvents = [makeEvent(20, "insert")];
+let shardZeroEventsBeforeNewShard = [makeEvent(0, "insert"), makeEvent(20, "insert")];
+let shardZeroEventsAfterNewShard = [makeEvent(20, "delete")];
+let shardOneEvents = [makeEvent(20, "insert")];
 
 // Check that each change stream returns the expected events.
 checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEventsBeforeNewShard);
@@ -118,7 +118,7 @@ assert.commandWorked(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}
 assert.commandWorked(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(mongosColl.insert({_id: 22}, {writeConcern: {w: "majority"}}));
 
-var shardZeroEvents = [makeEvent(1, "insert"), makeEvent(0, "delete"), makeEvent(1, "delete"), makeEvent(-2, "insert")];
+let shardZeroEvents = [makeEvent(1, "insert"), makeEvent(0, "delete"), makeEvent(1, "delete"), makeEvent(-2, "insert")];
 shardOneEvents = [
     makeEvent(21, "insert"),
     makeEvent(0, "insert"),

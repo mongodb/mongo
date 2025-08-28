@@ -10,27 +10,27 @@
  * ]
  */
 export const $config = (function () {
-    var data = {
+    let data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
         prefix: "rename_collection_droptarget",
     };
 
-    var states = (function () {
+    let states = (function () {
         function uniqueCollectionName(prefix, tid, num) {
             return prefix + tid + "_" + num;
         }
 
         function insert(db, collName, numDocs) {
-            for (var i = 0; i < numDocs; ++i) {
-                var res = db[collName].insert({});
+            for (let i = 0; i < numDocs; ++i) {
+                let res = db[collName].insert({});
                 assert.commandWorked(res);
                 assert.eq(1, res.nInserted);
             }
         }
 
         function init(db, collName) {
-            var num = 0;
+            let num = 0;
             this.fromCollName = uniqueCollectionName(this.prefix, this.tid, num++);
             this.toCollName = uniqueCollectionName(this.prefix, this.tid, num++);
 
@@ -39,18 +39,18 @@ export const $config = (function () {
 
         function rename(db, collName) {
             // Clear out the "from" collection and insert 'fromCollCount' documents
-            var fromCollCount = 7;
+            let fromCollCount = 7;
             assert(db[this.fromCollName].drop());
             assert.commandWorked(db.createCollection(this.fromCollName));
             insert(db, this.fromCollName, fromCollCount);
 
-            var toCollCount = 4;
+            let toCollCount = 4;
             assert.commandWorked(db.createCollection(this.toCollName));
             insert(db, this.toCollName, toCollCount);
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
             // after the rename occurs
-            var res = db[this.fromCollName].renameCollection(this.toCollName, true /* dropTarget */);
+            let res = db[this.fromCollName].renameCollection(this.toCollName, true /* dropTarget */);
 
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request
@@ -60,7 +60,7 @@ export const $config = (function () {
             assert.eq(0, db[this.fromCollName].find().itcount());
 
             // Swap "to" and "from" collections for next execution
-            var temp = this.fromCollName;
+            let temp = this.fromCollName;
             this.fromCollName = this.toCollName;
             this.toCollName = temp;
         }
@@ -68,7 +68,7 @@ export const $config = (function () {
         return {init: init, rename: rename};
     })();
 
-    var transitions = {init: {rename: 1}, rename: {rename: 1}};
+    let transitions = {init: {rename: 1}, rename: {rename: 1}};
 
     return {
         threadCount: 10,

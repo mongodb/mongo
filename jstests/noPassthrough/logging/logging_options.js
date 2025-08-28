@@ -1,4 +1,4 @@
-var baseName = "jstests_core_logging_options";
+let baseName = "jstests_core_logging_options";
 
 import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
 
@@ -48,8 +48,8 @@ expectedResult = {
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_component_verbosity.json"}, expectedResult);
 
 // Log output testing
-var baseDir = MongoRunner.dataPath + baseName;
-var logDir = MongoRunner.dataPath + baseName + "/logs/";
+let baseDir = MongoRunner.dataPath + baseName;
+let logDir = MongoRunner.dataPath + baseName + "/logs/";
 
 // ensure log directory exists
 assert(mkdir(baseDir));
