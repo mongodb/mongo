@@ -32,8 +32,8 @@ function compareId(a, b) {
 
 // Helper for testing that pipeline returns correct set of results.
 function testPipeline(pipeline, expectedResult, collection) {
-    arrayEq(collection.aggregate(pipeline).toArray().sort(compareId),
-            expectedResult.sort(compareId));
+    assert.eq(arrayEq(collection.aggregate(pipeline).toArray().sort(compareId),
+            expectedResult.sort(compareId)), true);
 }
 
 function runTest(coll, from, thirdColl, fourthColl) {
@@ -459,7 +459,7 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(
         from.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
     let fromView = undefined;
-    if (fromNS.typeof === "object") {
+    if (from.getDB() != coll.getDB()) {
         fromView = {db: from.getDB().getName(), coll: "fromView"};
     } else {
         fromView = "fromView";
