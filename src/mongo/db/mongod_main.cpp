@@ -66,6 +66,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -321,6 +322,9 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeShutdown);
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
 #endif
+
+auto& startupInfoSection =
+    *ServerStatusSectionBuilder<BSONObjectStatusSection>("startupInfo").forShard().forRouter();
 
 auto makeTransportLayer(ServiceContext* svcCtx) {
     boost::optional<int> proxyPort;
@@ -625,9 +629,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         startupInfoBuilder.append("Startup from clean shutdown?",
                                   lastShutdownState == StorageEngine::LastShutdownState::kClean);
         startupInfoBuilder.append("Statistics", startupTimeElapsedBuilder.obj());
-        LOGV2_INFO(8423403,
-                   "mongod startup complete",
-                   "Summary of time elapsed"_attr = startupInfoBuilder.obj());
+        BSONObj startupInfoObj = startupInfoBuilder.obj();
+        LOGV2_INFO(
+            8423403, "mongod startup complete", "Summary of time elapsed"_attr = startupInfoObj);
+        startupInfoSection.setObject(startupInfoObj);
     });
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED

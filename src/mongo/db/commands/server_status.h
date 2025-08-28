@@ -264,4 +264,27 @@ private:
     const OpCounters* _counters;
 };
 
+/**
+ * Publishes an infrequently-changing BSON object as a server status section.
+ */
+class BSONObjectStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext*, const BSONElement&) const override {
+        return **_obj;
+    }
+
+    void setObject(BSONObj obj) {
+        **_obj = std::move(obj);
+    }
+
+private:
+    synchronized_value<BSONObj> _obj;
+};
+
 }  // namespace mongo
