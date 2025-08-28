@@ -134,9 +134,16 @@ void lookupPipeValidator(const Pipeline& pipeline) {
 
 // Parses $lookup 'from' field. The 'from' field must be a string or an object with the following syntax
 // {from: {db: "dbName", coll: "collName"}, ...}
+//
+// In a view defintion, we only allow the object format when the namespace is either
+// {from: {db: "config", coll: "cache.chunks.*"}}
+// {from: {fb: "local", coll: "oplog.rs"}}
+// because a view cycle could not be detected in the general case when the 'from' field is an object due to However
+// sharded view resolution works.
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
-                                                   bool allowGenericForeignDbLookup) {
+                                                   bool allowGenericForeignDbLookup,
+                                                   bool isView) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$lookup 'from' field must be a string or object, but found "
                           << typeName(elem.type()),
@@ -145,6 +152,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
     if (elem.type() == BSONType::string) {
         return NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData());
     }
+
 
     const auto tenantId = defaultDb.tenantId();
     const auto vts = tenantId
@@ -157,6 +165,18 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         elem.embeddedObject());
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
+
+    // If we are in a view definition, we can only allow the cases nss == config.collections and nss == config.chunks
+    // to avoid possible undetectable view cycles. This could be relaxed to other known namespaces in the future, but
+    // these are maintained to not create a breaking change with past behavior.
+    bool isConfigSvrSupportedCollection = nss == NamespaceString::kConfigsvrCollectionsNamespace ||
+        nss == NamespaceString::kConfigsvrChunksNamespace;
+    uassert(
+        ErrorCodes::FailedToParse,
+        str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: '"
+                      << nss.dbName().toStringForErrorMsg() << "' and coll: '" << nss.coll() << "' in a view definition",
+        !isView || nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
+            isConfigSvrSupportedCollection || allowGenericForeignDbLookup);
     return nss;
 }
 
@@ -458,7 +478,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
         fromNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
     } else {
         fromNss = parseLookupFromAndResolveNamespace(
-            fromElement, nss.dbName(), options.allowGenericForeignDbLookup);
+            fromElement, nss.dbName(), options.allowGenericForeignDbLookup, false);
     }
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
@@ -1578,7 +1598,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     if (lookupSpec.getFrom().has_value()) {
         fromNs = parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),
                                                     pExpCtx->getNamespaceString().dbName(),
-                                                    pExpCtx->getAllowGenericForeignDbLookup());
+                                                    pExpCtx->getAllowGenericForeignDbLookup(),
+                                                    pExpCtx->getIsParsingViewDefinition());
     }
 
     as = std::string{lookupSpec.getAs()};

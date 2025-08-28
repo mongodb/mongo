@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/document_source_lookup.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -223,6 +224,62 @@ TEST_F(DocumentSourceLookUpTest, LookupWithOutInPipelineNotAllowed) {
             expCtx),
         AssertionException,
         ERROR_CODE_OUT_BANNED_IN_LOOKUP);
+}
+
+TEST_F(DocumentSourceLookUpTest, GeneralCrossDBLookupNotAllowedInView) {
+    auto expCtx = getExpCtx();
+    expCtx->setIsParsingViewDefinition(true);
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << BSON("db" << "other db" << "coll" << "other_coll")
+                                          << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                          << "as"
+                                          << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+TEST_F(DocumentSourceLookUpTest, SpecialNamespaceCrossDBLookupAllowedInView) {
+    auto expCtx = getExpCtx();
+    expCtx->setIsParsingViewDefinition(true);
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "config", "cache.chunks.randomNameBecauseAnyNameShouldWork");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << BSON("db" << "config" << "coll" << "cache.chunks.randomNameBecauseAnyNameShouldWork")
+                                          << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                          << "as"
+                                          << "as"))
+                .firstElement(),
+            expCtx));
+    NamespaceString fromNs2 = NamespaceString::createNamespaceString_forTest(
+        boost::none, "local", "oplog.rs");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs2, {fromNs, std::vector<BSONObj>()}}});
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs")
+                                          << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                          << "as"
+                                          << "as"))
+                .firstElement(),
+            expCtx));
+    // must be exactly oplog.rs!
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs1")
+                                          << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                          << "as"
+                                          << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedNamespaces) {
