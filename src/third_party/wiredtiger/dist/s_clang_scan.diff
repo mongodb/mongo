@@ -11,4 +11,3 @@ wiredtiger/src/reconcile/rec_row.c Branch condition evaluates to a garbage value
 wiredtiger/src/reconcile/rec_write.c 3rd function call argument is an uninitialized value [core.CallAndMessage]
 wiredtiger/src/schema/schema_create.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
 wiredtiger/src/session/session_api.c Called function pointer is null (null dereference) [core.CallAndMessage]
-wiredtiger/src/include/buf_inline.h Assigned value is garbage or undefined [core.uninitialized.Assign]
