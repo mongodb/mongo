@@ -624,8 +624,8 @@ Status _createLegacyTimeseries(
             validatedCollator = swCollator.getValue()->getSpec().toBSON();
         }
 
-        uassertStatusOK(timeseries::createDefaultTimeseriesIndex(
-            opCtx, bucketsOptions, collectionWriter, validatedCollator));
+        uassertStatusOK(
+            timeseries::createDefaultTimeseriesIndex(opCtx, collectionWriter, validatedCollator));
         wuow.commit();
         return Status::OK();
     });
@@ -742,6 +742,28 @@ Status _createCollection(
         }
         if (!status.isOK()) {
             return status;
+        }
+
+        // We create the index on time and meta, which is used for query-based reopening, here for
+        // viewless time-series collections if we are creating the collection on a primary. This is
+        // done within the same WUOW as the collection creation.
+        if (collectionOptions.timeseries && !nss.isTimeseriesBucketsCollection() &&
+            opCtx->writesAreReplicated()) {
+            CollectionWriter collWriter(opCtx, nss);
+            invariant(collWriter->isNewTimeseriesWithoutView());
+
+            auto validatedCollator = collectionOptions.collation;
+            if (!collectionOptions.collation.isEmpty()) {
+                auto tmpOptions = collectionOptions;
+                auto swCollator = db->validateCollator(opCtx, tmpOptions);
+
+                // The userCreateNS already has a uassertStatusOK and validateCollator is called in
+                // it, so we should have the case that the status of the swCollator is ok.
+                invariant(swCollator.getStatus());
+                validatedCollator = swCollator.getValue()->getSpec().toBSON();
+            }
+            uassertStatusOK(
+                timeseries::createDefaultTimeseriesIndex(opCtx, collWriter, validatedCollator));
         }
 
         wunit.commit();

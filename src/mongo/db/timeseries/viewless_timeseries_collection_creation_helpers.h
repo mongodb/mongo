@@ -43,7 +43,6 @@ BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField);
  * query-based reopening.
  */
 Status createDefaultTimeseriesIndex(OperationContext* opCtx,
-                                    CollectionOptions& options,
                                     CollectionWriter& collection,
                                     BSONObj collator);
 }  // namespace mongo::timeseries

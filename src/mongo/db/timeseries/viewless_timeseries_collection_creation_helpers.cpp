@@ -159,7 +159,6 @@ BSONObj generateTimeseriesValidator(int bucketVersion, StringData timeField) {
 }
 
 Status createDefaultTimeseriesIndex(OperationContext* opCtx,
-                                    CollectionOptions& options,
                                     CollectionWriter& collection,
                                     BSONObj collator) {
     auto tsOptions = collection->getCollectionOptions().timeseries;
