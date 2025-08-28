@@ -5071,11 +5071,6 @@ function shouldSkipTestCase(clusterType,
     if (command == "setIndexCommitQuorum") {
         return true;
     }
-    // TODO SERVER-96839 dropRole and dropAllRolesFromDatabse does not always return a WCE
-    if (command == "dropRole" || command == "dropAllRolesFromDatabase") {
-        jsTestLog("Skipping " + command + " test until SERVER-96839 is backported.");
-        return true;
-    }
 
     if (clusteredColls && command == "create") {
         // More information about this in SERVER-102058.
