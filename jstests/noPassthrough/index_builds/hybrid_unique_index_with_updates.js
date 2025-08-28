@@ -4,6 +4,8 @@
  * index build to confirm that the resulting behavior is failure.
  *
  * @tags: [
+ *   # TODO (SERVER-107052): Remove this exclusion once primary-driven index builds handle concurrent writes.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

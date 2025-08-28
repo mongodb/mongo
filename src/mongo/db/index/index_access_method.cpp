@@ -912,11 +912,15 @@ protected:
 
 private:
     virtual std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
-    _finalizeSort() = 0;
+    _finalizeSort(OperationContext* opCtx, RecoveryUnit& ru, const CollectionPtr& coll) = 0;
 
     virtual SharedBufferFragmentBuilder& _getMemPool() = 0;
 
-    virtual void _insert(const key_string::Value& keyString) = 0;
+    virtual void _insert(OperationContext* opCtx,
+                         RecoveryUnit& ru,
+                         const CollectionPtr& coll,
+                         const IndexCatalogEntry& entry,
+                         const key_string::Value& keyString) = 0;
 
     virtual void _addKeyForCommit(OperationContext* opCtx,
                                   RecoveryUnit& ru,
@@ -1099,7 +1103,7 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::insert(
     }
 
     for (const auto& keyString : *keys) {
-        _insert(keyString);
+        _insert(opCtx, *shard_role_details::getRecoveryUnit(opCtx), collection, *entry, keyString);
         ++_keysInserted;
     }
 
@@ -1121,7 +1125,7 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
-    auto it = _finalizeSort();
+    auto it = _finalizeSort(opCtx, ru, *collection);
 
     ProgressMeterHolder pm;
     {
@@ -1241,12 +1245,16 @@ public:
     IndexStateInfo persistDataForShutdown() final;
 
 private:
-    std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator> _finalizeSort()
-        final;
+    std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator> _finalizeSort(
+        OperationContext* opCtx, RecoveryUnit& ru, const CollectionPtr& coll) final;
 
     SharedBufferFragmentBuilder& _getMemPool() final;
 
-    void _insert(const key_string::Value& keyString) final;
+    void _insert(OperationContext* opCtx,
+                 RecoveryUnit& ru,
+                 const CollectionPtr& coll,
+                 const IndexCatalogEntry& entry,
+                 const key_string::Value& keyString) final;
 
     void _addKeyForCommit(OperationContext* opCtx,
                           RecoveryUnit& ru,
@@ -1255,9 +1263,6 @@ private:
 
     void _finishCommit() final {}
 
-    void _insertMultikeyMetadataKeysIntoVec();
-
-    std::vector<std::pair<key_string::Value, mongo::NullValue>> _unsortedKeys;
     SharedBufferFragmentBuilder _memPool;
 };
 
@@ -1278,21 +1283,47 @@ SharedBufferFragmentBuilder& SortedDataIndexAccessMethod::PrimaryDrivenBulkBuild
 }
 
 void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_insert(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry& entry,
     const key_string::Value& keyString) {
-    _unsortedKeys.emplace_back(keyString, mongo::NullValue());
+    if (entry.descriptor()->unique() &&
+        _iam->getSortedDataInterface()->findLoc(opCtx, ru, keyString.getViewWithoutRecordId())) {
+        uassertStatusOK(buildDupKeyErrorStatus(keyString,
+                                               coll->ns(),
+                                               entry.descriptor()->indexName(),
+                                               entry.descriptor()->keyPattern(),
+                                               entry.descriptor()->collation(),
+                                               _iam->getSortedDataInterface()->getOrdering()));
+    }
+
+    WriteUnitOfWork wuow{opCtx};
+    uassertStatusOK(container_write::insert(opCtx,
+                                            ru,
+                                            coll,
+                                            _iam->getSortedDataInterface()->getContainer(),
+                                            keyString.getView(),
+                                            keyString.getTypeBitsView()));
+    wuow.commit();
 }
 
 std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
-SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_finalizeSort() {
-    _insertMultikeyMetadataKeysIntoVec();
-    std::sort(_unsortedKeys.begin(),
-              _unsortedKeys.end(),
-              [](const std::pair<key_string::Value, mongo::NullValue>& lhs,
-                 const std::pair<key_string::Value, mongo::NullValue>& rhs) {
-                  return lhs.first.compare(rhs.first) < 0;
-              });
-    return std::make_unique<sorter::InMemIterator<key_string::Value, mongo::NullValue>>(
-        _unsortedKeys);
+SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_finalizeSort(OperationContext* opCtx,
+                                                                     RecoveryUnit& ru,
+                                                                     const CollectionPtr& coll) {
+    for (auto&& key : _multikeyMetadataKeys) {
+        WriteUnitOfWork wuow{opCtx};
+        uassertStatusOK(container_write::insert(opCtx,
+                                                ru,
+                                                coll,
+                                                _iam->getSortedDataInterface()->getContainer(),
+                                                key.getView(),
+                                                key.getTypeBitsView()));
+        wuow.commit();
+        ++_keysInserted;
+    }
+    return std::make_unique<sorter::InMemIterator<key_string::Value, mongo::NullValue>>();
 }
 
 void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_addKeyForCommit(
@@ -1310,13 +1341,6 @@ void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_addKeyForCommit(
 
 IndexStateInfo SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::persistDataForShutdown() {
     MONGO_UNREACHABLE_TASSERT(1081640);
-}
-
-void SortedDataIndexAccessMethod::PrimaryDrivenBulkBuilder::_insertMultikeyMetadataKeysIntoVec() {
-    for (const auto& keyString : _multikeyMetadataKeys) {
-        _unsortedKeys.emplace_back(keyString, mongo::NullValue());
-        ++_keysInserted;
-    }
 }
 
 class SortedDataIndexAccessMethod::HybridBulkBuilder final
@@ -1338,12 +1362,16 @@ public:
     IndexStateInfo persistDataForShutdown() final;
 
 private:
-    std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator> _finalizeSort()
-        final;
+    std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator> _finalizeSort(
+        OperationContext* opCtx, RecoveryUnit& ru, const CollectionPtr& coll) final;
 
     SharedBufferFragmentBuilder& _getMemPool() final;
 
-    void _insert(const key_string::Value& keyString) final;
+    void _insert(OperationContext* opCtx,
+                 RecoveryUnit& ru,
+                 const CollectionPtr& coll,
+                 const IndexCatalogEntry& entry,
+                 const key_string::Value& keyString) final;
 
     void _addKeyForCommit(OperationContext* opCtx,
                           RecoveryUnit& ru,
@@ -1421,7 +1449,11 @@ IndexStateInfo SortedDataIndexAccessMethod::HybridBulkBuilder::persistDataForShu
     return stateInfo;
 }
 
-void SortedDataIndexAccessMethod::HybridBulkBuilder::_insert(const key_string::Value& keyString) {
+void SortedDataIndexAccessMethod::HybridBulkBuilder::_insert(OperationContext* opCtx,
+                                                             RecoveryUnit& ru,
+                                                             const CollectionPtr& coll,
+                                                             const IndexCatalogEntry& entry,
+                                                             const key_string::Value& keyString) {
     _sorter->add(keyString, mongo::NullValue());
 }
 
@@ -1478,7 +1510,9 @@ SortedDataIndexAccessMethod::HybridBulkBuilder::_makeSorterSettings() const {
 }
 
 std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
-SortedDataIndexAccessMethod::HybridBulkBuilder::_finalizeSort() {
+SortedDataIndexAccessMethod::HybridBulkBuilder::_finalizeSort(OperationContext* opCtx,
+                                                              RecoveryUnit& ru,
+                                                              const CollectionPtr& coll) {
     _insertMultikeyMetadataKeysIntoSorter();
     return _sorter->done();
 }
