@@ -652,6 +652,11 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const NamespaceString originalNss(
         CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
+    if (OptionalBool::parseFromBSON(originalCmdObj[kRawDataFieldName]) ||
+        originalNss.isTimeseriesBucketsCollection()) {
+        isRawDataOperation(opCtx) = true;
+    }
+
     sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
     return router.routeWithRoutingContext(
         opCtx,
@@ -678,11 +683,12 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             const auto& cm = cri.getChunkManager();
             auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
             auto isTimeseriesLogicalRequest = false;
-            if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
+
+            if (isTrackedTimeseries && !isRawDataOperation(opCtx)) {
+                isTimeseriesLogicalRequest = true;
+            }
+            if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView()) {
                 nss = std::move(cm.getNss());
-                if (!isRawDataOperation(opCtx)) {
-                    isTimeseriesLogicalRequest = true;
-                }
             }
             // Note: at this point, 'nss' should be the timeseries buckets collection namespace if
             // we're writing to a tracked timeseries collection.
@@ -696,8 +702,8 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             if (cri.hasRoutingTable()) {
                 // If the request is for a view on a sharded timeseries buckets collection, we need
                 // to replace the namespace by buckets collection namespace in the command object.
-                if (!cri.getChunkManager().isNewTimeseriesWithoutView() &&
-                    isTimeseriesLogicalRequest) {
+                if (isTimeseriesLogicalRequest &&
+                    !cri.getChunkManager().isNewTimeseriesWithoutView()) {
                     cmdObj = replaceNamespaceByBucketNss(opCtx, cmdObj, nss);
                 }
                 auto expCtx = makeExpressionContextWithDefaultsForTargeter(
@@ -780,6 +786,11 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         return true;
     }
 
+    if (OptionalBool::parseFromBSON(originalCmdObj[kRawDataFieldName]) ||
+        originalNss.isTimeseriesBucketsCollection()) {
+        isRawDataOperation(opCtx) = true;
+    }
+
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
         // Clear the BSONObjBuilder since this lambda function may be retried if the router cache is
         // stale.
@@ -801,10 +812,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         auto cmdObj = originalCmdObj;
 
         auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
-        auto isTimeseriesViewRequest = false;
-        if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
+        auto isTimeseriesLogicalRequest = false;
+        if (isTrackedTimeseries && !isRawDataOperation(opCtx) &&
+            !originalNss.isTimeseriesBucketsCollection()) {
+            isTimeseriesLogicalRequest = true;
+        }
+        if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView()) {
             nss = std::move(cm.getNss());
-            isTimeseriesViewRequest = true;
         }
         // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
         // writing to a sharded timeseries collection.
@@ -823,9 +837,9 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
         if (cri.hasRoutingTable()) {
-            // If the request is for a view on a sharded timeseries buckets collection, we need to
-            // replace the namespace by buckets collection namespace in the command object.
-            if (isTimeseriesViewRequest && !cri.getChunkManager().isNewTimeseriesWithoutView()) {
+            // If the request is for a view on a sharded legacy timeseries buckets collection, we
+            // need to replace the namespace by buckets collection namespace in the command object.
+            if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView()) {
                 cmdObjForShard = replaceNamespaceByBucketNss(opCtx, cmdObjForShard, nss);
             }
 
@@ -875,13 +889,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                                                              collation,
                                                              letParams,
                                                              runtimeConstants,
-                                                             isTimeseriesViewRequest)) {
+                                                             isTimeseriesLogicalRequest)) {
                 getQueryCounters(opCtx).findAndModifyNonTargetedShardedCount.increment(1);
                 auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
                     opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
                 if (auto shardId = targetPotentiallySingleShard(
-                        expCtx, cm, query, collation, isTimeseriesViewRequest)) {
+                        expCtx, cm, query, collation, isTimeseriesLogicalRequest)) {
                     // If we can find a single shard to target, we can skip the two phase write
                     // protocol.
                     _runCommand(opCtx,
@@ -892,13 +906,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                                 applyReadWriteConcern(opCtx, this, cmdObjForShard),
                                 false /* isExplain */,
                                 allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                isTimeseriesViewRequest,
+                                isTimeseriesLogicalRequest,
                                 &result);
                 } else {
                     _runCommandWithoutShardKey(opCtx,
                                                nss,
                                                applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                                               isTimeseriesViewRequest,
+                                               isTimeseriesLogicalRequest,
                                                &result);
                 }
             } else {
@@ -909,7 +923,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                 }
 
                 ShardId shardId =
-                    targetSingleShard(expCtx, cm, query, collation, isTimeseriesViewRequest);
+                    targetSingleShard(expCtx, cm, query, collation, isTimeseriesLogicalRequest);
 
                 _runCommand(opCtx,
                             shardId,
@@ -919,7 +933,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                             applyReadWriteConcern(opCtx, this, cmdObjForShard),
                             false /* isExplain */,
                             boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                            isTimeseriesViewRequest,
+                            isTimeseriesLogicalRequest,
                             &result);
             }
         } else {
@@ -934,7 +948,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                 applyReadWriteConcern(opCtx, this, cmdObjForShard),
                 false /* isExplain */,
                 boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                isTimeseriesViewRequest,
+                isTimeseriesLogicalRequest,
                 &result);
         }
     };

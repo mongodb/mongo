@@ -165,6 +165,8 @@ public:
 
     bool isTrackedTimeSeriesBucketsNamespace() const override;
 
+    bool isTrackedTimeSeriesNamespace() const override;
+
     bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;
 
     RoutingContext& getRoutingCtx() const;

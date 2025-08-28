@@ -46,7 +46,6 @@ function testUpdateExplain({
     expectedNumUpserted = 0,
     expectedNumUnpacked = null,
     expectedUsedIndexName = null,
-    skipIfSharded = false,
 }) {
     assert(expectedUpdateStageName === "TS_MODIFY" || expectedUpdateStageName === "UPDATE");
 
@@ -54,10 +53,6 @@ function testUpdateExplain({
     const collName = getCallerName();
     const coll = testDB.getCollection(collName);
     prepareCollection({collName, initialDocList: docs});
-    // TODO: SERVER-107666 Remove this once explain update works on sharded viewless collections.
-    if (skipIfSharded && FixtureHelpers.isSharded(coll)) {
-        return;
-    }
 
     // Creates an index same as the one in the hint so as to verify that the index hint is honored.
     if (singleUpdateOp.hasOwnProperty("hint")) {
@@ -268,9 +263,6 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
-        // TODO: SERVER-107666 Remove this once explain update works on sharded viewless
-        // collections.
-        skipIfSharded: FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections"),
     });
 })();
 
@@ -291,8 +283,5 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
         expectedUsedIndexName: metaFieldName + "_1",
-        // TODO: SERVER-107666 Remove this once explain update works on sharded viewless
-        // collections.
-        skipIfSharded: FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections"),
     });
 })();

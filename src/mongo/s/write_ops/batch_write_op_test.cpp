@@ -2245,6 +2245,7 @@ public:
 
 private:
     FailPointEnableBlock fp{"isTrackedTimeSeriesBucketsNamespaceAlwaysTrue"};
+    FailPointEnableBlock fp2{"isTrackedTimeSeriesNamespaceAlwaysTrue"};
     boost::optional<CollectionRoutingInfoTargeter> _criTargeter;
 };
 

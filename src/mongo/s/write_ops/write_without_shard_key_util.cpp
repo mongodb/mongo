@@ -131,9 +131,6 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
         return {upsertDoc, BSONObj()};
     }
 
-    tassert(7777500,
-            "Expected timeseries buckets collection namespace",
-            updateRequest.getNamespaceString().isTimeseriesBucketsCollection());
     auto upsertBucketObj =
         timeseries::write_ops::makeBucketDocument(std::vector{upsertDoc},
                                                   updateRequest.getNamespaceString(),
@@ -338,6 +335,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
                 std::vector<BSONObj> docs;
                 docs.push_back(queryResponse.getTargetDoc().get());
                 write_ops::InsertCommandRequest insertRequest(sharedBlock->nss, docs);
+                // For time-series operations we directly insert the newly generated bucket.
+                insertRequest.setRawData(true);
 
                 // Append "encryptionInformation" if the original command is an encrypted command.
                 boost::optional<EncryptionInformation> encryptionInformation;

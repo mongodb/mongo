@@ -1686,6 +1686,12 @@ WriteResult performUpdates(
     boost::optional<const timeseries::CollectionPreConditions&> preConditionsOptional,
     OperationSource source) {
 
+    tassert(10912000,
+            fmt::format("Performing a logical time-series update operation without passing in the "
+                        "CollectionPreConditions object with request on collection {}",
+                        wholeOp.getNamespace().toStringForErrorMsg()),
+            source != OperationSource::kTimeseriesUpdate || preConditionsOptional);
+
     timeseries::CollectionPreConditions preConditions = preConditionsOptional
         ? *preConditionsOptional
         : timeseries::CollectionPreConditions::getCollectionPreConditions(
@@ -1746,12 +1752,12 @@ WriteResult performUpdates(
         if (opCtx->isRetryableWrite()) {
             if (auto entry =
                     txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
-                // For non-sharded user time-series updates, handles the metrics of the command at
-                // the caller since each statement will run as a command through the internal
-                // transaction API.
+                // Set containsRetry to true for all types of operations except for user-facing
+                // time-series updates on a non-sharded cluster. For non-sharded user time-series
+                // updates, handles the metrics of the command at the caller since each statement
+                // will run as a command through the internal transaction API.
                 containsRetry = source != OperationSource::kTimeseriesUpdate ||
-                    (!preConditions.wasNssTranslated() &&
-                     preConditions.isLegacyTimeseriesCollection());
+                    !preConditions.getIsTimeseriesLogicalRequest() || wholeOp.getShardVersion();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 // Returns the '_id' of the user measurement for time-series upserts.
                 boost::optional<BSONElement> upsertedId;

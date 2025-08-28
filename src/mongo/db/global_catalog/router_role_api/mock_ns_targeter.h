@@ -167,6 +167,14 @@ public:
         _isTrackedTimeSeriesBucketsNamespace = isTrackedTimeSeriesBucketsNamespace;
     }
 
+    bool isTrackedTimeSeriesNamespace() const override {
+        return _isTrackedTimeSeriesBucketsNamespace;
+    }
+
+    void setIsTrackedTimeSeriesNamespace(bool isTrackedTimeseriesNamespace) {
+        _isTrackedTimeSeriesNamespace = isTrackedTimeseriesNamespace;
+    }
+
 private:
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of
@@ -180,6 +188,8 @@ private:
     std::vector<MockRange> _mockRanges;
 
     bool _isTrackedTimeSeriesBucketsNamespace = false;
+
+    bool _isTrackedTimeSeriesNamespace = false;
 };
 
 void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB);

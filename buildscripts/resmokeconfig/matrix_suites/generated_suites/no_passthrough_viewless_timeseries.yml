@@ -44,6 +44,7 @@ selector:
     - jstests/noPassthrough/catalog/server_status_catalog_stats.js
     - jstests/noPassthrough/cluster_scalability_misc/catalog_shard.js
     - jstests/noPassthrough/cluster_scalability_misc/move_collection_create_options.js
+    - jstests/noPassthrough/crud/bulk_write_metrics.js
     - jstests/noPassthrough/crud/vectored_insert_no_oplog_hole.js
     - jstests/noPassthrough/global_catalog/shareded_data_distribution_orphan_docs.js
     - jstests/noPassthrough/index_builds/create_indexes_return_on_start.js
@@ -84,8 +85,8 @@ selector:
     - jstests/noPassthrough/timeseries/query/timeseries_internal_bounded_sort_spilling.js
     - jstests/noPassthrough/timeseries/query/timeseries_nested_elem_match.js
     - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
-    - jstests/noPassthrough/timeseries/query/timeseries_sample_on_buckets.js
     - jstests/noPassthrough/timeseries/query/timeseries_sample.js
+    - jstests/noPassthrough/timeseries/query/timeseries_sample_on_buckets.js
     - jstests/noPassthrough/timeseries/query/timeseries_sort.js
     - jstests/noPassthrough/timeseries/query/timeseries_sparse_fields.js
     - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js

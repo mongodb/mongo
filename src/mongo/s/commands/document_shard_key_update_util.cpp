@@ -31,8 +31,10 @@
 #include "mongo/base/status.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -75,7 +77,8 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
                                              const BSONObj& deleteCmdObj,
                                              const BSONObj& insertCmdObj,
                                              const DatabaseName& db,
-                                             const bool shouldUpsert) {
+                                             const bool shouldUpsert,
+                                             const bool isTimeseriesViewRequest) {
     auto deleteOpMsg =
         OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx), db, deleteCmdObj);
     auto deleteRequest = BatchedCommandRequest::parseDelete(deleteOpMsg);
@@ -109,6 +112,15 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse insertResponse;
     BatchWriteExecStats insertStats;
+    const bool isRawData = isRawDataOperation(opCtx);
+    // Restore the isRawData value for this operation.
+    ON_BLOCK_EXIT([&] { isRawDataOperation(opCtx) = isRawData; });
+
+    if (isTimeseriesViewRequest) {
+        // We directly insert the updated bucket.
+        isRawDataOperation(opCtx) = true;
+    }
+
     cluster::write(opCtx, insertRequest, nullptr, &insertStats, &insertResponse);
     uassertStatusOKWithContext(insertResponse.toStatus(),
                                "During insert stage of updating a shard key");
@@ -170,7 +182,10 @@ std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorTrans
     try {
         // Delete the original document and insert the new one
         updatedShardKey = updateShardKeyForDocumentLegacy(
-            opCtx, nss, documentKeyChangeInfo, nss.isTimeseriesBucketsCollection());
+            opCtx,
+            nss,
+            documentKeyChangeInfo,
+            CollectionRoutingInfoTargeter{opCtx, nss}.isTrackedTimeSeriesNamespace());
 
         // If the operation was an upsert, record the _id of the new document.
         if (updatedShardKey && documentKeyChangeInfo.getShouldUpsert()) {
@@ -292,11 +307,18 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
     // If the WouldChangeOwningShard error happens for a timeseries collection, the pre-image is
     // a measurement to be deleted and so the delete command should be sent to the timeseries view.
     auto deleteCmdObj = constructShardKeyDeleteCmdObj(
-        isTimeseriesViewRequest ? nss.getTimeseriesViewNamespace() : nss, updatePreImage);
+        (isTimeseriesViewRequest && nss.isTimeseriesBucketsCollection())
+            ? nss.getTimeseriesViewNamespace()
+            : nss,
+        updatePreImage);
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, fleCrudProcessed);
 
-    return executeOperationsAsPartOfShardKeyUpdate(
-        opCtx, deleteCmdObj, insertCmdObj, nss.dbName(), documentKeyChangeInfo.getShouldUpsert());
+    return executeOperationsAsPartOfShardKeyUpdate(opCtx,
+                                                   deleteCmdObj,
+                                                   insertCmdObj,
+                                                   nss.dbName(),
+                                                   documentKeyChangeInfo.getShouldUpsert(),
+                                                   isTimeseriesViewRequest);
 }
 
 void startTransactionForShardKeyUpdate(OperationContext* opCtx) {

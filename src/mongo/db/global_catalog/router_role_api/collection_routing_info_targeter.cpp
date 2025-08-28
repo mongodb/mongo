@@ -88,6 +88,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(waitForDatabaseToBeDropped);
 MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue);
+MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesNamespaceAlwaysTrue);
 
 constexpr auto kIdFieldName = "_id"_sd;
 
@@ -879,6 +880,14 @@ bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const 
     }
     return _cri.hasRoutingTable() && _cri.getChunkManager().isTimeseriesCollection() &&
         !_cri.getChunkManager().isNewTimeseriesWithoutView();
+}
+
+bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesNamespace() const {
+    // Used for testing purposes to force that we always have a tracked timeseries namespace.
+    if (MONGO_unlikely(isTrackedTimeSeriesNamespaceAlwaysTrue.shouldFail())) {
+        return true;
+    }
+    return _cri.hasRoutingTable() && _cri.getChunkManager().isTimeseriesCollection();
 }
 
 bool CollectionRoutingInfoTargeter::timeseriesNamespaceNeedsRewrite(

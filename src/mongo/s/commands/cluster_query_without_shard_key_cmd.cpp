@@ -68,6 +68,7 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -266,6 +267,10 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
     const auto& writeCmdObj = writeReq.body;
     auto commandName = writeReq.getCommandName();
 
+    if (OptionalBool::parseFromBSON(writeCmdObj[kRawDataFieldName])) {
+        isRawDataOperation(opCtx) = true;
+    }
+
     ParsedCommandInfo parsedInfo;
 
     // For bulkWrite request, we set the nss when we parse the bulkWrite command.
@@ -449,9 +454,13 @@ public:
                     }
 
                     const auto& collectionUUID = cm.getUUID();
-                    const auto& timeseriesFields = cm.isSharded() &&
-                            cm.getTimeseriesFields().has_value() &&
-                            parsedInfoFromRequest.isTimeseriesNamespace
+
+                    const auto isShardedTimeseriesLogicalOperation = cm.isSharded() &&
+                        cm.getTimeseriesFields().has_value() && !isRawDataOperation(opCtx) &&
+                        (cm.isNewTimeseriesWithoutView() ||
+                         parsedInfoFromRequest.isTimeseriesNamespace);
+
+                    const auto& timeseriesFields = isShardedTimeseriesLogicalOperation
                         ? cm.getTimeseriesFields()
                         : boost::none;
 

@@ -209,7 +209,9 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
     // field which is not guaranteed to exist and does not uniquely identify a measurement so we
     // cannot use this ID to reliably target a document in this write phase. Instead, we will
     // forward the full query to the chosen shard and it will be executed again on the target shard.
-    BSONObjBuilder queryBuilder(nss.isTimeseriesBucketsCollection() ? BSONObj() : targetDocId);
+    const bool isTrackedTimeseries =
+        CollectionRoutingInfoTargeter{opCtx, nss}.isTrackedTimeSeriesNamespace();
+    BSONObjBuilder queryBuilder(isTrackedTimeseries ? BSONObj() : targetDocId);
 
     auto cmdObj = [&]() {
         // Parse original write command and set _id as query filter for new command object.
@@ -239,8 +241,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                 updateOpWithNamespace.setBypassEmptyTsReplacement(
                     bulkWriteRequest->getBypassEmptyTsReplacement());
 
-                if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
-                    nss.isTimeseriesBucketsCollection()) {
+                if (requiresOriginalQuery(opCtx, updateOpWithNamespace) || isTrackedTimeseries) {
                     queryBuilder.appendElementsUnique(updateOp->getFilter());
                 } else {
                     // Unset the collation and sort because targeting by _id uses default collation
@@ -264,7 +265,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                 // If the query targets a time-series collection, include the original query
                 // alongside the target doc.
                 BulkWriteDeleteOp newDeleteOp = *deleteOp;
-                if (nss.isTimeseriesBucketsCollection()) {
+                if (isTrackedTimeseries) {
                     queryBuilder.appendElementsUnique(deleteOp->getFilter());
                 } else {
                     // Unset the collation because targeting by _id uses default collation.
@@ -281,7 +282,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
 
             return bulkWriteRequest->toBSON();
         } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
-            if (isRawDataOperation(opCtx) && nss.isTimeseriesBucketsCollection()) {
+            if (isRawDataOperation(opCtx) && isTrackedTimeseries) {
                 opMsgRequest.body =
                     rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
                         opMsgRequest.body, nss.coll());
@@ -308,8 +309,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
             updateOpWithNamespace.setBypassEmptyTsReplacement(
                 updateRequest.getBypassEmptyTsReplacement());
 
-            if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
-                nss.isTimeseriesBucketsCollection()) {
+            if (requiresOriginalQuery(opCtx, updateOpWithNamespace) || isTrackedTimeseries) {
                 queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
             } else {
                 // Unset the collation and sort because targeting by _id uses default collation and
@@ -326,7 +326,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
             batchedCommandRequest.setShardVersion(shardVersion);
             return batchedCommandRequest.toBSON();
         } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
-            if (isRawDataOperation(opCtx) && nss.isTimeseriesBucketsCollection()) {
+            if (isRawDataOperation(opCtx) && isTrackedTimeseries) {
                 opMsgRequest.body =
                     rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
                         opMsgRequest.body, nss.coll());
@@ -347,7 +347,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
 
             // If the query targets a time-series collection, include the original query alongside
             // the target doc.
-            if (nss.isTimeseriesBucketsCollection()) {
+            if (isTrackedTimeseries) {
                 queryBuilder.appendElementsUnique(deleteRequest.getDeletes().front().getQ());
             } else {
                 // Unset the collation because targeting by _id uses default collation.
@@ -363,7 +363,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
             return batchedCommandRequest.toBSON();
         } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                    commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
-            if (isRawDataOperation(opCtx) && nss.isTimeseriesBucketsCollection()) {
+            if (isRawDataOperation(opCtx) && isTrackedTimeseries) {
                 opMsgRequest.body =
                     rewriteCommandForRawDataOperation<write_ops::FindAndModifyCommandRequest>(
                         opMsgRequest.body, nss.coll());
@@ -391,7 +391,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                                           findAndModifyRequest.getNamespace(),
                                           findAndModifyRequest.getQuery(),
                                           findAndModifyRequest.getFields().value_or(BSONObj())) ||
-                    nss.isTimeseriesBucketsCollection()) {
+                    isTrackedTimeseries) {
                     queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
                 } else {
                     // Unset the collation and sort because targeting by _id uses default collation
@@ -407,7 +407,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
                                           findAndModifyRequest.getNamespace(),
                                           findAndModifyRequest.getQuery(),
                                           findAndModifyRequest.getFields().value_or(BSONObj())) ||
-                    nss.isTimeseriesBucketsCollection()) {
+                    isTrackedTimeseries) {
                     queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
                 } else {
                     // Unset the collation and sort because targeting by _id uses default collation
