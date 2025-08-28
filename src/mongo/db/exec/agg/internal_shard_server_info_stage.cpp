@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_internal_shardserver_info.h"
+#include "mongo/db/exec/agg/internal_shard_server_info_stage.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/pipeline/document_source_internal_shardserver_info.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-
-#include <initializer_list>
+#include "mongo/util/intrusive_counter.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(_internalShardServerInfo,
-                         DocumentSourceInternalShardServerInfo::LiteParsed::parse,
-                         DocumentSourceInternalShardServerInfo::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
-ALLOCATE_DOCUMENT_SOURCE_ID(_internalShardServerInfo, DocumentSourceInternalShardServerInfo::id)
-
-boost::intrusive_ptr<DocumentSource> DocumentSourceInternalShardServerInfo::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "$_internalShardServerInfo must take an empty object but found: "
-                          << elem,
-            elem.type() == BSONType::object && elem.Obj().isEmpty());
-
-    return new DocumentSourceInternalShardServerInfo(expCtx);
+boost::intrusive_ptr<mongo::exec::agg::Stage> internalShardServerInfoStageToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSourceInternalShardServerInfo) {
+    auto* ptr = dynamic_cast<DocumentSourceInternalShardServerInfo*>(
+        documentSourceInternalShardServerInfo.get());
+    tassert(10979900, "expected 'DocumentSourceInternalShardServerInfo' type", ptr);
+    return make_intrusive<mongo::exec::agg::InternalShardServerInfoStage>(ptr->kStageName,
+                                                                          ptr->getExpCtx());
 }
 
-Value DocumentSourceInternalShardServerInfo::serialize(const SerializationOptions& opts) const {
-    return Value(Document{{getSourceName(), Value{Document{{}}}}});
+namespace exec::agg {
+REGISTER_AGG_STAGE_MAPPING(internalShardServerInfoStage,
+                           DocumentSourceInternalShardServerInfo::id,
+                           internalShardServerInfoStageToStageFn);
+
+GetNextResult InternalShardServerInfoStage::doGetNext() {
+    if (!_didEmit) {
+        auto shardName =
+            pExpCtx->getMongoProcessInterface()->getShardName(pExpCtx->getOperationContext());
+        auto hostAndPort =
+            pExpCtx->getMongoProcessInterface()->getHostAndPort(pExpCtx->getOperationContext());
+        _didEmit = true;
+        return GetNextResult(DOC("shard" << shardName << "host" << hostAndPort));
+    }
+
+    return GetNextResult::makeEOF();
 }
 
+}  // namespace exec::agg
 }  // namespace mongo
