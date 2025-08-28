@@ -39,7 +39,7 @@ def list_idls(directory: str) -> Set[str]:
         os.path.join(dirpath, filename)
         for dirpath, dirnames, filenames in os.walk(directory)
         for filename in filenames
-        if filename.endswith(".idl")
+        if not filename.startswith(".") and filename.endswith(".idl")
     }
 
 
