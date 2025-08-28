@@ -646,7 +646,8 @@ std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* 
 }
 
 void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, StringData ident) {
-    // TODO (SERVER-107058): Remove this retry loop.
+    // Dropping the spill table may transiently return ObjectIsBusy if another spill engine user has
+    // a storage snapshot from before an earlier write to this table. Retry until the drop succeeds.
     for (size_t retries = 0;; ++retries) {
         auto status = _spillEngine->dropIdent(ru,
                                               ident,
