@@ -60,6 +60,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
@@ -466,6 +467,49 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(SysProfile).testOnly().forShard();
+
+class CommandFeatureFlaggedOnLatestFCVTestCmd : public BasicCommand {
+public:
+    CommandFeatureFlaggedOnLatestFCVTestCmd()
+        : BasicCommand("testCommandFeatureFlaggedOnLatestFCV") {}
+
+    bool adminOnly() const override {
+        return false;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    // No auth needed because it only works when enabled via command line.
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
+    std::string help() const override {
+        return "internal. for testing only.";
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        LOGV2(10044800, "Test-only command 'testCommandFeatureFlaggedOnLatestFCV' invoked");
+        return true;
+    }
+};
+
+MONGO_REGISTER_COMMAND(CommandFeatureFlaggedOnLatestFCVTestCmd)
+    .testOnly()
+    .requiresFeatureFlag(&feature_flags::gFeatureFlagBlender)
+    .forShard();
+
 }  // namespace
 
 std::string TestingDurableHistoryPin::getName() {
