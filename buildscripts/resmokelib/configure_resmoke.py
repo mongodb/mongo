@@ -93,7 +93,7 @@ def _set_up_modules():
             # both the fixures and the hooks just need to be loaded once for resmoke to recognize them
             for resource_dir in module_config.get("fixture_dirs", []) + module_config.get("hook_dirs", []):
                 norm_path = os.path.normpath(resource_dir)
-                package = norm_path.replace("/", ".")
+                package = resource_dir.replace("/", ".")
                 autoloader.load_all_modules(package, [norm_path])
                 
             for suite_dir in module_config.get("suite_dirs", []):
