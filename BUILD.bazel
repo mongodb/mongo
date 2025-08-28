@@ -434,7 +434,7 @@ extensions_with_config(
         # extension-enabled variant MUST have the "_mongo_extension" suffix for the
         # find_extensions.sh script to recognize it.
 
-        # TODO SERVER-108821: Remove the comment below once extension stages are no longer
+        # TODO SERVER-109838: Remove the comment below once extension stages are no longer
         # listed by $listMqlEntities.
         # Any extension added here will result in the with-extensions Evergreen variant
         # automatically loading it into the server for its tasks. This means that
