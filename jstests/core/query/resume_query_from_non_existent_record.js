@@ -140,6 +140,56 @@ const testFindCmd = function () {
         }),
         ErrorCodes.KeyNotFound,
     );
+
+    jsTestLog("[Find] startAt should fail with a malformed resume token.");
+    const malformedResumeToken = {x: 1, $recordId: NumberLong(1), $initialSyncId: UUID()};
+    res = assert.commandFailedWithCode(
+        db.runCommand({
+            find: collName,
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+            $_startAt: malformedResumeToken,
+        }),
+        ErrorCodes.BadValue,
+    );
+
+    jsTestLog("[Find] resumeAfter should fail with a malformed resume token.");
+    res = assert.commandFailedWithCode(
+        db.runCommand({
+            find: collName,
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+            $_resumeAfter: malformedResumeToken,
+        }),
+        ErrorCodes.BadValue,
+    );
+
+    jsTestLog("[Find] startAt should fail with an invalid initialSyncId in resume token.");
+    const invalidResumeToken = {$recordId: NumberLong(1), $initialSyncId: UUID()};
+    res = assert.commandFailedWithCode(
+        db.runCommand({
+            find: collName,
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+            $_startAt: invalidResumeToken,
+        }),
+        8132701,
+    );
+
+    jsTestLog("[Find] resumeAfter should fail with an invalid initialSyncId in resume token.");
+    res = assert.commandFailedWithCode(
+        db.runCommand({
+            find: collName,
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+            $_resumeAfter: invalidResumeToken,
+        }),
+        8132701,
+    );
 };
 
 const testAggregateCmd = function () {
@@ -213,6 +263,62 @@ const testAggregateCmd = function () {
             $_resumeAfter: resumeToken,
         }),
         ErrorCodes.KeyNotFound,
+    );
+
+    jsTestLog("[Aggregate] startAt should fail with a malformed resume token.");
+    const malformedResumeToken = {x: 1, $recordId: NumberLong(1), $initialSyncId: UUID()};
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [],
+            hint: {$natural: 1},
+            cursor: {batchSize: 1},
+            $_requestResumeToken: true,
+            $_startAt: malformedResumeToken,
+        }),
+        ErrorCodes.BadValue,
+    );
+
+    jsTestLog("[Aggregate] resumeAfter should fail with a malformed resume token.");
+
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [],
+            hint: {$natural: 1},
+            cursor: {batchSize: 1},
+            $_requestResumeToken: true,
+            $_resumeAfter: malformedResumeToken,
+        }),
+        ErrorCodes.BadValue,
+    );
+
+    jsTestLog("[Aggregate] startAt should failwith an invalid initialSyncId in resume token.");
+    const invalidResumeToken = {$recordId: NumberLong(1), $initialSyncId: UUID()};
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [],
+            hint: {$natural: 1},
+            cursor: {batchSize: 1},
+            $_requestResumeToken: true,
+            $_startAt: invalidResumeToken,
+        }),
+        8132701,
+    );
+
+    jsTestLog("[Aggregate] resumeAfter should fail with an invalid initialSyncId in resume token.");
+
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [],
+            hint: {$natural: 1},
+            cursor: {batchSize: 1},
+            $_requestResumeToken: true,
+            $_resumeAfter: invalidResumeToken,
+        }),
+        8132701,
     );
 };
 
