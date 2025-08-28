@@ -6,6 +6,8 @@
  *     requires_persistence,
  *     requires_replication,
  *     requires_wiredtiger,
+ *     # Primary-driven index builds don't write unfinished indexes to the catalog.
+ *     primary_driven_index_builds_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

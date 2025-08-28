@@ -2,6 +2,8 @@
  * Test aborting an index build after setup but before transitioning to in-progress.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
  * ]

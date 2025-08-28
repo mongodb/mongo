@@ -3,6 +3,8 @@
  * properly interrupted, without blocking shutdown, and restarted after shutdown.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
  * ]

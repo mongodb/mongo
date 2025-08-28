@@ -1,6 +1,10 @@
 /*
  * Test to verify when majority commit quorum is enabled for index build, the primary index builder
  * should not commit the index until majority of nodes finishes building their index.
+ * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";

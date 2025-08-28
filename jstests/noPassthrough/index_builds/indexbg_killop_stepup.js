@@ -3,6 +3,8 @@
  * node in an inconsistent state.
  *
  * @tags: [
+ *   # This test uses a failpoint that is only available for hybrid index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

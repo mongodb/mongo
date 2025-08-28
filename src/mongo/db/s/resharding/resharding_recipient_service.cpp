@@ -1200,17 +1200,25 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            auto opCtx = factory.makeOperationContext(&cc());
 
                            auto buildUUID = UUID::gen();
+
+                           // TODO(SERVER-109664): Do not use the feature-flag to disable commit
+                           // quorum for primary-driven index builds.
                            const auto fcvSnapshot =
                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                           const auto isPrimaryDrivenIndexBuild =
+                               fcvSnapshot.isVersionInitialized() &&
+                               feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                                   VersionContext::getDecoration(opCtx.get()), fcvSnapshot);
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
                                .indexBuildMethod =
-                                   ((fcvSnapshot.isVersionInitialized() &&
-                                     feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                                         VersionContext::getDecoration(opCtx.get()), fcvSnapshot))
-                                        ? IndexBuildMethodEnum::kPrimaryDriven
-                                        : IndexBuildMethodEnum::kHybrid),
+                                   (isPrimaryDrivenIndexBuild ? IndexBuildMethodEnum::kPrimaryDriven
+                                                              : IndexBuildMethodEnum::kHybrid),
+
                                .commitQuorum =
-                                   CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
+                                   (isPrimaryDrivenIndexBuild
+                                        ? CommitQuorumOptions(CommitQuorumOptions::kDisabled)
+                                        : CommitQuorumOptions(
+                                              CommitQuorumOptions::kVotingMembers))};
 
                            // TODO(SERVER-107070): investigate if this is a valid place to generate
                            // new idents or if we need to do something more complicated for catalog

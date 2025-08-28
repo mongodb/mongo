@@ -1939,6 +1939,9 @@ void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
     boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, collUUID);
     invariant(nss);
 
+    // The commit quorum gets set during _onStepUpAsyncTaskFn in _signalIfCommitQuorumNotEnabled, so
+    // we don't need to expicitely set the commit quorum of a primary-driven index build to be
+    // kDisabled here.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
         .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&

@@ -2,6 +2,7 @@
  * Tests that index build commitQuorum can include non-voting data-bearing nodes.
  *
  * @tags: [
+ *   requires_commit_quorum,
  *   requires_persistence,
  *   requires_replication,
  * ]

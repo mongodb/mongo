@@ -2,7 +2,11 @@
  * Tests that the dropIndexes command can drop ready indexes while there are index builds
  * in-progress.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
+ *   requires_replication
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";

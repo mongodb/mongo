@@ -2,6 +2,8 @@
  * Verifies that the index build step-up async task handles a stepdown gracefully.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
  * ]

@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   # Primary-driven index builds aren't resumable.
+ *   # This test uses a failpoint that is only available for hybrid index builds.
  *   primary_driven_index_builds_incompatible,
  *   requires_majority_read_concern,
  *   requires_persistence,

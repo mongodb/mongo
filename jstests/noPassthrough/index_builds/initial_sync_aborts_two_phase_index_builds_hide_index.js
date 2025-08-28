@@ -3,6 +3,7 @@
  * oplog replay phase.
  *
  * @tags: [
+ *   requires_commit_quorum,
  *   requires_replication,
  * ]
  */

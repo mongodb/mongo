@@ -16,6 +16,8 @@
  * index builds.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,

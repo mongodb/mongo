@@ -260,6 +260,13 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto commitQuorumEnabled = (enableIndexBuildCommitQuorum) ? true : false;
 
+    // TODO(SERVER-109664): Do not use the feature-flag to disable commit quorum for
+    // primary-driven index builds.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    auto isPrimaryDrivenIndexBuild = replCoord->getSettings().isReplSet() &&
+        fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
     auto commitQuorum = cmd.getCommitQuorum();
     if (commitQuorum) {
         uassert(ErrorCodes::BadValue,
@@ -269,7 +276,15 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
                 str::stream() << "commitQuorum is supported only for two phase index builds with "
                                  "commit quorum support enabled ",
                 (IndexBuildProtocol::kTwoPhase == protocol && commitQuorumEnabled));
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "commitQuorum is not supported for primary-driven index builds.",
+                !isPrimaryDrivenIndexBuild);
         return commitQuorum;
+    }
+
+    // Commit quorum is disabled for primary-driven index builds.
+    if (isPrimaryDrivenIndexBuild) {
+        return CommitQuorumOptions(CommitQuorumOptions::kDisabled);
     }
 
     if (IndexBuildProtocol::kTwoPhase == protocol) {

@@ -35,6 +35,7 @@
     exclude_with_any_tags:
       - primary_driven_index_builds_incompatible
       - rolling_index_builds
+      - requires_commit_quorum
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

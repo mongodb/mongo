@@ -2,7 +2,10 @@
  * Tests that an initial syncing node can drop ready indexes while having in-progress index builds
  * during the oplog replay phase.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_commit_quorum,
+ *   requires_replication,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";

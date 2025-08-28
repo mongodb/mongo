@@ -52,6 +52,7 @@ selector:
     - requires_profiling
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
+    - requires_commit_quorum
   roots:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js

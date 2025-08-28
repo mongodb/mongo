@@ -3,6 +3,8 @@
  * results in a consistent state with no crashing.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_replication,
  * ]
  */

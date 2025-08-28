@@ -3,6 +3,9 @@
  * the node in an inconsistent state.
  *
  * @tags: [
+ *   # Tests the hybrid index build-specific invalid state transition which involves an index on the secondary being aborted
+ *   # while the primary commits.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

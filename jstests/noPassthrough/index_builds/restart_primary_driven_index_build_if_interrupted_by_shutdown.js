@@ -1,5 +1,6 @@
 /**
- * Tests that a primary-driven index build gets restarted even after a clean shutdown.
+ * Tests that a primary-driven index build gets restarted even after a clean shutdown and checks
+ * that the commitQuorum value remains consistent (set to 0) before and after the restart.
  *
  * @tags: [
  *   requires_persistence,
@@ -39,12 +40,13 @@ jsTestLog("2. Insert data");
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(primary.getDB(dbName).getCollection(collName).insert({a: i}));
 }
+assert.commandWorked(primaryDB.runCommand({create: collName}));
 rst.awaitReplication();
 
-jsTestLog("3. Pause Index Build after intialization");
-let primFp = configureFailPoint(primary, "hangAfterInitializingIndexBuild");
+jsTestLog("3. Pause Index Build before commit");
+let primFp = configureFailPoint(primary, "hangIndexBuildBeforeSignalPrimaryForCommitReadiness");
 
-jsTestLog("4. Begin Index Build on all nodes");
+jsTestLog("4. Begin Index Build on the primary");
 const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, collNss, indexSpec, {name: indexName}, [
     ErrorCodes.InterruptedDueToReplStateChange,
 ]);
@@ -57,24 +59,42 @@ let buildUUID = extractUUIDFromObject(
 );
 jsTestLog("5. Obtained buildUUID ", buildUUID);
 
-jsTestLog("6. Restarting the primary");
+// Check the commitQuorum value before the restart
+// We can't directly check the commitQuorum from listIndexes, so we use this workaround of trying to set the commitQuorum and ensuring that we cannot set it.
+jsTestLog("6. Verify the commitQuorum is 0 (kDisabled) before restart");
+assert.commandFailedWithCode(
+    primaryDB.runCommand({setIndexCommitQuorum: collName, indexNames: [indexName], commitQuorum: 1}),
+    ErrorCodes.BadValue,
+);
+
+jsTestLog("7. Restarting the primary");
 rst.stop(primary, undefined, {forRestart: true, skipValidation: true});
 
 awaitIndexBuild({checkExitSuccess: false});
 
-jsTestLog("7. Check Index Build Resume State was not saved to disk");
+jsTestLog("8. Check Index Build Resume State was not saved to disk");
 assert(RegExp("20347.*" + buildUUID).test(rawMongoProgramOutput(".*")));
 assert.eq(false, RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput(".*")));
-rst.start(primary, {}, true);
+rst.start(
+    primary,
+    {setParameter: "failpoint.hangIndexBuildBeforeSignalPrimaryForCommitReadiness={mode:'alwaysOn'}"},
+    true,
+);
 
-jsTestLog("8. Wait for primary to get re-elected.");
+jsTestLog("9. Wait for primary to get re-elected.");
 primary = rst.getPrimary();
 primaryDB = primary.getDB(dbName);
 
-jsTestLog("9. Finish Index Build on Primary");
+jsTestLog("10. Verify the commitQuorum is 0 (kDisabled) after restart");
+assert.commandFailedWithCode(
+    primaryDB.runCommand({setIndexCommitQuorum: collName, indexNames: [indexName], commitQuorum: 1}),
+    ErrorCodes.BadValue,
+);
+
+jsTestLog("11. Finish Index Build on Primary");
 primFp.off();
 
-jsTestLog("10. Check that primary restarted the index build");
+jsTestLog("12. Check that primary restarted the index build");
 checkLog.containsJson(primary, 20660, {
     buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
@@ -82,7 +102,7 @@ checkLog.containsJson(primary, 20660, {
     method: "Primary driven",
 });
 
-jsTestLog("11. Check that the index build completed successfully on primary");
+jsTestLog("13. Check that the index build completed successfully on primary");
 checkLog.containsJson(primary, 20663, {
     buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;

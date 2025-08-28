@@ -3,6 +3,8 @@
  * oplog entry to be replicated. If a commit entry is received instead, the secondary should crash.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
  *   incompatible_with_windows_tls,

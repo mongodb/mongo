@@ -12,7 +12,11 @@
  * and drop any ready indexes even if there are index builds in-progress. To solve this problem, the
  * dropIndexes command cannot drop any ready indexes while there are any in-progress index builds.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
+ *   requires_replication,
+ * ]
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

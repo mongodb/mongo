@@ -1,6 +1,10 @@
 /**
  * Test that rolling back an index build, but not collection creation, behaves correctly even when
  * the index build is aborted.
+ * @tags: [
+ *   # We don't need to handle rollbacks in primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
 import {RollbackIndexBuildsTest} from "jstests/replsets/libs/rollback_index_builds_test.js";
 

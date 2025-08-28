@@ -3,6 +3,8 @@
  * is ready to commit by updating the corresponding document in config.system.indexBuilds.
  *
  * @tags: [
+ *     # hangBeforeGettingIndexBuildEntry only gets called when we retrieve the persisted index build data which is done for hybrid index builds.
+ *     primary_driven_index_builds_incompatible,
  *     requires_replication,
  * ]
  */

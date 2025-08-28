@@ -16,6 +16,7 @@
  *    not get sent to any other nodes.
  *
  * @tags: [
+ *   requires_commit_quorum,
  *   requires_replication,
  * ]
  */

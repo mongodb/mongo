@@ -19,6 +19,7 @@ selector:
   exclude_with_any_tags:
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
+    - requires_commit_quorum
   roots:
     - jstests/replsets/*index_build*.js
     - jstests/replsets/**/*index_build*.js

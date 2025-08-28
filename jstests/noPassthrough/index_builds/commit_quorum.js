@@ -2,6 +2,7 @@
  * Tests that the commit quorum can be changed during a two-phase index build.
  *
  * @tags: [
+ *   requires_commit_quorum,
  *   requires_replication,
  * ]
  */

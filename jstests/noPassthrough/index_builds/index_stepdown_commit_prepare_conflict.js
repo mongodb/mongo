@@ -15,6 +15,8 @@
  *    step-up from ocurring.
  *
  * @tags: [
+ *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
+ *   requires_commit_quorum,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]
