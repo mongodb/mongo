@@ -6,6 +6,7 @@ This pattern enables the associated class to be looked up later by using
 its name.
 """
 
+import sys
 import threading
 from contextlib import contextmanager
 
@@ -73,6 +74,8 @@ def make_registry_metaclass(registry_store, base_metaclass=None):
             if registered_name is not LEAVE_UNREGISTERED:
                 name_to_register = f"{registered_name}{GLOBAL_SUFFIX}"
                 if name_to_register in registry_store:
+                    print(f"Current values registered: {registry_store}", file=sys.stderr)
+                    print(f"Tried to register: {name_to_register} {cls}", file=sys.stderr)
                     raise ValueError(
                         "The name %s is already registered; a different value for the"
                         " 'REGISTERED_NAME' attribute must be chosen" % (registered_name)
