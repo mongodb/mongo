@@ -82,10 +82,7 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
 
     recordId.withFormat([&](RecordId::Null _) { hasNullRecordId = true; },
                         [&](int64_t rid) { _roaring.addChecked(rid); },
-                        [&](const char* str, int size) {
-                            _hashSetMemUsage += recordId.memUsage();
-                            _hashset.insert(recordId);
-                        });
+                        [&](const char* str, int size) { _hashset.insert(recordId); });
 
     return true;
 }
@@ -93,17 +90,7 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
 void RecordIdDeduplicator::freeMemory(const RecordId& recordId) {
     recordId.withFormat([&](RecordId::Null _) { hasNullRecordId = false; },
                         [&](int64_t rid) { _roaring.erase(rid); },
-                        [&](const char* str, int size) {
-                            if (_hashset.erase(recordId)) {
-                                uassert(10762700,
-                                        str::stream()
-                                            << "Trying to remove a recordId of size "
-                                            << recordId.memUsage()
-                                            << " from a hashset of total size " << _hashSetMemUsage,
-                                        _hashSetMemUsage >= recordId.memUsage());
-                                _hashSetMemUsage -= recordId.memUsage();
-                            }
-                        });
+                        [&](const char* str, int size) { _hashset.erase(recordId); });
 }
 
 void RecordIdDeduplicator::spill(SpillingStats& stats, uint64_t maximumMemoryUsageBytes) {
@@ -142,7 +129,6 @@ void RecordIdDeduplicator::spill(SpillingStats& stats, uint64_t maximumMemoryUsa
         additionalSpilledRecords += writer.writtenRecords();
 
         _hashset.clear();
-        _hashSetMemUsage = 0;
     }
 
     if (!_roaring.empty()) {
