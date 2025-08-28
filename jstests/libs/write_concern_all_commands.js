@@ -3770,7 +3770,13 @@ const wcTimeseriesViewsCommandsTests = {
             },
             confirmFunc: (res, coll, cluster) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
-                assert.includes([ErrorCodes.InvalidOptions, ErrorCodes.BadValue], res.code);
+                assert.includes(
+                    [
+                        ErrorCodes.InvalidOptions,
+                        ErrorCodes.BadValue,
+                        ErrorCodes.CommandNotSupportedOnView
+                    ],
+                    res.code);
                 assert.eq(coll.find().itcount(), 1);
                 assert.eq(coll.count({meta: {x: 1, y: 1}}), 1);
             },
@@ -4110,7 +4116,7 @@ const wcTimeseriesViewsCommandsTests = {
 };
 
 // A list of additional CRUD ops which exercise different write paths, and do error handling
-// differently than the basic write path exercised in wcCommandsTestsT.
+// differently than the basic write path exercised in wcCommandsTests.
 const additionalCRUDOpsTimeseriesViews = {
     "deleteMany": {
         noop: {
@@ -4247,7 +4253,13 @@ const additionalCRUDOpsTimeseriesViews = {
                 assert.eq(coll.find().itcount(), 1);
             },
             confirmFunc: (res, coll) => {
-                assert.includes([ErrorCodes.BadValue, ErrorCodes.InvalidOptions], res.code);
+                assert.includes(
+                    [
+                        ErrorCodes.BadValue,
+                        ErrorCodes.InvalidOptions,
+                        ErrorCodes.CommandNotSupportedOnView
+                    ],
+                    res.code);
             },
         },
     },
@@ -5139,14 +5151,11 @@ function shouldSkipTestCase(clusterType,
         // TODO SERVER-100935 updateRole does not return WCE
         // TODO SERVER-100935 updateUser does not return WCE
 
-        // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
-        // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
         if (clusterType == "sharded" &&
                 shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
             command == "createRole" || command == "createUser" || command == "dropRole" ||
             command == "dropUser" || command == "grantRolesToUser" || command == "updateRole" ||
             command == "updateUser" || command == "setDefaultRWConcern" ||
-            (command == "findOneAndUpdate") || (command == "findAndModify") ||
             (TestData.configShard && command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
