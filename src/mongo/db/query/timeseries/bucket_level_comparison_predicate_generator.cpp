@@ -116,9 +116,6 @@ boost::optional<StringData> checkComparisonPredicateEligibility(
     if (isTimeField && matchExprData.type() != BSONType::date) {
         // Users are not allowed to insert non-date measurements into the time field. So this query
         // would not match anything. We do not need to optimize for this case.
-        // TODO SERVER-84207: right now we will end up unpacking everything and applying the event
-        // filter, which indeed would be either trivially true or trivially false but it won't be
-        // optimized away.
         return "can't handle comparison of time field to a non-Date type"_sd;
     }
 
