@@ -15,7 +15,7 @@ const DB =
  * @param {String} message optional message for server to log at rotation time
  */
 DB.prototype.rotateCertificates = function (message) {
-    return this._adminCommand({rotateCertificates: 1, message: message});
+    return this._adminCommand({rotateCertificates: 1, message});
 };
 
 DB.prototype.getMongo = function () {
@@ -234,7 +234,7 @@ DB.prototype._helloOrLegacyHello = function (args) {
 };
 
 DB.prototype._runCommandWithoutApiStrict = function (command) {
-    let commandWithoutApiStrict = Object.assign({}, command);
+    let commandWithoutApiStrict = {...command};
     if (this.getMongo().getApiParameters().strict) {
         // Permit this command invocation, even if it's not in the requested API version.
         commandWithoutApiStrict["apiStrict"] = false;
@@ -307,7 +307,7 @@ DB.prototype._runAggregate = function (cmdObj, aggregateOptions) {
 
 DB.prototype.aggregate = function (pipeline, aggregateOptions) {
     assert(pipeline instanceof Array, "pipeline argument must be an array");
-    const cmdObj = this._mergeCommandOptions("aggregate", {pipeline: pipeline});
+    const cmdObj = this._mergeCommandOptions("aggregate", {pipeline});
 
     return this._runAggregate(cmdObj, aggregateOptions || {});
 };
@@ -440,7 +440,7 @@ DB.prototype.shutdownServer = function (opts) {
     }
 
     let cmd = {"shutdown": 1};
-    opts = opts || {};
+    opts ||= {};
     for (let o in opts) {
         cmd[o] = opts[o];
     }
@@ -610,12 +610,12 @@ DB.prototype.setProfilingLevel = function (level, options) {
  * @return result of your function, or null if error
  *
  */
-DB.prototype.eval = function (jsfunction) {
+DB.prototype.eval = function (jsfunction, ...args) {
     print("WARNING: db.eval is deprecated");
 
     let cmd = {$eval: jsfunction};
-    if (arguments.length > 1) {
-        cmd.args = Array.from(arguments).slice(1);
+    if (args.length > 0) {
+        cmd.args = args;
     }
 
     let res = this._dbCommand(cmd);
@@ -702,12 +702,12 @@ DB.prototype._getCollectionInfosCommand = function (
     authorizedCollections = false,
     options = {},
 ) {
-    filter = filter || {};
+    filter ||= {};
     const cmd = {
         listCollections: 1,
-        filter: filter,
-        nameOnly: nameOnly,
-        authorizedCollections: authorizedCollections,
+        filter,
+        nameOnly,
+        authorizedCollections,
     };
 
     const res = this.runCommand(Object.merge(cmd, options));
@@ -821,7 +821,7 @@ DB.prototype.currentOp = function (arg) {
         const results = this.currentOpCursor(arg).toArray();
         let res = {"inprog": results.length > 0 ? results : [], "ok": 1};
         Object.defineProperty(res, "fsyncLock", {
-            get: function () {
+            get() {
                 throw Error(
                     "fsyncLock is no longer included in the currentOp shell helper, run db.runCommand({currentOp: 1}) instead.",
                 );
@@ -871,7 +871,7 @@ DB.prototype.currentOpCursor = function (arg) {
 
 DB.prototype.killOp = function (op) {
     if (!op) throw Error("no opNum to kill specified");
-    return this.adminCommand({"killOp": 1, "op": op});
+    return this.adminCommand({"killOp": 1, op});
 };
 DB.prototype.killOP = DB.prototype.killOp;
 
@@ -1141,7 +1141,7 @@ DB.autocomplete = function (obj) {
     let colls = obj._getCollectionNamesInternal(isInteractive() ? {maxTimeMS: 1000} : {});
     let ret = [];
     for (let i = 0; i < colls.length; i++) {
-        if (colls[i].match(/^[a-zA-Z0-9_.\$]+$/)) ret.push(colls[i]);
+        if (colls[i].match(/^[a-zA-Z0-9_.$]+$/)) ret.push(colls[i]);
     }
     return ret;
 };
@@ -1391,16 +1391,16 @@ DB.prototype._getDefaultAuthenticationMechanism = function (username, database) 
 
 DB.prototype._defaultGssapiServiceName = null;
 
-DB.prototype._authOrThrow = function () {
+DB.prototype._authOrThrow = function (...args) {
     let params;
-    if (arguments.length == 2) {
-        params = {user: arguments[0], pwd: arguments[1]};
-    } else if (arguments.length == 1) {
-        if (typeof arguments[0] === "string") {
+    if (args.length == 2) {
+        params = {user: args[0], pwd: args[1]};
+    } else if (args.length == 1) {
+        if (typeof args[0] === "string") {
             let password = passwordPrompt();
-            params = {user: arguments[0], pwd: password};
-        } else if (typeof arguments[0] === "object") {
-            params = Object.extend({}, arguments[0]);
+            params = {user: args[0], pwd: password};
+        } else if (typeof args[0] === "object") {
+            params = Object.extend({}, args[0]);
         } else {
             throw Error("Single-argument form of auth expects a parameter object");
         }
@@ -1431,9 +1431,9 @@ DB.prototype._authOrThrow = function () {
     return good;
 };
 
-DB.prototype.auth = function () {
+DB.prototype.auth = function (...args) {
     try {
-        this._authOrThrow.apply(this, arguments);
+        this._authOrThrow(...args);
     } catch (ex) {
         print(ex);
         return 0;
@@ -1444,7 +1444,7 @@ DB.prototype.auth = function () {
 DB.prototype.grantRolesToUser = function (username, roles, writeConcern) {
     let cmdObj = {
         grantRolesToUser: username,
-        roles: roles,
+        roles,
         writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
@@ -1456,7 +1456,7 @@ DB.prototype.grantRolesToUser = function (username, roles, writeConcern) {
 DB.prototype.revokeRolesFromUser = function (username, roles, writeConcern) {
     let cmdObj = {
         revokeRolesFromUser: username,
-        roles: roles,
+        roles,
         writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
@@ -1557,7 +1557,7 @@ DB.prototype.dropAllRoles = function (writeConcern) {
 DB.prototype.grantRolesToRole = function (rolename, roles, writeConcern) {
     let cmdObj = {
         grantRolesToRole: rolename,
-        roles: roles,
+        roles,
         writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
@@ -1569,7 +1569,7 @@ DB.prototype.grantRolesToRole = function (rolename, roles, writeConcern) {
 DB.prototype.revokeRolesFromRole = function (rolename, roles, writeConcern) {
     let cmdObj = {
         revokeRolesFromRole: rolename,
-        roles: roles,
+        roles,
         writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
@@ -1581,7 +1581,7 @@ DB.prototype.revokeRolesFromRole = function (rolename, roles, writeConcern) {
 DB.prototype.grantPrivilegesToRole = function (rolename, privileges, writeConcern) {
     let cmdObj = {
         grantPrivilegesToRole: rolename,
-        privileges: privileges,
+        privileges,
         writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
@@ -1593,7 +1593,7 @@ DB.prototype.grantPrivilegesToRole = function (rolename, privileges, writeConcer
 DB.prototype.revokePrivilegesFromRole = function (rolename, privileges, writeConcern) {
     let cmdObj = {
         revokePrivilegesFromRole: rolename,
-        privileges: privileges,
+        privileges,
         writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
@@ -1660,7 +1660,7 @@ DB.prototype.setLogLevel = function (logLevel, component) {
 };
 
 DB.prototype.watch = function (pipeline, options) {
-    pipeline = pipeline || [];
+    pipeline ||= [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
     const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
@@ -1689,7 +1689,7 @@ DB.prototype.createEncryptedCollection = function (name, opts) {
 
     const res = assert.commandWorked(this.createCollection(name, opts));
 
-    const cis = this.getCollectionInfos({"name": name});
+    const cis = this.getCollectionInfos({name});
     assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
 
     const ci = cis[0];
@@ -1707,7 +1707,7 @@ DB.prototype.createEncryptedCollection = function (name, opts) {
 };
 
 DB.prototype.dropEncryptedCollection = function (name) {
-    const ci = globalThis.db.getCollectionInfos({name: name})[0];
+    const ci = globalThis.db.getCollectionInfos({name})[0];
     if (ci == undefined) {
         throw `Encrypted Collection '${name}' not found`;
     }
@@ -1750,40 +1750,40 @@ DB.prototype.getServerBuildInfo = function () {
         };
 
         return {
-            rawData: function () {
+            rawData() {
                 return buildInfo;
             },
 
-            getVersion: function () {
+            getVersion() {
                 return buildInfo.version;
             },
 
-            getBits: function () {
+            getBits() {
                 return buildInfo.bits;
             },
 
-            isOptimizationsEnabled: function () {
+            isOptimizationsEnabled() {
                 const optimizationsMatch = /(\s|^)-O2(\s|$)/.exec(buildInfo["buildEnvironment"]["ccflags"]);
                 return Boolean(optimizationsMatch);
             },
 
-            isAddressSanitizerActive: function () {
+            isAddressSanitizerActive() {
                 return _sanitizeMatch("address");
             },
 
-            isLeakSanitizerActive: function () {
+            isLeakSanitizerActive() {
                 return _sanitizeMatch("leak");
             },
 
-            isThreadSanitizerActive: function () {
+            isThreadSanitizerActive() {
                 return _sanitizeMatch("thread");
             },
 
-            isUndefinedBehaviorSanitizerActive: function () {
+            isUndefinedBehaviorSanitizerActive() {
                 return _sanitizeMatch("undefined");
             },
 
-            isDebug: function () {
+            isDebug() {
                 return buildInfo.debug;
             },
         };

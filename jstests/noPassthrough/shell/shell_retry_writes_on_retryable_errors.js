@@ -46,6 +46,7 @@ function testCommandIsRetried(testFn, assertFn) {
             cmdObjsSeen.push(cmdObj);
         }
 
+        // eslint-disable-next-line prefer-rest-params
         return mongoRunCommandOriginal.apply(this, arguments);
     };
 

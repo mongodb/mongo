@@ -28,7 +28,7 @@ let throwOrReturn = function (explainResult) {
 };
 
 let buildExplainCmd = function (innerCmd, verbosity) {
-    let explainCmd = {"explain": innerCmd, "verbosity": verbosity};
+    let explainCmd = {"explain": innerCmd, verbosity};
     // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
     // of explainCmd so that it has the intended effect.
     if (innerCmd.hasOwnProperty("maxTimeMS")) {
@@ -103,6 +103,7 @@ function Explainable(collection, verbosity) {
     this.aggregate = function (pipeline, extraOpts) {
         if (!(pipeline instanceof Array)) {
             // Support legacy varargs form. (Also handles db.foo.aggregate())
+            // eslint-disable-next-line prefer-rest-params
             pipeline = Array.from(arguments);
             extraOpts = {};
         }
@@ -122,7 +123,7 @@ function Explainable(collection, verbosity) {
                 extraOptsCopy = Object.extend(extraOptsCopy, {cursor: {}});
             }
 
-            let aggCmd = Object.extend({"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOptsCopy);
+            let aggCmd = Object.extend({"aggregate": this._collection.getName(), pipeline}, extraOptsCopy);
             let explainCmd = buildExplainCmd(aggCmd, this._verbosity);
             let explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
@@ -139,8 +140,8 @@ function Explainable(collection, verbosity) {
      * the DBExplainQuery abstraction in order to construct the proper explain command to send
      * to the server.
      */
-    this.find = function () {
-        let cursor = this._collection.find.apply(this._collection, arguments);
+    this.find = function (...args) {
+        let cursor = this._collection.find(...args);
         return new DBExplainQuery(cursor, this._verbosity);
     };
 
@@ -176,8 +177,8 @@ function Explainable(collection, verbosity) {
         return throwOrReturn(explainResult);
     };
 
-    this.remove = function () {
-        let parsed = this._collection._parseRemove.apply(this._collection, arguments);
+    this.remove = function (...args) {
+        let parsed = this._collection._parseRemove(...args);
         let query = parsed.query;
         let justOne = parsed.justOne;
         let collation = parsed.collation;
@@ -206,8 +207,8 @@ function Explainable(collection, verbosity) {
         return throwOrReturn(explainResult);
     };
 
-    this.update = function () {
-        let parsed = this._collection._parseUpdate.apply(this._collection, arguments);
+    this.update = function (...args) {
+        let parsed = this._collection._parseUpdate(...args);
         let query = parsed.query;
         let updateSpec = parsed.updateSpec;
         let upsert = parsed.upsert;
@@ -255,7 +256,7 @@ function Explainable(collection, verbosity) {
     this.mapReduce = function (map, reduce, optionsObjOrOutString) {
         assert(optionsObjOrOutString, "Must supply the 'optionsObjOrOutString ' argument");
 
-        const mapReduceCmd = {mapreduce: this._collection.getName(), map: map, reduce: reduce};
+        const mapReduceCmd = {mapreduce: this._collection.getName(), map, reduce};
 
         if (typeof optionsObjOrOutString == "string") mapReduceCmd["out"] = optionsObjOrOutString;
         else Object.extend(mapReduceCmd, optionsObjOrOutString);
@@ -700,8 +701,8 @@ Explain.sbeReformatExperimental(<explain>, <fieldsToKeep>)
 }
 
 const Explain = {
-    help: help,
-    sbeReformatExperimental: sbeReformatExperimental,
+    help,
+    sbeReformatExperimental,
 };
 
 /**

@@ -54,7 +54,7 @@ function runMongoShellWithRetryWritesEnabled(func) {
     const jsCode = "(" + func.toString() + ")()";
     args.push("--eval", jsCode);
 
-    const exitCode = runMongoProgram.apply(null, args);
+    const exitCode = runMongoProgram(...args);
     assert.eq(0, exitCode, "Encountered an error in the other mongo shell");
 }
 

@@ -27,7 +27,7 @@ function failNextCommand(db, command) {
             data: {
                 closeConnection: true,
                 failCommands: [command],
-                threadName: threadName,
+                threadName,
             },
         }),
     );

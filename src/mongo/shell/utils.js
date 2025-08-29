@@ -68,9 +68,9 @@ function _getErrorWithCode(codeOrObj, message) {
  */
 
 function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry) {
-    numRetries = numRetries || 1;
-    sleepMs = sleepMs || 1000;
-    additionalCodesToRetry = additionalCodesToRetry || [];
+    numRetries ||= 1;
+    sleepMs ||= 1000;
+    additionalCodesToRetry ||= [];
 
     while (true) {
         if (numRetries % 10 === 0) {
@@ -99,8 +99,8 @@ function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry
  * Returns the return value of the input call.
  */
 function retryOnNetworkError(func, numRetries, sleepMs) {
-    numRetries = numRetries || 1;
-    sleepMs = sleepMs || 1000;
+    numRetries ||= 1;
+    sleepMs ||= 1000;
 
     while (true) {
         try {
@@ -239,7 +239,7 @@ function friendlyEqual(a, b) {
     if (a == b) return true;
 
     let clean = function (s) {
-        s = s.replace(/NumberInt\((\-?\d+)\)/g, "$1");
+        s = s.replace(/NumberInt\((-?\d+)\)/g, "$1");
         return s;
     };
 
@@ -282,15 +282,15 @@ function compareOn(field) {
     };
 }
 
-print.captureAllOutput = function (fn, args) {
+print.captureAllOutput = function (fn, ...args) {
     let res = {};
     res.output = [];
     let __orig_print = print;
-    print = function () {
-        Array.prototype.push.apply(res.output, Array.prototype.slice.call(arguments).join(" ").split("\n"));
+    print = function (...args) {
+        res.output.push(...args.join(" ").split("\n"));
     };
     try {
-        res.result = fn.apply(undefined, args);
+        res.result = fn(...args);
     } finally {
         // Stop capturing print() output
         print = __orig_print;
@@ -511,7 +511,7 @@ function jsTestLog(msg, attr, {severity = "I"} = {}) {
             "s": severity,
             "c": "js_test",
             "ctx": TestData?.testName || "-", // context (e.g., TestData.testName)
-            "msg": msg, // message body
+            msg, // message body
         };
         if (attr && typeof attr === "object" && Object.keys(attr).length > 0) {
             new_msg["attr"] = attr;
@@ -962,7 +962,7 @@ shellAutocomplete.showPrivate = false; // toggle to show (useful when working on
 
 function shellHelper(command, rest, shouldPrint) {
     command = command.trim();
-    let args = rest.trim().replace(/\s*;$/, "").split("\s+");
+    let args = rest.trim().replace(/\s*;$/, "").split(/\s+/);
 
     if (!shellHelper[command]) throw Error("no command [" + command + "]");
 
@@ -1399,14 +1399,14 @@ let Random = (function () {
     }
 
     return {
-        genExp: genExp,
-        genNormal: genNormal,
-        isInitialized: isInitialized,
-        rand: rand,
-        randInt: randInt,
-        setRandomSeed: setRandomSeed,
-        setRandomFixtureSeed: setRandomFixtureSeed,
-        srand: srand,
+        genExp,
+        genNormal,
+        isInitialized,
+        rand,
+        randInt,
+        setRandomSeed,
+        setRandomFixtureSeed,
+        srand,
     };
 })();
 
@@ -1499,7 +1499,7 @@ function rs() {
  * replica set.
  */
 function _awaitRSHostViaRSMonitor(hostAddr, desiredState, rsName, timeout) {
-    timeout = timeout || 60 * 1000;
+    timeout ||= 60 * 1000;
 
     if (desiredState == undefined) {
         desiredState = {ok: true};

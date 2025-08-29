@@ -481,7 +481,7 @@ DBCollection.prototype._parseRemove = function (t, justOne) {
     }
 
     // Normalize "justOne" to a bool.
-    justOne = justOne ? true : false;
+    justOne = !!justOne;
 
     // Handle write concern.
     if (!wc) {
@@ -489,12 +489,12 @@ DBCollection.prototype._parseRemove = function (t, justOne) {
     }
 
     return {
-        "query": query,
-        "justOne": justOne,
-        "wc": wc,
-        "collation": collation,
+        query,
+        justOne,
+        wc,
+        collation,
         "let": letParams,
-        "rawData": rawData,
+        rawData,
     };
 };
 
@@ -587,24 +587,24 @@ DBCollection.prototype._parseUpdate = function (query, updateSpec, upsert, multi
     }
 
     // Normalize 'upsert' and 'multi' to booleans.
-    upsert = upsert ? true : false;
-    multi = multi ? true : false;
+    upsert = !!upsert;
+    multi = !!multi;
 
     if (!wc) {
         wc = this.getWriteConcern();
     }
 
     return {
-        "query": query,
-        "updateSpec": updateSpec,
-        "hint": hint,
-        "upsert": upsert,
-        "multi": multi,
-        "wc": wc,
-        "collation": collation,
-        "arrayFilters": arrayFilters,
+        query,
+        updateSpec,
+        hint,
+        upsert,
+        multi,
+        wc,
+        collation,
+        arrayFilters,
         "let": letParams,
-        "rawData": rawData,
+        rawData,
     };
 };
 
@@ -772,7 +772,7 @@ DBCollection.prototype.createIndexes = function (keys, options, commitQuorum, cm
     return this._db.runCommand({
         createIndexes: this.getName(),
         indexes: indexSpecs,
-        commitQuorum: commitQuorum,
+        commitQuorum,
         ...cmdArgs,
     });
 };
@@ -782,7 +782,7 @@ DBCollection.prototype.reIndex = function () {
 };
 
 DBCollection.prototype.dropIndexes = function (indexNames, cmdArgs) {
-    indexNames = indexNames || "*";
+    indexNames ||= "*";
     let res = this._db.runCommand({dropIndexes: this.getName(), index: indexNames, ...cmdArgs});
     assert(res, "no result from dropIndex result");
     if (res.ok) return res;
@@ -793,7 +793,7 @@ DBCollection.prototype.dropIndexes = function (indexNames, cmdArgs) {
 };
 
 DBCollection.prototype.drop = function (options = {}) {
-    const cmdObj = Object.assign({drop: this.getName()}, options);
+    const cmdObj = {drop: this.getName(), ...options};
     const ret = this._db.runCommand(cmdObj);
     if (!ret.ok) {
         if (ret.errmsg == "ns not found") return false;
@@ -850,7 +850,7 @@ DBCollection.prototype.renameCollection = function (newName, dropTarget) {
     return this._db._adminCommand({
         renameCollection: this._fullName,
         to: this._db._name + "." + newName,
-        dropTarget: dropTarget,
+        dropTarget,
     });
 };
 
@@ -963,7 +963,7 @@ DBCollection.prototype.dropIndex = function (index) {
         throw new Error("To drop indexes in the collection using '*', use db.collection.dropIndexes()");
     }
 
-    let res = this._dbCommand("dropIndexes", {index: index});
+    let res = this._dbCommand("dropIndexes", {index});
     return res;
 };
 
@@ -977,9 +977,9 @@ DBCollection.prototype._hiddenIndex = function (index, hidden) {
     // 'Array'.
     let indexField = {};
     if (typeof index == "string") {
-        indexField = {name: index, hidden: hidden};
+        indexField = {name: index, hidden};
     } else if (typeof index == "object") {
-        indexField = {keyPattern: index, hidden: hidden};
+        indexField = {keyPattern: index, hidden};
     } else {
         throw new Error("Index must be either the index name or the index specification document");
     }
@@ -1020,7 +1020,7 @@ DBCollection.prototype.stats = function (args) {
         throw new Error("Cannot filter indexDetails on both indexDetailsKey and " + "indexDetailsName");
     }
     // collStats can run on a secondary, so we need to apply readPreference
-    let res = this._db.runReadCommand({collStats: this._shortName, scale: scale});
+    let res = this._db.runReadCommand({collStats: this._shortName, scale});
     if (!res.ok) {
         return res;
     }
@@ -1111,7 +1111,7 @@ DBCollection.prototype.exists = function () {
 
 DBCollection.prototype.isCapped = function () {
     const m = this.getMetadata();
-    return m && m.options && m.options.capped ? true : false;
+    return !!(m && m.options && m.options.capped);
 };
 
 DBCollection.prototype.getUUID = function () {
@@ -1128,13 +1128,14 @@ DBCollection.prototype.getUUID = function () {
 DBCollection.prototype.aggregate = function (pipeline, aggregateOptions) {
     if (!(pipeline instanceof Array)) {
         // Support legacy varargs form. Also handles db.foo.aggregate().
+        // eslint-disable-next-line prefer-rest-params
         pipeline = Array.from(arguments);
         aggregateOptions = {};
     } else if (aggregateOptions === undefined) {
         aggregateOptions = {};
     }
 
-    const cmdObj = this._makeCommand("aggregate", {pipeline: pipeline});
+    const cmdObj = this._makeCommand("aggregate", {pipeline});
 
     return this._db._runAggregate(cmdObj, aggregateOptions);
 };
@@ -1151,7 +1152,7 @@ DBCollection.prototype.convertToSingleObject = function (valueField) {
  * @param optional object of optional fields;
  */
 DBCollection.prototype.mapReduce = function (map, reduce, optionsOrOutString) {
-    let c = {mapreduce: this._shortName, map: map, reduce: reduce};
+    let c = {mapreduce: this._shortName, map, reduce};
     assert(optionsOrOutString, "need to supply an optionsOrOutString");
 
     if (typeof optionsOrOutString == "string") c["out"] = optionsOrOutString;
@@ -1341,7 +1342,7 @@ DBCollection.prototype.getSplitKeysForChunks = function (chunkSize) {
         let host = shardDoc.host;
         let sconn = new Mongo(host);
 
-        let chunks = config.chunks.find({_id: sh._collRE(this), shard: shard}).toArray();
+        let chunks = config.chunks.find({_id: sh._collRE(this), shard}).toArray();
 
         print("\nGetting split points for chunks on shard " + shard + " at " + host);
 
@@ -1492,10 +1493,10 @@ DBCollection.prototype.getSecondaryOk = function () {
     return this._db.getSecondaryOk();
 };
 
-DBCollection.prototype.getQueryOptions = function () {
+DBCollection.prototype.getQueryOptions = function (...args) {
     // inherit this method from DB but use apply so
     // that secondaryOk will be set if is overridden on this DBCollection
-    return this._db.getQueryOptions.apply(this, arguments);
+    return this._db.getQueryOptions.apply(this, args);
 };
 
 /**
@@ -1565,7 +1566,7 @@ DBCollection.prototype.enableAutoMerger = function () {
  *
  */
 DBCollection.prototype.count = function (query, options) {
-    const cmd = Object.assign({count: this.getName(), query: this._massageObject(query || {})}, options);
+    const cmd = {count: this.getName(), query: this._massageObject(query || {}), ...options};
     if (cmd.readConcern) {
         cmd.readConcern = {level: cmd.readConcern};
     }
@@ -1595,7 +1596,7 @@ DBCollection.prototype.count = function (query, options) {
 DBCollection.prototype.countDocuments = function (query, options) {
     "use strict";
     let pipeline = [{"$match": query}];
-    options = options || {};
+    options ||= {};
     assert.eq(typeof options, "object", "'options' argument must be an object");
 
     if (options.skip) {
@@ -1646,7 +1647,7 @@ DBCollection.prototype.countDocuments = function (query, options) {
 DBCollection.prototype.estimatedDocumentCount = function (options) {
     "use strict";
     let cmd = {count: this.getName()};
-    options = options || {};
+    options ||= {};
     assert.eq(typeof options, "object", "'options' argument must be an object");
 
     if (options.maxTimeMS) {
@@ -1725,12 +1726,12 @@ DBCollection.prototype._distinct = function (keyString, query) {
 };
 
 DBCollection.prototype.latencyStats = function (options) {
-    options = options || {};
+    options ||= {};
     return this.aggregate([{$collStats: {latencyStats: options}}]);
 };
 
 DBCollection.prototype.watch = function (pipeline, options) {
-    pipeline = pipeline || [];
+    pipeline ||= [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
     const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
     return this.aggregate([changeStreamStage, ...pipeline], aggOptions);
@@ -1844,7 +1845,7 @@ PlanCache.prototype._parseQueryShape = function (query, projection, sort, collat
     }
 
     let shape = {
-        query: query,
+        query,
         projection: projection == undefined ? {} : projection,
         sort: sort == undefined ? {} : sort,
     };

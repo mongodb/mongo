@@ -42,6 +42,7 @@ function runTests({withSession}) {
 
         Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             cmdObjSeen = cmdObj;
+            // eslint-disable-next-line prefer-rest-params
             return mongoRunCommandOriginal.apply(this, arguments);
         };
 

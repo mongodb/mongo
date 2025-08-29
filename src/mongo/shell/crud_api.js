@@ -78,7 +78,7 @@ DBCollection.prototype.bulkWrite = function (operations, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulkOp = opts.ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
@@ -266,7 +266,7 @@ DBCollection.prototype.insertOne = function (document, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = this.initializeOrderedBulkOp();
@@ -328,7 +328,7 @@ DBCollection.prototype.insertMany = function (documents, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = opts.ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
@@ -374,7 +374,7 @@ DBCollection.prototype.deleteOne = function (filter, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = this.initializeOrderedBulkOp();
@@ -436,7 +436,7 @@ DBCollection.prototype.deleteMany = function (filter, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = this.initializeOrderedBulkOp();
@@ -512,7 +512,7 @@ DBCollection.prototype.replaceOne = function (filter, replacement, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = this.initializeOrderedBulkOp();
@@ -602,7 +602,7 @@ DBCollection.prototype.updateOne = function (filter, update, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = this.initializeOrderedBulkOp();
@@ -699,7 +699,7 @@ DBCollection.prototype.updateMany = function (filter, update, options) {
     let writeConcern = this._createWriteConcern(opts);
 
     // Result
-    let result = {acknowledged: writeConcern && writeConcern.w == 0 ? false : true};
+    let result = {acknowledged: !(writeConcern && writeConcern.w == 0)};
 
     // Use bulk operation API already in the shell
     let bulk = this.initializeOrderedBulkOp();
@@ -927,7 +927,7 @@ DBCollection.prototype.findOneAndUpdate = function (filter, update, options) {
     }
 
     // Set up the command
-    let cmd = {query: filter || {}, update: update};
+    let cmd = {query: filter || {}, update};
     if (opts.sort) {
         cmd.sort = opts.sort;
     }

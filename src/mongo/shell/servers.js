@@ -60,13 +60,13 @@ MongoRunner.getExtensionPath = function (shared_library_name) {
     return shared_library_name;
 };
 
-MongoRunner.parsePort = function () {
+MongoRunner.parsePort = function (...args) {
     let port = "";
     const portKey = jsTestOptions().shellGRPC ? "--grpcPort" : "--port";
 
-    for (let i = 0; i < arguments.length; ++i) {
-        if (arguments[i] == portKey) {
-            port = arguments[i + 1];
+    for (let i = 0; i < args.length; ++i) {
+        if (args[i] == portKey) {
+            port = args[i + 1];
         }
     }
 
@@ -324,7 +324,7 @@ MongoRunner.logicalOptions = {
 
 MongoRunner.toRealPath = function (path, pathOpts) {
     // Replace all $pathOptions with actual values
-    pathOpts = pathOpts || {};
+    pathOpts ||= {};
     path = path.replace(/\$dataPath/g, MongoRunner.dataPath);
     path = path.replace(/\$dataDir/g, MongoRunner.dataDir);
     for (let key in pathOpts) {
@@ -542,7 +542,7 @@ MongoRunner.mongoOptions = function (opts) {
     }
 
     // Create a new runId
-    opts.runId = opts.runId || ObjectId();
+    opts.runId ||= ObjectId();
 
     if (opts.forgetPort) {
         delete opts.port;
@@ -563,7 +563,7 @@ MongoRunner.mongoOptions = function (opts) {
     // Default for waitForConnect is true
     opts.waitForConnect = waitForConnect == undefined || waitForConnect == null ? true : waitForConnect;
 
-    opts.port = opts.port || allocatePort();
+    opts.port ||= allocatePort();
 
     if (jsTestOptions().tlsMode && !opts.tlsMode) {
         opts.tlsMode = jsTestOptions().tlsMode;
@@ -581,7 +581,7 @@ MongoRunner.mongoOptions = function (opts) {
     const setParameters = jsTestOptions().setParameters || {};
     const tlsEnabled = (opts.tlsMode && opts.tlsMode != "disabled") || (opts.sslMode && opts.sslMode != "disabled");
     if (setParameters.featureFlagGRPC && tlsEnabled) {
-        opts.grpcPort = opts.grpcPort || allocatePort();
+        opts.grpcPort ||= allocatePort();
         grpcToMongoRpcPortMap[opts.grpcPort] = opts.port;
     }
 
@@ -693,7 +693,7 @@ MongoRunner.mongodOptions = function (opts = {}) {
 
     opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
 
-    opts.setParameter = opts.setParameter || {};
+    opts.setParameter ||= {};
     if (jsTestOptions().enableTestCommands && typeof opts.setParameter !== "string") {
         if (
             jsTestOptions().setParameters &&
@@ -902,7 +902,7 @@ MongoRunner.runningChildPids = function () {
  * @see MongoRunner.arrOptions
  */
 MongoRunner.runMongod = function (opts) {
-    opts = opts || {};
+    opts ||= {};
     let env = undefined;
     let useHostName = true;
     let runId = null;
@@ -972,7 +972,7 @@ MongoRunner.getMongosName = function (port, useHostName) {
 };
 
 MongoRunner.runMongos = function (opts) {
-    opts = opts || {};
+    opts ||= {};
 
     let env = undefined;
     let useHostName = false;
@@ -1084,7 +1084,7 @@ let stopMongoProgram = function (conn, signal, opts, waitpid) {
     }
 
     signal = parseInt(signal) || SIGTERM;
-    opts = opts || {};
+    opts ||= {};
     waitpid = waitpid === undefined ? true : waitpid;
 
     // If we are executing an unclean shutdown, we want to avoid checking collection counts during
@@ -1564,21 +1564,21 @@ MongoRunner._startWithArgs = function (argArray, env, waitForConnect, waitForCon
     }
 
     if (env === undefined) {
-        pid = _startMongoProgram.apply(null, argArray);
+        pid = _startMongoProgram(...argArray);
     } else {
-        pid = _startMongoProgram({args: argArray, env: env});
+        pid = _startMongoProgram({args: argArray, env});
     }
 
     delete serverExitCodeMap[port];
     if (!waitForConnect) {
         print("Skip waiting to connect to node with pid=" + pid + ", port=" + port);
         return {
-            pid: pid,
-            port: port,
+            pid,
+            port,
         };
     }
 
-    return MongoRunner.awaitConnection({pid: pid, port: port, waitTimeoutMS: waitForConnectTimeoutMS});
+    return MongoRunner.awaitConnection({pid, port, waitTimeoutMS: waitForConnectTimeoutMS});
 };
 
 /**
@@ -1589,15 +1589,14 @@ MongoRunner._startWithArgs = function (argArray, env, waitForConnect, waitForCon
  *
  * @deprecated
  */
-function startMongoProgram() {
-    let port = MongoRunner.parsePort.apply(null, arguments);
+function startMongoProgram(...args) {
+    let port = MongoRunner.parsePort(...args);
 
     // Enable test commands.
     // TODO: Make this work better with multi-version testing so that we can support
     // enabling this on 2.4 when testing 2.6
-    let args = Array.from(arguments);
     args = appendSetParameterArgs(args);
-    let pid = _startMongoProgram.apply(null, args);
+    let pid = _startMongoProgram(...args);
 
     let m;
     assert.soon(
@@ -1685,8 +1684,8 @@ function _getMongoProgramArguments(args) {
     return args;
 }
 
-function runMongoProgram() {
-    return _runMongoProgram.apply(null, _getMongoProgramArguments(arguments));
+function runMongoProgram(...args) {
+    return _runMongoProgram(..._getMongoProgramArguments(args));
 }
 
 /**
@@ -1694,8 +1693,8 @@ function runMongoProgram() {
  * program name, and subsequent arguments to this function are passed as
  * command line arguments to the program.  Returns pid of the spawned program.
  */
-function startMongoProgramNoConnect() {
-    return _startMongoProgram.apply(null, _getMongoProgramArguments(arguments));
+function startMongoProgramNoConnect(...args) {
+    return _startMongoProgram(..._getMongoProgramArguments(args));
 }
 
 export {MongoRunner, runMongoProgram, startMongoProgram, startMongoProgramNoConnect};

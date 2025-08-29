@@ -915,7 +915,7 @@ function assertThrowsHelper(func, params) {
         );
     }
 
-    return {error: error, res: res};
+    return {error, res};
 }
 
 /**
@@ -937,9 +937,9 @@ function assertThrowsHelper(func, params) {
 assert.throws = function (func, params, msg, attr) {
     _validateAssertionMessage(msg, attr);
 
-    // Use .apply() instead of calling the function directly with explicit arguments to
     // preserve the length of the `arguments` object.
-    const {error} = assertThrowsHelper.apply(null, arguments);
+    // eslint-disable-next-line prefer-rest-params
+    const {error} = assertThrowsHelper(...arguments);
 
     if (!error) {
         _doassert(msg, "did not throw exception", attr);
@@ -1007,9 +1007,9 @@ assert.throwsWithCode = function (func, expectedCode, params, msg, attr) {
 assert.doesNotThrow = function (func, params, msg, attr) {
     _validateAssertionMessage(msg, attr);
 
-    // Use .apply() instead of calling the function directly with explicit arguments to
     // preserve the length of the `arguments` object.
-    const {error, res} = assertThrowsHelper.apply(null, arguments);
+    // eslint-disable-next-line prefer-rest-params
+    const {error, res} = assertThrowsHelper(...arguments);
 
     if (error) {
         const {code, message} = error;
@@ -1165,7 +1165,7 @@ function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernEr
     if (_isWriteResultType(res)) {
         // These can only contain write errors, not command errors.
         if (!ignoreWriteErrors) {
-            assert.writeOK(res, msg, {ignoreWriteConcernErrors: ignoreWriteConcernErrors});
+            assert.writeOK(res, msg, {ignoreWriteConcernErrors});
         }
     } else if (res instanceof WriteCommandError || res instanceof Error) {
         // A WriteCommandError implies ok:0.
@@ -1177,8 +1177,8 @@ function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernEr
         // response.
         if (
             !_rawReplyOkAndNoWriteErrors(res, {
-                ignoreWriteErrors: ignoreWriteErrors,
-                ignoreWriteConcernErrors: ignoreWriteConcernErrors,
+                ignoreWriteErrors,
+                ignoreWriteConcernErrors,
             })
         ) {
             _runHangAnalyzerForSpecificFailureTypes(res);

@@ -170,8 +170,8 @@ function checkContainsOnceJsonStringMatch(connOrFile, id, attrName, msg) {
     }
 
     for (let logMsg of logMessages) {
-        if (logMsg.search(`\"id\":${id},`) != -1) {
-            if (logMsg.search(`\"${attrName}\":\"?[^\"|\\\"]*` + msg) != -1) {
+        if (logMsg.search(`"id":${id},`) != -1) {
+            if (logMsg.search(`"${attrName}":"?[^"|\\"]*` + msg) != -1) {
                 return true;
             }
         }
@@ -498,21 +498,21 @@ function compareLogs(obj, id, severity, context, attrsDict, isRelaxed = false) {
 }
 
 export const checkLog = {
-    getGlobalLog: getGlobalLog,
-    getLogMessage: getLogMessage,
-    checkContainsOnce: checkContainsOnce,
-    checkContainsOnceJson: checkContainsOnceJson,
-    checkContainsWithCountJson: checkContainsWithCountJson,
-    checkContainsWithAtLeastCountJson: checkContainsWithAtLeastCountJson,
-    checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
-    compareLogs: compareLogs,
-    contains: contains,
-    containsLog: containsLog,
-    containsJson: containsJson,
-    containsRelaxedJson: containsRelaxedJson,
-    containsWithCount: containsWithCount,
-    containsWithAtLeastCount: containsWithAtLeastCount,
-    formatAsLogLine: formatAsLogLine,
-    formatAsJsonLogLine: formatAsJsonLogLine,
-    getFilteredLogMessages: getFilteredLogMessages,
+    getGlobalLog,
+    getLogMessage,
+    checkContainsOnce,
+    checkContainsOnceJson,
+    checkContainsWithCountJson,
+    checkContainsWithAtLeastCountJson,
+    checkContainsOnceJsonStringMatch,
+    compareLogs,
+    contains,
+    containsLog,
+    containsJson,
+    containsRelaxedJson,
+    containsWithCount,
+    containsWithAtLeastCount,
+    formatAsLogLine,
+    formatAsJsonLogLine,
+    getFilteredLogMessages,
 };

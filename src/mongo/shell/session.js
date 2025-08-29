@@ -194,7 +194,7 @@ function SessionAwareClient(client) {
     };
 
     function gossipClusterTime(cmdObj, clusterTime) {
-        cmdObj = Object.assign({}, cmdObj);
+        cmdObj = {...cmdObj};
 
         if (!cmdObj.hasOwnProperty("$clusterTime")) {
             cmdObj.$clusterTime = clusterTime;
@@ -213,19 +213,19 @@ function SessionAwareClient(client) {
             return cmdObj;
         }
 
-        cmdObj = Object.assign({}, cmdObj);
+        cmdObj = {...cmdObj};
         let cmdName = Object.keys(cmdObj)[0];
 
         // Explain read concerns are on the inner command.
         let cmdObjUnwrapped = cmdObj;
         if (cmdName === "explain") {
-            cmdObj[cmdName] = Object.assign({}, cmdObj[cmdName]);
+            cmdObj[cmdName] = {...cmdObj[cmdName]};
             cmdObjUnwrapped = cmdObj[cmdName];
         }
 
         // Transaction read concerns are handled later in assignTxnInfo().
         const sessionReadConcern = driverSession.getOptions().getReadConcern();
-        cmdObjUnwrapped.readConcern = Object.assign({}, sessionReadConcern, cmdObjUnwrapped.readConcern);
+        cmdObjUnwrapped.readConcern = {...sessionReadConcern, ...cmdObjUnwrapped.readConcern};
         const readConcern = cmdObjUnwrapped.readConcern;
 
         if (!readConcern.hasOwnProperty("afterClusterTime")) {
@@ -586,7 +586,7 @@ function ServerSession(client) {
     }
 
     this.injectSessionId = function injectSessionId(cmdObj) {
-        cmdObj = Object.assign({}, cmdObj);
+        cmdObj = {...cmdObj};
 
         if (!cmdObj.hasOwnProperty("lsid")) {
             if (isAcknowledged(cmdObj)) {
@@ -602,7 +602,7 @@ function ServerSession(client) {
     };
 
     this.assignTransactionNumber = function assignTransactionNumber(cmdObj) {
-        cmdObj = Object.assign({}, cmdObj);
+        cmdObj = {...cmdObj};
 
         if (!cmdObj.hasOwnProperty("txnNumber")) {
             this.handle.incrementTxnNumber();
@@ -631,7 +631,7 @@ function ServerSession(client) {
             setTxnState("inactive");
             throw new Error("Transactions are only supported on server versions 4.0 and greater.");
         }
-        cmdObj = Object.assign({}, cmdObj);
+        cmdObj = {...cmdObj};
 
         const cmdName = Object.keys(cmdObj)[0];
 
@@ -651,7 +651,7 @@ function ServerSession(client) {
             cmdObj.startTransaction = true;
             if (_txnOptions.getTxnReadConcern() !== undefined) {
                 // Override the readConcern with the one specified during startTransaction.
-                cmdObj.readConcern = Object.assign({}, cmdObj.readConcern, _txnOptions.getTxnReadConcern());
+                cmdObj.readConcern = {...cmdObj.readConcern, ..._txnOptions.getTxnReadConcern()};
             }
         }
 

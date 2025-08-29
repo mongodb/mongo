@@ -64,7 +64,7 @@ sh._writeBalancerStateDeprecated = function (onOrNot) {
             ._getConfigDB()
             .settings.update(
                 {_id: "balancer"},
-                {$set: {stopped: onOrNot ? false : true}},
+                {$set: {stopped: !onOrNot}},
                 {upsert: true, writeConcern: {w: "majority"}},
             ),
     );
@@ -181,7 +181,7 @@ sh.shardCollection = function (fullName, key, unique, options) {
     assert(key, "need a key");
     assert(typeof key == "object", "key needs to be an object");
 
-    let cmd = {shardCollection: fullName, key: key};
+    let cmd = {shardCollection: fullName, key};
     if (unique) cmd.unique = true;
     if (options) {
         if (typeof options !== "object") {
@@ -195,17 +195,17 @@ sh.shardCollection = function (fullName, key, unique, options) {
 
 sh.splitFind = function (fullName, find) {
     sh._checkFullName(fullName);
-    return sh._adminCommand({split: fullName, find: find});
+    return sh._adminCommand({split: fullName, find});
 };
 
 sh.splitAt = function (fullName, middle) {
     sh._checkFullName(fullName);
-    return sh._adminCommand({split: fullName, middle: middle});
+    return sh._adminCommand({split: fullName, middle});
 };
 
 sh.moveChunk = function (fullName, find, to) {
     sh._checkFullName(fullName);
-    return sh._adminCommand({moveChunk: fullName, find: find, to: to});
+    return sh._adminCommand({moveChunk: fullName, find, to});
 };
 
 sh.setBalancerState = function (isOn) {
@@ -237,14 +237,14 @@ sh.isBalancerRunning = function (configDB) {
 };
 
 sh.stopBalancer = function (timeoutMs, interval) {
-    timeoutMs = timeoutMs || 60000;
+    timeoutMs ||= 60000;
 
     let result = globalThis.db.adminCommand({balancerStop: 1, maxTimeMS: timeoutMs});
     return assert.commandWorked(result);
 };
 
 sh.startBalancer = function (timeoutMs, interval) {
-    timeoutMs = timeoutMs || 60000;
+    timeoutMs ||= 60000;
 
     let result = globalThis.db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
     return assert.commandWorked(result);
@@ -365,7 +365,7 @@ sh.waitForPingChange = function (activePings, timeout, interval) {
  * round. If no round has been executed, throws an error.
  */
 sh.awaitBalancerRound = function (timeout, interval) {
-    timeout = timeout || 60000;
+    timeout ||= 60000;
 
     let initialStatus = sh._getBalancerStatus();
     let currentStatus;
@@ -418,8 +418,8 @@ sh.awaitCollectionBalance = function (coll, timeout, interval) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
-    timeout = timeout || 60000;
-    interval = interval || 200;
+    timeout ||= 60000;
+    interval ||= 200;
 
     const ns = coll.getFullName();
     const orphanDocsPipeline = [
@@ -619,15 +619,15 @@ sh.addTagRange = function (ns, min, max, tag) {
     let config = sh._getConfigDB();
     return assert.commandWorked(
         config.tags.update(
-            {_id: {ns: ns, min: min}},
-            {_id: {ns: ns, min: min}, ns: ns, min: min, max: max, tag: tag},
+            {_id: {ns, min}},
+            {_id: {ns, min}, ns, min, max, tag},
             {upsert: true, writeConcern: {w: "majority", wtimeout: 60000}},
         ),
     );
 };
 
 sh.removeTagRange = function (ns, min, max) {
-    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min: min, max: max, zone: null});
+    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min, max, zone: null});
 };
 
 sh.addShardToZone = function (shardName, zoneName) {
@@ -639,11 +639,11 @@ sh.removeShardFromZone = function (shardName, zoneName) {
 };
 
 sh.updateZoneKeyRange = function (ns, min, max, zoneName) {
-    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min: min, max: max, zone: zoneName});
+    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min, max, zone: zoneName});
 };
 
 sh.removeRangeFromZone = function (ns, min, max) {
-    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min: min, max: max, zone: null});
+    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min, max, zone: null});
 };
 
 sh.getBalancerWindow = function (configDB) {

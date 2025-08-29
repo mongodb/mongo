@@ -421,7 +421,7 @@ DBQuery.prototype.maxTimeMS = function (maxTimeMS) {
 
 DBQuery.prototype.readConcern = function (level, atClusterTime = undefined) {
     this._checkModify();
-    let readConcernObj = atClusterTime ? {level: level, atClusterTime: atClusterTime} : {level: level};
+    let readConcernObj = atClusterTime ? {level, atClusterTime} : {level};
     this._additionalCmdParams["readConcern"] = readConcernObj;
     return this;
 };
@@ -455,7 +455,7 @@ DBQuery.prototype.rawData = function (value) {
  * Returns 'this'.
  */
 DBQuery.prototype.readPref = function (mode, tagSet) {
-    let readPrefObj = {mode: mode};
+    let readPrefObj = {mode};
 
     if (tagSet) {
         readPrefObj.tags = tagSet;

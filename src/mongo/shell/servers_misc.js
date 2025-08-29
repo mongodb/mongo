@@ -18,7 +18,7 @@ ToolTest.prototype.startDB = function (coll) {
 
     Object.extend(options, this.options);
 
-    this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("mongod", options));
+    this.m = startMongoProgram(...MongoRunner.arrOptions("mongod", options));
     this.db = this.m.getDB(this.baseName);
     if (coll) return this.db.getCollection(coll);
     return this.db;
@@ -33,31 +33,6 @@ ToolTest.prototype.stop = function () {
     print("*** " + this.name + " completed successfully ***");
 };
 
-ToolTest.prototype.runTool = function () {
-    let a = ["mongo" + arguments[0]];
-
-    let hasdbpath = false;
-    let hasDialTimeout = false;
-
-    for (let i = 1; i < arguments.length; i++) {
-        a.push(arguments[i]);
-        if (arguments[i] === "--dbpath") hasdbpath = true;
-        if (arguments[i] === "--dialTimeout") hasDialTimeout = true;
-    }
-
-    if (!hasdbpath) {
-        a.push("--host");
-        a.push("127.0.0.1:" + this.port);
-    }
-
-    if (!hasDialTimeout) {
-        a.push("--dialTimeout");
-        a.push("30");
-    }
-
-    return runMongoProgram.apply(null, a);
-};
-
 // Defer initializing these variables until the first call, as TestData attributes may be
 // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
 // until after this has loaded.
@@ -70,8 +45,8 @@ let nextPort;
 function allocatePort() {
     // The default port was chosen in an attempt to have a large number of unassigned ports that
     // are also outside the ephemeral port range.
-    nextPort = nextPort || jsTestOptions().minPort || 20000;
-    maxPort = maxPort || jsTestOptions().maxPort || Math.pow(2, 16) - 1;
+    nextPort ||= jsTestOptions().minPort || 20000;
+    maxPort ||= jsTestOptions().maxPort || Math.pow(2, 16) - 1;
 
     if (nextPort === maxPort) {
         throw new Error("Exceeded maximum port range in allocatePort()");
@@ -152,7 +127,7 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     args.push(...optionArgs);
     args.push("--eval", jsCode);
 
-    let pid = startMongoProgramNoConnect.apply(null, args);
+    let pid = startMongoProgramNoConnect(...args);
     parallelShellPids.push(pid);
 
     // Returns a function that when called waits for the parallel shell to exit and returns the exit

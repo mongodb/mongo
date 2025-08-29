@@ -29,6 +29,7 @@ function runShellScript(uri, cmdArgs, insertShouldHaveTxnNumber, shellFn) {
                     assert(!cmdObjSeen.hasOwnProperty("txnNumber"), "insert sent with txnNumber unexpectedly");
                 }
             }
+            // eslint-disable-next-line prefer-rest-params
             return mongoRunCommandOriginal.apply(this, arguments);
         };
 

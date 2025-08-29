@@ -62,7 +62,7 @@ class DBExplainQuery {
      */
     #createDelegationFunc(name) {
         return (...args) => {
-            this._query[name].apply(this._query, args);
+            this._query[name](...args);
             return this;
         };
     }

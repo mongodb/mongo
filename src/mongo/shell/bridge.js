@@ -18,7 +18,7 @@ function MongoBridge(options) {
         return new MongoBridge(options);
     }
 
-    options = options || {};
+    options ||= {};
     if (!options.hasOwnProperty("dest")) {
         throw new Error('Missing required field "dest"');
     }
@@ -69,7 +69,7 @@ function MongoBridge(options) {
         }
     });
 
-    let pid = _startMongoProgram.apply(null, args);
+    let pid = _startMongoProgram(...args);
 
     /**
      * Initializes the mongo shell's connections to the mongobridge process. Throws an error if the
@@ -110,7 +110,7 @@ function MongoBridge(options) {
         // we define it here for consistency.
         Object.defineProperty(userConn, "name", {
             enumerable: true,
-            get: function () {
+            get() {
                 return this.host;
             },
         });
@@ -231,7 +231,7 @@ function MongoBridge(options) {
         bridges.forEach((bridge) => {
             let res = runBridgeCommand(controlConn, "delayMessagesFrom", {
                 host: bridge.dest,
-                delay: delay,
+                delay,
             });
             assert.commandWorked(
                 res,

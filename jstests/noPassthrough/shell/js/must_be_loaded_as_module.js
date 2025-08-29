@@ -6,4 +6,4 @@
 let fn = (val) => {
     return Promise.resolve(val);
 };
-Object.assign({}, await fn(42));
+({...(await fn(42))});

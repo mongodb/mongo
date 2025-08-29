@@ -51,7 +51,7 @@ class CollInfos {
         const collInfoRaw = this.collInfosRes.find((elem) => elem.name === collName);
         if (collInfoRaw) {
             collInfo = {
-                ns: ns,
+                ns,
                 host: this.conn.host,
                 UUID: collInfoRaw.info.uuid,
                 count: coll.find().itcount(),

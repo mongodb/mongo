@@ -12,7 +12,7 @@ const WRITE_CONCERN_FAILED = 64;
 let defineReadOnlyProperty = function (self, name, value) {
     Object.defineProperty(self, name, {
         enumerable: true,
-        get: function () {
+        get() {
             return value;
         },
     });
@@ -30,6 +30,7 @@ let defineReadOnlyProperty = function (self, name, value) {
 function WriteConcern(wValue, wTimeout, jValue) {
     if (!(this instanceof WriteConcern)) {
         let writeConcern = Object.create(WriteConcern.prototype);
+        // eslint-disable-next-line prefer-rest-params
         WriteConcern.apply(writeConcern, arguments);
         return writeConcern;
     }
@@ -266,7 +267,7 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
                 }
             }
 
-            return new WriteConcernError({errmsg: errmsg, code: WRITE_CONCERN_FAILED});
+            return new WriteConcernError({errmsg, code: WRITE_CONCERN_FAILED});
         }
     };
 
@@ -340,6 +341,7 @@ function BulkWriteError(bulkResult, singleBatchType, writeConcern, message) {
     this.message = message || "unknown bulk write error";
 
     // Bulk errors are basically bulk results with additional error information
+    // eslint-disable-next-line prefer-rest-params
     BulkWriteResult.apply(this, arguments);
 
     // Override some particular methods
@@ -522,7 +524,7 @@ let Bulk = function (collection, ordered) {
     let defineBatchTypeCounter = function (self, name, type) {
         Object.defineProperty(self, name, {
             enumerable: true,
-            get: function () {
+            get() {
                 let counter = 0;
 
                 for (let i = 0; i < batches.length; i++) {
@@ -643,11 +645,11 @@ let Bulk = function (collection, ordered) {
     //
     // Find based operations
     const findOperations = {
-        update: function (updateDocument) {
+        update(updateDocument) {
             // Set the top value for the update 0 = multi true, 1 = multi false
             let upsert = typeof currentOp.upsert == "boolean" ? currentOp.upsert : false;
             // Establish the update command
-            let document = {q: currentOp.selector, u: updateDocument, multi: true, upsert: upsert};
+            let document = {q: currentOp.selector, u: updateDocument, multi: true, upsert};
 
             // Copy over the hint, if we have one.
             if (currentOp.hasOwnProperty("hint")) {
@@ -670,11 +672,11 @@ let Bulk = function (collection, ordered) {
             return addToOperationsList(UPDATE, document);
         },
 
-        updateOne: function (updateDocument) {
+        updateOne(updateDocument) {
             // Set the top value for the update 0 = multi true, 1 = multi false
             let upsert = typeof currentOp.upsert == "boolean" ? currentOp.upsert : false;
             // Establish the update command
-            let document = {q: currentOp.selector, u: updateDocument, multi: false, upsert: upsert};
+            let document = {q: currentOp.selector, u: updateDocument, multi: false, upsert};
 
             // Copy over the sort, if we have one.
             if (currentOp.hasOwnProperty("sort")) {
@@ -702,7 +704,7 @@ let Bulk = function (collection, ordered) {
             return addToOperationsList(UPDATE, document);
         },
 
-        replaceOne: function (updateDocument) {
+        replaceOne(updateDocument) {
             // Cannot use pipeline-style updates in a replacement operation.
             if (Array.isArray(updateDocument)) {
                 throw new Error("Cannot use pipeline-style updates in a replacement operation");
@@ -710,23 +712,23 @@ let Bulk = function (collection, ordered) {
             findOperations.updateOne(updateDocument);
         },
 
-        upsert: function () {
+        upsert() {
             currentOp.upsert = true;
             // Return the findOperations
             return findOperations;
         },
 
-        sort: function (sort) {
+        sort(sort) {
             currentOp.sort = sort;
             return findOperations;
         },
 
-        hint: function (hint) {
+        hint(hint) {
             currentOp.hint = hint;
             return findOperations;
         },
 
-        removeOne: function () {
+        removeOne() {
             // Establish the removeOne command
             let document = {q: currentOp.selector, limit: 1};
 
@@ -741,7 +743,7 @@ let Bulk = function (collection, ordered) {
             return addToOperationsList(REMOVE, document);
         },
 
-        remove: function () {
+        remove() {
             // Establish the remove command
             let document = {q: currentOp.selector, limit: 0};
 
@@ -756,12 +758,12 @@ let Bulk = function (collection, ordered) {
             return addToOperationsList(REMOVE, document);
         },
 
-        collation: function (collationSpec) {
+        collation(collationSpec) {
             currentOp.collation = collationSpec;
             return findOperations;
         },
 
-        arrayFilters: function (filters) {
+        arrayFilters(filters) {
             currentOp.arrayFilters = filters;
             return findOperations;
         },
@@ -772,7 +774,7 @@ let Bulk = function (collection, ordered) {
     this.find = function (selector) {
         if (selector == undefined) throw Error("find() requires query criteria");
         // Save a current selector
-        currentOp = {selector: selector};
+        currentOp = {selector};
 
         // Return the find Operations
         return findOperations;
@@ -857,7 +859,7 @@ let Bulk = function (collection, ordered) {
 
         // Generate the right update
         if (batch.batchType == UPDATE) {
-            cmd = {update: coll.getName(), updates: batch.operations, ordered: ordered};
+            cmd = {update: coll.getName(), updates: batch.operations, ordered};
         } else if (batch.batchType == INSERT) {
             let transformedInserts = [];
             batch.operations.forEach(function (insertDoc) {
@@ -865,9 +867,9 @@ let Bulk = function (collection, ordered) {
             });
             batch.operations = transformedInserts;
 
-            cmd = {insert: coll.getName(), documents: batch.operations, ordered: ordered};
+            cmd = {insert: coll.getName(), documents: batch.operations, ordered};
         } else if (batch.batchType == REMOVE) {
-            cmd = {delete: coll.getName(), deletes: batch.operations, ordered: ordered};
+            cmd = {delete: coll.getName(), deletes: batch.operations, ordered};
         }
 
         // If we have a write concern
@@ -981,7 +983,7 @@ let Bulk = function (collection, ordered) {
 
         let explainBatch = batches[0];
         let writeCmd = buildBatchCmd(explainBatch);
-        return {"explain": writeCmd, "verbosity": verbosity};
+        return {"explain": writeCmd, verbosity};
     };
 };
 

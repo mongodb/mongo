@@ -75,7 +75,7 @@ class KeyVault {
             "updateDate": current,
             "status": NumberInt(0),
             "version": NumberLong(0),
-            "masterKey": masterKey,
+            masterKey,
         };
 
         if (keyAltNames) {
@@ -163,12 +163,12 @@ class ClientEncryption {
         this.mongo = mongo;
     }
 
-    encrypt() {
-        return this.mongo.encrypt.apply(this.mongo, arguments);
+    encrypt(...args) {
+        return this.mongo.encrypt(...args);
     }
 
-    decrypt() {
-        return this.mongo.decrypt.apply(this.mongo, arguments);
+    decrypt(...args) {
+        return this.mongo.decrypt(...args);
     }
 }
 

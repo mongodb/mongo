@@ -368,26 +368,26 @@ describe("tojson", function () {
 
     describe("Strings to escape", function () {
         it("serializes strings that needs escaping", function () {
-            const stringThatNeedsEscaping = 'ho\"la';
+            const stringThatNeedsEscaping = 'ho"la';
 
-            assert.eq('\"ho\\\"la\"', JSON.stringify(stringThatNeedsEscaping));
-            assert.eq(tojson(stringThatNeedsEscaping), '\"ho\\\"la\"');
-            assert.eq(toJsonForLog(stringThatNeedsEscaping), '\"ho\\\"la\"');
+            assert.eq('"ho\\"la"', JSON.stringify(stringThatNeedsEscaping));
+            assert.eq(tojson(stringThatNeedsEscaping), '"ho\\"la"');
+            assert.eq(toJsonForLog(stringThatNeedsEscaping), '"ho\\"la"');
 
             const obj = {quotes: stringThatNeedsEscaping};
-            assert.eq(tojson(obj), '{ "quotes" : "ho\\\"la" }');
+            assert.eq(tojson(obj), '{ "quotes" : "ho\\"la" }');
         });
 
         it("serializes strings in errors", function () {
-            const stringThatNeedsEscaping = 'ho\"la';
+            const stringThatNeedsEscaping = 'ho"la';
 
             assert.eq("{}", JSON.stringify(new Error(stringThatNeedsEscaping)));
-            assert.eq(tojson(new Error(stringThatNeedsEscaping)), 'new Error(\"ho\\\"la\")');
-            assert.eq(toJsonForLog(new Error(stringThatNeedsEscaping)), '{"$error":"ho\\\"la"}');
+            assert.eq(tojson(new Error(stringThatNeedsEscaping)), 'new Error("ho\\"la")');
+            assert.eq(toJsonForLog(new Error(stringThatNeedsEscaping)), '{"$error":"ho\\"la"}');
 
             assert.eq("{}", JSON.stringify(new SyntaxError(stringThatNeedsEscaping)));
-            assert.eq(tojson(new SyntaxError(stringThatNeedsEscaping)), 'new SyntaxError(\"ho\\\"la\")');
-            assert.eq(toJsonForLog(new SyntaxError(stringThatNeedsEscaping)), '{"$error":"ho\\\"la"}');
+            assert.eq(tojson(new SyntaxError(stringThatNeedsEscaping)), 'new SyntaxError("ho\\"la")');
+            assert.eq(toJsonForLog(new SyntaxError(stringThatNeedsEscaping)), '{"$error":"ho\\"la"}');
         });
     });
 

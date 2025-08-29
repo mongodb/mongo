@@ -31,7 +31,7 @@ Timestamp.prototype.toStringIncomparable = function () {
 Date.timeFunc = function (theFunc, numTimes = 1, ...args) {
     let start = new Date();
     for (let i = 0; i < numTimes; i++) {
-        theFunc.apply(null, args);
+        theFunc(...args);
     }
 
     return new Date().getTime() - start.getTime();
@@ -569,7 +569,7 @@ BSONAwareMap.prototype._get = function (key) {
             return a[i];
         }
     }
-    let o = {key: key, value: null};
+    let o = {key, value: null};
     a.push(o);
     return o;
 };

@@ -379,8 +379,20 @@ export default [
         // Shell-specific: extra strict!
         files: ["jstests/core/js/**", "jstests/noPassthrough/shell/**", "src/mongo/shell/**"],
         rules: {
-            "no-var": 2,
+            "logical-assignment-operators": 2,
+            "no-extra-bind": 2,
+            "no-irregular-whitespace": 2,
+            "no-loss-of-precision": 2,
+            "no-unneeded-ternary": 2,
             "no-unused-vars": [2, {args: "none", caughtErrors: "none"}],
+            "no-useless-call": 2,
+            "no-useless-escape": 2,
+            "no-var": 2,
+            "object-shorthand": 2,
+            "prefer-object-has-own": 2,
+            "prefer-object-spread": 2,
+            "prefer-rest-params": 2,
+            "prefer-spread": 2,
         },
     },
 ];
