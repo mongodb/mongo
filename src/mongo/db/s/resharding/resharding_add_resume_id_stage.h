@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,22 +30,12 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/stage_constraints.h"
-#include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
 
-#include <set>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace mongo::exec::agg {
 
 /**
  * This stage is responsible for attaching the resharding's _id field to all the input oplog entry
@@ -53,42 +43,13 @@ namespace mongo {
  * transaction, this will be {clusterTime: <transaction commit timestamp>, ts: <applyOps
  * optime.ts>}. For all other documents, this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class DocumentSourceReshardingAddResumeId : public DocumentSource {
+class ReshardingAddResumeIdStage final : public Stage {
 public:
-    static constexpr StringData kStageName = "$_addReshardingResumeId"_sd;
-
-    static boost::intrusive_ptr<DocumentSourceReshardingAddResumeId> create(
-        const boost::intrusive_ptr<ExpressionContext>&);
-
-    static boost::intrusive_ptr<DocumentSourceReshardingAddResumeId> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    DepsTracker::State getDependencies(DepsTracker* deps) const final;
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
-    DocumentSource::GetModPathsReturn getModifiedPaths() const final;
-
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-
-    StageConstraints constraints(PipelineSplitState pipeState) const final;
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
-    }
-
-    const char* getSourceName() const override {
-        return DocumentSourceReshardingAddResumeId::kStageName.data();
-    }
-
-    static const Id& id;
-
-    Id getId() const override {
-        return id;
-    }
+    ReshardingAddResumeIdStage(StringData stageName,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
-    DocumentSourceReshardingAddResumeId(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    GetNextResult doGetNext() override;
 };
 
-}  // namespace mongo
+}  // namespace mongo::exec::agg

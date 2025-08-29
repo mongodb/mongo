@@ -34,16 +34,15 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 
+#include <memory>
 #include <set>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -56,8 +55,7 @@ namespace mongo {
  * resharding pipelines which need to be able to answer this question very quickly. To do so, it
  * re-uses pieces of sharding infrastructure rather than applying a MatchExpression.
  */
-class DocumentSourceReshardingOwnershipMatch final : public DocumentSource,
-                                                     public exec::agg::Stage {
+class DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalReshardingOwnershipMatch"_sd;
 
@@ -95,23 +93,20 @@ public:
     }
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceReshardingOwnershipMatchToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     DocumentSourceReshardingOwnershipMatch(
         ShardId recipientShardId,
         ShardKeyPattern reshardingKey,
         boost::optional<NamespaceString> temporaryReshardingNamespace,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    DocumentSource::GetNextResult doGetNext() final;
-
     const ShardId _recipientShardId;
-    const ShardKeyPattern _reshardingKey;
+    // This is a shared_ptr because ReshardingOwnershipMatchStage needs a copy of it too, but it's
+    // not copyable.
+    std::shared_ptr<ShardKeyPattern> _reshardingKey;
     const boost::optional<NamespaceString> _temporaryReshardingNamespace;
-
-    // _tempReshardingChunkMgr is used to decide to which recipient shard that documents in the
-    // source collection should be routed. It is safe to cache this information for the duration of
-    // the aggregation pipeline because the ownership information for the temporary resharding
-    // collection is frozen for the duration of the resharding operation.
-    boost::optional<ChunkManager> _tempReshardingChunkMgr;
 };
 
 }  // namespace mongo

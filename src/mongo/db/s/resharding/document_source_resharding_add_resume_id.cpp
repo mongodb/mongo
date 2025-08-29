@@ -34,45 +34,13 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-namespace {
-/**
- * Generates the _id field for the given oplog entry document. If the document corresponds to an
- * applyOps oplog entry for a committed transaction, it should have the commit timestamp for the
- * transaction attached to it, and the generated _id will be {clusterTime: <transaction commit
- * timestamp>, ts: <applyOps optime.ts>}. For all other documents, the generated _id will be
- * {clusterTime: <optime.ts>, ts: <optime.ts>}.
- */
-Document appendId(Document inputDoc) {
-    auto eventTime = inputDoc.getField(repl::OplogEntry::kTimestampFieldName);
-    tassert(
-        6387801, "'ts' field is not a BSON Timestamp", eventTime.getType() == BSONType::timestamp);
-    auto commitTxnTs = inputDoc.getField(CommitTransactionOplogObject::kCommitTimestampFieldName);
-    tassert(6387802,
-            str::stream() << "'" << CommitTransactionOplogObject::kCommitTimestampFieldName
-                          << "' field is not a BSON Timestamp",
-            commitTxnTs.missing() || commitTxnTs.getType() == BSONType::timestamp);
-
-    MutableDocument doc{inputDoc};
-    doc.remove(CommitTransactionOplogObject::kCommitTimestampFieldName);
-    doc.setField(repl::OplogEntry::k_idFieldName,
-                 Value{Document{{ReshardingDonorOplogId::kClusterTimeFieldName,
-                                 commitTxnTs.missing() ? eventTime.getTimestamp()
-                                                       : commitTxnTs.getTimestamp()},
-                                {ReshardingDonorOplogId::kTsFieldName, eventTime.getTimestamp()}}});
-    return doc.freeze();
-}
-}  // namespace
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_addReshardingResumeId,
                                   LiteParsedDocumentSourceInternal::parse,
@@ -96,7 +64,7 @@ DocumentSourceReshardingAddResumeId::createFromBson(
 
 DocumentSourceReshardingAddResumeId::DocumentSourceReshardingAddResumeId(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
+    : DocumentSource(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceReshardingAddResumeId::constraints(
     PipelineSplitState pipeState) const {
@@ -128,20 +96,5 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingAddResumeId::getModifi
             {std::string{repl::OplogEntry::k_idFieldName},
              std::string{CommitTransactionOplogObject::kCommitTimestampFieldName}},
             {}};
-}
-
-DocumentSource::GetNextResult DocumentSourceReshardingAddResumeId::doGetNext() {
-    uassert(6387804,
-            str::stream() << kStageName << " cannot be executed from router",
-            !pExpCtx->getInRouter());
-
-    // Get the next input document.
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
-    auto doc = input.releaseDocument();
-    return appendId(doc);
 }
 }  // namespace mongo

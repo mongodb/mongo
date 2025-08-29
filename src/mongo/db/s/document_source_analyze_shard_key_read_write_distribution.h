@@ -29,33 +29,23 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution_gen.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/topology/cluster_role.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #include <memory>
 #include <set>
@@ -70,8 +60,7 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public DocumentSource,
-                                                                 public exec::agg::Stage {
+class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_analyzeShardKeyReadWriteDistribution"_sd;
 
@@ -111,9 +100,7 @@ public:
     DocumentSourceAnalyzeShardKeyReadWriteDistribution(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec)
-        : DocumentSource(kStageName, pExpCtx),
-          exec::agg::Stage(kStageName, pExpCtx),
-          _spec(std::move(spec)) {}
+        : DocumentSource(kStageName, pExpCtx), _spec(std::move(spec)) {}
 
     ~DocumentSourceAnalyzeShardKeyReadWriteDistribution() override = default;
 
@@ -145,6 +132,10 @@ public:
         return id;
     }
 
+    auto& getSpec() const {
+        return _spec;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
@@ -155,12 +146,9 @@ public:
 private:
     DocumentSourceAnalyzeShardKeyReadWriteDistribution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
-
-    GetNextResult doGetNext() final;
+        : DocumentSource(kStageName, expCtx) {}
 
     DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec _spec;
-    bool _finished = false;
 };
 
 }  // namespace analyze_shard_key

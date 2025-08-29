@@ -31,25 +31,17 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/session/logical_session_id.h"
 
-#include <memory>
 #include <set>
-#include <stack>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -73,7 +65,7 @@ namespace mongo {
  * {clusterTime: <transaction commit timestamp>, ts: <applyOps optime.ts>}. For all other documents,
  * this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class DocumentSourceReshardingIterateTransaction : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceReshardingIterateTransaction : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalReshardingIterateTransaction"_sd;
     static constexpr StringData kIncludeCommitTransactionTimestampFieldName =
@@ -110,98 +102,19 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-protected:
-    DocumentSource::GetNextResult doGetNext() override;
+    bool getIncludeCommitTransactionTimestamp() const {
+        return _includeCommitTransactionTimestamp;
+    }
 
 private:
     DocumentSourceReshardingIterateTransaction(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool includeCommitTransactionTimestamp);
 
-    /**
-     * Validates if the supplied document contains transaction details.
-     */
-    bool _isTransactionOplogEntry(const Document& doc);
-
-    /**
-     * Represents the DocumentSource's state if it's currently reading from a transaction.
-     * Transaction operations are packed into 'applyOps' entries in the oplog.
-     *
-     * This iterator returns applyOps entries from a transaction in the same order they appear on
-     * the oplog (chronological order). Note that the TransactionHistoryIterator, which this class
-     * uses to query the oplog, returns the oplog entries in _reverse_ order. We internally reverse
-     * the output of the TransactionHistoryIterator in order to get the desired order.
-     */
-    class TransactionOpIterator {
-    public:
-        TransactionOpIterator(const TransactionOpIterator&) = delete;
-        TransactionOpIterator& operator=(const TransactionOpIterator&) = delete;
-
-        TransactionOpIterator(OperationContext* opCtx,
-                              std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-                              const Document& input,
-                              bool includeCommitTransactionTimestamp);
-
-        Timestamp clusterTime() const {
-            return _clusterTime;
-        }
-
-        Document lsid() const {
-            return _lsid;
-        }
-
-        TxnNumber txnNumber() const {
-            return _txnNumber;
-        }
-
-        /**
-         * Returns the next 'applyOps' oplog entry from the transaction. Returns boost::none to
-         * indicate that there are no operations left.
-         */
-        boost::optional<Document> getNextApplyOpsTxnEntry(OperationContext* opCtx);
-
-    private:
-        // Perform a find on the oplog to find an OplogEntry by its OpTime.
-        repl::OplogEntry _lookUpOplogEntryByOpTime(OperationContext* opCtx,
-                                                   repl::OpTime lookupTime) const;
-
-        // Traverse backwards through the oplog by starting at the entry at 'firstOpTime' and
-        // following "prevOpTime" links until reaching the terminal "prevOpTime" value, and push the
-        // OpTime value to '_txnOplogEntries' for each entry traversed, including the 'firstOpTime'
-        // entry. Note that we follow the oplog links _backwards_ through the oplog (i.e., in
-        // reverse chronological order) but because this is a stack, the iterator will process them
-        // in the opposite order, allowing iteration to proceed forwards and return operations in
-        // chronological order.
-        void _collectAllOpTimesFromTransaction(OperationContext* opCtx, repl::OpTime firstOpTime);
-
-        // This stack contains the timestamps for all oplog entries in this transaction that have
-        // yet to be processed by the iterator. Each time the TransactionOpIterator returns an
-        // applyOps entry, it pops the next optime off the stack and uses it to load the next
-        // applyOps entry, meaning that the top entry is always the next entry to be processed. From
-        // top-to-bottom, the stack is ordered chronologically, in the same order as entries appear
-        // in the oplog.
-        std::stack<repl::OpTime> _txnOplogEntries;
-
-        // The clusterTime of the entry which committed the transaction.
-        Timestamp _clusterTime;
-
-        // Fields that were taken from the oplog entry which committed the transaction.
-        Document _lsid;
-        TxnNumber _txnNumber;
-
-        // Used for traversing the oplog with TransactionHistoryInterface.
-        std::shared_ptr<MongoProcessInterface> _mongoProcessInterface;
-
-        bool _includeCommitTransactionTimestamp;
-    };
-
     // Set to true if this stage should attach the transaction commit timestamp to the applyOps
     // oplog entry documents that it emits instead of generating a resharding id for the documents
     // that it emits.
     bool _includeCommitTransactionTimestamp;
-
-    // Represents the current transaction we're unwinding, if any.
-    boost::optional<TransactionOpIterator> _txnIterator;
 };
 
 }  // namespace mongo
