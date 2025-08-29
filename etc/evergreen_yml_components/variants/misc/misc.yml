@@ -22,6 +22,7 @@ buildvariants:
         enterprise-rhel-8-64-bit-inmem
         enterprise-rhel-8-64-bit-multiversion
         amazon-linux2023-arm64-try-sbe-engine
+        amazon_linux2023_arm64_static-classic-engine-query-patch-only
       burn_in_tag_compile_task_dependency: archive_dist_test
       compile_variant: &amazon_linux2023_arm64_static_compile_variant_name amazon-linux2023-arm64-static-compile
     depends_on:
