@@ -148,6 +148,9 @@ public:
      * TODO: SERVER-105801 we should consider moving this information up to Interruptible.
      */
     struct OverdueInterruptCheckStats {
+        OverdueInterruptCheckStats(TickSource::Tick startTime)
+            : interruptCheckWindowStartTime(std::move(startTime)) {}
+
         Atomic<int64_t> overdueInterruptChecks{0};
 
         // Sum and max time an operation was overdue in checking for interrupts.

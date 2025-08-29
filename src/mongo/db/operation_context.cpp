@@ -271,9 +271,10 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 }
 
 void OperationContext::trackOverdueInterruptChecks(TickSource::Tick startTime) {
-    dassert(!_overdueInterruptCheckStats);
-    _overdueInterruptCheckStats = std::make_unique<OverdueInterruptCheckStats>();
-    _overdueInterruptCheckStats->interruptCheckWindowStartTime = startTime;
+    tassert(10988600,
+            "OperationContext::trackOverdueInterruptChecks may be called at most once",
+            !_overdueInterruptCheckStats);
+    _overdueInterruptCheckStats = std::make_unique<OverdueInterruptCheckStats>(startTime);
 }
 
 void OperationContext::updateInterruptCheckCounters() {

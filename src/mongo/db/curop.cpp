@@ -612,14 +612,7 @@ TickSource::Tick CurOp::startTime() {
 
     _blockedTimeAtStart = _sumBlockedTimeTotal();
 
-    // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
-    // accessed. The above thread ownership requirement ensures that there will never be
-    // concurrent calls to this '_start' assignment, but we use compare-exchange anyway as an
-    // additional check that writes to '_start' never race.
-    TickSource::Tick unassignedStart = 0;
-    invariant(_start.compare_exchange_strong(unassignedStart, _tickSource->getTicks()));
-
-    TickSource::Tick startTime = _start.load();
+    TickSource::Tick startTime = _tickSource->getTicks();
 
     // For top level operations, we decide whether or not to sample this operation for interrupt
     // tracking.
@@ -628,6 +621,13 @@ TickSource::Tick CurOp::startTime() {
             gOverdueInterruptCheckSamplingRate.loadRelaxed()) {
         opCtx()->trackOverdueInterruptChecks(startTime);
     }
+
+    // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
+    // accessed. The above thread ownership requirement ensures that there will never be
+    // concurrent calls to this '_start' assignment, but we use compare-exchange anyway as an
+    // additional check that writes to '_start' never race.
+    TickSource::Tick unassignedStart = 0;
+    invariant(_start.compare_exchange_strong(unassignedStart, startTime));
 
     return startTime;
 }
@@ -1097,7 +1097,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
 
-    if (!parent()) {
+    if (!parent() && isStarted()) {
         builder->append("numInterruptChecks", opCtx->numInterruptChecks());
         const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
         const auto* stats = opCtx->overdueInterruptCheckStats();
