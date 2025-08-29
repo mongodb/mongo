@@ -342,7 +342,7 @@ TrafficRecorder::TrafficRecorder() : _shouldRecord(shouldAlwaysRecordTraffic) {}
 
 TrafficRecorder::~TrafficRecorder() {
     if (shouldAlwaysRecordTraffic) {
-        _recording->shutdown().ignore();
+        (**_recording)->shutdown().ignore();
     }
 }
 
@@ -354,12 +354,10 @@ void TrafficRecorder::start(const StartTrafficRecording& options) {
             !gTrafficRecordingDirectory.empty());
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-        uassert(ErrorCodes::BadValue, "Traffic recording already active", !_recording);
-
-        _recording = std::make_shared<Recording>(options);
-        _recording->run();
+        auto rec = _recording.synchronize();
+        uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
+        *rec = std::make_shared<Recording>(options);
+        (*rec)->run();
     }
 
     _shouldRecord.store(true);
@@ -371,11 +369,10 @@ void TrafficRecorder::stop() {
     _shouldRecord.store(false);
 
     auto recording = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        auto rec = _recording.synchronize();
+        uassert(ErrorCodes::BadValue, "Traffic recording not active", *rec);
 
-        uassert(ErrorCodes::BadValue, "Traffic recording not active", _recording);
-
-        return std::move(_recording);
+        return std::move(*rec);
     }();
 
     uassertStatusOK(recording->shutdown());
@@ -385,21 +382,19 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
                               const Message& message,
                               ServiceContext* svcCtx) {
     if (shouldAlwaysRecordTraffic) {
-        {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
+        auto rec = _recording.synchronize();
 
-            if (!_recording) {
-                StartTrafficRecording options;
-                options.setDestination(gAlwaysRecordTraffic);
-                options.setMaxFileSize({double(std::numeric_limits<int64_t>::max())});
+        if (!*rec) {
+            StartTrafficRecording options;
+            options.setDestination(gAlwaysRecordTraffic);
+            options.setMaxFileSize({double(std::numeric_limits<int64_t>::max())});
 
-                _recording = std::make_shared<Recording>(options);
-                _recording->run();
-            }
+            *rec = std::make_shared<Recording>(options);
+            (*rec)->run();
         }
 
-        invariant(_recording->pushRecord(
-            ts, svcCtx->getPreciseClockSource()->now(), _recording->order.addAndFetch(1), message));
+        invariant((*rec)->pushRecord(
+            ts, svcCtx->getPreciseClockSource()->now(), (*rec)->order.addAndFetch(1), message));
         return;
     }
 
@@ -420,12 +415,9 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
         return;
     }
 
-    // We couldn't queue
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
     // If the recording isn't the one we have in hand bail (its been ended, or a new one has
     // been created
-    if (_recording != recording) {
+    if (**_recording != recording) {
         return;
     }
 
@@ -434,8 +426,7 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
 }
 
 std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_getCurrentRecording() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _recording;
+    return *_recording;
 }
 
 class TrafficRecorder::TrafficRecorderSSS : public ServerStatusSection {

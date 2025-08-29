@@ -35,6 +35,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -89,9 +90,7 @@ private:
 
     AtomicWord<bool> _shouldRecord;
 
-    // The mutex only protects the last recording shared_ptr
-    mutable stdx::mutex _mutex;
-    std::shared_ptr<Recording> _recording;
+    mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
 };
 
 }  // namespace mongo
