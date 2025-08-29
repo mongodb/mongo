@@ -29,12 +29,38 @@
 
 #pragma once
 
-#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/util/deferred.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHash,
@@ -44,25 +70,13 @@ using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHa
 /**
  * The $querySettings stage returns all QueryShapeConfigurations stored in the cluster.
  */
-class DocumentSourceQuerySettings final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceQuerySettings final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$querySettings"_sd;
-    static constexpr StringData kDebugQueryShapeFieldName = "debugQueryShape"_sd;
     static const Id& id;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    /**
-     * The possible states of the stage. First we are reading all the 'config.representativeQueries'
-     * collection and return all QueryShapeConfigurations that have representative queries. Once the
-     * cursor is exhausted, we iterate over the remaining configurations in the
-     * '_queryShapeConfigsMap'.
-     */
-    enum class State {
-        kReadingFromQueryShapeRepresentativeQueriesColl,
-        kReadingFromQueryShapeConfigsMap
-    };
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -137,6 +151,10 @@ public:
         return id;
     }
 
+    bool getShowDebugQueryShape() const {
+        return _showDebugQueryShape;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
@@ -145,48 +163,8 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    void detachFromOperationContext() final;
-
-    void reattachToOperationContext(OperationContext* opCtx) final;
-
 private:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
-
-    /**
-     * DocumentSource that holds a cursor over the 'queryShapeRepresentativeQueries' collection:
-     * - either on local node if we are in the replica set
-     * - or on the configsvr if we are in the sharded cluster deployment.
-     *
-     * If gFeatureFlagPQSBackfill is disabled, returns empty DocumentSourceQueue.
-     */
-    boost::intrusive_ptr<DocumentSource> createQueryShapeRepresentativeQueriesCursor(
-        OperationContext* opCtx);
-
-    DeferredFn<QueryShapeConfigurationMap> _queryShapeConfigsMap{[this]() {
-        // Get all query shape configurations owned by 'tenantId'.
-        auto tenantId = getContext()->getNamespaceString().tenantId();
-        auto* opCtx = getContext()->getOperationContext();
-        auto configs = query_settings::QuerySettingsService::get(opCtx)
-                           .getAllQueryShapeConfigurations(tenantId)
-                           .queryShapeConfigurations;
-
-        QueryShapeConfigurationMap map;
-        for (auto&& config : configs) {
-            map.emplace(config.getQueryShapeHash(), std::move(config));
-        }
-        return map;
-    }};
-    QueryShapeConfigurationMap::const_iterator _iterator;
-
-    DeferredFn<boost::intrusive_ptr<exec::agg::Stage>> _queryShapeRepresentativeQueriesCursor{
-        [this]() {
-            return exec::agg::buildStage(
-                createQueryShapeRepresentativeQueriesCursor(getContext()->getOperationContext()));
-        }};
-
-    bool _showDebugQueryShape;
-    State _state = State::kReadingFromQueryShapeRepresentativeQueriesColl;
+    const bool _showDebugQueryShape;
 };
 
 }  // namespace mongo

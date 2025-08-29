@@ -212,11 +212,13 @@ mongo_cc_library(
         # dependency. Generating the Debug Query Shape requires re-parsing the
         # query instance via `query_settings::createRepresentativeInfo()`
         # which internally uses `Pipeline::parse()`.
+        "//src/mongo/db/exec/agg:query_settings_stage.cpp",
         "//src/mongo/db/pipeline:document_source_query_settings.cpp",
         ":query_settings_cmds_gen",
         "query_settings_cmds.cpp",
     ],
     hdrs = [
+        "//src/mongo/db/exec/agg:query_settings_stage.h",
         "//src/mongo/db/pipeline:document_source_query_settings.h",
         "//src/mongo/s/query/exec:async_results_merger_params_gen",
     ],
