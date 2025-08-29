@@ -188,11 +188,6 @@ private:
      */
     void maybeTranslateTimeseriesUpdate();
 
-    /**
-     * Adds closed bucket filtering to query for timeseries multi-updates
-     */
-    std::unique_ptr<MatchExpression> getClosedBucketFilteredExpr();
-
     // Unowned pointer to the transactional context.
     OperationContext* _opCtx;
 
