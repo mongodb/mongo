@@ -79,7 +79,7 @@ protected:
         ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds));
     }
 
-    // Helper functions for creating document source stages for more consise pipeline building
+    // Helper functions for creating document source stages for more concise pipeline building
     // below. For the sake of these tests, $limit, $skip, and $unwind are the only stages for which
     // we care about the parameters applied to the stage.
 
@@ -185,7 +185,7 @@ protected:
     auto lookupWithUnwind(bool includeNullIfEmptyOrMissing) {
         auto lookupStage = lookup();
         auto unwindStage = unwind(includeNullIfEmptyOrMissing);
-        static_cast<DocumentSourceLookUp*>(lookupStage.get())->setUnwindStage(unwindStage);
+        static_cast<DocumentSourceLookUp*>(lookupStage.get())->setUnwindStage_forTest(unwindStage);
         return lookupStage;
     }
 

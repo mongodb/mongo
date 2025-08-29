@@ -38,6 +38,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/lookup_stage.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -117,10 +118,20 @@ public:
 };
 
 auto makeLookUpFromBson(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto docSource = DocumentSourceLookUp::createFromBson(elem, expCtx);
-    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.detach());
-    return std::unique_ptr<DocumentSourceLookUp, DocumentSourceDeleter>(lookup,
-                                                                        DocumentSourceDeleter());
+    auto result = boost::dynamic_pointer_cast<DocumentSourceLookUp>(
+        DocumentSourceLookUp::createFromBson(elem, expCtx));
+    ASSERT(result);
+    return result;
+}
+
+auto makeLookUpFromJson(StringData json, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return makeLookUpFromBson(fromjson(json).firstElement(), expCtx);
+}
+
+auto buildLookUpStage(const boost::intrusive_ptr<DocumentSource>& ds) {
+    auto result = boost::dynamic_pointer_cast<exec::agg::LookUpStage>(exec::agg::buildStage(ds));
+    ASSERT(result);
+    return result;
 }
 
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
@@ -1189,25 +1200,25 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
                                          {"as", "foreignDocs"_sd}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
+    auto lookupStage = exec::agg::buildStage(lookup);
+    lookupStage->setSource(mockLocalStage.get());
 
-    lookup->setSource(mockLocalStage.get());
-
-    auto next = lookup->getNext();
+    auto next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 0}, {"foreignDocs", {Document{{"_id", 0}}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    next = lookup->getNext();
+    next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 1}, {"foreignDocs", {Document{{"_id", 1}}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    ASSERT_TRUE(lookup->getNext().isEOF());
-    ASSERT_TRUE(lookup->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
@@ -1241,28 +1252,28 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     const bool preserveNullAndEmptyArrays = false;
     const boost::optional<std::string> includeArrayIndex = boost::none;
-    lookup->setUnwindStage(DocumentSourceUnwind::create(
+    lookup->setUnwindStage_forTest(DocumentSourceUnwind::create(
         expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
 
+    auto lookupStage = exec::agg::buildStage(lookup.get());
+    lookupStage->setSource(mockLocalStage.get());
 
-    lookup->setSource(mockLocalStage.get());
-
-    auto next = lookup->getNext();
+    auto next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 0}, {"foreignDoc", Document{{"_id", 0}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    next = lookup->getNext();
+    next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(),
                        (Document{{"foreignId", 1}, {"foreignDoc", Document{{"_id", 1}}}}));
 
-    ASSERT_TRUE(lookup->getNext().isPaused());
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
 
-    ASSERT_TRUE(lookup->getNext().isEOF());
-    ASSERT_TRUE(lookup->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
@@ -1303,7 +1314,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
 
     const bool preserveNullAndEmptyArrays = false;
     const boost::optional<std::string> includeArrayIndex = std::string("arrIndex");
-    lookup->setUnwindStage(DocumentSourceUnwind::create(
+    lookup->setUnwindStage_forTest(DocumentSourceUnwind::create(
         expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
 
     auto modifiedPaths = lookup->getModifiedPaths();
@@ -1327,16 +1338,15 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheNonCorrelatedSubPipelinePrefix) {
     expCtx->setMongoProcessInterface(
         std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
-                 "{$addFields: {varField: '$$var1'}}], from: 'coll', as: 'as'}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
+        "{$addFields: {varField: '$$var1'}}], from: 'coll', as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1359,18 +1369,17 @@ TEST_F(DocumentSourceLookUpTest,
     // In the $facet stage here, the correlated $match stage comes after a $group stage which
     // returns EXHAUSTIVE_ALL for its dependencies. Verify that we continue enumerating the $facet
     // pipeline's variable dependencies after this point, so that the $facet stage is correctly
-    // identified as correlated and the cache is placed before it in the $lookup pipeline.
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
-                 "{$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: {$expr: {$eq: ['$_id', "
-                 "'$$var1']}}}]}}], from: 'coll', as: 'as'}}")
-            .firstElement(),
+    // identified as correlated and the cache is placed befor
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
+        "{$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: {$expr: {$eq: ['$_id', "
+        "'$$var1']}}}]}}], from: 'coll', as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     // Note that the second $match stage should be moved up to before the $group stage, since $group
@@ -1399,16 +1408,15 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
         std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
     // This pipeline includes a $match stage that itself includes a $expr expression.
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {$expr: {$eq: "
-                 "['$_id','$$var1']}}}], from: 'coll', as: 'as'}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {$expr: {$eq: "
+        "['$_id','$$var1']}}}], from: 'coll', as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     const auto& sources = subPipeline->getSources();
@@ -1435,21 +1443,21 @@ TEST_F(DocumentSourceLookUpTest,
     expCtx->setMongoProcessInterface(
         std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    // The $project stage defines a local variable with the same name as the $lookup 'let' variable.
-    // Verify that the $project is identified as non-correlated and the cache is placed after it.
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: 1}}, {$sort: {x: 1}}, "
-                 "{$project: {projectedField: {$let: {vars: {var1: '$x'}, in: "
-                 "'$$var1'}}, _id: false}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], "
-                 "from: 'coll', "
-                 "as: 'as'}}")
-            .firstElement(),
+    // The $project stage defines a local variable with the same name as the $lookup 'let'
+    // variable. Verify that the $project is identified as non-correlated and the cache is
+    // placed after it.
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: 1}}, {$sort: {x: 1}}, "
+        "{$project: {projectedField: {$let: {vars: {var1: '$x'}, in: "
+        "'$$var1'}}, _id: false}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], "
+        "from: 'coll', "
+        "as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1474,18 +1482,17 @@ TEST_F(DocumentSourceLookUpTest, ShouldInsertCacheBeforeCorrelatedNestedLookup) 
     // Create a $lookup stage whose pipeline contains nested $lookups. The third-level $lookup
     // refers to a 'let' variable defined in the top-level $lookup. Verify that the second-level
     // $lookup is correctly identified as a correlated stage and the cache is placed before it.
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {from: 'coll', as: 'as', let: {var1: '$_id'}, pipeline: [{$match: "
-                 "{x:1}}, {$sort: {x: 1}}, {$lookup: {from: 'coll', as: 'subas', pipeline: "
-                 "[{$match: {x: 1}}, {$lookup: {from: 'coll', as: 'subsubas', pipeline: [{$match: "
-                 "{$expr: {$eq: ['$y', '$$var1']}}}]}}]}}, {$addFields: {varField: '$$var1'}}]}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {from: 'coll', as: 'as', let: {var1: '$_id'}, pipeline: [{$match: "
+        "{x:1}}, {$sort: {x: 1}}, {$lookup: {from: 'coll', as: 'subas', pipeline: "
+        "[{$match: {x: 1}}, {$lookup: {from: 'coll', as: 'subsubas', pipeline: [{$match: "
+        "{$expr: {$eq: ['$y', '$$var1']}}}]}}]}}, {$addFields: {varField: '$$var1'}}]}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1511,18 +1518,17 @@ TEST_F(DocumentSourceLookUpTest,
 
     // The nested $lookup stage defines a 'let' variable with the same name as the top-level 'let'.
     // Verify the nested $lookup is identified as non-correlated and the cache is placed after it.
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
-                 "{$lookup: {let: {var1: '$y'}, pipeline: [{$match: {$expr: { $eq: ['$z', "
-                 "'$$var1']}}}], from: 'coll', as: 'subas'}}, {$addFields: {varField: '$$var1'}}], "
-                 "from: 'coll', as: 'as'}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
+        "{$lookup: {let: {var1: '$y'}, pipeline: [{$match: {$expr: { $eq: ['$z', "
+        "'$$var1']}}}], from: 'coll', as: 'subas'}}, {$addFields: {varField: '$$var1'}}], "
+        "from: 'coll', as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1540,20 +1546,19 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, {$lookup: "
-                 "{pipeline: [{$match: {y: 5}}], from: 'coll', as: 'subas'}}, {$addFields: "
-                 "{constField: 5}}], from: 'coll', as: 'as'}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, {$lookup: "
+        "{pipeline: [{$match: {y: 5}}], from: 'coll', as: 'subas'}}, {$addFields: "
+        "{constField: 5}}], from: 'coll', as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
     expCtx->setMongoProcessInterface(
         std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1577,25 +1582,22 @@ TEST_F(DocumentSourceLookUpTest,
         Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 2}}};
     expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(mockForeignContents));
 
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: {$gte: 0}}}, {$sort: {x: "
-                 "1}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], from: 'coll', as: "
-                 "'as'}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: {$gte: 0}}}, {$sort: {x: "
+        "1}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], from: 'coll', as: "
+        "'as'}}",
         expCtx);
-
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
 
     // Prepare the mocked local stage.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
 
-
+    auto lookupStage = buildLookUpStage(lookupDS);
     lookupStage->setSource(mockLocalStage.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 0));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1616,7 +1618,7 @@ TEST_F(DocumentSourceLookUpTest,
     // Preview the subpipeline that will be used to process the second local document {_id: 1}. The
     // sub-pipeline cache has been built on the first iteration, and is now serving in place of the
     // mocked foreign input source and the non-correlated stages at the start of the pipeline.
-    subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 1));
+    subPipeline = lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 1));
     ASSERT(subPipeline);
 
     expectedPipe =
@@ -1652,28 +1654,26 @@ TEST_F(DocumentSourceLookUpTest,
                                                                   Document{{"x", 1}}};
     expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(mockForeignContents));
 
-    // Ensure the cache is abandoned after the first iteration by setting its max size to 0.
-    size_t maxCacheSizeBytes = 0;
-    auto docSource = DocumentSourceLookUp::createFromBsonWithCacheSize(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: {$gte: 0}}}, {$sort: {x: "
-                 "1}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], from: 'coll', as: "
-                 "'as'}}")
-            .firstElement(),
-        expCtx,
-        maxCacheSizeBytes);
-
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: {$gte: 0}}}, {$sort: {x: "
+        "1}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], from: 'coll', as: "
+        "'as'}}",
+        expCtx);
 
     // Prepare the mocked local and foreign sources.
     auto mockLocalStage =
         exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
 
-
+    auto lookupStage = buildLookUpStage(lookupDS);
     lookupStage->setSource(mockLocalStage.get());
 
+    // Ensure the cache is abandoned after the first iteration by setting its max size to 0.
+    size_t maxCacheSizeBytes = 0;
+    lookupStage->reInitializeCache_forTest(maxCacheSizeBytes);
+
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 0));
     ASSERT(subPipeline);
 
     auto expectedPipe = fromjson(
@@ -1692,7 +1692,7 @@ TEST_F(DocumentSourceLookUpTest,
     // Preview the subpipeline that will be used to process the second local document {_id: 1}. The
     // sub-pipeline cache exceeded its max size on the first iteration, was abandoned, and is now
     // absent from the pipeline.
-    subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 1));
+    subPipeline = lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 1));
     ASSERT(subPipeline);
 
     expectedPipe = fromjson(
@@ -1719,17 +1719,16 @@ TEST_F(DocumentSourceLookUpTest, ShouldNotCacheIfCorrelatedStageIsAbsorbedIntoPl
     expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(
         std::deque<DocumentSource::GetNextResult>{}, removeLeadingQueryStages));
 
-    auto docSource = DocumentSourceLookUp::createFromBson(
-        fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {$expr: { $gte: ['$x', "
-                 "'$$var1']}}}, {$sort: {x: 1}}, {$addFields: {varField: {$sum: ['$x', "
-                 "'$$var1']}}}], from: 'coll', as: 'as'}}")
-            .firstElement(),
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {$expr: { $gte: ['$x', "
+        "'$$var1']}}}, {$sort: {x: 1}}, {$addFields: {varField: {$sum: ['$x', "
+        "'$$var1']}}}], from: 'coll', as: 'as'}}",
         expCtx);
 
-    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT(lookupStage);
+    auto lookupStage = buildLookUpStage(lookupDS);
 
-    auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 0));
     ASSERT(subPipeline);
 
     auto expectedPipe =

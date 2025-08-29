@@ -34,37 +34,29 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_lookup_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/sequential_document_cache.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <cstddef>
 #include <memory>
@@ -73,21 +65,38 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+struct LookUpSharedState {
+    // TODO SERVER-107976: Move 'pipeline' and 'execPipeline' entirely into the 'LookUpStage' class.
+    std::unique_ptr<mongo::Pipeline> pipeline;
+    std::unique_ptr<exec::agg::Pipeline> execPipeline;
+
+    // The aggregation pipeline to perform against the '_resolvedNs' namespace. Referenced view
+    // namespaces have been resolved.
+    // TODO SERVER-107976: Make 'resolvedPipeline' a 'std::shared_ptr<std::vector<BSONObj>>' and
+    // move it back to the 'DocumentSourceLookUp' class.
+    std::vector<BSONObj> resolvedPipeline;
+
+    // A pipeline parsed from _sharedState->resolvedPipeline at creation time, intended to support
+    // introspective functions. If sub-$lookup stages are present, their pipelines are constructed
+    // recursively.
+    // TODO SERVER-107976: Move 'resolvedIntrospectionPipeline' back to the 'DocumentSourceLookUp'
+    // class.
+    std::unique_ptr<Pipeline> resolvedIntrospectionPipeline;
+};
+
+void lookupPipeValidator(const Pipeline& pipeline);
 
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$lookup"_sd;
     static constexpr StringData kFromField = "from"_sd;
@@ -181,35 +190,14 @@ public:
 
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* collectionNames) const final;
 
-    void detachFromOperationContext() final;
-
     void detachSourceFromOperationContext() final;
-
-    void reattachToOperationContext(OperationContext* opCtx) final;
 
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
-    bool validateOperationContext(const OperationContext* opCtx) const final;
-
     bool validateSourceOperationContext(const OperationContext* opCtx) const final;
-
-    bool usedDisk() const final;
-
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
-    }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    static boost::intrusive_ptr<DocumentSource> createFromBsonWithCacheSize(
-        BSONElement elem,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        size_t maxCacheSizeBytes) {
-        auto dsLookup = createFromBson(elem, expCtx);
-        static_cast<DocumentSourceLookUp*>(dsLookup.get())->reInitializeCache(maxCacheSizeBytes);
-        return dsLookup;
-    }
 
     void resolvedPipelineHelper(
         NamespaceString fromNs,
@@ -228,7 +216,7 @@ public:
     /**
      * Helper to absorb an $unwind stage. Only used for testing this special behavior.
      */
-    void setUnwindStage(const boost::intrusive_ptr<DocumentSourceUnwind>& unwind) {
+    void setUnwindStage_forTest(const boost::intrusive_ptr<DocumentSourceUnwind>& unwind) {
         invariant(!_unwindSrc);
         _unwindSrc = unwind;
     }
@@ -267,31 +255,27 @@ public:
      * any document to look up it is missing variable definitions for the former type and the $match
      * stage which will be added to enforce the join criteria for the latter.
      */
-    const auto& getResolvedIntrospectionPipeline() const {
-        return *_resolvedIntrospectionPipeline;
+    inline const auto& getResolvedIntrospectionPipeline() const {
+        return *_sharedState->resolvedIntrospectionPipeline;
     }
 
-    auto& getResolvedIntrospectionPipeline() {
-        return *_resolvedIntrospectionPipeline;
+    inline auto& getResolvedIntrospectionPipeline() {
+        return *_sharedState->resolvedIntrospectionPipeline;
     }
 
-    const Variables& getVariables_forTest() {
+    inline const Variables& getVariables_forTest() {
         return _variables;
     }
 
-    const VariablesParseState& getVariablesParseState_forTest() {
+    inline const VariablesParseState& getVariablesParseState_forTest() {
         return _variablesParseState;
     }
 
     const DocumentSourceContainer* getSubPipeline() const final {
         tassert(6080015,
                 "$lookup expected to have a resolved pipeline, but didn't",
-                _resolvedIntrospectionPipeline);
-        return &_resolvedIntrospectionPipeline->getSources();
-    }
-
-    std::unique_ptr<Pipeline> getSubPipeline_forTest(const Document& inputDoc) {
-        return buildPipeline(_fromExpCtx, inputDoc);
+                _sharedState->resolvedIntrospectionPipeline);
+        return &_sharedState->resolvedIntrospectionPipeline->getSources();
     }
 
     boost::intrusive_ptr<DocumentSource> clone(
@@ -305,7 +289,7 @@ public:
         return _fromNs;
     }
 
-    const boost::intrusive_ptr<DocumentSourceUnwind>& getUnwindSource() const {
+    inline const boost::intrusive_ptr<DocumentSourceUnwind>& getUnwindSource() const {
         return _unwindSrc;
     }
 
@@ -314,24 +298,15 @@ public:
      * unwinds the lookup result array.
      */
     bool hasUnwindSrc() const {
-        return _unwindSrc ? true : false;
+        return bool(_unwindSrc);
     }
 
     /**
-     * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
-     * cursor and/or cache source as appropriate.
-     */
-    // TODO SERVER-84208: Refactor this method so as to clearly separate the logic for the streams
-    // engine from the logic for the classic $lookup..
-    template <bool isStreamsEngine = false>
-    PipelinePtr buildPipeline(const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
-                              const Document& inputDoc);
-
-    /**
-     * Rebuilds the _resolvedPipeline from the _resolvedIntrospectionPipeline. This is required for
-     * server rewrites for FLE2. The server rewrite code operates on DocumentSources of a parsed
-     * pipeline, which we obtain from DocumentSourceLookUp::_resolvedIntrospectionPipeline.
-     * However, we use _resolvedPipeline to execute each iteration of doGetNext(). This method is
+     * Rebuilds the _sharedState->resolvedPipeline from the
+     * _sharedState->resolvedIntrospectionPipeline. This is required for server rewrites for FLE2.
+     * The server rewrite code operates on DocumentSources of a parsed pipeline, which we obtain
+     * from DocumentSourceLookUp::_sharedState->resolvedIntrospectionPipeline. However, we use
+     * _sharedState->resolvedPipeline to execute each iteration of doGetNext(). This method is
      * called exclusively from rewriteLookUp (server_rewrite.cpp) once the pipeline has been
      * rewritten for FLE2.
      */
@@ -345,21 +320,26 @@ public:
         return _fromExpCtx;
     }
 
+    BSONObj getAdditionalFilter() const {
+        return hasPipeline() ? BSONObj() : _additionalFilter.value_or(BSONObj());
+    }
+
 protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
     boost::optional<ShardId> computeMergeShardId() const final;
 
     /**
      * Attempts to combine with an immediately following $unwind stage that unwinds the $lookup's
-     * "as" field, setting the '_unwindSrc' member to the absorbed $unwind stage. If this is done
-     * it may also absorb one or more $match stages that immediately followed the $unwind, setting
-     * the resulting combined $match in the '_matchSrc' member.
+     * "as" field, setting the '_unwindSrc' member to the absorbed $unwind stage. If
+     * this is done it may also absorb one or more $match stages that immediately followed the
+     * $unwind, setting the resulting combined $match in the '_matchSrc' member.
      */
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceLookUpToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Target constructor. Handles common-field initialization for the syntax-specific delegating
      * constructors.
@@ -397,46 +377,11 @@ private:
     }
 
     /**
-     * Delegate of doGetNext() in the case where an $unwind stage has been absorbed into _unwindSrc.
-     * This returns the next record resulting from unwinding the lookup's "as" field.
-     */
-    GetNextResult unwindResult();
-
-    /**
-     * Resolves let defined variables against 'localDoc' and stores the results in 'variables'.
-     */
-    void resolveLetVariables(const Document& localDoc, Variables* variables);
-
-    /**
      * Builds a parsed pipeline for introspection (e.g. constraints, dependencies). Any sub-$lookup
      * pipelines will be built recursively.
      */
     void initializeResolvedIntrospectionPipeline();
 
-    /**
-     * Builds the $lookup pipeline using the resolved view definition for a sharded foreign view and
-     * updates the '_resolvedPipeline', as well as '_fieldMatchPipelineIdx' in the case of a
-     * 'foreign' join.
-     */
-    std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
-        std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace);
-
-    /**
-     * Reinitialize the cache with a new max size. May only be called if this DSLookup was created
-     * with pipeline syntax only, the cache has not been frozen or abandoned, and no data has been
-     * added to it.
-     */
-    void reInitializeCache(size_t maxCacheSizeBytes) {
-        invariant(!hasLocalFieldForeignFieldJoin());
-        invariant(!_cache || (_cache->isBuilding() && _cache->sizeBytes() == 0));
-        _cache.emplace(maxCacheSizeBytes);
-    }
-
-    /**
-     * Method to add a DocumentSourceSequentialDocumentCache stage and optimize the pipeline to
-     * move the cache to its final position.
-     */
-    void addCacheStageAndOptimize(Pipeline& pipeline);
 
     /**
      * Given a mutable document, appends execution stats such as 'totalDocsExamined',
@@ -464,8 +409,6 @@ private:
         }
     }
 
-    DocumentSourceLookupStats _stats;
-
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
     bool _fromNsIsAView;
@@ -478,20 +421,15 @@ private:
     // For use when $lookup is specified with localField/foreignField syntax.
     boost::optional<FieldPath> _localField;
     boost::optional<FieldPath> _foreignField;
-    // Indicates the index in '_resolvedPipeline' where the local/foreignField $match resides.
+    // Indicates the index in '_sharedState->resolvedPipeline' where the local/foreignField $match
+    // resides.
     boost::optional<size_t> _fieldMatchPipelineIdx;
 
-    // Holds 'let' defined variables defined both in this stage and in parent pipelines. These are
-    // copied to the '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use
-    // in foreign pipeline execution.
+    // Holds 'let' defined variables defined both in this stage and in parent pipelines.
+    // These are copied to the '_fromExpCtx' ExpressionContext's 'variables' and
+    // 'variablesParseState' for use in foreign pipeline execution.
     Variables _variables;
     VariablesParseState _variablesParseState;
-
-    // Caches documents returned by the non-correlated prefix of the $lookup pipeline during the
-    // first iteration, up to a specified size limit in bytes. If this limit is not exceeded by the
-    // time we hit EOF, subsequent iterations of the pipeline will draw from the cache rather than
-    // from a cursor source.
-    boost::optional<SequentialDocumentCache> _cache;
 
     // The ExpressionContext used when performing aggregation pipelines against the '_resolvedNs'
     // namespace.
@@ -500,15 +438,9 @@ private:
     // Can this $lookup be pushed down into SBE?
     SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 
-    // The aggregation pipeline to perform against the '_resolvedNs' namespace. Referenced view
-    // namespaces have been resolved.
-    std::vector<BSONObj> _resolvedPipeline;
     // The aggregation pipeline defined with the user request, prior to optimization and view
     // resolution. If the user did not define a pipeline this will be 'boost::none'.
     boost::optional<std::vector<BSONObj>> _userPipeline;
-    // A pipeline parsed from _resolvedPipeline at creation time, intended to support introspective
-    // functions. If sub-$lookup stages are present, their pipelines are constructed recursively.
-    std::unique_ptr<Pipeline> _resolvedIntrospectionPipeline;
 
     // Holds 'let' variables defined in $lookup stage. 'let' variables are stored in the vector in
     // order to ensure the stability in the query shape serialization.
@@ -517,13 +449,7 @@ private:
     boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;
     boost::intrusive_ptr<DocumentSourceUnwind> _unwindSrc;
 
-    // The following members are used to hold onto state across getNext() calls when '_unwindSrc' is
-    // not null.
-    long long _cursorIndex = 0;
-    PipelinePtr _pipeline;
-    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
-    boost::optional<Document> _input;
-    boost::optional<Document> _nextValue;
+    std::shared_ptr<LookUpSharedState> _sharedState;
 };  // class DocumentSourceLookUp
 
 }  // namespace mongo
