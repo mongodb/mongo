@@ -63,4 +63,5 @@ public:
     }
 };
 
-REGISTER_EXTENSION(VectorSearchExtension);
+REGISTER_EXTENSION(VectorSearchExtension)
+DEFINE_GET_EXTENSION()

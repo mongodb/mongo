@@ -38,3 +38,4 @@ public:
 };
 
 REGISTER_EXTENSION(NullStageExtension);
+DEFINE_GET_EXTENSION()

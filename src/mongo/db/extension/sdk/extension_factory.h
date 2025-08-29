@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/host_portal.h"
+#include "mongo/db/extension/sdk/versioned_extension.h"
 
 #include <memory>
 
@@ -77,6 +78,10 @@ public:
                      ::MongoExtensionAPIVersion version)
         : ::MongoExtension{&VTABLE, version}, _extensionPointer(std::move(extensionPointer)) {}
 
+    ExtensionAdapter(const VersionedExtension& versionedExtension)
+        : ::MongoExtension{&VTABLE, versionedExtension.version},
+          _extensionPointer(versionedExtension.factoryFunc()) {}
+
     ~ExtensionAdapter() = default;
 
 private:
@@ -93,19 +98,17 @@ private:
 };
 
 /**
- * Base case macro to define get_mongodb_extension.
+ * Registers extension type with an API version attached.
  */
-#define REGISTER_EXTENSION_WITH_VERSION(MyExtensionType, apiVersion)                         \
-    extern "C" {                                                                             \
-    ::MongoExtensionStatus* get_mongodb_extension(                                           \
-        const ::MongoExtensionAPIVersionVector* hostVersions,                                \
-        const ::MongoExtension** extension) {                                                \
-        return mongo::extension::sdk::enterCXX([&] {                                         \
-            static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>( \
-                std::make_unique<MyExtensionType>(), (apiVersion));                          \
-            *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());           \
-        });                                                                                  \
-    }                                                                                        \
+#define REGISTER_EXTENSION_WITH_VERSION(ExtensionType, ApiVersion)                             \
+    namespace {                                                                                \
+    struct ExtensionType##Registrar {                                                          \
+        ExtensionType##Registrar() {                                                           \
+            mongo::extension::sdk::VersionedExtensionContainer::getInstance().registerVersion( \
+                ApiVersion, []() { return std::make_unique<ExtensionType>(); });               \
+        }                                                                                      \
+    };                                                                                         \
+    static ExtensionType##Registrar ExtensionType##RegistrarInstance;                          \
     }
 
 /**
@@ -113,5 +116,23 @@ private:
  */
 #define REGISTER_EXTENSION(MyExtensionType) \
     REGISTER_EXTENSION_WITH_VERSION(MyExtensionType, (MONGODB_EXTENSION_API_VERSION))
+
+/**
+ * Base case macro to define get_mongodb_extension.
+ */
+#define DEFINE_GET_EXTENSION()                                                               \
+    extern "C" {                                                                             \
+    ::MongoExtensionStatus* get_mongodb_extension(                                           \
+        const ::MongoExtensionAPIVersionVector* hostVersions,                                \
+        const ::MongoExtension** extension) {                                                \
+        return mongo::extension::sdk::enterCXX([&] {                                         \
+            const auto& versionedExtensionContainer =                                        \
+                mongo::extension::sdk::VersionedExtensionContainer::getInstance();           \
+            static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>( \
+                versionedExtensionContainer.getVersionedExtension(hostVersions));            \
+            *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());           \
+        });                                                                                  \
+    }                                                                                        \
+    }
 
 }  // namespace mongo::extension::sdk

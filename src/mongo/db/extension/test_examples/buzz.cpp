@@ -60,4 +60,5 @@ public:
     }
 };
 
-REGISTER_EXTENSION(BuzzExtension);
+REGISTER_EXTENSION(BuzzExtension)
+DEFINE_GET_EXTENSION()

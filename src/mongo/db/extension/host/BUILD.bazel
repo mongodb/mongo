@@ -72,6 +72,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:major_version_max_int_bad_extension",
         "//src/mongo/db/extension/test_examples:duplicate_stage_descriptor_bad_extension",
         "//src/mongo/db/extension/test_examples:null_stage_descriptor_bad_extension",
+        "//src/mongo/db/extension/test_examples:duplicate_version_bad_extension",
+        "//src/mongo/db/extension/test_examples:no_compatible_version_bad_extension",
+        "//src/mongo/db/extension/test_examples:loadHighestCompatibleVersion_mongo_extension",
     ],
     tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({

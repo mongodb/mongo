@@ -72,7 +72,6 @@ public:
     }
 };
 
-
 class MyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
@@ -81,4 +80,5 @@ public:
     }
 };
 
-REGISTER_EXTENSION(MyExtension);
+REGISTER_EXTENSION(MyExtension)
+DEFINE_GET_EXTENSION()

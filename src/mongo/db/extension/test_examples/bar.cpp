@@ -69,4 +69,5 @@ public:
     }
 };
 
-REGISTER_EXTENSION(BarExtension);
+REGISTER_EXTENSION(BarExtension)
+DEFINE_GET_EXTENSION()

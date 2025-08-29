@@ -27,38 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 
 namespace sdk = mongo::extension::sdk;
 
-class MyLogicalStage : public sdk::LogicalAggregationStage {};
-
-class MyStageDescriptor : public sdk::AggregationStageDescriptor {
-public:
-    static inline const std::string kStageName = "$myStage";
-
-    MyStageDescriptor()
-        : sdk::AggregationStageDescriptor(kStageName, MongoExtensionAggregationStageType::kNoOp) {}
-
-    std::unique_ptr<sdk::LogicalAggregationStage> parse(mongo::BSONObj stageBson) const override {
-        uassert(10696403,
-                "Failed to parse " + kStageName + ", expected object",
-                stageBson.hasField(kStageName) && stageBson.getField(kStageName).isABSONObj());
-
-        return std::make_unique<MyLogicalStage>();
-    }
-};
-
 class MyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
-        // Should fail due to registering the same StageDescriptor multiple times.
-        _registerStage<MyStageDescriptor>(portal);
-        _registerStage<MyStageDescriptor>(portal);
+        // Intentionally left blank.
     }
 };
 
-REGISTER_EXTENSION(MyExtension)
+// This test confirms the error code thrown by the macro when no valid version is found in the
+// versionedExtensions set. This is compared to the "major/minor_version_too_high/low" tests as
+// those don't use the macro and instead confirm the error code thrown by
+// assertVersionCompatibility.
+REGISTER_EXTENSION_WITH_VERSION(
+    MyExtension, (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1, 0, 0}))
 DEFINE_GET_EXTENSION()

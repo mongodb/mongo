@@ -117,6 +117,16 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
         ExtensionLoader::load(getExtensionPath("libduplicate_stage_descriptor_bad_extension.so")),
         AssertionException,
         10696402);
+
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libduplicate_version_bad_extension.so")),
+        AssertionException,
+        10930201);
+
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libno_compatible_version_bad_extension.so")),
+        AssertionException,
+        10930202);
 }
 
 // null_initialize_function_bad_extension has a null initialization function.
@@ -230,5 +240,30 @@ TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {
     ASSERT_TRUE(fooStage != nullptr && barStage != nullptr);
     ASSERT_EQUALS(std::string(fooStage->getSourceName()), "$foo");
     ASSERT_EQUALS(std::string(barStage->getSourceName()), "$bar");
+}
+
+TEST(LoadExtensionTest, LoadHighestCompatibleVersionSucceeds) {
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
+        getExtensionPath("libloadHighestCompatibleVersion_mongo_extension.so")));
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    std::vector<BSONObj> pipeline = {BSON("$extensionV3" << BSONObj())};
+    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+
+    auto extensionStage =
+        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+
+    ASSERT_TRUE(extensionStage != nullptr);
+    ASSERT_EQUALS(std::string(extensionStage->getSourceName()), "$extensionV3");
+
+    // Assert that the other extension versions registered aren't available.
+    pipeline = {BSON("$extensionV1" << BSONObj())};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+    pipeline = {BSON("$extensionV2" << BSONObj())};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+    pipeline = {BSON("$extensionV4" << BSONObj())};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
 }
 }  // namespace mongo::extension::host

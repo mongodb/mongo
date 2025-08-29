@@ -66,4 +66,5 @@ public:
     }
 };
 
-REGISTER_EXTENSION(FooExtension);
+REGISTER_EXTENSION(FooExtension)
+DEFINE_GET_EXTENSION()

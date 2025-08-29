@@ -46,3 +46,4 @@ public:
 };
 
 REGISTER_EXTENSION(MyExtension)
+DEFINE_GET_EXTENSION()

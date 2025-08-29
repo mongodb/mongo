@@ -28,9 +28,8 @@
  */
 
 
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/extension_helper.h"
-#include "mongo/db/extension/sdk/extension_status.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -48,29 +47,9 @@ public:
     }
 };
 
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtension** extension) {
-    // We expect to successfully set extension to extensionB. extensionA is not compatible with the
-    // most recent host version, but extensionB is.
-    return sdk::enterCXX([&] {
-        const ::MongoExtensionAPIVersion verA{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
-                                              MONGODB_EXTENSION_API_MINOR_VERSION,
-                                              MONGODB_EXTENSION_API_PATCH_VERSION};
-
-        const ::MongoExtensionAPIVersion verB = MONGODB_EXTENSION_API_VERSION;
-
-        if (sdk::isVersionCompatible(hostVersions, &verA)) {
-            static auto extA =
-                std::make_unique<sdk::ExtensionAdapter>(std::make_unique<ExtensionA>(), verA);
-            *extension = reinterpret_cast<const ::MongoExtension*>(extA.get());
-        } else if (sdk::isVersionCompatible(hostVersions, &verB)) {
-            static auto extB =
-                std::make_unique<sdk::ExtensionAdapter>(std::make_unique<ExtensionB>(), verB);
-            *extension = reinterpret_cast<const ::MongoExtension*>(extB.get());
-        } else {
-            *extension = nullptr;
-        }
-    });
-}
-}
+REGISTER_EXTENSION_WITH_VERSION(ExtensionA,
+                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
+                                                            MONGODB_EXTENSION_API_MINOR_VERSION,
+                                                            MONGODB_EXTENSION_API_PATCH_VERSION}))
+REGISTER_EXTENSION_WITH_VERSION(ExtensionB, (MONGODB_EXTENSION_API_VERSION))
+DEFINE_GET_EXTENSION()
