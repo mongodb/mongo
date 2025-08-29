@@ -34,13 +34,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/update/update_driver.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 
@@ -54,8 +53,7 @@ namespace mongo {
  * This is an internal stage that takes an oplog update description and applies the update to the
  * input Document.
  */
-class DocumentSourceInternalApplyOplogUpdate final : public DocumentSource,
-                                                     public exec::agg::Stage {
+class DocumentSourceInternalApplyOplogUpdate final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalApplyOplogUpdate"_sd;
     static constexpr StringData kOplogUpdateFieldName = "oplogUpdate"_sd;
@@ -106,12 +104,13 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceInternalApplyOplogUpdateGroupToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+        
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    GetNextResult doGetNext() override;
-
     BSONObj _oplogUpdate;
-    UpdateDriver _updateDriver;
 };
 
 }  // namespace mongo

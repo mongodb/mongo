@@ -79,20 +79,21 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldBeAbleToReParseSerializ
 TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldRejectNonObjectSpecs) {
     {
         auto spec = fromjson("{$_internalApplyOplogUpdate: 1}");
-
-        ASSERT_THROWS_CODE(DocumentSourceInternalApplyOplogUpdate::createFromBson(
-                               spec.firstElement(), getExpCtx()),
-                           DBException,
-                           6315901);
+        ASSERT_THROWS_CODE(
+            exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                spec.firstElement(), getExpCtx())),
+            DBException,
+            6315901);
     }
 
     {
         auto spec = fromjson("{$_internalApplyOplogUpdate: []}");
 
-        ASSERT_THROWS_CODE(DocumentSourceInternalApplyOplogUpdate::createFromBson(
-                               spec.firstElement(), getExpCtx()),
-                           DBException,
-                           6315901);
+        ASSERT_THROWS_CODE(
+            exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                spec.firstElement(), getExpCtx())),
+            DBException,
+            6315901);
     }
 }
 
@@ -101,48 +102,48 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldRejectMalformedSpecs) {
         R"({$_internalApplyOplogUpdate: {
                 oplogUpdate: {"$v": NumberInt(999999999), diff: {u: {b: 3}}}
            }})");
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
-        DBException,
-        4772600);
+    ASSERT_THROWS_CODE(exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                           spec.firstElement(), getExpCtx())),
+                       DBException,
+                       4772600);
 
     spec = fromjson(
         R"({$_internalApplyOplogUpdate: {
             oplogUpdate: {"$v": "2", diff: {u: {b: 3}}}
            }})");
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
-        DBException,
-        4772600);
+    ASSERT_THROWS_CODE(exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                           spec.firstElement(), getExpCtx())),
+                       DBException,
+                       4772600);
 
     spec = fromjson(R"({$_internalApplyOplogUpdate: {oplogUpdate: {"$v": NumberInt(2)}}})");
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
-        DBException,
-        4772601);
+    ASSERT_THROWS_CODE(exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                           spec.firstElement(), getExpCtx())),
+                       DBException,
+                       4772601);
 
     spec = fromjson("{$_internalApplyOplogUpdate: {}}");
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
-        DBException,
-        ErrorCodes::IDLFailedToParse);
+    ASSERT_THROWS_CODE(exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                           spec.firstElement(), getExpCtx())),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
 
     spec =
         fromjson(R"({$_internalApplyOplogUpdate: {foo: {"$v": NumberInt(2), diff: {u: {b: 3}}}}})");
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
-        DBException,
-        40415);
+    ASSERT_THROWS_CODE(exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                           spec.firstElement(), getExpCtx())),
+                       DBException,
+                       40415);
 
     spec = fromjson(
         R"({$_internalApplyOplogUpdate: {
                 oplogUpdate: {"$v": NumberInt(2), diff: {u: {b: 3}}},
                 foo: 1
            }})");
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
-        DBException,
-        40415);
+    ASSERT_THROWS_CODE(exec::agg::buildStage(DocumentSourceInternalApplyOplogUpdate::createFromBson(
+                           spec.firstElement(), getExpCtx())),
+                       DBException,
+                       40415);
 }
 
 TEST_F(DocumentSourceInternalApplyOplogUpdateTest, UpdateMultipleDocuments) {

@@ -889,9 +889,11 @@ idl_generator(
 mongo_cc_library(
     name = "document_source_internal_apply_oplog_update",
     srcs = [
+        "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.cpp",
         "document_source_internal_apply_oplog_update.cpp",
     ],
     hdrs = [
+        "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.h",
         "document_source_internal_apply_oplog_update.h",
     ],
     deps = [
