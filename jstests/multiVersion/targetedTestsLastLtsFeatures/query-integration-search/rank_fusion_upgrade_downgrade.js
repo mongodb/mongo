@@ -67,8 +67,11 @@ function assertRankFusionCompletelyRejected(primaryConn) {
     // Running $rankFusion against a view is rejected.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}),
-        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.OptionNotSupportedOnView]);
+        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}), [
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.OptionNotSupportedOnView,
+        ]);
 }
 
 function assertRankFusionCompletelyAccepted(primaryConn) {
