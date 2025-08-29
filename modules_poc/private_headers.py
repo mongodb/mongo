@@ -230,26 +230,35 @@ def main(
     )
     print("That does not necessarily mean that it is intended to be private.")
     print("A human should review to ensure that this matches intent.")
-    print()
 
-    pattern = path_to_regex(pattern)
-    all_paths_to_files = get_all_paths_to_files_passing_filter(pattern, module, team)
+    all_paths_to_files = get_all_paths_to_files_passing_filter(
+        path_to_regex(pattern) if pattern else None,
+        module,
+        team,
+    )
 
     # Get headers with external usage. This is faster than finding headers without external usage.
     headers_to_exclude = get_excluded_headers(all_paths_to_files)
+
+    print(
+        f"\nThe following {len(headers_to_exclude)} files contain external usages"
+        " and will not be modified:"
+    )
+    for file_path in sorted(headers_to_exclude):
+        print(f"  {file_path}")
 
     # Find files that can be marked as private by taking the difference between [all headers] and
     # [headers with external usages, headers with some visibility already marked].
     private_candidates = sorted(all_paths_to_files.keys() - headers_to_exclude)
 
-    print(f"Found {len(private_candidates)} files to mark as private:")
+    print(f"\nFound {len(private_candidates)} files to mark as private:")
 
     headers_modified = []
     idl_files_modified = []
 
     # Possibly modify files for #include or mod_visibility.
     for file_path in private_candidates:
-        print(f"  {file_path} - {mod_for_file(file_path)} - {teams_for_file(file_path)}")
+        print(f"  {file_path} - {mod_for_file(file_path)} - {', '.join(teams_for_file(file_path))}")
 
         if file_path.endswith(".idl"):
             if add_mod_visibility_to_idl(file_path, write_unless_dry):
