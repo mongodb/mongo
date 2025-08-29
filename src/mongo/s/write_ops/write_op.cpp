@@ -226,21 +226,17 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
     // there is more than one shard that owns chunks.
     WriteType writeType = [&] {
         if (isUpdate || isDelete) {
-            const bool isTimeseriesRetryableUpdateOp = targeter.isTrackedTimeSeriesNamespace() &&
-                isUpdate && opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() &&
-                !isRawDataOperation(opCtx);
-
             if (!isMultiWrite && isNonTargetedRetryableWriteWithId) {
                 return WriteType::WithoutShardKeyWithId;
             }
-            if (!isMultiWrite && useTwoPhaseWriteProtocol &&
-                (!isTimeseriesRetryableUpdateOp || multipleEndpoints)) {
+            if (!isMultiWrite && useTwoPhaseWriteProtocol) {
                 return WriteType::WithoutShardKeyOrId;
             }
             if (isMultiWrite && enableMultiWriteBlockingMigrations) {
                 return WriteType::MultiWriteBlockingMigrations;
             }
-            if (isTimeseriesRetryableUpdateOp) {
+            if (isUpdate && targeter.isTrackedTimeSeriesNamespace() && opCtx->isRetryableWrite() &&
+                !opCtx->inMultiDocumentTransaction() && !isRawDataOperation(opCtx)) {
                 return WriteType::TimeseriesRetryableUpdate;
             }
         }
