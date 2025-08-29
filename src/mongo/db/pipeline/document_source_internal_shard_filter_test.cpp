@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -154,16 +155,17 @@ TEST_F(DocumentSourceInternalShardFilterTest, FiltersDocuments) {
     auto mock = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
     const auto nToFilter = 2;
-    DocumentSourceInternalShardFilter filter(getExpCtx(),
-                                             std::make_unique<FirstNShardFilterer>(nToFilter));
-    filter.setSource(mock.get());
+    auto filterSource = make_intrusive<DocumentSourceInternalShardFilter>(
+        getExpCtx(), std::make_unique<FirstNShardFilterer>(nToFilter));
+    auto filterStage = exec::agg::buildStage(filterSource);
+    filterStage->setSource(mock.get());
 
     // The first two documents should get filtered out.
-    auto next = filter.getNext();
+    auto next = filterStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(3), next.getDocument().getField("a"));
 
-    ASSERT_TRUE(filter.getNext().isEOF());
+    ASSERT_TRUE(filterStage->getNext().isEOF());
 }
 
 /**
@@ -193,12 +195,13 @@ TEST_F(DocumentSourceInternalShardFilterTest, SkipDocumentsWithoutShardKey) {
     DocumentSourceContainer container;
     auto mock = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
-    DocumentSourceInternalShardFilter filter(getExpCtx(),
-                                             std::make_unique<ShardFiltererNoShardKey>());
-    filter.setSource(mock.get());
+    auto filterSource = make_intrusive<DocumentSourceInternalShardFilter>(
+        getExpCtx(), std::make_unique<ShardFiltererNoShardKey>());
+    auto filterStage = exec::agg::buildStage(filterSource);
+    filterStage->setSource(mock.get());
 
     // The call to getNext() return nothing.
-    ASSERT_TRUE(filter.getNext().isEOF());
+    ASSERT_TRUE(filterStage->getNext().isEOF());
 }
 
 }  // namespace

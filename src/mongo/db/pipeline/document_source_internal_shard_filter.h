@@ -57,12 +57,9 @@ namespace mongo {
  * Filters out documents which are physically present on this shard but not logically owned
  * according to this operation's shard version.
  */
-class DocumentSourceInternalShardFilter final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceInternalShardFilter final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalShardFilter"_sd;
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Examines the state of the OperationContext (attached to 'expCtx') to determine if this
@@ -125,9 +122,10 @@ public:
     }
 
 private:
-    GetNextResult doGetNext() override;
+    friend boost::intrusive_ptr<mongo::exec::agg::Stage> internalShardFilterToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
-    std::unique_ptr<ShardFilterer> _shardFilterer;
+    std::shared_ptr<ShardFilterer> _shardFilterer;
 };
 
 inline ExecShardFilterPolicy buildExecShardFilterPolicy(
