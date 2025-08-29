@@ -29,8 +29,28 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/stdx/unordered_set.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -42,7 +62,7 @@ namespace mongo {
  * which we create during desugaring or optimization. The order of results is guarenteed to be
  * sorted by name.
  */
-class DocumentSourceListMqlEntities final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceListMqlEntities final : public DocumentSource {
 public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:
@@ -81,8 +101,7 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceListMqlEntities(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  MqlEntityTypeEnum type,
-                                  const StringMap<ParserRegistration>& docSourceParserMap);
+                                  MqlEntityTypeEnum type);
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
     const char* getSourceName() const final;
@@ -92,6 +111,11 @@ public:
     Id getId() const override {
         return id;
     }
+
+    MqlEntityTypeEnum getType() const {
+        return _type;
+    }
+
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
@@ -99,10 +123,7 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    GetNextResult doGetNext() final;
-
     MqlEntityTypeEnum _type;
-    std::vector<std::string> _results;
 };
 
 }  // namespace mongo

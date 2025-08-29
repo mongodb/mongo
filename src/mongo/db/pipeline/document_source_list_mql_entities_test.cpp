@@ -29,10 +29,22 @@
 
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/list_mql_entities_stage.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_list_mql_entities_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -60,15 +72,18 @@ TEST_F(DocumentSourceListMqlEntitiesTest, ParserRejectsInvalid) {
 }
 
 TEST_F(DocumentSourceListMqlEntitiesTest, AggStages) {
+    // Verify that the order of result is sorted.
     StringMap<DocumentSource::ParserRegistration> availableDocSources = {
         {"docSource1", {}}, {"docSource3", {}}, {"docSource2", {}}};
-    DocumentSourceListMqlEntities ds(
-        getExpCtx(), MqlEntityTypeEnum::aggregationStages, availableDocSources);
-    // Verify that the order of result is sorted.
-    ASSERT_EQ("docSource1", ds.getNext().getDocument().getField("name").getString());
-    ASSERT_EQ("docSource2", ds.getNext().getDocument().getField("name").getString());
-    ASSERT_EQ("docSource3", ds.getNext().getDocument().getField("name").getString());
-    ASSERT(ds.getNext().isEOF());
+    auto stage =
+        exec::agg::ListMqlEntitiesStage::create_forTest(DocumentSourceListMqlEntities::kStageName,
+                                                        getExpCtx(),
+                                                        MqlEntityTypeEnum::aggregationStages,
+                                                        availableDocSources);
+    ASSERT_EQ("docSource1", stage->getNext().getDocument().getField("name").getString());
+    ASSERT_EQ("docSource2", stage->getNext().getDocument().getField("name").getString());
+    ASSERT_EQ("docSource3", stage->getNext().getDocument().getField("name").getString());
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceListMqlEntitiesTest, Serialize) {

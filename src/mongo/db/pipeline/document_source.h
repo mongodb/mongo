@@ -202,6 +202,10 @@ using DocumentSourceContainer = std::list<boost::intrusive_ptr<DocumentSource>>;
 
 class Pipeline;
 
+namespace exec::agg {
+class ListMqlEntitiesStage;
+}  // namespace exec::agg
+
 // TODO SPM-4106: Remove virtual keyword once the refactoring is done.
 class DocumentSource : public virtual RefCountable {
 public:
@@ -763,13 +767,20 @@ protected:
     static void unregisterParser_forTest(const std::string& name);
 
 private:
-    // Give access to 'parserMap' for the implementation of $listMqlEntities but hiding 'parserMap'
-    // from all other DocumentSource implementations.
-    friend class DocumentSourceListMqlEntities;
+    // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
+    // it from all other stages.
+    friend class exec::agg::ListMqlEntitiesStage;
 
     // Used to keep track of which DocumentSources are registered under which name. Initialized
     // during process initialization and const thereafter.
     static StringMap<ParserRegistration> parserMap;
+
+    /**
+     * Return the map of curently registered parsers.
+     */
+    static const StringMap<ParserRegistration>& getParserMap() {
+        return parserMap;
+    }
 
     /**
      * Create a Value that represents the document source.

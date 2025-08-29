@@ -29,8 +29,24 @@
 
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -56,23 +72,15 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListMqlEntities::createFromBs
             "$listMqlEntities must be run against the 'admin' database with {aggregate: 1}",
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());
     auto spec = ListMqlEntitiesSpec::parse(elem.embeddedObject(), IDLParserContext(kStageName));
-    return new DocumentSourceListMqlEntities(expCtx, spec.getEntityType(), parserMap);
+    return new DocumentSourceListMqlEntities(expCtx, spec.getEntityType());
 }
 
 DocumentSourceListMqlEntities::DocumentSourceListMqlEntities(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    MqlEntityTypeEnum type,
-    const StringMap<ParserRegistration>& docSourceParserMap)
-    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx), _type(type) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, MqlEntityTypeEnum type)
+    : DocumentSource(kStageName, expCtx), _type(type) {
     if (_type != MqlEntityTypeEnum::aggregationStages) {
         MONGO_UNIMPLEMENTED;
     }
-    for (auto&& [stageName, _] : docSourceParserMap) {
-        _results.push_back(stageName);
-    }
-    // Canonicalize output order of results. Sort in descending order so that we can use a cheap
-    // 'pop_back()' to return the results in order.
-    std::sort(_results.begin(), _results.end(), std::greater<>());
 }
 
 StageConstraints DocumentSourceListMqlEntities::constraints(PipelineSplitState pipeState) const {
@@ -105,16 +113,6 @@ Value DocumentSourceListMqlEntities::serialize(const SerializationOptions& opts)
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceListMqlEntities::distributedPlanLogic() {
     return boost::none;
-}
-
-DocumentSource::GetNextResult DocumentSourceListMqlEntities::doGetNext() {
-    if (_results.empty()) {
-        return GetNextResult::makeEOF();
-    }
-    auto res = Document(
-        BSON("name" << _results.back() << kEntityTypeFieldName << MqlEntityType_serializer(_type)));
-    _results.pop_back();
-    return res;
 }
 
 }  // namespace mongo
