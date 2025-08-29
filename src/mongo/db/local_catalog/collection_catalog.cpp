@@ -940,7 +940,7 @@ ConsistentCollection CollectionCatalog::establishConsistentCollection(
         return ConsistentCollection{opCtx, coll};
     }
 
-    auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
+    auto coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID).get();
     return ConsistentCollection{opCtx, coll};
 }
 
@@ -1236,7 +1236,8 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
         return nullptr;
     }
 
-    auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
+    auto latestCollection =
+        _lookupCollectionByUUIDNoFindInstantiated(*catalogEntry->metadata->options.uuid);
 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
@@ -1540,7 +1541,7 @@ std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByUUID(Operat
         return *instantiatedColl;
     }
 
-    return _lookupCollectionByUUID(uuid);
+    return _lookupCollectionByUUIDNoFindInstantiated(uuid);
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
@@ -1562,7 +1563,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
         return uncommittedPtr.get();
     }
 
-    std::shared_ptr<Collection> coll = _lookupCollectionByUUID(uuid);
+    std::shared_ptr<Collection> coll = _lookupCollectionByUUIDNoFindInstantiated(uuid);
 
     if (!coll)
         return nullptr;
@@ -1592,7 +1593,7 @@ const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* op
         return instantiatedColl->get();
     }
 
-    return _lookupCollectionByUUID(uuid).get();
+    return _lookupCollectionByUUIDNoFindInstantiated(uuid).get();
 }
 
 const Collection* CollectionCatalog::lookupCollectionByNamespaceOrUUID(
@@ -1604,9 +1605,25 @@ const Collection* CollectionCatalog::lookupCollectionByNamespaceOrUUID(
     return lookupCollectionByNamespace(opCtx, nssOrUUID.nss());
 }
 
-std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid) const {
+std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByNamespaceNoFindInstantiated(
+    const NamespaceString& nss) const {
+    const std::shared_ptr<Collection>* coll = _collections.find(nss);
+    return coll ? *coll : nullptr;
+}
+
+std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUIDNoFindInstantiated(
+    UUID uuid) const {
     const std::shared_ptr<Collection>* coll = _catalog.find(uuid);
     return coll ? *coll : nullptr;
+}
+
+std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByNamespaceOrUUIDNoFindInstantiated(
+    const NamespaceStringOrUUID& nssOrUUID) const {
+    if (nssOrUUID.isUUID()) {
+        return _lookupCollectionByUUIDNoFindInstantiated(nssOrUUID.uuid());
+    }
+
+    return _lookupCollectionByNamespaceNoFindInstantiated(nssOrUUID.nss());
 }
 
 std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByNamespace(
@@ -1616,8 +1633,7 @@ std::shared_ptr<const Collection> CollectionCatalog::_getCollectionByNamespace(
         return *instantiatedColl;
     }
 
-    const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
-    return collPtr ? *collPtr : nullptr;
+    return _lookupCollectionByNamespaceNoFindInstantiated(nss);
 }
 
 Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
@@ -1673,8 +1689,7 @@ const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContex
         return instantiatedColl->get();
     }
 
-    const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
-    return collPtr ? collPtr->get() : nullptr;
+    return _lookupCollectionByNamespaceNoFindInstantiated(nss).get();
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
@@ -1906,7 +1921,7 @@ CollectionCatalog::_findInstantiatedCollectionByNamespace(OperationContext* opCt
     auto [found, uncommittedColl, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, nss);
     if (uncommittedColl) {
-        return std::shared_ptr<const Collection>(uncommittedColl);
+        return std::shared_ptr<const Collection>(std::move(uncommittedColl));
     }
 
     // Report the drop or rename as nothing new was created.
@@ -1933,7 +1948,7 @@ CollectionCatalog::_findInstantiatedCollectionByUUID(OperationContext* opCtx,
     auto [found, uncommittedColl, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, uuid);
     if (uncommittedColl) {
-        return std::shared_ptr<const Collection>(uncommittedColl);
+        return std::shared_ptr<const Collection>(std::move(uncommittedColl));
     }
 
     // Report the drop or rename as nothing new was created.
@@ -1963,7 +1978,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid,
                                                      const CollectionInfoFn& predicate) const {
     invariant(predicate);
 
-    auto collection = _lookupCollectionByUUID(uuid);
+    auto collection = _lookupCollectionByUUIDNoFindInstantiated(uuid);
 
     if (!collection) {
         return false;

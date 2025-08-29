@@ -748,13 +748,25 @@ private:
         OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
+     * Looks up the Collection corresponding to the provided namespace or UUID in the catalog of
+     * committed/registered collections.
+     * Does not find previously instantiated collections for this snapshot in `OpenedCollections`
+     * or `UncommittedCatalogUpdates`. In particular, it will not return changes from the active
+     * `WriteUnitOfWork`, which are generally expected to be visible to users of the catalog.
+     * The caller is expected to have previously checked for those.
+     */
+    std::shared_ptr<Collection> _lookupCollectionByNamespaceNoFindInstantiated(
+        const NamespaceString& nss) const;
+    std::shared_ptr<Collection> _lookupCollectionByUUIDNoFindInstantiated(UUID uuid) const;
+    std::shared_ptr<Collection> _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(
+        const NamespaceStringOrUUID& nssOrUUID) const;
+
+    /**
      * Register the collection.
      */
     void _registerCollection(OperationContext* opCtx,
                              std::shared_ptr<Collection> collection,
                              boost::optional<Timestamp> commitTime);
-
-    std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
     const Collection* _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 

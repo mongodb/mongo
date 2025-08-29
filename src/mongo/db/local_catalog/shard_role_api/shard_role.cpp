@@ -1172,13 +1172,17 @@ ResolvedNamespaceOrViewAcquisitionRequests generateSortedAcquisitionRequests(
     for (const auto& ar : acquisitionRequests) {
         const auto resolvedBy =
             ar.nssOrUUID.isNamespaceString() ? ResolutionType::kNamespace : ResolutionType::kUUID;
-        auto coll = catalog.establishConsistentCollection(opCtx, ar.nssOrUUID, readTimestamp);
 
-        if (ar.nssOrUUID.isUUID()) {
-            validateResolvedCollectionByUUID(opCtx, ar, coll.get());
-        }
-
-        const auto& nss = ar.nssOrUUID.isNamespaceString() ? ar.nssOrUUID.nss() : coll->ns();
+        const auto& nss = [&] {
+            if (ar.nssOrUUID.isUUID()) {
+                auto coll =
+                    catalog.establishConsistentCollection(opCtx, ar.nssOrUUID, readTimestamp);
+                validateResolvedCollectionByUUID(opCtx, ar, coll.get());
+                return coll->ns();
+            } else {
+                return ar.nssOrUUID.nss();
+            }
+        }();
         const auto& prerequisiteUUID =
             ar.nssOrUUID.isUUID() ? ar.nssOrUUID.uuid() : ar.expectedUUID;
         AcquisitionPrerequisites prerequisites(nss,
