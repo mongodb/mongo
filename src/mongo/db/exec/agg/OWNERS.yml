@@ -32,6 +32,9 @@ filters:
   - "list_catalog_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "plan_cache_stats_stage*":
+    approvers:
+      - 10gen/query-optimization
   - "query_stats_stage*":
     approvers:
       - 10gen/query-integration-observability

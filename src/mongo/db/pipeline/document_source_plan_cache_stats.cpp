@@ -83,9 +83,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
 
 DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, bool allHosts)
-    : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
-      _allHosts(allHosts) {}
+    : DocumentSource(kStageName, expCtx), _allHosts(allHosts) {}
 
 void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
                                                     const SerializationOptions& opts) const {
@@ -119,50 +117,6 @@ DocumentSourceContainer::iterator DocumentSourcePlanCacheStats::doOptimizeAt(
 
     _absorbedMatch = subsequentMatch;
     return container->erase(itrToNext);
-}
-
-DocumentSource::GetNextResult DocumentSourcePlanCacheStats::doGetNext() {
-    if (!_haveRetrievedStats) {
-        const auto matchExpr = _absorbedMatch ? _absorbedMatch->getMatchExpression() : nullptr;
-        _results = pExpCtx->getMongoProcessInterface()->getMatchingPlanCacheEntryStats(
-            pExpCtx->getOperationContext(), pExpCtx->getNamespaceString(), matchExpr);
-
-        _resultsIter = _results.begin();
-        _haveRetrievedStats = true;
-    }
-
-    if (_resultsIter == _results.end()) {
-        return GetNextResult::makeEOF();
-    }
-
-    MutableDocument nextPlanCacheEntry{Document{*_resultsIter++}};
-
-    // Augment each plan cache entry with this node's host and port string.
-    if (_hostAndPort.empty()) {
-        _hostAndPort =
-            pExpCtx->getMongoProcessInterface()->getHostAndPort(pExpCtx->getOperationContext());
-        uassert(31386,
-                "Aggregation request specified 'fromRouter' but unable to retrieve host name "
-                "for $planCacheStats pipeline stage.",
-                !_hostAndPort.empty());
-    }
-    nextPlanCacheEntry.setField("host", Value{_hostAndPort});
-
-    // If we're returning results to mongos, then additionally augment each plan cache entry with
-    // the shard name, for the node from which we're collecting plan cache information.
-    if (pExpCtx->getFromRouter()) {
-        if (_shardName.empty()) {
-            _shardName =
-                pExpCtx->getMongoProcessInterface()->getShardName(pExpCtx->getOperationContext());
-            uassert(31385,
-                    "Aggregation request specified 'fromRouter' but unable to retrieve shard name "
-                    "for $planCacheStats pipeline stage.",
-                    !_shardName.empty());
-        }
-        nextPlanCacheEntry.setField("shard", Value{_shardName});
-    }
-
-    return nextPlanCacheEntry.freeze();
 }
 
 }  // namespace mongo

@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -41,7 +40,6 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -49,7 +47,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <memory>
 #include <set>
@@ -63,7 +60,7 @@
 
 namespace mongo {
 
-class DocumentSourcePlanCacheStats final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourcePlanCacheStats final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$planCacheStats"_sd;
 
@@ -152,10 +149,11 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourcePlanCacheStatsToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+
     DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  bool allHosts);
-
-    GetNextResult doGetNext() final;
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
         MONGO_UNREACHABLE_TASSERT(7484303);  // Should call serializeToArray instead.
@@ -164,24 +162,6 @@ private:
     // If true, requests plan cache stats from all data-bearing nodes, primary and secondary.
     // Otherwise, follows read preference.
     const bool _allHosts;
-
-    // If running through mongos in a sharded cluster, stores the shard name so that it can be
-    // appended to each plan cache entry document.
-    std::string _shardName;
-
-    // If running through mongos in a sharded cluster, stores the "host:port" string so that it can
-    // be appended to each plan cache entry document.
-    std::string _hostAndPort;
-
-    // The result set for this change is produced through the mongo process interface on the first
-    // call to getNext(), and then held by this data member.
-    std::vector<BSONObj> _results;
-
-    // Whether '_results' has been populated yet.
-    bool _haveRetrievedStats = false;
-
-    // Used to spool out '_results' as calls to getNext() are made.
-    std::vector<BSONObj>::iterator _resultsIter;
 
     // $planCacheStats can push a match down into the plan cache layer, in order to avoid copying
     // the entire contents of the cache.
