@@ -316,17 +316,20 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --excludeWithAnyTags=resource_intensive
+    # This set of tasks is not able to be reused on the all-feature-flags variant. Any changes
+    # here should be duplicated to
+    # enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only.
     tasks: &query-alias-task-list
-      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
-      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
+      - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
-      - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
+      - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks !.blocked_in_query_alias
-      - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_integration !.requires_large_host !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
+      - name: .assigned_to_jira_team_server_query_integration .requires_large_host !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags
         distros:
           - amazon2023-arm64-atlas-latest-large
       - name: burn_in_tests_gen
@@ -373,7 +376,6 @@ buildvariants:
     run_on:
       - amazon2023-arm64-atlas-latest-small
     expansions:
-      expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
       has_packages: false
       jstestfuzz_num_generated_files: 20
@@ -385,14 +387,32 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
         --excludeWithAnyTags=resource_intensive
-    # This set of tasks includes everything from the query-alias-task-list YAML anchor,
-    # along with the additional query_correctness_generated_test tasks (.query_correctness).
+    tasks: *query-alias-task-list
+
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only
+    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (all feature flags)"
+    tags: []
+    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    expansions:
+      <<: *amazon_linux2023_arm64_dynamic_expansions
+      has_packages: false
+      jstestfuzz_num_generated_files: 20
+      jstestfuzz_concurrent_num_files: 5
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=resource_intensive
+    # This set of tasks is duplicated from amazon_linux2023_arm64_static-classic-engine-query-patch-only.
     tasks:
-      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
       - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2023-arm64-atlas-latest-large
@@ -407,8 +427,6 @@ buildvariants:
             omit_generated_tasks: true
           - name: archive_dist_test
             variant: *amazon_linux2023_arm64_static_compile_variant_name
-      - name: .query_correctness
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter
       - name: check_feature_flag_tags
       - name: check_for_todos
       - name: test_api_version_compatibility
@@ -419,26 +437,24 @@ buildvariants:
       - name: noPassthroughWithMongod_gen
       - name: initial_sync_fuzzer_sanity_patch_gen
       - name: rollback_fuzzer_sanity_patch_gen
-
-  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only
-    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (all feature flags)"
-    tags: []
-    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
-    expansions:
-      expansions:
-      <<: *amazon_linux2023_arm64_dynamic_expansions
-      has_packages: false
-      jstestfuzz_num_generated_files: 20
-      jstestfuzz_concurrent_num_files: 5
-      target_resmoke_time: 30
-      max_sub_suites: 3
-      idle_timeout_factor: 1.5
-      exec_timeout_factor: 1.5
-      test_flags: >-
-        --runAllFeatureFlagTests
-        --excludeWithAnyTags=resource_intensive
-    tasks: *query-alias-task-list
+      - name: query_golden_cbr_automatic
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_heuristic_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_heuristic_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_sampling_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_sampling_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_sampling
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_histogram_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_histogram_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_histogram
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
     name: amazon_linux2023_arm64_static-unified-write-executor-query-patch-only
@@ -448,7 +464,6 @@ buildvariants:
     run_on:
       - amazon2023-arm64-atlas-latest-small
     expansions:
-      expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
       has_packages: false
       target_resmoke_time: 30
