@@ -89,7 +89,7 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
         assert.docEq({db: sDB.getName(), coll: coll.getName()}, change.ns);
         assert.eq(change.operationType, "insert");
 
-        // Needs to be removed here because of multiversion testing.
+        // Needs to be removed here because of multiversion differences between v8.2.0 and previous/following versions.
         delete change.collectionUUID;
         docsFoundInOrder.push(change);
     }

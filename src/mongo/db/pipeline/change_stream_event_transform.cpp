@@ -347,11 +347,21 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                     auto deltaDesc = change_stream_document_diff_parser::parseDiff(
                         diffObj.getDocument().toBson());
 
-                    updateDescription = Value(Document{
-                        {"updatedFields", std::move(deltaDesc.updatedFields)},
-                        {"removedFields", std::move(deltaDesc.removedFields)},
-                        {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
-                        {"disambiguatedPaths", Value(std::move(deltaDesc.disambiguatedPaths))}});
+                    // If the 'showExpandedEvents' flag is set, the update description will also
+                    // contain the 'disambiguatedPaths' sub-field. The field will not be emitted
+                    // otherwise.
+                    if (_changeStreamSpec.getShowExpandedEvents()) {
+                        updateDescription = Value(Document{
+                            {"updatedFields", std::move(deltaDesc.updatedFields)},
+                            {"removedFields", std::move(deltaDesc.removedFields)},
+                            {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
+                            {"disambiguatedPaths", std::move(deltaDesc.disambiguatedPaths)}});
+                    } else {
+                        updateDescription = Value(
+                            Document{{"updatedFields", std::move(deltaDesc.updatedFields)},
+                                     {"removedFields", std::move(deltaDesc.removedFields)},
+                                     {"truncatedArrays", std::move(deltaDesc.truncatedArrays)}});
+                    }
                 }
             } else if (!oplogVersion.missing() || id.missing()) {
                 // This is not a replacement op, and we did not see a valid update version number.
@@ -525,13 +535,15 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     doc.addField(DocumentSourceChangeStream::kOperationTypeField, Value(operationType));
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
-    // Commit timestamp for CRUD events in prepared transactions.
-    auto commitTimestamp = input[DocumentSourceChangeStream::kCommitTimestampField];
-    if (!commitTimestamp.missing()) {
-        doc.addField(DocumentSourceChangeStream::kCommitTimestampField, commitTimestamp);
+    if (_changeStreamSpec.getShowCommitTimestamp()) {
+        // Commit timestamp for CRUD events in prepared transactions.
+        auto commitTimestamp = input[DocumentSourceChangeStream::kCommitTimestampField];
+        if (!commitTimestamp.missing()) {
+            doc.addField(DocumentSourceChangeStream::kCommitTimestampField, commitTimestamp);
+        }
     }
 
-    if (!uuid.missing()) {
+    if (_changeStreamSpec.getShowExpandedEvents() && !uuid.missing()) {
         doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
     }
 
@@ -569,7 +581,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // The event may have a documentKey OR an operationDescription, but not both. We already
     // validated this while creating the resume token.
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
-    if (!operationDescription.missing()) {
+    if (_changeStreamSpec.getShowExpandedEvents() && !operationDescription.missing()) {
         doc.addField(DocumentSourceChangeStream::kOperationDescriptionField,
                      std::move(operationDescription));
     }
@@ -658,14 +670,17 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
             Document opDesc = copyDocExceptFields(oField, {"_id"_sd});
             operationDescription = Value(opDesc);
 
-            // Populate 'nsType' field with either "view" or "timeseries".
-            auto collectionType = determineCollectionType(oField, nss.dbName());
-            tassert(8814202,
+            if (_changeStreamSpec.getShowExpandedEvents()) {
+                // Populate 'nsType' field with either "view" or "timeseries".
+                auto collectionType = determineCollectionType(oField, nss.dbName());
+                tassert(
+                    8814202,
                     "'operationDescription.type' should always resolve to 'view' or 'timeseries' "
                     "for view creation event",
                     collectionType == CollectionType::kView ||
                         collectionType == CollectionType::kTimeseries);
-            nsType = Value(toString(collectionType));
+                nsType = Value(toString(collectionType));
+            }
             break;
         }
         case repl::OpTypeEnum::kUpdate: {

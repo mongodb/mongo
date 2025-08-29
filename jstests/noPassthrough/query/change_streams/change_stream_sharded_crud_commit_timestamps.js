@@ -107,7 +107,7 @@ assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {shard: -1}, 
 assert.commandWorked(st.s0.adminCommand({moveChunk: kNsName, find: {shard: 1}, to: st["shard1"].shardName}));
 
 // Create changestream on the target database.
-const cursor = db.watch([], {showExpandedEvents: true});
+const cursor = db.watch([], {showExpandedEvents: true, showCommitTimestamp: true});
 
 // Start session.
 const sessionOptions = {

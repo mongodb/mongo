@@ -197,6 +197,14 @@ structs:
                     expanded events and parameters that may not be part of the stable API.
                 query_shape: literal
 
+            showCommitTimestamp:
+                type: optionalBool
+                description:
+                    A flag indicating whether the commit timestamp should be emitted for
+                    DML events inside prepared transactions.
+                    This is an internal fields and should not be documented for public use.
+                query_shape: literal
+
             showRawUpdateDescription:
                 cpp_name: showRawUpdateDescription
                 type: optionalBool

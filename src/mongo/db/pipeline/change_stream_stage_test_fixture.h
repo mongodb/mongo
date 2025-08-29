@@ -154,7 +154,8 @@ public:
     Document makeExpectedUpdateEvent(Timestamp ts,
                                      const NamespaceString& nss,
                                      BSONObj documentKey,
-                                     Document updateDescription);
+                                     Document updateDescription,
+                                     bool expandedEvents = false);
 
     /**
      * Helper function to do a $v:2 delta oplog test.

@@ -315,7 +315,8 @@ std::vector<Document> ChangeStreamStageTest::getApplyOpsResults(
 Document ChangeStreamStageTest::makeExpectedUpdateEvent(Timestamp ts,
                                                         const NamespaceString& nss,
                                                         BSONObj documentKey,
-                                                        Document updateDescription) {
+                                                        Document updateDescription,
+                                                        bool expandedEvents) {
     return Document{
         {DocumentSourceChangeStream::kIdField,
          change_stream_test_helper::makeResumeToken(ts,
@@ -326,7 +327,7 @@ Document ChangeStreamStageTest::makeExpectedUpdateEvent(Timestamp ts,
          DocumentSourceChangeStream::kUpdateOpType},
         {DocumentSourceChangeStream::kClusterTimeField, ts},
         {DocumentSourceChangeStream::kCollectionUuidField,
-         Value{change_stream_test_helper::testUuid()}},
+         expandedEvents ? Value{change_stream_test_helper::testUuid()} : Value{}},
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kNamespaceField,
          Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},

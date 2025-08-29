@@ -59,7 +59,7 @@ function verifyOnWholeCluster(
 ) {
     verifyChangeStreamOnWholeCluster({
         st,
-        changeStreamSpec: {resumeAfter: resumeAfterToken, showExpandedEvents: true},
+        changeStreamSpec: {resumeAfter: resumeAfterToken},
         userMatchExpr,
         expectedResult,
         expectedOplogNReturnedPerShard: Array.isArray(expectedOplogRetDocsForEachShard)
@@ -100,7 +100,6 @@ const updateDesc = {
     updatedFields: {},
     removedFields: ["z"],
     truncatedArrays: [],
-    disambiguatedPaths: {},
 };
 
 // Test out a predicate on the full 'updateDescription' field.

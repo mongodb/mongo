@@ -94,7 +94,7 @@ function runTest(conn) {
     session3.startTransaction({readConcern: {level: "majority"}});
 
     // Open a change stream on the test collection.
-    const changeStreamCursor = coll.watch([], {showExpandedEvents: true});
+    const changeStreamCursor = coll.watch([], {showExpandedEvents: true, showCommitTimestamp: true});
     const resumeToken = changeStreamCursor.getResumeToken();
 
     // Insert a document and confirm that the change stream has it.

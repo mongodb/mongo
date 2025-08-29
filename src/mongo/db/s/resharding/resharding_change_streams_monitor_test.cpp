@@ -1189,6 +1189,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
     ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
     ASSERT_FALSE(donorChangeStreamSpec.getAllowToRunOnSystemNS());
     ASSERT_FALSE(donorChangeStreamSpec.getShowExpandedEvents());
+    ASSERT_TRUE(donorChangeStreamSpec.getShowCommitTimestamp());
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDonorTimeseries) {
@@ -1216,6 +1217,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
     ASSERT_TRUE(donorChangeStreamSpec.getShowSystemEvents());
     ASSERT_TRUE(donorChangeStreamSpec.getAllowToRunOnSystemNS());
     ASSERT_FALSE(donorChangeStreamSpec.getShowExpandedEvents());
+    ASSERT_TRUE(donorChangeStreamSpec.getShowCommitTimestamp());
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForRecipient) {
@@ -1239,6 +1241,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForRec
     ASSERT_FALSE(recipientChangeStreamSpec.getShowSystemEvents());
     ASSERT_TRUE(recipientChangeStreamSpec.getAllowToRunOnSystemNS());
     ASSERT_FALSE(recipientChangeStreamSpec.getShowExpandedEvents());
+    ASSERT_TRUE(recipientChangeStreamSpec.getShowCommitTimestamp());
 }
 
 }  // namespace
