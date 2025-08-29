@@ -63,6 +63,11 @@ bool shouldSkipDirectShardOpChecks(OperationContext* opCtx, const NamespaceStrin
     if (OperationShardingState::get(opCtx).shouldSkipDirectConnectionChecks()) {
         return true;
     }
+    // Skip direct shard connections checks when the corresponding server parameter is set. This
+    // parameter should be active in rare cases, like restoring a sharded cluster as a replica set.
+    if (disableDirectShardDDLOperations.load()) {
+        return true;
+    }
     // Skip direct shard connection checks when the sharding state is disabled, this prevents
     // blocking direct operations on replica sets.
     if (!ShardingState::get(opCtx)->enabled()) {
