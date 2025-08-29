@@ -11,19 +11,17 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 import {getQueryPlanners} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
-// Flag which tracks if we run this test using the two-cluster fixture.
-const isMultiShardedClusterFixture = TestData.isMultiShardedClusterFixture || false;
-
 /**
- * Because the _defaultSession is shared, spawning two mongo shells with the same app name uses a
- * cached ReplicaSetMonitor, which leads to only using the mongod's from the first cluster.
+ * We need to set secondary ok in order to propagate commands on secondary nodes.
  */
 const connectFn = (host) => {
     const conn = new Mongo(host, undefined, {gRPC: false});
-    conn._defaultSession = new _DummyDriverSession(conn);
     conn.setSecondaryOk();
     return conn;
 };
+
+// Flag which tracks if we run this test using the two-cluster fixture.
+const isMultiShardedClusterFixture = TestData.isMultiShardedClusterFixture || false;
 
 // Because the topology doesn't change throughout the run of a test, we can cache all the connection
 // and re-use them to not overload the server with new connections.
@@ -33,8 +31,12 @@ function getTopologyConnections(conn) {
     if (!topologyCache.allConnections) {
         jsTest.log.debug(`Discovering topology...`);
         topologyCache.allConnections = getAllMongosConnections(conn)
-            .flatMap((connection) => DiscoverTopology.findNonConfigNodes(connection, {connectFn}))
-            .map((host) => connectFn(host));
+            .flatMap((connection) => DiscoverTopology.findNonConfigNodes(connection))
+            .map(connectFn);
+        // Assert that all hosts are different.
+        const setOfHosts = new Set(topologyCache.allConnections.map((el) => el.toString()));
+        assert.eq(setOfHosts.size, topologyCache.allConnections.length);
+        jsTest.log.debug("List vs set topology...", {setOfHosts, list: topologyCache.allConnections});
     }
     return topologyCache.allConnections;
 }

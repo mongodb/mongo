@@ -18,9 +18,6 @@ from buildscripts.resmokelib.utils.sharded_cluster_util import (
 class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a sharded cluster to run against."""
 
-    _CONFIGSVR_REPLSET_NAME = "config-rs"
-    _SHARD_REPLSET_NAME_PREFIX = "shard-rs"
-
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
     def __init__(
@@ -49,6 +46,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         load_all_extensions=False,
         set_cluster_parameter=None,
         inject_catalog_metadata=None,
+        shard_replset_name_prefix = "shard-rs",
+        configsvr_replset_name = "config-rs",
     ):
         """
         Initialize ShardedClusterFixture with different options for the cluster processes.
@@ -98,6 +97,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.replica_endpoint_mode = replica_set_endpoint
         self.set_cluster_parameter = set_cluster_parameter
         self.inject_catalog_metadata = inject_catalog_metadata
+        self.configsvr_replset_name = configsvr_replset_name
+        self.shard_replset_name_prefix = shard_replset_name_prefix
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -517,7 +518,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         )
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
-        mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
+        mongod_options["replSet"] = self.configsvr_replset_name
         mongod_options["storageEngine"] = "wiredTiger"
 
         return {
@@ -563,7 +564,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         )
         mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
-        mongod_options["replSet"] = self._SHARD_REPLSET_NAME_PREFIX + str(index)
+        mongod_options["replSet"] = self.shard_replset_name_prefix + str(index)
 
         if self.config_shard == index:
             del mongod_options["shardsvr"]

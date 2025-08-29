@@ -5,7 +5,7 @@
  *   assumes_superuser_permissions,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,
- *   requires_fcv_82,
+ *   requires_fcv_83,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
  *   # This test relies on query commands returning specific batch-sized responses.
