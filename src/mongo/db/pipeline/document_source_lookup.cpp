@@ -1102,7 +1102,8 @@ bool DocumentSourceLookUp::usedDisk() const {
 void DocumentSourceLookUp::doDispose() {
     if (_execPipeline) {
         _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-        _execPipeline->dispose(pExpCtx->getOperationContext());
+        _execPipeline->reattachToOperationContext(pExpCtx->getOperationContext());
+        _execPipeline->dispose();
         _execPipeline.reset();
     }
     if (_pipeline) {
@@ -1148,7 +1149,8 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         // side of the lookup) is done.
         if (_execPipeline) {
             _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-            _execPipeline->dispose(pExpCtx->getOperationContext());
+            _execPipeline->reattachToOperationContext(pExpCtx->getOperationContext());
+            _execPipeline->dispose();
         }
 
         auto nextInput = pSource->getNext();

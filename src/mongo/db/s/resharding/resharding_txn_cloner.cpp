@@ -278,7 +278,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    if (!chainCtx->donorRecord) {
                        auto opCtx = factory.makeOperationContext(&cc());
                        ScopeGuard guard([&] {
-                           chainCtx->execPipeline->dispose(opCtx.get());
+                           chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
+                           chainCtx->execPipeline->dispose();
                            chainCtx->pipeline.reset();
                            chainCtx->execPipeline.reset();
                        });
@@ -330,7 +331,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
         .until<Status>([chainCtx, factory](const Status& status) {
             if (!status.isOK() && chainCtx->pipeline) {
                 auto opCtx = factory.makeOperationContext(&cc());
-                chainCtx->execPipeline->dispose(opCtx.get());
+                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
+                chainCtx->execPipeline->dispose();
                 chainCtx->pipeline.reset();
                 chainCtx->execPipeline.reset();
             }
@@ -356,7 +358,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                 AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();
 
-                chainCtx->execPipeline->dispose(opCtx.get());
+                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
+                chainCtx->execPipeline->dispose();
                 chainCtx->pipeline.reset();
                 chainCtx->execPipeline.reset();
             }

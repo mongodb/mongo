@@ -47,7 +47,9 @@ Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionConte
 
 Pipeline::~Pipeline() {
     if (_disposeInDestructor) {
-        dispose(expCtx->getOperationContext());
+        // 'dispose()' performs the actual disposal only once, so it is safe to call it again from
+        // here.
+        dispose();
     }
     tassert(10617100, "expecting the pipeline to be disposed at destruction", _disposed);
 }
@@ -134,12 +136,12 @@ bool Pipeline::usedDisk() const {
         _stages.begin(), _stages.end(), [](const auto& stage) { return stage->usedDisk(); });
 }
 
-void Pipeline::dispose(OperationContext* opCtx) {
+void Pipeline::dispose() {
     if (_disposed) {
+        // Avoid double-disposal of the same pipeline.
         return;
     }
     try {
-        expCtx->setOperationContext(opCtx);
         _stages.back()->dispose();
         _disposed = true;
     } catch (...) {

@@ -43,7 +43,7 @@ using GetNextResult = mongo::exec::agg::GetNextResult;
 
 class FakeStage : public Stage {
 public:
-    FakeStage() : Stage("$fake", make_intrusive<ExpressionContextForTest>()) {}
+    FakeStage(const boost::intrusive_ptr<ExpressionContext>& expCtx) : Stage("$fake", expCtx) {}
 
     GetNextResult doGetNext() final {
         return GetNextResult::makeEOF();
@@ -55,25 +55,29 @@ public:
 };
 
 TEST(PipelineTest, OneStagePipeline) {
-    StageContainer stages{make_intrusive<FakeStage>()};
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    StageContainer stages{make_intrusive<FakeStage>(expCtx)};
 
     // Assert that the source stage is initially set to nullptr.
     ASSERT_EQ(nullptr, dynamic_cast<FakeStage*>(stages.back().get())->getSource());
 
-    Pipeline pl(std::move(stages), make_intrusive<ExpressionContextForTest>());
+    Pipeline pl(std::move(stages), expCtx);
 
     // Assert that the source stage is still set to nullptr.
     ASSERT_EQ(nullptr, dynamic_cast<FakeStage*>(pl.getStages().back().get())->getSource());
 }
 
 TEST(PipelineTest, ThreeStagePipeline) {
-    auto stage0 = make_intrusive<FakeStage>();
-    auto stage1 = make_intrusive<FakeStage>();
-    auto stage2 = make_intrusive<FakeStage>();
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    auto stage0 = make_intrusive<FakeStage>(expCtx);
+    auto stage1 = make_intrusive<FakeStage>(expCtx);
+    auto stage2 = make_intrusive<FakeStage>(expCtx);
 
     StageContainer stages{stage0, stage1, stage2};
 
-    Pipeline pl(std::move(stages), make_intrusive<ExpressionContextForTest>());
+    Pipeline pl(std::move(stages), expCtx);
 
     // Assert that the stage order does not change.
     ASSERT_EQ(stage0.get(), pl.getStages()[0].get());

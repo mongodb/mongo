@@ -68,8 +68,7 @@ StatusWith<ClusterQueryResult> RouterStagePipeline::next() {
 
     // If we reach this point, we have hit EOF.
     if (!_mergePipeline->getContext()->isTailableAwaitData()) {
-        _mergeExecPipeline->dismissDisposal();
-        _mergeExecPipeline->dispose(getOpCtx());
+        _mergeExecPipeline->dispose();
     }
 
     return {ClusterQueryResult()};
@@ -86,8 +85,8 @@ void RouterStagePipeline::doDetachFromOperationContext() {
 }
 
 void RouterStagePipeline::kill(OperationContext* opCtx) {
-    _mergeExecPipeline->dismissDisposal();
-    _mergeExecPipeline->dispose(opCtx);
+    _mergeExecPipeline->reattachToOperationContext(opCtx);
+    _mergeExecPipeline->dispose();
 }
 
 std::size_t RouterStagePipeline::getNumRemotes() const {

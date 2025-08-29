@@ -192,6 +192,9 @@ public:
      *
      * This is a non-virtual public interface to ensure dispose() is threaded through the entire
      * pipeline. Subclasses should override doDispose() to implement their disposal.
+     *
+     * The pipeline and its constituent stages should be attached to a valid 'OperationContext'
+     * pointer when calling this method.
      */
     void dispose() {
         doDispose();

@@ -221,7 +221,8 @@ void UnionWithStage::doDispose() {
     // will be disposed in '~UnionWithSharedState()'.
     if (!pExpCtx->getExplain()) {
         if (_sharedState->_execPipeline) {
-            _sharedState->_execPipeline->dispose(pExpCtx->getOperationContext());
+            _sharedState->_execPipeline->reattachToOperationContext(pExpCtx->getOperationContext());
+            _sharedState->_execPipeline->dispose();
         }
         _sharedState->_pipeline.reset();
         _sharedState->_execPipeline.reset();

@@ -114,8 +114,7 @@ bool FacetStage::usedDisk() const {
 
 void FacetStage::doDispose() {
     for (auto&& facet : _facets) {
-        facet.execPipeline->dismissDisposal();
-        facet.execPipeline->dispose(pExpCtx->getOperationContext());
+        facet.execPipeline->dispose();
     }
 }
 

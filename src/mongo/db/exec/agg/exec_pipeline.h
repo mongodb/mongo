@@ -123,10 +123,10 @@ public:
      *    automatically call 'dispose()' before deleting the Pipeline, and the owner does not need
      * to call 'dispose()'.
      *  - This Pipeline may use multiple OperationContexts over its lifetime. In this case it is the
-     *    owner's responsibility to call 'dispose()' with a valid OperationContext before deleting
-     * the Pipeline.
+     *    owner's responsibility to call 'dispose()' with a valid OperationContext being installed
+     *    before deleting the Pipeline.
      */
-    void dispose(OperationContext* opCtx);
+    void dispose();
 
     bool isDisposed() const {
         return _disposed;

@@ -106,10 +106,10 @@ void SetVariableFromSubPipelineStage::doDispose() {
     if (_subPipeline && !_sharedState->_subExecPipeline) {
         // Create an execution pipeline to make sure the resources are correctly disposed.
         _sharedState->_subExecPipeline = exec::agg::buildPipeline(_subPipeline->freeze());
+        _sharedState->_subExecPipeline->reattachToOperationContext(pExpCtx->getOperationContext());
     }
     if (_sharedState->_subExecPipeline) {
-        _sharedState->_subExecPipeline->dismissDisposal();
-        _sharedState->_subExecPipeline->dispose(pExpCtx->getOperationContext());
+        _sharedState->_subExecPipeline->dispose();
         _sharedState->_subExecPipeline.reset();
     }
     _subPipeline.reset();

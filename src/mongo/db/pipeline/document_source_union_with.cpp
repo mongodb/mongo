@@ -191,7 +191,9 @@ DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     // dispose it here.
     if (getExpCtx()->getExplain()) {
         if (_sharedState->_execPipeline) {
-            _sharedState->_execPipeline->dispose(getExpCtx()->getOperationContext());
+            _sharedState->_execPipeline->reattachToOperationContext(
+                getExpCtx()->getOperationContext());
+            _sharedState->_execPipeline->dispose();
         }
     }
 }

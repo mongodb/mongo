@@ -446,10 +446,12 @@ void Exchange::dispose(OperationContext* opCtx, size_t consumerId) {
     // throwing thread will do the dispose.
     if (!_errorInLoadNextBatch.isOK()) {
         if (_loadingThreadId == consumerId) {
-            _execPipeline->dispose(opCtx);
+            _execPipeline->reattachToOperationContext(opCtx);
+            _execPipeline->dispose();
         }
     } else if (_disposeRunDown == getConsumers()) {
-        _execPipeline->dispose(opCtx);
+        _execPipeline->reattachToOperationContext(opCtx);
+        _execPipeline->dispose();
     }
 
     _consumers[consumerId]->dispose();

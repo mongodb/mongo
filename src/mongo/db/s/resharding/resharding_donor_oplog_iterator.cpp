@@ -218,7 +218,8 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 
 void ReshardingDonorOplogIterator::dispose(OperationContext* opCtx) {
     if (_pipeline) {
-        _execPipeline->dispose(opCtx);
+        _execPipeline->reattachToOperationContext(opCtx);
+        _execPipeline->dispose();
         _pipeline.reset();
         _execPipeline.reset();
     }

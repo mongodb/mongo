@@ -141,7 +141,8 @@ public:
     }
 
     void dispose(OperationContext* opCtx) override {
-        _execPipeline->dispose(opCtx);
+        _execPipeline->reattachToOperationContext(opCtx);
+        _execPipeline->dispose();
     }
 
     void forceSpill(PlanYieldPolicy* yieldPolicy) override {
