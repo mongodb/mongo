@@ -11,15 +11,19 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const kDBName = "test";
 const kSourceCollName = "out_max_time_ms_source";
 const kDestCollName = "out_max_time_ms_dest";
-// Picked `1000` documents to force the `$out` stage to write several batches.
+
 const nDocs = 1000;
+
+// Add padding to ensure that we can't insert everything in a single batch.
+const paddingSize = Math.ceil((20 * 1024 * 1024) / nDocs);
+const padding = "X".repeat(paddingSize);
 
 /**
  * Helper for populating the collection.
  */
 function insertDocs(coll) {
     for (let i = 0; i < nDocs; i++) {
-        assert.commandWorked(coll.insert({_id: i}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(coll.insert({_id: i, padding: padding}, {writeConcern: {w: "majority"}}));
     }
 }
 
@@ -68,24 +72,22 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(failPointName, conn, fai
     /* eslint-disable */
     const runAggregate = function () {
         const pipeline = [{$out: destColl.getName()}];
-        const err = assert.throws(() =>
-            sourceColl.aggregate(pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}),
+        assert.throwsWithCode(
+            () => sourceColl.aggregate(pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}),
+            [ErrorCodes.MaxTimeMSExpired],
         );
-        assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
     /* eslint-enable */
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 
-    waitForCurOpByFailPointNoNS(failPointConn.getDB("admin"), failPointName);
+    waitForCurOpByFailPointNoNS(failPointConn.getDB("admin"), failPointName, {
+        microsecs_running: {$gt: maxTimeMS * 1100},
+    });
 
     assert.commandWorked(
         maxTimeMsConn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
     );
-
-    // The aggregation running in the parallel shell will hang on the failpoint, burning
-    // its time. Wait until the maxTimeMS has definitely expired.
-    sleep(maxTimeMS + 2000);
 
     // Now drop the failpoint, allowing the aggregation to proceed. It should hit an
     // interrupt check and terminate immediately.
@@ -148,7 +150,7 @@ function runUnshardedTest(conn, primaryConn, maxTimeMsConn) {
     replTest.awaitReplication();
     const primary = replTest.getPrimary();
     const secondary = replTest.getSecondary();
-    connsToAllNodes = [primary, secondary];
+    connsToAllNodes = replTest.nodes;
     insertDocs(primary.getDB(kDBName)[kSourceCollName]);
     // Run the $out on the primary and test that the maxTimeMS times out on the primary.
     runUnshardedTest(primary, primary, primary);
