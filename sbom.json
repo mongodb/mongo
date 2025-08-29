@@ -915,6 +915,49 @@
       "scope": "required"
     },
     {
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "name": "googletest",
+      "version": "1.17.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:github/googletest/googletest@v1.17.0",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Disaggregated Storage"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/google/googletest"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/googletest_restricted_for_disagg_only/scripts/import.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "e57f94bd-b0b1-4e47-912e-c690a01e4f95",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/googletest_restricted_for_disagg_only"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
       "type": "library",
       "bom-ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
       "supplier": {

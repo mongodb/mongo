@@ -127,24 +127,62 @@ Timestamp getMedianAppliedTimestamp(const std::vector<repl::MemberData>& sortedM
     const int sustainerIdx = sortedMemberData.size() / 2;
     return sortedMemberData[sustainerIdx].getLastAppliedOpTime().getTimestamp();
 }
+}  // namespace
+
+namespace flow_control_details {
+ReplicationTimestampProvider::ReplicationTimestampProvider(repl::ReplicationCoordinator* replCoord)
+    : _replCoord(replCoord) {}
+
+Timestamp ReplicationTimestampProvider::getCurrSustainerTimestamp() const {
+    return getMedianAppliedTimestamp(_currMemberData);
+}
+
+Timestamp ReplicationTimestampProvider::getPrevSustainerTimestamp() const {
+    return getMedianAppliedTimestamp(_prevMemberData);
+}
+
+repl::TimestampAndWallTime ReplicationTimestampProvider::getTargetTimestampAndWallTime() const {
+    auto time = _replCoord->getLastCommittedOpTimeAndWallTime();
+    return {.timestamp = time.opTime.getTimestamp(), .wallTime = time.wallTime};
+}
+
+repl::TimestampAndWallTime ReplicationTimestampProvider::getLastWriteTimestampAndWallTime() const {
+    auto time = _replCoord->getMyLastAppliedOpTimeAndWallTime();
+    return {.timestamp = time.opTime.getTimestamp(), .wallTime = time.wallTime};
+}
+
+void ReplicationTimestampProvider::update() {
+    _prevMemberData = _currMemberData;
+    _currMemberData = _replCoord->getMemberData();
+
+    // Sort MemberData with the 0th index being the node with the lowest applied optime.
+    std::sort(_currMemberData.begin(),
+              _currMemberData.end(),
+              [](const repl::MemberData& left, const repl::MemberData& right) -> bool {
+                  return left.getLastAppliedOpTime() < right.getLastAppliedOpTime();
+              });
+}
+
+bool ReplicationTimestampProvider::flowControlUsable() const {
+    return _replCoord->canAcceptNonLocalWrites();
+}
 
 /**
  * Sanity checks whether the successive queries of topology data are comparable for doing a flow
  * control calculation. In particular, the number of members must be the same and the median
  * applier's timestamp must not go backwards.
  */
-bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
-                       const std::vector<repl::MemberData>& currMemberData) {
-    if (currMemberData.size() == 0 || currMemberData.size() != prevMemberData.size()) {
+bool ReplicationTimestampProvider::sustainerAdvanced() const {
+    if (_currMemberData.size() == 0 || _currMemberData.size() != _prevMemberData.size()) {
         LOGV2_WARNING(22223,
                       "Flow control detected a change in topology",
-                      "prevSize"_attr = prevMemberData.size(),
-                      "currSize"_attr = currMemberData.size());
+                      "prevSize"_attr = _prevMemberData.size(),
+                      "currSize"_attr = _currMemberData.size());
         return false;
     }
 
-    auto currSustainerAppliedTs = getMedianAppliedTimestamp(currMemberData);
-    auto prevSustainerAppliedTs = getMedianAppliedTimestamp(prevMemberData);
+    auto currSustainerAppliedTs = getMedianAppliedTimestamp(_currMemberData);
+    auto prevSustainerAppliedTs = getMedianAppliedTimestamp(_prevMemberData);
 
     if (currSustainerAppliedTs < prevSustainerAppliedTs) {
         LOGV2_WARNING(22224,
@@ -156,13 +194,42 @@ bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
 
     return true;
 }
-}  // namespace
+
+void ReplicationTimestampProvider::setCurrMemberData_forTest(
+    const std::vector<repl::MemberData>& memberData) {
+    _currMemberData = memberData;
+    std::sort(_currMemberData.begin(),
+              _currMemberData.end(),
+              [](const repl::MemberData& left, const repl::MemberData& right) -> bool {
+                  return left.getLastAppliedOpTime() < right.getLastAppliedOpTime();
+              });
+}
+
+void ReplicationTimestampProvider::setPrevMemberData_forTest(
+    const std::vector<repl::MemberData>& memberData) {
+    _prevMemberData = memberData;
+    std::sort(_prevMemberData.begin(),
+              _prevMemberData.end(),
+              [](const repl::MemberData& left, const repl::MemberData& right) -> bool {
+                  return left.getLastAppliedOpTime() < right.getLastAppliedOpTime();
+              });
+}
+
+}  // namespace flow_control_details
 
 FlowControl::FlowControl(repl::ReplicationCoordinator* replCoord)
-    : _replCoord(replCoord), _lastTimeSustainerAdvanced(Date_t::now()) {}
+    : _timestampProvider(
+          std::make_unique<flow_control_details::ReplicationTimestampProvider>(replCoord)),
+      _lastTimeSustainerAdvanced(Date_t::now()) {}
 
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
-    : _replCoord(replCoord), _lastTimeSustainerAdvanced(Date_t::now()) {
+    : FlowControl(service,
+                  std::make_unique<flow_control_details::ReplicationTimestampProvider>(replCoord)) {
+}
+
+FlowControl::FlowControl(ServiceContext* service,
+                         std::unique_ptr<TimestampProvider> timestampProvider)
+    : _timestampProvider(std::move(timestampProvider)), _lastTimeSustainerAdvanced(Date_t::now()) {
     // Initialize _lastTargetTicketsPermitted to maximum tickets to make sure flow control doesn't
     // cause a slow start on start up.
     FlowControlTicketholder::set(service, std::make_unique<FlowControlTicketholder>(kMaxTickets));
@@ -254,44 +321,26 @@ void FlowControl::disableUntil(Date_t deadline) {
     _disableUntil.store(deadline);
 }
 
-/**
- * Advance the `_*MemberData` fields and sort the new data by the element's last applied optime.
- */
-void FlowControl::_updateTopologyData() {
-    _prevMemberData = _currMemberData;
-    _currMemberData = _replCoord->getMemberData();
-
-    // Sort MemberData with the 0th index being the node with the lowest applied optime.
-    std::sort(_currMemberData.begin(),
-              _currMemberData.end(),
-              [](const repl::MemberData& left, const repl::MemberData& right) -> bool {
-                  return left.getLastAppliedOpTime() < right.getLastAppliedOpTime();
-              });
-}
-
-int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>& prevMemberData,
-                                            const std::vector<repl::MemberData>& currMemberData,
+int FlowControl::_calculateNewTicketsForLag(const Timestamp& prevSustainerTimestamp,
+                                            const Timestamp& currSustainerTimestamp,
                                             std::int64_t locksUsedLastPeriod,
                                             double locksPerOp,
                                             std::uint64_t lagMillis,
                                             std::uint64_t thresholdLagMillis) {
+    invariant(prevSustainerTimestamp <= currSustainerTimestamp,
+              fmt::format("PrevSustainer: {} CurrSustainer: {}",
+                          prevSustainerTimestamp.toString(),
+                          currSustainerTimestamp.toString()));
     invariant(lagMillis >= thresholdLagMillis);
 
-    const auto currSustainerAppliedTs = getMedianAppliedTimestamp(currMemberData);
-    const auto prevSustainerAppliedTs = getMedianAppliedTimestamp(prevMemberData);
-    invariant(prevSustainerAppliedTs <= currSustainerAppliedTs,
-              fmt::format("PrevSustainer: {} CurrSustainer: {}",
-                          prevSustainerAppliedTs.toString(),
-                          currSustainerAppliedTs.toString()));
-
     const std::int64_t sustainerAppliedCount =
-        _approximateOpsBetween(prevSustainerAppliedTs, currSustainerAppliedTs);
+        _approximateOpsBetween(prevSustainerTimestamp, currSustainerTimestamp);
     LOGV2_DEBUG(22218,
                 DEBUG_LOG_LEVEL,
-                " PrevApplied: {prevSustainerAppliedTs} CurrApplied: {currSustainerAppliedTs} "
+                " PrevApplied: {prevSustainerTimestamp} CurrApplied: {currSustainerTimestamp} "
                 "NumSustainerApplied: {sustainerAppliedCount}",
-                "prevSustainerAppliedTs"_attr = prevSustainerAppliedTs,
-                "currSustainerAppliedTs"_attr = currSustainerAppliedTs,
+                "prevSustainerTimestamp"_attr = prevSustainerTimestamp,
+                "currSustainerTimestamp"_attr = currSustainerTimestamp,
                 "sustainerAppliedCount"_attr = sustainerAppliedCount);
     if (sustainerAppliedCount > 0) {
         _lastTimeSustainerAdvanced = Date_t::now();
@@ -359,35 +408,35 @@ int FlowControl::getNumTickets(Date_t now) {
     }
 
     // Flow Control is only enabled on nodes that can accept writes.
-    const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
+    const bool flowControlUsable = _timestampProvider->flowControlUsable();
 
     if (auto sfp = flowControlTicketOverride.scoped(); MONGO_unlikely(sfp.isActive())) {
         int numTickets = sfp.getData().getIntField("numTickets");
-        if (numTickets > 0 && canAcceptWrites) {
+        if (numTickets > 0 && flowControlUsable) {
             return numTickets;
         }
     }
 
     // It's important to update the topology on each iteration.
-    _updateTopologyData();
-    const repl::OpTimeAndWallTime myLastApplied = _replCoord->getMyLastAppliedOpTimeAndWallTime();
-    const repl::OpTimeAndWallTime lastCommitted = _replCoord->getLastCommittedOpTimeAndWallTime();
+    _timestampProvider->update();
+    const auto lastWriteTime = _timestampProvider->getLastWriteTimestampAndWallTime();
+    const auto lastTargetTime = _timestampProvider->getTargetTimestampAndWallTime();
     const double locksPerOp = _getLocksPerOp();
     const std::int64_t locksUsedLastPeriod = _getLocksUsedLastPeriod();
 
-    if (gFlowControlEnabled.load() == false || canAcceptWrites == false || locksPerOp < 0.0) {
-        _trimSamples(std::min(lastCommitted.opTime.getTimestamp(),
-                              getMedianAppliedTimestamp(_prevMemberData)));
+    if (gFlowControlEnabled.load() == false || flowControlUsable == false || locksPerOp < 0.0) {
+        _trimSamples(
+            std::min(lastTargetTime.timestamp, _timestampProvider->getPrevSustainerTimestamp()));
         return kMaxTickets;
     }
 
     int ret = 0;
     const auto thresholdLagMillis = getThresholdLagMillis();
 
-    // Successive lastCommitted and lastApplied wall clock time recordings are not guaranteed to be
+    // Successive lastTargetTime and lastApplied wall clock time recordings are not guaranteed to be
     // monotonically increasing. Recordings that satisfy the following check result in a negative
     // value for lag, so ignore them.
-    const bool ignoreWallTimes = lastCommitted.wallTime > myLastApplied.wallTime;
+    const bool ignoreWallTimes = lastTargetTime.wallTime > lastWriteTime.wallTime;
 
     // _approximateOpsBetween will return -1 if the input timestamps are in the same "bucket".
     // This is an indication that there are very few ops between the two timestamps.
@@ -395,9 +444,8 @@ int FlowControl::getNumTickets(Date_t now) {
     // Don't let the no-op writer on idle systems fool the sophisticated "is the replica set
     // lagged" classifier.
     const bool isHealthy = !ignoreWallTimes &&
-        (getLagMillis(myLastApplied.wallTime, lastCommitted.wallTime) < thresholdLagMillis ||
-         _approximateOpsBetween(lastCommitted.opTime.getTimestamp(),
-                                myLastApplied.opTime.getTimestamp()) == -1);
+        (getLagMillis(lastWriteTime.wallTime, lastTargetTime.wallTime) < thresholdLagMillis ||
+         _approximateOpsBetween(lastTargetTime.timestamp, lastWriteTime.timestamp) == -1);
 
     if (isHealthy) {
         // The add/multiply technique is used to ensure ticket allocation can ramp up quickly,
@@ -412,16 +460,16 @@ int FlowControl::getNumTickets(Date_t now) {
             auto waitTime = curTimeMicros64() - _startWaitTime;
             _isLaggedTimeMicros.fetchAndAddRelaxed(waitTime);
         }
-    } else if (!ignoreWallTimes && sustainerAdvanced(_prevMemberData, _currMemberData)) {
+    } else if (!ignoreWallTimes && _timestampProvider->sustainerAdvanced()) {
         // Expected case where flow control has meaningful data from the last period to make a new
         // calculation.
-        ret =
-            _calculateNewTicketsForLag(_prevMemberData,
-                                       _currMemberData,
-                                       locksUsedLastPeriod,
-                                       locksPerOp,
-                                       getLagMillis(myLastApplied.wallTime, lastCommitted.wallTime),
-                                       thresholdLagMillis);
+        ret = _calculateNewTicketsForLag(
+            _timestampProvider->getPrevSustainerTimestamp(),
+            _timestampProvider->getCurrSustainerTimestamp(),
+            locksUsedLastPeriod,
+            locksPerOp,
+            getLagMillis(lastWriteTime.wallTime, lastTargetTime.wallTime),
+            thresholdLagMillis);
         if (!_isLagged.load()) {
             _isLagged.store(true);
             _isLaggedCount.fetchAndAddRelaxed(1);
@@ -443,9 +491,10 @@ int FlowControl::getNumTickets(Date_t now) {
                 DEBUG_LOG_LEVEL,
                 "FlowControl debug.",
                 "isLagged"_attr = (_isLagged.load() ? "true" : "false"),
-                "currlagMillis"_attr = getLagMillis(myLastApplied.wallTime, lastCommitted.wallTime),
-                "opsLagged"_attr = _approximateOpsBetween(lastCommitted.opTime.getTimestamp(),
-                                                          myLastApplied.opTime.getTimestamp()),
+                "currlagMillis"_attr =
+                    getLagMillis(lastWriteTime.wallTime, lastTargetTime.wallTime),
+                "opsLagged"_attr =
+                    _approximateOpsBetween(lastTargetTime.timestamp, lastWriteTime.timestamp),
                 "granting"_attr = ret,
                 "lastGranted"_attr = _lastTargetTicketsPermitted.load(),
                 "lastSustainerApplied"_attr = _lastSustainerAppliedCount.load(),
@@ -457,7 +506,7 @@ int FlowControl::getNumTickets(Date_t now) {
     _lastTargetTicketsPermitted.store(ret);
 
     _trimSamples(
-        std::min(lastCommitted.opTime.getTimestamp(), getMedianAppliedTimestamp(_prevMemberData)));
+        std::min(lastTargetTime.timestamp, _timestampProvider->getPrevSustainerTimestamp()));
 
     return ret;
 }

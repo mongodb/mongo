@@ -188,6 +188,12 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.debug("Mongod not running when gathering standalone fixture pid.")
         return out
 
+    def get_mongod_options(self):
+        return self.mongod_options
+
+    def set_mongod_options(self, options):
+        self.mongod_options = options
+
     def _handle_await_ready_retry(self, deadline):
         remaining = deadline - time.time()
         if remaining <= 0.0:

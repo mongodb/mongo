@@ -176,6 +176,8 @@ struct CollectionOptions {
     boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
 
     // When 'true', will use the same recordIds across all nodes in the replica set.
+    // When using disaggregated storage, will be enabled implicitly when the collection
+    // is created.
     bool recordIdsReplicated = false;
 };
 

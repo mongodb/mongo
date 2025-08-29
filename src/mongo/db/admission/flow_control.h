@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/service_context.h"
@@ -62,12 +63,66 @@ namespace mongo {
  */
 class FlowControl {
 public:
+    class TimestampProvider {
+    public:
+        virtual ~TimestampProvider() = default;
+        /**
+         * The sustainer timestamp is the timestamp which, if moved forward, will cause an
+         * advance in the target timestamp.  For replication, it is the median applied timestamp
+         * on all the relevant nodes.  We need to know this timestamp both for the current iteration
+         * and the previous iteration.
+         */
+        virtual Timestamp getCurrSustainerTimestamp() const = 0;
+        virtual Timestamp getPrevSustainerTimestamp() const = 0;
+
+        /**
+         * The target time is the time we are trying to throttle to.  For replication, it is the
+         * last committed time (majority snapshot time).
+         */
+        virtual repl::TimestampAndWallTime getTargetTimestampAndWallTime() const = 0;
+
+        /**
+         * The last write time is what we are trying to control.  For replication, it is
+         * the last applied time.
+         */
+        virtual repl::TimestampAndWallTime getLastWriteTimestampAndWallTime() const = 0;
+
+        /**
+         * Is flow control possible with this timestamp provider?  For replication,
+         * true if this is a primary and majority read concern is enabled.
+         */
+        virtual bool flowControlUsable() const = 0;
+
+        /**
+         * Are the previous and current updates compatible?  For replication,
+         * makes sure number of nodes is the same and the median node timestamp (the sustainer)
+         * has not gone backwards.
+         */
+        virtual bool sustainerAdvanced() const = 0;
+
+        /**
+         * Advance the `_*MemberData` fields and sort the new data by the element's last applied
+         * optime.
+         */
+        virtual void update() = 0;
+    };
+
     static constexpr int kMaxTickets = 1000 * 1000 * 1000;
 
+    /**
+     * Construct a flow control object based on a custom timestamp provider.
+     * Takes ownership of the timestamp provider.
+     */
+    FlowControl(ServiceContext* service, std::unique_ptr<TimestampProvider> timestampProvider);
+
+    /**
+     * Construct a replication-based flow control object.
+     */
     FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord);
 
     /**
-     * Construct a flow control object without adding a periodic job runner for testing.
+     * Construct a replication-based flow control object without adding a periodic job runner for
+     * testing.
      */
     FlowControl(repl::ReplicationCoordinator* replCoord);
 
@@ -122,13 +177,13 @@ public:
 
     std::int64_t _approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
 
-    void _updateTopologyData();
-    int _calculateNewTicketsForLag(const std::vector<repl::MemberData>& prevMemberData,
-                                   const std::vector<repl::MemberData>& currMemberData,
+    int _calculateNewTicketsForLag(const Timestamp& prevSustainerTimestamp,
+                                   const Timestamp& currSustainerTimestamp,
                                    std::int64_t locksUsedLastPeriod,
                                    double locksPerOp,
                                    std::uint64_t lagMillis,
                                    std::uint64_t thresholdLagMillis);
+
     void _trimSamples(Timestamp trimSamplesTo);
 
     // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
@@ -139,7 +194,7 @@ public:
     }
 
 private:
-    repl::ReplicationCoordinator* _replCoord;
+    std::unique_ptr<TimestampProvider> _timestampProvider;
 
     // These values are updated with each flow control computation and are also surfaced in server
     // status.
@@ -161,9 +216,6 @@ private:
 
     std::int64_t _lastPollLockAcquisitions = 0;
 
-    std::vector<repl::MemberData> _currMemberData;
-    std::vector<repl::MemberData> _prevMemberData;
-
     Date_t _lastTimeSustainerAdvanced;
 
     // This value is used for calculating server status metrics.
@@ -171,5 +223,28 @@ private:
 
     PeriodicJobAnchor _jobAnchor;
 };
+
+namespace flow_control_details {
+class ReplicationTimestampProvider final : public FlowControl::TimestampProvider {
+public:
+    explicit ReplicationTimestampProvider(repl::ReplicationCoordinator* replCoord);
+    Timestamp getCurrSustainerTimestamp() const final;
+    Timestamp getPrevSustainerTimestamp() const final;
+    repl::TimestampAndWallTime getTargetTimestampAndWallTime() const final;
+    repl::TimestampAndWallTime getLastWriteTimestampAndWallTime() const final;
+    bool flowControlUsable() const final;
+    bool sustainerAdvanced() const final;
+    void update() final;
+
+    void setCurrMemberData_forTest(const std::vector<repl::MemberData>& memberData);
+    void setPrevMemberData_forTest(const std::vector<repl::MemberData>& memberData);
+
+private:
+    repl::ReplicationCoordinator* _replCoord;
+    std::vector<repl::MemberData> _currMemberData;
+    std::vector<repl::MemberData> _prevMemberData;
+};
+
+}  // namespace flow_control_details
 
 }  // namespace mongo

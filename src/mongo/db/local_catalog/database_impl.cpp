@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/disagg_storage/server_parameters_gen.h"
 #include "mongo/db/index_builds/index_build_block.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
@@ -65,6 +64,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -158,10 +158,9 @@ RecordId acquireCatalogId(
     OperationContext* opCtx,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     MDBCatalog* mdbCatalog) {
-    if (disagg::gDisaggregatedStorageEnabled && createCollCatalogIdentifier.has_value()) {
-        // Replicated catalogIds aren't compatible with standard architecture, as a node may create
-        // local collection whose catalogId collides with that of a replicated collection created on
-        // another node.
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (rss.getPersistenceProvider().shouldUseReplicatedCatalogIdentifiers() &&
+        createCollCatalogIdentifier.has_value()) {
         return createCollCatalogIdentifier->catalogId;
     }
     return mdbCatalog->reserveCatalogId(opCtx);
@@ -770,8 +769,10 @@ Collection* DatabaseImpl::_createCollection(
     // Additionally, we do not set the recordIdsReplicated:true option on timeseries and
     // clustered collections because in those cases the recordId is the _id, or on capped
     // collections which utilizes a separate mechanism for ensuring uniform recordIds.
-    if (generatedUUID && !nss.isOnInternalDb() && !optionsWithUUID.timeseries &&
-        !optionsWithUUID.clusteredIndex && !optionsWithUUID.capped &&
+    const bool collectionTypeSupportsReplicatedRecordIds =
+        !optionsWithUUID.timeseries && !optionsWithUUID.clusteredIndex && !optionsWithUUID.capped;
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    if (generatedUUID && !nss.isOnInternalDb() && collectionTypeSupportsReplicatedRecordIds &&
         gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
@@ -779,6 +780,19 @@ Collection* DatabaseImpl::_createCollection(
         LOGV2_DEBUG(8700501,
                     0,
                     "Collection will use recordIdsReplicated:true.",
+                    "oldValue"_attr = optionsWithUUID.recordIdsReplicated);
+        optionsWithUUID.recordIdsReplicated = true;
+    } else if (provider.shouldUseReplicatedRecordIds() && nss.isReplicated() &&
+               !nss.isImplicitlyReplicated() && collectionTypeSupportsReplicatedRecordIds) {
+        tassert(10985561,
+                str::stream() << "Replicated record IDs must be enabled with " << provider.name(),
+                gFeatureFlagRecordIdsReplicated.isEnabledUseLatestFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        LOGV2_DEBUG(10985560,
+                    2,
+                    "Collection will use recordIdsReplicated:true",
+                    "provider"_attr = provider.name(),
                     "oldValue"_attr = optionsWithUUID.recordIdsReplicated);
         optionsWithUUID.recordIdsReplicated = true;
     }

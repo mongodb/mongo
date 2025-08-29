@@ -972,6 +972,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/repl/dbcheck",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",

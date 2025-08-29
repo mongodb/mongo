@@ -46,6 +46,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -116,7 +117,9 @@ private:
     std::unique_ptr<StorageEngine> makeEngine() {
         // Use a small journal for testing to account for the unlikely event that the underlying
         // filesystem does not support fast allocation of a file of zeros.
-        WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        auto& provider = rss::ReplicatedStorageService::get(_svcCtx).getPersistenceProvider();
+        WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
+            getWiredTigerConfigFromStartupOptions(provider);
         wtConfig.cacheSizeMB = 1;
         wtConfig.extraOpenOptions = "log=(file_max=1m,prealloc=false)";
         // Faithfully simulate being in replica set mode for timestamping tests which requires
@@ -129,6 +132,7 @@ private:
                                                        _cs.get(),
                                                        std::move(wtConfig),
                                                        WiredTigerExtensions::get(_svcCtx),
+                                                       provider,
                                                        _forRepair,
                                                        isReplSet,
                                                        shouldRecoverFromOplogAsStandalone,
@@ -175,7 +179,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     std::string ident = "collection-1234";
     RecordStore::Options options;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options));
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options));
     auto rs = _helper.getWiredTigerKVEngine()->getRecordStore(
         opCtxPtr.get(), nss, ident, options, UUID::gen());
     ASSERT(rs);
@@ -227,7 +232,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(tmpFile, *dataFilePath, err);
     ASSERT(!err) << err.message();
 
-    auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(nss, ident, options);
+    auto status =
+        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, nss, ident, options);
     ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code());
 #endif
 }
@@ -239,7 +245,8 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
     RecordStore::Options options;
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options));
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options));
 
     UUID uuid = UUID::gen();
     auto rs =
@@ -292,7 +299,8 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 
     // This should recreate an empty data file successfully and move the old one to a name that ends
     // in ".corrupt".
-    auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(nss, ident, options);
+    auto status =
+        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, nss, ident, options);
     ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code()) << status.reason();
 
     boost::filesystem::path corruptFile = (dataFilePath->string() + ".corrupt");
@@ -408,7 +416,8 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
     RecordStore::Options options;
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options));
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options));
 
     // A new record store must always have its own storage table uniquely identified by the ident.
     // Otherwise, multiple record stores could point to the same storage resource and lead to data
@@ -417,7 +426,8 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
     // Validate the server throws when trying to create a new record store with an ident already in
     // use.
 
-    const auto status = _helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options);
+    const auto status =
+        _helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::ObjectAlreadyExists);
 }
@@ -434,7 +444,8 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     std::string ident = "collection-1234";
     RecordStore::Options options;
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options));
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options));
 
     const boost::optional<boost::filesystem::path> dataFilePath =
         _helper.getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
@@ -447,7 +458,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 
     // Because the underlying file was not removed, it will be renamed out of the way by WiredTiger
     // when creating a new table with the same ident.
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options));
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options));
 
     const boost::filesystem::path renamedFilePath = dataFilePath->generic_string() + ".1";
     ASSERT(boost::filesystem::exists(*dataFilePath));
@@ -924,7 +935,10 @@ protected:
     StatusWith<boost::filesystem::path> createIdent(StringData ns, StringData ident) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         RecordStore::Options options;
-        Status stat = _helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, options);
+        auto& provider =
+            rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+        Status stat =
+            _helper.getWiredTigerKVEngine()->createRecordStore(provider, nss, ident, options);
         if (!stat.isOK()) {
             return stat;
         }

@@ -36,6 +36,7 @@
 #include "mongo/db/local_catalog/durable_catalog.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -117,8 +118,9 @@ public:
      */
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
         const std::string identName = _storageEngine->generateNewCollectionIdent(collName.dbName());
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         return _storageEngine->getEngine()->createRecordStore(
-            collName, identName, RecordStore::Options{});
+            provider, collName, identName, RecordStore::Options{});
     }
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, StringData indexName) {

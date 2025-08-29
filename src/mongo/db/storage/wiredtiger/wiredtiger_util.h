@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -328,7 +329,8 @@ public:
                                      boost::optional<StringData> indexName,
                                      ValidateResultsIf& validationResult);
 
-    static bool useTableLogging(const NamespaceString& nss,
+    static bool useTableLogging(const rss::PersistenceProvider& provider,
+                                const NamespaceString& nss,
                                 bool isReplSet,
                                 bool shouldRecoverFromOplogAsStandalone);
 

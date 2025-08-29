@@ -106,6 +106,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -916,7 +917,9 @@ public:
     }
 
     StringData indexNameOplogField() const {
-        return shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(_opCtx))
+        return shouldReplicateLocalCatalogIdentifers(
+                   rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider(),
+                   VersionContext::getDecoration(_opCtx))
             ? "o.spec.name"
             : "o.name";
     }
@@ -3088,14 +3091,16 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     // supports 2 phase index build.
     indexStartTs = op.getTimestamp();
     indexCreateTs =
-        repl::OplogEntry(queryOplog(BSON("op" << "c"
-                                              << "ns" << nss.getCommandNS().ns_forTest()
-                                              << "o.createIndexes" << nss.coll()
-                                              << (shouldReplicateLocalCatalogIdentifers(
-                                                      VersionContext::getDecoration(_opCtx))
-                                                      ? "o.spec.name"
-                                                      : "o.name")
-                                              << "user_1_db_1")))
+        repl::OplogEntry(
+            queryOplog(BSON(
+                "op" << "c"
+                     << "ns" << nss.getCommandNS().ns_forTest() << "o.createIndexes" << nss.coll()
+                     << (shouldReplicateLocalCatalogIdentifers(
+                             rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider(),
+                             VersionContext::getDecoration(_opCtx))
+                             ? "o.spec.name"
+                             : "o.name")
+                     << "user_1_db_1")))
             .getTimestamp();
     indexCompleteTs = indexCreateTs;
 

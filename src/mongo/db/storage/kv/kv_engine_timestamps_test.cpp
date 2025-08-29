@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -237,7 +238,9 @@ public:
         const auto nss = NamespaceString::createNamespaceString_forTest("a.b");
         const auto ident = "collection-ident";
         RecordStore::Options options;
-        ASSERT_OK(engine->createRecordStore(nss, ident, options));
+        auto& provider =
+            rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+        ASSERT_OK(engine->createRecordStore(provider, nss, ident, options));
         rs = engine->getRecordStore(op, nss, ident, options, UUID::gen());
         ASSERT(rs);
     }

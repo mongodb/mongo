@@ -87,3 +87,9 @@ filters:
   - "json_utils.js":
     approvers:
       - 10gen/query-integration-extensions
+  - "replicated_ident_utils.js":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "replicated_record_ids_utils.js":
+    approvers:
+      - 10gen/server-storage-engine-integration

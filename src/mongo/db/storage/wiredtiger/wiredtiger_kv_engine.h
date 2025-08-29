@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -220,6 +221,13 @@ public:
         bool prefetchEnabled{true};
         // Specifies whether restore is enabled.
         bool restoreEnabled{true};
+        // Specifies whether unstable checkpoints are supported by the underlying
+        // PersistenceProvider.
+        bool providerSupportsUnstableCheckpoints{true};
+        // Specifies whether it is safe to take duplicate checkpoints on the same stable timestamp.
+        bool safeToTakeDuplicateCheckpoints{true};
+        // Specifies whether the value for the flatten_leaf_page_delta configuration parameter.
+        int flattenLeafPageDelta{1};
         // This specifies the value for the log.compressor configuration parameter.
         std::string logCompressor{"snappy"};
         // This specifies the value for the live_restore.path configuration parameter.
@@ -346,6 +354,7 @@ public:
                        ClockSource* cs,
                        WiredTigerConfig wtConfig,
                        const WiredTigerExtensions& wtExtensions,
+                       const rss::PersistenceProvider& provider,
                        bool repair,
                        bool isReplSet,
                        bool shouldRecoverFromOplogAsStandalone,
@@ -385,11 +394,13 @@ public:
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
-    Status createRecordStore(const NamespaceString& ns,
+    Status createRecordStore(const rss::PersistenceProvider& provider,
+                             const NamespaceString& ns,
                              StringData ident,
                              const RecordStore::Options& options) override {
         // Parameters required for a standard WiredTigerRecordStore.
-        return _createRecordStore(ns,
+        return _createRecordStore(provider,
+                                  ns,
                                   ident,
                                   options.keyFormat,
                                   options.storageEngineCollectionOptions,
@@ -411,6 +422,7 @@ public:
                                                           KeyFormat keyFormat) override;
 
     Status createSortedDataInterface(
+        const rss::PersistenceProvider&,
         RecoveryUnit&,
         const NamespaceString& nss,
         const UUID& uuid,
@@ -487,7 +499,8 @@ public:
 
     Status repairIdent(RecoveryUnit& ru, StringData ident) override;
 
-    Status recoverOrphanedIdent(const NamespaceString& nss,
+    Status recoverOrphanedIdent(const rss::PersistenceProvider&,
+                                const NamespaceString& nss,
                                 StringData ident,
                                 const RecordStore::Options& options) override;
 
@@ -502,6 +515,12 @@ public:
     }
 
     void setJournalListener(JournalListener* jl) final;
+
+    void setLastMaterializedLsn(uint64_t lsn) final;
+
+    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final;
+
+    void promoteToLeader() final;
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force) override;
 
@@ -719,7 +738,8 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
-    Status _createRecordStore(const NamespaceString& ns,
+    Status _createRecordStore(const rss::PersistenceProvider& provider,
+                              const NamespaceString& ns,
                               StringData ident,
                               KeyFormat keyFormat,
                               const BSONObj& storageEngineCollectionOptions,
@@ -883,18 +903,22 @@ private:
     bool _isReplSet;
     bool _shouldRecoverFromOplogAsStandalone;
     Atomic<bool> _inStandaloneMode;
+
+    const bool _supportsTableLogging;
 };
 
 /**
  * Generates config string for wiredtiger_open() from the given config options.
  */
 std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
-                                       StringData extensionsConfig);
+                                       StringData extensionsConfig,
+                                       StringData providerConfig);
 
 /**
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
  * startup.
  */
-WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions();
+WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
+    const rss::PersistenceProvider&);
 
 }  // namespace mongo

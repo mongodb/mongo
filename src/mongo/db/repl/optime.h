@@ -212,4 +212,10 @@ public:
 };
 
 std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
+
+// A convenience class for holding both a Timestamp and a Date_t.
+struct TimestampAndWallTime {
+    Timestamp timestamp;
+    Date_t wallTime;
+};
 }  // namespace mongo::repl

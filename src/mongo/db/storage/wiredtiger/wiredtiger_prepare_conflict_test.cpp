@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -56,7 +57,9 @@ namespace {
 std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
                                                  const std::string& path,
                                                  ClockSource* clockSource) {
-    WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+    auto& provider = rss::ReplicatedStorageService::get(serviceContext).getPersistenceProvider();
+    WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
+        getWiredTigerConfigFromStartupOptions(provider);
     wtConfig.cacheSizeMB = 1;
     return std::make_unique<WiredTigerKVEngine>(
         /*canonicalName=*/"",
@@ -64,6 +67,7 @@ std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
         clockSource,
         std::move(wtConfig),
         WiredTigerExtensions::get(serviceContext),
+        provider,
         /*repair=*/false,
         /*isReplSet=*/false,
         /*shouldRecoverFromOplogAsStandalone=*/false,

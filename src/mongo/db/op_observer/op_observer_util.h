@@ -35,6 +35,7 @@
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -54,7 +55,8 @@ extern FailPoint sleepBetweenInsertOpTimeGenerationAndLogOp;
 /**
  * Returns true when local catalog identifiers should be replicated through the oplog.
  */
-bool shouldReplicateLocalCatalogIdentifers(const VersionContext& vCtx);
+bool shouldReplicateLocalCatalogIdentifers(const rss::PersistenceProvider&,
+                                           const VersionContext& vCtx);
 
 /**
  * Returns true if gFeatureFlagPrimaryDrivenIndexBuilds is enabled.

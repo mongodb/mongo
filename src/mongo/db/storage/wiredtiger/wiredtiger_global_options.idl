@@ -126,6 +126,18 @@ server_parameters:
             lte: 100
         redact: false
 
+    wiredTigerFlattenLeafPageDelta:
+        description: >-
+            WiredTiger page read rewrites the leaf pages with deltas to a new disk image if 
+            successful. We will use a ternary where 0=Disabled, 1=Enabled if disaggregatedStorageEnabled is true, 2=Enabled unconditionally.
+        set_at: startup
+        cpp_varname: "wiredTigerGlobalOptions.flattenLeafPageDelta"
+        default: 1
+        validator:
+            gte: 0
+            lte: 2
+        redact: false
+
     wiredTigerEvictionDirtyTargetGB:
         description: >-
             Absolute dirty cache eviction target. Once eviction begins,

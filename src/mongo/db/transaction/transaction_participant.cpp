@@ -73,6 +73,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -1065,6 +1066,13 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     TransactionActions action) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (!rss.getPersistenceProvider().supportsMultiDocumentTransactions() && autocommit) {
+        uasserted(ErrorCodes::NotImplemented,
+                  str::stream() << rss.getPersistenceProvider().name()
+                                << "does not support multi-document transactions");
+    }
+
     opCtx->setActiveTransactionParticipant();
 
     if (_isInternalSessionForRetryableWrite()) {

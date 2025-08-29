@@ -39,6 +39,7 @@
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
@@ -123,7 +124,9 @@ void AuthOpObserver::onCreateCollection(
 
     BSONObj o2;
     if (createCollCatalogIdentifier.has_value() &&
-        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
+        shouldReplicateLocalCatalogIdentifers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+            VersionContext::getDecoration(opCtx))) {
         o2 = repl::MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
             createCollCatalogIdentifier->ident,

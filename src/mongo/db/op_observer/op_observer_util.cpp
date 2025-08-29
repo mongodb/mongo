@@ -33,8 +33,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
-#include "mongo/db/disagg_storage/server_parameters_gen.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -53,10 +53,9 @@ const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
-bool shouldReplicateLocalCatalogIdentifers(const VersionContext& vCtx) {
-    if (disagg::gDisaggregatedStorageEnabled) {
-        // Disaggregated storage relies on consistent catalog storage. Safe-guard if FCV is not yet
-        // initialized despite the feature being enabled.
+bool shouldReplicateLocalCatalogIdentifers(const rss::PersistenceProvider& provider,
+                                           const VersionContext& vCtx) {
+    if (provider.shouldUseReplicatedCatalogIdentifiers()) {
         return true;
     }
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();

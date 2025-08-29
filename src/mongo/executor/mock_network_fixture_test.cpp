@@ -237,7 +237,7 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
     const auto deadline = net().now() + Milliseconds(100);
     mock().runUntil(deadline);
 
-    // The command matcher superceded the BSON matcher so we have an some unmatched expectation.
+    // The command matcher superseded the BSON matcher so we have an some unmatched expectation.
     ASSERT_THROWS_CODE(mock().verifyExpectations(), DBException, (ErrorCodes::Error)5015501);
     ASSERT(!specificExp.isSatisfied());
 

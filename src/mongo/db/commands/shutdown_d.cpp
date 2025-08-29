@@ -35,6 +35,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -71,7 +72,10 @@ Status stepDownForShutdown(OperationContext* opCtx,
 
             // Specify a high freeze time, so that if there is a stall during shut down, the node
             // does not run for election.
-            replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));
+            auto& rss = rss::ReplicatedStorageService::get(opCtx);
+            if (rss.getPersistenceProvider().shouldStepDownForShutdown()) {
+                replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));
+            }
 
             if (MONGO_unlikely(hangInShutdownAfterStepdown.shouldFail())) {
                 LOGV2(4695100, "hangInShutdownAfterStepdown failpoint enabled");

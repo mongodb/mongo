@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/op_msg_fuzzer_router_fixture.h"
 
 #include "mongo/base/string_data.h"

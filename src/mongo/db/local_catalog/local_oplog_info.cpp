@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -146,6 +147,10 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     Timestamp ts;
     // Provide a sample to FlowControl after the `oplogInfo.newOpMutex` is released.
     ON_BLOCK_EXIT([opCtx, &ts, count] {
+        auto& rss = rss::ReplicatedStorageService::get(opCtx);
+        if (!rss.getPersistenceProvider().shouldUseOplogWritesForFlowControlSampling())
+            return;
+
         auto flowControl = FlowControl::get(opCtx);
         if (flowControl) {
             flowControl->sample(ts, count);

@@ -1471,6 +1471,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:replica_set_messages",
         "//src/mongo/db/repl/dbcheck",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/s:sharding_catalog_manager",
         "//src/mongo/db/s:sharding_commands_d",
         "//src/mongo/db/s:transaction_coordinator",

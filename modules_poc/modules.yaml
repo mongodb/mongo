@@ -530,6 +530,7 @@ encrypted_storage_engine:
     slack: server-security
     jira: Server Security
   files:
+    - src/mongo/db/modules/atlas/src/disagg_storage/encryption
     - src/mongo/db/modules/enterprise/src/encryptdb
 
 security:
@@ -854,8 +855,7 @@ disagg_storage:
     slack: disaggregated-storage-mongod
     jira: RSSD
   files:
-    - src/mongo/db/modules/atlas
-    - src/mongo/db/disagg_storage
+    - src/mongo/db/modules/atlas/src/disagg_storage
 
 storage_engine_api:
   meta:
@@ -991,6 +991,13 @@ server_parameters:
 installer:
   files:
     - src/mongo/installer/
+
+replicated_storage_service:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/rss
 
 replication:
   meta:

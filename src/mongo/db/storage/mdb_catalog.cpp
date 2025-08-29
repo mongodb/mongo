@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -242,7 +243,9 @@ StatusWith<std::unique_ptr<RecordStore>> MDBCatalog::createRecordStoreForEntry(
     const MDBCatalog::EntryIdentifier& entry,
     const boost::optional<UUID>& uuid,
     const RecordStore::Options& recordStoreOptions) {
-    Status status = _engine->createRecordStore(entry.nss, entry.ident, recordStoreOptions);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    Status status =
+        _engine->createRecordStore(provider, entry.nss, entry.ident, recordStoreOptions);
     if (!status.isOK()) {
         return status;
     }

@@ -39,6 +39,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -331,10 +332,13 @@ Status createIndex(OperationContext* opCtx,
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto kvEngine = storageEngine->getEngine();
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+
     invariant(collectionOptions.uuid);
 
-    bool replicateLocalCatalogIdentifiers =
-        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx));
+    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(
+        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+        VersionContext::getDecoration(opCtx));
     if (replicateLocalCatalogIdentifiers) {
         // If a previous attempt at creating this index was rolled back, the ident may still be drop
         // pending. Complete that drop before creating the index if so.
@@ -349,6 +353,7 @@ Status createIndex(OperationContext* opCtx,
     }
 
     Status status = kvEngine->createSortedDataInterface(
+        provider,
         ru,
         nss,
         *collectionOptions.uuid,
@@ -466,8 +471,10 @@ Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
         return status;
 
     invariant(collectionOptions.uuid);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
     status =
-        engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
+        engine->createSortedDataInterface(provider,
+                                          *shard_role_details::getRecoveryUnit(opCtx),
                                           nss,
                                           *collectionOptions.uuid,
                                           ident,

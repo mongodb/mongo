@@ -1,5 +1,6 @@
 """Utilities for constructing fixtures that may span multiple versions."""
 
+import json
 import logging
 import threading
 from abc import ABC, abstractmethod
@@ -222,6 +223,33 @@ class ReplSetBuilder(FixtureBuilder):
                 launch_mongot,
             )
             replset.install_mongod(node)
+
+        if replset.disagg_base_config:
+            members = []
+            for idx, node in enumerate(replset.nodes):
+                member = {
+                    "_id": idx,
+                    "host": node.get_internal_connection_string(),
+                    "priority": 1
+                }
+                members.append(member)
+            disagg_base_config = {
+                **replset.disagg_base_config,
+                "replSetConfig": {
+                    "_id": replset.replset_name,
+                    "version": 1,
+                    "term": 1,
+                    "members": members,
+                }
+            }
+            for node in replset.nodes:
+                opts = node.get_mongod_options()
+                opts["set_parameters"]["disaggregatedStorageConfig"] = json.dumps(
+                    disagg_base_config)
+                opts["set_parameters"]["disaggregatedStorageEnabled"] = True
+                opts["set_parameters"]["logComponentVerbosity"] = json.dumps(
+                    {"disaggregatedStorage": 5})
+                node.set_mongod_options(opts)
 
         if replset.start_initial_sync_node:
             if not replset.initial_sync_node:

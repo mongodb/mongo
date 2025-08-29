@@ -291,7 +291,7 @@ public:
     }
 
     // Should be called after all oplog entries have been processed to handle the deletes that
-    // were not superceded by a later write.
+    // were not superseded by a later write.
     void handleLatestDeletes(std::function<void(OplogEntry*)> handler) {
         std::for_each(_retryImageWrites.begin(),
                       _retryImageWrites.end(),

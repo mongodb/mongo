@@ -2,7 +2,7 @@
 // documents, otherwise.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-function getShowRecordIdsCursor(node, dbName, replicatedCollName) {
+export function getShowRecordIdsCursor(node, dbName, replicatedCollName) {
     return node
         .getDB(dbName)
         [replicatedCollName].aggregate([{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}]);

@@ -262,6 +262,7 @@ mongo_cc_library(
     name = "mdb_catalog",
     srcs = [
         "mdb_catalog.cpp",
+        "//src/mongo/db/rss:persistence_provider.h",
         "//src/mongo/db/storage/kv:kv_engine.h",
     ],
     hdrs = [
@@ -270,6 +271,7 @@ mongo_cc_library(
     deps = [
         ":record_store_base",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:feature_document_util",
         "//src/mongo/db/storage:ident",
     ],
@@ -423,6 +425,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "oplog_truncate_markers.h",
+        "//src/mongo/db/rss:persistence_provider.h",
         "//src/mongo/db/storage/kv:kv_engine.h",
     ],
     deps = [
@@ -501,6 +504,7 @@ mongo_cc_library(
         ":storage_repair_observer",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
     ],
 )

@@ -66,6 +66,7 @@ a notice will be included in
 | [pyiso8601]                                          | MIT                                                                                                 | 2.1.0                                    | unknown              |                                 |
 | [RoaringBitmap/CRoaring]                             | Unknown License                                                                                     | v3.0.1                                   |                      | ✗                               |
 | [SchemaStore/schemastore]                            | Apache-2.0                                                                                          | Unknown                                  |                      |                                 |
+| [sls-proto]                                          | Unknown License                                                                                     | 1.0                                      | unknown              | ✗                               |
 | [smhasher]                                           | Unknown License                                                                                     | Unknown                                  | unknown              | ✗                               |
 | [Snowball Stemming Algorithms]                       | BSD-3-Clause                                                                                        | 7b264ffa0f767c579d052fd8142558dc8264d795 | ✗                    | ✗                               |
 | [subunit]                                            | BSD-3-Clause, Apache-2.0                                                                            | 1.4.4                                    | unknown              |                                 |
@@ -122,6 +123,7 @@ a notice will be included in
 [opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp/
 [opentelemetry-proto]: https://github.com/open-telemetry/opentelemetry-proto
 [pyiso8601]: https://pypi.org/project/iso8601/
+[sls-proto]: https://github.com/10gen/sls
 [smhasher]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [subunit]: https://github.com/testing-cabal/subunit
 [tcmalloc]: https://github.com/google/tcmalloc

@@ -173,6 +173,8 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(tableName);
+    ss << WiredTigerCustomizationHooksRegistry::get(getGlobalServiceContext())
+              .getTableCreateConfig(tableName);
     ss << sysIndexConfig << ",";
     ss << collIndexConfig << ",";
 

@@ -3320,6 +3320,8 @@ mongo_cc_library(
         "//src/mongo/db/repl:serveronly_repl",
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/repl:topology_coordinator",
+        "//src/mongo/db/rss:persistence_provider_impl",
+        "//src/mongo/db/rss:service_lifecycle_impl",
         "rw_concern_d",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:service_liaison_mongod",
@@ -3433,6 +3435,11 @@ mongo_cc_library(
             "//src/mongo/db/modules/enterprise/src/kmip:kmip_configuration",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:build_atlas_enabled": [
+            "//src/mongo/db/modules/atlas/src/disagg_storage/encryption:sls_log_encryption_manager",
+        ],
+        "//conditions:default": [],
     }),
 )
 
@@ -3530,6 +3537,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/repl:topology_coordinator",
         "//src/mongo/db/repl:wait_for_majority_service",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/s:sessions_collection_config_server",
         "//src/mongo/db/s:sharding_commands_d",
@@ -3561,11 +3569,6 @@ mongo_cc_library(
     }) + select({
         "//bazel/config:use_tracing_profiler_enabled": [
             "//src/mongo/util/tracing_profiler",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:build_atlas_required_settings": [
-            "//src/mongo/db/modules/atlas:atlas_only",
         ],
         "//conditions:default": [],
     }),
@@ -3697,6 +3700,7 @@ mongo_cc_library(
         "//src/mongo/db/local_catalog:catalog_impl",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/rss:persistence_provider_impl",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_options",
@@ -4138,6 +4142,7 @@ mongo_cc_library(
         "//src/mongo/db/local_catalog:database_holder",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/rss:persistence_provider_impl",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:storage_control",
@@ -4369,6 +4374,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/repl:repl_coordinator_impl",
         "//src/mongo/db/repl:serveronly_repl",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/rss:persistence_provider_impl",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",

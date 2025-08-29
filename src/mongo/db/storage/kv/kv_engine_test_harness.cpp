@@ -47,6 +47,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -116,8 +117,10 @@ protected:
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         KVEngine* engine = helper->getEngine();
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         ASSERT_OK(
-            engine->createRecordStore(NamespaceString::createNamespaceString_forTest("catalog"),
+            engine->createRecordStore(provider,
+                                      NamespaceString::createNamespaceString_forTest("catalog"),
                                       "collection-catalog",
                                       RecordStore::Options{}));
 
@@ -231,7 +234,8 @@ protected:
                                                 const RecordStore::Options& recordStoreOptions,
                                                 boost::optional<UUID> uuid) {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(nss, ident, recordStoreOptions));
+        auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+        ASSERT_OK(engine->createRecordStore(provider, nss, ident, recordStoreOptions));
         auto rs = engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
         ASSERT(rs);
         return rs;
@@ -348,8 +352,14 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     {
         auto opCtx = _makeOperationContext(engine);
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-        ASSERT_OK(engine->createSortedDataInterface(
-            ru, kNss, kUUID, kIdent, config, boost::none /* storageEngineIndexOptions */));
+        auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+        ASSERT_OK(engine->createSortedDataInterface(provider,
+                                                    ru,
+                                                    kNss,
+                                                    kUUID,
+                                                    kIdent,
+                                                    config,
+                                                    boost::none /* storageEngineIndexOptions */));
         sorted = engine->getSortedDataInterface(
             opCtx.get(), ru, kNss, kUUID, kIdent, config, kRecordStoreOptions.keyFormat);
         ASSERT(sorted);

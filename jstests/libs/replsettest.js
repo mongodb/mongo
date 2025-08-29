@@ -1769,6 +1769,28 @@ export class ReplSetTest {
     }
 
     /**
+     * Runs replSetInitiate on the first node of the replica set.
+     *
+     * TODO (SERVER-109841): Replsetinitiate is currently a no-op command for disagg. Determine the
+     * next steps for this function if additional functionality is to be incorporated.
+     */
+    initiateForDisagg(cfg, initCmd) {
+        const startTime = new Date(); // Measure the execution time of this function.
+
+        // Blocks until there is a primary. We use a faster retry interval here since we expect the
+        // primary to be ready very soon. We also turn the failpoint off once we have a primary.
+        this.getPrimary(this.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+
+        jsTest.log(
+            "ReplSetTest initiateForDisagg took " +
+                (new Date() - startTime) +
+                "ms for " +
+                this.nodes.length +
+                " nodes.",
+        );
+    }
+
+    /**
      * Steps up 'node' as primary and by default it waits for the stepped up node to become a
      * writable primary and waits for all nodes to reach the same optime before sending the
      * replSetStepUp command to 'node'.
@@ -3589,7 +3611,7 @@ function _constructStartNewInstances(rst, opts) {
         rst._unbridgedPorts = Array.from({length: numNodes}, rst._allocatePortForNode);
         rst._unbridgedNodes = [];
     } else {
-        rst.ports = Array.from({length: numNodes}, rst._allocatePortForNode);
+        rst.ports = opts.ports || Array.from({length: numNodes}, rst._allocatePortForNode);
     }
 
     for (let i = 0; i < numNodes; i++) {

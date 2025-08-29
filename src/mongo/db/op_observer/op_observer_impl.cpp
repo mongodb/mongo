@@ -66,6 +66,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_txn_record_gen.h"
@@ -330,8 +331,9 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
         return;
     }
 
-    bool replicateLocalCatalogIdentifiers =
-        shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx));
+    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(
+        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+        VersionContext::getDecoration(opCtx));
 
     BSONObjBuilder builder;
     // Note that despite using this constant, we are not building a CreateIndexCommand here
@@ -417,7 +419,9 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
-    if (shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
+    if (shouldReplicateLocalCatalogIdentifers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+            VersionContext::getDecoration(opCtx))) {
         // TODO (SERVER-109824): Move 'directoryPerDB' and 'directoryForIndexes' to the function
         // parameters.
         oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr() << "directoryPerDB"
@@ -1190,7 +1194,9 @@ void OpObserverImpl::onCreateCollection(
     oplogEntry.setNss(collectionName.getCommandNS());
     oplogEntry.setUuid(options.uuid);
     oplogEntry.setObject(MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex));
-    if (shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
+    if (shouldReplicateLocalCatalogIdentifers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+            VersionContext::getDecoration(opCtx))) {
         invariant(createCollCatalogIdentifier.has_value(),
                   "Missing catalog identifier required to log replicated "
                   "collection");

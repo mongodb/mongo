@@ -33,6 +33,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -57,7 +58,10 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test") {
-    WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+    auto& provider =
+        rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+    WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
+        getWiredTigerConfigFromStartupOptions(provider);
     wtConfig.cacheSizeMB = 1;
     wtConfig.extraOpenOptions = _testLoggingSettings(std::string{extraStrings});
     _isReplSet = options == Options::ReplicationEnabled;
@@ -68,6 +72,7 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
                                                    &_cs,
                                                    std::move(wtConfig),
                                                    WiredTigerExtensions::get(serviceContext()),
+                                                   provider,
                                                    false,
                                                    _isReplSet,
                                                    shouldRecoverFromOplogAsStandalone,
@@ -81,7 +86,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     const RecordStore::Options& recordStoreOptions,
     boost::optional<UUID> uuid) {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    const auto res = _engine->createRecordStore(nss, ident, recordStoreOptions);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+    const auto res = _engine->createRecordStore(provider, nss, ident, recordStoreOptions);
     return _engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
 }
 
@@ -100,11 +106,12 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     oplogRecordStoreOptions.isCapped = true;
     // Large enough not to exceed capped limits.
     oplogRecordStoreOptions.oplogMaxSize = 1024 * 1024 * 1024;
+    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
+    auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
     const auto res = _engine->createRecordStore(
-        NamespaceString::kRsOplogNamespace, ident, oplogRecordStoreOptions);
+        provider, NamespaceString::kRsOplogNamespace, ident, oplogRecordStoreOptions);
 
     // Cannot use 'getRecordStore', which automatically starts the the oplog manager.
-    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     return std::make_unique<WiredTigerRecordStore::Oplog>(
         _engine.get(),
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
@@ -116,6 +123,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
                                              .oplogMaxSize = oplogRecordStoreOptions.oplogMaxSize,
                                              .sizeStorer = nullptr,
                                              .tracksSizeAdjustments = true,
+                                             .isLogged = true,
                                              .forceUpdateWithFullDocument = false});
 }
 

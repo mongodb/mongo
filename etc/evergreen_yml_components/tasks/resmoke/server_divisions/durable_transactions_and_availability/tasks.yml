@@ -667,12 +667,13 @@ tasks:
   - <<: *jstestfuzz_template
     name: initial_sync_fuzzer_sanity_patch_gen
     patch_only: true
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_repl",
         "default",
         "require_npm",
         "random_name",
+        # TODO SERVER-109849: Remove this tag.
+        "incompatible_disaggregated_storage",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1551,13 +1552,14 @@ tasks:
   - <<: *jstestfuzz_template
     name: rollback_fuzzer_sanity_patch_gen
     patch_only: true
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_repl",
         "default",
         "rollbackfuzzer",
         "require_npm",
         "random_name",
+        # TODO SERVER-109849: Remove this tag.
+        "incompatible_disaggregated_storage",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2341,3 +2343,30 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           suite: v1index_jscore_passthrough
+
+  ################################################
+  #           Disagg Storage tasks               #
+  ################################################
+
+  - <<: *gen_task_template
+    name: disagg_storage_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_disagg",
+        "default",
+        "large",
+        "clustered_collections",
+        "uses_docker",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_storage
+          use_large_distro: "true"
+
+  - <<: *task_template
+    name: disagg_repl_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_disagg", "default", "uses_docker"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"

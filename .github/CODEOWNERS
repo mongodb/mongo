@@ -81,6 +81,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/idl/**/idl_compatibility_errors.py @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/idl/**/test_compatibility.py @10gen/query-optimization @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/modules/atlas/OWNERS.yml
+/buildscripts/modules/atlas/ @10gen/server-disagg-storage @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/monitor_build_status/OWNERS.yml
 /buildscripts/monitor_build_status/ @10gen/devprod-correctness @svc-auto-approve-bot
 
@@ -888,6 +891,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/catalog_list_operations_consistency_validator.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/raw_operation_utils.js @10gen/server-collection-write-path @svc-auto-approve-bot
 /jstests/libs/**/json_utils.js @10gen/query-integration-extensions @svc-auto-approve-bot
+/jstests/libs/**/replicated_ident_utils.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/jstests/libs/**/replicated_record_ids_utils.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/clustered_collections/OWNERS.yml
 /jstests/libs/clustered_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -1831,9 +1836,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/release_memory_cmd.* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/update_metrics.* @10gen/query-execution @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/disagg_storage/OWNERS.yml
-/src/mongo/db/disagg_storage/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
 /src/mongo/db/exec/**/* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/exec/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
@@ -2042,6 +2044,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/atlas/OWNERS.yml
 /src/mongo/db/modules/atlas/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/atlas/jstests/disagg_storage/OWNERS.yml
+/src/mongo/db/modules/atlas/jstests/disagg_storage/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/atlas/src/disagg_storage/OWNERS.yml
+/src/mongo/db/modules/atlas/src/disagg_storage/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/atlas/src/disagg_storage/encryption/OWNERS.yml
+/src/mongo/db/modules/atlas/src/disagg_storage/encryption/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/OWNERS.yml
 /src/mongo/db/modules/enterprise/BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
@@ -2589,6 +2600,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/repl/split_horizon/OWNERS.yml
 /src/mongo/db/repl/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/rss/OWNERS.yml
+/src/mongo/db/rss/**/* @10gen/server-replication @10gen/server-storage-execution @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
@@ -3068,6 +3082,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/croaring @10gen/query-execution @svc-auto-approve-bot
 /src/third_party/**/fmt @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/folly @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/third_party/**/googletest_restricted_for_disagg_only @10gen/server-disagg-storage @svc-auto-approve-bot
 /src/third_party/**/gperftools @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/third_party/**/grpc @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/icu4c* @10gen/query-execution @svc-auto-approve-bot

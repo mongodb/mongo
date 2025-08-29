@@ -89,6 +89,7 @@
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
@@ -878,6 +879,14 @@ void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
                      StorageEngine::LastShutdownState lastShutdownState,
                      BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup()) {
+        LOGV2(10985327,
+              "Skip startupRecovery; it will be handled later when WT loads the "
+              "checkpoint");
+        return;
+    }
+
     invariant(!storageGlobalParams.repair);
 
     ServiceContext* svcCtx = opCtx->getServiceContext();

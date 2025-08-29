@@ -103,7 +103,6 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -141,21 +140,6 @@
 namespace mongo {
 namespace repl {
 namespace {
-CreateCollCatalogIdentifier newCatalogIdentifier(OperationContext* opCtx,
-                                                 const DatabaseName& dbName,
-                                                 bool includeIdIndexIdent) {
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto mdbCatalog = storageEngine->getMDBCatalog();
-    invariant(mdbCatalog);
-
-    CreateCollCatalogIdentifier catalogIdentifier;
-    catalogIdentifier.catalogId = mdbCatalog->reserveCatalogId(opCtx);
-    catalogIdentifier.ident = storageEngine->generateNewCollectionIdent(dbName);
-    if (includeIdIndexIdent) {
-        catalogIdentifier.idIndexIdent = storageEngine->generateNewIndexIdent(dbName);
-    }
-    return catalogIdentifier;
-}
 
 auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     BSONElement tsArray;
@@ -626,45 +610,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
         ASSERT_EQUALS(nss, collNss);
     };
     auto entry = OplogEntry(op);
-    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
-        _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kInitialSync));
-    ASSERT_TRUE(applyCmdCalled);
-    ASSERT_TRUE(collectionExists(_opCtx.get(), nss));
-}
-
-TEST_F(OplogApplierImplTest, CreateCollectionCommandDisaggBasic) {
-    RAIIServerParameterControllerForTest disaggServer("disaggregatedStorageEnabled", true);
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    auto catalogIdentifier =
-        newCatalogIdentifier(_opCtx.get(), nss.dbName(), true /* includeIdIndexIdent*/);
-
-    auto entry =
-        makeCreateCollectionOplogEntry(nextOpTime(),
-                                       nss,
-                                       CollectionOptions{.uuid = UUID::gen()},
-                                       BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                                << "_id_") /* idIndex */,
-                                       catalogIdentifier);
-
-    bool applyCmdCalled = false;
-    _opObserver->onCreateCollectionFn =
-        [&](OperationContext* opCtx,
-            const NamespaceString& collNss,
-            const CollectionOptions&,
-            const BSONObj&,
-            const boost::optional<CreateCollCatalogIdentifier>& collCatalogIdentifier) {
-            applyCmdCalled = true;
-            ASSERT_TRUE(opCtx);
-            ASSERT_TRUE(
-                shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
-            ASSERT_EQUALS(nss, collNss);
-            ASSERT(collCatalogIdentifier);
-            ASSERT_EQUALS(catalogIdentifier.catalogId, collCatalogIdentifier->catalogId);
-            ASSERT_EQUALS(catalogIdentifier.ident, collCatalogIdentifier->ident);
-        };
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kInitialSync));
     ASSERT_TRUE(applyCmdCalled);

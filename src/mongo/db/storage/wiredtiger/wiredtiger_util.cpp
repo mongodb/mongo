@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/snapshot_window_options_gen.h"
@@ -870,7 +871,8 @@ void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
     }
 }
 
-bool WiredTigerUtil::useTableLogging(const NamespaceString& nss,
+bool WiredTigerUtil::useTableLogging(const rss::PersistenceProvider& provider,
+                                     const NamespaceString& nss,
                                      bool isReplSet,
                                      bool shouldRecoverFromOplogAsStandalone) {
     if (storageGlobalParams.forceDisableTableLogging) {
@@ -881,7 +883,12 @@ bool WiredTigerUtil::useTableLogging(const NamespaceString& nss,
 
     // We only turn off logging in the case of:
     // 1) Replication is enabled (the typical deployment), or
-    // 2) We're running as a standalone with recoverFromOplogAsStandalone=true
+    // 2) This is a disaggregated storage mongod, or
+    // 3) We're running as a standalone with recoverFromOplogAsStandalone=true
+    if (!provider.supportsTableLogging()) {
+        return false;
+    }
+
     const bool journalWritesBecauseStandalone = !isReplSet && !shouldRecoverFromOplogAsStandalone;
     if (journalWritesBecauseStandalone) {
         return true;

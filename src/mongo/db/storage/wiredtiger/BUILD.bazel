@@ -112,6 +112,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:container",
         "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:execution_context",
@@ -173,6 +174,7 @@ mongo_cc_library(
     deps = [
         ":storage_wiredtiger_core",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/rss:persistence_provider_impl",
         "//src/mongo/db/storage:record_store_test_harness",
         "//src/mongo/util:clock_source_mock",
     ],
@@ -228,6 +230,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/kv:kv_engine_test_harness",
         "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
     ],
 )

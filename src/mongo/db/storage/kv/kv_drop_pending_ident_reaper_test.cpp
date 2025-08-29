@@ -90,7 +90,8 @@ public:
         return nullptr;
     }
 
-    Status createRecordStore(const NamespaceString& nss,
+    Status createRecordStore(const rss::PersistenceProvider&,
+                             const NamespaceString& nss,
                              StringData ident,
                              const RecordStore::Options& options) override {
         return Status::OK();
@@ -108,6 +109,7 @@ public:
         return {};
     }
     Status createSortedDataInterface(
+        const rss::PersistenceProvider&,
         RecoveryUnit&,
         const NamespaceString& nss,
         const UUID& uuid,

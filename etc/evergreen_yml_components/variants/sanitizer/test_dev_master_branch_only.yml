@@ -226,11 +226,11 @@ buildvariants:
       - name: .release_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .default !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .default .requires_large_host !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default !.requires_large_host !.requires_large_host_debug_mode !.uses_docker !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default .requires_large_host !.uses_docker !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
-      - name: .default .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default .requires_large_host_debug_mode !.uses_docker !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
       - name: .non_deterministic !.requires_large_host !.requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
@@ -480,8 +480,8 @@ buildvariants:
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel8.8-xlarge
-      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
-      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel8.8-xlarge
       - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
@@ -583,11 +583,11 @@ buildvariants:
       - name: .release_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .default !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
-      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default !.requires_large_host !.requires_large_host_tsan !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .default .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host_tsan !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
       - name: .non_deterministic !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags

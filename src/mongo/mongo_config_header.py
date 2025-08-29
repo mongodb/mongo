@@ -432,6 +432,7 @@ def get_config_header_substs():
         ("@mongo_config_tcmalloc_gperf@", "MONGO_CONFIG_TCMALLOC_GPERF"),
         ("@mongo_config_streams@", "MONGO_CONFIG_STREAMS"),
         ("@mongo_config_otel@", "MONGO_CONFIG_OTEL"),
+        ("@mongo_config_disagg_storage@", "MONGO_CONFIG_DISAGG_STORAGE"),
         (
             "@mongo_config_mutex_observation@",
             "MONGO_CONFIG_MUTEX_OBSERVATION",

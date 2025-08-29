@@ -216,7 +216,7 @@ MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTes
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
 
-    storageGlobalParams.reset();
+    storageGlobalParams.reset_forTest();
 }
 
 }  // namespace mongo

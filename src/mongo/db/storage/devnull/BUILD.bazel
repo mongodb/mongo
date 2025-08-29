@@ -18,6 +18,7 @@ mongo_cc_library(
     hdrs = [
         "devnull_kv_engine.h",
         "ephemeral_catalog_record_store.h",
+        "//src/mongo/db/rss:persistence_provider.h",
         "//src/mongo/db/storage/kv:kv_engine.h",
     ],
     deps = [

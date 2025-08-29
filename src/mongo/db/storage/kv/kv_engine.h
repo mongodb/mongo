@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -126,7 +127,8 @@ public:
      *
      * Creates a 'RecordStore' and generated from the provided 'options'.
      */
-    virtual Status createRecordStore(const NamespaceString& nss,
+    virtual Status createRecordStore(const rss::PersistenceProvider&,
+                                     const NamespaceString& nss,
                                      StringData ident,
                                      const RecordStore::Options& options) = 0;
 
@@ -201,6 +203,7 @@ public:
     virtual bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) = 0;
 
     virtual Status createSortedDataInterface(
+        const rss::PersistenceProvider&,
         RecoveryUnit&,
         const NamespaceString& nss,
         const UUID& uuid,
@@ -257,10 +260,11 @@ public:
      * This recovery process makes no guarantees about the integrity of data recovered or even that
      * it still exists when recovered.
      */
-    virtual Status recoverOrphanedIdent(const NamespaceString& nss,
+    virtual Status recoverOrphanedIdent(const rss::PersistenceProvider& provider,
+                                        const NamespaceString& nss,
                                         StringData ident,
                                         const RecordStore::Options& recordStoreOptions) {
-        auto status = createRecordStore(nss, ident, recordStoreOptions);
+        auto status = createRecordStore(provider, nss, ident, recordStoreOptions);
         if (status.isOK()) {
             return {ErrorCodes::DataModifiedByRepair, "Orphan recovery created a new record store"};
         }
@@ -374,6 +378,22 @@ public:
      * system about journaled write progress.
      */
     virtual void setJournalListener(JournalListener* jl) = 0;
+
+    /**
+     * See `StorageEngine::setLastMaterializedLsn`
+     */
+    virtual void setLastMaterializedLsn(uint64_t lsn) {}
+
+    /**
+     * Configures the specified checkpoint as the starting point for recovery.
+     */
+    virtual void setRecoveryCheckpointMetadata(StringData checkpointMetadata) {}
+
+    /**
+     * Configures the storage engine as the leader, allowing it to flush checkpoints to remote
+     * storage.
+     */
+    virtual void promoteToLeader() {}
 
     /**
      * See `StorageEngine::setStableTimestamp`

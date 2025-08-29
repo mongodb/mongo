@@ -59,6 +59,7 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_test_fixture.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -2250,7 +2251,9 @@ TEST_F(RollbackImplObserverInfoTest,
     auto uuid = UUID::gen();
 
     BSONObj indexObj;
-    if (shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(_opCtx.get()))) {
+    if (shouldReplicateLocalCatalogIdentifers(
+            rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider(),
+            VersionContext::getDecoration(_opCtx.get()))) {
         indexObj = BSON("createIndexes" << nss.coll() << "spec"
                                         << BSON("v" << 2 << "key"
                                                     << "x"

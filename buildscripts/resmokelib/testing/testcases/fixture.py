@@ -50,6 +50,10 @@ class FixtureSetupTestCase(FixtureTestCase):
             self.fixture.await_ready()
             if (
                 not isinstance(self.fixture, (fixture_interface.NoOpFixture, ExternalFixture))
+                # TODO(SERVER-109851): Remove this.
+                # disagg mongod does not yet support "refreshLogicalSessionCacheNow" because it requires
+                # wtimeout support.
+                and self.fixture.__class__.__name__ != "DisaggFixture"
                 # Replica set with --configsvr cannot run refresh unless it is part of a sharded cluster.
                 and not (
                     isinstance(self.fixture, ReplicaSetFixture)

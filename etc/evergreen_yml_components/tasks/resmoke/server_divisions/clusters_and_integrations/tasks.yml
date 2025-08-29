@@ -1962,14 +1962,15 @@ tasks:
 
   - <<: *jstestfuzz_template
     name: resharding_timeseries_fuzzer_gen
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_cluster_scalability",
         "default",
         "feature_flag_guarded",
         "random_name",
         "require_npm",
         "requires_all_feature_flags",
+        # TODO SERVER-109849: Remove this tag.
+        "incompatible_disaggregated_storage",
       ]
     commands:
       - func: "generate resmoke tasks"

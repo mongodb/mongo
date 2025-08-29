@@ -241,6 +241,15 @@ TEST_F(FlowControlTest, CalculatingTickets) {
     currMemberData.emplace_back(constructMemberData(Timestamp(2000)));
     currMemberData.emplace_back(constructMemberData(Timestamp(3000)));
 
+    flow_control_details::ReplicationTimestampProvider timestampProvider(replCoordMock);
+    timestampProvider.setPrevMemberData_forTest(prevMemberData);
+    timestampProvider.setCurrMemberData_forTest(currMemberData);
+    auto prevSustainerTimestamp = timestampProvider.getPrevSustainerTimestamp();
+    auto currSustainerTimestamp = timestampProvider.getCurrSustainerTimestamp();
+
+    ASSERT_EQ(Timestamp(1000), prevSustainerTimestamp);
+    ASSERT_EQ(Timestamp(2000), currSustainerTimestamp);
+
     // Construct samples where Timestamp X maps to operation number X.
     for (int ts = 1; ts <= 3000; ++ts) {
         flowControl->sample(Timestamp(ts), 1);
@@ -251,8 +260,8 @@ TEST_F(FlowControlTest, CalculatingTickets) {
     const std::uint64_t thresholdLag = 1;
     const std::uint64_t currLag = thresholdLag;
     ASSERT_EQ(1900,
-              flowControl->_calculateNewTicketsForLag(prevMemberData,
-                                                      currMemberData,
+              flowControl->_calculateNewTicketsForLag(prevSustainerTimestamp,
+                                                      currSustainerTimestamp,
                                                       locksUsedLastPeriod,
                                                       locksPerOp,
                                                       currLag,

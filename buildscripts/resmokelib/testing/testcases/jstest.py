@@ -3,7 +3,9 @@
 import copy
 import os
 import os.path
+import random
 import shutil
+import string
 import sys
 import threading
 import uuid
@@ -67,6 +69,9 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         global_vars["MongoRunner.dataPath"] = data_path
 
         test_data = global_vars.get("TestData", {}).copy()
+        test_run_id = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+        self.fixture.test_run_id = test_run_id
+        test_data["test_run_id"] = test_run_id
         test_data["minPort"] = core.network.PortAllocator.min_test_port(self.fixture.job_num)
         test_data["maxPort"] = core.network.PortAllocator.max_test_port(self.fixture.job_num)
         test_data["peerPids"] = self.fixture.pids()

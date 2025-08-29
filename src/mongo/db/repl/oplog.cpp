@@ -105,6 +105,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -211,7 +212,10 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
 boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
     OperationContext* opCtx, const OplogEntry& oplogEntry) {
     auto& o2 = oplogEntry.getObject2();
-    if (!o2 || !shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
+    if (!o2 ||
+        !shouldReplicateLocalCatalogIdentifers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+            VersionContext::getDecoration(opCtx))) {
         // Either no catalog identifier information was provided, or replicated local catalog
         // identifiers are not supported.
         return boost::none;
@@ -365,7 +369,9 @@ void createIndexForApplyOps(OperationContext* opCtx,
     IndexBuildInfo indexBuildInfo = [&] {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         if (!indexMetadata ||
-            !shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx))) {
+            !shouldReplicateLocalCatalogIdentifers(
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+                VersionContext::getDecoration(opCtx))) {
             return IndexBuildInfo(indexSpec, *storageEngine, indexCollection->ns().dbName());
         }
 
@@ -733,8 +739,13 @@ void createOplog(OperationContext* opCtx,
         uow.commit();
     });
 
-    /* sync here so we don't get any surprising lag later when we try to sync */
-    service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
+    // We cannot guarantee that we have a stable timestamp at this point, but if the persistence
+    // provider supports unstable checkpoints, we can take a checkpoint now to avoid any surprising
+    // lag later when we try to sync.
+    auto& rss = rss::ReplicatedStorageService::get(service);
+    if (rss.getPersistenceProvider().supportsUnstableCheckpoints()) {
+        service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
+    }
 }
 
 void createOplog(OperationContext* opCtx) {
@@ -961,7 +972,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           auto swOplogEntry = IndexBuildOplogEntry::parse(
               opCtx,
               entry,
-              shouldReplicateLocalCatalogIdentifers(VersionContext::getDecoration(opCtx)));
+              shouldReplicateLocalCatalogIdentifers(
+                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+                  VersionContext::getDecoration(opCtx)));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'startIndexBuild' oplog entry");

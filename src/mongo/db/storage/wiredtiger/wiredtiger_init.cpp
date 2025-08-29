@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
@@ -141,7 +142,9 @@ public:
             }
         }
 
-        WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
+            getWiredTigerConfigFromStartupOptions(provider);
         wtConfig.cacheSizeMB = cacheMB;
         wtConfig.inMemory = params.inMemory;
         if (params.inMemory) {
@@ -154,6 +157,7 @@ public:
             &opCtx->fastClockSource(),
             std::move(wtConfig),
             WiredTigerExtensions::get(opCtx->getServiceContext()),
+            provider,
             params.repair,
             isReplSet,
             shouldRecoverFromOplogAsStandalone,

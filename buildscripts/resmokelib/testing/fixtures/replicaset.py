@@ -74,6 +74,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         launch_mongot=False,
         load_all_extensions=False,
         router_endpoint_for_mongot: Optional[int] = None,
+        disagg_base_config=None,
     ):
         """Initialize ReplicaSetFixture."""
 
@@ -138,6 +139,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         # Set the default oplogSize to 511MB.
         self.mongod_options.setdefault("oplogSize", 511)
+
+        self.disagg_base_config = disagg_base_config
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -462,12 +465,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         primary = self.nodes[0]
         client = primary.mongo_client()
         while True:
-            self.logger.info("Waiting for primary on port %d to be elected.", primary.port)
-            is_master = client.admin.command("isMaster")["ismaster"]
-            if is_master:
+            self.logger.info(
+                "Waiting for primary on port %d to be elected.", primary.port)
+            cmd_result = client.admin.command("isMaster")
+            if cmd_result["ismaster"]:
                 break
             time.sleep(0.1)  # Wait a little bit before trying again.
-        self.logger.info("Primary on port %d successfully elected.", primary.port)
+        self.logger.info(
+            "Primary on port %d successfully elected.", primary.port)
 
     def _await_secondaries(self):
         # Wait for the secondaries to become available.

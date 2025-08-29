@@ -144,6 +144,12 @@ public:
 
     void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) override;
 
+    void setLastMaterializedLsn(uint64_t lsn) override;
+
+    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) override;
+
+    void promoteToLeader() override;
+
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
     Timestamp getStableTimestamp() const override;

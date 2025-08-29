@@ -129,7 +129,14 @@ public:
     boost::optional<Timestamp> getLastStableRecoveryTimestamp() const final {
         MONGO_UNREACHABLE;
     }
-    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
+
+    void setLastMaterializedLsn(uint64_t lsn) final {}
+
+    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final {}
+
+    void promoteToLeader() final {}
+
+    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {}
     Timestamp getStableTimestamp() const override {
         return Timestamp();
     }

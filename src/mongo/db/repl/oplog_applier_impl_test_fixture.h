@@ -277,6 +277,7 @@ protected:
         return OpTime(Timestamp(Seconds(lastSecond++), 0), 1LL);
     }
 
+    virtual std::unique_ptr<ReplicationCoordinator> makeReplCoord(ServiceContext*);
     void setUp() override;
     void tearDown() override;
 
@@ -415,6 +416,13 @@ void createIndex(OperationContext* opCtx,
                  UUID collUUID,
                  const BSONObj& spec);
 
-}  // namespace MONGO_MOD_PUB repl
+/**
+ * Generate a new catalog identifier.
+ */
+CreateCollCatalogIdentifier newCatalogIdentifier(OperationContext* opCtx,
+                                                 const DatabaseName& dbName,
+                                                 bool includeIdIndexIdent);
 
+
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

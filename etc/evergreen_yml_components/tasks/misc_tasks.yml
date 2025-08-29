@@ -431,7 +431,13 @@ tasks:
 
   - <<: *run_jepsen_template
     name: jepsen_config_fuzzer_list-append
-    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen_docker"]
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "experimental",
+        "jepsen_docker",
+        "uses_docker",
+      ]
     commands:
       - func: "do setup"
       - func: "do jepsen docker setup"
@@ -514,7 +520,13 @@ tasks:
 
   - <<: *run_jepsen_template
     name: jepsen_list-append
-    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen_docker"]
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "experimental",
+        "jepsen_docker",
+        "uses_docker",
+      ]
     commands:
       - func: "do setup"
       - func: "do jepsen docker setup"
@@ -689,11 +701,7 @@ tasks:
 
   # Check that the mutational fuzzer can parse JS files modified in a patch build.
   - name: lint_fuzzer_sanity_patch
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "development_critical_single_variant",
-      ]
+    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
     patch_only: true
     commands:
       - command: manifest.load
@@ -1516,6 +1524,22 @@ tasks:
       ]
     commands:
       - func: "generate smoke test tasks"
+
+  - name: push_mongod_to_ecr
+    tags: ["assigned_to_jira_team_disag_mongod"]
+    depends_on:
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch dist tarball"
+      - func: "extract binaries"
+      - command: ec2.assume_role
+        params:
+          role_arn: "${disagg_storage_ecr_arn}"
+      - func: "build and push module images"
 
   - name: selinux_rhel8_enterprise
     tags: ["assigned_to_jira_team_server_security", "experimental"]

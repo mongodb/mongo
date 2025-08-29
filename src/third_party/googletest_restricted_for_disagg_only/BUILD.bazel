@@ -1,0 +1,48 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "gtest",
+    srcs = glob(
+        include = [
+            "dist/googletest/src/*.cc",
+            "dist/googletest/src/*.h",
+            "dist/googletest/include/gtest/**/*.h",
+            "dist/googlemock/src/*.cc",
+            "dist/googlemock/include/gmock/**/*.h",
+        ],
+        exclude = [
+            "dist/googletest/src/gtest-all.cc",
+            "dist/googletest/src/gtest_main.cc",
+            "dist/googlemock/src/gmock-all.cc",
+            "dist/googlemock/src/gmock_main.cc",
+        ],
+    ),
+    hdrs = glob([
+        "dist/googletest/include/gmock/*.h",
+        "dist/googletest/include/gtest/*.h",
+    ]),
+    defines = [
+        "GTEST_DONT_DEFINE_ASSERT_EQ=1",
+        "GTEST_DONT_DEFINE_ASSERT_FALSE=1",
+        "GTEST_DONT_DEFINE_ASSERT_GE=1",
+        "GTEST_DONT_DEFINE_ASSERT_GT=1",
+        "GTEST_DONT_DEFINE_ASSERT_LE=1",
+        "GTEST_DONT_DEFINE_ASSERT_LT=1",
+        "GTEST_DONT_DEFINE_ASSERT_NE=1",
+        "GTEST_DONT_DEFINE_ASSERT_TRUE=1",
+        "GTEST_DONT_DEFINE_ASSERT_XY=1",
+        "GTEST_DONT_DEFINE_FAIL=1",
+        "GTEST_DONT_DEFINE_SUCCEED=1",
+        "GTEST_DONT_DEFINE_TEST=1",
+        "GTEST_DONT_DEFINE_TEST_F=1",
+        "GTEST_NO_ABSL_FLAGS=1",
+    ],
+    includes = [
+        "dist/googlemock",
+        "dist/googlemock/include",
+        "dist/googletest",
+        "dist/googletest/include",
+    ],
+)

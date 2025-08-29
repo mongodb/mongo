@@ -716,6 +716,26 @@ public:
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const = 0;
 
     /**
+     * Sets the last materialized LSN, marking the highest phylog LSN
+     * that has been successfully written to the page server and should have no holes.
+     *
+     * TODO: Revisit how to handle cases where mongod speaks with a log server
+     * in a non-local zone due to failover.
+     */
+    virtual void setLastMaterializedLsn(uint64_t lsn) = 0;
+
+    /**
+     * Configures the specified checkpoint as the starting point for recovery.
+     */
+    virtual void setRecoveryCheckpointMetadata(StringData checkpointMetadata) = 0;
+
+    /**
+     * Configures the storage engine as the leader, allowing it to flush checkpoints to remote
+     * storage.
+     */
+    virtual void promoteToLeader() = 0;
+
+    /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This
      * timestamp must not decrease unless force=true is set, in which case we force the stable
      * timestamp, the oldest timestamp, and the commit timestamp backward.

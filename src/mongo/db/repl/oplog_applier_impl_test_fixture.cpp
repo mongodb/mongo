@@ -62,6 +62,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -198,14 +199,18 @@ void OplogApplierImplOpObserver::onCollMod(OperationContext* opCtx,
     onCollModFn(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
 }
 
+std::unique_ptr<ReplicationCoordinator> OplogApplierImplTest::makeReplCoord(
+    ServiceContext* serviceContext) {
+    return std::make_unique<ReplicationCoordinatorMock>(serviceContext);
+}
+
 void OplogApplierImplTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
     serviceContext = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
-    ReplicationCoordinator::set(serviceContext,
-                                std::make_unique<ReplicationCoordinatorMock>(serviceContext));
+    ReplicationCoordinator::set(serviceContext, makeReplCoord(serviceContext));
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
     StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
@@ -623,6 +628,22 @@ void createIndex(OperationContext* opCtx,
     repl::UnreplicatedWritesBlock noRep(opCtx);
     indexBuildsCoord->createIndex(
         opCtx, collUUID, spec, IndexBuildsManager::IndexConstraints::kEnforce, false);
+}
+
+CreateCollCatalogIdentifier newCatalogIdentifier(OperationContext* opCtx,
+                                                 const DatabaseName& dbName,
+                                                 bool includeIdIndexIdent) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto mdbCatalog = storageEngine->getMDBCatalog();
+    invariant(mdbCatalog);
+
+    CreateCollCatalogIdentifier catalogIdentifier;
+    catalogIdentifier.catalogId = mdbCatalog->reserveCatalogId(opCtx);
+    catalogIdentifier.ident = storageEngine->generateNewCollectionIdent(dbName);
+    if (includeIdIndexIdent) {
+        catalogIdentifier.idIndexIdent = storageEngine->generateNewIndexIdent(dbName);
+    }
+    return catalogIdentifier;
 }
 
 }  // namespace repl

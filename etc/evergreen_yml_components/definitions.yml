@@ -1236,6 +1236,19 @@ functions:
       args:
         - "./src/evergreen/resmoke_tests_execute_bazel.sh"
 
+  "assume ECR role": &assume_ecr_role
+    command: ec2.assume_role
+    params:
+      role_arn: "${disagg_storage_ecr_arn}"
+
+  "fetch module images": &fetch_module_images
+    command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true # needed to get the AWS secrets from ec2.assume_role
+      args:
+        - "./src/evergreen/fetch_module_images.sh"
+
   "retrieve generated test configuration":
     &retrieve_generated_test_configuration
     command: s3.get
@@ -1472,6 +1485,8 @@ functions:
     - *f_expansions_write
     - *sign_macos_dev_binaries
     - *multiversion_exclude_tags_generate
+    - *assume_ecr_role
+    - *fetch_module_images
     - *execute_resmoke_tests
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -1521,6 +1536,8 @@ functions:
     - *configure_evergreen_api_credentials
     - *sign_macos_dev_binaries
     - *multiversion_exclude_tags_generate
+    - *assume_ecr_role
+    - *fetch_module_images
     - *execute_resmoke_tests
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -3294,3 +3311,11 @@ functions:
           [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
         args:
           - "./src/evergreen/container_registry_login.sh"
+
+  "build and push module images": &build_and_push_module_images
+    command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true # needed to get the AWS secrets from ec2.assume_role
+      args:
+        - "./src/evergreen/build_and_push_module_images.sh"

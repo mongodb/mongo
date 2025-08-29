@@ -221,17 +221,13 @@ std::string WiredTigerRecordStore::generateCreateString(
 
     ss << "block_compressor=" << wtTableConfig.blockCompressor << ",";
 
+    // TODO: Replace WiredTigerCustomizationHooks with WiredTigerCustomizationHooksRegistry.
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(tableName);
+    ss << WiredTigerCustomizationHooksRegistry::get(getGlobalServiceContext())
+              .getTableCreateConfig(tableName);
 
     ss << wtTableConfig.extraCreateOptions << ",";
-
-    if (isOplog) {
-        // force file for oplog
-        ss << "type=file,";
-        // Tune down to 10m.  See SERVER-16247
-        ss << "memory_page_max=10m,";
-    }
 
     // By default, WiredTiger silently ignores a create table command if the specified ident already
     // exists - even if the existing table has a different configuration.
@@ -1419,7 +1415,7 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
               .engineName = oplogParams.engineName,
               .keyFormat = KeyFormat::Long,
               .overwrite = true,
-              .isLogged = true,
+              .isLogged = oplogParams.isLogged,
               .forceUpdateWithFullDocument = oplogParams.forceUpdateWithFullDocument,
               .inMemory = oplogParams.inMemory,
               .sizeStorer = oplogParams.sizeStorer,

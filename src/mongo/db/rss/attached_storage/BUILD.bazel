@@ -1,0 +1,43 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "attached_persistence_provider",
+    srcs = [
+        "attached_persistence_provider.cpp",
+    ],
+    hdrs = [
+        "attached_persistence_provider.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/rss:replicated_storage_service",
+    ],
+)
+
+mongo_cc_library(
+    name = "attached_service_lifecycle",
+    srcs = [
+        "attached_service_lifecycle.cpp",
+    ],
+    hdrs = [
+        "attached_service_lifecycle.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:flow_control",
+        "//src/mongo/db/repl:repl_coordinator_impl",
+        "//src/mongo/db/repl:serveronly_repl",
+        "//src/mongo/db/rss:replicated_storage_service",
+    ],
+)

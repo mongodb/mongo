@@ -40,6 +40,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -657,6 +658,45 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
     }
 }
 
+TEST(WiredTigerRecordStoreTest, CreateOnExistingIdentFails) {
+    const std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
+    const std::string ns = "testRecordStore";
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+    const std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
+    bool isReplSet = false;
+    bool shouldRecoverFromOplogAsStandalone =
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(
+        provider, nss, isReplSet, shouldRecoverFromOplogAsStandalone);
+    const std::string config = WiredTigerRecordStore::generateCreateString(
+        NamespaceStringUtil::serializeForCatalog(nss), wtTableConfig);
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        WiredTigerRecoveryUnit* ru =
+            checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
+        WiredTigerSession* s = ru->getSession();
+        invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
+        uow.commit();
+    }
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        WiredTigerRecoveryUnit* ru =
+            checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
+        WiredTigerSession* s = ru->getSession();
+        const auto ret = s->create(uri.c_str(), config.c_str());
+        ASSERT_EQ(EEXIST, ret);
+        const auto status = wtRCToStatus(ret, *s);
+        ASSERT_NOT_OK(status);
+        uow.commit();
+    }
+}
+
 // Verify clustered record stores.
 // This test case complements StorageEngineTest:TemporaryRecordStoreClustered which verifies
 // clustered temporary record stores.
@@ -673,8 +713,9 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     bool isReplSet = false;
     bool shouldRecoverFromOplogAsStandalone = false;
-    wtTableConfig.logEnabled =
-        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(
+        provider, nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     const std::string config = WiredTigerRecordStore::generateCreateString(
         NamespaceStringUtil::serializeForCatalog(nss), wtTableConfig);
     {
@@ -692,8 +733,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.engineName = std::string{kWiredTigerEngineName};
     params.keyFormat = KeyFormat::String;
     params.overwrite = false;
-    params.isLogged =
-        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
+    params.isLogged = WiredTigerUtil::useTableLogging(
+        provider, nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     params.forceUpdateWithFullDocument = false;
     params.inMemory = false;
     params.sizeStorer = nullptr;

@@ -38,6 +38,7 @@
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
@@ -70,7 +71,10 @@ namespace {
 class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelper {
 public:
     WiredTigerRecoveryUnitHarnessHelper() : _dbpath("wt_test") {
-        WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        auto& provider =
+            rss::ReplicatedStorageService::get(serviceContext()).getPersistenceProvider();
+        WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
+            getWiredTigerConfigFromStartupOptions(provider);
         wtConfig.cacheSizeMB = 1;
 
         // Use a replica set so that writes to replicated collections are not journaled and thus
@@ -81,6 +85,7 @@ public:
                                                  &_cs,
                                                  std::move(wtConfig),
                                                  WiredTigerExtensions::get(serviceContext()),
+                                                 provider,
                                                  false /* repair */,
                                                  true /* isReplSet */,
                                                  false /* shouldRecoverFromOplogAsStandalone */,
@@ -107,7 +112,8 @@ public:
         std::string ident = "collection-" + ns;
         std::replace(ident.begin(), ident.end(), '.', '-');
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        const auto res = _engine->createRecordStore(nss, ident, RecordStore::Options{});
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        const auto res = _engine->createRecordStore(provider, nss, ident, RecordStore::Options{});
         return _engine->getRecordStore(opCtx, nss, ident, RecordStore::Options{}, UUID::gen());
     }
 

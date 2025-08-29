@@ -418,6 +418,7 @@ public:
         int64_t oplogMaxSize;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;
+        bool isLogged;
         bool forceUpdateWithFullDocument;
     };
 

@@ -35,6 +35,7 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
         "//src/mongo/db/local_catalog:catalog_impl",
         "//src/mongo/db/op_observer",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_options",

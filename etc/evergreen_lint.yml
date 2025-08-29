@@ -79,6 +79,7 @@ rules:
           - assigned_to_jira_team_server_workload_scheduling
           - assigned_to_jira_team_server_networking_and_observability
           - assigned_to_jira_team_server_integration
+          - assigned_to_jira_team_server_disagg
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/rnd_dev_prod.yaml
           - assigned_to_jira_team_devprod_build
@@ -130,6 +131,7 @@ rules:
           - incompatible_inmemory
           - incompatible_all_feature_flags
           - incompatible_development_variant
+          - incompatible_disaggregated_storage
           - requires_compile_variant
           - requires_large_host
           - requires_large_host_tsan

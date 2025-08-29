@@ -45,10 +45,14 @@
 namespace mongo {
 
 StorageGlobalParams::StorageGlobalParams() {
-    reset();
+    _reset();
 }
 
-void StorageGlobalParams::reset() {
+void StorageGlobalParams::reset_forTest() {
+    _reset();
+}
+
+void StorageGlobalParams::_reset() {
     engine = "wiredTiger";
     engineSetByUser = false;
     dbpath = kDefaultDbPath;
@@ -60,7 +64,7 @@ void StorageGlobalParams::reset() {
 
     noTableScan.store(false);
     directoryperdb = false;
-    syncdelay.store(60.0);
+    syncdelay.store(-1.0);
     queryableBackupMode = false;
     groupCollections = false;
     oplogMinRetentionHours.store(0.0);
