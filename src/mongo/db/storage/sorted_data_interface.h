@@ -643,7 +643,7 @@ private:
     int32_t _ksOriginalSize = 0;
     int32_t _ridSize = 0;
     int32_t _tbSize = 0;
-    key_string::Version _version;
+    key_string::Version _version = key_string::Version::kLatestVersion;
     const RecordId* _id = nullptr;
 };
 
