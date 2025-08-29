@@ -54,7 +54,6 @@ TEST(parseReplSetSeedList, ParseReplSetSeedList_BadPort) {
                        "bad --replSet seed hostname (could not parse to HostAndPort)");
 }
 
-// TODO SERVER-106541: If whitespace constraints change, this test needs to be edited or removed.
 TEST_F(ServiceContextTest, ParseReplSetSeedList_AllowWhitespaceInHostName) {
     ReplicationCoordinatorExternalStateMock rses;
 
