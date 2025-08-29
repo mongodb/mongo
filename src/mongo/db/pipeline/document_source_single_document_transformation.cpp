@@ -83,7 +83,6 @@ StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
     // This transformation could be part of a 'collectionless' change stream on an entire
     // database or cluster, mark as independent of any collection if so.
     constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
-    constraints.noFieldModifications = getTransformer().noFieldModifications();
     return constraints;
 }
 

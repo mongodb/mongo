@@ -637,7 +637,6 @@ StageConstraints DocumentSourceInternalChangeStreamMatch::constraints(
                                  LookupRequirement::kAllowed,
                                  UnionRequirement::kAllowed,
                                  ChangeStreamRequirement::kAllowlist};
-    constraints.noFieldModifications = true;
     constraints.consumesLogicalCollectionData = false;
     return constraints;
 }

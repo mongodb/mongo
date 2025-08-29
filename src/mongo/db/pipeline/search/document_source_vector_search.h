@@ -162,9 +162,6 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.unionRequirement = UnionRequirement::kAllowed;
-        if (!isStoredSource()) {
-            constraints.noFieldModifications = true;
-        }
         constraints.setConstraintsForNoInputSources();
         // All search stages are unsupported on timeseries collections.
         constraints.canRunOnTimeseries = false;

@@ -73,14 +73,6 @@ public:
     }
 
     /**
-     * Method used to toggle the 'noFieldModifications' stage constraint. True only if guaranteed
-     * this transformation will not modify any document fields (although it may modify metadata).
-     */
-    virtual bool noFieldModifications() const {
-        return false;
-    }
-
-    /**
      * Returns a document describing this transformation. For example, this function will return
      * {_id: 0, x: 1} for the stage parsed from {$project: {_id: 0, x: 1}}.
      */

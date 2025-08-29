@@ -51,10 +51,6 @@ public:
         return TransformerType::kSetMetadata;
     }
 
-    bool noFieldModifications() const final {
-        return true;
-    }
-
     DocumentMetadataFields::MetaType getMetaType() {
         return _metaType;
     }

@@ -167,9 +167,6 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
 
 StageConstraints DocumentSourceSearch::constraints(PipelineSplitState pipeState) const {
     auto constraints = DocumentSourceInternalSearchMongotRemote::getSearchDefaultConstraints();
-    if (!isStoredSource()) {
-        constraints.noFieldModifications = true;
-    }
     return constraints;
 }
 bool checkRequiresSearchSequenceToken(DocumentSourceContainer::iterator itr,

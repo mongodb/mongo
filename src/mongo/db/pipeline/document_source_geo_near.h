@@ -81,16 +81,14 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        StageConstraints constraints{StreamType::kStreaming,
-                                     PositionRequirement::kCustom,
-                                     HostTypeRequirement::kAnyShard,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed};
-        constraints.noFieldModifications = (!includeLocs && !distanceField);
-        return constraints;
+        return StageConstraints{StreamType::kStreaming,
+                                PositionRequirement::kCustom,
+                                HostTypeRequirement::kAnyShard,
+                                DiskUseRequirement::kNoDiskUse,
+                                FacetRequirement::kNotAllowed,
+                                TransactionRequirement::kAllowed,
+                                LookupRequirement::kAllowed,
+                                UnionRequirement::kAllowed};
     }
 
     void validatePipelinePosition(bool alreadyOptimized,

@@ -66,16 +66,14 @@ public:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        StageConstraints constraints{StreamType::kBlocking,
-                                     PositionRequirement::kNone,
-                                     HostTypeRequirement::kNone,
-                                     DiskUseRequirement::kWritesTmpData,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed};
-        constraints.noFieldModifications = true;
-        return constraints;
+        return StageConstraints{StreamType::kBlocking,
+                                PositionRequirement::kNone,
+                                HostTypeRequirement::kNone,
+                                DiskUseRequirement::kWritesTmpData,
+                                FacetRequirement::kAllowed,
+                                TransactionRequirement::kAllowed,
+                                LookupRequirement::kAllowed,
+                                UnionRequirement::kAllowed};
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {

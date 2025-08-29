@@ -155,8 +155,6 @@ struct StageConstraints {
                 std::min(newReqs.lookupRequirement, stageConstraints.lookupRequirement);
             newReqs.unionRequirement =
                 std::min(newReqs.unionRequirement, stageConstraints.unionRequirement);
-            newReqs.noFieldModifications =
-                std::min(newReqs.noFieldModifications, stageConstraints.noFieldModifications);
         }
         return newReqs;
     }
@@ -402,10 +400,6 @@ struct StageConstraints {
     // If set, merge should be performed on the specified shard.
     boost::optional<ShardId> mergeShardId = boost::none;
 
-    // If true, then this stage only retrieves and/or reorders documents from a base collection
-    // without making any modifications or transformations to the fields.
-    bool noFieldModifications = false;
-
     // If false, then this stage should never run on a timeseries collection.
     bool canRunOnTimeseries = true;
 
@@ -426,7 +420,6 @@ struct StageConstraints {
             unionRequirement == other.unionRequirement &&
             preservesOrderAndMetadata == other.preservesOrderAndMetadata &&
             mergeShardId == other.mergeShardId &&
-            noFieldModifications == other.noFieldModifications &&
             consumesLogicalCollectionData == other.consumesLogicalCollectionData;
     }
 };
