@@ -198,15 +198,13 @@ class TestTimeout(_ResmokeSelftest):
             "--originSuite=resmoke_end2end_tests",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
-            "--repeatTests=2",
-            "--jobs=2",
         ]
         self.execute_resmoke(resmoke_args, sentinel_file="timeout0")
 
-        archival_dirs_to_expect = 4  # 2 tests * 2 mongod
+        archival_dirs_to_expect = 2  # 2 mongod nodes
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
-        analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
+        analysis_pids_to_expect = 3  # 2 mongod + 1 mongo
         self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
     def test_task_timeout_no_passthrough(self):
@@ -220,15 +218,13 @@ class TestTimeout(_ResmokeSelftest):
             "--originSuite=resmoke_end2end_tests",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
-            "--repeatTests=2",
-            "--jobs=2",
         ]
         self.execute_resmoke(resmoke_args, sentinel_file="timeout1")
 
-        archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
+        archival_dirs_to_expect = 4  # 2 mongod nodes + 2 stacktrace files
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
-        analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
+        analysis_pids_to_expect = 3  # 2 mongod + 1 mongo
         self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
     # Test scenarios where an resmoke-launched process launches resmoke.
