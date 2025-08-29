@@ -791,7 +791,9 @@ conn_stats = [
     YieldStat('page_index_slot_ref_blocked', 'get reference for page index and slot time sleeping (usecs)'),
     YieldStat('page_locked_blocked', 'page acquire locked blocked'),
     YieldStat('page_read_blocked', 'page acquire read blocked'),
+    YieldStat('page_read_skip_deleted', 'pages skipped during read due to deleted state'),
     YieldStat('page_sleep', 'page acquire time sleeping (usecs)'),
+    YieldStat('page_split_restart', 'page split and restart read'),
     YieldStat('prepared_transition_blocked_page', 'page access yielded due to prepare state change'),
     YieldStat('txn_release_blocked', 'connection close blocked waiting for transaction state stabilization'),
 ]
@@ -1014,7 +1016,13 @@ conn_dsrc_stats = [
     CacheStat('cache_eviction_dirty', 'modified pages evicted'),
     CacheStat('cache_eviction_dirty_obsolete_tw', 'pages dirtied due to obsolete time window by eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
+    CacheStat('cache_eviction_pages_queued_clean', 'eviction walk pages queued that were clean'),
+    CacheStat('cache_eviction_pages_queued_dirty', 'eviction walk pages queued that were dirty'),
+    CacheStat('cache_eviction_pages_queued_updates', 'eviction walk pages queued that had updates'),
     CacheStat('cache_eviction_pages_seen', 'pages seen by eviction walk'),
+    CacheStat('cache_eviction_pages_seen_clean', 'eviction walk pages seen that were clean'),
+    CacheStat('cache_eviction_pages_seen_dirty', 'eviction walk pages seen that were dirty'),
+    CacheStat('cache_eviction_pages_seen_updates', 'eviction walk pages seen that had updates'),
     CacheStat('cache_eviction_random_sample_inmem_root', 'locate a random in-mem ref by examining all entries on the root page'),
     CacheStat('cache_eviction_split_internal', 'internal pages split during eviction'),
     CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
@@ -1147,6 +1155,7 @@ conn_dsrc_stats = [
     ##########################################
     # Reconciliation statistics
     ##########################################
+    RecStat('rec_hs_wrapup_next_prev_calls', 'cursor next/prev calls during HS wrapup search_near'),
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),

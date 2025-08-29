@@ -132,5 +132,6 @@ __wt_checksum_with_seed
 __wt_conf_gets
 __wt_verbose_error
 __wt_verbose_level
+__wt_verbose_level_id
 __wt_verbose_level_multi
 wt_shared

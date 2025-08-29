@@ -1998,6 +1998,9 @@ extern void __wt_verbose_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t ts, 
 extern void __wt_verbose_worker(WT_SESSION_IMPL *session, WT_VERBOSE_CATEGORY category,
   WT_VERBOSE_LEVEL level, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 4, 5)))
   WT_GCC_FUNC_DECL_ATTRIBUTE((cold));
+extern void __wt_verbose_worker_id(
+  WT_SESSION_IMPL *session, const WT_VERBOSE_MESSAGE_INFO *verb_info, const char *fmt, ...)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 3, 4))) WT_GCC_FUNC_DECL_ATTRIBUTE((cold));
 extern void __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l);
 extern void __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l);
 extern void __wti_blkcache_get_read_handle(WT_BLOCK *block);

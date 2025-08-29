@@ -34,18 +34,27 @@ from wtscenario import make_scenarios
 # test_cc10.py
 # Test that the obsolete cleanup thread can be configured to run at different intervals.
 class test_cc10(test_cc_base):
+    conn_config_common = 'statistics=(all),statistics_log=(json,wait=1,on_close=true),verbose=(checkpoint_cleanup:1)'
+
     waiting_time = [
-        ('1sec', dict(conn_config=f'checkpoint_cleanup=[wait=1]')),
-        ('2sec', dict(conn_config=f'checkpoint_cleanup=[wait=2]')),
-        ('3sec', dict(conn_config=f'checkpoint_cleanup=[wait=3]')),
+        ('1sec_wait_0sec_file_wait', dict(conn_config=f'{conn_config_common},checkpoint_cleanup=[wait=1,file_wait_ms=0]')),
+        ('1sec_wait_1sec_file_wait', dict(conn_config=f'{conn_config_common},checkpoint_cleanup=[wait=1,file_wait_ms=1000]')),
+        ('2sec_wait_2sec_file_wait', dict(conn_config=f'{conn_config_common},checkpoint_cleanup=[wait=2,file_wait_ms=2000]')),
+        ('3sec_wait_3sec_file_wait', dict(conn_config=f'{conn_config_common},checkpoint_cleanup=[wait=3,file_wait_ms=3000]')),
     ]
+
     scenarios = make_scenarios(waiting_time)
+
+    # We enabled verbose log level DEBUG_1 in this test, ignore the output.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_CHECKPOINT_CLEANUP')
 
     def test_cc10(self):
         # Create a table.
         create_params = 'key_format=i,value_format=S'
         nrows = 1000
-        uri = "table:cc02"
+        uri = "table:cc10"
 
         # Create and populate a table.
         self.session.create(uri, create_params)

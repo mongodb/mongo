@@ -191,6 +191,11 @@ struct __wt_session_impl {
         uint64_t total_reentry_hs_eviction_time;
     } reconcile_timeline;
 
+    /* Record statistics in an reconciliation. */
+    struct __wt_reconcile_stats {
+        uint64_t hs_wrapup_next_prev_calls;
+    } reconcile_stats;
+
     /*
      * Record the important timestamps of each stage in an eviction. If an eviction takes a long
      * time and times out, we can trace the time usage of each stage from this information.
@@ -294,20 +299,21 @@ struct __wt_session_impl {
 #define WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID 0x000020u
 #define WT_SESSION_DEBUG_RELEASE_EVICT 0x000040u
 #define WT_SESSION_EVICTION 0x000080u
-#define WT_SESSION_IGNORE_CACHE_SIZE 0x000100u
-#define WT_SESSION_IMPORT 0x000200u
-#define WT_SESSION_IMPORT_REPAIR 0x000400u
-#define WT_SESSION_INTERNAL 0x000800u
-#define WT_SESSION_LOGGING_INMEM 0x001000u
-#define WT_SESSION_NO_DATA_HANDLES 0x002000u
-#define WT_SESSION_NO_RECONCILE 0x004000u
-#define WT_SESSION_PREFETCH_ENABLED 0x008000u
-#define WT_SESSION_PREFETCH_THREAD 0x010000u
-#define WT_SESSION_QUIET_CORRUPT_FILE 0x020000u
-#define WT_SESSION_READ_WONT_NEED 0x040000u
-#define WT_SESSION_RESOLVING_TXN 0x080000u
-#define WT_SESSION_ROLLBACK_TO_STABLE 0x100000u
-#define WT_SESSION_SCHEMA_TXN 0x200000u
+#define WT_SESSION_HS_WRAPUP 0x000100u
+#define WT_SESSION_IGNORE_CACHE_SIZE 0x000200u
+#define WT_SESSION_IMPORT 0x000400u
+#define WT_SESSION_IMPORT_REPAIR 0x000800u
+#define WT_SESSION_INTERNAL 0x001000u
+#define WT_SESSION_LOGGING_INMEM 0x002000u
+#define WT_SESSION_NO_DATA_HANDLES 0x004000u
+#define WT_SESSION_NO_RECONCILE 0x008000u
+#define WT_SESSION_PREFETCH_ENABLED 0x010000u
+#define WT_SESSION_PREFETCH_THREAD 0x020000u
+#define WT_SESSION_QUIET_CORRUPT_FILE 0x040000u
+#define WT_SESSION_READ_WONT_NEED 0x080000u
+#define WT_SESSION_RESOLVING_TXN 0x100000u
+#define WT_SESSION_ROLLBACK_TO_STABLE 0x200000u
+#define WT_SESSION_SCHEMA_TXN 0x400000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 

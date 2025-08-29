@@ -1283,7 +1283,7 @@ err:
 
     /* Time since the shutdown has started. */
     __wt_timer_evaluate_ms(session, &timer, &conn->shutdown_timeline.shutdown_ms);
-    __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+    __wt_verbose_info_id(session, 1493200, WT_VERB_RECOVERY_PROGRESS,
       "shutdown was completed successfully and took %" PRIu64 "ms, including %" PRIu64
       "ms for the rollback to stable, and %" PRIu64 "ms for the checkpoint.",
       conn->shutdown_timeline.shutdown_ms, conn->shutdown_timeline.rts_ms,

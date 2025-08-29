@@ -1231,7 +1231,7 @@ done:
 
     /* Time since the recovery has started. */
     __wt_timer_evaluate_ms(session, &timer, &conn->recovery_timeline.recovery_ms);
-    __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+    __wt_verbose_level_multi_id(session, 1493201, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO,
       "recovery was completed successfully and took %" PRIu64 "ms, including %" PRIu64
       "ms for the log replay, %" PRIu64 "ms for the rollback to stable, and %" PRIu64
       "ms for the checkpoint.",

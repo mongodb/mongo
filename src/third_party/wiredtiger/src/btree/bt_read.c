@@ -302,8 +302,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
             if (LF_ISSET(WT_READ_CACHE | WT_READ_NO_WAIT))
                 return (WT_NOTFOUND);
             if (LF_ISSET(WT_READ_SKIP_DELETED) &&
-              __wti_delete_page_skip(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT)))
+              __wti_delete_page_skip(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
+                WT_STAT_CONN_INCR(session, page_read_skip_deleted);
                 return (WT_NOTFOUND);
+            }
             goto read;
         case WT_REF_DISK:
             /* Optionally limit reads to cache-only. */
@@ -350,6 +352,7 @@ read:
             stalled = true;
             break;
         case WT_REF_SPLIT:
+            WT_STAT_CONN_INCR(session, page_split_restart);
             return (WT_RESTART);
         case WT_REF_MEM:
             /*

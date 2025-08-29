@@ -789,6 +789,10 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 
     WT_STAT_CONN_DATA_INCR(session, cursor_next);
 
+    /* Track next calls during HS wrapup */
+    if (F_ISSET(session, WT_SESSION_HS_WRAPUP))
+        session->reconcile_stats.hs_wrapup_next_prev_calls++;
+
     flags = WT_READ_NO_SPLIT | WT_READ_SKIP_INTL; /* tree walk flags */
     if (truncating)
         LF_SET(WT_READ_TRUNCATE);
@@ -894,6 +898,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
                 continue;
             }
         }
+
         /*
          * If we saw a lot of deleted records on this page, or we went all the way through a page
          * and only saw deleted records, try to evict the page when we release it. Otherwise

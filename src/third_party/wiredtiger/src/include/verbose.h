@@ -7,6 +7,14 @@
  */
 
 #pragma once
+/*
+ * Structure to bundle verbose message identification details.
+ */
+struct __wt_verbose_message_info {
+    uint32_t id;
+    WT_VERBOSE_CATEGORY category;
+    WT_VERBOSE_LEVEL level;
+};
 
 /* clang-format off */
 #define WT_VERBOSE_CATEGORY_STR_INIT \
@@ -62,6 +70,8 @@
     /* AUTOMATIC VERBOSE ENUM STRING GENERATION STOP */ \
     }
 /* clang-format on */
+
+#define WT_DEFAULT_LOG_ID 1000000 /* Default log ID 1000000 for verbose messages */
 
 /* Convert a verbose level to its string representation. */
 #define WT_VERBOSE_LEVEL_STR(level, level_str) \
@@ -189,6 +199,27 @@ struct __wt_verbose_multi_category {
     __wt_verbose_level(session, category, WT_VERBOSE_INFO, fmt, __VA_ARGS__)
 
 /*
+ * __wt_verbose_level_id --
+ *     Check for the verbosity level and invoke the worker with an id.
+ */
+#define __wt_verbose_level_id(session, log_id, verb_category, verb_level, fmt, ...)      \
+    do {                                                                                 \
+        if (WT_VERBOSE_LEVEL_ISSET((session), verb_category, verb_level)) {              \
+            WT_VERBOSE_MESSAGE_INFO verb_message_info = {                                \
+              .id = log_id, .category = verb_category, .level = verb_level};             \
+            __wt_verbose_worker_id((session), (&verb_message_info), (fmt), __VA_ARGS__); \
+        }                                                                                \
+    } while (0)
+
+/*
+ * __wt_verbose_info_id --
+ *     Wrapper to __wt_verbose_level_id defaulting the verbosity level to WT_VERBOSE_INFO with a log
+ *     id.
+ */
+#define __wt_verbose_info_id(session, log_id, category, fmt, ...) \
+    __wt_verbose_level_id(session, log_id, category, WT_VERBOSE_INFO, fmt, __VA_ARGS__)
+
+/*
  * __wt_verbose_debug1 --
  *     Wrapper to __wt_verbose_level using the default (DEBUG_1) verbosity level.
  */
@@ -219,6 +250,20 @@ struct __wt_verbose_multi_category {
  */
 #define __wt_verbose(session, category, fmt, ...) \
     __wt_verbose_level(session, category, WT_VERBOSE_LEVEL_DEFAULT, fmt, __VA_ARGS__)
+
+/*
+ * __wt_verbose_level_multi_id --
+ *     Refer to __wt_verbose_level_multi for details.
+ */
+#define __wt_verbose_level_multi_id(session, log_id, multi_category, level, fmt, ...)          \
+    do {                                                                                       \
+        uint32_t __v_idx;                                                                      \
+        WT_VERBOSE_MULTI_CATEGORY __multi_category = multi_category;                           \
+        for (__v_idx = 0; __v_idx < __multi_category.cnt; __v_idx++) {                         \
+            __wt_verbose_level_id(                                                             \
+              session, log_id, __multi_category.categories[__v_idx], level, fmt, __VA_ARGS__); \
+        }                                                                                      \
+    } while (0)
 
 /*
  * __wt_verbose_level_multi --
