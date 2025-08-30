@@ -32,44 +32,54 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
 
     jsTest.log("Test the case where there is no replication lag on " + participantRst.name);
     assert.soon(() => {
-        const res0 = assert.commandWorked(primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        const res0 = assert.commandWorked(
+            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
         jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res0));
         validateShardsvrReshardingOperationTimeResponse(res0, isRecipient);
         return res0.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
 
-    jsTest.log("Test the case where there is replication lag on only one secondary on " + participantRst.name);
+    jsTest.log("Test the case where there is replication lag on only one secondary on " +
+               participantRst.name);
     stopServerReplication(participantRst.getSecondaries()[0]);
     const sleepMillis1 = 100;
     sleep(sleepMillis1);
     // Perform a write and and wait for it to replicate to the other secondary.
-    assert.commandWorked(primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 2}}));
-    const res1 = assert.commandWorked(primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+    assert.commandWorked(
+        primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 2}}));
+    const res1 = assert.commandWorked(
+        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
     validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
     assert.soon(() => {
-        const res1 = assert.commandWorked(primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        const res1 = assert.commandWorked(
+            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
         jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res1));
         validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
         return res1.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
 
-    jsTest.log("Test the case where there is replication lag on both secondaries on " + participantRst.name);
+    jsTest.log("Test the case where there is replication lag on both secondaries on " +
+               participantRst.name);
     stopServerReplication(participantRst.getSecondaries()[1]);
     const sleepMillis2 = 200;
     sleep(sleepMillis2);
     // Perform a write and and don't wait for it to replicate to secondaries since replication
     // has been paused on both secondaries.
-    assert.commandWorked(primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}));
-    const res2 = assert.commandWorked(primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+    assert.commandWorked(
+        primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}));
+    const res2 = assert.commandWorked(
+        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
     validateShardsvrReshardingOperationTimeResponse(res2, isRecipient);
     assert.gte(res2.majorityReplicationLagMillis, sleepMillis2, {res2});
 
-    jsTest.log("Test the case where there is replication lag on only one secondary again on " + participantRst.name);
+    jsTest.log("Test the case where there is replication lag on only one secondary again on " +
+               participantRst.name);
     // Unpause replication on one of the secondaries. The majority replication lag should become
     // 0 eventually.
     restartServerReplication(participantRst.getSecondaries()[0]);
     assert.soon(() => {
-        const res3 = assert.commandWorked(primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        const res3 = assert.commandWorked(
+            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
         jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res3));
         validateShardsvrReshardingOperationTimeResponse(res3, isRecipient);
         return res3.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
@@ -100,7 +110,8 @@ const reshardingDbName = "testDb";
 const reshardingCollName = "testColl";
 const reshardingNs = reshardingDbName + "." + reshardingCollName;
 const reshardingColl = st.s.getCollection(reshardingNs);
-assert.commandWorked(st.s.adminCommand({enableSharding: reshardingDbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: reshardingDbName, primaryShard: st.shard1.shardName}));
 CreateShardedCollectionUtil.shardCollectionWithChunks(
     reshardingColl,
     {oldKey: 1},
@@ -136,7 +147,8 @@ const reshardThread = new Thread(
     st.shard2.shardName,
 );
 
-const fp = configureFailPoint(st.configRS.getPrimary(), "reshardingPauseCoordinatorBeforeBlockingWrites");
+const fp =
+    configureFailPoint(st.configRS.getPrimary(), "reshardingPauseCoordinatorBeforeBlockingWrites");
 reshardThread.start();
 fp.wait();
 

@@ -56,15 +56,20 @@ if (is32Bits && _isWindows()) {
 
     jsTest.log("Stepdown primary and then step back up...");
 
-    let stepDown = function (node, timeSecs) {
-        assert.commandWorked(node.getDB("admin").runCommand({replSetStepDown: timeSecs, force: true}));
+    let stepDown = function(node, timeSecs) {
+        assert.commandWorked(
+            node.getDB("admin").runCommand({replSetStepDown: timeSecs, force: true}));
     };
 
     stepDown(primary, 0);
 
     jsTest.log("Waiting for mongos to acknowledge stepdown...");
 
-    awaitRSClientHosts(mongos, secondary, {ismaster: true}, st.rs0, 2 * 60 * 1000); // slow hosts can take longer to recognize sd
+    awaitRSClientHosts(mongos,
+                       secondary,
+                       {ismaster: true},
+                       st.rs0,
+                       2 * 60 * 1000);  // slow hosts can take longer to recognize sd
 
     jsTest.log("Stepping back up...");
 
@@ -93,7 +98,7 @@ if (is32Bits && _isWindows()) {
     }
 
     assert.eq(0, numErrors);
-} // End Win32 check
+}  // End Win32 check
 
 jsTest.log("DONE!");
 

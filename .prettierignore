@@ -18,6 +18,15 @@
 jstests/noPassthrough/js_exceptions.js
 jstests/noPassthrough/network/client_metadata_slowlog.js
 jstests/noPassthrough/network/client_metadata_slowlog_rs.js
+# TODO(SERVER-110065): Fix these tests so that the formatting on them
+# doesn't cause them to fail
+jstests/sharding/rs_stepdown_and_pooling.js
+jstests/sharding/migration_coordinator_abort_failover.js
+jstests/sharding/resharding_commit_monitor_repl_lag.js
+jstests/sharding/refresh_sessions.js
+jstests/sharding/query/agg/agg_orphan_filtering_renamed_shardkey.js
+jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
+jstests/libs/shardingtest.js
 
 # Opt in specific JS file paths
 !*.mjs

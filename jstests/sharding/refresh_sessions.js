@@ -12,7 +12,8 @@ let cluster = new ShardingTest({
     shards: 2,
     rs: {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
     other: {
-        configOptions: {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
+        configOptions:
+            {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
     },
 });
 
@@ -33,7 +34,9 @@ let cluster = new ShardingTest({
     assert.commandWorked(mongos.runCommand(refresh));
 
     // Test that it landed in the collection.
-    assert.eq(mongos.system.sessions.count(), sessionCount + 1, "refresh on mongos did not flush session record");
+    assert.eq(mongos.system.sessions.count(),
+              sessionCount + 1,
+              "refresh on mongos did not flush session record");
 }
 
 // Test that refreshing on mongod flushes local records to the collection.
@@ -46,7 +49,9 @@ let cluster = new ShardingTest({
     assert.commandWorked(shard.runCommand(refresh));
 
     // Test that the new record landed in the collection.
-    assert.eq(mongos.system.sessions.count(), sessionCount + 1, "refresh on mongod did not flush session record");
+    assert.eq(mongos.system.sessions.count(),
+              sessionCount + 1,
+              "refresh on mongod did not flush session record");
 }
 
 // Test that refreshing on all servers flushes all records.
@@ -62,7 +67,9 @@ let cluster = new ShardingTest({
     assert.commandWorked(shard1.runCommand(startSession));
 
     // All records should be in local caches only.
-    assert.eq(mongos.system.sessions.count(), sessionCount, "startSession should not flush records to disk");
+    assert.eq(mongos.system.sessions.count(),
+              sessionCount,
+              "startSession should not flush records to disk");
 
     // Refresh on each server, see that it ups the session count.
     assert.commandWorked(mongos.runCommand(refresh));

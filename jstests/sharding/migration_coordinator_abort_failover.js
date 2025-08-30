@@ -8,7 +8,9 @@
 // This test induces failovers on shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-import {runMoveChunkMakeDonorStepDownAfterFailpoint} from "jstests/sharding/migration_coordinator_failover_include.js";
+import {
+    runMoveChunkMakeDonorStepDownAfterFailpoint
+} from "jstests/sharding/migration_coordinator_failover_include.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -25,7 +27,8 @@ let st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,

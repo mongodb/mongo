@@ -30,18 +30,20 @@ export class ShardingTest {
         }
 
         let countDBsFound = 0;
-        this.config.databases.find().forEach(function (db) {
+        this.config.databases.find().forEach(function(db) {
             countDBsFound++;
             jsTest.log.info({db});
         });
-        throw Error("couldn't find dbname: " + dbname + " in config.databases. Total DBs: " + countDBsFound);
+        throw Error("couldn't find dbname: " + dbname +
+                    " in config.databases. Total DBs: " + countDBsFound);
     }
 
     getNonPrimaries(dbname) {
         let x = this.config.databases.findOne({_id: dbname});
         if (!x) {
             this.config.databases.find().forEach(jsTest.log.info);
-            throw Error("couldn't find dbname: " + dbname + " total: " + this.config.databases.count());
+            throw Error("couldn't find dbname: " + dbname +
+                        " total: " + this.config.databases.count());
         }
 
         return this.config.shards.find({_id: {$ne: x.primary}}).map((z) => z._id);
@@ -76,12 +78,14 @@ export class ShardingTest {
 
             for (let i = 0; i < this._connections.length; i++) {
                 let c = this._connections[i];
-                if (connectionURLTheSame(shardConnectionString, c.name) || connectionURLTheSame(rsName, c.name))
+                if (connectionURLTheSame(shardConnectionString, c.name) ||
+                    connectionURLTheSame(rsName, c.name))
                     return c;
             }
         }
 
-        throw Error("can't find server connection for db '" + dbname + "'s primary shard: " + tojson(primaryShard));
+        throw Error("can't find server connection for db '" + dbname +
+                    "'s primary shard: " + tojson(primaryShard));
     }
 
     // TODO SERVER-95358 remove once 9.0 becomes last LTS.
@@ -94,7 +98,8 @@ export class ShardingTest {
 
     normalize(x) {
         let z = this.config.shards.findOne({host: x});
-        if (z) return z._id;
+        if (z)
+            return z._id;
         return x;
     }
 
@@ -129,7 +134,8 @@ export class ShardingTest {
         }
 
         for (let i = 0; i < this._connections.length; i++) {
-            if (this._connections[i] == one) return this._connections[(i + 1) % this._connections.length];
+            if (this._connections[i] == one)
+                return this._connections[(i + 1) % this._connections.length];
         }
     }
 
@@ -176,7 +182,8 @@ export class ShardingTest {
                 });
 
                 returnData.forEach((res) => {
-                    assert.commandWorked(res, "terminating shard or config server replica sets failed");
+                    assert.commandWorked(res,
+                                         "terminating shard or config server replica sets failed");
                 });
             }
         } else {
@@ -231,14 +238,11 @@ export class ShardingTest {
             this.configRS.stopContinuousFailover();
         }
 
-        let startTime = new Date(); // Measure the execution time of shutting down shards.
+        let startTime = new Date();  // Measure the execution time of shutting down shards.
         this.stopAllShards(opts);
         jsTest.log.info(
-            "ShardingTest stopped all shards, took " +
-                (new Date() - startTime) +
-                "ms for " +
-                this._connections.length +
-                " shards.",
+            "ShardingTest stopped all shards, took " + (new Date() - startTime) + "ms for " +
+                this._connections.length + " shards.",
         );
 
         if (!this.isConfigShardMode) {
@@ -248,7 +252,8 @@ export class ShardingTest {
         let timeMillis = new Date().getTime() - this._startTime.getTime();
 
         jsTest.log.info(
-            "*** ShardingTest " + this._testName + " completed successfully in " + timeMillis / 1000 + " seconds ***",
+            "*** ShardingTest " + this._testName + " completed successfully in " +
+                timeMillis / 1000 + " seconds ***",
         );
     }
 
@@ -272,7 +277,8 @@ export class ShardingTest {
 
     adminCommand(cmd) {
         let res = this.admin.runCommand(cmd);
-        if (res && res.ok == 1) return true;
+        if (res && res.ok == 1)
+            return true;
 
         throw _getErrorWithCode(res, "command " + tojson(cmd) + " failed: " + tojson(res));
     }
@@ -301,47 +307,36 @@ export class ShardingTest {
     }
 
     forEachConnection(fn) {
-        this._connections.forEach(function (conn) {
+        this._connections.forEach(function(conn) {
             fn(conn);
         });
     }
 
     forEachMongos(fn) {
-        this._mongos.forEach(function (conn) {
+        this._mongos.forEach(function(conn) {
             fn(conn);
         });
     }
 
     forEachConfigServer(fn) {
-        this.configRS.nodes.forEach(function (conn) {
+        this.configRS.nodes.forEach(function(conn) {
             fn(conn);
         });
     }
 
     printChangeLog() {
-        this.config.changelog.find().forEach(function (z) {
+        this.config.changelog.find().forEach(function(z) {
             let msg = z.server + "\t" + z.time + "\t" + z.what;
-            for (let i = z.what.length; i < 15; i++) msg += " ";
+            for (let i = z.what.length; i < 15; i++)
+                msg += " ";
 
             msg += " " + z.ns + "\t";
             if (z.what == "split") {
-                msg +=
-                    _rangeToString(z.details.before) +
-                    " -->> (" +
-                    _rangeToString(z.details.left) +
-                    "), (" +
-                    _rangeToString(z.details.right) +
-                    ")";
+                msg += _rangeToString(z.details.before) + " -->> (" +
+                    _rangeToString(z.details.left) + "), (" + _rangeToString(z.details.right) + ")";
             } else if (z.what == "multi-split") {
-                msg +=
-                    _rangeToString(z.details.before) +
-                    "  -->> (" +
-                    z.details.number +
-                    "/" +
-                    z.details.of +
-                    " " +
-                    _rangeToString(z.details.chunk) +
-                    ")";
+                msg += _rangeToString(z.details.before) + "  -->> (" + z.details.number + "/" +
+                    z.details.of + " " + _rangeToString(z.details.chunk) + ")";
             } else {
                 msg += tojsononeline(z.details);
             }
@@ -371,27 +366,10 @@ export class ShardingTest {
             }
 
             let s = "";
-            this.config.chunks
-                .find(query)
-                .sort(sorting_criteria)
-                .forEach(function (z) {
-                    s +=
-                        " \t" +
-                        z._id +
-                        "\t" +
-                        z.lastmod.t +
-                        "|" +
-                        z.lastmod.i +
-                        "\t" +
-                        tojson(z.min) +
-                        " -> " +
-                        tojson(z.max) +
-                        " " +
-                        z.shard +
-                        " " +
-                        ns +
-                        "\n";
-                });
+            this.config.chunks.find(query).sort(sorting_criteria).forEach(function(z) {
+                s += " \t" + z._id + "\t" + z.lastmod.t + "|" + z.lastmod.i + "\t" + tojson(z.min) +
+                    " -> " + tojson(z.max) + " " + z.shard + " " + ns + "\n";
+            });
 
             return s;
         } else {
@@ -423,12 +401,14 @@ export class ShardingTest {
 
         for (var i = 0; i < this._connections.length; i++) {
             var c = this._connections[i];
-            out += "  mongod " + c + " " + tojson(c.getCollection(ns).getShardVersion(), " ", true) + "\n";
+            out += "  mongod " + c + " " +
+                tojson(c.getCollection(ns).getShardVersion(), " ", true) + "\n";
         }
 
         for (var i = 0; i < this._mongos.length; i++) {
             var c = this._mongos[i];
-            out += "  mongos " + c + " " + tojson(c.getCollection(ns).getShardVersion(), " ", true) + "\n";
+            out += "  mongos " + c + " " +
+                tojson(c.getCollection(ns).getShardVersion(), " ", true) + "\n";
         }
 
         out += this.getChunksString(ns);
@@ -440,10 +420,11 @@ export class ShardingTest {
      * Returns the number of shards which contain the given dbName.collName collection
      */
     onNumShards(dbName, collName) {
-        return this.shardCounts(dbName, collName).reduce(
-            (total, currentValue) => total + (currentValue > 0 ? 1 : 0),
-            0,
-        );
+        return this.shardCounts(dbName, collName)
+            .reduce(
+                (total, currentValue) => total + (currentValue > 0 ? 1 : 0),
+                0,
+            );
     }
 
     /**
@@ -451,7 +432,8 @@ export class ShardingTest {
      * that particular shard
      */
     shardCounts(dbName, collName) {
-        return this._connections.map((connection) => connection.getDB(dbName).getCollection(collName).count());
+        return this._connections.map((connection) =>
+                                         connection.getDB(dbName).getCollection(collName).count());
     }
 
     chunkCounts(collName, dbName) {
@@ -464,12 +446,12 @@ export class ShardingTest {
         }
 
         let x = {};
-        this.config.shards.find().forEach(function (z) {
+        this.config.shards.find().forEach(function(z) {
             x[z._id] = 0;
         });
 
         let coll = this.config.collections.findOne({_id: dbName + "." + collName});
-        let chunksQuery = (function () {
+        let chunksQuery = (function() {
             if (coll.timestamp != null) {
                 return {uuid: coll.uuid};
             } else {
@@ -477,9 +459,11 @@ export class ShardingTest {
             }
         })();
 
-        this.config.chunks.find(chunksQuery).forEach(function (z) {
-            if (x[z.shard]) x[z.shard]++;
-            else x[z.shard] = 1;
+        this.config.chunks.find(chunksQuery).forEach(function(z) {
+            if (x[z.shard])
+                x[z.shard]++;
+            else
+                x[z.shard] = 1;
         });
 
         return x;
@@ -491,8 +475,10 @@ export class ShardingTest {
         let min = Number.MAX_VALUE;
         let max = 0;
         for (let s in c) {
-            if (c[s] < min) min = c[s];
-            if (c[s] > max) max = c[s];
+            if (c[s] < min)
+                min = c[s];
+            if (c[s] > max)
+                max = c[s];
         }
 
         jsTest.log.info("ShardingTest input", {chunkCounts: c, min, max});
@@ -530,8 +516,7 @@ export class ShardingTest {
 
         if (execStages.shards) {
             for (var i = 0; i < execStages.shards.length; i++) {
-                let hasResults =
-                    execStages.shards[i].executionStages.nReturned &&
+                let hasResults = execStages.shards[i].executionStages.nReturned &&
                     execStages.shards[i].executionStages.nReturned > 0;
                 if (includeEmpty || hasResults) {
                     shards.push(plannerShards[i].connectionString);
@@ -555,8 +540,10 @@ export class ShardingTest {
         split = split != false ? split || key : split;
         move = split != false && move != false ? move || split : false;
 
-        if (collName.getDB) dbName = "" + collName.getDB();
-        else dbName = dbName || "test";
+        if (collName.getDB)
+            dbName = "" + collName.getDB();
+        else
+            dbName = dbName || "test";
 
         let c = dbName + "." + collName;
         if (collName.getDB) {
@@ -586,7 +573,8 @@ export class ShardingTest {
             }
 
             const result = this.s.adminCommand(cmd);
-            if (result.ok) break;
+            if (result.ok)
+                break;
 
             sleep(5 * 1000);
         }
@@ -615,7 +603,8 @@ export class ShardingTest {
 
         for (let i = 0; i < this._rs.length; ++i) {
             let replSet = this._rs[i];
-            if (!replSet) continue;
+            if (!replSet)
+                continue;
             const nodes = replSet.test.nodes;
             const keyFileUsed = replSet.test.keyFile;
 
@@ -629,14 +618,11 @@ export class ShardingTest {
 
                 const tlsOptions = ["preferTLS", "requireTLS"];
                 const sslOptions = ["preferSSL", "requireSSL"];
-                const TLSEnabled =
-                    currNode.fullOptions &&
+                const TLSEnabled = currNode.fullOptions &&
                     (tlsOptions.includes(currNode.fullOptions.tlsMode) ||
-                        sslOptions.includes(currNode.fullOptions.sslMode));
+                     sslOptions.includes(currNode.fullOptions.sslMode));
 
-                const x509AuthRequired =
-                    this.s.fullOptions &&
-                    this.s.fullOptions.clusterAuthMode &&
+                const x509AuthRequired = this.s.fullOptions && this.s.fullOptions.clusterAuthMode &&
                     this.s.fullOptions.clusterAuthMode === "x509";
 
                 if (keyFileUsed) {
@@ -645,8 +631,7 @@ export class ShardingTest {
                     });
                 } else if (x509AuthRequired && TLSEnabled) {
                     const exitCode = _runMongoProgram(
-                        ...[
-                            "mongo",
+                        ...["mongo",
                             currNode.host,
                             "--tls",
                             "--tlsAllowInvalidHostnames",
@@ -655,14 +640,14 @@ export class ShardingTest {
                                 ? currNode.fullOptions.tlsCertificateKeyFile
                                 : currNode.fullOptions.sslPEMKeyFile,
                             "--tlsCAFile",
-                            currNode.fullOptions.tlsCAFile
-                                ? currNode.fullOptions.tlsCAFile
-                                : currNode.fullOptions.sslCAFile,
+                            currNode.fullOptions.tlsCAFile ? currNode.fullOptions.tlsCAFile
+                                                           : currNode.fullOptions.sslCAFile,
                             "--authenticationDatabase=$external",
                             "--authenticationMechanism=MONGODB-X509",
                             "--eval",
-                            `(${getShardVersion.toString()})(db.getMongo(), ` + (timeoutMs - diff).toString() + `)`,
-                        ],
+                            `(${getShardVersion.toString()})(db.getMongo(), ` +
+                                (timeoutMs - diff).toString() + `)`,
+                    ],
                     );
                     assert.eq(0, exitCode, "parallel shell for x509 auth failed");
                 } else {
@@ -722,8 +707,10 @@ export class ShardingTest {
         this.stopMongos(n, stopOpts);
 
         if (this._useBridge) {
-            const hostName = this._otherParams.host === undefined ? getHostName() : this._otherParams.host;
-            let bridgeOptions = opts !== mongos ? opts.bridgeOptions : mongos.fullOptions.bridgeOptions;
+            const hostName =
+                this._otherParams.host === undefined ? getHostName() : this._otherParams.host;
+            let bridgeOptions =
+                opts !== mongos ? opts.bridgeOptions : mongos.fullOptions.bridgeOptions;
             bridgeOptions = Object.merge(this._otherParams.bridgeOptions, bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: this._otherParams.useHostname ? hostName : "localhost",
@@ -864,7 +851,8 @@ export class ShardingTest {
         let hasLastLTS = clusterHasBinVersion(this, "last-lts");
         let hasLastContinuous = clusterHasBinVersion(this, "last-continuous");
         if (lastLTSFCV !== lastContinuousFCV && hasLastLTS && hasLastContinuous) {
-            throw new Error("Can only specify one of 'last-lts' and 'last-continuous' " + "in binVersion, not both.");
+            throw new Error("Can only specify one of 'last-lts' and 'last-continuous' " +
+                            "in binVersion, not both.");
         }
         if (hasLastLTS) {
             return {isMixedVersion: true, oldestBinVersion: "last-lts"};
@@ -893,7 +881,11 @@ export class ShardingTest {
      * Query the oplog from a given node.
      */
     findOplog(conn, query, limit) {
-        return conn.getDB("local").getCollection(kOplogName).find(query).sort({$natural: -1}).limit(limit);
+        return conn.getDB("local")
+            .getCollection(kOplogName)
+            .find(query)
+            .sort({$natural: -1})
+            .limit(limit);
     }
 
     /**
@@ -1022,19 +1014,24 @@ export class ShardingTest {
         let numShards = otherParams.hasOwnProperty("shards") ? otherParams.shards : 2;
         let mongosVerboseLevel = otherParams.hasOwnProperty("verbose") ? otherParams.verbose : 1;
         let numMongos = otherParams.hasOwnProperty("mongos") ? otherParams.mongos : 1;
-        const usedDefaultNumConfigs = !otherParams.hasOwnProperty("config") || otherParams.config === undefined;
+        const usedDefaultNumConfigs =
+            !otherParams.hasOwnProperty("config") || otherParams.config === undefined;
         let numConfigs = otherParams.hasOwnProperty("config") ? otherParams.config : 3;
 
         let useAutoBootstrapProcedure = otherParams.hasOwnProperty("useAutoBootstrapProcedure")
             ? otherParams.useAutoBootstrapProcedure
             : false;
-        useAutoBootstrapProcedure = useAutoBootstrapProcedure || jsTestOptions().useAutoBootstrapProcedure;
-        let alwaysUseTestNameForShardName = otherParams.hasOwnProperty("alwaysUseTestNameForShardName")
+        useAutoBootstrapProcedure =
+            useAutoBootstrapProcedure || jsTestOptions().useAutoBootstrapProcedure;
+        let alwaysUseTestNameForShardName =
+            otherParams.hasOwnProperty("alwaysUseTestNameForShardName")
             ? otherParams.alwaysUseTestNameForShardName
             : false;
 
-        let isConfigShardMode = otherParams.hasOwnProperty("configShard") ? otherParams.configShard : false;
-        isConfigShardMode = isConfigShardMode || jsTestOptions().configShard || useAutoBootstrapProcedure;
+        let isConfigShardMode =
+            otherParams.hasOwnProperty("configShard") ? otherParams.configShard : false;
+        isConfigShardMode =
+            isConfigShardMode || jsTestOptions().configShard || useAutoBootstrapProcedure;
         Object.defineProperty(this, "isConfigShardMode", {
             value: isConfigShardMode,
             writable: false,
@@ -1047,7 +1044,8 @@ export class ShardingTest {
         }
 
         // Default enableBalancer to false.
-        otherParams.enableBalancer = "enableBalancer" in otherParams && otherParams.enableBalancer === true;
+        otherParams.enableBalancer =
+            "enableBalancer" in otherParams && otherParams.enableBalancer === true;
 
         // Allow specifying mixed-type options like this:
         // { mongos : [ { bind_ip : "localhost" } ],
@@ -1110,13 +1108,15 @@ export class ShardingTest {
         }
         defineReadOnlyProperty(this, "_numConfigs", numConfigs);
 
-        otherParams.useHostname = otherParams.useHostname == undefined ? true : otherParams.useHostname;
+        otherParams.useHostname =
+            otherParams.useHostname == undefined ? true : otherParams.useHostname;
         otherParams.useBridge = otherParams.useBridge || false;
         otherParams.bridgeOptions = otherParams.bridgeOptions || {};
         otherParams.causallyConsistent = otherParams.causallyConsistent || false;
 
         if (jsTestOptions().networkMessageCompressors) {
-            otherParams.bridgeOptions["networkMessageCompressors"] = jsTestOptions().networkMessageCompressors;
+            otherParams.bridgeOptions["networkMessageCompressors"] =
+                jsTestOptions().networkMessageCompressors;
         }
 
         this.keyFile = otherParams.keyFile;
@@ -1150,7 +1150,7 @@ export class ShardingTest {
             const _makeAllocatePortFn = (preallocatedPorts, errorMessage) => {
                 let idxNextNodePort = 0;
 
-                return function () {
+                return function() {
                     if (idxNextNodePort >= preallocatedPorts.length) {
                         throw new Error(errorMessage(preallocatedPorts.length));
                     }
@@ -1161,20 +1161,23 @@ export class ShardingTest {
                 };
             };
 
-            const errorMessage = (length) => "Cannot use more than " + length + " mongos processes when useBridge=true";
+            const errorMessage = (length) =>
+                "Cannot use more than " + length + " mongos processes when useBridge=true";
             _allocatePortForBridgeForMongos = _makeAllocatePortFn(
                 allocatePorts(MongoBridge.kBridgeOffset),
                 errorMessage,
             );
-            _allocatePortForMongos = _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+            _allocatePortForMongos =
+                _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
         } else {
-            _allocatePortForBridgeForMongos = function () {
+            _allocatePortForBridgeForMongos = function() {
                 throw new Error("Using mongobridge isn't enabled for this sharded cluster");
             };
             _allocatePortForMongos = allocatePort;
         }
 
-        otherParams.migrationLockAcquisitionMaxWaitMS = otherParams.migrationLockAcquisitionMaxWaitMS || 30000;
+        otherParams.migrationLockAcquisitionMaxWaitMS =
+            otherParams.migrationLockAcquisitionMaxWaitMS || 30000;
 
         let randomSeedAlreadySet = false;
 
@@ -1204,7 +1207,7 @@ export class ShardingTest {
         try {
             const clusterVersionInfo = this.getClusterVersionInfo();
 
-            let startTime = new Date(); // Measure the execution time of startup and initiate.
+            let startTime = new Date();  // Measure the execution time of startup and initiate.
             if (!isConfigShardMode) {
                 //
                 // Start up the config server replica set.
@@ -1370,7 +1373,8 @@ export class ShardingTest {
             // Wait for each shard replica set to finish starting up.
             //
             for (let i = 0; i < numShards; i++) {
-                jsTest.log.info("Waiting for shard " + this._rs[i].setName + " to finish starting up.");
+                jsTest.log.info("Waiting for shard " + this._rs[i].setName +
+                                " to finish starting up.");
                 if (isConfigShardMode && i == 0) {
                     continue;
                 }
@@ -1387,13 +1391,9 @@ export class ShardingTest {
             config.settings = config.settings || {};
 
             jsTest.log.info(
-                "ShardingTest startup for all nodes took " +
-                    (new Date() - startTime) +
-                    "ms with " +
-                    this.configRS.nodeList().length +
-                    " config server nodes and " +
-                    totalNumShardNodes(this) +
-                    " total shard nodes.",
+                "ShardingTest startup for all nodes took " + (new Date() - startTime) + "ms with " +
+                    this.configRS.nodeList().length + " config server nodes and " +
+                    totalNumShardNodes(this) + " total shard nodes.",
             );
 
             if (setDefaultTransactionLockTimeout) {
@@ -1421,7 +1421,8 @@ export class ShardingTest {
                 // wcMajorityJournalDefault in ReplSetTest cannot be done automatically without the
                 // shell performing such authentication, so allow tests to pass the value in.
                 if (otherParams.hasOwnProperty("writeConcernMajorityJournalDefault")) {
-                    rstConfig.writeConcernMajorityJournalDefault = otherParams.writeConcernMajorityJournalDefault;
+                    rstConfig.writeConcernMajorityJournalDefault =
+                        otherParams.writeConcernMajorityJournalDefault;
                 }
 
                 if (rst === this.configRS) {
@@ -1434,17 +1435,13 @@ export class ShardingTest {
                     initiateWithDefaultElectionTimeout: false,
                 };
 
-                if (
-                    otherParams.hasOwnProperty("allNodesAuthorizedToRunRSGetStatus") &&
-                    otherParams.allNodesAuthorizedToRunRSGetStatus == false
-                ) {
+                if (otherParams.hasOwnProperty("allNodesAuthorizedToRunRSGetStatus") &&
+                    otherParams.allNodesAuthorizedToRunRSGetStatus == false) {
                     rstInitiateArgs.allNodesAuthorizedToRunRSGetStatus = false;
                 }
 
-                if (
-                    otherParams.hasOwnProperty("initiateWithDefaultElectionTimeout") &&
-                    otherParams.initiateWithDefaultElectionTimeout == true
-                ) {
+                if (otherParams.hasOwnProperty("initiateWithDefaultElectionTimeout") &&
+                    otherParams.initiateWithDefaultElectionTimeout == true) {
                     rstInitiateArgs.initiateWithDefaultElectionTimeout = true;
                 }
 
@@ -1481,7 +1478,7 @@ export class ShardingTest {
                 // Do replication.
                 rst.awaitNodesAgreeOnPrimary();
                 if (rst.keyFile) {
-                    authutil.asCluster(rst.nodes, rst.keyFile, function () {
+                    authutil.asCluster(rst.nodes, rst.keyFile, function() {
                         rst.awaitReplication();
                     });
                 }
@@ -1548,7 +1545,8 @@ export class ShardingTest {
                     });
 
                     returnData.forEach((res) => {
-                        assert.commandWorked(res, "Initiating shard or config servers as a replica set failed");
+                        assert.commandWorked(
+                            res, "Initiating shard or config servers as a replica set failed");
                     });
                 }
             } else {
@@ -1592,12 +1590,8 @@ export class ShardingTest {
 
             jsTest.log.info(
                 "ShardingTest startup and initiation for all nodes took " +
-                    (new Date() - startTime) +
-                    "ms with " +
-                    this.configRS.nodeList().length +
-                    " config server nodes and " +
-                    totalNumShardNodes(this) +
-                    " total shard nodes.",
+                    (new Date() - startTime) + "ms with " + this.configRS.nodeList().length +
+                    " config server nodes and " + totalNumShardNodes(this) + " total shard nodes.",
             );
 
             // If 'otherParams.mongosOptions.binVersion' is an array value, then we'll end up
@@ -1652,7 +1646,8 @@ export class ShardingTest {
                 }
 
                 if (this.keyFile) {
-                    authutil.asCluster(this.configRS.nodes, this.keyFile, setFeatureCompatibilityVersion);
+                    authutil.asCluster(
+                        this.configRS.nodes, this.keyFile, setFeatureCompatibilityVersion);
                 } else {
                     setFeatureCompatibilityVersion();
                 }
@@ -1669,7 +1664,7 @@ export class ShardingTest {
                                 upsert: true,
                                 writeConcern: {w: "majority", wtimeout: kDefaultWTimeoutMs},
                             },
-                        ),
+                            ),
                     );
 
                     configRS.awaitLastOpCommitted();
@@ -1701,7 +1696,8 @@ export class ShardingTest {
                 options.configdb = this._configDB;
 
                 if (otherParams.useBridge) {
-                    let bridgeOptions = Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
+                    let bridgeOptions =
+                        Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
                     bridgeOptions = Object.merge(bridgeOptions, {
                         hostName: otherParams.useHostname ? hostName : "localhost",
                         port: _allocatePortForBridgeForMongos(),
@@ -1747,7 +1743,8 @@ export class ShardingTest {
             if (this.keyFile) {
                 authutil.asCluster(this._mongos, this.keyFile, () => _configureCluster(this));
             } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
-                authutil.asCluster(this._mongos, mongosOptions[0].keyFile, () => _configureCluster(this));
+                authutil.asCluster(
+                    this._mongos, mongosOptions[0].keyFile, () => _configureCluster(this));
             } else {
                 _configureCluster(this);
                 // Ensure that all config server nodes are up to date with any changes made to
@@ -1763,7 +1760,7 @@ export class ShardingTest {
                     let admin = this.admin;
                     let keyFile = this.keyFile;
 
-                    this._connections.forEach(function (z, idx) {
+                    this._connections.forEach(function(z, idx) {
                         let n = z.name || z.host || z;
 
                         let name;
@@ -1771,7 +1768,8 @@ export class ShardingTest {
                             name = "config";
 
                             if (!useAutoBootstrapProcedure) {
-                                jsTest.log.info("ShardingTest " + testName + " transitioning to config shard");
+                                jsTest.log.info("ShardingTest " + testName +
+                                                " transitioning to config shard");
 
                                 function transitionFromDedicatedConfigServer() {
                                     return assert.commandWorked(
@@ -1780,7 +1778,9 @@ export class ShardingTest {
                                 }
 
                                 if (keyFile) {
-                                    authutil.asCluster(admin.getMongo(), keyFile, transitionFromDedicatedConfigServer);
+                                    authutil.asCluster(admin.getMongo(),
+                                                       keyFile,
+                                                       transitionFromDedicatedConfigServer);
                                 } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
                                     authutil.asCluster(
                                         admin.getMongo(),
@@ -1794,7 +1794,8 @@ export class ShardingTest {
 
                             z.shardName = name;
                         } else {
-                            jsTest.log.info("ShardingTest " + testName + " going to add shard : " + n);
+                            jsTest.log.info("ShardingTest " + testName +
+                                            " going to add shard : " + n);
 
                             let addShardCmd = {addShard: n};
                             if (alwaysUseTestNameForShardName) {
@@ -1819,7 +1820,8 @@ export class ShardingTest {
             // Ensure that the sessions collection exists so jstests can run things with
             // logical sessions and test them. We do this by forcing an immediate cache refresh
             // on the config server, which auto-shards the collection for the cluster.
-            this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+            this.configRS.getPrimary().getDB("admin").runCommand(
+                {refreshLogicalSessionCacheNow: 1});
 
             // Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
             // multiple mongoses. In those cases, the first mongos initializes the contents of the
@@ -1856,19 +1858,19 @@ export class ShardingTest {
                 // Invokes the actual execution of cache refresh.
                 const execFlushRT = (conn) => {
                     assert.commandWorked(
-                        conn.getDB("admin").runCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
+                        conn.getDB("admin").runCommand(
+                            {_flushRoutingTableCacheUpdates: "config.system.sessions"}),
                     );
                 };
 
-                const x509AuthRequired =
-                    conn.fullOptions && conn.fullOptions.clusterAuthMode && conn.fullOptions.clusterAuthMode === "x509";
+                const x509AuthRequired = conn.fullOptions && conn.fullOptions.clusterAuthMode &&
+                    conn.fullOptions.clusterAuthMode === "x509";
 
                 if (keyFileLocal) {
                     authutil.asCluster(conn, keyFileLocal, () => execFlushRT(conn));
                 } else if (x509AuthRequired) {
                     const exitCode = _runMongoProgram(
-                        ...[
-                            "mongo",
+                        ...["mongo",
                             conn.host,
                             "--tls",
                             "--tlsAllowInvalidHostnames",
@@ -1877,12 +1879,13 @@ export class ShardingTest {
                                 ? conn.fullOptions.tlsCertificateKeyFile
                                 : conn.fullOptions.sslPEMKeyFile,
                             "--tlsCAFile",
-                            conn.fullOptions.tlsCAFile ? conn.fullOptions.tlsCAFile : conn.fullOptions.sslCAFile,
+                            conn.fullOptions.tlsCAFile ? conn.fullOptions.tlsCAFile
+                                                       : conn.fullOptions.sslCAFile,
                             "--authenticationDatabase=$external",
                             "--authenticationMechanism=MONGODB-X509",
                             "--eval",
                             `(${execFlushRT.toString()})(db.getMongo())`,
-                        ],
+                    ],
                     );
                     assert.eq(0, exitCode, "parallel shell for x509 auth failed");
                 } else {
@@ -1894,8 +1897,8 @@ export class ShardingTest {
                 for (let i = 0; i < numShards; i++) {
                     const keyFileLocal =
                         otherParams.shards && otherParams.shards[i] && otherParams.shards[i].keyFile
-                            ? otherParams.shards[i].keyFile
-                            : this.keyFile;
+                        ? otherParams.shards[i].keyFile
+                        : this.keyFile;
 
                     const rs = this._rs[i].test;
                     flushRT(rs.getPrimary(), keyFileLocal);
@@ -1911,31 +1914,33 @@ export class ShardingTest {
             throw e;
         }
         // This initialization was expected to fail, but it did not.
-        assert.neq(true, params.shouldFailInit, "This was expected to fail initialization, but it did not");
+        assert.neq(true,
+                   params.shouldFailInit,
+                   "This was expected to fail initialization, but it did not");
     }
 }
 
 // Stub for a hook to check that the cluster-wide metadata is consistent.
-ShardingTest.prototype.checkMetadataConsistency = function () {
+ShardingTest.prototype.checkMetadataConsistency = function() {
     jsTest.log.info("Unhooked checkMetadataConsistency function");
 };
 
 // Stub for a hook to check that collection UUIDs are consistent across shards and the config
 // server.
-ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function () {};
+ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {};
 
 // Stub for a hook to check that indexes are consistent across shards.
-ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function () {};
+ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {};
 
-ShardingTest.prototype.checkOrphansAreDeleted = function () {
+ShardingTest.prototype.checkOrphansAreDeleted = function() {
     jsTest.log.info("Unhooked function");
 };
 
-ShardingTest.prototype.checkRoutingTableConsistency = function () {
+ShardingTest.prototype.checkRoutingTableConsistency = function() {
     jsTest.log.info("Unhooked checkRoutingTableConsistency function");
 };
 
-ShardingTest.prototype.checkShardFilteringMetadata = function () {
+ShardingTest.prototype.checkShardFilteringMetadata = function() {
     jsTest.log.info("Unhooked checkShardFilteringMetadata function");
 };
 
@@ -1950,7 +1955,7 @@ function _rangeToString(r) {
  * Extends the ShardingTest class with the methods exposed by the sh utility class.
  */
 function _extendWithShMethods(st) {
-    Object.keys(sh).forEach(function (fn) {
+    Object.keys(sh).forEach(function(fn) {
         if (typeof sh[fn] !== "function") {
             return;
         }
@@ -1958,13 +1963,12 @@ function _extendWithShMethods(st) {
         assert.eq(
             undefined,
             st[fn],
-            "ShardingTest contains a method " +
-                fn +
+            "ShardingTest contains a method " + fn +
                 " which duplicates a method with the same name on sh. " +
                 "Please select a different function name.",
         );
 
-        st[fn] = function () {
+        st[fn] = function() {
             const oldDb = globalThis.db;
             globalThis.db = st.getDB("test");
 
@@ -1987,26 +1991,36 @@ function _configureCluster(st) {
 }
 
 function connectionURLTheSame(a, b) {
-    if (a == b) return true;
+    if (a == b)
+        return true;
 
-    if (!a || !b) return false;
+    if (!a || !b)
+        return false;
 
-    if (a.name) return connectionURLTheSame(a.name, b);
-    if (b.name) return connectionURLTheSame(a, b.name);
+    if (a.name)
+        return connectionURLTheSame(a.name, b);
+    if (b.name)
+        return connectionURLTheSame(a, b.name);
 
-    if (a.host) return connectionURLTheSame(a.host, b);
-    if (b.host) return connectionURLTheSame(a, b.host);
+    if (a.host)
+        return connectionURLTheSame(a.host, b);
+    if (b.host)
+        return connectionURLTheSame(a, b.host);
 
     if (a.indexOf("/") < 0 && b.indexOf("/") < 0) {
         a = a.split(":");
         b = b.split(":");
 
-        if (a.length != b.length) return false;
+        if (a.length != b.length)
+            return false;
 
-        if (a.length == 2 && a[1] != b[1]) return false;
+        if (a.length == 2 && a[1] != b[1])
+            return false;
 
-        if (a[0] == "localhost" || a[0] == "127.0.0.1") a[0] = getHostName();
-        if (b[0] == "localhost" || b[0] == "127.0.0.1") b[0] = getHostName();
+        if (a[0] == "localhost" || a[0] == "127.0.0.1")
+            a[0] = getHostName();
+        if (b[0] == "localhost" || b[0] == "127.0.0.1")
+            b[0] = getHostName();
 
         return a[0] == b[0];
     } else {
@@ -2069,7 +2083,7 @@ function replicaSetsToTerminate(st, shardRS) {
         // Generating a list of live nodes in the replica set
         const liveNodes = [];
         const pidValues = [];
-        rst.nodes.forEach(function (node) {
+        rst.nodes.forEach(function(node) {
             try {
                 node.getDB("admin")._helloOrLegacyHello();
                 liveNodes.push(node);
@@ -2108,7 +2122,8 @@ function replicaSetsToTerminate(st, shardRS) {
             // rst.Args to ensure the replica set is constructed correctly
             assert(liveNodes.length == pidValues.length);
 
-            const hostName = st._otherParams.host === undefined ? getHostName() : st._otherParams.host;
+            const hostName =
+                st._otherParams.host === undefined ? getHostName() : st._otherParams.host;
             replicaSetsToTerminate.push({
                 // Arguments for each replica set within parallel threads.
                 rstArgs: {
@@ -2148,16 +2163,13 @@ function totalNumShardNodes(st) {
 function clusterHasBinVersion(st, version) {
     const binVersion = MongoRunner.getBinVersionFor(version);
     const hasBinVersionInParams = (params) => {
-        return (
-            params &&
-            params.binVersion &&
-            MongoRunner.areBinVersionsTheSame(binVersion, MongoRunner.getBinVersionFor(params.binVersion))
-        );
+        return (params && params.binVersion &&
+                MongoRunner.areBinVersionsTheSame(binVersion,
+                                                  MongoRunner.getBinVersionFor(params.binVersion)));
     };
 
     // Must check mongosBinVersion because it does not update mongosOptions.binVersion.
-    const isMixedVersionMongos =
-        jsTestOptions().mongosBinVersion &&
+    const isMixedVersionMongos = jsTestOptions().mongosBinVersion &&
         MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion);
 
     if (isMixedVersionMongos) {
@@ -2206,5 +2218,6 @@ function clusterHasBinVersion(st, version) {
 }
 
 function defineReadOnlyProperty(st, name, value) {
-    Object.defineProperty(st, name, {value: value, writable: false, enumerable: true, configurable: false});
+    Object.defineProperty(
+        st, name, {value: value, writable: false, enumerable: true, configurable: false});
 }

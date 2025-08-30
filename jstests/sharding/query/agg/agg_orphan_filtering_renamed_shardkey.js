@@ -47,10 +47,10 @@ const queries = [
 ];
 
 function dbHasOrphan(st, coll) {
-    let allShards = st
-        .getDB("admin")
-        .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: coll.getFullName()}}])
-        .next();
+    let allShards =
+        st.getDB("admin")
+            .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: coll.getFullName()}}])
+            .next();
     let hasOrphan = false;
     for (const shard of allShards.shards) {
         hasOrphan = hasOrphan || shard.numOrphanedDocs;
@@ -74,20 +74,25 @@ for (const query of queries) {
     const resultsAfterSharding = coll.aggregate(query).toArray();
 
     // The results before and after sharding should be identical.
-    assert.eq(resultsBeforeSharding, resultsAfterSharding, {resultsBeforeSharding, resultsAfterSharding});
+    assert.eq(
+        resultsBeforeSharding, resultsAfterSharding, {resultsBeforeSharding, resultsAfterSharding});
 
     // one doc on each shard
     assert(st.adminCommand({split: coll.getFullName(), middle: {shardKey: 3}}));
     const resultsAfterSplitting = coll.aggregate(query).toArray();
 
     // The results before and after splitting should be identical.
-    assert.eq(resultsBeforeSharding, resultsAfterSplitting, {resultsBeforeSharding, resultsAfterSplitting});
+    assert.eq(resultsBeforeSharding,
+              resultsAfterSplitting,
+              {resultsBeforeSharding, resultsAfterSplitting});
 
-    let suspendRangeDeletionShard0Fp = configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
+    let suspendRangeDeletionShard0Fp =
+        configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
 
-    // shard0 will have shardKey=0 doc and the orphaned shardKey=6 doc, and shard1 will have only the
-    // shardKey=6 document.
-    assert(st.adminCommand({moveChunk: coll.getFullName(), find: {shardKey: 6}, to: st.shard1.shardName}));
+    // shard0 will have shardKey=0 doc and the orphaned shardKey=6 doc, and shard1 will have only
+    // the shardKey=6 document.
+    assert(st.adminCommand(
+        {moveChunk: coll.getFullName(), find: {shardKey: 6}, to: st.shard1.shardName}));
     suspendRangeDeletionShard0Fp.wait();
 
     const resultsAfterMovingChunk = coll.aggregate(query).toArray();
@@ -97,7 +102,9 @@ for (const query of queries) {
 
     // Assert on results of queries despite orphaned documents.
     // The results before and after moving chunks should be identical.
-    assert.eq(resultsBeforeSharding, resultsAfterMovingChunk, {resultsBeforeSharding, resultsAfterMovingChunk});
+    assert.eq(resultsBeforeSharding,
+              resultsAfterMovingChunk,
+              {resultsBeforeSharding, resultsAfterMovingChunk});
 
     // ensure there is an orphaned document even after the query.
     assert.eq(dbHasOrphan(st, coll), 1);
