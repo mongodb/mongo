@@ -1054,6 +1054,10 @@ connection_ops(WT_CONNECTION *conn)
       conn->configure_method(conn, "WT_SESSION.open_cursor", "my_data:", "devices", "list", NULL));
     /*! [Configure method configuration] */
 
+    /*! [Set the last materialized LSN by the page log service] */
+    error_check(conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, 100));
+    /*! [Set the last materialized LSN by the page log service] */
+
     /*! [Close a connection] */
     error_check(conn->close(conn, NULL));
     /*! [Close a connection] */

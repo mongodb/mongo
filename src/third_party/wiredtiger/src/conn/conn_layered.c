@@ -860,11 +860,11 @@ err:
 }
 
 /*
- * __disagg_set_last_materialized_lsn --
+ * __wti_disagg_set_last_materialized_lsn --
  *     Set the latest materialized LSN.
  */
-static int
-__disagg_set_last_materialized_lsn(WT_SESSION_IMPL *session, uint64_t lsn)
+int
+__wti_disagg_set_last_materialized_lsn(WT_SESSION_IMPL *session, uint64_t lsn)
 {
     WT_DISAGGREGATED_STORAGE *disagg;
     uint64_t cur_lsn;
@@ -951,7 +951,7 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     /* Get the last materialized LSN. */
     WT_ERR(__wt_config_gets(session, cfg, "disaggregated.last_materialized_lsn", &cval));
     if (cval.len > 0 && cval.val >= 0)
-        WT_ERR(__disagg_set_last_materialized_lsn(session, (uint64_t)cval.val));
+        WT_ERR(__wti_disagg_set_last_materialized_lsn(session, (uint64_t)cval.val));
 
     /* Set the role. */
     WT_ERR(__wt_config_gets(session, cfg, "disaggregated.role", &cval));

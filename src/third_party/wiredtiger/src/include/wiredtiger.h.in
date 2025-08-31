@@ -2041,6 +2041,11 @@ struct __wt_session {
 #endif
 };
 
+/*! WT_CONNECTION::set_context_uint types */
+typedef enum {
+    WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, /*!< The LSN of the last materialized page log entry. */
+} WT_CONTEXT_TYPE;
+
 /*!
  * A connection to a WiredTiger database.  The connection may be opened within
  * the same address space as the caller or accessed over a socket connection.
@@ -2909,6 +2914,20 @@ struct __wt_connection {
      */
     int __F(get_storage_source)(WT_CONNECTION *connection, const char *name,
         WT_STORAGE_SOURCE **storage_sourcep);
+
+    /*!
+     * Set a global context parameter, which tells WiredTiger about relevant changes
+     * in the running system, such as the state of the page log service.
+     *
+     * @snippet ex_all.c Set the last materialized page log LSN by the page log service
+     *
+     * @param connection the connection handle
+     * @param which the context parameter being set (see ::WT_CONTEXT_TYPE for available options).
+     * @param value the value
+     * @errors
+     */
+    int __F(set_context_uint)(WT_CONNECTION *connection, WT_CONTEXT_TYPE which,
+        uint64_t value);
 #endif
 
     /*!
@@ -5623,6 +5642,7 @@ struct __wt_page_log_put_args {
        uint64_t base_lsn;
        uint64_t backlink_checkpoint_id;
        uint64_t base_checkpoint_id;
+       size_t image_size;
 
        WT_PAGE_LOG_ENCRYPTION encryption;
 
