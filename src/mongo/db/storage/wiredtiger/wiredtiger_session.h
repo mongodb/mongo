@@ -307,7 +307,7 @@ private:
 
     Date_t _idleExpireTime;
 
-    // Tracks the duration of the last WT_SESSION API call.
+    // Tracks the cumulative duration of WT_SESSION API calls.
     Microseconds _storageExecutionTime;
 
     // A set that contains the undo config strings for any reconfigurations we might have performed
