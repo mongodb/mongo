@@ -31,6 +31,17 @@ def validate(mdb, logger, acceptable_err_codes):
                 if "code" in res and res["code"] in acceptable_err_codes:
                     # Command not supported on view.
                     pass
+                elif ("code" in res and "errmsg" in res and res["code"] == 26 and
+                      "Timeseries buckets collection does not exist" in res["errmsg"]):
+                    # TODO(SERVER-109819): Remove this workaround once v9.0 is last LTS
+                    # Validating a timeseries view without a matching buckets collection fails with
+                    # NamespaceNotFound. This can happen with this create+drop interleaving:
+                    # Thread 1 (create mycoll as timeseries): Creates system.buckets.mycoll.
+                    # Thread 2 (drop mycoll): Drops system.buckets.mycoll.
+                    # Thread 1 (create mycoll as timeseries): Creates mycoll, the timeseries view.
+                    # Ignore this error, which can not happen with viewless timeseries collections.
+                    logger.info("Ignoring NamespaceNotFound due to orphan legacy timeseries view")
+                    pass
                 else:
                     logger.info("FAILURE!\nValidate Response: ")
                     logger.info(res)
