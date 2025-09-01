@@ -334,6 +334,9 @@ public:
         if (!collection.exists()) {
             return query_shape::CollectionType::kNonExistent;
         }
+        if (collection.getCollectionPtr()->isNewTimeseriesWithoutView()) {
+            return query_shape::CollectionType::kTimeseries;
+        }
         return query_shape::CollectionType::kCollection;
     }
 

@@ -284,7 +284,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             }
         }
 
-        if (cmdIndex.getHidden() && coll->isClustered() && !nss.isTimeseriesBucketsCollection()) {
+        if (cmdIndex.getHidden() && coll->isClustered() && !coll->isTimeseriesCollection()) {
             auto clusteredInfo = coll->getClusteredInfo();
             tassert(6011801,
                     "Collection isClustered() and getClusteredInfo() should be synced",

@@ -240,7 +240,7 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
         collection.get()->ns().isFLE2StateCollection();
 
     auto numIndexes = indexCatalog->numIndexesTotal();
-    if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
+    if (collection->isClustered() && !collection->isTimeseriesCollection()) {
         // There is an implicit 'clustered' index on a clustered collection. Increment the total
         // index count to reflect that.
         numIndexes++;
@@ -323,14 +323,16 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool numericOnly = storageStatsSpec.getNumericOnly();
     static constexpr auto kStorageStatsField = "storageStats"_sd;
 
+    // TODO(SERVER-110087): Remove this legacy timeseries translation logic once v9.0 is last LTS
     const auto bucketNss =
         nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
     auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    const bool mayBeTimeseries = bucketsColl && bucketsColl->getTimeseriesOptions();
-    const auto collNss =
-        (mayBeTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
+    const bool mayBeLegacyTimeseries = bucketsColl && bucketsColl->getTimeseriesOptions();
+    const auto collNss = (mayBeLegacyTimeseries && !nss.isTimeseriesBucketsCollection())
+        ? std::move(bucketNss)
+        : nss;
 
     auto failed = [&](const DBException& ex) {
         LOGV2_DEBUG(3088801,

@@ -45,6 +45,12 @@ assert.commandFailedWithCode(
 // Successfully hides a time-series secondary index.
 assert.commandWorked(db.runCommand({"collMod": collName, "index": {"keyPattern": {[indexField]: 1}, "hidden": true}}));
 
+// Hiding the internal clustered index fails, since the index is not exposed to users.
+assert.commandFailedWithCode(
+    db.runCommand({collMod: collName, index: {name: "_id_", hidden: true}}),
+    ErrorCodes.IndexNotFound,
+);
+
 // Tries to set the validator for a time-series collection.
 assert.commandFailedWithCode(
     db.runCommand({"collMod": collName, "validator": {required: ["time"]}}),
