@@ -35,6 +35,7 @@ namespace mongo {
 struct ReplayConfig {
     std::string recordingPath;
     std::string mongoURI;
+    std::string enablePerformanceRecording;
 
     explicit operator bool() const {
         return !recordingPath.empty() && !mongoURI.empty();

@@ -26,47 +26,54 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/client/dbclient_base.h"
-#include "mongo/client/dbclient_connection.h"
+#include "mongo/replay/performance_reporter.h"
 
-#include <chrono>
-#include <memory>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/replay/test_packet.h"
+#include "mongo/unittest/unittest.h"
+
+#include <fstream>
+#include <string>
 #include <vector>
 
 namespace mongo {
-class ServiceContext;
-class ReplayCommand;
 
-/*
- *   ReplayCommandExecutor is not an object to create and throw away constantly.
- *   It is meant to be used for serving a client session for all the queries
- *   received in a recording.
- */
-class ReplayCommandExecutor {
-public:
-    /*
-     * Connect the executor to the server instance passed in the constructor. The connection status
-     * is checked and if successful a new client instance is created.
-     */
-    void connect(StringData uri);
-    /*
-     * Reset the connection, this method is particularly useful if a new connection needs to be
-     * established without creating a new instance of this class.
-     */
-    void reset();
-    /**
-     * Simply checks if the executor is connected to same instance.
-     */
-    bool isConnected() const;
-    /*
-     * Given a well formed binary protocol bson command encapsulated inside a replay command. This
-     * method runs the command against the server (if connection is established).
-     */
-    BSONObj runCommand(const ReplayCommand& command) const;
+class PerformanceReporterTest : public unittest::Test {
+protected:
+    const char* perfFileName = "perf_file.bin";
 
-private:
-    std::unique_ptr<DBClientBase> _dbConnection = nullptr;
+    void setUp() override {}
+
+    void tearDown() override {
+        std::remove(perfFileName);
+    }
 };
+
+
+TEST_F(PerformanceReporterTest, WriteSomeData) {
+    ASSERT_FALSE(boost::filesystem::exists(perfFileName));
+    PerformancePacket packet1{1, 1, 100, 1};
+    PerformancePacket packet2{2, 2, 200, 2};
+    PerformancePacket packet3{1, 3, 500, 5};
+    std::vector<PerformancePacket> packets{packet1, packet2, packet3};
+    const char* uri = "fake_uri";
+    const size_t dumpToDiskThreshold = 1;
+    {
+        // Performance recorded follows the same RAII pattern of SessionHandler. When the dtor runs
+        // the bg thread is joined, all the data left to write is dumped on disk and the file is
+        // closed.
+        PerformanceReporter reporter{uri, perfFileName, dumpToDiskThreshold};
+        for (auto&& p : packets) {
+            reporter.add(std::move(p));
+        }
+    }
+    // read back the packets.
+    ASSERT_TRUE(boost::filesystem::exists(perfFileName));
+    auto testRecording = PerformanceReporter::read(perfFileName);
+    ASSERT_EQ(testRecording.mongoURI, uri);
+    ASSERT_EQ(testRecording.packets, packets);
+}
+
 }  // namespace mongo

@@ -32,6 +32,7 @@
 #include "mongo/replay/replay_config.h"
 
 namespace mongo {
+class ServiceContext;
 class ReplayClient {
 public:
     void replayRecording(const ReplayConfigs&);

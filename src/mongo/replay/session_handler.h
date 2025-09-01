@@ -44,14 +44,23 @@ class SessionSimulator;
 class SessionHandler {
 public:
     using key_t = int64_t;
+
+    /**
+     * Enable perf recording. Essentially record each command and how long it took plus the
+     * response. By default enable perf recording is disabled (useful for testing). But for real
+     * simulations the recording will always be enabled.
+     */
+    explicit SessionHandler(std::string uri, std::string perfFileName = "")
+        : _uri(std::move(uri)), _perfFileName(std::move(perfFileName)) {}
+
     /* Global start time shared with all the sessions*/
     void setStartTime(Date_t recordStartTime);
     /**
      * Start a new session given uri and start session recorded command. Returns the key for the
      * session just started
      */
-    void onSessionStart(StringData, Date_t eventTimestamp, int64_t sessionId);
-    void onSessionStart(StringData, const ReplayCommand& command);
+    void onSessionStart(Date_t eventTimestamp, int64_t sessionId);
+    void onSessionStart(const ReplayCommand& command);
     /**
      * Stop the session started with the key provided as argument and use the stop command received
      */
@@ -59,7 +68,7 @@ public:
     /**
      * Just replay the command, read from the recording file
      */
-    void onBsonCommand(StringData, const ReplayCommand&);
+    void onBsonCommand(const ReplayCommand&);
     /**
      * To use carefully, basically destroys all the sessions and reset the session cache
      */
@@ -72,9 +81,11 @@ public:
     }
 
 private:
-    stdx::unordered_map<key_t, std::shared_ptr<SessionSimulator>> _runningSessions;
+    stdx::unordered_map<key_t, std::unique_ptr<SessionSimulator>> _runningSessions;
     std::chrono::steady_clock::time_point _replayStartTime;  // when the replay started
-    Date_t _recordStartTime;                                 // timestamp of first event.
+    Date_t _recordStartTime;                                 // timestamp of first event
+    std::string _uri;                                        // uri of the mongo shadow instance
+    std::string _perfFileName;  // perf recording file name if specified
 
     void addToRunningSessionCache(key_t);
     void removeFromRunningSessionCache(key_t);
@@ -85,6 +96,6 @@ private:
     SessionSimulator& getSessionSimulator(key_t);
     const SessionSimulator& getSessionSimulator(key_t) const;
 
-    void createNewSessionOnNewCommand(StringData, Date_t timestamp, int64_t sessionId);
+    void createNewSessionOnNewCommand(Date_t timestamp, int64_t sessionId);
 };
 }  // namespace mongo

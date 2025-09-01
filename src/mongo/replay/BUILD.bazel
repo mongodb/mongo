@@ -8,6 +8,7 @@ mongo_cc_library(
     name = "mongor_lib",
     srcs = [
         "config_handler.cpp",
+        "performance_reporter.cpp",
         "rawop_document.cpp",
         "recording_reader.cpp",
         "replay_client.cpp",
@@ -20,6 +21,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "config_handler.h",
+        "performance_reporter.h",
         "rawop_document.h",
         "recording_reader.h",
         "replay_client.h",
@@ -61,6 +63,7 @@ mongo_cc_unit_test(
     srcs = [
         "config_handler_test.cpp",
         "mini_mock.h",
+        "performance_reporter_test.cpp",
         "replay_command_executor_test.cpp",
         "replay_command_test.cpp",
         "replay_test_server.cpp",

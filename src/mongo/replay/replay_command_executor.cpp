@@ -68,16 +68,13 @@ bool ReplayCommandExecutor::isConnected() const {
 
 BSONObj ReplayCommandExecutor::runCommand(const ReplayCommand& command) const {
     uassert(ErrorCodes::ReplayClientNotConnected, "MongoR is not connected", isConnected());
-    OpMsgRequest request = command.fetchMsgRequest();
     try {
-        const auto reply = _dbConnection->runCommand(std::move(request));
+        const auto reply = _dbConnection->runCommand(command.fetchMsgRequest());
         return reply->getCommandReply().getOwned();
     } catch (const DBException& e) {
         auto lastError = e.toStatus();
         tassert(ErrorCodes::ReplayClientInternalError, lastError.reason(), false);
     }
-    return {};
 }
-
 
 }  // namespace mongo

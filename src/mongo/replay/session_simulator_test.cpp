@@ -33,10 +33,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/replay/mini_mock.h"
+#include "mongo/replay/performance_reporter.h"
 #include "mongo/replay/rawop_document.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/replay_test_server.h"
+#include "mongo/replay/session_scheduler.h"
 #include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -45,11 +47,17 @@
 #include "mongo/util/time_support.h"
 
 #include <chrono>
+#include <memory>
 
 namespace mongo {
 
 class TestSessionSimulator : public SessionSimulator {
 public:
+    TestSessionSimulator()
+        : SessionSimulator(std::make_unique<ReplayCommandExecutor>(),
+                           std::make_unique<SessionScheduler>(),
+                           std::make_unique<PerformanceReporter>("test.bin")) {}
+
     std::chrono::steady_clock::time_point now() const override {
         auto handle = nowHook.synchronize();
         return (*handle)();

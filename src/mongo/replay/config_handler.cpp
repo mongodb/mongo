@@ -53,6 +53,7 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
     auto recordingPath = "Path to the recording file";
     auto mongodbTarget = "URI of the shadow mongod/s";
     auto configFilePath = "Path to the config file";
+    auto enablePerfRecording = "Enable/Disable perf recording specifying file name";
 
     namespace po = boost::program_options;
 
@@ -63,7 +64,8 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
         ("help,h", "help")
         ("input,i", po::value<std::string>(), recordingPath)
         ("target,t", po::value<std::string>(), mongodbTarget)
-        ("config,c", po::value<std::string>(), configFilePath);
+        ("config,c", po::value<std::string>(), configFilePath)
+        ("perf,p", po::value<std::string>()->default_value(""), enablePerfRecording);
     // clang-format on
 
     // Parse the program options
@@ -74,7 +76,8 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
     if (vm.count("help") || vm.empty()) {
         std::cout << "MongoR Help: \n\n"
                   << "\tUsage:\n"
-                  << "\t\t./mongor -i <traffic input file> -t <mongod/s uri>\n"
+                  << "\t\t./mongor -i <traffic input file> -t <mongod/s uri> -p <filename for "
+                     "enabling perf reporting>\n"
                   << "\t\t./mongor -c <JSON config file path>\n\n"
                   << "\tConfig file format (JSON):\n"
                   << "\t\t{\n"
@@ -98,7 +101,7 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
 
     //-c <config file> has the precedence over -i -t options
     uassert(ErrorCodes::ReplayClientConfigurationError,
-            "config file cannot be specified if single instance options are specified",
+            "The configuration provided is invalid.",
             singleInstanceOptionsSpecified ^ configFileSpecified);
 
     if (configFileSpecified) {
@@ -126,7 +129,7 @@ std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
     auto uri = vm["target"].as<std::string>();
     uassert(ErrorCodes::ReplayClientConfigurationError, "target URI is empty", !uri.empty());
     config.mongoURI = uri;
-
+    config.enablePerformanceRecording = vm["perf"].as<std::string>();
     return {config};
 }
 

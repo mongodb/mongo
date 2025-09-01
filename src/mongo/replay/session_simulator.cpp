@@ -59,11 +59,16 @@ void handleErrors(Callable&& callable) {
 
 static constexpr size_t MAX_SIMULATION_PROCESSING_TASKS = 1;
 
-SessionSimulator::SessionSimulator()
-    : _commandExecutor(std::make_unique<ReplayCommandExecutor>()),
-      _sessionScheduler(std::make_unique<SessionScheduler>(MAX_SIMULATION_PROCESSING_TASKS)) {}
+SessionSimulator::SessionSimulator(std::unique_ptr<ReplayCommandExecutor> replayCommandExecutor,
+                                   std::unique_ptr<SessionScheduler> sessionScheduler,
+                                   std::unique_ptr<PerformanceReporter> perfReporter)
+    : _commandExecutor(std::move(replayCommandExecutor)),
+      _sessionScheduler(std::move(sessionScheduler)),
+      _perfReporter(std::move(perfReporter)) {}
 
-SessionSimulator::~SessionSimulator() {}
+SessionSimulator::~SessionSimulator() {
+    shutdown();
+}
 
 void SessionSimulator::shutdown() {
     _sessionScheduler->join();
@@ -107,7 +112,7 @@ void SessionSimulator::stop(const Date_t& sessionEnd) {
     _sessionScheduler->submit([f]() { handleErrors(f); });
 }
 
-void SessionSimulator::run(const ReplayCommand& command, const Date_t& commandTimeStamp) const {
+void SessionSimulator::run(const ReplayCommand& command, const Date_t& commandTimeStamp) {
     // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
     // read member variables, because there is only one thread. Beware about spawning multiple
     // threads. Order of commands can be different than the ones recorded and a mutex must be used
@@ -117,7 +122,9 @@ void SessionSimulator::run(const ReplayCommand& command, const Date_t& commandTi
                 "SessionSimulator is not connected to a valid mongod/s instance.",
                 _running);
         waitIfNeeded(commandTimeStamp);
-        _commandExecutor->runCommand(command);
+        _perfReporter->executeAndRecordPerf(
+            [this](const ReplayCommand& command) { return _commandExecutor->runCommand(command); },
+            command);
     };
 
     _sessionScheduler->submit([f]() { handleErrors(f); });

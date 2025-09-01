@@ -29,6 +29,7 @@
 
 #include "mongo/replay/session_handler.h"
 
+#include "mongo/replay/performance_reporter.h"
 #include "mongo/replay/rawop_document.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/util/duration.h"
@@ -41,16 +42,16 @@ void SessionHandler::setStartTime(Date_t recordStartTime) {
     _recordStartTime = recordStartTime;
 }
 
-void SessionHandler::onSessionStart(StringData uri, Date_t eventTimestamp, int64_t sessionId) {
+void SessionHandler::onSessionStart(Date_t eventTimestamp, int64_t sessionId) {
     addToRunningSessionCache(sessionId);
     // now initialize the session.
     auto& session = getSessionSimulator(sessionId);
     // connects to the server
-    session.start(uri, _replayStartTime, _recordStartTime, eventTimestamp);
+    session.start(_uri, _replayStartTime, _recordStartTime, eventTimestamp);
 }
-void SessionHandler::onSessionStart(StringData uri, const ReplayCommand& command) {
-    auto [ts, sid] = extractTimeStampAndSessionFromCommand(command);
-    onSessionStart(uri, ts, sid);
+void SessionHandler::onSessionStart(const ReplayCommand& command) {
+    const auto& [ts, sid] = extractTimeStampAndSessionFromCommand(command);
+    onSessionStart(ts, sid);
 }
 
 void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
@@ -66,15 +67,15 @@ void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
     removeFromRunningSessionCache(sessionId);
 }
 
-void SessionHandler::onBsonCommand(StringData uri, const ReplayCommand& command) {
+void SessionHandler::onBsonCommand(const ReplayCommand& command) {
     // just run the command. the Session simulator will make sure things work.
     const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
     if (!isSessionActive(sessionId)) {
         // TODO SERVER-105627: When session start event will be added remove this code. This is
         // needed for making integration tests pass.
-        createNewSessionOnNewCommand(uri, timestamp, sessionId);
+        createNewSessionOnNewCommand(timestamp, sessionId);
     }
-    const auto& session = getSessionSimulator(sessionId);
+    auto& session = getSessionSimulator(sessionId);
     session.run(command, timestamp);
 }
 
@@ -86,7 +87,13 @@ void SessionHandler::addToRunningSessionCache(SessionHandler::key_t key) {
     uassert(ErrorCodes::ReplayClientSessionSimulationError,
             "Error, running session cannot contain the same key",
             !isSessionActive(key));
-    _runningSessions.insert({key, std::make_shared<SessionSimulator>()});
+
+    auto commandExecutor = std::make_unique<ReplayCommandExecutor>();
+    auto sessionScheduler = std::make_unique<SessionScheduler>();
+    auto perfReporter = std::make_unique<PerformanceReporter>(_uri, _perfFileName);
+    auto session = std::make_unique<SessionSimulator>(
+        std::move(commandExecutor), std::move(sessionScheduler), std::move(perfReporter));
+    _runningSessions.insert({key, std::move(session)});
 }
 
 void SessionHandler::removeFromRunningSessionCache(SessionHandler::key_t key) {
@@ -117,10 +124,8 @@ bool SessionHandler::isSessionActive(SessionHandler::key_t key) const {
     return _runningSessions.contains(key);
 }
 
-void SessionHandler::createNewSessionOnNewCommand(StringData uri,
-                                                  Date_t timestamp,
-                                                  int64_t sessionId) {
-    onSessionStart(uri, timestamp, sessionId);
+void SessionHandler::createNewSessionOnNewCommand(Date_t timestamp, int64_t sessionId) {
+    onSessionStart(timestamp, sessionId);
 }
 
 

@@ -89,7 +89,7 @@ protected:
     }
 };
 
-TEST_F(ConfigHandlerTest, SimpleParseSingleInstance) {
+TEST_F(ConfigHandlerTest, SimpleParseSingleInstancePerfRecordingDisabled) {
     ASSERT_TRUE(boost::filesystem::exists(tempFilename1));
     std::vector<std::string> commandLine = {
         "fakeMongoR", "-i", tempFilename1, "-t", "$local:12345"};
@@ -100,6 +100,21 @@ TEST_F(ConfigHandlerTest, SimpleParseSingleInstance) {
     auto& option = options[0];
     ASSERT_TRUE(option.recordingPath == "tmp_recording_file1.dat");
     ASSERT_TRUE(option.mongoURI == "$local:12345");
+    ASSERT_TRUE(option.enablePerformanceRecording.empty());
+}
+
+TEST_F(ConfigHandlerTest, SimpleParseSingleInstancePerfRecordingEnabled) {
+    ASSERT_TRUE(boost::filesystem::exists(tempFilename1));
+    std::vector<std::string> commandLine = {
+        "fakeMongoR", "-i", tempFilename1, "-t", "$local:12345", "-p", "test.bin"};
+    auto argv = toArgv(commandLine);
+    ConfigHandler configHandler;
+    auto options = configHandler.parse(argv.size(), argv.data());
+    ASSERT_TRUE(options.size() == 1);
+    auto& option = options[0];
+    ASSERT_TRUE(option.recordingPath == "tmp_recording_file1.dat");
+    ASSERT_TRUE(option.mongoURI == "$local:12345");
+    ASSERT_EQ(option.enablePerformanceRecording, "test.bin");
 }
 
 TEST_F(ConfigHandlerTest, SimpleParseMultipleInstances) {

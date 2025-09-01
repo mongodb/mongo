@@ -75,7 +75,7 @@ For launching mongor all you need is a recording file and the URI on the mongodb
 
 alternative a configuration file can be specified:
 
-`	./mongor -c <JSON config file> `
+`./mongor -c <JSON config file> `
 
 where the config file is:
 
@@ -104,7 +104,7 @@ During command replaying MongoR stores the information about the execution itsel
 
 ```cpp
 struct PerformancePacket {
-    uint64_t session;
+    uint64_t sessionId;
     uint64_t messageId;
     int64_t time;
     uint64_t ncount;
@@ -117,3 +117,6 @@ struct PerformancePacket {
 - `number of documents returned (ncount)` => list of documents returned after the query execution. Useful for comparing recording and replaying results.
 
 In case of multiple batches in the cursor returned after a `find` or `aggregate`, the total number of documents is the size of the first batch. `getMore` commands are not issued to navigate the cursor, unless explicitely recorded in the recording file.
+
+The first N bytes recorded in the perf file represent the mongoURI used to connect to the shadow instance. So the recording format is the following:
+`<size_mongo_uri><mongo_uri><packet1><packet2>.....<packetN>`

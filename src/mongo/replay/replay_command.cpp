@@ -55,25 +55,15 @@ OpMsgRequest ReplayCommand::fetchMsgRequest() const {
 }
 
 Date_t ReplayCommand::fetchRequestTimestamp() const {
-    try {
-        return parseSeenTimestamp();
-    } catch (const DBException& e) {
-        auto lastError = e.toStatus();
-        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
-    } catch (const std::exception& e) {
-        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, e.what());
-    }
+    return _packet.date;
 }
 
-int64_t ReplayCommand::fetchRequestSessionId() const {
-    try {
-        return parseSessionId();
-    } catch (const DBException& e) {
-        auto lastError = e.toStatus();
-        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
-    } catch (const std::exception& e) {
-        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, e.what());
-    }
+uint64_t ReplayCommand::fetchRequestSessionId() const {
+    return _packet.id;
+}
+
+uint64_t ReplayCommand::fetchMessageId() const {
+    return _packet.order;
 }
 
 std::string ReplayCommand::toString() const {
@@ -87,15 +77,8 @@ OpMsgRequest ReplayCommand::parseBody() const {
     // OpMsg should be changed to allow parsing from a "view" type.
     message.setData(dbMsg, _packet.message.data(), _packet.message.dataLen());
     OpMsg::removeChecksum(&message);
+    // TODO: SERVER-109756 remove unused fields such as lsid.
     return rpc::opMsgRequestFromAnyProtocol(message);
-}
-
-Date_t ReplayCommand::parseSeenTimestamp() const {
-    return _packet.date;
-}
-
-int64_t ReplayCommand::parseSessionId() const {
-    return _packet.id;
 }
 
 std::string ReplayCommand::parseOpType() const {

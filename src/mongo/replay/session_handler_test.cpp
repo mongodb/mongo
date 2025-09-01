@@ -49,10 +49,10 @@ TEST(SessionHandlerTest, StartAndStopSession) {
     auto stopRecording = cmds::stop({.date = Date_t::now() + Milliseconds(5)});
 
     {
-        SessionHandler sessionHandler;
-        sessionHandler.setStartTime(startRecording.fetchRequestTimestamp());
         const auto uri = server.getConnectionString();
-        sessionHandler.onSessionStart(uri, startRecording);
+        SessionHandler sessionHandler{uri};
+        sessionHandler.setStartTime(startRecording.fetchRequestTimestamp());
+        sessionHandler.onSessionStart(startRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
         sessionHandler.onSessionStop(stopRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
@@ -69,12 +69,12 @@ TEST(SessionHandlerTest, StartSessionSameSessionIDError) {
     auto commandStart1 = cmds::start({.date = Date_t::now()});
 
     {
-        SessionHandler sessionHandler;
+        SessionHandler sessionHandler{uri};
         sessionHandler.setStartTime(commandStart1.fetchRequestTimestamp());
-        sessionHandler.onSessionStart(uri, commandStart1);
+        sessionHandler.onSessionStart(commandStart1);
         auto commandStart2 = cmds::start({.date = Date_t::now() + Milliseconds(100)});
         // this will throw. we can't have different sessions with same session id.
-        ASSERT_THROWS_CODE(sessionHandler.onSessionStart(uri, commandStart2),
+        ASSERT_THROWS_CODE(sessionHandler.onSessionStart(commandStart2),
                            DBException,
                            ErrorCodes::ReplayClientSessionSimulationError);
 
@@ -83,7 +83,7 @@ TEST(SessionHandlerTest, StartSessionSameSessionIDError) {
         sessionHandler.onSessionStop(commandStop1);
         // there should be 0 active sessions and 1 free session simulator to be re-used
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
-        sessionHandler.onSessionStart(uri, commandStart2);
+        sessionHandler.onSessionStart(commandStart2);
         // not there should be 1 active session and 0 free sessions.
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
         sessionHandler.clear();
@@ -105,9 +105,9 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
     auto commandStop1 = cmds::stop({.date = Date_t::now()});
 
     {
-        SessionHandler sessionHandler;
+        SessionHandler sessionHandler{uri};
         sessionHandler.setStartTime(commandStart1.fetchRequestTimestamp());
-        sessionHandler.onSessionStart(uri, commandStart1);
+        sessionHandler.onSessionStart(commandStart1);
 
         sessionHandler.onSessionStop(commandStop1);
 
@@ -118,7 +118,7 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
         //                    DBException,
         //                    ErrorCodes::ReplayClientSessionSimulationError);
 
-        sessionHandler.onSessionStart(uri, commandStart2);
+        sessionHandler.onSessionStart(commandStart2);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
         sessionHandler.clear();
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
@@ -148,12 +148,12 @@ TEST(SessionHandlerTest, ExecuteCommand) {
 
 
     {
-        SessionHandler sessionHandler;
+        SessionHandler sessionHandler{uri};
         sessionHandler.setStartTime(startRecording.fetchRequestTimestamp());
-        sessionHandler.onSessionStart(uri, startRecording);
+        sessionHandler.onSessionStart(startRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
 
-        sessionHandler.onBsonCommand(uri, findCommand);
+        sessionHandler.onBsonCommand(findCommand);
 
         sessionHandler.onSessionStop(stopRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);

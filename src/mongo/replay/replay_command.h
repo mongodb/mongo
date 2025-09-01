@@ -52,7 +52,10 @@ public:
     Date_t fetchRequestTimestamp() const;
 
     /** Extract the session id for the current command */
-    int64_t fetchRequestSessionId() const;
+    uint64_t fetchRequestSessionId() const;
+
+    /** Unique id associated to the message present in the recording */
+    uint64_t fetchMessageId() const;
 
     /** Use this method to know if the command represents a start recording, this starts the session
      * simulation. */
@@ -75,19 +78,6 @@ public:
 private:
     /** Extract the actual message body containing the actual bson command containing the query */
     OpMsgRequest parseBody() const;
-
-    /*
-     * Extract timestamp of when the command was recorded on the server and use it for deciding
-     * whether to replay the command or not
-     */
-    Date_t parseSeenTimestamp() const;
-
-    /*
-     * Extract sessionId. Used for pinning the command to a session simulator
-     */
-    int64_t parseSessionId() const;
-
-
     TrafficReaderPacket _packet;
 };
 

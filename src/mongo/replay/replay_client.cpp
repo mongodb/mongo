@@ -30,11 +30,18 @@
 #include "mongo/replay/replay_client.h"
 
 #include "mongo/db/query/util/stop_token.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_config.h"
 #include "mongo/replay/session_handler.h"
 #include "mongo/replay/traffic_recording_iterator.h"
+#include "mongo/transport/asio/asio_session_manager.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/version.h"
 
 #include <condition_variable>
 #include <exception>
@@ -43,6 +50,7 @@
 #include <string>
 
 namespace mongo {
+
 /**
  * Helper class for applying a callable to a container of N elements,
  * spawning a new thread for each element.
@@ -158,9 +166,14 @@ private:
     std::exception_ptr exception = nullptr;
 };
 
+// We don't want to replay all the commands we find in the recording file. Mainly we want to skip:
+// 1. legacy commands. Everything that is marked legacy, won't be replayable.
+// 2. Responses (cursor). These will be the result of some query like find and aggregate.
+// 3. n/ok commands. These are just responses.
+// 4. isWritablePrimary/isMaster. These are mostly diagnostic commands that we don't want.
 // NOLINTNEXTLINE needs audit
 static std::unordered_set<std::string> forbiddenKeywords{
-    "legacy", "cursor", "endSessions", "ok", "isWritablePrimary", "n"};
+    "legacy", "cursor", "endSessions", "ok", "isWritablePrimary", "n", "isMaster", "ismaster"};
 
 bool isReplayable(const std::string& commandType) {
     return !commandType.empty() && !forbiddenKeywords.contains(commandType);
@@ -190,7 +203,8 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
         // setup recording and replaying starting time
         auto firstCommand = *iter;
         // create a new session handler for mananging the recording.
-        SessionHandler sessionHandler;
+        SessionHandler sessionHandler{replayConfig.mongoURI,
+                                      replayConfig.enablePerformanceRecording};
         sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
 
         for (const auto& packet : iter) {
@@ -205,13 +219,13 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
                 // will associated the URI to a session task and run all the commands associated
                 // with this session id.
                 const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
-                sessionHandler.onSessionStart(replayConfig.mongoURI, timestamp, sessionId);
+                sessionHandler.onSessionStart(timestamp, sessionId);
             } else if (command.isStopRecording()) {
                 // stop commad will reset the complete the simulation and reset the connection.
                 sessionHandler.onSessionStop(command);
             } else {
                 // must be a runnable command.
-                sessionHandler.onBsonCommand(replayConfig.mongoURI, command);
+                sessionHandler.onBsonCommand(command);
             }
         }
     } catch (const std::exception& e) {

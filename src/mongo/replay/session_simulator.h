@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/replay/performance_reporter.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/session_scheduler.h"
 #include "mongo/util/duration.h"
@@ -63,11 +64,11 @@ namespace mongo {
  * design as simple as possible. Performance is not very important in this case, however
  * SessionSimulator is not supposed to be thrown away and reconstructed constantly.
  */
-class SessionScheduler;
-class ReplayCommandExecutor;
 class SessionSimulator {
 public:
-    explicit SessionSimulator();
+    SessionSimulator(std::unique_ptr<ReplayCommandExecutor>,
+                     std::unique_ptr<SessionScheduler>,
+                     std::unique_ptr<PerformanceReporter>);
     virtual ~SessionSimulator();
 
     void start(StringData uri,
@@ -75,7 +76,7 @@ public:
                const Date_t& recordStartTime,
                const Date_t& eventTimestamp);
     void stop(const Date_t& sessionEnd);
-    void run(const ReplayCommand&, const Date_t& commandTimeStamp) const;
+    void run(const ReplayCommand&, const Date_t& commandTimeStamp);
 
 protected:
     /**
@@ -104,6 +105,7 @@ private:
     Date_t _recordStartTime;
     std::unique_ptr<ReplayCommandExecutor> _commandExecutor;
     std::unique_ptr<SessionScheduler> _sessionScheduler;
+    std::unique_ptr<PerformanceReporter> _perfReporter;
 };
 
 }  // namespace mongo
