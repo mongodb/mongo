@@ -37,10 +37,20 @@ function runTest({queryInstance, expectedDebugQueryShape, shouldRunExplain = tru
 
     // Compare the actual debug query shape against the expected one. Using 'assert.docEq()' has the
     // added bonus of ensuring that the 'tenantId' does not get leaked within the 'cmdNs' property.
-    const actualDebugQueryShape = qsutils.getQuerySettings({
-        showDebugQueryShape: true,
-    })[0].debugQueryShape;
-    assert.docEq(expectedDebugQueryShape, actualDebugQueryShape);
+    // We need to wrap the query shape comparison into an 'assert.soon()' call here because during
+    // FCV donwgrade the collection with representative query shapes is discarded, and there is a
+    // small window of time in which there is no representative query present, and thus no debug
+    // query shape can be computed from it by the $querySettings command.
+    assert.soon(() => {
+        const actualDebugQueryShape = qsutils.getQuerySettings({
+            showDebugQueryShape: true,
+        })[0].debugQueryShape;
+        if (actualDebugQueryShape === undefined) {
+            return false;
+        }
+        assert.docEq(expectedDebugQueryShape, actualDebugQueryShape);
+        return true;
+    }, "expecting debugQueryShape to be as expected");
 
     // Remove the newly added query settings, so the rest of the tests can be executed from a fresh
     // state.
