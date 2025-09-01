@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/unittest/assert.h"
@@ -92,6 +93,8 @@ class DirectConnectionDDLHookTest : public ShardServerTestFixture {
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();
+
+        ReplicaSetDDLTracker::create(getServiceContext());
 
         const auto& client = operationContext()->getClient();
         authzManager = AuthorizationManager::get(client->getService());

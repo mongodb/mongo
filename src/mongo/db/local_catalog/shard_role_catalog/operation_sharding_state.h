@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -145,6 +146,7 @@ public:
 
     private:
         OperationContext* const _opCtx;
+        ReplicaSetDDLTracker::ScopedReplicaSetDDL _scopedReplicaSetDDL;
     };
 
     /**

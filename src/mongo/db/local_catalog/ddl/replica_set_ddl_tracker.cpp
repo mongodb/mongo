@@ -69,11 +69,15 @@ ReplicaSetDDLHook* ReplicaSetDDLTracker::lookupHookByName(const StringData hookN
 ReplicaSetDDLTracker::ScopedReplicaSetDDL::ScopedReplicaSetDDL(OperationContext* opCtx,
                                                                const NamespaceString& nss)
     : _ddlTracker(ReplicaSetDDLTracker::get(opCtx->getServiceContext())), _opCtx(opCtx), _nss(nss) {
-    _ddlTracker->onBeginDDL(_opCtx, _nss);
+    if (_ddlTracker) {
+        _ddlTracker->onBeginDDL(_opCtx, _nss);
+    }
 }
 
 ReplicaSetDDLTracker::ScopedReplicaSetDDL::~ScopedReplicaSetDDL() {
-    _ddlTracker->onEndDDL(_opCtx, _nss);
+    if (_ddlTracker) {
+        _ddlTracker->onEndDDL(_opCtx, _nss);
+    }
 }
 
 void ReplicaSetDDLTracker::onBeginDDL(OperationContext* opCtx, const NamespaceString& nss) const {
