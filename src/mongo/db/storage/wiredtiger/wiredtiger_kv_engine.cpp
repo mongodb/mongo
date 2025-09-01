@@ -2339,8 +2339,8 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
 }
 
 void WiredTigerKVEngine::setLastMaterializedLsn(uint64_t lsn) {
-    auto lastMaterializedLsnConfig = fmt::format("disaggregated=(last_materialized_lsn={})", lsn);
-    invariantWTOK(_conn->reconfigure(_conn, lastMaterializedLsnConfig.c_str()), nullptr);
+    invariantWTOK(_conn->set_context_uint(_conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, lsn),
+                  nullptr);
 }
 
 void WiredTigerKVEngine::setRecoveryCheckpointMetadata(StringData checkpointMetadata) {
