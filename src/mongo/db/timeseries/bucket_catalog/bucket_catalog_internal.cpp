@@ -106,7 +106,6 @@ boost::optional<OperationId> getOpId(OperationContext* opCtx,
         case CombineWithInsertsFromOtherClients::kAllow:
             return boost::none;
         case CombineWithInsertsFromOtherClients::kDisallow:
-            invariant(opCtx->getOpID());
             return opCtx->getOpID();
     }
     MONGO_UNREACHABLE;
