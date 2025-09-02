@@ -610,12 +610,11 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
             continue;
         }
 
-        auto response = shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            cmdObj,
-            Shard::RetryPolicy::kIdempotent);
+        auto response = shard->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kAdmin,
+                                          cmdObj,
+                                          Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
             return response.getStatus();
         }
@@ -652,12 +651,11 @@ Status ShardingCatalogManager::runCloneAuthoritativeMetadataOnShards(OperationCo
         request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
         request.setDbName(DatabaseName::kAdmin);
 
-        auto response = shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            request.toBSON(),
-            Shard::RetryPolicy::kIdempotent);
+        auto response = shard->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kAdmin,
+                                          request.toBSON(),
+                                          Shard::RetryPolicy::kIdempotent);
 
         if (!response.isOK()) {
             return response.getStatus();

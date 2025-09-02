@@ -113,12 +113,11 @@ protected:
         findAndModifyRequest.setWriteConcern(WriteConcernOptions(
             WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(15)));
 
-        return _shardLocal->runCommandWithFixedRetryAttempts(
-            _opCtx.get(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.dbName(),
-            findAndModifyRequest.toBSON(),
-            Shard::RetryPolicy::kNoRetry);
+        return _shardLocal->runCommand(_opCtx.get(),
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       nss.dbName(),
+                                       findAndModifyRequest.toBSON(),
+                                       Shard::RetryPolicy::kNoRetry);
     }
     /**
      * Facilitates running a find query by supplying the redundant parameters. Finds documents in
@@ -134,12 +133,11 @@ protected:
      * Returns the index definitions that exist for the given collection.
      */
     StatusWith<std::vector<BSONObj>> getIndexes(NamespaceString nss) {
-        auto response = _shardLocal->runCommandWithFixedRetryAttempts(
-            _opCtx.get(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.dbName(),
-            BSON("listIndexes" << nss.coll()),
-            Shard::RetryPolicy::kIdempotent);
+        auto response = _shardLocal->runCommand(_opCtx.get(),
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                nss.dbName(),
+                                                BSON("listIndexes" << nss.coll()),
+                                                Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
             return response.getStatus();
         }

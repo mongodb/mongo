@@ -105,7 +105,7 @@ public:
 
         SetQuerySettingsCommandReply typedRun(OperationContext* opCtx) {
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            const auto cmdResponse = uassertStatusOK(configShard->runCommand(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
@@ -168,7 +168,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            const auto cmdResponse = uassertStatusOK(configShard->runCommand(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,

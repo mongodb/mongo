@@ -403,14 +403,15 @@ std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
 
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(_dataShard->runCommand(
-        _opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        BSON(kCheckShardingIndexCmdName
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-             << kKeyPatternField << proposedKey),
-        Shard::RetryPolicy::kIdempotent)));
+    uassertStatusOK(
+        Shard::CommandResponse::getEffectiveStatus(_dataShard->runCommandWithIndefiniteRetries(
+            _opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            DatabaseName::kAdmin,
+            BSON(kCheckShardingIndexCmdName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                 << kKeyPatternField << proposedKey),
+            Shard::RetryPolicy::kIdempotent)));
 }
 
 void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
@@ -532,16 +533,17 @@ void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
         uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss));
     auto shard = uassertStatusOK(Grid::get(_opCtx)->shardRegistry()->getShard(
         _opCtx, cri.getChunkManager().getMinKeyShardIdWithSimpleCollation()));
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(shard->runCommand(
-        _opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        appendShardVersion(
-            BSON(kCheckShardingIndexCmdName
-                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-                 << kKeyPatternField << proposedKey),
-            cri.getShardVersion(shard->getId())),
-        Shard::RetryPolicy::kIdempotent)));
+    uassertStatusOK(
+        Shard::CommandResponse::getEffectiveStatus(shard->runCommandWithIndefiniteRetries(
+            _opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            DatabaseName::kAdmin,
+            appendShardVersion(
+                BSON(kCheckShardingIndexCmdName
+                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                     << kKeyPatternField << proposedKey),
+                cri.getShardVersion(shard->getId())),
+            Shard::RetryPolicy::kIdempotent)));
 }
 
 void ValidationBehaviorsReshardingBulkIndex::verifyCanCreateShardKeyIndex(

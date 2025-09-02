@@ -266,12 +266,11 @@ void invokeCommandOnShardWithIdempotentRetryPolicy(OperationContext* opCtx,
 
     LOGV2_DEBUG(22023, 1, "Sending request to recipient", "commandToSend"_attr = redact(cmd));
 
-    auto response = recipientShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        dbName,
-        cmd,
-        Shard::RetryPolicy::kIdempotent);
+    auto response = recipientShard->runCommand(opCtx,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               dbName,
+                                               cmd,
+                                               Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(response.getStatus());
     uassertStatusOK(getStatusFromWriteCommandReply(response.getValue().response));

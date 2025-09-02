@@ -606,7 +606,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     Timer t;
 
     auto commitChunkMigrationResponse =
-        Grid::get(_opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+        Grid::get(_opCtx)->shardRegistry()->getConfigShard()->runCommand(
             _opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,

@@ -212,7 +212,7 @@ QuerySettingsStage::createQueryShapeRepresentativeQueriesCursor(OperationContext
         findRepresentativeQueriesCmd.setReadConcern(readConcernArgs);
 
         auto configShard = grid->shardRegistry()->getConfigShard();
-        auto shardResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        auto shardResponse = uassertStatusOK(configShard->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             nss.dbName(),

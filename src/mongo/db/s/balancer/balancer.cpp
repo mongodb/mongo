@@ -1310,13 +1310,13 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
         }
         const auto s = std::move(shardStatus.getValue());
 
-        auto result = uassertStatusOK(
-            s->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                DatabaseName::kAdmin,
-                                                BSON("features" << 1),
-                                                Seconds(30),
-                                                Shard::RetryPolicy::kIdempotent));
+        auto result =
+            uassertStatusOK(s->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kAdmin,
+                                          BSON("features" << 1),
+                                          Seconds(30),
+                                          Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(result.commandStatus);
         BSONObj f = std::move(result.response);
 
@@ -1331,25 +1331,24 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                       "firstShardId"_attr = shardId,
                       "secondShardId"_attr = oids[x]);
 
-                result = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
-                    opCtx,
-                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    DatabaseName::kAdmin,
-                    BSON("features" << 1 << "oidReset" << 1),
-                    Seconds(30),
-                    Shard::RetryPolicy::kIdempotent));
+                result = uassertStatusOK(
+                    s->runCommand(opCtx,
+                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                  DatabaseName::kAdmin,
+                                  BSON("features" << 1 << "oidReset" << 1),
+                                  Seconds(30),
+                                  Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(result.commandStatus);
 
                 auto otherShardStatus = shardingContext->shardRegistry()->getShard(opCtx, oids[x]);
                 if (otherShardStatus.isOK()) {
-                    result = uassertStatusOK(
-                        otherShardStatus.getValue()->runCommandWithFixedRetryAttempts(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            DatabaseName::kAdmin,
-                            BSON("features" << 1 << "oidReset" << 1),
-                            Seconds(30),
-                            Shard::RetryPolicy::kIdempotent));
+                    result = uassertStatusOK(otherShardStatus.getValue()->runCommand(
+                        opCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        DatabaseName::kAdmin,
+                        BSON("features" << 1 << "oidReset" << 1),
+                        Seconds(30),
+                        Shard::RetryPolicy::kIdempotent));
                     uassertStatusOK(result.commandStatus);
                 }
 

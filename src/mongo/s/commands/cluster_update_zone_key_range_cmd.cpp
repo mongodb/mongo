@@ -75,12 +75,12 @@ public:
             cmd.serialize(&cmdBuilder);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponseStatus = uassertStatusOK(
-                configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                              kPrimaryOnlyReadPreference,
-                                                              DatabaseName::kAdmin,
-                                                              cmdBuilder.obj(),
-                                                              Shard::RetryPolicy::kIdempotent));
+            auto cmdResponseStatus =
+                uassertStatusOK(configShard->runCommand(opCtx,
+                                                        kPrimaryOnlyReadPreference,
+                                                        DatabaseName::kAdmin,
+                                                        cmdBuilder.obj(),
+                                                        Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(cmdResponseStatus.commandStatus);
         }
 

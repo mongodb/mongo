@@ -183,12 +183,12 @@ void refreshDbVersionOnPrimaryShard(OperationContext* opCtx,
                                     const ShardId& primaryShard) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto primaryShardPtr = uassertStatusOK(shardRegistry->getShard(opCtx, primaryShard));
-    auto cmdResponse = uassertStatusOK(primaryShardPtr->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin,
-        BSON("_flushDatabaseCacheUpdates" << dbNameStr),
-        Shard::RetryPolicy::kIdempotent));
+    auto cmdResponse = uassertStatusOK(
+        primaryShardPtr->runCommand(opCtx,
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    DatabaseName::kAdmin,
+                                    BSON("_flushDatabaseCacheUpdates" << dbNameStr),
+                                    Shard::RetryPolicy::kIdempotent));
     uassertStatusOK(cmdResponse.commandStatus);
 }
 

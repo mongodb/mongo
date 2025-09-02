@@ -93,23 +93,23 @@ protected:
 
     void runDummyCommandOnShard(ShardId shardId) {
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
-        uassertStatusOK(
-            shard->runCommand(operationContext(),
-                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                              DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
-                              BSON("unused" << "cmd"),
-                              Shard::RetryPolicy::kNoRetry));
+        uassertStatusOK(shard->runCommandWithIndefiniteRetries(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Shard::RetryPolicy::kNoRetry));
     }
 
     void runDummyCommandOnShardWithMaxTimeMS(ShardId shardId, Milliseconds maxTimeMS) {
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
-        uassertStatusOK(
-            shard->runCommand(operationContext(),
-                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                              DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
-                              BSON("unused" << "cmd"),
-                              maxTimeMS,
-                              Shard::RetryPolicy::kNoRetry));
+        uassertStatusOK(shard->runCommandWithIndefiniteRetries(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            maxTimeMS,
+            Shard::RetryPolicy::kNoRetry));
     }
 
     inline static auto errorLabelsSystemOverloaded =

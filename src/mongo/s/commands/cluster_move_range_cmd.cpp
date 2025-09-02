@@ -100,12 +100,13 @@ public:
             configsvrRequest.setWriteConcern(opCtx->getWriteConcern());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto commandResponse = uassertStatusOK(
-                configShard->runCommand(opCtx,
-                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                        DatabaseName::kAdmin,
-                                        configsvrRequest.toBSON(),
-                                        Shard::RetryPolicy::kIdempotent));
+            const auto commandResponse =
+                uassertStatusOK(configShard->runCommandWithIndefiniteRetries(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    DatabaseName::kAdmin,
+                    configsvrRequest.toBSON(),
+                    Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commandResponse));
         }

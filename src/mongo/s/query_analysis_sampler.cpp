@@ -109,12 +109,12 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
     if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto swResponse = configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            cmd.toBSON(),
-            Shard::RetryPolicy::kIdempotent);
+        auto swResponse =
+            configShard->runCommand(opCtx,
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    DatabaseName::kAdmin,
+                                    cmd.toBSON(),
+                                    Shard::RetryPolicy::kIdempotent);
         if (auto status = Shard::CommandResponse::getEffectiveStatus(swResponse); !status.isOK()) {
             return status;
         }

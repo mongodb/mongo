@@ -134,13 +134,14 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
 
 template <typename Inserter>
 BSONObj MigrationBatchFetcher<Inserter>::_fetchBatch(OperationContext* opCtx) {
-    auto commandResponse = uassertStatusOKWithContext(
-        _fromShard->runCommand(opCtx,
-                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                               DatabaseName::kAdmin,
-                               _migrateCloneRequest,
-                               Shard::RetryPolicy::kNoRetry),
-        "_migrateClone failed: ");
+    auto commandResponse =
+        uassertStatusOKWithContext(_fromShard->runCommandWithIndefiniteRetries(
+                                       opCtx,
+                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                       DatabaseName::kAdmin,
+                                       _migrateCloneRequest,
+                                       Shard::RetryPolicy::kNoRetry),
+                                   "_migrateClone failed: ");
 
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(commandResponse),
                                "_migrateClone failed: ");

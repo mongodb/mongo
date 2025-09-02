@@ -98,12 +98,12 @@ BSONObj selectMedianKey(OperationContext* opCtx,
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
-    auto cmdResponse = uassertStatusOK(
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                DatabaseName::kAdmin,
-                                                cmd.obj(),
-                                                Shard::RetryPolicy::kIdempotent));
+    auto cmdResponse =
+        uassertStatusOK(shard->runCommand(opCtx,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          DatabaseName::kAdmin,
+                                          cmd.obj(),
+                                          Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOK(cmdResponse.commandStatus);
 

@@ -112,12 +112,12 @@ public:
                   "About to run balancer control command",
                   "cmd"_attr = _configsvrCommandName);
 
-        auto cmdResponse = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                          kPrimaryOnlyReadPreference,
-                                                          DatabaseName::kAdmin,
-                                                          BSON(_configsvrCommandName << 1),
-                                                          Shard::RetryPolicy::kIdempotent));
+        auto cmdResponse =
+            uassertStatusOK(configShard->runCommand(opCtx,
+                                                    kPrimaryOnlyReadPreference,
+                                                    DatabaseName::kAdmin,
+                                                    BSON(_configsvrCommandName << 1),
+                                                    Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponse.commandStatus);
 
         // Append any return value from the response, which the config server returned

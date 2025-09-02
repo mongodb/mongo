@@ -342,15 +342,13 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 commitRequest.setCommitRefineCollectionShardKeyRequest(cRCSreq);
                 generic_argument_util::setMajorityWriteConcern(commitRequest);
 
-                auto commitResponse = Grid::get(opCtx)
-                                          ->shardRegistry()
-                                          ->getConfigShard()
-                                          ->runCommandWithFixedRetryAttempts(
-                                              opCtx,
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              DatabaseName::kAdmin,
-                                              commitRequest.toBSON(),
-                                              Shard::RetryPolicy::kIdempotent);
+                auto commitResponse =
+                    Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+                        opCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        DatabaseName::kAdmin,
+                        commitRequest.toBSON(),
+                        Shard::RetryPolicy::kIdempotent);
 
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commitResponse));
 

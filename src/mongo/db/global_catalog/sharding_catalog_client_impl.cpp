@@ -553,13 +553,13 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
 
 HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
     OperationContext* opCtx, ConfigsvrGetHistoricalPlacement&& request) {
-    auto remoteResponse = uassertStatusOK(_getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin,
-        request.toBSON(),
-        Milliseconds(defaultConfigCommandTimeoutMS.load()),
-        Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+    auto remoteResponse = uassertStatusOK(
+        _getConfigShard(opCtx)->runCommand(opCtx,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           DatabaseName::kAdmin,
+                                           request.toBSON(),
+                                           Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                           Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
 
     uassertStatusOK(remoteResponse.commandStatus);
 
@@ -1197,13 +1197,13 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
         cmdToRun = modifiedCmd.obj();
     }
 
-    auto swResponse = _getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        dbname,
-        cmdToRun,
-        Milliseconds(defaultConfigCommandTimeoutMS.load()),
-        Shard::RetryPolicy::kNotIdempotent);
+    auto swResponse =
+        _getConfigShard(opCtx)->runCommand(opCtx,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           dbname,
+                                           cmdToRun,
+                                           Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                           Shard::RetryPolicy::kNotIdempotent);
 
     if (!swResponse.isOK()) {
         return swResponse.getStatus();
@@ -1233,13 +1233,13 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
                                                              const DatabaseName& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
-    auto resultStatus = _getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
-        opCtx,
-        kConfigPrimaryPreferredReadPreference,
-        dbname,
-        cmdObj,
-        Milliseconds(defaultConfigCommandTimeoutMS.load()),
-        Shard::RetryPolicy::kIdempotent);
+    auto resultStatus =
+        _getConfigShard(opCtx)->runCommand(opCtx,
+                                           kConfigPrimaryPreferredReadPreference,
+                                           dbname,
+                                           cmdObj,
+                                           Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                           Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
         CommandHelpers::filterCommandReplyForPassthrough(resultStatus.getValue().response, result);
         return resultStatus.getValue().commandStatus.isOK();

@@ -217,13 +217,12 @@ Status splitChunk(OperationContext* opCtx,
 
     auto configCmdObj = request.toConfigCommandBSON(defaultMajorityWriteConcernDoNotUse().toBSON());
 
-    auto cmdResponseStatus =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            kPrimaryOnlyReadPreference,
-            DatabaseName::kAdmin,
-            configCmdObj,
-            Shard::RetryPolicy::kIdempotent);
+    auto cmdResponseStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+        opCtx,
+        kPrimaryOnlyReadPreference,
+        DatabaseName::kAdmin,
+        configCmdObj,
+        Shard::RetryPolicy::kIdempotent);
 
     // If we failed to get any response from the config server at all, despite retries, then we
     // should just go ahead and fail the whole operation.

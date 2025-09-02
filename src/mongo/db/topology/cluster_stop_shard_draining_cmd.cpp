@@ -70,19 +70,16 @@ public:
             configsvrRequest.setDbName(request().getDbName());
 
             const auto cmdResponseWithStatus =
-                Grid::get(opCtx)
-                    ->shardRegistry()
-                    ->getConfigShard()
-                    ->runCommandWithFixedRetryAttempts(
-                        opCtx,
-                        kPrimaryOnlyReadPreference,
-                        DatabaseName::kAdmin,
-                        // TODO SERVER-91373: Remove appendMajorityWriteConcern
-                        CommandHelpers::appendMajorityWriteConcern(
-                            CommandHelpers::filterCommandRequestForPassthrough(
-                                configsvrRequest.toBSON()),
-                            opCtx->getWriteConcern()),
-                        Shard::RetryPolicy::kIdempotent);
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+                    opCtx,
+                    kPrimaryOnlyReadPreference,
+                    DatabaseName::kAdmin,
+                    // TODO SERVER-91373: Remove appendMajorityWriteConcern
+                    CommandHelpers::appendMajorityWriteConcern(
+                        CommandHelpers::filterCommandRequestForPassthrough(
+                            configsvrRequest.toBSON()),
+                        opCtx->getWriteConcern()),
+                    Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(cmdResponseWithStatus.getValue().commandStatus);
         }

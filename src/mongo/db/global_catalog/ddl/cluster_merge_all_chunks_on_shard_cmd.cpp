@@ -97,12 +97,12 @@ public:
             shardSvrMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(
                 req.getMaxTimeProcessingChunksMS());
 
-            auto swCommandResponse = shard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                shardSvrMergeAllChunksOnShard.toBSON(),
-                Shard::RetryPolicy::kIdempotent);
+            auto swCommandResponse =
+                shard->runCommand(opCtx,
+                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                  DatabaseName::kAdmin,
+                                  shardSvrMergeAllChunksOnShard.toBSON(),
+                                  Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
 

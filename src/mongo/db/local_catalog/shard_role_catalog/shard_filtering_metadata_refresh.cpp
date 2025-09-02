@@ -214,7 +214,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
 
     const auto ensureChunkVersionIsGreaterThanResponse =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,

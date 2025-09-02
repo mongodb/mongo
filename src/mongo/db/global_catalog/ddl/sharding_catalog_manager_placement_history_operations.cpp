@@ -811,7 +811,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
         }()});
         deleteOp.setWriteConcern(ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
-        uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
+        uassertStatusOK(_localConfigShard->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
@@ -1002,12 +1002,12 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
     write_ops::DeleteCommandRequest deleteRequest(
         NamespaceString::kConfigsvrPlacementHistoryNamespace);
     deleteRequest.setDeletes(std::move(deleteStatements));
-    uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
-        deleteRequest.toBSON(),
-        Shard::RetryPolicy::kIdempotent));
+    uassertStatusOK(
+        _localConfigShard->runCommand(opCtx,
+                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                      NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
+                                      deleteRequest.toBSON(),
+                                      Shard::RetryPolicy::kIdempotent));
 
     LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");
 }

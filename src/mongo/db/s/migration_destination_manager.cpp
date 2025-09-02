@@ -1563,11 +1563,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
             auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
                 auto commandResponse = uassertStatusOKWithContext(
-                    fromShard->runCommand(opCtx,
-                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          DatabaseName::kAdmin,
-                                          xferModsRequest,
-                                          Shard::RetryPolicy::kNoRetry),
+                    fromShard->runCommandWithIndefiniteRetries(
+                        opCtx,
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        DatabaseName::kAdmin,
+                        xferModsRequest,
+                        Shard::RetryPolicy::kNoRetry),
                     "_transferMods failed: ");
 
                 uassertStatusOKWithContext(
@@ -1688,11 +1689,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 }
 
                 auto res = uassertStatusOKWithContext(
-                    fromShard->runCommand(opCtx,
-                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          DatabaseName::kAdmin,
-                                          xferModsRequest,
-                                          Shard::RetryPolicy::kNoRetry),
+                    fromShard->runCommandWithIndefiniteRetries(
+                        opCtx,
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        DatabaseName::kAdmin,
+                        xferModsRequest,
+                        Shard::RetryPolicy::kNoRetry),
                     "_transferMods failed in STEADY STATE: ");
 
                 uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),

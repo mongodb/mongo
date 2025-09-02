@@ -214,6 +214,31 @@ public:
      * given "retryPolicy".  Retries indefinitely until/unless a non-retriable error is encountered,
      * the maxTimeMs on the OperationContext expires, or the operation is interrupted.
      */
+    StatusWith<CommandResponse> runCommandWithIndefiniteRetries(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const DatabaseName& dbName,
+        const BSONObj& cmdObj,
+        RetryPolicy retryPolicy);
+
+    /**
+     * Same as the other variant of runCommandWithIndefiniteRetries, but allows the operation
+     * timeout to be overriden. Runs for the lesser of the remaining time on the operation
+     * context or the specified maxTimeMS override.
+     */
+    StatusWith<CommandResponse> runCommandWithIndefiniteRetries(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const DatabaseName& dbName,
+        const BSONObj& cmdObj,
+        Milliseconds maxTimeMSOverride,
+        RetryPolicy retryPolicy);
+
+    /**
+     * Same as runCommandWithIndefiniteRetries, but will only retry failed operations up to 3
+     * times, regardless of the retryPolicy or the remaining maxTimeMs.
+     * Wherever possible this method should be avoided in favor of runCommandWithIndefiniteRetries.
+     */
     StatusWith<CommandResponse> runCommand(OperationContext* opCtx,
                                            const ReadPreferenceSetting& readPref,
                                            const DatabaseName& dbName,
@@ -221,9 +246,9 @@ public:
                                            RetryPolicy retryPolicy);
 
     /**
-     * Same as the other variant of runCommand, but allows the operation timeout to be overriden.
-     * Runs for the lesser of the remaining time on the operation context or the specified maxTimeMS
-     * override.
+     * Same as runCommandWithIndefiniteRetries, but will only retry failed operations up to 3
+     * times, regardless of the retryPolicy or the remaining maxTimeMs.
+     * Wherever possible this method should be avoided in favor of runCommandWithIndefiniteRetries.
      */
     StatusWith<CommandResponse> runCommand(OperationContext* opCtx,
                                            const ReadPreferenceSetting& readPref,
@@ -231,31 +256,6 @@ public:
                                            const BSONObj& cmdObj,
                                            Milliseconds maxTimeMSOverride,
                                            RetryPolicy retryPolicy);
-
-    /**
-     * Same as runCommand, but will only retry failed operations up to 3 times, regardless of
-     * the retryPolicy or the remaining maxTimeMs.
-     * Wherever possible this method should be avoided in favor of runCommand.
-     */
-    StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
-        OperationContext* opCtx,
-        const ReadPreferenceSetting& readPref,
-        const DatabaseName& dbName,
-        const BSONObj& cmdObj,
-        RetryPolicy retryPolicy);
-
-    /**
-     * Same as runCommand, but will only retry failed operations up to 3 times, regardless of
-     * the retryPolicy or the remaining maxTimeMs.
-     * Wherever possible this method should be avoided in favor of runCommand.
-     */
-    StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
-        OperationContext* opCtx,
-        const ReadPreferenceSetting& readPref,
-        const DatabaseName& dbName,
-        const BSONObj& cmdObj,
-        Milliseconds maxTimeMSOverride,
-        RetryPolicy retryPolicy);
 
     /**
      * Schedules the command to be sent to the shard asynchronously. Does not provide any guarantee

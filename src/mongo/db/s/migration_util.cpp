@@ -425,7 +425,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             "release migration critical section on recipient",
             [&](OperationContext* newOpCtx) {
                 try {
-                    const auto response = recipientShard->runCommandWithFixedRetryAttempts(
+                    const auto response = recipientShard->runCommand(
                         newOpCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         DatabaseName::kAdmin,

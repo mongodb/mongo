@@ -333,12 +333,12 @@ std::vector<ShardId> getCurrentCollPlacement(OperationContext* opCtx, const UUID
     distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-        DatabaseName::kConfig,
-        distinctRequest.toBSON(),
-        Shard::RetryPolicy::kIdempotent));
+    auto reply = uassertStatusOK(
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                                DatabaseName::kConfig,
+                                distinctRequest.toBSON(),
+                                Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
     std::vector<ShardId> shardIds;

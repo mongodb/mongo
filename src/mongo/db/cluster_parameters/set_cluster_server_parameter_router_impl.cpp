@@ -51,12 +51,12 @@ void setClusterParameterImplRouter(OperationContext* opCtx,
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        configsvrSetClusterParameter.toBSON(),
-        Shard::RetryPolicy::kIdempotent));
+    const auto cmdResponse =
+        uassertStatusOK(configShard->runCommand(opCtx,
+                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                                DatabaseName::kAdmin,
+                                                configsvrSetClusterParameter.toBSON(),
+                                                Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
 }

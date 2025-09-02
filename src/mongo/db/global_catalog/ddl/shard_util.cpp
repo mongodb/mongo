@@ -83,13 +83,13 @@ StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
     const auto cmdObj =
         BSON("dataSize" << NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())
                         << "estimate" << estimate);
-    auto statStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        ns.dbName(),
-        cmdObj,
-        maxTimeMSOverride,
-        Shard::RetryPolicy::kIdempotent);
+    auto statStatus =
+        shardStatus.getValue()->runCommand(opCtx,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                           ns.dbName(),
+                                           cmdObj,
+                                           maxTimeMSOverride,
+                                           Shard::RetryPolicy::kIdempotent);
 
     auto stat = Shard::CommandResponse::getEffectiveStatus(statStatus);
     if (!stat.isOK()) {
@@ -125,12 +125,12 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
         nss, shardKeyPattern.toBSON(), chunkRange.getMin(), chunkRange.getMax(), chunkSizeBytes);
     req.setLimit(limit);
 
-    auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        nss.dbName(),
-        req.toBSON(),
-        Shard::RetryPolicy::kIdempotent);
+    auto cmdStatus =
+        shardStatus.getValue()->runCommand(opCtx,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                           nss.dbName(),
+                                           req.toBSON(),
+                                           Shard::RetryPolicy::kIdempotent);
 
     auto status = Shard::CommandResponse::getEffectiveStatus(cmdStatus);
     if (!status.isOK()) {
@@ -202,12 +202,12 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
     if (!shardStatus.isOK()) {
         status = shardStatus.getStatus();
     } else {
-        auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            cmdObj,
-            Shard::RetryPolicy::kNotIdempotent);
+        auto cmdStatus =
+            shardStatus.getValue()->runCommand(opCtx,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               DatabaseName::kAdmin,
+                                               cmdObj,
+                                               Shard::RetryPolicy::kNotIdempotent);
         if (!cmdStatus.isOK()) {
             status = std::move(cmdStatus.getStatus());
         } else {

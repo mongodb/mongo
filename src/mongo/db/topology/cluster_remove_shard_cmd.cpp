@@ -120,7 +120,7 @@ public:
         generic_argument_util::setMajorityWriteConcern(configsvrRequest, &opCtx->getWriteConcern());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        auto cmdResponseStatus = uassertStatusOK(configShard->runCommand(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,

@@ -70,12 +70,12 @@ public:
             generic_argument_util::setMajorityWriteConcern(cmd, &opCtx->getWriteConcern());
 
             auto cfg = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto response = uassertStatusOK(cfg->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                cmd.toBSON(),
-                Shard::RetryPolicy::kIdempotent));
+            auto response =
+                uassertStatusOK(cfg->runCommand(opCtx,
+                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                                DatabaseName::kAdmin,
+                                                cmd.toBSON(),
+                                                Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             uassertStatusOK(response.writeConcernStatus);
         }

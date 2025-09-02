@@ -83,15 +83,15 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin,
-            // TODO SERVER-91373: Remove appendMajorityWriteConcern
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                opCtx->getWriteConcern()),
-            Shard::RetryPolicy::kNotIdempotent));
+        auto cmdResponse = uassertStatusOK(
+            configShard->runCommand(opCtx,
+                                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                    DatabaseName::kAdmin,
+                                    // TODO SERVER-91373: Remove appendMajorityWriteConcern
+                                    CommandHelpers::appendMajorityWriteConcern(
+                                        CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                                        opCtx->getWriteConcern()),
+                                    Shard::RetryPolicy::kNotIdempotent));
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
 
@@ -176,12 +176,12 @@ public:
             setReadWriteConcern(opCtx, configsvrRequest, this);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                configsvrRequest.toBSON(),
-                Shard::RetryPolicy::kIdempotent));
+            auto cmdResponse = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        DatabaseName::kAdmin,
+                                        configsvrRequest.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);
 

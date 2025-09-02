@@ -123,7 +123,7 @@ public:
         parsedRequest.appendAsConfigCommand(&cmdBuilder);
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        auto cmdResponseStatus = uassertStatusOK(configShard->runCommand(
             opCtx,
             kPrimaryOnlyReadPreference,
             DatabaseName::kAdmin,

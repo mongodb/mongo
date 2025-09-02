@@ -599,12 +599,12 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
     };
 
     auto clonedCollections = [&](const BSONObj& command) {
-        const auto cloneResponse =
-            toShard->runCommand(opCtx,
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                DatabaseName::kAdmin,
-                                command,
-                                Shard::RetryPolicy::kNoRetry);
+        const auto cloneResponse = toShard->runCommandWithIndefiniteRetries(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            DatabaseName::kAdmin,
+            command,
+            Shard::RetryPolicy::kNoRetry);
 
         uassertStatusOKWithContext(
             Shard::CommandResponse::getEffectiveStatus(cloneResponse),
@@ -654,11 +654,11 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
 
     const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     const auto commitResponse =
-        config->runCommandWithFixedRetryAttempts(opCtx,
-                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                 DatabaseName::kAdmin,
-                                                 commitCommand,
-                                                 Shard::RetryPolicy::kIdempotent);
+        config->runCommand(opCtx,
+                           ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                           DatabaseName::kAdmin,
+                           commitCommand,
+                           Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(commitResponse),
@@ -905,12 +905,11 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
             const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
             const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
-            return toShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                enterCriticalSectionCommand,
-                Shard::RetryPolicy::kIdempotent);
+            return toShard->runCommand(opCtx,
+                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                       DatabaseName::kAdmin,
+                                       enterCriticalSectionCommand,
+                                       Shard::RetryPolicy::kIdempotent);
         }();
 
         uassertStatusOKWithContext(
@@ -958,12 +957,11 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(
             const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
             const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
-            return toShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                exitCriticalSectionCommand,
-                Shard::RetryPolicy::kIdempotent);
+            return toShard->runCommand(opCtx,
+                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                       DatabaseName::kAdmin,
+                                       exitCriticalSectionCommand,
+                                       Shard::RetryPolicy::kIdempotent);
         }();
 
         uassertStatusOKWithContext(

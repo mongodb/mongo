@@ -1400,7 +1400,7 @@ long long runCountCommandOnConfig(OperationContext* opCtx,
     countBuilder.append("count", nss.coll());
     countBuilder.append("query", query);
 
-    auto resultStatus = localConfigShard->runCommandWithFixedRetryAttempts(
+    auto resultStatus = localConfigShard->runCommand(
         opCtx,
         kConfigReadSelector,
         nss.dbName(),
@@ -1677,7 +1677,7 @@ void updateClusterCardinalityParameter(const Lock::ExclusiveLock&, OperationCont
     configsvrSetClusterParameter.set_compatibleWithTopologyChange(true);
 
     while (true) {
-        const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        const auto cmdResponse = shardRegistry->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,

@@ -169,11 +169,12 @@ TEST_F(ConfigShardWrapperTest, RunCommandAttachesMinClusterTime) {
     expectedMinClusterTime.addTicks(10);
     VectorClock::get(operationContext())->advanceConfigTime_forTest(expectedMinClusterTime);
 
-    auto result = _configShardWrapper->runCommand(operationContext(),
-                                                  ReadPreferenceSetting{},
-                                                  DatabaseName::kConfig,
-                                                  BSONObj{},
-                                                  Shard::RetryPolicy::kNoRetry);
+    auto result =
+        _configShardWrapper->runCommandWithIndefiniteRetries(operationContext(),
+                                                             ReadPreferenceSetting{},
+                                                             DatabaseName::kConfig,
+                                                             BSONObj{},
+                                                             Shard::RetryPolicy::kNoRetry);
 
     ASSERT_EQ(_mockConfigShard->lastReadPref.minClusterTime, expectedMinClusterTime.asTimestamp());
 }

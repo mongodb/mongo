@@ -400,7 +400,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx,
     // currently have no way to detect a topology change/rollback after the return from primary is
     // received.
     runAndThrowIfTermChanged(opCtx, [&](auto term) {
-        auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+        auto cmdResponse = uassertStatusOK(selfShard->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
@@ -1381,7 +1381,7 @@ ShardServerCatalogCacheLoaderImpl::_forcePrimaryCollectionRefreshAndWaitForRepli
     return runAndThrowIfTermChanged(opCtx, [&](auto term) {
         auto notif = _namespaceNotifications.createNotification(nss);
 
-        auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+        auto cmdResponse = uassertStatusOK(selfShard->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,

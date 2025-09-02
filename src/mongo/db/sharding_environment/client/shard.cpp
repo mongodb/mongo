@@ -187,20 +187,23 @@ bool Shard::remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options) 
     MONGO_UNREACHABLE;
 }
 
-StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const DatabaseName& dbName,
-                                                     const BSONObj& cmdObj,
-                                                     RetryPolicy retryPolicy) {
-    return runCommand(opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+StatusWith<Shard::CommandResponse> Shard::runCommandWithIndefiniteRetries(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const DatabaseName& dbName,
+    const BSONObj& cmdObj,
+    RetryPolicy retryPolicy) {
+    return runCommandWithIndefiniteRetries(
+        opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
 }
 
-StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const DatabaseName& dbName,
-                                                     const BSONObj& cmdObj,
-                                                     Milliseconds maxTimeMSOverride,
-                                                     RetryPolicy retryPolicy) {
+StatusWith<Shard::CommandResponse> Shard::runCommandWithIndefiniteRetries(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const DatabaseName& dbName,
+    const BSONObj& cmdObj,
+    Milliseconds maxTimeMSOverride,
+    RetryPolicy retryPolicy) {
     while (true) {
         auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK()) {
@@ -223,23 +226,20 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
-    OperationContext* opCtx,
-    const ReadPreferenceSetting& readPref,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    RetryPolicy retryPolicy) {
-    return runCommandWithFixedRetryAttempts(
-        opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const DatabaseName& dbName,
+                                                     const BSONObj& cmdObj,
+                                                     RetryPolicy retryPolicy) {
+    return runCommand(opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
 }
 
-StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
-    OperationContext* opCtx,
-    const ReadPreferenceSetting& readPref,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    Milliseconds maxTimeMSOverride,
-    RetryPolicy retryPolicy) {
+StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const DatabaseName& dbName,
+                                                     const BSONObj& cmdObj,
+                                                     Milliseconds maxTimeMSOverride,
+                                                     RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
         auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK()) {

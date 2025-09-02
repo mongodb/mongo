@@ -230,12 +230,12 @@ public:
             generic_argument_util::setMajorityWriteConcern(configsvrRequest);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto commandResponse =
-                configShard->runCommand(opCtx,
-                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                        DatabaseName::kAdmin,
-                                        configsvrRequest.toBSON(),
-                                        Shard::RetryPolicy::kIdempotent);
+            auto commandResponse = configShard->runCommandWithIndefiniteRetries(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                DatabaseName::kAdmin,
+                configsvrRequest.toBSON(),
+                Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
 
             Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);

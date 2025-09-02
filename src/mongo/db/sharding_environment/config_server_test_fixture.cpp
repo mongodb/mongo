@@ -196,7 +196,7 @@ std::shared_ptr<Shard> ConfigServerTestFixture::getConfigShard() const {
 Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc) {
-    auto insertResponse = getConfigShard()->runCommand(
+    auto insertResponse = getConfigShard()->runCommandWithIndefiniteRetries(
         opCtx,
         kReadPref,
         ns.dbName(),
@@ -218,7 +218,7 @@ Status ConfigServerTestFixture::updateToConfigCollection(OperationContext* opCtx
                                                          const BSONObj& query,
                                                          const BSONObj& update,
                                                          const bool upsert) {
-    auto updateResponse = getConfigShard()->runCommand(
+    auto updateResponse = getConfigShard()->runCommandWithIndefiniteRetries(
         opCtx,
         kReadPref,
         ns.dbName(),
@@ -246,7 +246,7 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc,
                                                          const bool multi) {
-    auto deleteResponse = getConfigShard()->runCommand(
+    auto deleteResponse = getConfigShard()->runCommandWithIndefiniteRetries(
         opCtx,
         kReadPref,
         ns.dbName(),
@@ -419,12 +419,13 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
                                                                      const NamespaceString& ns) {
     auto configShard = getConfigShard();
 
-    auto response = configShard->runCommand(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            ns.dbName(),
-                                            BSON("listIndexes" << ns.coll()),
-                                            Milliseconds(defaultConfigCommandTimeoutMS.load()),
-                                            Shard::RetryPolicy::kIdempotent);
+    auto response = configShard->runCommandWithIndefiniteRetries(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        ns.dbName(),
+        BSON("listIndexes" << ns.coll()),
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {
         return response.getStatus();
     }

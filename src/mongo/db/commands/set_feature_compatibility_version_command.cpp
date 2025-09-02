@@ -337,12 +337,11 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
         request.setDbName(DatabaseName::kAdmin);
         request.setTypes({{DDLCoordinatorType_serializer(DDLCoordinatorTypeEnum::kDropDatabase)}});
 
-        const auto response = shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            request.toBSON(),
-            Shard::RetryPolicy::kIdempotent);
+        const auto response = shard->runCommand(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                DatabaseName::kAdmin,
+                                                request.toBSON(),
+                                                Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
     }

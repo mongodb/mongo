@@ -1896,14 +1896,13 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
 
     for (const auto& shardId : shardsOwningChunks) {
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        uassertStatusOK(
-            Shard::CommandResponse::getEffectiveStatus(shard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                BSON("_flushRoutingTableCacheUpdates"
-                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
-                Shard::RetryPolicy::kIdempotent)));
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(shard->runCommand(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin,
+            BSON("_flushRoutingTableCacheUpdates"
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+            Shard::RetryPolicy::kIdempotent)));
     }
 }
 

@@ -115,12 +115,12 @@ public:
             auto shard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk.getShardId()));
 
-            auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                cmdBuilder.obj(),
-                Shard::RetryPolicy::kNotIdempotent));
+            auto response = uassertStatusOK(
+                shard->runCommand(opCtx,
+                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                  DatabaseName::kAdmin,
+                                  cmdBuilder.obj(),
+                                  Shard::RetryPolicy::kNotIdempotent));
             uassertStatusOK(response.commandStatus);
 
             Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);

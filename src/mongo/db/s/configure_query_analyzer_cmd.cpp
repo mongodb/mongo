@@ -270,12 +270,12 @@ public:
                     request.setWriteConcern(defaultMajorityWriteConcern());
 
                     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-                    auto swResponse = configShard->runCommandWithFixedRetryAttempts(
-                        opCtx,
-                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        DatabaseName::kConfig,
-                        request.toBSON(),
-                        Shard::RetryPolicy::kIdempotent);
+                    auto swResponse =
+                        configShard->runCommand(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                DatabaseName::kConfig,
+                                                request.toBSON(),
+                                                Shard::RetryPolicy::kIdempotent);
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
                     return write_ops::FindAndModifyCommandReply::parse(
                         swResponse.getValue().response, IDLParserContext("configureQueryAnalyzer"));

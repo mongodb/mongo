@@ -147,12 +147,11 @@ public:
                 }
                 const auto s = std::move(shardStatus.getValue());
 
-                auto response = uassertStatusOK(
-                    s->runCommandWithFixedRetryAttempts(opCtx,
-                                                        ReadPreferenceSetting::get(opCtx),
-                                                        DatabaseName::kAdmin,
-                                                        filteredCmd,
-                                                        Shard::RetryPolicy::kIdempotent));
+                auto response = uassertStatusOK(s->runCommand(opCtx,
+                                                              ReadPreferenceSetting::get(opCtx),
+                                                              DatabaseName::kAdmin,
+                                                              filteredCmd,
+                                                              Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(response.commandStatus);
                 BSONObj x = std::move(response.response);
 

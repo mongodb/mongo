@@ -111,12 +111,12 @@ public:
                 defaultMajorityWriteConcernDoNotUse());
 
             auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto swCommandResponse = config->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                configSvrCommitMergeAllChunksOnShard.toBSON(),
-                Shard::RetryPolicy::kIdempotent);
+            auto swCommandResponse =
+                config->runCommand(opCtx,
+                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   DatabaseName::kAdmin,
+                                   configSvrCommitMergeAllChunksOnShard.toBSON(),
+                                   Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
 

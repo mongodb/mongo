@@ -242,7 +242,7 @@ void setAllowMigrations(OperationContext* opCtx,
     }
 
     const auto swSetAllowMigrationsResult =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
@@ -301,12 +301,12 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
     generic_argument_util::setMajorityWriteConcern(configsvrRemoveTagsCmd);
     generic_argument_util::setOperationSessionInfo(configsvrRemoveTagsCmd, osi);
 
-    const auto swRemoveTagsResult = configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin,
-        configsvrRemoveTagsCmd.toBSON(),
-        Shard::RetryPolicy::kIdempotent);
+    const auto swRemoveTagsResult =
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                DatabaseName::kAdmin,
+                                configsvrRemoveTagsCmd.toBSON(),
+                                Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(swRemoveTagsResult),
                                str::stream() << "Error removing tags for collection "
@@ -331,12 +331,12 @@ void removeQueryAnalyzerMetadata(OperationContext* opCtx,
                 NamespaceString::kConfigQueryAnalyzersNamespace);
             generic_argument_util::setMajorityWriteConcern(deleteCmd);
             deleteCmd.setDeletes(std::move(deleteOps));
-            const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kConfig,
-                deleteCmd.toBSON(),
-                Shard::RetryPolicy::kIdempotent);
+            const auto deleteResult =
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        DatabaseName::kConfig,
+                                        deleteCmd.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(deleteResult),
                                        str::stream()
@@ -358,12 +358,12 @@ void removeQueryAnalyzerMetadata(OperationContext* opCtx,
                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
     entry.setMulti(false);
     deleteCmd.setDeletes({std::move(entry)});
-    const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kConfig,
-        deleteCmd.toBSON(),
-        Shard::RetryPolicy::kIdempotent);
+    const auto deleteResult =
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                DatabaseName::kConfig,
+                                deleteCmd.toBSON(),
+                                Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(deleteResult),
                                str::stream() << "Failed to remove query analyzer documents");

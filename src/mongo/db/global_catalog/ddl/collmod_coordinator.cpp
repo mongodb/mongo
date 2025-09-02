@@ -382,11 +382,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                     const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
-                        configShard->runCommand(opCtx,
-                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                nss().dbName(),
-                                                request.toBSON(),
-                                                Shard::RetryPolicy::kIdempotent)));
+                        configShard->runCommandWithIndefiniteRetries(
+                            opCtx,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            nss().dbName(),
+                            request.toBSON(),
+                            Shard::RetryPolicy::kIdempotent)));
                 }
             }))
         .then(_buildPhaseHandler(

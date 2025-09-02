@@ -241,12 +241,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-            const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                configsvrReshardCollection.toBSON(),
-                Shard::RetryPolicy::kIdempotent));
+            const auto cmdResponse = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        DatabaseName::kAdmin,
+                                        configsvrReshardCollection.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }));
 }

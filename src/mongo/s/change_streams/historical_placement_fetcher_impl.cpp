@@ -41,13 +41,13 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     ConfigsvrGetHistoricalPlacement request(nss.value_or(NamespaceString::kEmpty), atClusterTime);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto remoteResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin,
-        request.toBSON(),
-        Milliseconds(defaultConfigCommandTimeoutMS.load()),
-        Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+    auto remoteResponse = uassertStatusOK(
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                DatabaseName::kAdmin,
+                                request.toBSON(),
+                                Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
     uassertStatusOK(remoteResponse.commandStatus);
 
     return ConfigsvrGetHistoricalPlacementResponse::parse(

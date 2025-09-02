@@ -121,11 +121,11 @@ private:
 
         auto cmdToSend = BSON("killOp" << 1 << "op" << opId);
         shard
-            ->runCommand(opCtx,
-                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                         DatabaseName::kAdmin,
-                         cmdToSend,
-                         Shard::RetryPolicy::kNoRetry)
+            ->runCommandWithIndefiniteRetries(opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              DatabaseName::kAdmin,
+                                              cmdToSend,
+                                              Shard::RetryPolicy::kNoRetry)
             .getStatus()
             .ignore();
 

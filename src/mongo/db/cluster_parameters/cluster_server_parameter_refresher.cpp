@@ -136,12 +136,12 @@ getFCVAndClusterParametersFromConfigServer() {
             findFCV.setReadConcern(repl::ReadConcernArgs::kSnapshot);
             findFCV.setLimit(1);
             auto findFCVResponseBSON =
-                uassertStatusOK(
-                    configServers->runCommand(opCtx.get(),
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              findFCV.getDbName(),
-                                              findFCV.toBSON(),
-                                              Shard::RetryPolicy::kIdempotent))
+                uassertStatusOK(configServers->runCommandWithIndefiniteRetries(
+                                    opCtx.get(),
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    findFCV.getDbName(),
+                                    findFCV.toBSON(),
+                                    Shard::RetryPolicy::kIdempotent))
                     .response;
             auto findFCVResponse =
                 uassertStatusOK(CursorResponse::parseFromBSON(findFCVResponseBSON));

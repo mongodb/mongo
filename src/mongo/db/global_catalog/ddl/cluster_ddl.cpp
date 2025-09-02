@@ -139,12 +139,12 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         auto txnRouterResourceYielder = TransactionRouterResourceYielder::makeForRemoteCommand();
         auto sendCommand = [&] {
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                request.toBSON(),
-                Shard::RetryPolicy::kIdempotent));
+            auto response = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        DatabaseName::kAdmin,
+                                        request.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
             return response;
         };
         auto response = runWithYielding(opCtx, txnRouterResourceYielder.get(), sendCommand);

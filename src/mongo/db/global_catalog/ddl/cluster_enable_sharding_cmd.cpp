@@ -101,12 +101,12 @@ public:
             generic_argument_util::setMajorityWriteConcern(configsvrCreateDatabase);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin,
-                configsvrCreateDatabase.toBSON(),
-                Shard::RetryPolicy::kIdempotent));
+            auto response = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        DatabaseName::kAdmin,
+                                        configsvrCreateDatabase.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOKWithContext(response.commandStatus,
                                        str::stream() << "Database " << dbName.toStringForErrorMsg()

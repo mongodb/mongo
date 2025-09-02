@@ -454,12 +454,12 @@ void setupZonesForTempNss(OperationContext* opCtx,
         cmdBuilder.append("writeConcern", resharding::kMajorityWriteConcern.toBSON());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                          kPrimaryOnlyReadPreference,
-                                                          DatabaseName::kAdmin,
-                                                          cmdBuilder.obj(),
-                                                          Shard::RetryPolicy::kIdempotent));
+        auto cmdResponseStatus =
+            uassertStatusOK(configShard->runCommand(opCtx,
+                                                    kPrimaryOnlyReadPreference,
+                                                    DatabaseName::kAdmin,
+                                                    cmdBuilder.obj(),
+                                                    Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
     }
 }

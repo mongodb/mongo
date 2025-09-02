@@ -72,11 +72,12 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     listDbCommand.setNameOnly(true);
     std::set<boost::optional<TenantId>> tenantIds;
 
-    auto swListDbResponse = shard.runCommand(opCtx,
-                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                             DatabaseName::kAdmin,
-                                             listDbCommand.toBSON(),
-                                             Shard::RetryPolicy::kIdempotent);
+    auto swListDbResponse =
+        shard.runCommandWithIndefiniteRetries(opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              DatabaseName::kAdmin,
+                                              listDbCommand.toBSON(),
+                                              Shard::RetryPolicy::kIdempotent);
     if (!swListDbResponse.isOK()) {
         return swListDbResponse.getStatus();
     }

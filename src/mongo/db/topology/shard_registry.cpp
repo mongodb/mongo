@@ -569,11 +569,11 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync(
 
 Status ShardRegistry::_pingForNewTopologyTime(OperationContext* opCtx) {
     return getConfigShard()
-        ->runCommand(opCtx,
-                     ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
-                     DatabaseName::kAdmin,
-                     BSON("ping" << 1),
-                     Shard::RetryPolicy::kNoRetry)
+        ->runCommandWithIndefiniteRetries(opCtx,
+                                          ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+                                          DatabaseName::kAdmin,
+                                          BSON("ping" << 1),
+                                          Shard::RetryPolicy::kNoRetry)
         .getStatus();
 }
 

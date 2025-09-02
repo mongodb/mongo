@@ -90,13 +90,13 @@ public:
 
 
             // Force a reload of this node's shard list cache at the end of this command.
-            auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                kPrimaryOnlyReadPreference,
-                DatabaseName::kAdmin,
-                CommandHelpers::filterCommandRequestForPassthrough(
-                    transitionToDedicatedConfigServer.toBSON()),
-                Shard::RetryPolicy::kIdempotent);
+            auto cmdResponseWithStatus =
+                configShard->runCommand(opCtx,
+                                        kPrimaryOnlyReadPreference,
+                                        DatabaseName::kAdmin,
+                                        CommandHelpers::filterCommandRequestForPassthrough(
+                                            transitionToDedicatedConfigServer.toBSON()),
+                                        Shard::RetryPolicy::kIdempotent);
 
             Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 

@@ -51,12 +51,12 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoS(
     configsvrRequest.setDbName(DatabaseName::kAdmin);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::Nearest),
-        DatabaseName::kAdmin,
-        configsvrRequest.toBSON(),
-        Shard::RetryPolicy::kIdempotent));
+    auto cmdResponse =
+        uassertStatusOK(configShard->runCommand(opCtx,
+                                                ReadPreferenceSetting(ReadPreference::Nearest),
+                                                DatabaseName::kAdmin,
+                                                configsvrRequest.toBSON(),
+                                                Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOK(cmdResponse.commandStatus);
 

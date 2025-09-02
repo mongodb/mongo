@@ -215,13 +215,12 @@ Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
                       << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
     while (true) {
-        auto result = configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kConfig,
-            createCmd,
-            Milliseconds(defaultConfigCommandTimeoutMS.load()),
-            Shard::RetryPolicy::kIdempotent);
+        auto result = configShard->runCommand(opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              DatabaseName::kConfig,
+                                              createCmd,
+                                              Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                              Shard::RetryPolicy::kIdempotent);
 
         if (!result.isOK()) {
             return result.getStatus();

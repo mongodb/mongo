@@ -127,12 +127,15 @@ public:
             request.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
             auto cmdResponse =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
-                    opCtx,
-                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    DatabaseName::kAdmin,
-                    request.toBSON(),
-                    Shard::RetryPolicy::kIdempotent));
+                uassertStatusOK(Grid::get(opCtx)
+                                    ->shardRegistry()
+                                    ->getConfigShard()
+                                    ->runCommandWithIndefiniteRetries(
+                                        opCtx,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        DatabaseName::kAdmin,
+                                        request.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
 
             auto chunkVersionReceived = [&]() -> boost::optional<ChunkVersion> {
                 // Old versions might not have the shardVersion field

@@ -72,16 +72,12 @@ public:
             configsvrRequest.setDbName(request().getDbName());
 
             const auto cmdResponseWithStatus =
-                Grid::get(opCtx)
-                    ->shardRegistry()
-                    ->getConfigShard()
-                    ->runCommandWithFixedRetryAttempts(
-                        opCtx,
-                        kPrimaryOnlyReadPreference,
-                        DatabaseName::kAdmin,
-                        CommandHelpers::filterCommandRequestForPassthrough(
-                            configsvrRequest.toBSON()),
-                        Shard::RetryPolicy::kIdempotent);
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+                    opCtx,
+                    kPrimaryOnlyReadPreference,
+                    DatabaseName::kAdmin,
+                    CommandHelpers::filterCommandRequestForPassthrough(configsvrRequest.toBSON()),
+                    Shard::RetryPolicy::kIdempotent);
 
             const auto cmdResponse = uassertStatusOK(cmdResponseWithStatus);
             uassertStatusOK(cmdResponseWithStatus.getValue().commandStatus);

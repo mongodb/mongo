@@ -202,11 +202,12 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
     uassertStatusOK(shardStatus.getStatus());
 
     auto shard = shardStatus.getValue();
-    auto responseStatus = shard->runCommand(opCtx,
-                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                            DatabaseName::kAdmin,
-                                            buildMigrateSessionCmd(migrationSessionId),
-                                            Shard::RetryPolicy::kNoRetry);
+    auto responseStatus =
+        shard->runCommandWithIndefiniteRetries(opCtx,
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               DatabaseName::kAdmin,
+                                               buildMigrateSessionCmd(migrationSessionId),
+                                               Shard::RetryPolicy::kNoRetry);
 
     uassertStatusOK(responseStatus.getStatus());
     uassertStatusOK(responseStatus.getValue().commandStatus);

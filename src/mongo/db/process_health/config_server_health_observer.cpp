@@ -263,12 +263,13 @@ void ConfigServerHealthObserver::_runSmokeReadShardsCommand(std::shared_ptr<Chec
         findOneShardResponse = Grid::get(ctx->opCtx.get())
                                    ->shardRegistry()
                                    ->getConfigShard()
-                                   ->runCommand(ctx->opCtx.get(),
-                                                readPref,
-                                                NamespaceString::kConfigsvrShardsNamespace.dbName(),
-                                                findCmdBuilder.done(),
-                                                kServerRequestTimeout,
-                                                Shard::RetryPolicy::kNoRetry);
+                                   ->runCommandWithIndefiniteRetries(
+                                       ctx->opCtx.get(),
+                                       readPref,
+                                       NamespaceString::kConfigsvrShardsNamespace.dbName(),
+                                       findCmdBuilder.done(),
+                                       kServerRequestTimeout,
+                                       Shard::RetryPolicy::kNoRetry);
     } catch (const DBException& exc) {
         findOneShardResponse = StatusWith<Shard::CommandResponse>(exc.toStatus());
     }
