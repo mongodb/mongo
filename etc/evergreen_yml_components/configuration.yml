@@ -50,7 +50,7 @@ parameters:
 ## Patch Aliases
 patch_aliases:
 - alias: required
-  variant: '^(.*-required$|linux-64-debug|enterprise-amazon-linux2-arm64-all-feature-flags|amazon-linux2-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$'
+  variant: '^(.*-required$|linux-64-debug|enterprise-amazon-linux2023-arm64-all-feature-flags|amazon-linux2023-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$'
   task: '.*'
 
 - alias: convert_bazel
@@ -63,7 +63,7 @@ commit_queue_aliases:
   task: "^(bazel_.*|run_.*|compile_.*|lint_.*|validate_commit_message|jsCore|version_gen_validation|resmoke_validation_tests)$"
   variant_tags: []
   task_tags: []
-- variant: "^(amazon-linux2-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
+- variant: "^(amazon-linux2023-arm64-dynamic-compile|linux-x86-dynamic-compile-required)$"
   task: "clang_tidy.*"
   variant_tags: []
   task_tags: []

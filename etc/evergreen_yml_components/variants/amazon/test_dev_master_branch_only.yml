@@ -11,7 +11,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
-  - amazon2-arm64-latest-large
+  - amazon2023-arm64-latest-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   stepback: false
 
@@ -29,17 +29,17 @@ variables:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_compile_variant_dependency
+- &amazon_linux2023_arm64_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test
-    variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
+    variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2023-arm64-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
   # - name: generate_buildid_to_debug_symbols_mapping
-  #   variant: amazon-linux2-arm64-dynamic-compile
+  #   variant: amazon-linux2023-arm64-dynamic-compile
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/perf/perf.yml
@@ -48,48 +48,50 @@ variables:
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_arm64_generic_expansions
-  multiversion_platform: amazon2
+  multiversion_platform: amazon2023
   multiversion_edition: enterprise
   multiversion_architecture: aarch64
   packager_arch: aarch64
-  packager_distro: amazon2
+  packager_distro: amazon2023
   repo_edition: enterprise
-  large_distro_name: amazon2-arm64-latest-large
-  core_analyzer_distro_name: amazon2-arm64-latest-xlarge
+  large_distro_name: amazon2023-arm64-latest-large
+  core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
   num_scons_link_jobs_available: 0.99
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_expansions
+- &amazon_linux2023_arm64_dynamic_expansions
   <<: *linux_arm64_generic_expansions
   compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
 
 
 buildvariants:
 - <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
-  display_name: "* Amazon Linux 2 arm64 Enterprise Stitch Compile"
+  name: &amazon-linux2023-arm64-stitch-compile amazon-linux2023-arm64-stitch-compile
+  display_name: "* Amazon Linux 2023 arm64 Enterprise Stitch Compile"
   tags: ["suggested", "bazel_check"]
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
-    compile_variant: *amazon-linux2-arm64-stitch-compile
+    compile_variant: *amazon-linux2023-arm64-stitch-compile
     evergreen_remote_exec: on
   tasks:
     - name: .stitch
 
-- &enterprise-amazon-linux2-arm64-all-feature-flags-template
-  <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
-  name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
-  display_name: "! Amazon Linux 2 arm64 Enterprise (all feature flags)"
+- &enterprise-amazon-linux2023-arm64-all-feature-flags-template
+  <<: *amazon_linux2023_arm64_dynamic_compile_variant_dependency
+  name: enterprise-amazon-linux2023-arm64-all-feature-flags
+  display_name: "! Amazon Linux 2023 arm64 Enterprise (all feature flags)"
   tags: ["required"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-    - amazon2-arm64-latest-small
+    - amazon2023-arm64-atlas-latest-small
   stepback: true
-  expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
-    <<: *amazon_linux2_arm64_dynamic_expansions
+  expansions:
+    <<: *amazon_linux2023_arm64_dynamic_expansions
+    large_distro_name: amazon2023-arm64-atlas-latest-large
+    core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -101,7 +103,7 @@ buildvariants:
     download_mongot_release: true
     test_flags: >-
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool,incompatible_with_atlas_environment
   tasks:
   # TODO: DEVPROD-5173
   # Add !.incompatible_all_feature_flags back when the tag is added to any task or DEVPROD-5173 is completed.
@@ -113,11 +115,10 @@ buildvariants:
     - amazon2-arm64-latest-large
   - name: .default !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
 
-- &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
-  <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-  name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
+- <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+  name: enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers
   tags: ["suggested"]
-  display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
+  display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Fuzzers"
   tasks:
   - name: .aggfuzzer
   - name: .change_stream_fuzzer
