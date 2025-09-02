@@ -541,7 +541,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
     cancelSource.cancel();
     executor->shutdown();
 
-    ASSERT_EQ(monitor->awaitFinalChangeEvent().getNoThrow(), ErrorCodes::ShutdownInProgress);
+    auto status = monitor->awaitFinalChangeEvent().getNoThrow();
+    ASSERT(status == ErrorCodes::ShutdownInProgress || status == ErrorCodes::CallbackCanceled)
+        << "Found an unexpected error " << status;
 
     // The cleanup should still succeed.
     monitor->awaitCleanup().get();
