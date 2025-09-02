@@ -139,7 +139,7 @@ ninja = [
 [tool.poetry.group.testing.dependencies]
 curatorbin = "1.2.3"
 PyKMIP = "0.10.0"
-evergreen-py = "^3.6.13"
+evergreen-py = "^3.11.3"
 jinja2 = "^3.1.4"
 mock = "^5.1.0"
 shrub-py = "^3.1.4"

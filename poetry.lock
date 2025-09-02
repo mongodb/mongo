@@ -829,14 +829,14 @@ typing-extensions = ">=3.10.0"
 
 [[package]]
 name = "evergreen-py"
-version = "3.6.22"
+version = "3.11.3"
 description = "Python client for the Evergreen API"
 optional = false
-python-versions = ">=3.9,<4.0"
+python-versions = "<4.0,>=3.9"
 groups = ["testing"]
 files = [
-    {file = "evergreen_py-3.6.22-py3-none-any.whl", hash = "sha256:6cbc14c43fd464681fc4e228147feff5e295db705d7745ee571a8ba8bf662695"},
-    {file = "evergreen_py-3.6.22.tar.gz", hash = "sha256:d5a56d66765542c56c54b2c937dc18eb1af7d8d189a3804052c5a26f33f3742e"},
+    {file = "evergreen_py-3.11.3-py3-none-any.whl", hash = "sha256:28290d923dfc0f5f200cbe8ed58e72480a6b5dc882ee22f633e5fe5979b74f69"},
+    {file = "evergreen_py-3.11.3.tar.gz", hash = "sha256:64e994ab0f3207a451ec839f6aabebb260013c57ece1e4f285d5b13af1131e4b"},
 ]
 
 [package.dependencies]
@@ -846,7 +846,6 @@ python-dateutil = ">=2"
 PyYAML = ">=5"
 requests = ">=2"
 structlog = ">=19"
-tenacity = ">=5"
 
 [[package]]
 name = "exceptiongroup"
@@ -3706,7 +3705,7 @@ version = "9.1.2"
 description = "Retry code until it succeeds"
 optional = false
 python-versions = ">=3.9"
-groups = ["core", "testing"]
+groups = ["core"]
 files = [
     {file = "tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138"},
     {file = "tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb"},
@@ -4388,4 +4387,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "59b1ec87c61a82883fd709add68fab4c3cc7249435c6cdd80ef08e8194eadd0e"
+content-hash = "5fc2b0d9fc4f626f9dbc326ae8acfa8798c6b005726762c588999f4e4a986228"
