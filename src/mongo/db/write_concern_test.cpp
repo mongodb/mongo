@@ -82,6 +82,18 @@ class WriteConcernTest : public WriteConcernEphemeralTest {
     }
 };
 
+TEST_F(WriteConcernTest, ExtractFailsOnNullBytes) {
+    std::string s = "wcWithNullBytes ";
+    s[s.length() - 1] = '\0';
+    auto expectedErrMsg = "illegal embedded NUL byte in write concern " + s;
+    expectedErrMsg.pop_back();
+    auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern" << BSON("w" << s << "j" << false));
+    ASSERT_THROWS_CODE_AND_WHAT(extractWriteConcern(_opCtx.get(), commandBSON, false /*internal*/),
+                                DBException,
+                                103742,
+                                expectedErrMsg);
+}
+
 TEST_F(WriteConcernTest, ExtractOverridesWMajorityJFalse) {
     auto commandBSON = BSON("doSomeWrite" << 1 << "writeConcern"
                                           << BSON("w"
