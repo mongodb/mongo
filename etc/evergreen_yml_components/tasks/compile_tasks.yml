@@ -434,7 +434,7 @@ tasks:
             --config=evg
             --build_tag_filters=-mongo_unittest,mongo_binary,mongo_benchmark,mongo_integration_test
             --linkopt=-s
-            ${compile_all_but_not_unittests_flags|--linkopt=-s}
+          task_compile_flags: ${compile_all_but_not_unittests_flags|--linkopt=-s}
 
   ## compile_unittests ##
   - name: compile_unittests_future_git_tag_multiversion

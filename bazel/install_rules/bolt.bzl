@@ -59,6 +59,7 @@ def _bolt_optimize_impl(ctx):
             "-split-eh",
             "-dyno-stats",
             "--lite",
+            "--update-debug-sections",
             "-skip-funcs=" + functions_to_skip,
         ],
         mnemonic = "BoltOptimize",

@@ -231,6 +231,9 @@ common --//bazel/config:asan=False
 common --//bazel/config:tsan=False
 common --//bazel/config:ubsan=False
 common --//bazel/config:libunwind=auto
+common --//bazel/config:dtlto=False
+common --//bazel/config:pgo_profile_use=False
+common --//bazel/config:bolt_profile_use=False
 common --jobs=300
 common:macos --jobs=auto
 common:windows --jobs=auto
@@ -256,6 +259,9 @@ common:fastbuild --//bazel/config:allocator=auto
 common:fastbuild --//bazel/config:asan=False
 common:fastbuild --//bazel/config:tsan=False
 common:fastbuild --//bazel/config:ubsan=False
+common:fastbuild --//bazel/config:dtlto=False
+common:fastbuild --//bazel/config:pgo_profile_use=False
+common:fastbuild --//bazel/config:bolt_profile_use=False
 common:fastbuild --//bazel/config:libunwind=auto
 common:fastbuild --enable_platform_specific_config=true
 
@@ -280,6 +286,9 @@ common:dbg --//bazel/config:asan=False
 common:dbg --//bazel/config:tsan=False
 common:dbg --//bazel/config:ubsan=False
 common:dbg --//bazel/config:libunwind=auto
+common:dbg --//bazel/config:dtlto=False
+common:dbg --//bazel/config:pgo_profile_use=False
+common:dbg --//bazel/config:bolt_profile_use=False
 common:dbg --enable_platform_specific_config=true
 
 # Build with address and undefined sanitizers
@@ -324,13 +333,26 @@ common:opt --//bazel/config:asan=False
 common:opt --//bazel/config:tsan=False
 common:opt --//bazel/config:ubsan=False
 common:opt --//bazel/config:libunwind=auto
+common:opt --//bazel/config:dtlto=False
+common:opt --//bazel/config:pgo_profile_use=False
+common:opt --//bazel/config:bolt_profile_use=False
 common:opt --enable_platform_specific_config=true
+
+--config=opt_profiled
+common:opt_profiled --config=opt
+common:opt_profiled --fission=no
+common:opt_profiled --//bazel/config:separate_debug=True
+common:opt_profiled --//bazel/config:compiler_type=clang
+common:opt_profiled --//bazel/config:dtlto=True
+common:opt_profiled --//bazel/config:pgo_profile_use=True
+common:opt_profiled --//bazel/config:bolt_profile_use=True
+common:opt_profiled --enable_platform_specific_config=true
 
 --config=evg
 common:evg --config=opt
+common:evg --fission=no
 common:evg --//bazel/config:opt=auto
 common:evg --//bazel/config:separate_debug=True
-common:evg --fission=no
 common:evg --enable_platform_specific_config=true
 
 --config=evg_crypt

@@ -180,6 +180,58 @@ buildvariants:
           - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic
 
+  - name: amazon-linux2023-arm64-tests-lto-pgo-bolt
+    display_name: "Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) LTO/PGO/BOLT"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # Every day at 04:00
+    depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-lto-pgo-bolt
+      - name: archive_jstestshell
+        variant: amazon-linux2023-arm64-lto-pgo-bolt
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    run_on:
+      - amazon2023-arm64-atlas-latest-small
+    stepback: true
+    expansions:
+      compile_variant: amazon-linux2023-arm64-lto-pgo-bolt
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-large
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-atlas-latest-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-atlas-latest-large
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-atlas-latest-large
+      - name: .fuzzer_deterministic
+
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-non-rollback-feature-flags
     display_name: "Amazon Linux 2023 arm64 Enterprise (all non-rollback feature flags)"
