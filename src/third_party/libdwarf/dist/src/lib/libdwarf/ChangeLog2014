@@ -1,0 +1,399 @@
+2014-12-31:  David Anderson
+     * dwarf_error.c: Add DW_DLE_DW_DLE_ATTR_OUTSIDE_SECTION.
+     * libdwarf.h.in: Add DW_DLE_DW_DLE_ATTR_OUTSIDE_SECTION.
+     * dwarf_form.c(dwarf_formexprloc): Call the new function
+       _dwarf_reference_outside_section() as a check
+       for an exprloc with data that is outside the section it
+       belongs in.  Ie, a bug somewhere. Return error
+       DW_DLE_DW_DLE_ATTR_OUTSIDE_SECTION if applicable.
+     * dwarf_frame2.c(read_encoded_ptr): Pass error down so we set
+       a complete Dwarf_Error record at the point of error.
+       Just three functions that could use this were changed.
+     * dwarf_leb.c(_dwarf_decode_u_leb128): Presented with bogus
+       leb values we stop scanning the leb number before
+       overrunning our value-output buffer (and dumping core).
+       The change is reasonably adequate but will not catch
+       all cases.
+     * dwarf_query.c(dwarf_attrlist): Call _dwarf_reference_outside_section
+       to check the pointer is valid.
+     * dwarf_util.c,dwarf_util.h: Implement _dwarf_reference_outside_section().
+2014-12-28:  David Anderson
+     * dwarf_alloc.c: Added global _dwarf_failsafe_error
+       to enable better error reporting when malloc arena
+       has no space left. On dwarf_dealloc() avoids attempting
+       a free() of the static struct.
+     * dwarf_error.c,libdwarf.h.in: New error code
+       DW_DLE_FAILSAFE_ERRVAL for the malloc-arena-exhausted
+       case. Now use that static instead of aborting.
+     * dwarf_error.h: New field and library-private extern declaration
+       for the malloc-arena-exhausted case.
+     * libdwarf2.1.mm: Documented the handling of Dwarf_Error
+       when malloc space exhausted.
+     * libdwarf2.1.pdf: Regenerated. Rev 2.23.
+2014-09-10:  David Anderson
+     * dwarf_tsearchhash.c(calculate_allowed_fill): Moved a declaration
+       to avoid using a C99 feature.
+     * dwarf_query.c(dwarf_highpc_b): Moved a declaration to avoid using
+        aC99 feature.
+     * dwarf_util.c(dwarf_print): Moved a declaration to avoid using
+        aC99 feature.
+2014-08-11  David Anderson, avoiding some compiler warnings.
+     *dwarf_xu_index.c,dwarf_macro.c: Failed to cast the pointer
+      returned by _dwarf_get_macro (one place in each file).
+2014-08-04  David Anderson, avoiding some compiler warnings.
+     * dwarf_alloc.c, dwarf_alloc.h: Change some uses of Dwarf_Ptr to be char *
+       so we avoid adding (etc) to Dwarf_Ptr.
+     * dwarf_gdbindex.c: Cast _dwarf_get_alloc() return properly.
+     * dwarf_loc.c: Cast Dwarf_Ptr to char * in a couple places.
+     * dwarf_query.c,dwarf_sort_line.c,pro_arange.c: Change names of local
+       variables to avoid
+       compiler warning about shadowing other locals.
+     * dwarf_tsearchhash.c: Changed to avoid compiler warnings
+       about const casts whereever possible.
+     * libdwarf.h.in: Added prototypes for DWARF5
+       dwarf_get_SECT_name() and dwarf_get_MACRO_name().
+     * pro_alloc.c: Add include of pro_alloc.h.
+     * pro_forms.c: Made  _dwarf_add_AT_reference_internal()
+       static to avoid warning.
+     * pro_types.c: Add include of pro_types.h.
+2014-08-02  David Anderson
+     * dwarf_gdbindex.c: Fix an argument list by adding section name.
+     * libdwarf.h.in: Fix an argument list by adding section name.
+       Clarify some commentary on dwarf_get_xu* function declarations.
+     * libdwarf2.1.mm: Documented the new gdbindex and dwarf_get_xu*
+       functions.
+     * libdwarf2.1.pdf: Regenerate. Version 2.22.
+2014-07-12  David Anderson
+     * dwarf_die_deliv.c: Remove trailing whitespace.
+       Implement dwarf_get_die_section_name() allow
+       clients to get the Elf
+       section name actually used for the section.
+     * dwarf_xu_index.c: Remmove traling whitespace  and fix
+       indents.
+2014-07-11  David Anderson
+     * dwarf_opaque.h: Various CU context fields were
+       not clarified by comments, so comments added.
+2014-07-11  David Anderson
+     * dwarf_opaque.h: Clarified a couple comments.
+2014-07-11  David Anderson
+     * dwarf_xu_index.c: Now extracts the offset and size table
+       data correctly.
+2014-07-10  David Anderson
+     * dwarf_die_deliv.c: Clarify a comment a little bit.
+       No change in the code.
+2014-07-10  David Anderson
+     * dwarf_error.c,libdwarf.h.in: Added new error codes.
+     * dwarf_xu_index.c: Now extracts the hash table
+       values from .debug_tu_index and .debug_cu_index sections.
+2014-07-09  David Anderson
+     * dwarf_alloc.c,dwarf_xu_index.c,dwarf_xu_index.h:
+        Removed trailing whitespace characters.
+2014-07-09  David Anderson
+     * Makefile.in: Added dwarf_xu_index.o. Moved dwarf_macro.o
+       to get closer to alphabetical order in the list.
+     * dwarf.h: Added DW_SECT codes so the .debug_[tc]u.index
+       sections can be interpreted properly. DWARF5.
+     * dwarf_alloc.c: Added dwarf_xu_index.h #include. Added
+       struct Dwarf_Xu_Index_Header_s to alloced structs.
+       Added a couple lines of commentary about .gdb_index
+       section access type.
+     * dwarf_alloc.h: Increased  ALLOC_AREA_INDEX_TABLE_MAX to 57
+       for the new alloc type.
+     * dwarf_die_deliv.c: Removed trailing whitespace.
+     * dwarf_elf_access.c: Added commentary.
+     * dwarf_error.c: Added new error codes for .debug_tu_index
+       and .debug_cu_index sections code.
+     * dwarf_init_finish.c: Add handling of .debug_tu_index
+       and .debug_cu_index sections.
+     * dwarf_opaque.h: Add de_debug_cu_index and
+       de_debug_tu_index to Dwarf_Debug_s struct.
+     * dwarf_xu_index.c: New code for the newly handled
+       DWARF5 sections .debug_tu_index and .debug_cu_index .
+     * dwarf_xu_index.h: Defines struct Dwarf_Xu_Index_Header_s.
+     * libdwarf.h.in: Declares new functions implementing some of the
+       new section interfaces.
+2014-07-05  David Anderson
+     * dwarf_arange.c(dwarf_get_aranges_list): Remove the length variable
+       as its calculated value is unused.  rename length to area_length
+       for clarity.  Calculate arange_ptr_past_end early and
+       correctly.  Ensure that the test for version 4 is a >=
+       to reflect normal standards upgrades.
+     * dwarf_die_deliv.c(dwarf_find_offdie_CU_Context): Add commentary
+       about offsets and lengths for clarity.
+       Rename fields for clarity about local vs global offset.
+       Use the newly named fields for precise tests of section overflow of
+       a type unit.
+     * dwarf_frame.h: Add commentary about pointers in the cie_fde_prefix_s
+       structure.
+     * dwarf_global.c(_dwarf_internal_get_pubnames_like_data): Add
+       commentary about the of fields.
+     * dwarf_opaque.h: Improve commentary about offsets.
+2014-07-03  David Anderson
+     * dwarf_die_deliv.c: Fixed CU type offset check. Created local variable
+       so we do not repeat a calculation so the error does not recur and simplifying
+       nearby code.
+     * gdb_index.c: Remove unused local variable.
+     * dwarf_opaque.h: Change offset entries from Dwarf_Word to Dwarf_Unsigned
+       to ensure we do not remove bits from values.
+     * dwarf_query.c: Remove unused local variable and a comment referencing
+       that unused variable.
+     * pro_reloc_stream.c: Remove unused local variable.
+2014-07-01  David Anderson
+     * dwarf_alloc.c, dwarf_gdbindex.c, dwarf_init_finish.c, dwarf_opaque.h, libdwarf.h.in:
+       Fixed indent errors and removed trailing whitespace.
+2014-07-01  David Anderson
+     * libdwarf.h.in: Matched up gdbindex symboltable interfaces with
+       the C source.
+     * dwarf_gdbindex.c: Implement Symbol table access.
+2014-06-30  David Anderson
+     * libdwarf.h.in: Remove useless interface to gdbindex.
+     * dwarf_gdbindex.c: Implement TU list access code.
+       Implement access to the address area.
+2014-06-29  David Anderson
+     * dwarf_error.c: Added error codes for gdbindex access.
+     * libdwarf.h.in: Revised gdbindex function interface: simpler.
+     * dwarf_gdbindex.c, dwarf_gdbindex.h: Implement gdbindex
+       functions.
+2014-06-28  David Anderson
+     * Makefile.in: Add dwarf_gdbindex.o to objects.
+     * dwarf_alloc.c: Add new type Dwarf_Gdbindex_s to allocatable
+       types.
+     * dwarf_elf_access.c: Add a comment reflecting lack of need
+       to relocate a .gdb_index section.
+     * dwarf_error.c: Add new error strings for gdb_index
+       related errors.
+     * dwarf_init_finish.c: Add .gdb_index section to the
+       sections we read.  Refactor a test into a function
+       this_section_dwarf_relevant() to make code more readable.
+     * dwarf_opaque.h: Add  de_debug_gdbindex to Dwarf_Debug_s.
+     * libdwarf.h.in: Add opaque types for .gdb_index section
+       interfaces. Add DW_DLA_GDBINDEX for allocatability of
+       the new type. Add new GDB_INDEX error codes in DW_DLA list.
+       Declare new gdb_index interfaces.
+2014-05-19  David Anderson
+     * dwarf_init_finish.c: Removed unused local variable.
+     * dwarf_opaque.h: Added _dwarf_extract_string_offset_via_str_offsets()
+       to communicate the argument list to other libdwarf source files.
+     * dwarf_query.c: Fixed botch in call argument list, the dwarf_opaque.h
+       change exposed it.   Deleted an unused local variable.
+     * pro_reloc_symbolic.c: Deleted an unused local variable.
+2014-05-18  David Anderson
+     * libdwarf2.1.mm: Fixed a typo in the H3 line
+       for dwarf_get_debug_add_index().
+     * libdwarf2.1.pdf: Regenerated. Rev 2.20, May 18 2014.
+2014-05-18  David Anderson
+     * dwarf_loc.: Fixed offset update for DW_OP_constx/addrx.
+2014-05-18  David Anderson
+     * dwarf_form.c: Removed trailing whitespace, added commentary.
+     * dwarf_loc.c: Added commentary.
+2014-05-18  David Anderson
+     * libdwarf.h.in, dwarf_form.c: Restored the function
+       dwarf_get_debug_addr_index(). It is useful as a convenience
+       for apps like dwarfdump.
+2014-05-18  David Anderson
+     *  dwarf_die_deliv.c,dwarf_error.c,dwarf_form.c,dwarf_init_finish.c,
+        dwarf_opaque.h,dwarf_query.c,dwarf_util.c,libdwarf.h.in:
+        Fixed numerous indent errors and removed trailing whitespace.
+2014-05-17  David Anderson
+     * dwarf.h: Minor comment enhancement.
+     * dwarf_loc.c: Fixed code for DW_OP_constx, DW_OP_addrx,
+       DW_OP_GNU_addr_index, DW_OP_GNU_const_index.
+     * dwarf_form.c: DW_FORM_addr_index, DW_FORM_addrx,
+       DW_FORM_strx, DW_FORM_GNU_str_index
+     * dwarf_opaque.h: added new field dss_name to help
+       debugging.
+     * dwarf_query.c: Returns DW_DLE_MISSING_NEEDED_DEBUG_ADDR_SECTION when
+       debug_addr is missing so address cannot be
+       literally extracted.
+       New functions:  dwarf_get_debug_addr_index()
+       and dwarf_get_debug_str_index().
+     * libdwarf.h.in: New error codes for FORM errors.
+       New function declarations:  dwarf_get_debug_addr_index()
+      and dwarf_get_debug_str_index().
+2014-05-14  David Anderson
+     * dwarf_die_deliv.c: Refactored several interfaces and used
+       DW_DLV_OK (etc) returned values internally much more than
+       before to  get the desired behavior easily.
+     * dwarf_error.c: Error strings for 8 new error numbers.
+     * dwarf_form.c: DW_FORM_addr_index, DW_FORM_addrx
+       support added.
+     * dwarf_init_finish.c: Sections .debug_addr and
+       .debug_addr.dwo now handled if present.
+     * dwarf_opaque.h: New Dwarf_CU_Context fields added
+       so we can get CU DIE attributes for DW_FORM_addrx
+       DW_FORM_strx etc.
+       New de_debug* fields added for the new DebugFission
+       sections.
+     * dwarf_query.c: Using the revised _dwarf_get_size_of_val()
+       internal function.
+       Handling DW_FORM_GNU_str_index, DW_FORM_strx.
+       New functions (internal) for DW_FORM_strx, DW_FORM_addrx
+       and the GNU version of these to avoid duplicating code.
+     * dwarf_util.c: Implement revised _dwarf_get_size_of_val().
+       Handling DW_FORM_GNU_str_index, DW_FORM_strx.
+     * dwarf_util.h: Updated _dwarf_get_size_of_val()
+       declaration.
+     * libdwarf2.1.mm: Revision 2.8. May 15 2014. Documented
+       a restriction to a sensible view to strings that
+       dwarf_errmsg() returns.   However without actually
+       changing anything to take advantage of that restriction.
+     * libdwarf2.1.pdf: Regenerated.
+2014-05-11  David Anderson
+     * dwarf_error.c: Added 3 new error strings.
+     * dwarf_form.c: Added DW_FORM_GNU_str_index and partial
+       DW_FORM_GNU_addr_index handling.
+     * dwarf_init_finish.c: Refactored initial section setup
+       so we can handle dwo (DebugFission) or regular sections.
+     * dwarf_query.c:  Add support for DW_FORM_GNU_str_index.
+       Partial support for DW_FORM_GNU_addr_index.
+     * dwarf_util.c:  Add support for DW_FORM_GNU_str_index,
+       DW_FORM_GNU_addr_index.
+     * libdwarf.h.in: 4 new error codes in DW_DLE_ list. Last now 248.
+2014-05-09  David Anderson
+     * Makefile.in: Write ar std-out to ar-output-temp
+       so the text is not needlessly filling a terminal window.
+2014-05-08  David Anderson
+     * dwarf.h: Adds DW_AT_GNU_dwo_id, DW_AT_GNU_dwo_name and other
+       GNU extensions.
+     * libdwarf.h.in: Producer code changes:
+       The dwarf_producer_init_d() is new and has new arguments.
+       The older dwarf_producer_init() and _b _c versions are removed.
+       Only one producer callback declaration exists now:
+       Dwarf_Callback_Func.
+     * pro_init.c: Implements the new dwarf_producer_init_d()
+       function and initializes fields at runtime to select
+       what DWARF to emit. Messy and confusing initialization code
+       rewritten to depend on the runtime arguments
+       to dwarf_producer_init_d, not library compile-time.
+     * pro_opaque.h: New runtime fields set by initialization code.
+     * pro_reloc.c:  Fix a couple comment indentations.
+     * pro_forms.c:  Add curly braces in an if to avoid
+       a hard-to-find bug (there was none yet, but it was a trap...).
+     * pro_reloc_symbolic.c,pro_reloc_stream.c:  Remove use
+       of obsolete callback functions.
+     * pro_section.c: Ensure only IRIX isa/abi target generates
+       an exception CIE entry. Remove use of obsolete
+       callbacks.
+     * pro_util.h: Remove confusing and unreadable
+       relocation number ifdefs that
+       depended on settings at library compile-time. Most of the
+       content of the file is deleted now. See
+       isa_relocs[] in pro_init.c
+     * dwarf_error.c: Added error code (used by producer code).
+     * libdwarf2p.1.mm: Now version 1.36. Updated dwarf_producer_init()
+       documentation.
+     * libdwarf2p.1.pdf: Regenerated.
+2014-04-14  David Anderson
+     * pro_forms.c: Modified a comment about DW_FORM_ref_addr.
+       No logic change.
+     * bldDWindex.sh: Deleted. This shell script was intended for
+       DWARF2 postscript post-processing and was never useful.
+2014-04-12  David Anderson
+     * dwarf_die_deliv.c,dwarf_query.c: Gets the version stamp passed to
+       _dwarf_get_size_of_val() so DW_FORM_ref_addr handled
+       correctly.
+     * dwarf_form.c: Handle DW_FORM_ref_addr as the V2
+       specification says (V3 and later continue to
+       be handled unchanged.).
+     * dwarf_util.c: Handle DW_FORM_ref_addr as the V2
+       specification says (V3 and later continue to
+       be handled unchanged.).
+     * dwarf_addr_finder.c: Removed a mistaken handling
+       of DW_FORM_ref_addr. No one should be using this
+       function's features though...
+     * pro_forms.c: Made a comment clearer about
+       DW_FORM_ref_addr.
+     * pro_section.c: Made a comment clearer, removed
+       #if 0 code.
+2014-04-02  David Anderson
+     * libdwarf2.1.mm: Examples using dwarf_offdie_b() were
+       miscoded (is_info argument not provided). Now fixed.
+       Now at version 2.17.
+     * libdwarf2.1.pdf: Regenerated
+2014-03-17  David Anderson
+     * dwarf.v2.mm,dwarf.v2.pdf,index.v2.mm,index.v2.pdf: Removed
+       these files, they are now on dwarfstd.org.
+     * Makefile.in: Removed mention of the deleted files.
+     * README, COPYING: Removed mention of the deleted files.
+2014-02-08  David Anderson
+     * libdwarf2p.1.mm: Now version 1.35.  Added a few words
+       about the sect_name_index field in the callback
+       from libdwarf to your code for each new Elf section
+       to be generated.
+     * libdwarf2p.1.pdf: Regenerated.
+2014-02-02  David Anderson
+     * dwarf_alloc.c: Added commentary.
+     * dwarf_loc.c: Fixed two indents.
+     * gennames.c: Removed trailing newlines from the printf
+       output (dwarf_names_new.h is the file generated).
+     * libdwarf.h.in: Removed trailing whitespace.
+2014-02-01  David Anderson
+     * dwarf_alloc.c: Instead of doing a long list of address compares,
+       use the hash 'tree' and tfind() to determine if we malloced
+       the space or simply took an address from .debug_info (
+       or other in-memory section) when
+       we returned a _dwarf_get_alloc() pointer to the user.
+2014-01-31  David Anderson
+     * configure.in: The test to generate HAVE___UINT32_T_IN_SYS_TYPES_H
+       was in a strange place. Moved it up a few lines.
+     * configure: Regenerated.
+     * dwarf_alloc.c: Added comment hinting at how dwarf_dealloc
+       can be further simplified.
+2014-01-30  David Anderson
+     * dwarf_loc.c: Add support for DW_FORM_exprloc
+       to dwarf_loclist_n().
+     * libdwarf2.1.mm: Document support for DW_FORM_exprloc.Version 2.16
+     * libdwarf2.1.pdf: Regenerate.
+     * dwarf.h, dwarf_form.c, dwarf_line.c,
+       dwarf_query.c, dwarf_util.c: Add limited support for DW_FORM_GNU_ref_alt
+        and DW_FORM_GNU_strp_alt.
+2014-01-30  David Anderson
+     * dwarf_alloc.c: Refactored and added relevant commentary.
+       Added a check for debug_types in dwarf_dealloc().
+     * dwarf_init_finish.c: Corrected a comment and made one line
+       declation-is-initialization.
+     * dwarf_opaque.h: Added commentary.
+
+2014-01-29  David Anderson
+     * common.h,dwarf.h,dwarf_abbrev.c,dwarf_abbrev.h,dwarf_addr_finder.c,
+       dwarf_alloc.c,dwarf_alloc.h,dwarf_arange.c,dwarf_arange.h,
+       dwarf_base_types.h,dwarf_die_deliv.c,dwarf_die_deliv.h,
+       dwarf_elf_access.c,dwarf_elf_access.h,dwarf_error.c,dwarf_error.h,
+       dwarf_form.c,dwarf_frame.c,dwarf_frame.h,dwarf_frame2.c,
+       dwarf_frame3.c,dwarf_funcs.c,dwarf_funcs.h,dwarf_global.c,
+       dwarf_global.h,dwarf_harmless.c,dwarf_harmless.h,dwarf_incl.h,
+       dwarf_init_finish.c,dwarf_line.c,dwarf_line.h,dwarf_line2.c,
+       dwarf_loc.h,dwarf_macro.h,dwarf_opaque.h,dwarf_reloc_arm.h,
+       dwarf_reloc_mips.h,dwarf_reloc_ppc.h,dwarf_reloc_ppc64.h,
+       dwarf_reloc_x86_64.h,dwarf_tsearch.h,dwarf_types.h,dwarf_util.h,
+       dwarf_vars.h,dwarf_weaks.h,libdwarfdefs.h,malloc_check.h,
+       pro_alloc.h,pro_arange.h,pro_die.h,pro_encode_nm.h,pro_error.h,
+       pro_frame.h,pro_incl.h,pro_line.h,pro_opaque.h,dwarf_tsearch.h:
+       Remove trailing whitespace.
+2014-01-29  David Anderson
+     *  dwarf_tsearch.h, dwarf_tsearchhash.c: New files implementing
+        a hashed tree with tsearch() interfaces.
+     *  Makefile.in: Add dwarf_tsearchhash.c to the build.
+     *  dwarf_init_finish.c: Remove references to malloc_check and _dwarf_setup_debug()
+        and include of "malloc_check.h" as those are no longer needed.
+     *  dwarf_line.c: Removed a superfluous _dwarf_get_alloc().  The result of the call
+        was never used.
+     *  dwarf_opaque.h: Removed Dwarf_Alloc_Hdr_s references and simple malloc references.
+        added de_alloc_tree as base of a hash database replacing most of dwarf_alloc.c.
+     *  dwarf_query.c: Removed an unused local variable.
+     *  dwarf_alloc.h,dwarf_alloc.c: Removed simple malloc support and all the
+        complicated code handling allocation record-keeping in favor of
+        much simpler code calling functions
+        using a tsearch-like interface.
+2014-01-10  David Anderson
+     *  dwarf_print_lines.c,dwarf_macro.c: Remove trailing whitespace.
+     *  dwarf_ranges.c, dwarf_sort_lines.c: Remove trailing whitespace.
+     *  dwarf_query.c, dwarf_pubtypes.c: Remove trailing whitespace.
+     *  dwarf_original_elf_init.c,dwarf_loc.c: Remove trailing whitespace.
+     *  gennames.c: Fix a printf so the generated dwarf_names.c
+        does not have a trailing space.
+2014-01-10  David Anderson
+     *	gennames.c: Added comment clarifying why error is set
+        before the call to fgets, and fixing the declaration
+        order to avoid c99-ism.
+     *  dwarf_frame2.c: Use /* not // for comments in C.

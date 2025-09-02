@@ -1,0 +1,131 @@
+2012-11-30  David Anderson
+     * dwarf.h: defines for some added DW_OP_GNU operators
+     * dwarf_loc.c: Added support for some DW_OP_GNU operators.
+2012-11-29  David Anderson
+     * dwarf_elf_access.c,dwarf_init_finish.c,dwarf_loc.c,
+       dwarf_reloc_arm.h,dwarf_reloc_x86_64.h,libdwarf.h:
+       Fix indents so dicheck gives no warnings.
+2012-11-29  David Anderson
+     * dwarf_addr_finder.c: Add const to a couple
+       const arrays.
+     * gennames.c: Add const to a couple const variables.
+     * dwarf_form.c: dwarf_formflag() was incorrectly
+       returning 1 instead of the actual flag value when
+       non-zero flag value. Now returns the real flag byte value.
+     * dwarf_opaque.h: Moved debug_section area info into
+       a new array in Dwarf_Debug struct.
+     * dwarf_init_finish.c: Instead of a file-static array,
+       the array is moved to the Dwarf_Debug struct and accesses
+       are adjusted to match.
+     * pro_section.c: Add const to an array declaration.
+     * libdwarf2.1.mm: Updated dwarf_formflag()
+       documentation. Now version is 2.06.
+     * libdwarf2.1.pdf: Regenerated.
+2012-11-22  David Anderson
+     * dwarf_loc.c: Removed the last dbg->de_length_size
+       instances from _dwarf_get_locdesc() to reflect the
+       incoming argument with the offset size (length size).
+2012-11-21  David Anderson
+     * dwarf_loc.c: Updated argument list and implementation for
+       dwarf_loclist_from_expr_b(), adding offset size (length size).
+     * libdwarf.h: Updated argument list for
+       dwarf_loclist_from_expr_b().
+     * libdwarf2.1.mm: Updated dwarf_loclist_from_expr_b()
+       documentation. Now version is 2.05.
+     * libdwarf2.1.pdf: Regenerated.
+2012-11-20  David Anderson
+     * dwarf_line.h: Fixing two small formatting
+       inconsistencies.
+2012-11-17  David Anderson
+     * dwarf_original_elf_init.c: Expanded comment about
+       HAVE_ELF_C_READ_MMAP (which is not settable
+       by configure and is not really needed).
+     * configure regenerated with autoconf 2.69
+     * libdwarf2.1.mm: Document dwarf_encode_leb128() and
+       and dwarf_encode_signed_leb128().
+     * libdwarf2.1.pdf: Regenerated.
+
+2012-11-17  David Anderson
+     * dwarf_arange.c,dwarf_base_types.h,dwarf_die_deliv.c,
+       dwarf_elf_access.c,dwarf_form.c,dwarf_frame.c,
+       dwarf_frame2.c,dwarf_harmless.c,dwarf_init_finish.c,
+       dwarf_line.c,dwarf_line.h,dwarf_loc.c,dwarf_macro.c,
+       dwarf_original_elf_init.c,dwarf_print_lines.c,dwarf_query.c
+       dwarf_ranges.c,dwarf_reloc_arm.h,dwarf_reloc_mips.h,
+       dwarf_reloc_ppc.h,dwarf_reloc_ppc64.h,dwarf_reloc_x86_64.h,
+       dwarf_util.c,dwarf_util.h,pro_forms.c,pro_frame.c,
+       pro_incl.h,pro_init.c,pro_section.c: Update copyright
+       on files changed recently.
+2012-11-15  CarlosAlbertoEnciso <carlos.alberto.enciso@gmail.com>
+     * dwarf.h: Incorrect comments for registers (64 to 108).
+     * dwarf_arange.c: Consistent layout for if statements.
+     * dwarf_base_type.h: Minor comment type.
+     * dwarf_die_deliv.c: Consistent layout for if and while statements.
+     * dwarf_elf_access.c: Consistent layout for if statements.
+       For Windows, include header files with relocation definitions.
+       Populate new fields 'type' (section type) and 'info' (target section
+       for relocation) in data structure 'Dwarf_Obj_Access_Section_s'.
+       Minor typo error in function 'is_32bit_abs_reloc' for the case
+       'EM_PPC64', to use the correct symbol 'R_PPC64_DTPREL32' and
+       'R_PPC64_DTPREL32'.
+     * dwarf_form.c: Consistent layout for if statements.
+     * dwarf_frame.c: Consistent layout for if, for and while statements.
+     * dwarf_frame2.c: Consistent layout for if statements.
+     * dwarf_harmless.c: Consistent layout for if and for statements.
+     * dwarf_init_finish.c: Consistent layout for if statements.
+       Use HAVE_ELF_H, HAVE_LIBELF_H, HAVE_LIBELF_LIBELF_H to control
+       the inclusion of the libelf symbols.
+       New function 'add_debug_section_info' and new data structure
+       'dbg_sect_s' to deal properly with .rel and .rela section types
+       independently of the section name. The new algorithm to setup
+       the debug sections is implemented in '_dwarf_setup'.
+     * dwarf_line.c: Consistent layout for if statements.
+     * dwarf_line.h: Consistent layout for if statements.
+     * dwarf_loc.c: Consistent layout for if and switch statements.
+     * dwarf_macro.c: Consistent layout for if statements.
+     * dwarf_original_elf_init.c: Consistent layout for if statements.
+     * dwarf_print_lines.c: Consistent layout for if statements.
+     * dwarf_query.c: Consistent layout for if and switch statements.
+     * dwarf_ranges.c: Consistent layout for if and for statements.
+     * dwarf_reloc_arm.h: New file; relocations definitions for ARM.
+     * dwarf_reloc_mips.h: New file; relocations definitions for MIPS.
+     * dwarf_reloc_ppc.h: New file; relocations definitions for PPC.
+     * dwarf_reloc_ppc64.h: New file; relocations definitions for PPC64.
+     * dwarf_reloc_x86_64.h: New file; relocations definitions for X86_64.
+     * dwarf_sort_line.c: Consistent layout for while statements.
+     * dwarf_util.c: Consistent layout for if, for and while statements.
+       New functions 'dwarf_encode_leb128', 'dwarf_encode_signed_leb128'
+       to encode a value as unsiged LEB128 and signed LEB128.
+     * dwarf_util.h: Consistent layout for the macros DECODE_LEB128_UWORD,
+       DECODE_LEB128_SWORD, SKIP_LEB128_WORD, CHECK_DIE, READ_UNALIGNED,
+       SIGN_EXTEND, READ_AREA_LENGTH to include proper tabbing.
+     * libdwarf.h: Consistent layout for some typedef definitions.
+       New fields 'type' (section type) and 'info' (target section for
+       relocation) in data structure 'Dwarf_Obj_Access_Section_s'.
+       Prototypes for new functions 'dwarf_encode_leb128' and
+       'dwarf_encode_signed_leb128', defined in dwarf_util.c.
+     * pro_forms.c: Consistent layout for if statements.
+     * pro_frame.c: Consistent layout for if statements.
+     * pro_incl.h: For Windows, include the stdafx.h header file.
+     * pro_init.c: Consistent layout for if statements.
+     * pro_section.c: Consistent layout for if statements.
+2012-11-14  DavidAnderson <davea42@earthlink.net>
+     * dwarf_loc.c: DW_OP_GNU_implicit_pointer requires a version stamp
+       to work correctly.  Created a new function
+       dwarf_loclist_from_expr_b()
+       to allow clients to expicitly pass the version stamp.
+       Most clients can continue to use the old interface.
+     * libdwarf.h: Declaring new function dwarf_loclist_from_expr_b()
+     * libdwarf2.1.mm: Documenting dwarf_loclist_from_expr_b()
+     * libdwarf2.1.pdf: Regenerated.
+2012-10-31  DavidAnderson <davea42@earthlink.net>
+     * CODINGSTYLE: Added some small details here.
+2012-04-04  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h: A pointer "*" was right next to
+       a "/*" so a space introduced between them for clarity.
+       Fixed comments on DW_DLC_SIZE_64 and DW_DLC_SIZE_32.
+     * dwarf_die_deliv.c: Two local variables were declared in the
+       middle of code, accidentally creating C99 dependencies.
+       Both trivially fixed with no change in logic.
+2012-01-01  DavidAnderson <davea42@earthlink.net>
+     * A new year starts.

@@ -54,6 +54,9 @@ filters:
   - "libbson":
     approvers:
       - 10gen/server-security
+  - "libdwarf":
+    approvers:
+      - 10gen/server-programmability
   - "libmongocrypt":
     approvers:
       - 10gen/server-security

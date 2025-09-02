@@ -1,0 +1,297 @@
+2011-12-14  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h, dwarf_error.c: Add a new error code
+       for DW_OP location codes.
+     * dwarf_loc.c: Implement support for new DW_OP_GNU codes.
+2011-12-13  DavidAnderson <davea42@earthlink.net>
+     * dwarf.h: Added some GNU extensions.
+     * libdwarf.h: Added dwarf_lineoff_b() as
+       dwarf_lineoff() wrongly returns a signed column number.
+       Added dwarf_add_lineentry_b() as preparation for creating
+       DWARF3/4 output.
+     * dwarf_line.h: Added new struct fields to accomodate
+       DWARF3/4 isa and discriminator fields.
+     * dwarf_line.c: Now deals with the VLIW line calculations
+       in DWARF4.  Adds support for computing the discriminator
+       and isa fields.  Adds dwarf_lineoff_b() (and dwarf_lineoff
+       is now deprecated).  Adds dwarf_prologue_end_etc() which
+       returns some DWARF3/4 line fields.
+     * dwarf_print_lines.c: Adds handling of DWARF3/4
+       line operations and fields and prints the details.
+     * libdwarf2.1.mm: Documents the new functions in dwarf_line.c
+       Version set to 2.02.
+     * libdwarf2.1.pdf: Regenerated.
+     * libdwarf2p.1.mm: Documents the new function
+       dwaf_add_line_entry_b().
+       Version set to 1.32.
+     * libdwarf2p.1.pdf: Regenerated.
+     * pro_incl.h:  Add parentheses so the WRITE_UNALIGNED macro
+       works correctly in all circumtances.
+     * pro_opaque.h: Add DEBUG_RANGES and dEBUG_TYPES to the list
+       of sections we could generate.  Define struct Dwarf_P_Line_Inits_s
+       to hold initialization values for line table data so we can later
+       make the choices at runtime rather than compile time.
+       The new struct is a field of the Dwarf_P_Debug struct.
+     * pro_line.h: Added some DWARF3/4 support and preparations
+       for emitting DWARF3/4.
+     * pro_line.c: Define dwarf_add_line_entry_b() for DWARF3/4
+       line fields, and _dwarf_init_default_line_header_vals()
+       to provide a default set of values, the defaults match
+       what was previously done.
+       Add support for the new DWARF3/4 line table fields.
+     * pro_section.c:  Add the beginnings of support for creating
+       new DWARF3/4 sections and the new standard opcodes.
+       Move the field-writing code to small functions making
+       the line table writing smaller and easier to read.
+       Added the beginnings of allowing writing DWARF3/4
+       line table fields. Some if() missing {} were
+       modified by adding {} to avoid future problems.
+2011-12-08  DavidAnderson <davea42@earthlink.net>
+     * dwarf_frame.c: Corrected a typo by adding a space
+       to a comment.
+     * libdwarf2p.1.mm: A sentence about dwarf_lne_end_sequence()
+       was missing its introductory words. New version is 1.31.
+     * libdwarf2p.1.pdf: Regenerated.
+2011-11-02  DavidAnderson <davea42@earthlink.net>
+     * dwarf.h: Spelling fix: specfic->specific.
+       Rearranged a few comments  about MIPS/SGI for
+       a better appearance.
+2011-10-29  DavidAnderson <davea42@earthlink.net>
+     * dwarf_alloc.c: Add support for the .debug_types section.
+     * dwarf_arange.c,dwarf_global.c: Add commentary about
+       debug_info vs debug_types and a new argument to
+       an internal function.
+     * dwarf_arange.h,dwarf_global.h: Add comment that this is
+       debug_info related only.
+     * dwarf_die_deliv.c: Now handles .debug_types as well as
+       .debug_info, and context information for the two sections
+       is kept seperate.
+     * dwarf_elf_access.c: Add a check for relocations of .debug_types.
+     * dwarf_error.c: Added error strings related to .debug_types.
+     * dwarf_form.c: Changes for .debug_types, mainly due to removing
+       'info_' from certain struct member names.
+     * dwarf_init_finish.c: Notice the .debug_types section.
+       New function dwarf_get_section_max_offsets_b() returns
+       the size of debug_types (added to existing arguments).
+     * dwarf_opaque.h: Fields named *_info_* have the info_
+       removed as they apply to debug_types as well.
+       A new struct Dwarf_Debug_InfoTypes holds the data
+       for either of .debug_types and .debug_info sections.
+       Separating them so the sections can be accessed
+       simultaneously.  Moved data items from Dwarf_Debug to
+       the new struct. DIE structs now have a 'is_info' field
+       so a CU and a DIE know whether they are from .debug_info
+       or .debug_types.
+     * dwarf_query.c: The query functions now work for
+       debug_info and debug_query as appropriate.
+     * dwarf_util.h: Added _dwarf_load_debug_types() and altered
+       a couple internal function prototypes with an 'is_info' flag
+       argument.
+     * dwarf_util.c: Added _dwarf_load_debug_types(). Altered
+       functions so the deal with .debug_types or .debug_info
+       as appropriate.
+     * libdwarf.h: Added debug_types error codes.
+       Added dwarf_siblingof_b() and dwarf_offdie_b() and
+       Added dwarf_next_cu_header_c() and
+       dwarf_get_cu_die_offset_given_cu_header_offset_b()
+       to account for .debug_types or .debug_info as required.
+       Added dwarf_get_die_infotypes_flag() so client code
+       can know if a DIE is debug_info or debug_types based.
+       Added dwarf_get_section_max_offsets_b(), adding
+       a debug_types size argument.
+     * libdwarf2.1.mm: Documented the new functions. New version
+       is 2.0 (somewhat arbitrarily changed from 1.x to 2.0)
+     * libdwarf2.1.pdf: Regenerated
+
+2011-10-26  DavidAnderson <davea42@earthlink.net>
+     * Makefile.in, README: Added Make settings of PREINCS POSTINCS
+       PRELIBS, POSTLIBS to simplify building when libdwarf or libelf
+       are not in the normal locations.   Documented usable ways to
+       deal with unusual situations at build time.
+2011-10-09  DavidAnderson <davea42@earthlink.net> .
+     * dwarf_die_deliv.c, dwarf_elf_access.c: Fix bad indentation.
+2011-10-05  DavidAnderson <davea42@earthlink.net> .
+     * dwarf_die_deliv.c: When relocations fail, record
+       a 'harmless error' and continue the CU loading.
+       No way to be sure the error is really harmless, of course.
+       But it seems to often be harmless.
+       For some if() tests add {} to make the clause extent clear.
+     * dwarf_harmless.c: Add a comment prefix to dwarf_harmless_init().
+2011-10-03  DavidAnderson <davea42@earthlink.net>
+     * dwarf_line.c: Introduce {} in a test to avoid future mistakes.
+2011-09-23  DavidAnderson <davea42@earthlink.net>
+     * dwarf_arange.c: Test for a zero address-size: that indicates
+       broken dwarf generation.
+     * dwarf_line.c: Test for irrational line number header data and
+       error off with DW_DLE_LINE_NUMBER_HEADER_ERROR if we find it.
+       Add accidentally-omitted check for version 4.
+     * dwarf_error.c, libdwarf.h: New error code
+       DW_DLE_LINE_NUMBER_HEADER_ERROR.
+2011-09-16  DavidAnderson <davea42@earthlink.net>
+     * dwarf_elf_access.c: Give up relocating if the Elf symtab
+       header sh_entrysize is zero, and refine the test for
+       invalid symbol index to be a >= test.
+     * dwarf_error.c: Define text message for
+       DW_DLE_SYMTAB_SECTION_ENTRYSIZE_ZERO.
+     * libdwarf.h: New error code DW_DLE_SYMTAB_SECTION_ENTRYSIZE_ZERO.
+2011-09-15  DavidAnderson <davea42@earthlink.net>
+     * dwarf_elf_access.c: Adding fields to the object
+       structs dwarf uses and using them for error checks
+       when processing relocations.
+     * dwarf_error.c: Adding descriptions of new error messages
+       for Elf object file interpretation problems.
+     * dwarf_init_finish.c: Adding 'entrysize' field about objects
+       do dwarf_elf_access.c can check for object and relocation
+       data errors and avoid a coredump.  And we memset() a struct
+       to ensure there are no uninitialized contents.
+     * dwarf_opaque.h: Adding new dss_entrysize and
+       dss_reloc_entrysize fields so elf error
+       checks can be added to dwarf_elf_access.c.  These changes mean
+       you must recompile all of libdwarf source, not
+       just a subset, when rebuilding (the first time one sees this change).
+     * libdwarf.h: Adding entrysize element to Dwarf_Obj_Access_Section_s.
+       Non-elf object formats can just set this field zero and ignore it.
+       Added new elf-specific error codes for the new checks in
+       dwarf_elf_access.c.
+2011-09-14  DavidAnderson <davea42@earthlink.net>
+     * BLDLIBDWARFTAR: Moved a local disk file. Irrelevant
+       to everyone but DA.
+     * dwarf_arange.c: check that the address_size and segment
+       selector size fields are sensible.
+     * dwarf_die_deliv.c,dwarf_frame2.c: Give
+       DW_DLE_ADDRESS_SIZE_ERROR or DW_DLE_CU_ADDRESS_SIZE_BAD
+       if the address size read from a section is obviously wrong.
+       Similarly for a bad segment-selector-size give
+       DW_DLE_SEGMENT_SIZE_BAD.
+     * dwarf_error.c: Added text for the DW_DLE_SEGMENT_SIZE_BAD
+       error.
+     * dwarf_frame.c: If dwarf_set_default_address_size() is handed
+       an address_size that we cannot handle, ignore the input so
+       we don't wind up coredumping the library or consumer code.
+     * libdwarf2.1.mm: Updated list of error codes a little bit. Rev 1.99
+     * libdwarf2.1.pdf: Regenerated.
+2011-09-08  DavidAnderson <davea42@earthlink.net>
+     * dwarf_frame.c: Fixed bad indents.
+2011-09-02  DavidAnderson <davea42@earthlink.net>
+     * libdwarf2.1.mm: Document the new function
+       dwarf_set_default_address_size(). Updated revision to 1.97.
+     * libdwarf2.1.pdf: Regenerated.
+     * dwarf_frame.c: Implement dwarf_set_default_address_size().
+     * libdwarf.h: Declare the new function dwarf_set_default_address_size().
+     * dwarf_form.c(dwarf_formref): Removed c99-ish
+       declaration so C90 can compile the code.
+     * Makefile.in, configure.in: If building shared lib
+       CFLAGS gets -fPIC  added in.
+     * configure: Fegenerated.
+     * dwarf_loc.c: New test returns DW_DLE_LOC_BAD_TERMINATION
+       in case of compiler bug in location expression.
+     * dwarf_error.c, libdwarf.h: Define and document the new
+       error.
+     * pro_opaque.h: Fixed a bad indent.
+
+2011-06-12  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h: Added dwarf_producer_init_c() and its
+       callback functions. Adds a user_data void* to the
+       init and callback functions for user convenience.
+     * libdwarf2p.1.m: Documented dwarf_producer_init_c().
+       Rev 1.30.
+     * libdwarf2p.1.pdf: Regenerated
+     * pro_init.c: Implement dwarf_producer_init_c().
+     * pro_opaque.h: Add fields for dwarf_producer_init_c().
+     * pro_reloc_stream.c: Implement dwarf_producer_init_c() callback.
+     * pro_reloc_symbolic.c: Implement dwarf_producer_init_c() callback.
+     * pro_section.c: Implement dwarf_producer_init_c() callback.
+2011-06-09  DavidAnderson <davea42@earthlink.net>
+     * dwarf_form.c: Code getting access to CU context and
+       dbg was repeated many times. Refactored the common
+       code into a file-static subprogram.
+2011-06-08  DavidAnderson <davea42@earthlink.net>
+     * libdwarf2.1.mm,libdwarf2.1.pdf: Now discusses
+       DW_AT_data_member_location in the context
+       if dwarf_loclist_n(). Rev 1.96
+2011-06-08  DavidAnderson <davea42@earthlink.net>
+     * dwarf_init_finish.c: Inserted missing include of
+       dwarf_harmless.h.
+2011-06-07  DavidAnderson <davea42@earthlink.net>
+     * dwarf_elf_access.c: Added EM_QUALCOMM_DSP6
+       machine so that relocations work on a
+       Qualcomm relocatable object in the dwarf regressiontests.
+     * dwarf_util.c: Fixed indent problems added in previous
+       change.
+2011-06-07  DavidAnderson <davea42@earthlink.net>
+     * dwarf_util.c(_dwarf_get_abbrev_for_code): If there is no
+       section padding the code could read-from-memory
+       one past the end of the section
+       which could (in very rare circumstances) coredump
+       an application. In addition, earlier in the same funcion
+       we did not account for the case where we had already read to
+       end of section. Both fixed.
+2011-06-06  DavidAnderson <davea42@earthlink.net>
+     * dwarf_error.c: Fix a typo in an error string.
+     * dwarf_query.c: Implement the new function
+       dwarf_get_verion_of_die().
+     * libdwarf.h: Add prototype for dwarf_get_verion_of_die().
+     * libdwarf2.1.mm: for dwarf_form_{s,u}data, mention
+       the DW_FORM_data{4,8} class ambiguity.
+       Document the new function dwarf_get_verion_of_die().
+       Document version now 1.95.
+     * libdwarf2.1.pdf: Regenerate.
+2011-06-04  DavidAnderson <davea42@earthlink.net>
+     * NEWS: Mention the non-elf documentation oversight.
+     * dwarf_arange.c,dwarf_elf_access.c, dwarf_frame3.c,
+       dwarf_funcs.c,dwarf_global.c,dwarf_init_finish.c,
+       dwarf_line.c,dwarf_loc.c,dwarf_macro.c,dwarf_print_lines.c,
+       dwarf_pubtypes.c,dwarf_query.c,dwarf_ranges.c,dwarf_string.c,
+       dwarf_types.c,dwarf_vars.c, dwarf_weaks.c: Everything loading
+       a section now checks the result for 'empty' and returns
+       DW_DLV_NO_ENTRY explicitly.  This makes it easier to
+       do nothing safely when there is no data.
+2011-06-04  DavidAnderson <davea42@earthlink.net>
+     * dwarf_line.c (_dwarf_internal_srclines): Created new local functions
+       to unify some repeated code in into function calls.  One of the
+       earlier inline-repetitions was coded wrong.  Added {} to ensure clarity
+       on the intended scope a couple places. Added initializers to
+       a couple of local variables.
+2011-06-04  DavidAnderson <davea42@earthlink.net>
+     * dwarf_alloc.c: Added include "dwarf_harmless.h" so
+       a prototype is visible here.
+     * dwarf_form.c (dwarf_convert_to_global_offset,dwarf_global_formref):                   Deleted unused local variables.
+     * dwarf_frame.c (dwarf_initialize_fde_table): Uses local instead
+       of ignoring it (avoids compiler warning).
+     * dwarf_frame2.c (_dwarf_get_fde_list_internal): Delete unused
+       local variable.
+     * dwarf_line.c (dwarf_srcfiles): Call uses variable expected
+       signedness now, avoiding compiler warning.
+     * dwarf_print_lines.c: Printf was missing %, gcc -Wall pointed
+       out the mistake.
+2011-04-23  DavidAnderson <davea42@earthlink.net>
+     * pro_error.c (_dwarf_p_error): The code attempting to deal with
+       an unexpected error code was doing an inappropriate cast and
+       an inappropriate (possibly out-of-bounds) reference to an array
+       of strings.  Removed the cast and removed the questionable
+       array reference.
+     * dwarf_frame.c: A couple lines were indented badly. Fixed the indentation.
+     * pro_line.h: Now __x86_64 also gets MIN_INST_LENGTH 1
+2011-03-29  DavidAnderson <davea42@earthlink.net>
+     * everything:   Redid all indentations for
+       consistency.  Updated copyrights.  Interfaces
+       did not change, existing clients should not
+       encounter difficulty.
+2011-03-13  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h, dwarf_error.c: Added
+       DW_DLE_DEBUG_FRAME_POSSIBLE_ADDRESS_BOTCH.
+2011-01-20  DavidAnderson <davea42@earthlink.net>
+     * dwarf.h: Added some Apple attribute extensions.
+2011-01-13  DavidAnderson <davea42@earthlink.net>
+     * dwarf_print_lines.c: Handles DW_FORM_exprloc now. With -vvv
+       it now prints the dwarf version of the line table header.
+     * dwarf_line.c:  Handles DW_FORM_exprloc now.
+2011-01-13  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h: Added new function dwarf_get_die_address_size().
+     * libdwarf2.1.mm: Documented new function dwarf_get_die_address_size().
+       Rev 1.91, 12 January 2011
+     * libdwarf2.1.pdf: Regenerated.
+     * dwarf_form.c: Corrected handling of DW_FORM_exprloc.
+     * dwarf_query.c: Implemented dwarf_get_die_address_size().
+       Corected handling of DW_FORM_exprloc.
+     * dwarf_util.c: Added handling of DW_FORM_exprloc and
+       DW_FORM_flag_present.

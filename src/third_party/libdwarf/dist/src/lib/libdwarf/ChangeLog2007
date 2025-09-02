@@ -1,0 +1,217 @@
+2007-12-09 DavidAnderson <davea42@earthlink.net>
+     * dwarf_sort_line.c dwarf_print_lines.c darf_frame.c: Forgot
+       to commit yesterday.
+       Today's commit includes renaming _dwarf_fde_section_offset
+       _dwarf_cie_section_offset, _dwarf_print_lines, _dwarf_ld_sort_lines
+       to dwarf_* name while retaining support for the now obsolete
+       _dwarf_* form.
+2007-12-08 DavidAnderson <davea42@earthlink.net>
+     * config.h.in, configure.in: Latest linux libelf.h requires
+       _GNU_SOURCE to get off64_t defined so dwarfdump compiles.
+       Only define _GNU_SOURCE  if libelf.h defines off64_t.
+       Regenerated configure.
+     * config.guess, config.sub: Updated to 2.61
+     * acconfig.h: Deleted, removing autoconf complaint.
+2007-11-14 David Anderson <davea42@earthlink.net>
+      * dwarf_frame2.c (gnu_aug_encodings): Now allows 'S' augmentation
+        character in eh_frame.
+2007-10-16 David Anderson <davea42@earthlink.net>
+      * dwarf_alloc.c: Reformat a comment.
+      * dwarf_die_deliv.c (dwarf_siblingof): When there is no trailing
+        null-DIE in the section, ensure we don't test the contents
+        of a byte past section end.
+      * dwarf_frame.c:  Changed spelling of a local variable
+        so it is easier to grep for and to read.
+      * dwarf_macro.c (free_macro_stack): Was free()ing memory that
+        _dwarf_get_alloc() had supplied, which could lead to core dump.
+        Fixed potential memory leaks (said leaks only possible with an
+        error in the macro data, not  with valid macro section
+        data).
+2007-10-15 David Anderson <davea42@earthlink.net>
+      * dwarf_alloc.c: The code supporting the special build
+        flag DWARF_SIMPLE_MALLOC
+        was broken and could coredump libdwarf
+        (which did not affect normal use of libdwarf).
+      * dwarf_opaque.h: Remove the field de_simple_malloc_current
+        as it is no longer used.
+
+2007-09-04 David Anderson <davea42@earthlink.net>
+      * pro_forms.c: Add commentary relating to the
+        recent DWARF4 DW_AT_high_pc change.
+        Correct FSF address.
+      * libdwarf2p.1.mm: Document dwarf_add_AT_dataref()
+        and dwarf_add_AT_ref_address().
+      * libdwarf2p.1.pdf: Regenerate.
+      * dwarf.h: Update FSF address.
+      * dwarf_opaque.h: Add DWARF4 entry (version stamp).
+        Update FSF address.
+      * dwarf_die_deliv.c: Add check for .debug_info version 4
+        (version stamp). Update FSF address.
+      * libdwarf.h pro_macinfo.h pro_line.h dwarf_incl.h
+        pro_alloc.h pro_section.h libdwarfdefs.h pro_util.h
+        dwarf_vars.h dwarf_funcs.h pro_error.h dwarf_alloc.h pro_arange.h
+        dwarf_arange.h pro_die.h dwarf_global.h pro_expr.h
+        pro_reloc_stream.h pro_incl.h pro_encode_nm.h
+        dwarf_line.h pro_frame.h pro_opaque.h dwarf_error.h
+        dwarf_base_types.h dwarf_abbrev.h pro_types.h pro_reloc_symbolic.h
+        dwarf_weaks.h dwarf_util.h dwarf_loc.h malloc_check.h
+        dwarf_die_deliv.h acconfig.h dwarf_frame.h dwarf_macro.h
+        pro_reloc.h dwarf_types.h
+        pro_funcs.c Makefile.in pro_forms.c pro_line.c
+        dwarf_print_lines.c pro_alloc.c pro_init.c dwarf_addr_finder.c
+        pro_section.c dwarf_form.c dwarf_query.c dwarf_vars.c
+        dwarf_pubtypes.c dwarf_frame3.c dwarf_funcs.c pro_error.c
+        pro_arange.c dwarf_alloc.c dwarf_arange.c pro_die.c
+        dwarf_sort_line.c dwarf_global.c dwarf_init_finish.c pro_weaks.c
+        pro_pubnames.c pro_expr.c pro_reloc_stream.c pro_finish.c
+        pro_encode_nm.c dwarf_line.c pro_frame.c dwarf_error.c
+        dwarf_abbrev.c pro_types.c dwarf_leb.c pro_reloc_symbolic.c
+        dwarf_string.c pro_vars.c dwarf_line2.c dwarf_weaks.c
+        dwarf_frame2.c dwarf_util.c dwarf_loc.c LIBDWARFCOPYRIGHT
+        malloc_check.c dwarf_die_deliv.c dwarf_frame.c dwarf_stubs.c
+        dwarf_macro.c pro_reloc.c dwarf_types.c pro_macinfo.c:
+        Update FSF address.
+2007-07-26 David Anderson <davea42@earthlink.net>
+      * pro_frame.c: Added commentary about some missing DWARF3 support.
+      * dwarf_srclines_dealloc.c: File unused, now deleted.
+2007-07-04 David Anderson <davea42@earthlink.net>
+      * libdwarf.h: dwarf_get_loclist_entry() is implemented,
+        removed the erroneous 'unimplemented' comment.
+      * libdwarf2.1.mm: Improved the dwarf_get_loclist_entry()
+        documentation.
+      * libdwarf2.1.pdf: regenerated
+      * dwarf_loclist_entry.c: Removed from distribution, the
+        source has nothing of interest.
+
+2007-07-03 David Anderson <davea42@earthlink.net>
+      * libdwarf.h: Add declaration of dwarf_loclist_from_expr();
+      * dwarf_loc.c: Implement dwarf_loclist_from_expr() and add
+        sign-extension macro calls to case DW_OP_const4s numbers.
+        Removed unused local variables.
+      * dwarf_form.c: Removed unused local variables.
+      * libdwarf2.1.mm: Document dwarf_loclist_from_expr().
+      * libdwarf2.1.pdf: Regenerated.
+2007-07-01 David Anderson <davea42@earthlink.net>
+      * dwarf_frame2.c: Add commentary.
+      * dwarf_frame.c: Add in block_len for DW_CFA_val_expression
+        so libdwarf does not get confused by this frame expression
+        operator.  Thanks to Cristian Vlasceanu for providing
+        a test case.
+2007-06-29 David Anderson <davea42@earthlink.net>
+      * README: added a note that a few warnings about conversions
+        from pointer to integer are normal at libdwarf compile time.
+2007-05-25 David Anderson <davea42@earthlink.net>
+      * dwarf_frame2.c (_dwarf_get_fde_list_internal):
+        Correct cie-list-creation so it adds to the tail of the list.
+        gcc 4.1.2 generates cie-use in an order the code did
+        not properly handle.
+2007-05-08 David Anderson <davea42@earthlink.net>
+      * Makefile.in:  Now generates pdf files.
+      * mips_extensions.mm: The only changes were to eliminate
+        unsupported macro (.PM) and to try to get correct output
+        from groff.  No technical content change intended.
+        The pdf/postscript output remains a little odd though.
+      * libdwarf2.1.mm: Remove troff comment line.
+2007-04-18 Chris Quenelle <chris.quenelle@sun.com>
+      * dwarf_addr_finder.c: repaired comment
+      * dwarf_form.c: add support for DW_AT_SUN_func_offsets
+      * pro_alloc.c: add memory block tracking to find and fix
+	lingering allocations.  This is more important for very large
+	and intensive compiles.
+      * pro_die.c: Implement "markers" which are a generic way to
+	do things like relocations.  You can set a marker on any
+	die, and when dwarf is produced in binary form, you get back
+	a list of your markers with the offset of each one in the binary
+	output.  This is used by the Sun compilers to implement die
+	references that span compile unit blocks.  (I may remove this,
+	it might be unused code related to partial_units and comdat
+	support)
+      * pro_die.c: Also check for loops in the die relationships so
+	that if you add a child twice, or other errors, you won't get
+	an infinite loop or a crash.  Also start passing a DBG structure
+	to all allocation calls to help with memory block tracking.
+      * pro_expr.c: Add a public function to "reset" an expr.  This
+	allows the same expr object to be reused over and over to save
+	memory if you're creating many many expressions for a location list.
+      * pro_finish.c: Free any left over blocks when the user calls
+	dwarf_producer_finish.
+      * pro_forms.c: More support for compressed integer blocks. Modify
+	error diagnostics so that user-defined attributes can be any type.
+	Add support for dwarf_add_AT_ref_address which is just like
+	dwarf_add_AT_address, only it produces a DW_FORM_ref_addr instead
+	of DW_FORM_addr.  This is needed for cross-CU die pointers.
+      * pro_incl.h: add macros to control the spelling of relocation types.
+      * pro_init.c: use new macros to control reloc types
+      * pro_line.h: correct minimum instruction length on x86
+      * pro_opaque.h: add support for markers (see above) and also ability
+	have libdwarf tell the caller where the string constants are so
+	that they can be recorded as strings in case the binary output of libdwarf
+	needs to be converted back into assembly.  That's what
+	Dwarf_P_Per_Sect_String_Attrs is about.
+        Remove de_mem_list as it is never used.
+      * pro_reloc_stream.c: repair prototype and comment for
+	_dwarf_pro_reloc_name_stream64, and use relocation type macros.
+      * pro_section.c: support for markers (see above) and for tracking
+	inline string attributes.  Add code to sort the attributes so that
+	abbreviation table entries will be reduced.  Change treatment of
+	DW_FORM_ref_addr to be more correct.  Some support for packing
+	in the middle of sections, this will probably be removed.
+	Also pass DBg structure to more allocations.
+      * pro_util.h: relocation type values can't be zero.
+2007-04-10 David Anderson <davea42@earthlink.net
+      * dwarf_print_lines.c pro_section.c dwarf_query.c
+        dwarf_alloc.c dwarf_arange.c dwarf_sort_line.c
+        dwarf_global.c dwarf_line.c dwarf_abbrev.c
+        dwarf_frame2.c dwarf_util.c dwarf_loc.c dwarf_util.h
+        dwarf_die_deliv.c dwarf_frame.c dwarf_macro.c: Additions
+        to source for year 2007 now fit in with pre-existing
+        copyright wording.  Effectively no change.
+      * dwarf_srclines_dealloc.c: Now has the (always-intended) SGI
+        LGPL copyright wording.
+2007-04-09 David Anderson <davea42@earthlink.net
+      * dwarf_error.h: Add DW_DLE_LINK_LOOP error code (Sun).
+      * libdwarf.h: Add DW_DLE_LINK_LOOP error code (Sun).
+      * dwarf.h: Incorporate Sun extensions. Thanks to
+        Chris Quenelle at Sun Microsystems.
+2007-04-06 David Anderson <davea42@earthlink.net
+      * dwarf_sort_line.c (_dwarf_update_line_sec): initialize
+        Dwarf_Debug_s struct. Thanks to Chris Quenelle of Sun Microsystems.
+        Also initialize other local variables.
+2007-04-02 David Anderson <davea42@earthlink.net
+      * dwarf_form.c (dwarf_formsdata, dwarf_formudata): Use
+        Dwarf_sfixed in dwarf_formsdata, document need for casts,
+        Use Dwarf_Signed as type for READ_UNALIGNED macro use.
+        The only real correction here is for a 64bit long compiled
+        libdwarf reading 32bit dwarf_formsdata FORM_data4.
+      * dwarf_base_types.h: Now Dwarf_sfixed64 and Dwarf_ufixed64
+        are properly declared (so they are usable).
+2007-03-11 David Anderson <davea42@earthlink.net
+      * Makefile.in: use groff to produce postscript.
+      * libdwarf2.1.mm libdwarf2.1.ps  libdwarf2p.1.mm
+        libdwarf2p.1.ps: Clean up the introduction and history.
+        Add a non-restrictive copyright notice.
+2007-02-23 David Anderson <davea42@earthlink.net
+      * dwarf_util.h: now the macros use do{} while(0)
+      * pro_forms.c dwarf_print_lines.c pro_section.c dwarf_query.c
+        dwarf_arange.c dwarf_sort_line.c dwarf_global.c dwarf_line.c
+        dwarf_abbrev.c dwarf_frame2.c dwarf_util.c dwarf_loc.c
+        dwarf_die_deliv.c dwarf_frame.c: Now have ;
+        after all dwarf_util.h macros. Also added local variable
+        initializations (compiler noticed).
+      * dwarf_macro.c: was missing include of <stdlib.h> for free()
+        declaration.
+      * dwarf_print_lines.c pro_section.c dwarf_query.c dwarf_alloc.c
+        dwarf_arange.c dwarf_sort_line.c dwarf_global.c dwarf_line.c
+        dwarf_abbrev.c dwarf_srclines_dealloc.c dwarf_frame2.c
+        dwarf_util.c dwarf_loc.c dwarf_die_deliv.c dwarf_frame.c
+        dwarf_macro.c: indent run with standard libdwarf options.
+
+2007-02-20 David Anderson <davea42@earthlink.net
+      * dwarf_macro.c  (dwarf_get_macro_details): Now call
+        dwarf_free_macro_stack() at every return so no data
+        is leaked and there is no longer any global data
+        (restoring thread safety).
+2007-02-09 David Anderson <davea42@earthlink.net
+      * dwarf_line.c (dwarf_srclines): Added in calls
+        to dwarf_free_line_table_prefix() which were omitted
+        by accident.  Thanks to  Cristian Vlasceanu for noticing.

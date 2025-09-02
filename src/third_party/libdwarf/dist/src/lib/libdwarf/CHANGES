@@ -1,0 +1,102 @@
+
+
+-------------------------------------------------------------
+April 14, 2000  davea@sgi.com
+Corrected minor bugs in production of 32bit dwarf with
+64 bit pointers.  Fixed omissions in legal
+DIE children of a DIE.  Make small changes in
+description of regster output in frame information
+access.
+
+-------------------------------------------------------------
+Mar 7, 2000 davea@sgi.com
+Corrected line table reading so it will handle
+reading an object with a diffent number of standard
+op codes than at libdwarf compile time.
+This was possible all along, but libdwarf did
+not do it right.
+
+-------------------------------------------------------------
+Dec 8, 1999  davea@sgi.com
+Changed nearly all files.
+Adding the capability to read and produce
+the new, accepted by committee, but not
+released-publically 64bit extension proposal
+dwarf data.
+This allows dwarf compilation units
+with 64bit section offsets and 32bit
+sections offsets to be mixed.
+So that offsets can grow very large with
+64-bit pointer applications (though 64bit pointers
+and 64bit offsets are not the same notion).
+
+In addition, removed all the contents (or nearly all)
+of the dwarf_funcs.c dwarf_weaks.c dwarf_vars.c,
+and dwarf_types.c, as the data format is identical
+to dwarf globals (pubnames) and there is no need
+to duplicate all that code.
+
+All these sections whose contents were gutted are things that
+are formatted exactly like pubnames, and all are sgi
+extensions.  Now the implementation uses pubnames code
+(dwarf_global.c) to do the work for all the pubnames-like
+sections.
+
+The (minor, IMO) difference is that in case of an incorrect
+dwarf file (leading to libdwarf being unable to process
+something in one of the sgi-specific pubnames-like sections)
+the dwarf error string may reference pubnames when weaks,
+static functions, static variables, or global typenames are
+actually the problem.  This is fixable, however the price would
+appear to be that even globals would need to call a helper
+function (to pass in the correct error return).  Right now the
+dwarf_weaks.c calls the dwarf_global.c function, for example,
+with no extra arguments indicating the true section involved.
+(Other approaches keeping the original error codes exist.
+Producing the code uniquely via macros seems unappealing.
+Inline functions would be ok though.  This version does not
+inline the functions we are talking about, such as
+dwarf_global_name_offsets() when called from
+dwarf_type_name_offsets().)
+
+Since these extra sections are SGI only and only really used by
+SGI's workshop product, and the performance hit is small, the
+extra function calls in reading each seem acceptable.
+
+
+-------------------------------------------------------------
+Sep 29,1999 davea@sgi.com
+Changed many files, so that it is easy to switch
+from 32bit-offset-only (like cygnus
+and dwarf2 v 2.0.0)  to sgi/mips 64 bit dwarf.
+See NEWS for more info on 32bit-offset.
+
+
+-------------------------------------------------------------
+Since Oct 95 and before May, 1996
+
+Added the function dwarf_get_cie_of_fde() which makes it possible
+to remember a single fde/cie set out of a block usefully.
+
+Enhanced doc of dwarf_bitoffset()
+
+Added new function dwarf_global_formref() so all reference
+forms can be retrieved.
+
+Fixed bug in retrieving array bounds: was failing to sign extend
+formsdata.
+
+Added function dwarf_get_fde_info_for_all_regs(), which makes
+retrieval of the complete set of registers (as needed by
+debuggers and exception handlers) effectively N times faster
+than getting them one a time where N is the number of registers.
+
+Added support for exception table handling (really just support
+for a reference to an exception table for c++ exceptions).
+
+Fixed a bug where useless extra space (several megabytes)
+were malloc'ed for the abbreviations table by the libdwarf
+consumer code.
+
+davea@sgi.com
+-------------------------------------------------------------

@@ -64,10 +64,15 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
         check_component_validity(component)
         name = component["name"]
         license_string = []
-        for lic in component["licenses"]:
-            for key in ["id", "name"]:
-                if key in lic["license"]:
-                    license_string.append(lic["license"][key])
+        for licenses in component["licenses"]:
+            # Items can be of the form {"expression": ...} or {"license": {"id"/"name": ...}}
+            for k, v in licenses.items():
+                if k == "expression":
+                    license_string.append(v)
+                elif k == "license":
+                    for key in ["id", "name"]:
+                        if key in v:
+                            license_string.append(v[key])
         license_string = ", ".join(license_string)
         version = component["version"]
         emits_persisted_data = "unknown"

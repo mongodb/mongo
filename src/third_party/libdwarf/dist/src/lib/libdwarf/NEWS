@@ -1,0 +1,678 @@
+7 July 26, 2021
+  The only abort() in libdwarf has been removed.
+  The abort() was in case a user setup
+  for error handling provided no means to report
+  an error (see errhand and errarg in documentation
+  of dwarf_init_b() etc).
+  As of now the error code simply returns.
+  A DW_DLV_ERROR is returned
+  from the call to libdwarf and a single line
+  message starting with 'libdwarf'
+  is printed, with the error number, to stderr.
+December 26, 2020
+  With mm -> pdf the table of contents of libdwarf2.1.pdf
+  is at the end of the pdf and difficult to locate.
+  Now we extract a companion pdf: libdwarftoc.pdf , which
+  contains the 1 page abstract followed by the table of contents
+  and list of figures.  We hope this will make finding
+  functions of interest easier.
+July 09, 2020
+  Access to .debug_gnu_pubtypes and .debug_gnu_pubnames
+  is possible. See function  dwarf_get_gnu_index_head().
+  Recently support for reading .debug_loclists
+  was added.
+  Recently support for reading .debug_rnglists
+  was added.
+  See libdwarf2.1.pdf and libdwarf.h for details.
+March 14, 2020
+  The documentation of dwarf_diename() and dwarf_die_text()
+  has been corrected. Never dwarf_dealloc() the strings
+  returned by these functions.
+  The new function dwarf_set_de_alloc_flag(0) allows
+  consumer code to save memory space at run time.
+  If it is called it leaves all dwarf_dealloc() calls
+  to the libdwarf caller: dwarf_finish() will not be able
+  to free leftover allocations. By default libdwarf
+  does keep track of allocations and dwarf_finish() will
+  clean up any allocations not already dwarf_dealloc()-d.
+  Unless the DWARF one is reading is really large
+  it is best to let libdwarf keep track of its allocations.
+  so there will be no leaks after dwarf_finish().
+November 26, 2019
+  The dwarf_init*() functions no longer use libelf
+  so calling dwarf_get_elf() cannot succeed unless
+  dwarf_elf_init() or dwarf_elf_init_b() was used
+  to open a Dwarf_Debug on an object file.
+  This change actually happened around  5 May 2019
+  but was not documented properly till  26 November.
+January 15, 2019
+  All references to C data types spelled *int16* *int32* or
+  *int64* have been removed.  Dwarf_Unsigned is used instead.
+  This simplifies builds in certain environments.
+December 05, 2018
+  Many new producer functions provided. Now no matter
+  what producer task is to be done there is a version
+  that returns DW_DLV_OK/DW_DLV_ERROR and no ugly
+  casting of return values is needed to check for success/failure.
+  All the old interfaces continue to work.
+  One can switch from
+    Dwarf_P_Attribute dwarf_add_AT_name(Dwarf_P_Die die,
+    char*        name,
+    Dwarf_Error* error);
+    (requires a cast to check return code DW_DLV_BADADDR)
+  to
+    int dwarf_add_AT_comp_dir_a(Dwarf_P_Die ownerdie,
+    char*             current_working_directory,
+    Dwarf_P_Attribute * outattr,
+    Dwarf_Error*    error);
+    (no cast,type safe)
+  for example.
+  The libdwarf2p.1.mm document table-of-contents
+  lists only the latest functions, but all the documentation
+  of all the earlier versions remain in the document as
+  subsections.
+October 24, 2018
+  Now supports reading MacOS dSYM object files.
+May 17, 2017
+  Now supports some COMDAT groups as well as split-dwarf.
+  Some new functions added so consumer code can know
+  what the sections and groups contain.
+  Some compilers emit groups findable only with relocation
+  data: libdwarf does not understand those groups.
+April 02, 2017
+  The consumer code now reads DWARF5 split-dwarf sections.
+  The functions dwarf_init_b() and dwarf_elf_init_b()
+  and dwarf_object_init_b() have a groupnumber argument
+  added.  For non-split-dwarf objects the original
+  dwarf_init() and dwarf_elf_init() and
+  dwarf_object_init() functions continue to work properly.
+September 11, 2016
+  The producer code is getting a new batch of functions.
+
+  For each existing producer call returning
+  a value other than DW_DLV_OK/DW_DLV_ERROR/DW_DLV_NO_ENTRY
+  a new function returning one of those three codes with
+  a pointer argument added to return the actual desired
+  value (that used to be the 'return').
+  The existing calls require the caller to do ugly casting
+  to determine whether the call did its work or got an error.
+  The new calls have type-safe interfaces that separate
+  the desired result from the error-indication.
+  So producer calls look more like consumer calls.
+
+  The existing historical producer interfaces will remain
+  unchanged and will continue to be supported. The
+  existing interfaces will simply call the new interfaces
+  so there is no code duplication: Old and new use the same
+  implementation.
+
+  Source and binary compatibility is retained, but
+  users of the producer code can, when they wish,
+  partially or fully convert to the new interfaces.
+
+  This work will be ongoing and gradual, not 'all at once'.
+
+August 27, 2016
+  Now the producer is capable of producing .debug_str strings.
+  Strings are never duplicated in .debug_str.
+  See dwarf_pro_set_default_string_form() in libdwarf2p.1.pdf
+May 23, 2016
+  When building a shared-library the soname is set
+  in the dynamic section "libdwarf.so.1".
+  Much more testing of object correctness is done
+  to catch corrupted dwarf and corrupted object files.
+March 14, 2016
+  When libdwarf callers provide neither an error argument nor
+  an error-handler function pointer libdwarf gives up on detecting
+  an error. Before now it emitted a short message on stderr
+  and did abort().  Now it emits a short message on stdout
+  and does abort(). Having libdwarf just stop application
+  processing (stopping the entire application) was never
+  good application-development policy, so one hopes no one
+  ever relied on doing no-error-handling themselves.
+  So one hopes no one will actually notice this change.
+  The change makes it much easier to test that the error
+  handling is all behaving as intended.
+March 1, 2016
+  Much support of GNU extensions to dwarf and
+  of DWARF5 features now exist in libdwarf.
+  Including the ability to deal with the most
+  usual forms of split-dwarf.
+  Handling of zlib compression of dwarf is now
+  automatic (assuming you had zlib visible when
+  configuring libdwarf).
+May 01, 2015
+  dwarf_next_cu_header_d() is the latest extension for CU reading.
+  Earlier versions still supported.
+  dwarf_die_from_hash_signature() added so readers can
+  use a hash to access a dwp package file DIE.
+  New support for some of DWARF5 and for dwp debug-fission
+  package file reading.
+February 25, 2015
+  Now gennames uses dwgetopt() instead of getopt.
+  So it will more easily build where no getopt() available.
+  We copied dwgetopt.h, .c here (rather than reaching around
+  to dwarfdump) to keep the libdwarf build more easily
+  buildable separate from dwarfdump.
+
+January 8, 2015
+  When malloc fails (out of space) dwarfdump will now
+  use a statically-allocated Dwarf_Error_s struct so it can get
+  the original malloc failure (or other error) reported back to
+  the calling client.
+
+  Some checks for invalid Elf files were changed to actually
+  report errors properly.  Thanks to Edward Williamson for
+  providing test cases with odd errors in the Elf and DWARF.
+
+May 19, 2014
+  REASON FOR RELEASE
+  Now handles DebugFission (part of the unreleased standard
+  named DWARF5) in which debug information can be split from
+  objects and gathered into separate object files.
+
+  MINOR POINT:
+
+  Added a caveat that dwarf_errmsg() returned string pointers are not
+  necessarily pointers that can be relied on to be valid for the
+  duration of the current executable.   It's best for consumers
+  to print or copy the string right away and then forget the returned
+  pointer.    This  restriction is probably already met by
+  most conservative consumer code: earlier, nothing was said about
+  the lifetime of the string!   Eventually it would be nice to
+  actually have more ephemeral strings as then some much better
+  error strings could easily be produced with no leakage and
+  no growth in the size of the running executable.
+  For now, though, all dwarf_errmsg() strings continue to point to
+  static strings.  Just please don't depend on it!
+
+  BINARY & SOURCE INCOMPATIBLITY:
+
+  The Producer code drops old dwarf_producer_init* functions
+  and provides an old name with a new interface: dwarf_producer_init().
+  The producer callback function is renamed Dwarf_Callback_Func.
+  Hence code calling the libdwarf producer must change.
+
+  Code calling the consumer interface is not affected.
+
+  The determination of what/how to emit DWARF is now determined
+  at run time, not at build time.  It's now much simpler to
+  get the sort of output you want. Provision is made for emitting
+  DWARF3,4,5 and 5 (though that provision is at a very early stage
+  and not much supported yet).
+
+  The postal addresses for SGI in the copyright comments
+  changed from time to time and are no longer accurate.
+  So they are gradually being removed.
+March 17, 2014
+  The dwarf.v2.mm and index.v2.mm and their pdf files have been
+  removed from the distribution.    Those files are available
+  on dwarfstd.org and they are 20 years old, so removed
+  from libdwarf.
+January 29, 2014
+  Now using dwarf_tsearch() instead of the original complicated
+  allocation code.
+October 14, 2013
+  The Callback_Func declarations in libdwarf.h were missing a
+  const on the name argument.  Adding it removes compiler warnings.
+  But removing it means client code calling
+  producer functions has to change to get their
+  callback function declarations/definitions to match.
+  The change does not affect those calling the consumer interfaces.
+August 15, 2013
+  Now the printf (stdout) here go through a callback function instead
+  of actually using stdout.  That way dwarfdump and other apps have full
+  control of libdwarf output from dwarf_print_lines() for example.
+  It also means callers of dwarf_print_lines() need to have called
+  dwarf_register_printf_callback() to get any actual print output.
+January 26, 2013
+  Retracted the incompatible change. The interfaces are
+  again compatible with previous releases and the January 25
+  release is withdrawn.  Has all the fixes of Jan 25 present
+  in the code.
+January 25, 2013
+  The definition of the Dwarf_Loc struct
+  could not handle DW_OP_GNU_const_type
+  so it had to change. The new field added makes this version of libdwarf
+  incompatible with any existing dwarfdump.  Rebuild dwarfdump
+  and dwarfdump2 to use it with this libdwarf.
+  Moved firmly into C89/C90 usage by more complete use of const
+  and be using int x(void) for example to prototype parameter-less
+  functions.  Compiles close to cleanly with
+  gcc options -Wsystem-headers
+    -Wall  -Wsign-compare
+ -Wno-format-y2k -W
+ -Wno-unused-parameter -Wstrict-prototypes
+ -Wmissing-prototypes -Wpointer-arith
+ -Wreturn-type -Wcast-qual -Wwrite-strings
+ -Wswitch -Wshadow -Wunused-parameter
+ -Wcast-align -Wchar-subscripts -Winline
+ -Wnested-externs -Wredundant-decls
+ -Wold-style-definition -Wno-pointer-sign
+
+November 29, 2012
+  The function dwarf_formflag() now returns the actual flag value
+  instead of just 1 or 0.   It has been coded wrong a very long time.
+  The DWARF documents (DWARF2 on) have always made it clear any non-zero
+  value means true and zero means false. Now consumers can properly
+  note the value the compiler actually put into the flag byte.
+November 17, 2012
+  New headers contain the relocation codes for various object
+  ABIs.   These headers are needed in libdwarf and expected
+  by builds of dwarfdump[2] for best dwarfdump[2] relocation
+  handling.
+  It is best to build libdwarf and dwarfdump together for
+  best handling of relocatable objects.
+  GNU compilers may generate the operator
+  DW_OP_GNU_implicit_pointer which is generated differently in
+  DWARF2 versus DWARF3/4. Hence a new interface to libdwarf
+  dwarf_loclist_from_expr_b() adds the compilation unit
+  DWARF version number to the argument list (as compared
+  to dwarf_loclist_from_expr_a()).  Hopefully few
+  consumers will need to change to use the new interface.
+December 13, 2011
+  dwarf_lineoff() is now deprecated, dwarf_lineoff_b() is
+  strongly recommended instead.
+  dwarf_add_line_entry() does not have all the line fields
+  needed for generating DWARF3/4, use dwarf_add_line_entry_b() instead.
+  Generation of DWARF3/4 is not yet functional, this new function
+  is a first step.
+October 29, 2011
+  Added support for reading .debug_types (type unit) data.
+October 26,2011
+  Revised the Makefile.in and README to make building libdwarf
+  easier to accomplish with unusual locations of libelf headers
+  or other headers or libraries.
+June 04,2011
+  Non-Elf objects could be used with libdwarf, but
+  no one has contributed non-elf-reading code for libdwarf
+  and a crucial detail was not documented so those writing
+  such object-reading code have not done it entirely correctly.
+  Fundamentally such code must treat a section index of 0 as
+  a real but empty section with no name (an empty name).
+  dwarf_elf_access.c and dwarf_elf_init_finish.c have some comments
+  on this point now.
+March 29,2011
+  All the code changed a lot because indentations were all over
+  the map, now they are consistent.
+  Additions were made to DWARF4 support.
+  Now we use dicheck (a new open source application) to check indentation.
+  Library users will not see any change, all interfaces remain
+  as before.
+January 12,2010
+  A libdwarf user has noticed that the April 4, 2009
+  consumer function changes introduced
+  a problem:  the default CFA column was DW_FRAME_CFA_COL
+  even when a newer DWARF3 consumer frame interface like
+  dwarf_get_fde_info_for_all_regs3() is used.  The
+  libdwarf2.1.pdf documentation
+  stated the default should be DW_FRAME_CFA_COL3 in that case.
+
+  The introduction of a caller-specified  frame-column
+  function (dwarf_set_frame_cfa_value())
+  in that April 4, 2009 release was flawed in that it failed
+  to match the documentation.
+
+  Now the default frame column is DW_FRAME_CFA_COL3 unless
+  the configure option  --enable-oldframecol
+  is used at libdwarf build time.
+  If you are using libdwarf old frame consumer interfaces
+  dwarf_get_fde_info_for_reg(), dwarf_get_fde_info_for_cfa_reg(),
+  and dwarf_get_fde_info_for_all_regs() and want unchanged operation
+  then please configure libdwarf with --enable-oldframecol .
+  or add the call dwarf_set_frame_cfa_value(dbg,DW_FRAME_CFA_COL)
+  after calling a libdwarf initialization function.
+  It is impossible to configure a single libdwarf.a so that
+  it transparently defaults to both DW_FRAME_CFA_COL
+  and DW_FRAME_CFA_COL3.
+
+  A call such as dwarf_set_frame_cfa_value(dbg,DW_FRAME_CFA_COL3)
+  or dwarf_set_frame_cfa_value(dbg,DW_FRAME_CFA_COL)
+  (or some other name/value of your choosing)
+  following the dwarf_init() call gives your application
+  full control of the frame cfa column independent of the libdwarf
+  configure option.  See the libdwarf2.1.pdf documentation for details.
+  We strongly recommend that you use dwarf_set_frame_cfa_value()
+  to avoid a configure-time dependency.
+
+July 7, 2009
+  Implemented support for elf 'rela' relocations so libdwarf and dwarfdump
+  can read *nix .o files with such relocations reasonably,
+  at least for some machines
+  (see dwarf_elf_access.c for EM_  in 'case' statements.)
+  This changes the binary access for non-Elf object users (folks
+  who have coded there own non-Elf access routines do reference
+  internals of dwarf_opaque.h), but the new data can be left zero
+  and the rest of the code should work fine.
+  dwarf_opaque.h gathers section data in Dwarf_Section_s structs
+  which simplifies the code in dwarf_init_finish.c and clarifies
+  what fields are section related.
+July 4, 2009
+  When something erroneous is detected in a die
+  information about the CU context may be of interest.
+  So we added dwarf_CU_dieoffset_given_die(), a function which allows
+  clients to find the relevant CU die for any die.
+  The consumer can use normal attribute access functions to
+  print information about that CU die (and the erroneous die,
+  of course).  See the libdwarf consumer document for more
+  information.
+April 27, 2009
+  Interface additions: dwarf_loclist_from_expr_a() and
+  dwarf_get_ranges_a() are new interfaces like
+  dwarf_loclist_from_expr() and dwarf_get_ranges() respectively,
+  but with arguments allowing
+  full support for different CIEs
+  in an executable  having different address-sizes
+  (and their compilation unit DIEs if .debug_info is present).
+  dwarf_get_loclist_entry() does not support
+  differing address sizes per CIE/CU.
+April 4, 2009
+  Added new functions dwarf_set_frame_cfa_value()
+  dwarf_set_frame_same_value(), and
+  dwarf_set_frame_undefined_value(). These are essential
+  for ABIs where the real register numbers exceed 1033
+  (such as ppc).  Failing to use these leads to
+  frame instructions  DW_CFA_undefined and
+  DW_CFA_same_value emitting values that cannot be
+  interpreted correctly by a libdwarf consumer.
+  See dwarfdump for examples of use.
+Feb 14, 2009
+  Added configure option --enable-nonstandardprintf
+  which makes it easy to get printf of Dwarf_Unsigned (etc)
+  types correct even for non-standard compilers.
+Dec 30, 2008
+  Added interfaces for getting and printing the .debug_ranges
+  data.
+Dec 8, 2008
+  Record the abbreviation 'code' (index) in each DIE.
+  Making it possible for a pretty-printer to print the
+  abbreviation code.
+Sep 30, 2008
+  Phil Mucci provided an a.out test chase which demonstrates a bug
+  in 64bit DWARF2 output by gcc.   Now libdwarf works around this
+  and with -v -v -v -v prints a warning.
+Sep 29, 2008
+  Thanks to Phil Mucci for providing a little-endian 64bit
+  test object file that exposed a problem when there are 'extra' bytes
+  (possibly unused) after a line table prologue header and before the
+  line table itself.  This releases fixes the bug.
+
+  Thanks to Matthew Legendre for pointing out that we were sharing
+  de_fde_count for eh and non-eh and that could cause erroneous
+  error returns in a couple of functions.
+  These counts are now separate.
+April 9, 2008
+  libdwarf would behave badly if one compilation unit had more than 64K
+  abbreviations: It was both very slow dealing with abbreviations and would
+  get mixed up and error-off.  Increased the size of some internal variables
+  and rewrote abbreviation lookup.
+February 18, 2008
+  It is now possible to write one's own access to objects, making it possible
+  to use a different library than libelf or even read a completely
+  different object format than ELF.
+  See dwarf_object_init() and see the new source files
+  dwarf_original_elf_init.c and dwarf_elf_access.c  for example
+  code using the new function-pointer approach as it's implementation.
+  Thanks to Josh Fuhs for doing the design and 99% of the work to make
+  this happen.
+February 2, 2008 As of 2021 DW_DLC only in libdwarfp
+  Now pro_init() defaults to standard DWARF3 generated offset sizes.
+  But if a new flag DW_DLC_OFFSET_SIZE_64 or'd into flags passed to
+  dwarf_produser_init() or dwarf_producer_init_b,
+  the DWARF3 extended offset size is generated (if the address size
+  is 64 bit).
+  The new configure option  --enable-dwarf-format-strict-32bit
+  forces pro_init() to always cause 32bit offset dwarf generation.
+  The new configure option --enable-dwarf-format-sgi-irix forces
+  the old SGI IRIX 64bit offset generation for 64bit pointer size objects.
+
+  This is intended to simplify standard DWARF3 generation with
+  the now-normal use of 32bit DWARF offsets for both 32 and 64
+  bit pointer objects.
+
+  It does require that anyone wanting SGI IRIX dwarf generation
+  with its non-standard offsets for 64bit objects use the new
+  --enable-dwarf-format-sgi-irix configure time option.
+
+  This has no effect on dwarf reader code. It affects code calling
+  the libdwarf producer interfaces.
+
+December 8, 2007
+  Had to add an ugly configure conditional as libelf has
+  unconditional use of off64_t in recent libelf.h
+July 3, 2007
+  A new interface function, dwarf_loclist_from_expr(),
+  allows easy extraction of dwarf expression bytes from
+  expressions in frame data.
+May 8, 2007
+  Now documents released as .mm and .pdf (no longer as .ps).
+May 7, 2007
+  Incorporates Sun Microsystems  extensions to dwarf.h and
+  to the consumer and producer libraries.   The changes
+  include corrections so the producer library  cleans up it's memory
+  use on a call to dwarf_producer_finish(dbg).
+  Thanks to Chris Quenelle of Sun for these contributions.
+
+March 20, 2007
+  nroff/troff and the AT&T -mm package are not widely available,
+  so now the Makefile refers to groff, which works quite nicely.
+
+February 20, 2007
+  Documented libdwarf thread safety in README.
+  Fixed memory leak in  dwarf macro reading code.
+  Removed use of static data in dwarf macro
+  reading code: now uses stack/heap (for
+  thread safety).
+
+February 9, 2007
+  Maintenance of libdwarf is now outside SGI
+  as David Anderson has left SGI.
+
+March 29, 2006
+  The March  27, 2006 version accommodates DWARF3.
+  Some people have been using the library without
+  altering dwarf.h, libdwarf.h to accommodate
+  large numbers of registers.  This exposed a bug
+  (an off-by-one error) but also makes it clear
+  additional documentation is needed.  So
+  in libdwarf large new comments near 'TARGET DEPENDENCY'
+  attempt to explain better.
+Oct 03, 2005
+  The July version had an incompatible interface: old
+  dealloc code did not always work right. The incompatibility
+  is now fixed and the new features remain.
+
+July 15, 2005
+  New optional alloc-check code optionally checks all
+  allocated memory is freed (malloc_check.h malloc_check.c)
+  Various new dealloc routines written as the previous approach
+  of letting client code do detailed dealloc turned out not
+  to dealloc all memory.
+  To get the new checking you must manually change a line
+  in malloc_check.h and rebuild libdwarf.
+
+
+Mar 31, 2005
+  Documented  the libexc.so/.debug_funcnames
+  dependency and the 64bit-offset DWARF extension in
+  mips_extentions.{mm,ps}.
+
+Mar 21, 2005
+  gcc 3.3 and 3.4 .eh_frame 'z' augmentations are not handled
+  correctly, so libdwarf gives an error when attempting to
+  print such. gcc 2 'eh' augmentation is simpler and
+  prints correctly.  (.eh_frame is a GNU section,
+  not DWARF2/3, and what is recorded in .eh_frame is not
+  specified by DWARF2/3, though .eh_frame does resemble
+  DWARF2/3 .debug_frame).
+
+
+Oct 28, 2004
+  Updated contact address in copyright: SGI moved 1/4 mile
+  in 2003 to a new address: 1500 Crittenden Lane.
+
+  Documented additional vendor extensions.
+
+Oct 27, 2004
+  Added known vendor extensions to dwarf2/3 to dwarf.h
+  HP, GNU, PGI and UPC extensions are now recorded.
+  Recorded vendor extensions from Concurrent.
+
+Feb 3, 2004
+  If 'Dwarf_Word' is 64 bits, two macros reading leb numbers
+  fail to initialize upper bits of the values read.
+  First noticed with bogus line numbers printing from dwarfdump.
+  Now we use already-existing functions, avoiding the problem.
+
+Oct 02, 2003
+  Support .debug_loc section fully.
+
+Sept 29, 2003
+  Support DW_FORM_indirect properly.
+  Supports loclists in part (but not multiple loclist entries yet).
+  Support 'padding bytes' at end of .debug_arange and
+  .debug_pubnames and .debug_pubtypes per CU
+  (recent dwarf committee email made it clear this is appropriate).
+
+May 23, 2002
+  Libdwarf now asks for sections only when they are
+  used, so that unneeded sections aren't loaded.
+  Support for using SGI's ELF library as an alternative to
+  using AT&T libelf-style has been added (the SGI ELF
+  library is presently only available internally to SGI).
+
+Jan 10, 2002
+  Fixed memory leak in dwarf_finish().
+
+Aug 21, 2001
+  If one called dwarf_add_file_decl()
+  or dwarf_add_directory_decl() but never added a line,
+  .debug_line was not produced.  This was a mistake,
+  as if any file or directory was provided .debug_line
+  should be produced. Now it is produced.
+
+June 14, 2001
+  Given a cu header offset, it was not easy to derive the
+  CU header DIE offset. Created the new
+  function dwarf_get_cu_die_offset_given_cu_header_offset()
+  do get the CU header DIE offset.
+  Added the function dwarf_get_arange_cu_header_offset()
+  so the cu header offset could be retrieved from .debug_aranges
+  information.
+
+June 07, 2001
+  Major bug in dwarf_leb.c decoding large integers
+  (Dwarf_Signed 64 bit where library is compiled in ILP32)
+  found and fixed.
+
+May 21, 2001
+  Some small fixes have been found by various folks,
+  so it seems time to prepare a new source release.
+  See ChangeLog for details.
+
+April 15, 2000
+  The libdwarf copyright has changed to
+     version 2.1 of the GNU Lesser General Public License.
+  Anyone holding a version of libdwarf that was published
+  before this new copyright is allowed to use
+    the copyright published in that earlier libdwarf source
+    on the earlier source
+  or to use
+    this new copyright on the earlier source,
+  at their option.
+
+
+December 08, 1999
+  The dwarf committee has adopted the offset-extension
+  proposal. This allows compatibly emitting
+  dwarf with 64bit offsets.
+
+  The dwarf reader now automatically figures out which is in use.
+  The dwarf writer configures itself at the time the
+  writer initialization routine is called, though
+  the writer is restricted, at libdwarf
+  compile time, to one of
+		mips/sgi pure 32/pure 64 offsets/pointers.
+
+		32bit offsets only (per dwarf 2.0.0 and cygnus)
+
+		32bit offsets with extension to 64bit offsets
+		allowed (the offset-extension newly passed).
+
+  In addition, a great deal of duplicate code
+  for the sgi  .debug_weaknames, .debug_funcnames,
+  .debug_varnames and .debug_typenames sections has
+  been removed: a single set of functions does the real work now.
+
+Sept 29, 1999
+  Just found out that cygnus is, on 64bit targets, generating
+  32bit offsets (as elf32 has, for example) with 64 bit
+  pointers (in references to text and data).
+  Whereas sgi has always generated 64bit dwarf with
+  64 bit offsets (as in elf64) and 64bit pointers for
+  64bit pointer objects.
+  I'll call the sgi approach 64-bit and the cygnus approach
+  32bit-offsets.
+
+  Cygnus is following the DWARF2 spec as written, so they are
+  right in doing only 32bit-offsets.
+
+  Folks at sgi (including me) think that, as for elf64,
+  the offsets in dwarf for 64bit pointer-apps should be
+  64 bits.  We think it is only a matter of time
+  before we really *need* 64bit offsets and when that happens
+  it will be on an important app.  Disk space is cheap,
+  so lets just go 64 bit on 64bit apps (such as ia64 apps)
+  to avoid a future problem.
+  I(davea@sgi.com) think the 'pointer-size' references in the dwarf
+  spec were really written for 64-bit pointer apps.
+  I don't recall serious consideration of 64bit pointer
+  apps in the committee deliberations (I did miss
+  a couple of meetings) and think 64bit offsets
+  are consistent with dwarf2, even though the speci
+  was not written for such. We think true full 64 bit
+  dwarf2 is the right way to go (the spec changes
+  are obvious: file and section offsets become 64bit
+  with 64bit pointer objects.
+
+  MIPS/SGI is definitely 64-bit offsets for 64 bit objects,
+  cygnus is definitely 32bit-offsets for earlier 64bit pointer
+  environments.
+
+  At any rate, now the dwarf reader allows and accommodates
+  both and the dwarf producer also accommodates both.
+  Some tweaking of the pro_init.c or dwarf_init_finish.c
+  files may be necessary in future: no other changes should
+  be needed to accommodate the two 64bit approaches, as
+  the library (and dwarfdump) now deal with both forms.
+
+
+August 20, 1999
+  Added some #ifndef/#define to pro_util.h to let libdwarf build
+  on more hosts.  (since those hosts don't need the producer
+  code, AFAIK, zero values suffice for missing #defines.)
+
+July 21, 1999
+  Now reader transparently reads either-endianness data
+  from an either-endianness object.
+  Updated dwarf.h and libdwarf.h to recognize
+  GNU egcs dwarf extensions and to print the egcs eh_frame
+  section.
+
+June 10, 1999
+  gnu configure version of libdwarf made available for the
+  first time.
+  Still allows only same-endian-as-host in objects.
+
+August, 1994
+  libdwarf source made available for ftp on sgigate.sgi.com
+	/ftp/pub
+
+June, 1994
+  Consumer interface changed completely, following
+  "Candy Machine Interfaces" chapter from
+   "Writing Solid Code" by Steve Maguire (Microsoft Press).
+
+April,  1993
+  Initial version of libdwarf  for dwarf version 2
+  written at sgi.

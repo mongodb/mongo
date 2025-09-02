@@ -2736,6 +2736,16 @@
           "expression": "MIT"
         }
       ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        },
+        {
+          "name": "info_link",
+          "value": "https://pypi.org/project/asn1crypto/"
+        }
+      ],
       "copyright": "Copyright (c) 2015-2022 Will Bond <will@wbond.net>",
       "purl": "pkg:pypi/asn1crypto@1.5.1"
     },
@@ -2759,6 +2769,16 @@
           "expression": "MIT"
         }
       ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        },
+        {
+          "name": "info_link",
+          "value": "https://bottlepy.org/docs/dev/"
+        }
+      ],
       "copyright": "Copyright (c) 2009-2024, Marcel Hellkamp",
       "cpe": "cpe:2.3:a:bottlepy:bottle:0.12.25:*:*:*:*:*:*:*",
       "purl": "pkg:pypi/bottle@0.12.25"
@@ -2777,8 +2797,71 @@
           "expression": "MIT"
         }
       ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        },
+        {
+          "name": "info_link",
+          "value": "https://pypi.org/project/oscrypto/"
+        }
+      ],
       "copyright": "Copyright (c) 2015-2022 Will Bond <will@wbond.net>",
       "purl": "pkg:pypi/oscrypto@1.3.0"
+    },
+    {
+      "name": "libdwarf",
+      "type": "library",
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "version": "v2.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-or-later"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        },
+        {
+          "license": {
+            "name": "Public Domain"
+          }
+        }
+      ],
+      "purl": "pkg:github/davea42/libdwarf-code@v2.1.0",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Programmability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/davea42/libdwarf-code"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/libdwarf/scripts/import.sh"
+        }
+      ],
+      "bom-ref": "eb4cc09f-c13a-4d71-a276-5d47365f2372",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/libdwarf"
+          }
+        ]
+      },
+      "scope": "excluded"
     }
   ],
   "dependencies": [

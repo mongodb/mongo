@@ -3090,6 +3090,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/IntelRDFPMathLib* @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/JSON-Schema-Test-Suite @10gen/query-optimization @svc-auto-approve-bot
 /src/third_party/**/libbson @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/libdwarf @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/libmongocrypt @10gen/server-security @svc-auto-approve-bot
 /src/third_party/**/librdkafka @10gen/streams-engine @svc-auto-approve-bot
 /src/third_party/**/libstemmer_c @10gen/query-integration @svc-auto-approve-bot
@@ -3122,6 +3123,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/third_party/libmongocrypt/OWNERS.yml
 /src/third_party/libmongocrypt/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/third_party/scripts/OWNERS.yml
+/src/third_party/scripts/**/gen_thirdpartyreadme.py @10gen/code-review-team-ssdlc @svc-auto-approve-bot
+/src/third_party/scripts/**/README.third_party.md.template @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 
 # The following patterns are parsed from ./tools/OWNERS.yml
 /tools/**/* @10gen/devprod-build @svc-auto-approve-bot
