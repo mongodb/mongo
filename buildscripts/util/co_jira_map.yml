@@ -62,7 +62,7 @@
   - Server Security
 10gen/server-storage-execution:
   - Storage Execution
-10gen/server-workload-scheduling:
+10gen/server-workload-resilience:
   - Workload Execution
 10gen/streams-engine:
   - Atlas Streams

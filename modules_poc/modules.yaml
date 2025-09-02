@@ -484,7 +484,7 @@ access_control:
 
 admission:
   meta:
-    slack: server-workload-scheduling
+    slack: server-workload-resilience
     jira: Workload Scheduling
   files:
     - src/mongo/db/admission/
@@ -493,7 +493,7 @@ admission:
 
 workload_simulation:
   meta:
-    slack: server-workload-scheduling
+    slack: server-workload-resilience
     jira: Workload Scheduling
   files:
     - src/mongo/tools/workload_simulation/

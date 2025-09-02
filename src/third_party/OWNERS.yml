@@ -29,13 +29,13 @@ filters:
       - 10gen/server-programmability
   - "folly":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "googletest_restricted_for_disagg_only":
     approvers:
       - 10gen/server-disagg-storage
   - "gperftools":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "grpc":
     approvers:
       - 10gen/server-networking-and-observability
@@ -81,7 +81,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "node":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "opentelemetry-cpp":
     approvers:
       - 10gen/server-networking-and-observability
@@ -114,7 +114,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "tcmalloc":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "timelib":
     approvers:
       - 10gen/query-execution

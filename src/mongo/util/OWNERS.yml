@@ -43,10 +43,10 @@ filters:
       - 10gen/query-optimization
   - "latency_distribution*":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "tcmalloc*":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "log_and_backoff*":
     approvers:
       - 10gen/server-networking-and-observability

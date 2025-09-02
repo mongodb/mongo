@@ -17,7 +17,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "mongo_unittest_fifth_group",
-        "server-workload-scheduling",
+        "server-workload-resilience",
     ],
     deps = [
         ":folly_token_bucket",

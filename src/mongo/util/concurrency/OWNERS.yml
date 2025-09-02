@@ -5,7 +5,7 @@ filters:
       - 10gen/server-programmability
   - "*ticketholder*":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
   - "admission_context.*":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience

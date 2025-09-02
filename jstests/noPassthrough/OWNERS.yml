@@ -23,4 +23,4 @@ filters:
       - 10gen/server-programmability
   - "delinquent*":
     approvers:
-      - 10gen/server-workload-scheduling
+      - 10gen/server-workload-resilience
