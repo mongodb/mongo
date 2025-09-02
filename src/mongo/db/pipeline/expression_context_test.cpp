@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -235,6 +236,67 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kNowId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kClusterTimeId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kUserRolesId));
+}
+
+TEST_F(ExpressionContextTest, UseLastLTSFeatureFlagWhenFCVUninitialized) {
+    auto opCtx = makeOperationContext();
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSON("a" << 1)));
+    AggregateCommandRequest acr({} /*nss*/, pipeline);
+    ResolvedNamespaceMap sm;
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx.get(),
+                                                    acr,
+                                                    nullptr /*collator*/,
+                                                    nullptr /*mongoProcessInterface*/,
+                                                    sm,
+                                                    boost::none /*collUUID*/);
+
+    const auto kOriginalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ON_BLOCK_EXIT([&] { serverGlobalParams.mutableFCV.setVersion(kOriginalFCV); });
+    // (Generic FCV reference): for testing only. This comment is required by linter.
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+
+    // If the FCV is uninitialized, we should check the feature flag is enabled on the lastLTS
+    // version.
+    // 'featureFlagSpoon' should be enabled, since it is a test feature flag that is always enabled
+    // on the lastLTS version.
+    ASSERT_DOES_NOT_THROW(
+        expCtx->throwIfFeatureFlagIsNotEnabledOnFCV("foo", feature_flags::gFeatureFlagSpoon));
+
+    // 'featureFlagBlender' should not be enabled, since it is a test feature flag that is always
+    // enabled on the latest version.
+    ASSERT_THROWS_CODE(
+        expCtx->throwIfFeatureFlagIsNotEnabledOnFCV("foo", feature_flags::gFeatureFlagBlender),
+        DBException,
+        ErrorCodes::QueryFeatureNotAllowed);
+}
+
+TEST_F(ExpressionContextTest, UseLatestFeatureFlagWhenFCVInitialized) {
+    auto opCtx = makeOperationContext();
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSON("a" << 1)));
+    AggregateCommandRequest acr({} /*nss*/, pipeline);
+    ResolvedNamespaceMap sm;
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx.get(),
+                                                    acr,
+                                                    nullptr /*collator*/,
+                                                    nullptr /*mongoProcessInterface*/,
+                                                    sm,
+                                                    boost::none /*collUUID*/);
+
+    const auto& fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    ASSERT_TRUE(fcvSnapshot.isVersionInitialized());
+    // (Generic FCV reference): for testing only. This comment is required by linter.
+    ASSERT_TRUE(fcvSnapshot.isGreaterThanOrEqualTo(multiversion::GenericFCV::kLatest));
+
+    // Since the FCV is initialized and is the latest version, 'featureFlagSpoon', enabled on the
+    // lastLTS, and 'featureFlagBlender', enabled on the latest version, should both be enabled.
+    ASSERT_DOES_NOT_THROW(
+        expCtx->throwIfFeatureFlagIsNotEnabledOnFCV("foo", feature_flags::gFeatureFlagSpoon));
+    ASSERT_DOES_NOT_THROW(
+        expCtx->throwIfFeatureFlagIsNotEnabledOnFCV("foo", feature_flags::gFeatureFlagBlender));
 }
 
 }  // namespace

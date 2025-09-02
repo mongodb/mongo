@@ -708,6 +708,35 @@ TEST(SetupOptions, NonNumericSlowMsYAMLConfigOptionFailsToParse) {
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
+TEST(SetupOptions, ProfileFilterDependsOnFeatureParsesSuccessfully) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.yaml");
+
+    // $toUUID depends on 'featureFlagBinDataConvert' under FCV 8.0. This filter should
+    // successfully parse, even though we do not verify feature flags in any of these functions.
+    auto filterObj = BSON("$expr" << BSON("$lt" << BSON_ARRAY(BSON("$toUUID" << 0) << 0.01)));
+    parser.setConfig("config.yaml",
+                     "operationProfiling:\n"
+                     "    filter: '{$expr: {$lt: [{$toUUID: 0}, 0.01]}}'\n");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+    ASSERT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::mongo::setupServerOptions(argv));
+    ASSERT_OK(::mongo::storeServerOptions(environment));
+
+    ASSERT_BSONOBJ_EQ(::mongo::serverGlobalParams.defaultProfileFilter.get(), filterObj);
+}
+
 TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
     OptionsParserTester parser;
     moe::Environment environment;
