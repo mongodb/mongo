@@ -361,6 +361,32 @@ server_parameters:
             lte: 20
         redact: false
 
+    wiredTigerEvictionThreadsMin:
+        description: >-
+            The minimum number of threads that the WiredTiger instance will use for cache eviction.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_varname: gWiredTigerEvictionThreadsMin
+        on_update: "WiredTigerKVEngine::updateEvictionThreadsMin"
+        default: 4
+        validator:
+            gte: 1
+            lte: 64
+        redact: false
+
+    wiredTigerEvictionThreadsMax:
+        description: >-
+            The maximum number of threads that the WiredTiger instance will use for cache eviction.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_varname: gWiredTigerEvictionThreadsMax
+        on_update: "WiredTigerKVEngine::updateEvictionThreadsMax"
+        default: 4
+        validator:
+            gte: 1
+            lte: 64
+        redact: false
+
     spillWiredTigerEvictionThreadsMax:
         description: >-
             The maximum number of threads that the spill WiredTiger instance will use for cache

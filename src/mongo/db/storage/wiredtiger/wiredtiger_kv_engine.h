@@ -672,6 +672,10 @@ public:
 
     bool hasOngoingLiveRestore() override;
 
+    static Status updateEvictionThreadsMax(const int32_t& threadsMax);
+
+    static Status updateEvictionThreadsMin(const int32_t& threadsMin);
+
 private:
     StatusWith<Timestamp> _pinOldestTimestamp(WithLock,
                                               const std::string& requestingServiceName,
