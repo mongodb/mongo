@@ -43,7 +43,6 @@ namespace mongo {
 template <typename Callable>
 void handleErrors(Callable&& callable) {
     try {
-        // TODO SERVER-106495 will handle properly errors, responses and stats.
         callable();
     } catch (const DBException& ex) {
         tasserted(ErrorCodes::ReplayClientSessionSimulationError,
