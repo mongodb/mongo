@@ -182,6 +182,12 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropIndexesEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(collModEvent, expCtx));
 
+    if (expCtx->changeStreamSpec->getShowSystemEvents()) {
+        orCmdEvents->add(MatchExpressionParser::parseAndNormalize(
+            backingBsonObjs.emplace_back(BSON("o.startIndexBuild" << BSONRegEx{collRegex})),
+            expCtx));
+    }
+
     // Omit dropDatabase on single-collection streams. While the stream will be invalidated before
     // it sees this event, the user will incorrectly see it if they startAfter the invalidate.
     if (streamType != DocumentSourceChangeStream::ChangeStreamType::kSingleCollection) {
