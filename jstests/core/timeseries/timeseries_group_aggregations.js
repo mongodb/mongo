@@ -3,47 +3,37 @@
  * would be hard to write out by hand.
  * We create a list of common pipeline stages that could run in block processing, and run different
  * permutations of them, while checking the results against a mongod using the classic engine.
+ *
+ * @tags: [
+ *      requires_timeseries,
+ *      does_not_support_stepdowns,
+ *      not_allowed_with_signed_security_token,
+ *      assumes_read_concern_unchanged
+ * ]
  */
-
-const classicConn =
-    MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}});
-const bpConn = MongoRunner.runMongod(
-    {setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
-
-assert.neq(null, classicConn, "mongod was unable to start up");
-assert.neq(null, bpConn, "mongod was unable to start up");
 
 // Only run this test for debug=off opt=on without sanitizers active, since this test runs lots of
 // queries.
-function isSlowBuild(db) {
-    const debugBuild = db.adminCommand("buildInfo").debug;
-    return debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
-        _isLeakSanitizerActive() || _isThreadSanitizerActive() ||
-        _isUndefinedBehaviorSanitizerActive();
-}
-
-const classicDb = classicConn.getDB(jsTestName());
-const bpDb = bpConn.getDB(jsTestName());
-if (isSlowBuild(classicDb) || isSlowBuild(bpDb)) {
+const debugBuild = db.adminCommand("buildInfo").debug;
+if (debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
+    _isLeakSanitizerActive() || _isThreadSanitizerActive() ||
+    _isUndefinedBehaviorSanitizerActive()) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
-    MongoRunner.stopMongod(classicConn);
-    MongoRunner.stopMongod(bpConn);
     quit();
 }
-
-const classicColl = classicDb.timeseries_group_aggregations;
-const bpColl = bpDb.timeseries_group_aggregations;
+const classicColl = db[jsTestName() + '_classic'];
+const bpColl = db[jsTestName() + '_bp'];
 
 classicColl.drop();
 bpColl.drop();
 // Create a TS collection to get block processing running. Compare this against a classic
 // collection.
-assert.commandWorked(bpDb.createCollection(bpColl.getName(), {
+assert.commandWorked(db.createCollection(bpColl.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},
 }));
 
 const datePrefix = 1680912440;
-const dateLowerBound = new Date(datePrefix);
+const dateLowerBound = new Date(0);
 
 // Create time series buckets with different meta fields, time fields, and data.
 const allFields = ['t', 'm', 'a', 'b'];
@@ -54,16 +44,14 @@ for (let metaIdx = 0; metaIdx < 5; metaIdx++) {
     // Mix of number and object meta values.
     const metaVal = metaIdx % 2 === 0 ? metaIdx : {metaA: metaIdx, metaB: metaIdx / 2};
 
-    let currentDate = 0;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
         tsData.push({
             _id: id,
-            t: new Date(datePrefix + currentDate - 100),
+            t: metaIdx % 3 === 0 ? new Date(-1000 * i) : new Date(1000 * i),
             m: metaVal,
             a: i,
             b: alphabet.charAt(i)
         });
-        currentDate += 25;
         id++;
     }
 }
@@ -76,6 +64,8 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
     pipeline = pipeline.concat([{$_internalInhibitOptimization: {}}, {$sort: {_id: 1}}]);
 
     const classicResults = classicColl.aggregate(pipeline, {allowDiskUse}).toArray();
+    // Clear the plan cache so each query is unaffected by state.
+    db.system.buckets[bpColl.getName()].getPlanCache().clear();
     const bpResults = bpColl.aggregate(pipeline, {allowDiskUse}).toArray();
 
     function errFn() {
@@ -127,7 +117,7 @@ for (const includeField of [0, 1]) {
 }
 
 const addFieldsStages = [
-    {stage: {$addFields: {t: new Date(datePrefix + 100)}}, uses: [], produces: allFields},
+    {stage: {$addFields: {t: new Date(100)}}, uses: [], produces: allFields},
     {stage: {$addFields: {m: 5}}, uses: [], produces: allFields},
     {stage: {$addFields: {a: 2}}, uses: [], produces: allFields}
 ];
@@ -250,7 +240,7 @@ function stageRequirementsMatch(stage1, stage2) {
 
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
-    assert.commandWorked(bpDb.adminCommand({
+    assert.commandWorked(db.adminCommand({
         setParameter: 1,
         internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
     }));
@@ -299,8 +289,4 @@ function runAggregations(allowDiskUse, forceSpilling) {
                 forceSpilling=${forceSpilling}`);
 }
 
-// Run with different combinations of allowDiskUse and force spilling.
 runAggregations(false /*allowDiskUse*/, false /*forceSpilling*/);
-
-MongoRunner.stopMongod(classicConn);
-MongoRunner.stopMongod(bpConn);

@@ -47,14 +47,14 @@ namespace {
 
 using InternalUnpackBucketGroupReorder = AggregationContextFixture;
 
-std::vector<BSONObj> makeAndOptimizePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
     boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
     std::vector<BSONObj> stages,
-
     int bucketMaxSpanSeconds,
     bool fixedBuckets,
-    BSONArray fields = BSONArray(),
-    bool exclude = true) {
+    BSONArray fields,
+    bool exclude) {
+
     BSONObjBuilder unpackSpecBuilder;
     if (exclude) {
         unpackSpecBuilder.append("exclude", fields);
@@ -68,11 +68,40 @@ std::vector<BSONObj> makeAndOptimizePipeline(
     auto unpackSpecObj = BSON("$_internalUnpackBucket" << unpackSpecBuilder.obj());
 
     stages.insert(stages.begin(), unpackSpecObj);
-    auto pipeline = Pipeline::parse(stages, expCtx);
+    return Pipeline::parse(stages, expCtx);
+}
+
+std::vector<BSONObj> makeAndOptimizePipeline(
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+    std::vector<BSONObj> stages,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    BSONArray fields = BSONArray(),
+    bool exclude = true) {
+    auto pipeline =
+        makePipeline(expCtx, stages, bucketMaxSpanSeconds, fixedBuckets, fields, exclude);
     pipeline->optimizePipeline();
     return pipeline->serializeToBson();
 }
 
+// This makes a pipeline and optimizes twice, once as the router, and once as a shard. This is meant
+// to simulate the path that is taken for an unsharded collection in a sharded cluster.
+std::vector<BSONObj> makePipelineAndOptimizeTwice(
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+    std::vector<BSONObj> stages,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    BSONArray fields = BSONArray(),
+    bool exclude = true) {
+
+    expCtx->inMongos = true;
+    auto pipeline =
+        makePipeline(expCtx, stages, bucketMaxSpanSeconds, fixedBuckets, fields, exclude);
+    pipeline->optimizePipeline();
+    expCtx->inMongos = false;
+    pipeline->optimizePipeline();
+    return pipeline->serializeToBson();
+}
 
 // The following tests confirm the expected behavior for the $count aggregation stage rewrite.
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountAggStage) {
@@ -325,17 +354,87 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetaFieldsExpression) {
     }
 }
 
+/*
+ * We can rewrite a $group on $max to reference the bucket control.max.time if there is no extended
+ * range data, and we are on mongod. The flag `requiresTimeseriesExtendedRangeSupport` is not
+ * accurate on mongos.
+ */
 TEST_F(InternalUnpackBucketGroupReorder, MaxGroupRewriteTimeField) {
-    // Validate $max can be rewritten if on the timeField to use control.max.time, since
-    // control.max.time is not rounded, like control.min.time.
+    struct TestData {
+        bool inMongos = false;
+        bool extendedRange = false;
+        bool shouldRewrite = false;
+    };
+
+    // Iterate through every test case, with inRouter true/false, and extended range true/false.
+    std::vector<TestData> testCases = {
+        {.inMongos = false, .extendedRange = false, .shouldRewrite = true},
+        {.inMongos = false, .extendedRange = true, .shouldRewrite = false},
+        {.inMongos = true, .extendedRange = false, .shouldRewrite = false},
+        {.inMongos = true, .extendedRange = true, .shouldRewrite = false},
+    };
+
     auto groupSpecObj = fromjson("{$group: {_id:'$meta1.m1', accmax: {$max: '$t'}}}");
+    auto rewrittenGroupStage =
+        fromjson("{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}}}");
+    auto expectedUnpackStageNoExtendedRange = fromjson(
+        "{ $_internalUnpackBucket: { include: [ 't', 'meta1' ], timeField: 't', metaField: "
+        "'meta1', bucketMaxSpanSeconds: 3600 } }");
+    auto expectedUnpackStageExtendedRangeTrue = fromjson(
+        "{ $_internalUnpackBucket: { include: [ 't', 'meta1' ], timeField: 't', metaField: "
+        "'meta1', bucketMaxSpanSeconds: 3600, usesExtendedRange: true } }");
 
-    auto serialized = makeAndOptimizePipeline(
-        getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
-    ASSERT_EQ(1, serialized.size());
+    for (auto&& testData : testCases) {
+        setExpCtx({.inMongos = testData.inMongos,
+                   .requiresTimeseriesExtendedRangeSupport = testData.extendedRange});
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
 
-    auto optimized = fromjson("{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}}}");
-    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+        if (testData.shouldRewrite) {
+            // We should see the rewrite occur, since we are on mongod and do not have extended
+            // range data.
+            ASSERT_EQ(1, serialized.size());
+            ASSERT_BSONOBJ_EQ(rewrittenGroupStage, serialized[0]);
+        } else {
+            // No rewrite should occur since we are on mongos or have extended range data.
+            ASSERT_EQ(2, serialized.size());
+            ASSERT_BSONOBJ_EQ(testData.extendedRange ? expectedUnpackStageExtendedRangeTrue
+                                                     : expectedUnpackStageNoExtendedRange,
+                              serialized[0]);
+            ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+        }
+    }
+
+    struct TestDataRouterShard {
+        bool extendedRange = false;
+        bool shouldRewrite = false;
+    };
+    // Try the "in router" cases again, this time optimizing once as the router, and once as the
+    // shard, to simulate a query on an unsharded collection in a sharded cluster.
+    std::vector<TestDataRouterShard> testCasesRouterShard = {
+        {.extendedRange = false, .shouldRewrite = true},
+        {.extendedRange = true, .shouldRewrite = false},
+    };
+
+    for (auto&& testData : testCasesRouterShard) {
+        setExpCtx({.requiresTimeseriesExtendedRangeSupport = testData.extendedRange});
+        auto serialized = makePipelineAndOptimizeTwice(
+            getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+
+        if (testData.shouldRewrite) {
+            // We should see the rewrite occur, since we are on mongod and do not have extended
+            // range data.
+            ASSERT_EQ(1, serialized.size());
+            ASSERT_BSONOBJ_EQ(rewrittenGroupStage, serialized[0]);
+        } else {
+            // No rewrite should occur since we are on mongos or have extended range data.
+            ASSERT_EQ(2, serialized.size());
+            ASSERT_BSONOBJ_EQ(testData.extendedRange ? expectedUnpackStageExtendedRangeTrue
+                                                     : expectedUnpackStageNoExtendedRange,
+                              serialized[0]);
+            ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+        }
+    }
 }
 
 // The following tests confirms the $group rewrite does not apply when some requirements are not

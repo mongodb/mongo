@@ -47,6 +47,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo::timeseries {
+
 /**
  * Carries parameters for unpacking a bucket. The order of operations applied to determine which
  * fields are in the final document are:
@@ -127,10 +128,6 @@ public:
     bool doesBucketSpecProvideField(const std::string& field) const {
         // When BucketSpec is in include mode, the should be present in the '_fieldSet'.
         return _fieldSet.contains(field) == (_behavior == BucketSpec::Behavior::kInclude);
-    }
-
-    bool doesBucketSpecProvideFieldWithoutModification(const std::string& field) const {
-        return doesBucketSpecProvideField(field) && !fieldIsComputed(field);
     }
 
     // Remove fields that the predicate function evaluates to true for.

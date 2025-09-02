@@ -46,6 +46,11 @@ namespace mongo {
  */
 class AggregationContextFixture : public ServiceContextTest {
 public:
+    struct ExpressionContextOptionsStruct {
+        bool inMongos = false;
+        bool requiresTimeseriesExtendedRangeSupport = false;
+    };
+
     AggregationContextFixture()
         : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
               boost::none, "test", "pipeline_test")) {}
@@ -67,6 +72,12 @@ public:
 
     auto getOpCtx() {
         return _opCtx.get();
+    }
+
+    void setExpCtx(ExpressionContextOptionsStruct options) {
+        _expCtx->inMongos = options.inMongos;
+        _expCtx->setRequiresTimeseriesExtendedRangeSupport(
+            options.requiresTimeseriesExtendedRangeSupport);
     }
 
     /*
