@@ -329,26 +329,55 @@ TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecs) {
     OplogWriterBatcher writerBatcher(&writerBuffer);
 
     // Set SecondaryDelaySecs to a large number, so we should get empty batches at the beginning.
-    getReplCoord()->setSecondaryDelaySecs(Seconds(500));
+    getReplCoord()->setSecondaryDelaySecs(Seconds(1000));
     auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
 
-    // Put one entry that is over secondaryDelaySecs and one entry not, the batcher will wait until
-    // all entries pass secondaryDelaySecs to return.
-    OplogWriterBatch batch1(
-        {makeNoopOplogEntry(Seconds(startTime - 100)), makeNoopOplogEntry(Seconds(startTime))},
-        _limits.minBytes);
-    writerBuffer.push_forTest(batch1);
+    // Put entries with different timestamps so that it will be separated into three batches by
+    // four different SecondaryDelaySecs (1000, 500, 10, and 5) where the first batch is just empty.
+    // The batcher will return the entries that satisfy the SecondaryDelaySecs without waiting for
+    // the entire batch to satisfy that delay.
+    OplogWriterBatch entireBatch({makeNoopOplogEntry(Seconds(startTime - 600)),  // second batch
+                                  makeNoopOplogEntry(Seconds(startTime - 550)),  // second batch
+                                  makeNoopOplogEntry(Seconds(startTime - 525)),  // second batch
+                                  makeNoopOplogEntry(Seconds(startTime - 30)),   // third batch
+                                  makeNoopOplogEntry(Seconds(startTime - 20)),   // third batch
+                                  makeNoopOplogEntry(Seconds(startTime - 15)),   // third batch
+                                  makeNoopOplogEntry(Seconds(startTime - 5))},   // fourth batch
+                                 _limits.minBytes);
+    writerBuffer.push_forTest(entireBatch);
 
-    for (auto i = 0; i < 5; i++) {
-        ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).empty());
-    }
-
-    // Set SecondaryDelaySecs to a small number, then we can get the batch.
-    getReplCoord()->setSecondaryDelaySecs(Seconds(5));
-
+    // No entries satisfy the 1000 seconds of secondary delay so the first batch is empty.
     auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
-    auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
-    ASSERT_TRUE(endTime - startTime >= 5);
+    ASSERT_EQUALS(0, batch.count());
+
+    // Set SecondaryDelaySecs to 500 seconds, and we get the first 3 entries.
+    getReplCoord()->setSecondaryDelaySecs(Seconds(500));
+    batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
+    ASSERT_EQUALS(3, batch.count());
+    ASSERT_EQ(startTime - 600,
+              batch.getBatch()[0].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
+    ASSERT_EQ(startTime - 550,
+              batch.getBatch()[1].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
+    ASSERT_EQ(startTime - 525,
+              batch.getBatch()[2].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
+
+    // Set SecondaryDelaySecs to 10 seconds, and we get the next 3 entries of the batch.
+    getReplCoord()->setSecondaryDelaySecs(Seconds(10));
+    batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
+    ASSERT_EQ(3, batch.count());
+    ASSERT_EQ(startTime - 30,
+              batch.getBatch()[0].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
+    ASSERT_EQ(startTime - 20,
+              batch.getBatch()[1].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
+    ASSERT_EQ(startTime - 15,
+              batch.getBatch()[2].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
+
+    // Set SecondaryDelaySecs to 5 seconds, and we get the rest of the batch.
+    getReplCoord()->setSecondaryDelaySecs(Seconds(5));
+    batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
+    ASSERT_EQ(1, batch.count());
+    ASSERT_EQ(startTime - 5,
+              batch.getBatch()[0].getField(OplogEntry::kTimestampFieldName).timestamp().getSecs());
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecsReturnFirstBatch) {
