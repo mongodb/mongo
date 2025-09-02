@@ -27,10 +27,6 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: change_stream_optimization_fuzzer
       exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_no_optimization_fuzzer
-      exec_timeout: 600 # 10 hours
 
   enterprise-amazon-linux2023-arm64-all-non-rollback-feature-flags-fuzzers:
     - task: ^change_stream_.*_fuzzer
@@ -55,10 +51,6 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
     - task: change_stream_optimization_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
   enterprise-amazon2023-arm64-fuzzers-roll-back-incremental-feature-flags:
@@ -175,10 +167,6 @@ overrides:
     - task: aggregation_wildcard_fuzzer
       exec_timeout: 600 # 10 hours
     - task: change_stream_optimization_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 600 # 10 hours
     - task: update_timeseries_fuzzer
       exec_timeout: 600 # 10 hours
@@ -312,18 +300,10 @@ overrides:
   rhel8-debug-aubsan-all-feature-flags:
     - task: update_timeseries_fuzzer
       exec_timeout: 180 # 3 hours
-    - task: change_stream_serverless_no_optimization_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_fuzzer
-      exec_timeout: 600 # 10 hours
     - task: change_stream_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
   rhel8-debug-aubsan:
-    - task: change_stream_serverless_no_optimization_fuzzer
-      exec_timeout: 600 # 10 hours
-    - task: change_stream_serverless_fuzzer
-      exec_timeout: 600 # 10 hours
     - task: change_stream_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
