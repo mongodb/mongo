@@ -541,11 +541,14 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
         // - The balancer is enabled since chunk migration deletes documents from the donor shard
         //   and re-inserts them on the recipient shard so there is no guarantee that the original
         //   insertion order is preserved.
+        // - There are unclean shutdowns. There is a known issue with the fast count estimate after unclean shutdowns
+        //   that could skew the correlation coefficient calculation. See https://www.mongodb.com/docs/manual/reference/method/db.collection.count/#accuracy-after-unexpected-shutdown for reference.
         // - There is a lot of shard key updates since they overwrite the recordId order in the
         //   the shard key index.
         const shouldCheckMonotonicity =
             !isSampling &&
             !TestData.runningWithBalancer &&
+            !TestData.runningWithShardStepdowns &&
             this.writeDistribution.percentageOfShardKeyUpdates <=
                 this.percentageOfShardKeyUpdatesThresholdForMonotonicityCheck;
         if (shouldCheckMonotonicity) {
