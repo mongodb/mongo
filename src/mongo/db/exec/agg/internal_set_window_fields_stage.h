@@ -83,7 +83,6 @@ private:
     // std::map is necessary to guarantee iteration order - see SERVER-88080 for details.
     std::map<std::string, std::unique_ptr<WindowFunctionExec>> _executableOutputs;
 
-    bool _init{false};
     bool _eof{false};
 
     // Used by the failpoint to determine when to spill to disk.

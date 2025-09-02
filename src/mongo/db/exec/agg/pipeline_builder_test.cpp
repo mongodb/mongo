@@ -29,20 +29,25 @@
 
 #include "mongo/db/exec/agg/pipeline_builder.h"
 
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::test {
 
+using namespace exec::agg;
+
 // TODO SERVER-108165 Consider if this test if still needed after all splits.
 TEST(PipelineBuilderTest, OneStagePipeline) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto dsFake = DocumentSourceLimit::create(expCtx, 10LL);
     std::list<boost::intrusive_ptr<DocumentSource>> sources{dsFake};
-    auto pipeline = Pipeline::create(std::move(sources), expCtx);
+    auto pipeline = mongo::Pipeline::create(std::move(sources), expCtx);
 
     auto pl = exec::agg::buildPipeline(pipeline->freeze());
 
@@ -52,5 +57,83 @@ TEST(PipelineBuilderTest, OneStagePipeline) {
     // refactored document sources during SPM-4106. After all stages are refactored, we must use
     // more specific assertions.
     ASSERT_EQ(dsFake.get(), dynamic_cast<DocumentSourceLimit*>(pl->getStages().back().get()));
+}
+
+class DocumentSourceMock1 : public DocumentSourceTestOptimizations {
+public:
+    using DocumentSourceTestOptimizations::DocumentSourceTestOptimizations;
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(documentSourceMock1, DocumentSourceMock1::id);
+
+// Stage that checks it is disposed when it goes out of scope, otherwise it triggers a test failure.
+class CustomDisposeStage : public Stage {
+public:
+    CustomDisposeStage(boost::intrusive_ptr<ExpressionContext> expCtx)
+        : Stage("$customDispose", expCtx) {}
+
+    ~CustomDisposeStage() override {
+        ASSERT_EQ(true, disposed);
+    }
+
+    GetNextResult doGetNext() final {
+        return GetNextResult::makeEOF();
+    }
+
+private:
+    void doDispose() final {
+        disposed = true;
+    }
+
+    bool disposed{false};
+};
+
+boost::intrusive_ptr<exec::agg::Stage> documentSourceMock1ToCustomDisposeStageMappingFn(
+    const boost::intrusive_ptr<DocumentSource>& ds) {
+    return make_intrusive<CustomDisposeStage>(ds->getExpCtx());
+}
+
+REGISTER_AGG_STAGE_MAPPING(customDisposeStage,
+                           DocumentSourceMock1::id,
+                           documentSourceMock1ToCustomDisposeStageMappingFn);
+
+// There is no stage associated with this DS, an exception is thrown by the mapping function.
+class DocumentSourceMock2 : public DocumentSourceTestOptimizations {
+public:
+    using DocumentSourceTestOptimizations::DocumentSourceTestOptimizations;
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(documentSourceMock2, DocumentSourceMock2::id);
+
+boost::intrusive_ptr<exec::agg::Stage> documentSourceMock2ToThrowsStageMappingFn(
+    const boost::intrusive_ptr<DocumentSource>& ds) {
+    throw ExceptionFor<ErrorCodes::InternalError>(
+        Status(ErrorCodes::InternalError, "Mocked error"));
+}
+
+REGISTER_AGG_STAGE_MAPPING(ThrowsStage,
+                           DocumentSourceMock2::id,
+                           documentSourceMock2ToThrowsStageMappingFn);
+
+TEST(PipelineBuilderTest, DisposeStagesIfExceptionOccurs) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto dsm1 = make_intrusive<DocumentSourceMock1>(expCtx);
+    auto dsm2 = make_intrusive<DocumentSourceMock2>(expCtx);
+    std::list<boost::intrusive_ptr<DocumentSource>> sources{dsm1, dsm2};
+
+    auto pipeline = mongo::Pipeline::create(std::move(sources), expCtx);
+    // CustomDisposeStage stage is created before documentSourceMock2ToThrowsStageMappingFn() throws
+    // (i.e, the second stage fails to be created). CustomDisposeStage is disposed before the
+    // exception is thrown.
+    ASSERT_THROWS_CODE(
+        exec::agg::buildPipeline(pipeline->freeze()), DBException, ErrorCodes::InternalError);
 }
 }  // namespace mongo::test

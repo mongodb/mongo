@@ -42,15 +42,26 @@ std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeli
     Pipeline::StageContainer stages;
     const auto& documentSources = pipeline.getSources();
 
-    if (MONGO_likely(!documentSources.empty())) {
-        stages.reserve(documentSources.size());
-        auto it = documentSources.cbegin();
-        stages.push_back(buildStage(*it));
-        for (++it; it != documentSources.cend(); ++it) {
-            // 'Stitch' stages together in the given order - a stage becomes the 'source' for the
-            // following stage.
-            stages.push_back(buildStageAndStitch(*it, stages.back()));
+    try {
+        if (MONGO_likely(!documentSources.empty())) {
+            stages.reserve(documentSources.size());
+            auto it = documentSources.cbegin();
+            stages.push_back(buildStage(*it));
+            for (++it; it != documentSources.cend(); ++it) {
+                // 'Stitch' stages together in the given order - a stage becomes the 'source' for
+                // the following stage.
+                stages.push_back(buildStageAndStitch(*it, stages.back()));
+            }
         }
+    } catch (...) {
+        // Dispose the stages already created if an exception occurs.
+        // TODO SERVER-109935: Not needed once each stage auto-disposes itself in the destructor
+        // unless dismissDisposal() is called.
+        if (!stages.empty()) {
+            stages.back()->dispose();
+        }
+
+        throw;
     }
 
     return std::make_unique<exec::agg::Pipeline>(std::move(stages), pipeline.getContext());

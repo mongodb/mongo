@@ -65,8 +65,9 @@ GetNextResult TeeConsumerStage::doGetNext() {
 }
 
 void TeeConsumerStage::doDispose() {
-    tassert(10537005, "TeeBuffer not set", _bufferSource);
-    _bufferSource->dispose(_facetId);
+    if (_bufferSource) {
+        _bufferSource->dispose(_facetId);
+    }
 }
 }  // namespace exec::agg
 }  // namespace mongo

@@ -75,23 +75,18 @@ InternalSetWindowFieldsStage::InternalSetWindowFieldsStage(
       // also.
       _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), sortBy),
       _sortBy(sortBy),
-      _outputFields(outputFields) {}
+      _outputFields(outputFields) {
+    initialize();
+}
 
 void InternalSetWindowFieldsStage::initialize() {
     for (auto& wfs : _outputFields) {
         _executableOutputs[wfs.fieldName] =
             WindowFunctionExec::create(pExpCtx.get(), &_iterator, wfs, _sortBy, &_memoryTracker);
     }
-    _init = true;
 }
 
 DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
-    if (!_init) {
-        // TODO SERVER-109522: Move this initialization to the constructor once it can safely throw
-        // without failing a 'tassert()' in `~CursorStage()`.
-        initialize();
-    }
-
     if (_eof) {
         // On EOF, update SetWindowFieldStats so explain has $_internalSetWindowFields-level
         // statistics.
