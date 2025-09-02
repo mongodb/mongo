@@ -43,6 +43,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
@@ -50,7 +51,9 @@ namespace mongo {
 /**
  * A FieldPath represents a path in a document, starting from the root. The path
  * is made of "field parts" separated by dots. The class provides an efficient means to
- * "split" the dotted fields in its parts, but no validation is done.
+ * "split" the dotted fields in its parts. It does not do UTF-8 validation but it does throw a
+ * uassert() upon an attempt to construct a FieldRef in which any field path component contains an
+ * embedded null byte.
  *
  * Any field part may be replaced, after the "original" field reference was parsed. Any
  * part can be accessed through a StringData object.
@@ -222,16 +225,43 @@ public:
     uint64_t estimateObjectSizeInBytes() const {
         return  // Add size of each element in '_replacements' vector.
             container_size_helper::estimateObjectSizeInBytes(
-                _replacements, [](const std::string& s) { return s.capacity(); }, true) +
+                _replacements,
+                [](const ValidatedPathString& s) { return s.get().capacity(); },
+                true) +
             // Add size of each element in '_parts' vector.
             container_size_helper::estimateObjectSizeInBytes(_parts) +
             // Add runtime size of '_dotted' string.
-            _dotted.capacity() +
+            _dotted.get().capacity() +
             // Add size of the object.
             sizeof(*this);
     }
 
 private:
+    /**
+     * Represents a string that has been validated to not contain embedded null bytes.
+     */
+    class ValidatedPathString {
+    public:
+        ValidatedPathString() = default;
+
+        explicit ValidatedPathString(std::string value) : _value(std::move(value)) {
+            uassert(9867600,
+                    "Field name can't contain null bytes",
+                    _value.find('\0') == std::string::npos);
+        }
+
+        void clear() {
+            _value.clear();
+        }
+
+        const std::string& get() const {
+            return _value;
+        }
+
+    private:
+        std::string _value;
+    };
+
     // Dotted fields are most often not longer than four parts. We use a mixed structure
     // here that will not require any extra memory allocation when that is the case. And
     // handle larger dotted fields if it is. The idea is not to penalize the common case
@@ -283,13 +313,13 @@ private:
      * Cached copy of the complete dotted name string. The StringView objects in "_parts" reference
      * this string.
      */
-    mutable std::string _dotted;
+    mutable ValidatedPathString _dotted;
 
     /**
      * String storage for path parts that have been replaced with setPart() or added with
      * appendPart() since the lasted time "_dotted" was materialized.
      */
-    mutable std::vector<std::string> _replacements;
+    mutable std::vector<ValidatedPathString> _replacements;
 };
 
 inline bool operator==(const FieldRef& lhs, const FieldRef& rhs) {
