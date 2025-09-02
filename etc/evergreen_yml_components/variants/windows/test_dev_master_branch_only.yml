@@ -100,9 +100,9 @@ buildvariants:
           - windows-2022-xxlarge
 
   - name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
-    display_name: "* Enterprise Windows Server 2022 (Benchmarks)"
-    tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    display_name: "~ Enterprise Windows Server 2022 (Benchmarks)"
+    tags: []
+    activate: false # Deactivated as part of SERVER-109807 due to lack of triaging.
     run_on:
       - windows-2022-xxlarge # To accommodate OOD issues noted in BF-31698
     expansions:
