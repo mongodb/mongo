@@ -13,7 +13,10 @@ import pyzstd
 import typer  # nicer error dump on exceptions
 from progressbar import ProgressBar, progressbar
 
-REPO_ROOT = os.environ.get("BUILD_WORKSPACE_DIRECTORY", os.path.dirname(os.path.abspath(sys.argv[0])) + "/..")
+REPO_ROOT = os.environ.get(
+    "BUILD_WORKSPACE_DIRECTORY", os.path.dirname(os.path.abspath(sys.argv[0])) + "/.."
+)
+
 
 class Decl(TypedDict):
     display_name: str
@@ -117,8 +120,13 @@ def worker(paths: list[bytes]):
             merge_decls(json.loads(f.read()))
 
 
-def is_submodule_usage(decl: Decl, mod: str) -> bool:
-    return decl["mod"] == mod or mod.startswith(decl["mod"] + ".")
+def parent_mod(mod: str):
+    return mod[: mod.rindex(".")]
+
+
+def is_submodule_usage(decl_mod: str, *, usage_mod: str) -> bool:
+    """usage_mod is keyword-only to avoid mixing up str arguments"""
+    return decl_mod == usage_mod or usage_mod.startswith(decl_mod + ".")
 
 
 def get_paths(timer: Timer):
@@ -156,6 +164,7 @@ def get_paths(timer: Timer):
     timer.mark("queried bazel for mod_scanner outputs")
     return outputs
 
+
 def get_file_family_regex(path: str) -> re.Pattern:
     # file_base is the portion of the file name that defines the family
     # e.g. bazel-out/blah/src/mongo/db/foo_details.h -> src/mongo/db/foo
@@ -171,6 +180,7 @@ def get_file_family_regex(path: str) -> re.Pattern:
     assert file_family_regex.match(path)  # sanity check
 
     return file_family_regex
+
 
 def main(
     jobs: int = typer.Option(os.cpu_count(), "--jobs", "-j"),
@@ -217,7 +227,7 @@ def main(
             decl["used_from"] = {
                 mod: locs
                 for mod, locs in decl["used_from"].items()
-                if not is_submodule_usage(decl, mod)
+                if not is_submodule_usage(decl["mod"], usage_mod=mod)
             }
         out = [d for d in out if d["used_from"]]
 
@@ -237,10 +247,13 @@ def main(
     for decl in sorted(all_decls.values(), key=lambda d: d["display_name"]):
         violations = []
         match decl["visibility"]:
-            case "private":
-                err = f"Illegal use of {decl['display_name']} outside of module {decl['mod']}:"
+            case "private" | "parent_private":
+                decl_mod = decl["mod"]
+                if decl["visibility"] == "parent_private":
+                    decl_mod = parent_mod(decl_mod)
+                err = f"Illegal use of {decl['display_name']} outside of module {decl_mod}:"
                 for mod, locs in decl["used_from"].items():
-                    if not is_submodule_usage(decl, mod):
+                    if not is_submodule_usage(decl_mod, usage_mod=mod):
                         for loc in locs:
                             violations.append(f"    {loc} ({mod})")
 

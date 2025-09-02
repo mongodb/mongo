@@ -100,6 +100,28 @@
 /** Stronger form of private, restricts usage to the same family of h, cpp, and test.cpp files. */
 #define MONGO_MOD_FILE_PRIVATE MONGO_MOD_ATTR_(file_private)
 
+/**
+ * Marks a declaration and everything inside as private from other modules, but
+ * behaves as-if attached to the parent module for the purposes of who can use
+ * it. For example a PARENT_PRIVATE class in module foo.bar can be used by any
+ * code in modules foo, foo.bar, and foo.baz, but not by code in module qux.
+ *
+ * This is intended for cases where a module is split into submodules that each
+ * have their own public and private APIs, but some submodules still want to
+ * present APIs only to the parent module. Without this option, you would have
+ * to choose between keeping the code in the parent module without the ability
+ * to have its own private API, or making it public to all modules.
+ *
+ * This can only be used from a submodule (a module with a dot in its name).
+ *
+ * Note: this is defined to make the declaration visibile to the *direct* parent.
+ * Because we currently only have one level of submodules, this is equivalent to
+ * making it visible to the whole top-level module. If we ever have multiple levels
+ * of submodules (eg query.opt.parser), we may want to allow specifying how far up
+ * the hierarchy the declaration should be visible.
+ */
+#define MONGO_MOD_PARENT_PRIVATE MONGO_MOD_ATTR_(parent_private)
+
 //
 // Implementation details for MONGO_MOD macros
 //

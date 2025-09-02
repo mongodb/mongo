@@ -264,7 +264,7 @@ def get_visibility(
             if scanning_parent:
                 continue  # shallow doesn't apply to children
         attr = terms.pop(0)
-        if is_internal_namespace and not attr.endswith("private"):
+        if is_internal_namespace and attr not in ("private", "file_private"):
             perr(
                 pretty_location(c.location)
                 + ": namespaces ending in 'detail(s)' or 'internal(s)' are implicitly private."
@@ -277,7 +277,7 @@ def get_visibility(
             # Must specify an alternate API
             if not alt or alt.isspace():
                 perr_exit(
-                    pretty_location(c.location)
+                    pretty_location(child.location)
                     + ": MONGO_MOD_USE_REPLACEMENT() must specify the replacement API"
                 )
         else:
@@ -287,11 +287,19 @@ def get_visibility(
                 "public",
                 "private",
                 "file_private",
+                "parent_private",
                 "needs_replacement",
             )
             if attr == "open" and scanning_parent:
                 # "open" only applies to the current class and makes semantic children public.
                 attr = "public"
+            if attr == "parent_private":
+                mod = mod_for_file(c.location.file)
+                if "." not in mod:
+                    perr_exit(
+                        pretty_location(child.location)
+                        + f": MONGO_MOD_PARENT_PRIVATE used in top-level module {mod}"
+                    )
         return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
 
     # Apply high-priority defaults that override parent's visibility.

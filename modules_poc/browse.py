@@ -26,6 +26,7 @@ cpp_highlight_query = (Path(__file__).parent / "cpp-highlights.scm").read_text()
 
 REPO_ROOT = os.environ.get("BUILD_WORKSPACE_DIRECTORY", ".")
 
+
 class Loc(NamedTuple):
     file: str
     line: int
@@ -171,6 +172,8 @@ class Decl:
                 return Text("pub", "green")
             case "private":
                 return Text("priv", "yellow3")
+            case "parent_private":
+                return Text("parent_priv", "yellow3")
             case "file_private":
                 return Text("file_priv", "yellow3")
             case "needs_replacement":

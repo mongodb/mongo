@@ -23,6 +23,7 @@ visibility_rank = {
             "public",
             "use_replacement",
             "needs_replacement",
+            "parent_private",
             "private",
             "file_private",
         ]
@@ -58,7 +59,8 @@ def print_decl_recursive(decl: Decl, indent_level=0, parent: Decl = None):
 
     print("".join(line_parts))
 
-    if decl.visibility.endswith("private") and ext_usages:
+    # Supporting the warning here for parent_private would add complexity, but little value.
+    if decl.visibility in ("private", "file_private") and ext_usages:
         direct_ext_usages = sum(
             len(locs)
             for mod, locs in decl.direct_usages.items()
