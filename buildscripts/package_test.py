@@ -51,79 +51,149 @@ PACKAGE_MANAGER_COMMANDS = {
 # Lookup table used when building and running containers
 # os_name, Optional[(base_image, package_manager, frozenset(base_packages), python_command)]
 OS_DOCKER_LOOKUP = {
-    'amazon': None,
-    'amzn64': None,
-    'amazon2': ('amazonlinux:2', "yum",
-                frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
-                "python3"),
-    'amazon2023': ('amazonlinux:2023', "yum",
-                   frozenset(
-                       ["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
-                   "python3"),
-    'debian10': ('debian:10-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'debian11': ('debian:11-slim', "apt",
-                 frozenset([
-                     "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                     "file"
-                 ]), "python3"),
-    'debian12': ('debian:12-slim', "apt",
-                 frozenset([
-                     "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
-                     "file"
-                 ]), "python3"),
-    'debian71': ('debian:7-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'debian81': ('debian:8-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'debian92': ('debian:9-slim', "apt",
-                 frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
-                            "file"]), "python3"),
-    'linux_i686': None,
-    'linux_x86_64': None,
-    'macos': None,
-    'osx': None,
-    'osx-ssl': None,
-    'rhel55': None,
-    'rhel57': None,
-    'rhel62': None,
-    'rhel70': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel71': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel72': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel79': ('centos:7', "yum",
-               frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
-               "/opt/rh/rh-python38/root/usr/bin/python3"),
-    'rhel8': ('almalinux:8', "yum",
-              frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel80': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel81': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel82': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel83': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel88': ('almalinux:8', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel90': ('almalinux:9', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'rhel93': ('almalinux:9', "yum",
-               frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]), "python3"),
-    'sunos5': None,
-    'suse11': None,
-    'suse12': None,
-    'suse15': ('registry.suse.com/suse/sle15:15.5', "zypper",
-               frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
-               "python3"),
+    "amazon": None,
+    "amzn64": None,
+    "amazon2": (
+        "amazonlinux:2",
+        "yum",
+        frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "amazon2023": (
+        "amazonlinux:2023",
+        "yum",
+        frozenset(["python", "python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian10": (
+        "debian:10-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian11": (
+        "debian:11-slim",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "debian12": (
+        "debian:12-slim",
+        "apt",
+        frozenset(
+            ["python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps", "file"]
+        ),
+        "python3",
+    ),
+    "debian71": (
+        "debian:7-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian81": (
+        "debian:8-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "debian92": (
+        "debian:9-slim",
+        "apt",
+        frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "linux_i686": None,
+    "linux_x86_64": None,
+    "macos": None,
+    "osx": None,
+    "osx-ssl": None,
+    "rhel55": None,
+    "rhel57": None,
+    "rhel62": None,
+    "rhel70": (
+        "registry.access.redhat.com/ubi7/ubi",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel71": (
+        "registry.access.redhat.com/ubi7/ubi",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel72": (
+        "registry.access.redhat.com/ubi7/ubi",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel79": (
+        "registry.access.redhat.com/ubi7/ubi",
+        "yum",
+        frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "/opt/rh/rh-python38/root/usr/bin/python3",
+    ),
+    "rhel8": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel80": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel81": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel82": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel83": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel88": (
+        "almalinux:8",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel90": (
+        "almalinux:9",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "rhel93": (
+        "almalinux:9",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
+    "sunos5": None,
+    "suse11": None,
+    "suse12": None,
+    "suse15": (
+        "registry.suse.com/suse/sle15:15.5",
+        "zypper",
+        frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
     # Has the same error as above
     'ubuntu1204': None,
     'ubuntu1404': None,
@@ -262,13 +332,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
     log_external_path = Path.joinpath(test_external_root, log_name)
     commands: List[str] = ["export PYTHONIOENCODING=UTF-8"]
 
-    if test.os_name.startswith('rhel'):
-        if test.os_name.startswith('rhel7'):
-            # RHEL 7 needs the SCL installed for Python 3
-            commands += [
-                "yum -y install centos-release-scl",
-                "yum-config-manager --enable centos-sclo-rh",
-            ]
+    if test.os_name.startswith("rhel"):
         # RHEL distros need EPEL for Compass dependencies
         commands += [
             "yum -y install yum-utils epel-release",
@@ -304,9 +368,19 @@ def run_test(test: Test, client: DockerClient) -> Result:
     container: Container | None = None
     try:
         image = get_image(test, client)
-        container = client.containers.run(image, command=f"bash -c \"{join_commands(commands)}\"",
-                                          auto_remove=True, detach=True,
-                                          volumes=[f'{test_external_root}:{test_docker_root}'])
+        container = client.containers.run(
+            image,
+            command=f'bash -c "{join_commands(commands)}"',
+            auto_remove=True,
+            detach=True,
+            volumes=[
+                f"{test_external_root}:{test_docker_root}",
+                "/etc/pki/entitlement/:/run/secrets/etc-pki-entitlement",
+                "/etc/rhsm:/run/secrets/rhsm",
+                "/etc/yum.repos.d/redhat.repo:/run/secrets/redhat.repo",
+                "/etc/yum.repos.d/redhat-rhsm.repo:/run/secrets/redhat-rhsm.repo",
+            ],
+        )
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode('UTF-8')
             # This is pretty verbose, lets run this way for a while and we can delete this if it ends up being too much
@@ -475,7 +549,7 @@ if args.command == "release":
             "Missing '--evg-project' command line option. If trying to run this locally, you will need to set the environment so that --evg-project=mongodb-mongo-master."
         )
         sys.exit(1)
-    if re.fullmatch(r"mongodb-mongo-v\d\.\d", evg_project):
+    if re.fullmatch(r"mongodb-mongo-v\d\.\d-staging", evg_project):
         logging.info(
             "Non-master evergreen project detected: '%s', skipping release package testing which is expected to only be run from master branches.",
             evg_project)
