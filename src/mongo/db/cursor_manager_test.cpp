@@ -830,5 +830,61 @@ TEST_F(CursorManagerTestCustomOpCtx,
     ASSERT_EQUALS(cursorsForNamespace.size(), 0ull);
 }
 
+/**
+ * Test that an attempt to kill a pinned cursor succeeds with a passing auth check.
+ */
+TEST_F(CursorManagerTest, KillCursorWithPassingAuthCheckSucceeds) {
+    OperationContext* const pinningOpCtx = _opCtx.get();
+
+    auto cursorPin = _cursorManager.registerCursor(
+        pinningOpCtx,
+        {makeFakePlanExecutor(),
+         kTestNss,
+         {},
+         APIParameters(),
+         {},
+         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+         BSONObj(),
+         PrivilegeVector()});
+
+    auto cursorId = cursorPin.getCursor()->cursorid();
+    cursorPin.release();
+
+    auto pinCheck = [&](const ClientCursor& cc) {
+        uassertStatusOK(Status::OK());
+    };
+    ASSERT_OK(_cursorManager.killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck));
+}
+
+/**
+ * Test that an attempt to kill fails due to an auth check.
+ */
+TEST_F(CursorManagerTest, KillCursorWithFailingAuthCheckFails) {
+    OperationContext* const pinningOpCtx = _opCtx.get();
+
+    auto cursorPin = _cursorManager.registerCursor(
+        pinningOpCtx,
+        {makeFakePlanExecutor(),
+         kTestNss,
+         {},
+         APIParameters(),
+         {},
+         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+         BSONObj(),
+         PrivilegeVector()});
+
+    auto cursorId = cursorPin.getCursor()->cursorid();
+    cursorPin.release();
+
+    auto pinCheck = [&](const ClientCursor& cc) {
+        uassertStatusOK(Status(ErrorCodes::Unauthorized, "Unauthorized"));
+    };
+    ASSERT_THROWS_CODE(_cursorManager.killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck),
+                       DBException,
+                       ErrorCodes::Unauthorized);
+}
+
 }  // namespace
 }  // namespace mongo

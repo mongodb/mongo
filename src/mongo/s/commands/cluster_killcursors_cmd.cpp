@@ -68,7 +68,13 @@ struct ClusterKillCursorsCmd {
     static Status doKillCursor(OperationContext* opCtx,
                                const NamespaceString& nss,
                                CursorId cursorId) {
-        return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, cursorId);
+        auto const authzSession = AuthorizationSession::get(opCtx->getClient());
+        AuthzCheckFn authChecker = [&authzSession, &nss](AuthzCheckFnInputType userName) -> Status {
+            return auth::checkAuthForKillCursors(authzSession, nss, userName);
+        };
+
+        return Grid::get(opCtx)->getCursorManager()->killCursorWithAuthCheck(
+            opCtx, cursorId, authChecker);
     }
 };
 MONGO_REGISTER_COMMAND(KillCursorsCmdBase<ClusterKillCursorsCmd>).forRouter();

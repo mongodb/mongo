@@ -362,8 +362,7 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
             }
 
             const auto authzSession = AuthorizationSession::get(opCtx->getClient());
-            const auto authChecker =
-                [&authzSession](const boost::optional<UserName>& userName) -> Status {
+            AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
                 return authzSession->isCoauthorizedWith(userName)
                     ? Status::OK()
                     : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");

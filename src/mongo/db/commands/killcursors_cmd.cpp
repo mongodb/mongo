@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/killcursors_common.h"
@@ -64,8 +65,15 @@ struct KillCursorsCmd {
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
         }
 
+        auto authCheck = [&](const ClientCursor& cc) {
+            uassertStatusOK(
+                auth::checkAuthForKillCursors(AuthorizationSession::get(opCtx->getClient()),
+                                              cc.nss(),
+                                              cc.getAuthenticatedUser()));
+        };
+
         auto cursorManager = CursorManager::get(opCtx);
-        return cursorManager->killCursor(opCtx, id);
+        return cursorManager->killCursorWithAuthCheck(opCtx, id, authCheck);
     }
 };
 MONGO_REGISTER_COMMAND(KillCursorsCmdBase<KillCursorsCmd>).forShard();
