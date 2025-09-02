@@ -153,10 +153,8 @@ protected:
         auto expCtx = getExpCtx();
         VariablesParseState vps = expCtx->variablesParseState;
         auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
-        const size_t maxMemoryUsageBytes = 2000;
         const int numBuckets = 2;
-        return DocumentSourceBucketAuto::create(
-            expCtx, groupByExpression, numBuckets, maxMemoryUsageBytes);
+        return DocumentSourceBucketAuto::create(expCtx, groupByExpression, numBuckets);
     }
 
     auto setWindowFields() {
