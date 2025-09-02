@@ -1080,7 +1080,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         batchResp->setNModified(_numModified);
     }
     if (!_retriedStmtIds.empty()) {
-        batchResp->setRetriedStmtIds(_retriedStmtIds);
+        batchResp->setRetriedStmtIds({_retriedStmtIds.begin(), _retriedStmtIds.end()});
     }
 }
 
@@ -1121,7 +1121,7 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
     }
 
     if (auto retriedStmtIds = response.getRetriedStmtIds(); !retriedStmtIds.empty()) {
-        _retriedStmtIds.insert(_retriedStmtIds.end(), retriedStmtIds.begin(), retriedStmtIds.end());
+        _retriedStmtIds.insert(retriedStmtIds.begin(), retriedStmtIds.end());
     }
 }
 

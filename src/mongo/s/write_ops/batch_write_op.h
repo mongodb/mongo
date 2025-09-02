@@ -268,7 +268,7 @@ private:
 
     // Statement ids for the ops that had already been executed, thus were not executed in this
     // batch write.
-    std::vector<StmtId> _retriedStmtIds;
+    std::set<StmtId> _retriedStmtIds;
 
     // Stats for the entire batch op
     int _numInserted{0};
