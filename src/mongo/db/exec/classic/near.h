@@ -168,7 +168,6 @@ private:
 
     // Tracks RecordIds from the child stage to do our own deduping.
     RecordIdDeduplicator _seenDocuments;
-    SpillingStats _seenDocumentsSpillingStats;
 
     // Stats for the stage covering this interval
     // This is owned by _specificStats

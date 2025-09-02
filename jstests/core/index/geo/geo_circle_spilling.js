@@ -20,8 +20,8 @@ const nearPredicate = {
 };
 
 function assertSpillingAndAllDocumentsReturned(coll) {
+    jsTest.log.info("Running query", nearPredicate);
     const explain = coll.find(nearPredicate).explain("executionStats");
-    jsTest.log.info("Running query", {explain});
     let assertedSpilling = false;
     for (let stages of getExecutionStages(explain)) {
         for (let stage of getPlanStages(stages, "GEO_NEAR_2DSPHERE")) {

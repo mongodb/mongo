@@ -250,44 +250,27 @@ SortOptions NearStage::makeSortOptions() {
 }
 
 void NearStage::updateSpillingStats() {
-    SpillingStats spillingStats = _seenDocumentsSpillingStats;
-    spillingStats.incrementSpills(_resultBuffer.stats().spilledRanges());
-    spillingStats.incrementSpilledRecords(_resultBuffer.stats().spilledKeyValuePairs());
-    spillingStats.incrementSpilledBytes(_sorterFileStats.bytesSpilledUncompressed());
-    spillingStats.incrementSpilledDataStorageSize(_sorterFileStats.bytesSpilled());
 
-    auto& previousSpillingStats = _specificStats.spillingStats;
-    geoNearCounters.incrementPerSpilling(
-        spillingStats.getSpills() - previousSpillingStats.getSpills(),
-        spillingStats.getSpilledBytes() - previousSpillingStats.getSpilledBytes(),
-        spillingStats.getSpilledRecords() - previousSpillingStats.getSpilledRecords(),
-        spillingStats.getSpilledDataStorageSize() -
-            previousSpillingStats.getSpilledDataStorageSize());
-    previousSpillingStats = spillingStats;
+    auto additionalSpilledBytes = _sorterFileStats.bytesSpilledUncompressed() -
+        _specificStats.spillingStats.getSpilledBytes();
+
+    auto spilledDataStorageIncrease = _specificStats.spillingStats.updateSpillingStats(
+        1 /*spills*/,
+        additionalSpilledBytes,
+        _resultBuffer.stats().spilledKeyValuePairs(),
+        _sorterFileStats.bytesSpilled());
+
+    geoNearCounters.incrementPerSpilling(1,
+                                         additionalSpilledBytes,
+                                         _resultBuffer.stats().spilledKeyValuePairs(),
+                                         spilledDataStorageIncrease);
 }
 
 void NearStage::spill(uint64_t maxMemoryBytes) {
-    uint64_t resultBufferMemoryBytes = _resultBuffer.stats().memUsage();
-    uint64_t seenDocumentsMemoryBytes = _seenDocuments.getApproximateSize();
-
-    // If we need to spill, spill the larger structure first.
-    if (resultBufferMemoryBytes + seenDocumentsMemoryBytes > maxMemoryBytes) {
-        if (resultBufferMemoryBytes > seenDocumentsMemoryBytes) {
-            _resultBuffer.forceSpill();
-        } else {
-            _seenDocuments.spill(_seenDocumentsSpillingStats);
-        }
+    if (_resultBuffer.stats().memUsage() <= maxMemoryBytes) {
+        return;
     }
-
-    // After spilling, we assume that the size of spilled structure is 0. Spill the other structure
-    // if we still need to spill.
-    if (seenDocumentsMemoryBytes > maxMemoryBytes) {
-        _seenDocuments.spill(_seenDocumentsSpillingStats);
-    }
-    if (resultBufferMemoryBytes > maxMemoryBytes) {
-        _resultBuffer.forceSpill();
-    }
-
+    _resultBuffer.forceSpill();
     updateSpillingStats();
 }
 
