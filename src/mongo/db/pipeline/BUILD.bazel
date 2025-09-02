@@ -1595,6 +1595,9 @@ mongo_cc_unit_test(
         "code_coverage_quarantine_SERVER-98846",
         "mongo_unittest_seventh_group",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     deps = [
         ":accumulator",
         ":aggregation_context_fixture",

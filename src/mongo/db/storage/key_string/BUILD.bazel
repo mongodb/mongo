@@ -60,6 +60,9 @@ mongo_cc_unit_test(
     tags = [
         "mongo_unittest_eighth_group",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     deps = [
         ":key_string_test_util",
     ],

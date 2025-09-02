@@ -128,6 +128,9 @@ mongo_cc_unit_test(
         "mongo_unittest_sixth_group",
         "server-programmability",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     deps = [
         "//src/mongo:base",
     ],
