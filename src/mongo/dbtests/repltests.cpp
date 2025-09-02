@@ -285,8 +285,14 @@ protected:
         std::vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.find(
-                FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())});
+            LocalOplogInfo* oplogInfo = LocalOplogInfo::get(&_opCtx);
+
+            // Oplog should be available in this test.
+            invariant(oplogInfo);
+            invariant(oplogInfo->getRecordStore());
+            oplogInfo->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(&_opCtx);
+            auto cursor = db.find(FindCommandRequest{NamespaceString::createNamespaceString_forTest(
+                cllNS())});  // Read all ops from the oplog.
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }

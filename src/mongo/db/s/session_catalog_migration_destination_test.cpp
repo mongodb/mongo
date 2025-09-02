@@ -196,6 +196,14 @@ public:
 
     repl::OplogEntry getOplog(OperationContext* opCtx, const repl::OpTime& opTime) {
         DBDirectClient client(opCtx);
+
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+        // Oplog should be available in this test.
+        invariant(oplogInfo);
+        invariant(oplogInfo->getRecordStore());
+        oplogInfo->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+
         auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace, opTime.asQuery());
 
         ASSERT_FALSE(oplogBSON.isEmpty());

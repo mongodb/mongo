@@ -44,6 +44,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/oplog_wait_config.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
@@ -94,6 +95,18 @@ public:
 
     CollectionScanParams::Direction getDirection() const {
         return _params.direction;
+    }
+
+    const CollectionScanParams& params() const {
+        return _params;
+    }
+
+    bool initializedCursor() const {
+        return _cursor != nullptr;
+    }
+
+    OplogWaitConfig* getOplogWaitConfig() {
+        return _oplogWaitConfig ? &(*_oplogWaitConfig) : nullptr;
     }
 
 protected:
@@ -149,6 +162,10 @@ private:
     CollectionScanStats _specificStats;
 
     bool _useSeek = false;
+
+    // Coordinates waiting for oplog visibility. Must be initialized if we are doing an oplog scan,
+    // boost::none otherwise.
+    boost::optional<OplogWaitConfig> _oplogWaitConfig;
 };
 
 }  // namespace mongo

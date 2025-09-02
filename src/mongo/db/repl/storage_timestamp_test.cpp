@@ -268,8 +268,17 @@ Status createIndexFromSpec(OperationContext* opCtx,
  */
 class OneOffRead {
 public:
-    OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
+    OneOffRead(OperationContext* opCtx, const Timestamp& ts, bool waitForOplog = false)
+        : _opCtx(opCtx) {
         shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        if (waitForOplog) {
+            LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+            // Oplog should be available in this test.
+            invariant(oplogInfo);
+            invariant(oplogInfo->getRecordStore());
+            oplogInfo->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+        }
         if (ts.isNull()) {
             shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
                 RecoveryUnit::ReadSource::kNoTimestamp);
@@ -422,7 +431,7 @@ public:
     }
 
     void dumpOplog() {
-        OneOffRead oor(_opCtx, Timestamp::min());
+        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
         shard_role_details::getRecoveryUnit(_opCtx)->beginUnitOfWork(_opCtx->readOnly());
         LOGV2(8423335, "Dumping oplog collection");
         AutoGetCollectionForRead oplogRaii(_opCtx, NamespaceString::kRsOplogNamespace);
@@ -569,12 +578,12 @@ public:
     }
 
     BSONObj queryOplog(const BSONObj& query) {
-        OneOffRead oor(_opCtx, Timestamp::min());
+        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
     }
 
     Timestamp getTopOfOplog() {
-        OneOffRead oor(_opCtx, Timestamp::min());
+        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
         BSONObj ret;
         ASSERT_TRUE(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, ret));
         return ret["ts"].timestamp();
@@ -641,7 +650,7 @@ public:
     void assertOplogDocumentExistsAtTimestamp(const BSONObj& query,
                                               const Timestamp& ts,
                                               bool exists) {
-        OneOffRead oor(_opCtx, ts);
+        OneOffRead oor(_opCtx, ts, true);
         BSONObj ret;
         bool found = Helpers::findOne(
             _opCtx,

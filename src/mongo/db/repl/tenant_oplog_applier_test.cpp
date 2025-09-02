@@ -511,6 +511,14 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeRetryableApplyOps) {
     _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
 
+    // Before reading from the oplog, wait for oplog visibility.
+    LocalOplogInfo* oplogInfo = LocalOplogInfo::get(_opCtx.get());
+
+    // Oplog should be available in this test.
+    invariant(oplogInfo);
+    invariant(oplogInfo->getRecordStore());
+    oplogInfo->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(_opCtx.get());
+
     // The session path in TenantOplogApplier bypasses the opObserver, so we can only read
     // the entries from the oplog.
     CollectionReader oplogReader(_opCtx.get(), NamespaceString::kRsOplogNamespace);

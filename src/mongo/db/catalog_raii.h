@@ -476,7 +476,8 @@ class ReadSourceScope {
 public:
     ReadSourceScope(OperationContext* opCtx,
                     RecoveryUnit::ReadSource readSource,
-                    boost::optional<Timestamp> provided = boost::none);
+                    boost::optional<Timestamp> provided = boost::none,
+                    bool waitForOplog = false);
     ~ReadSourceScope();
 
 private:

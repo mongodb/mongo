@@ -615,7 +615,8 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
 
 ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
                                  RecoveryUnit::ReadSource readSource,
-                                 boost::optional<Timestamp> provided)
+                                 boost::optional<Timestamp> provided,
+                                 bool waitForOplog)
     : _opCtx(opCtx),
       _originalReadSource(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()) {
     // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read
@@ -628,6 +629,16 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
     }
 
     shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+
+    // Wait for oplog visibility if the caller requested it.
+    if (waitForOplog) {
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+        tassert(9478700, "Should have oplog available at this point", oplogInfo);
+        tassert(9478705,
+                "Should have oplog record store available at this point",
+                oplogInfo->getRecordStore());
+        oplogInfo->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+    }
     shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(readSource, provided);
 }
 

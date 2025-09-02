@@ -69,9 +69,12 @@ public:
         return true;
     }
 
-    Status yieldOrInterrupt(OperationContext*,
-                            std::function<void()> whileYieldingFn,
-                            RestoreContext::RestoreType restoreType) override {
+    Status yieldOrInterrupt(
+        OperationContext*,
+        const std::function<void()>& whileYieldingFn,
+        RestoreContext::RestoreType restoreType,
+        const std::function<void()>& afterSnapshotAbandonFn = nullptr) override {
+
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
 };
@@ -89,9 +92,11 @@ public:
         return true;
     }
 
-    Status yieldOrInterrupt(OperationContext*,
-                            std::function<void()> whileYieldingFn,
-                            RestoreContext::RestoreType restoreType) override {
+    Status yieldOrInterrupt(
+        OperationContext*,
+        const std::function<void()>& whileYieldingFn,
+        RestoreContext::RestoreType restoreType,
+        const std::function<void()>& afterSnapshotAbandonFn = nullptr) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
     }
 };
@@ -109,9 +114,11 @@ public:
         return false;
     }
 
-    Status yieldOrInterrupt(OperationContext*,
-                            std::function<void()> whileYieldingFn,
-                            RestoreContext::RestoreType restoreType) override {
+    Status yieldOrInterrupt(
+        OperationContext*,
+        const std::function<void()>& whileYieldingFn,
+        RestoreContext::RestoreType restoreType,
+        const std::function<void()>& afterSnapshotAbandonFn = nullptr) override {
         MONGO_UNREACHABLE;
     }
 };

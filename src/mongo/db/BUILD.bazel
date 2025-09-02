@@ -815,6 +815,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:local_oplog_info",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:capped_snapshots",
+        "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:snapshot_helper",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/util/concurrency:spin_lock",

@@ -118,7 +118,7 @@ TEST_F(SessionHistoryIteratorTest, NormalHistory) {
         repl::OpTime(Timestamp(67, 54801), 2));  // optime of previous write in transaction
     insertOplogEntry(entry4);
 
-    TransactionHistoryIterator iter(repl::OpTime(Timestamp(97, 2472), 2));
+    TransactionHistoryIterator iter(repl::OpTime(Timestamp(97, 2472), 2), true);
 
     {
         ASSERT_TRUE(iter.hasNext());
@@ -163,7 +163,7 @@ TEST_F(SessionHistoryIteratorTest, NextShouldAssertIfHistoryIsTruncated) {
     insertOplogEntry(entry);
 
     repl::OpTime opTime(Timestamp(67, 54801), 2);
-    TransactionHistoryIterator iter(opTime);
+    TransactionHistoryIterator iter(opTime, true);
     ASSERT_TRUE(iter.hasNext());
 
     auto nextEntry = iter.next(opCtx());
@@ -181,7 +181,7 @@ TEST_F(SessionHistoryIteratorTest, OplogInWriteHistoryChainWithMissingPrevTSShou
                                 boost::none);  // optime of previous write in transaction
     insertOplogEntry(entry);
 
-    TransactionHistoryIterator iter(repl::OpTime(Timestamp(67, 54801), 2));
+    TransactionHistoryIterator iter(repl::OpTime(Timestamp(67, 54801), 2), true);
     ASSERT_TRUE(iter.hasNext());
     ASSERT_THROWS_CODE(iter.next(opCtx()), AssertionException, ErrorCodes::FailedToParse);
 }
