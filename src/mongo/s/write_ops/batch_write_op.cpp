@@ -796,11 +796,16 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 }
 
 void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
-                                  const write_ops::WriteError& error) {
+                                  const write_ops::WriteError& error,
+                                  const WriteConcernErrorDetail* wce) {
     // Treat errors to get a batch response as failures of the contained writes
     BatchedCommandResponse emulatedResponse;
     emulatedResponse.setStatus(Status::OK());
     emulatedResponse.setN(0);
+    if (wce) {
+        auto wceCopy = std::make_unique<WriteConcernErrorDetail>(*wce);
+        emulatedResponse.setWriteConcernError(wceCopy.release());
+    }
 
     const int numErrors = _clientRequest.getWriteCommandRequestBase().getOrdered()
         ? 1
