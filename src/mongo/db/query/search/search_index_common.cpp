@@ -109,7 +109,7 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
             ErrorCodes::QueryFeatureNotAllowed,
             "search index commands on views are not allowed in the current configuration. "
             "You may need to enable the "
-            "corrsponding feature flag",
+            "corresponding feature flag",
             feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
