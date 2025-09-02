@@ -147,6 +147,12 @@ public:
      */
     void joinPreviousRound();
 
+    /**
+     * Notifies this service that the provided TransactionCoordinator is finished and no longer
+     * needs to be interrupted when the service is interrupted.
+     */
+    void notifyCoordinatorFinished(std::shared_ptr<TransactionCoordinator>);
+
 private:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
@@ -181,8 +187,14 @@ private:
     // Sets to false once shutdown was called at least once.
     bool _isShuttingDown{false};
 
-    // Used to cancel WaitForMajority for TransactionCoordinator when this service steps down.
-    CancellationSource _cancelSource;
+    // tracks active transactionCoordinators to be interrupted on step-down. previously they were
+    // tracked implicitly through futures associated with the above CancellationSource, but that
+    // does not provide a way to deregister those futures when sub sources complete.
+    // NOTE: this must be an ordered container because std::weak_ptr only exposes an ordering
+    // operator, it does not expose an address or other control block information that would allow
+    // storage in a hash-based container.
+    std::set<std::weak_ptr<TransactionCoordinator>, std::owner_less<>>
+        _activeTransactionCoordinators;
 };
 
 }  // namespace mongo

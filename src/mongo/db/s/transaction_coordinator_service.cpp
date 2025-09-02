@@ -105,12 +105,12 @@ void TransactionCoordinatorService::createCoordinator(
         latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
-    auto coordinator = std::make_shared<TransactionCoordinator>(opCtx,
-                                                                lsid,
-                                                                txnNumberAndRetryCounter,
-                                                                scheduler.makeChildScheduler(),
-                                                                commitDeadline,
-                                                                _cancelSource.token());
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        _activeTransactionCoordinators.insert(coordinator);
+    }
     coordinator->start(opCtx);
 
     try {
@@ -229,14 +229,12 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 
     invariant(!_catalogAndScheduler);
     _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
-    _cancelSource = CancellationSource();
 
     auto future =
         _catalogAndScheduler->scheduler
             .scheduleWorkIn(
                 recoveryDelayForTesting,
-                [catalogAndScheduler = _catalogAndScheduler,
-                 cancelSource = _cancelSource](OperationContext* opCtx) {
+                [catalogAndScheduler = _catalogAndScheduler](OperationContext* opCtx) {
                     if (MONGO_unlikely(hangBeforeTxnCoordinatorOnStepUpWork.shouldFail())) {
                         LOGV2(8288301, "Hit hangBeforeTxnCoordinatorOnStepUpWork failpoint");
                         hangBeforeTxnCoordinatorOnStepUpWork.pauseWhileSet(opCtx);
@@ -298,8 +296,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                             lsid,
                             TxnNumberAndRetryCounter{txnNumber, txnRetryCounter},
                             scheduler.makeChildScheduler(),
-                            clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()),
-                            cancelSource.token());
+                            clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
                         coordinator->start(opCtx);
 
                         catalog.insert(opCtx,
@@ -319,16 +316,24 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 }
 
 void TransactionCoordinatorService::onStepDown() {
+    std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (!_catalogAndScheduler)
             return;
-
+        for (auto& ptr : _activeTransactionCoordinators) {
+            if (auto shared = ptr.lock(); shared) {
+                coordinatorsToCancel.emplace_back(std::move(shared));
+            }
+        }
+        _activeTransactionCoordinators.clear();
         _catalogAndSchedulerToCleanup = std::move(_catalogAndScheduler);
     }
 
-    _cancelSource.cancel();
     _catalogAndSchedulerToCleanup->onStepDown();
+    for (auto& ptr : coordinatorsToCancel) {
+        ptr->cancel();
+    }
 }
 
 void TransactionCoordinatorService::shutdown() {
@@ -368,17 +373,18 @@ TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) 
 }
 
 void TransactionCoordinatorService::joinPreviousRound() {
-    stdx::unique_lock<Latch> ul(_mutex);
+    std::shared_ptr<CatalogAndScheduler> schedulerToCleanup;
+    {
+        stdx::unique_lock<Latch> ul(_mutex);
 
-    // onStepDown must have been called
-    invariant(!_catalogAndScheduler);
+        // onStepDown must have been called
+        invariant(!_catalogAndScheduler);
 
-    if (!_catalogAndSchedulerToCleanup)
-        return;
+        if (!_catalogAndSchedulerToCleanup)
+            return;
 
-    auto schedulerToCleanup = _catalogAndSchedulerToCleanup;
-
-    ul.unlock();
+        schedulerToCleanup = std::move(_catalogAndSchedulerToCleanup);
+    }
 
     LOGV2(22454, "Waiting for coordinator tasks from previous term to complete");
 
@@ -386,9 +392,6 @@ void TransactionCoordinatorService::joinPreviousRound() {
     // drained. Because the scheduler was interrupted, it should be extremely rare for there to be
     // any coordinators left, so if this actually causes blocking, it would most likely be a bug.
     schedulerToCleanup->join();
-
-    ul.lock();
-    _catalogAndSchedulerToCleanup.reset();
 }
 
 void TransactionCoordinatorService::CatalogAndScheduler::onStepDown() {
@@ -422,4 +425,12 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
     }
 }
 
+void TransactionCoordinatorService::notifyCoordinatorFinished(
+    const std::shared_ptr<TransactionCoordinator> coordinator) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    // we don't need to know or care if we actually erased this weak ptr. its valid for this
+    // service to cancel and clear its set of coordinators and have already erased them when
+    // this continuation executes. all we're trying to do is bound memory usage.
+    _activeTransactionCoordinators.erase(coordinator);
+}
 }  // namespace mongo
