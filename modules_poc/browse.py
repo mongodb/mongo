@@ -217,7 +217,8 @@ def add_decl_node(node: TreeNode, d: Decl):
     # Assume that the last instance of the name is the main one.
     # TODO: if this is slow, consider moving to a render_label() override
     label = f"[bold bright_white]{d.spelling}[/]".join(d.display_name.rsplit(d.spelling, 1))
-    label += f" [i]unknowns:[/]{unknown_count(d)}"
+    if unknown_count(d) > 0:
+        label += f" [i]unknowns:[/]{unknown_count(d)}"
     label += f" [i]usages:[/]{sum(len(u) for u in d.transitive_usages.values())}"
     label += f" [i]external:[/]{sum(len(u) for m, u in d.transitive_usages.items() if not is_submodule_usage(d, m))}"
     if d.sem_children:
@@ -359,12 +360,34 @@ class FilesTree(Tree):
             return
 
         self.clear()
+
+        # self.files sorted by unknown count, so files[0] has most unknowns
+        need_sep = self.files and self.files[0].unknown_count > 0
+
         for file in self.files:
+            if need_sep and file.unknown_count == 0:
+                self.root.add_leaf("")  # blank line
+                self.root.add_leaf(
+                    f"{'':10}[red]unmarked :up_arrow:[/]   /   [green]:down_arrow: marked[/]",
+                )
+                self.root.add_leaf("")  # blank line
+                need_sep = False
+
             path = Path(file.name)
-            self.root.add(
-                label=f":page_facing_up: [gray]{path.parent}[/]/[bold bright_white]{path.name}[/] [i]mod:[/]{file.mod} [i]unknowns:[/]{unknown_count(file)}",
-                data=file,
-            )
+            label = f":page_facing_up: [gray]{path.parent}[/]/[bold bright_white]{path.name}[/]"
+
+            if self.mod == "ALL":
+                "[i]mod:[/]{file.mod}"
+            else:
+                # Don't show mod if single mod is selected
+                assert file.mod == self.mod
+
+            if unknown_count(file):
+                label += f" [i]unknowns:[/][red]{unknown_count(file)}[/]"
+            else:
+                label += " [i]unknowns:[/][green]none[/]"
+
+            self.root.add(label=label, data=file)
 
     def watch_loc(self, new: Loc | None):
         for preview in self.app.query(CodePreview):
