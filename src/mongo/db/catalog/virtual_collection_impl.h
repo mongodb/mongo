@@ -563,7 +563,7 @@ public:
         unimplementedTasserted();
     }
 
-    void onDeregisterFromCatalog(OperationContext* opCtx) final {}
+    void onDeregisterFromCatalog(ServiceContext* svcCtx) final {}
 
 private:
     void unimplementedTasserted() const {

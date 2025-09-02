@@ -2457,7 +2457,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    coll->onDeregisterFromCatalog(opCtx);
+    coll->onDeregisterFromCatalog(opCtx->getServiceContext());
 
     ResourceCatalog::get().remove({RESOURCE_COLLECTION, ns}, ns);
 
@@ -2534,10 +2534,11 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
 void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx) {
     LOGV2(20282, "Deregistering all the collections");
     for (auto& entry : _catalog) {
-        auto uuid = entry.first;
+        auto& uuid = entry.first;
         auto ns = entry.second->ns();
 
         LOGV2_DEBUG(20283, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
+        entry.second->onDeregisterFromCatalog(svcCtx);
     }
 
     _collections = {};

@@ -751,7 +751,7 @@ public:
     /**
      * Called when this Collection is deregistered from the catalog
      */
-    virtual void onDeregisterFromCatalog(OperationContext* opCtx) = 0;
+    virtual void onDeregisterFromCatalog(ServiceContext* svcCtx) = 0;
 
     friend auto logAttrs(const Collection& col) {
         return logv2::multipleAttrs(col.ns(), col.uuid());
