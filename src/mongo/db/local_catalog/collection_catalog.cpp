@@ -1080,7 +1080,11 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         // under open collection for this namespace. We can detect this case by comparing the
         // catalogId with what is pending for this namespace.
         if (nssOrUUID.isUUID()) {
-            const std::shared_ptr<Collection>& pending = *_pendingCommitNamespaces.find(nss);
+            const std::shared_ptr<Collection>* found = _pendingCommitNamespaces.find(nss);
+            // When openCollection is called with no timestamp, the namespace must be pending
+            // commit.
+            invariant(found);
+            auto& pending = *found;
             if (pending && pending->getCatalogId() != catalogId) {
                 openedCollections.store(nullptr, boost::none, uuid);
                 openedCollections.store(pending, nss, pending->uuid());
