@@ -98,6 +98,10 @@ const nestedViewTestCases = () => {
         {_id: "San Francisco", pop: 4, aa_type: "foo", bb_type: "foo"},
     ];
 
+    // The incremental-config-cycle-updater runs every second to swap any indexes that are ready.
+    // Thus, we need to wait for the index to be ready before running the search.
+    sleep(2000);
+
     validateSearchExplain(nestedView, wildcardSearchPipeline, true, combinedViewPipeline);
 
     results = nestedView.aggregate(wildcardSearchPipeline).toArray();
