@@ -214,6 +214,24 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
                 )
         else:
             shutil.copyfile(pathlib.Path("bazel-bin") / ".clang-tidy", clang_tidy_file)
+
+
+    if platform.system() == "Linux":
+        # TODO: SERVER-110144 optimize this to only generate the extensions source code
+        # instead of build the extension target entirely.
+        gen_source_cmd = (
+            [bazel_bin]
+            + ([f"--output_base={output_base}"] if persistent_compdb else [])
+            + compiledb_bazelrc
+            + ["build"]
+            + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
+            + compiledb_config
+            + [
+                "dist_test_extensions",
+            ]
+        )
+        run_pty_command(gen_source_cmd)
+
     if persistent_compdb:
         shutdown_proc = subprocess.run(
             [bazel_bin, f"--output_base={output_base}", "shutdown"], capture_output=True, text=True
