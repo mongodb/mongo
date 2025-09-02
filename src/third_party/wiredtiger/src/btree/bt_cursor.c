@@ -634,14 +634,16 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
  *     Search and return exact matching records only.
  */
 int
-__wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
+__wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp, bool *has_onpagep)
 {
     WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
     WT_UPDATE *upd;
+    bool has_onpage;
 
     *updp = upd = NULL; /* -Wuninitialized */
+    *has_onpagep = has_onpage = false;
     cbt = (WT_CURSOR_BTREE *)cursor;
     btree = CUR2BT(cbt);
 
@@ -673,10 +675,22 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
          */
         if (cbt->ins != NULL)
             upd = cbt->ins->upd;
-        else if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
-            upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+        else {
+            if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
+                upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+            has_onpage = true;
+        }
         break;
     case BTREE_COL_FIX:
+        /*
+         * Any update must be in the insert list and we want the most recent update (any update
+         * attempted after the prepare would have failed).
+         */
+        if (cbt->ins != NULL)
+            upd = cbt->ins->upd;
+
+        has_onpage = cbt->recno < cbt->ref->ref_recno + cbt->ref->page->entries;
+        break;
     case BTREE_COL_VAR:
         /*
          * Any update must be in the insert list and we want the most recent update (any update
@@ -684,10 +698,19 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
          */
         if (cbt->ins != NULL)
             upd = cbt->ins->upd;
+
+        if (F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH)) {
+            WT_PAGE *page = cbt->ref->page;
+            WT_COL *cip = &page->pg_var[cbt->slot];
+            WT_CELL *cell = WT_COL_PTR(page, cip);
+            if (__wt_cell_type(cell) != WT_CELL_DEL)
+                has_onpage = true;
+        }
         break;
     }
 
     *updp = upd;
+    *has_onpagep = has_onpage;
     return (0);
 }
 

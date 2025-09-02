@@ -26,17 +26,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover01.py
+# test_prepare_discover02.py
 #   Test that pending prepared transaction artifacts can be discovered after recovery
-#   and rolled back
+#   and committed
 
-import random, sys
+import wiredtiger
 from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
 
-class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_prepare_discover01'
+class test_prepare_discover02(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_prepare_discover02'
     uri = 'table:' + tablename
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
 
@@ -51,7 +51,7 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
 
     scenarios = make_scenarios(types, txn_end)
 
-    def test_prepare_discover01(self):
+    def test_prepare_discover02(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
         self.session.create(self.uri, self.s_config)
@@ -95,7 +95,35 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
             prepared_id = prepared_discover_cursor.get_key()
             self.assertEqual(prepared_id, 100)
             c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(prepared_id))
-            c2s2.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
+            c2s2.commit_transaction("commit_timestamp=" + self.timestamp_str(200)+",durable_timestamp=" + self.timestamp_str(210))
         self.assertEqual(count, 1)
-
         prepared_discover_cursor.close()
+
+        # Read cursor
+        c2s3 = conn2.open_session()
+
+        # check the read cursor can only find values committed at timestamp = 60
+        c2s3.begin_transaction(f'read_timestamp={self.timestamp_str(60)}')
+        read_cursor = c2s3.open_cursor(self.uri, None, None)
+        for i in range(1, 3):
+            read_cursor.set_key(i)
+            self.assertEqual(read_cursor.search(), 0)
+            self.assertEqual(read_cursor.get_value(), "commit ts=60")
+        for i in range(3, 6):
+            read_cursor.set_key(i)
+            self.assertEqual(read_cursor.search(), wiredtiger.WT_NOTFOUND)
+        c2s3.rollback_transaction()
+
+        # check the read cursor can read all keys after timestamp 200
+        c2s3.begin_transaction(f'read_timestamp={self.timestamp_str(200)}')
+        read_cursor = c2s3.open_cursor(self.uri, None, None)
+        for i in range(1, 3):
+            read_cursor.set_key(1)
+            self.assertEqual(read_cursor.search(), 0)
+            self.assertEqual(read_cursor.get_value(), "commit ts=60")
+
+        for i in range(3, 6):
+            read_cursor.set_key(3)
+            self.assertEqual(read_cursor.search(), 0)
+            self.assertEqual(read_cursor.get_value(), "prepare ts=100")
+        c2s3.rollback_transaction()

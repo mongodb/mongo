@@ -198,6 +198,8 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
              */
             __wt_free(session, multi->disk_image);
             __wt_free(session, multi->addr.block_cookie);
+            if (multi->block_meta != NULL)
+                __wt_free(session, multi->block_meta);
         }
         __wt_free(session, mod->mod_multi);
         break;

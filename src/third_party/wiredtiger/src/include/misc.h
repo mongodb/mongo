@@ -53,6 +53,7 @@
 
 /* Basic constants. */
 #define WT_MILLION_LITERAL 1000000
+#define WT_HUNDRED (100)
 #define WT_THOUSAND (1000)
 #define WT_MILLION (WT_MILLION_LITERAL)
 #define WT_BILLION (1000000000)

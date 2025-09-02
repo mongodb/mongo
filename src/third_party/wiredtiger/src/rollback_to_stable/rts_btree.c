@@ -42,7 +42,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
 
-        if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS))
+        if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_HS_MAX_STOP))
             hs_update = true;
 
         /*
@@ -118,19 +118,23 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
              * inserted to the history store.
              */
             WT_ASSERT(session,
-              F_ISSET(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS) ||
+              F_ISSET(stable_upd, WT_UPDATE_HS | WT_UPDATE_HS_MAX_STOP) ||
                 stable_upd->type == WT_UPDATE_TOMBSTONE);
             /*
              * Find the update following a stable tombstone that has been inserted to the history
              * store.
              */
-            if (stable_upd->type == WT_UPDATE_TOMBSTONE &&
-              F_ISSET(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS)) {
+            if (stable_upd->type == WT_UPDATE_TOMBSTONE && F_ISSET(stable_upd, WT_UPDATE_HS)) {
                 tombstone = stable_upd;
                 for (stable_upd = stable_upd->next; stable_upd != NULL;
                      stable_upd = stable_upd->next) {
                     if (stable_upd->txnid != WT_TXN_ABORTED) {
-                        if (F_ISSET(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS))
+                        /*
+                         * We have seen a tombstone in the history store so the update cannot have a
+                         * max stop point.
+                         */
+                        WT_ASSERT(session, !F_ISSET(stable_upd, WT_UPDATE_HS_MAX_STOP));
+                        if (F_ISSET(stable_upd, WT_UPDATE_HS))
                             break;
                         else
                             WT_ASSERT(session,
@@ -156,9 +160,9 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
              */
             if (!dryrun) {
                 if (stable_upd != NULL)
-                    F_CLR(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS);
+                    F_CLR(stable_upd, WT_UPDATE_HS | WT_UPDATE_HS_MAX_STOP);
                 if (tombstone != NULL)
-                    F_CLR(tombstone, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS);
+                    F_CLR(tombstone, WT_UPDATE_HS);
             }
         } else if (WT_IS_HS(session->dhandle) && stable_upd->type != WT_UPDATE_TOMBSTONE) {
             /*

@@ -938,7 +938,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
     else if (F_ISSET(conn, WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY))
         LF_SET(WT_REC_IN_MEMORY | WT_REC_SCRUB);
     /* For data store leaf pages, write the history to history store except for metadata. */
-    else if (!WT_IS_METADATA(btree->dhandle)) {
+    else if (!WT_IS_METADATA(btree->dhandle) && !WT_IS_DISAGG_META(btree->dhandle)) {
         LF_SET(WT_REC_HS);
 
         /*
@@ -987,9 +987,8 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
      * running application transaction.
      */
     use_snapshot_for_app_thread = !F_ISSET(session, WT_SESSION_INTERNAL) &&
-      !WT_IS_METADATA(session->dhandle) &&
-      __wt_atomic_loadv64(&WT_SESSION_TXN_SHARED(session)->id) != WT_TXN_NONE &&
-      F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT) && !F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT);
+      !WT_IS_METADATA(session->dhandle) && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT) &&
+      !F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT);
     is_eviction_thread = F_ISSET(session, WT_SESSION_EVICTION);
 
     /* Make sure that both conditions above are not true at the same time. */
@@ -1010,9 +1009,19 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
          * being processed. Therefore, we use snapshot API that doesn't publish shared IDs to the
          * outside world.
          */
-        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT))
-            LF_SET(WT_REC_VISIBLE_ALL);
-        else
+        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && !F_ISSET(btree, WT_BTREE_IN_MEMORY)) {
+            uint64_t btree_ckpt_gen, ckpt_gen;
+            /*
+             * If precise checkpoint is configured, only evict the updates that visible to the
+             * ongoing checkpoint for trees haven't been visited by the checkpoint.
+             */
+            WT_ACQUIRE_READ(btree_ckpt_gen, btree->checkpoint_gen);
+            ckpt_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
+            if (btree_ckpt_gen < ckpt_gen)
+                LF_SET(WT_REC_VISIBLE_CHECKPOINT);
+            else
+                __wt_txn_bump_snapshot(session);
+        } else
             __wt_txn_bump_snapshot(session);
     } else if (use_snapshot_for_app_thread) {
         /*
@@ -1029,9 +1038,10 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
 
         LF_SET(WT_REC_APP_EVICTION_SNAPSHOT);
     } else if (!WT_SESSION_BTREE_SYNC(session))
-        LF_SET(WT_REC_VISIBLE_ALL);
+        LF_SET(WT_REC_VISIBLE_CHECKPOINT);
 
-    WT_ASSERT(session, LF_ISSET(WT_REC_VISIBLE_ALL) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
+    WT_ASSERT(
+      session, LF_ISSET(WT_REC_VISIBLE_CHECKPOINT) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* We should not be trying to evict using a checkpoint-cursor transaction. */
     WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
@@ -1040,7 +1050,8 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
      * Reconcile the page. Force read-committed isolation level if we are using snapshots for
      * eviction workers or application threads.
      */
-    if (is_eviction_thread || use_snapshot_for_app_thread)
+    if ((is_eviction_thread && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) ||
+      use_snapshot_for_app_thread)
         WT_WITH_TXN_ISOLATION(
           session, WT_ISO_READ_COMMITTED, ret = __wt_reconcile(session, ref, NULL, flags));
     else
@@ -1061,7 +1072,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
      */
     WT_ASSERT(session,
       !__wt_page_is_modified(ref->page) || LF_ISSET(WT_REC_HS | WT_REC_IN_MEMORY) ||
-        WT_IS_METADATA(btree->dhandle));
+        WT_IS_METADATA(btree->dhandle) || WT_IS_DISAGG_META(btree->dhandle));
 
     return (0);
 }

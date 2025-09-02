@@ -8,53 +8,89 @@
 
 #include "wt_internal.h"
 
+#define WT_DEFAULT_PENDING_PREPARED_DISCOVER_HASHSIZE 64
+
 /*
- * __wt_prepared_discover_find_or_create_transaction --
- *     We have learned that a prepared transaction with a particular ID exists. If this is the first
- *     time it's been noticed, create a transaction corresponding to it. Otherwise return the
- *     matching transaction.
+ * __wt_prepared_discover_find_item --
+ *     Find a pending prepared item by its ID in the pending prepared items hash map.
  */
 int
-__wt_prepared_discover_find_or_create_transaction(WT_SESSION_IMPL *session,
-  wt_timestamp_t prepare_transaction_id, WT_SESSION_IMPL **prep_sessionp, bool create)
+__wt_prepared_discover_find_item(WT_SESSION_IMPL *session, uint64_t prepare_transaction_id,
+  WT_PENDING_PREPARED_ITEM **prepared_item)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_SESSION_IMPL *new_session, *next_session;
+    WT_PENDING_PREPARED_ITEM *item;
+    WT_PENDING_PREPARED_MAP *pending_prepare_items;
     WT_TXN_GLOBAL *txn_global;
-    uint32_t prepared_session_cnt;
-
-    new_session = next_session = NULL;
+    uint64_t bucket;
     conn = S2C(session);
     txn_global = &conn->txn_global;
-
-    if (txn_global->pending_prepared_sessions != NULL) {
-        for (prepared_session_cnt = 0;
-             (next_session = txn_global->pending_prepared_sessions[prepared_session_cnt]) != NULL;
-             prepared_session_cnt++) {
-            if (next_session->txn->prepare_timestamp == prepare_transaction_id) {
-                *prep_sessionp = next_session;
+    pending_prepare_items = &txn_global->pending_prepare_items;
+    if (pending_prepare_items->hash != NULL) {
+        bucket = prepare_transaction_id & (pending_prepare_items->hash_size - 1);
+        TAILQ_FOREACH (item, &pending_prepare_items->hash[bucket], hashq) {
+            if (item->prepared_id == prepare_transaction_id) {
+                *prepared_item = item;
                 return (0);
             }
         }
     }
+    return (WT_NOTFOUND);
+}
 
-    if (!create)
-        return (WT_NOTFOUND);
+/*
+ * __pending_prepare_items_init --
+ *     Initialize pending prepared txn hash map.
+ */
+static int
+__pending_prepare_items_init(
+  WT_SESSION_IMPL *session, WT_PENDING_PREPARED_MAP *pending_prepare_items, u_int hash_size)
+{
+    /* Hash size must be a power of 2 for efficient bucket calculation. */
+    WT_ASSERT(session, (hash_size & (hash_size - 1)) == 0);
 
-    /* No existing session/transaction matched, create a new one */
-    WT_RET(__wt_realloc_def(session, &txn_global->pending_prepared_sessions_allocated,
-      txn_global->pending_prepared_sessions_count + 1, &txn_global->pending_prepared_sessions));
+    pending_prepare_items->hash_size = hash_size;
+    WT_RET(
+      __wt_calloc_def(session, pending_prepare_items->hash_size, &pending_prepare_items->hash));
+    for (uint64_t i = 0; i < pending_prepare_items->hash_size; i++) {
+        TAILQ_INIT(&pending_prepare_items->hash[i]); /* hash lists */
+    }
+    return (0);
+}
 
-    /* Allocate a new session and setup the transaction ready for populating */
-    WT_RET(__wt_open_internal_session(conn, "prepared_discover", true, 0, 0, &new_session));
-    WT_RET(__wt_txn_begin(new_session, NULL));
-    new_session->txn->prepare_timestamp = prepare_transaction_id;
-    new_session->txn->prepared_id = prepare_transaction_id;
-    /* Add it to the discovered set of sessions. */
-    txn_global->pending_prepared_sessions[txn_global->pending_prepared_sessions_count++] =
-      new_session;
-    F_SET(new_session->txn, WT_TXN_PREPARE);
-    *prep_sessionp = new_session;
+/*
+ * __prepared_discover_find_or_create_item --
+ *     We have learned that a prepared transaction with a particular ID exists. If this is the first
+ *     time it's been noticed, create an item corresponding to it. Otherwise return the matching
+ *     item.
+ */
+static int
+__prepared_discover_find_or_create_item(WT_SESSION_IMPL *session, uint64_t prepare_transaction_id,
+  WT_PENDING_PREPARED_ITEM **prepared_item)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_PENDING_PREPARED_ITEM *item;
+    WT_PENDING_PREPARED_MAP *pending_prepare_items;
+    WT_TXN_GLOBAL *txn_global;
+    uint64_t bucket;
+
+    if (__wt_prepared_discover_find_item(session, prepare_transaction_id, prepared_item) == 0)
+        return (0);
+
+    conn = S2C(session);
+    txn_global = &conn->txn_global;
+    pending_prepare_items = &txn_global->pending_prepare_items;
+    if (pending_prepare_items->hash == NULL) {
+        WT_RET(__pending_prepare_items_init(session, pending_prepare_items,
+          /* hash size*/ WT_DEFAULT_PENDING_PREPARED_DISCOVER_HASHSIZE));
+    }
+
+    WT_RET(__wt_calloc_one(session, &item));
+    item->prepared_id = prepare_transaction_id;
+
+    bucket = prepare_transaction_id & (pending_prepare_items->hash_size - 1);
+    TAILQ_INSERT_HEAD(&pending_prepare_items->hash[bucket], item, hashq);
+    *prepared_item = item;
     return (0);
 }
 
@@ -66,23 +102,20 @@ int
 __wti_prepared_discover_add_artifact_upd(
   WT_SESSION_IMPL *session, wt_timestamp_t prepare_transaction_id, WT_ITEM *key, WT_UPDATE *upd)
 {
-    WT_DECL_RET;
-    WT_SESSION_IMPL *prep_session;
+    WT_PENDING_PREPARED_ITEM *prepared_item;
+    WT_TXN_OP *op;
 
-    WT_RET(__wt_prepared_discover_find_or_create_transaction(
-      session, prepare_transaction_id, &prep_session, true));
+    WT_RET(
+      __prepared_discover_find_or_create_item(session, prepare_transaction_id, &prepared_item));
 
-    /* Add the update to the prepared transaction context. */
-    WT_WITH_DHANDLE(prep_session, session->dhandle, ret = __wt_txn_modify(prep_session, upd));
-    WT_RET(ret);
-    /* Copy the key into the transaction operation, so it can be used to find the update later. */
-    WT_WITH_DHANDLE(prep_session, session->dhandle, ret = __wt_txn_op_set_key(prep_session, key));
-    WT_RET(ret);
+    WT_RET(__wt_pending_prepared_next_op(session, &op, prepared_item, key));
+    WT_RET(__wt_op_modify(session, upd, op));
+
+    WT_ASSERT(session, op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW);
 
 #ifdef HAVE_DIAGNOSTIC
-    ++prep_session->txn->prepare_count;
+    ++prepared_item->prepare_count;
 #endif
-
     return (0);
 }
 

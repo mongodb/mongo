@@ -148,9 +148,13 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
 
             /*
              * If we restore an update chain in update restore eviction, there should be no update
-             * or a restored tombstone on the existing update chain.
+             * on the existing update chain or a prepared update if the preserve prepared config is
+             * enabled.
              */
-            WT_ASSERT_ALWAYS(session, !restore || old_upd == NULL,
+            WT_ASSERT_ALWAYS(session,
+              !restore || old_upd == NULL ||
+                (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+                  F_ISSET(old_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS)),
               "Illegal update on chain during update restore eviction");
 
             /*

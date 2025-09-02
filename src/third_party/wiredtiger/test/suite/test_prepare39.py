@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
+import wiredtiger, wttest
 from prepare_util import test_prepare_preserve_prepare_base
 
 # Test prepared transaction rollback behavior and history store interactions.
@@ -66,12 +66,11 @@ class test_prepare39(test_prepare_preserve_prepare_base):
         self.assertEqual(read_cursor.get_value(), expected_value)
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_hs_rollback_prepare(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
-            self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
         value_a = 'aaaaaaa'

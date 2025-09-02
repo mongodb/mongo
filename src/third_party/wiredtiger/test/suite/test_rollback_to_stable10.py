@@ -278,6 +278,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
                 cursor.set_value(value)
                 self.assertEqual(cursor.update(), 0)
             self.pr("prepare")
+            cursor.reset()
             session.prepare_transaction(prepare_config)
 
         # Create a checkpoint thread

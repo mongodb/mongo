@@ -447,9 +447,11 @@ retry:
     /*
      * Handle the case that modify is a prepared update and we race with prepared rollback. This can
      * happen in reconciliation with the preserve prepared config.
+     *
+     * We may see a locked prepare state if we race with prepare rollback.
      */
     WT_ACQUIRE_READ(prepare_state, modify->prepare_state);
-    if (prepare_state == WT_PREPARE_INPROGRESS) {
+    if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
         WT_ACQUIRE_READ(txnid, modify->txnid);
         /* The update may be already aborted. Get the saved transaction id. */
         if (txnid == WT_TXN_ABORTED)

@@ -75,33 +75,39 @@ __cursor_prepared_discover_close(WT_CURSOR *cursor)
 {
     WT_CURSOR_PREPARE_DISCOVERED *cursor_prepare;
     WT_DECL_RET;
-    WT_SESSION_IMPL *next_session;
+    WT_PENDING_PREPARED_ITEM *item;
+    WT_PENDING_PREPARED_MAP *pending_prepare_items;
     WT_SESSION_IMPL *session;
     WT_TXN_GLOBAL *txn_global;
-    size_t prepared_session_cnt;
-
+    WT_TXN_OP *op;
+    uint64_t i, j;
     cursor_prepare = (WT_CURSOR_PREPARE_DISCOVERED *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 
     txn_global = &S2C(session)->txn_global;
-    if (txn_global->pending_prepared_sessions_allocated > 0) {
-        for (prepared_session_cnt = 0;
-             prepared_session_cnt < txn_global->pending_prepared_sessions_count;
-             prepared_session_cnt++) {
-            next_session = txn_global->pending_prepared_sessions[prepared_session_cnt];
-            if (next_session != NULL)
-                WT_ERR(__wt_session_close_internal(next_session));
+    pending_prepare_items = &txn_global->pending_prepare_items;
+    if (pending_prepare_items->hash != NULL) {
+        for (i = 0; i < pending_prepare_items->hash_size; i++) {
+            while ((item = TAILQ_FIRST(&pending_prepare_items->hash[i])) != NULL) {
+                TAILQ_REMOVE(&pending_prepare_items->hash[i], item, hashq);
+                /* Clean up memory of unclaimed mod array */
+                for (j = 0, op = item->mod; j < item->mod_count; j++, op++) {
+                    __wt_txn_op_free(session, op);
+                }
+                __wt_free(session, item->mod);
+                item->mod_alloc = 0;
+                item->mod_count = 0;
+                __wt_free(session, item);
+            }
         }
-        __wt_free(session, txn_global->pending_prepared_sessions);
-        txn_global->pending_prepared_sessions_allocated = 0;
-        txn_global->pending_prepared_sessions_count = 0;
+        __wt_free(session, pending_prepare_items->hash);
+        memset((void *)pending_prepare_items, 0, sizeof(WT_PENDING_PREPARED_MAP));
     }
 
 err:
 
     __wt_free(session, cursor_prepare->list);
     __wt_cursor_close(cursor);
-
     API_END_RET(session, ret);
 }
 
@@ -202,25 +208,34 @@ static int
 __cursor_prepared_discover_list_create(
   WT_SESSION_IMPL *session, WT_CURSOR_PREPARE_DISCOVERED *cursor_prepare)
 {
+    WT_PENDING_PREPARED_ITEM *item;
+    WT_PENDING_PREPARED_MAP *pending_prepare_items;
     WT_TXN_GLOBAL *txn_global;
-    uint32_t i, prepared_discovered_count;
 
     txn_global = &S2C(session)->txn_global;
+    pending_prepare_items = &txn_global->pending_prepare_items;
 
     /* If no transactions were discovered, there is nothing more to do here */
-    if (txn_global->pending_prepared_sessions == NULL)
+    if (pending_prepare_items->hash == NULL)
         return (0);
 
-    for (prepared_discovered_count = 0;
-         txn_global->pending_prepared_sessions[prepared_discovered_count] != NULL;
-         ++prepared_discovered_count)
-        ;
+    /* Iterate through the hash map and populate the list as we go */
+    for (uint64_t i = 0; i < pending_prepare_items->hash_size; i++) {
+        TAILQ_FOREACH (item, &pending_prepare_items->hash[i], hashq) {
+            /* Grow the list to accommodate this new item plus null terminator */
+            WT_RET(__wt_realloc_def(session, &cursor_prepare->list_allocated,
+              cursor_prepare->list_next + 2, &cursor_prepare->list));
 
-    /* Leave a NULL at the end to mark the end of the list. */
-    WT_RET(__wt_realloc_def(session, &cursor_prepare->list_allocated, prepared_discovered_count + 1,
-      &cursor_prepare->list));
-    for (i = 0; i < prepared_discovered_count; i++)
-        cursor_prepare->list[i] = txn_global->pending_prepared_sessions[i]->txn->prepared_id;
+            /* Add the prepared transaction ID to the list */
+            cursor_prepare->list[cursor_prepare->list_next] = item->prepared_id;
+            cursor_prepare->list_next++;
+        }
+    }
+
+    /* Null-terminate the list */
+    if (cursor_prepare->list_next > 0) {
+        cursor_prepare->list[cursor_prepare->list_next] = 0;
+    }
 
     return (0);
 }

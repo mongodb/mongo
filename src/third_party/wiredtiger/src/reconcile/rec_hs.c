@@ -806,14 +806,11 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
                 continue;
 
             /*
-             * We must have deleted any update left in the history store except if the preserve
-             * prepared config is enabled as we cannot delete them until the associated prepare
-             * commit or rollback becomes stable.
+             * We must have deleted any update left in the history store with a max stop time point
+             * except if continue to write a prepared update to the disk.
              */
             WT_ASSERT(session,
-              !F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS) ||
-                (F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) &&
-                  WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw)));
+              !F_ISSET(upd, WT_UPDATE_HS_MAX_STOP) || WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw));
 
             /* Detect any update without a timestamp. */
             if (prev_upd != NULL && prev_upd->upd_start_ts < upd->upd_start_ts) {
@@ -953,7 +950,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
         }
 
         /* Skip if we have nothing to insert to the history store. */
-        if (newest_hs == NULL || F_ISSET(newest_hs, WT_UPDATE_HS)) {
+        if (newest_hs == NULL || F_ISSET(newest_hs, WT_UPDATE_HS | WT_UPDATE_HS_MAX_STOP)) {
             /* The onpage value is squashed. */
             if (newest_hs == NULL && squashed)
                 ++cache_hs_write_squash;
@@ -975,7 +972,9 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             WT_ASSERT(session, upd != list->onpage_upd);
             WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_MODIFY);
             /* We should never insert prepared updates to the history store. */
-            WT_ASSERT(session, upd->prepare_state != WT_PREPARE_INPROGRESS);
+            WT_ASSERT(session,
+              upd->prepare_state != WT_PREPARE_INPROGRESS &&
+                upd->prepare_state != WT_PREPARE_LOCKED);
 
             tombstone = NULL;
 
@@ -1055,7 +1054,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             }
 
             /* Skip updates that are already in the history store. */
-            if (F_ISSET(upd, WT_UPDATE_HS)) {
+            if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_HS_MAX_STOP)) {
                 if (hs_inserted)
                     WT_ERR_PANIC(session, WT_PANIC,
                       "Reinserting updates to the history store may corrupt the data as it may "
@@ -1114,9 +1113,13 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             }
 
             /* Flag the update as now in the history store. */
-            F_SET(upd, WT_UPDATE_HS);
-            if (tombstone != NULL)
+            if (tombstone != NULL) {
                 F_SET(tombstone, WT_UPDATE_HS);
+                F_SET(upd, WT_UPDATE_HS);
+            } else if (WT_TIME_WINDOW_HAS_STOP(&tw))
+                F_SET(upd, WT_UPDATE_HS);
+            else
+                F_SET(upd, WT_UPDATE_HS_MAX_STOP);
 
             hs_inserted = true;
             ++insert_cnt;
@@ -1244,6 +1247,10 @@ __rec_hs_delete_record(
 
     btree = S2BT(session);
 
+    WT_ASSERT(session,
+      (tombstone != NULL && F_ISSET(upd, WT_UPDATE_HS) && F_ISSET(tombstone, WT_UPDATE_HS)) ||
+        (tombstone == NULL && F_ISSET(upd, WT_UPDATE_HS_MAX_STOP)));
+
     /*
      * Open a history store cursor if we don't yet have one. If we already have it, check if it
      * matches the current btree and attempt to reuse it if it does not.
@@ -1318,8 +1325,8 @@ __rec_hs_delete_record(
     }
 done:
     if (tombstone != NULL)
-        F_CLR(tombstone, WT_UPDATE_TO_DELETE_FROM_HS | WT_UPDATE_HS);
-    F_CLR(upd, WT_UPDATE_TO_DELETE_FROM_HS | WT_UPDATE_HS);
+        F_CLR(tombstone, WT_UPDATE_HS);
+    F_CLR(upd, WT_UPDATE_HS | WT_UPDATE_HS_MAX_STOP);
 
 err:
     if (!hs_read_committed)

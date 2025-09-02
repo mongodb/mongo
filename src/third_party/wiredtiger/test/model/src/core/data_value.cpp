@@ -97,6 +97,7 @@ data_value::unpack(const void *buffer, size_t length, const char *format)
         ret = __wt_struct_unpack(nullptr, buffer, length, wt_type, &v);           \
         if (ret == 0)                                                             \
             return data_value(cast(v));                                           \
+        throw model_exception("Failed to unpack data_value");                     \
     }
 
     switch (format[0]) {

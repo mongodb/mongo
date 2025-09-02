@@ -664,7 +664,7 @@ __rec_row_garbage_collect_fixup_update_list(WT_SESSION_IMPL *session, WTI_RECONC
     if (upd->type == WT_UPDATE_TOMBSTONE)
         return (0);
 
-    if (WT_TXNID_LT(upd->txnid, r->last_running) && r->rec_prune_timestamp != WT_TS_NONE &&
+    if (upd->txnid < r->rec_start_oldest_id && r->rec_prune_timestamp != WT_TS_NONE &&
       upd->upd_durable_ts <= r->rec_prune_timestamp) {
         WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
         tombstone->next = first_upd;
@@ -707,7 +707,7 @@ __rec_row_garbage_collect_fixup_insert_list(
     if (upd->type == WT_UPDATE_TOMBSTONE)
         return (0);
 
-    if (WT_TXNID_LT(upd->txnid, r->last_running) && r->rec_prune_timestamp != WT_TS_NONE &&
+    if (upd->txnid < r->rec_start_oldest_id && r->rec_prune_timestamp != WT_TS_NONE &&
       upd->upd_durable_ts <= r->rec_prune_timestamp) {
         WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
         tombstone->next = first_upd;
@@ -1012,14 +1012,14 @@ __wti_rec_row_leaf(
                 upd = &upd_tombstone;
             else if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
                 if (WT_TIME_WINDOW_HAS_STOP(twp)) {
-                    if (WT_TXNID_LT(twp->stop_txn, r->last_running) &&
+                    if (twp->stop_txn < r->rec_start_oldest_id &&
                       r->rec_prune_timestamp != WT_TS_NONE &&
                       twp->durable_stop_ts <= r->rec_prune_timestamp) {
                         upd = &upd_tombstone;
                         WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
                     }
                 } else {
-                    if (WT_TXNID_LT(twp->start_txn, r->last_running) &&
+                    if (twp->start_txn < r->rec_start_oldest_id &&
                       r->rec_prune_timestamp != WT_TS_NONE &&
                       twp->durable_start_ts <= r->rec_prune_timestamp) {
                         upd = &upd_tombstone;
@@ -1089,8 +1089,7 @@ __wti_rec_row_leaf(
               F_ISSET(upd, WT_UPDATE_DS) || !F_ISSET(r, WT_REC_HS) ||
                 __wt_txn_tw_start_visible_all(session, twp) ||
                 (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) &&
-                  WT_TXNID_LT(twp->start_txn, r->last_running) &&
-                  r->rec_prune_timestamp != WT_TS_NONE &&
+                  twp->start_txn < r->rec_start_oldest_id && r->rec_prune_timestamp != WT_TS_NONE &&
                   twp->durable_start_ts <= r->rec_prune_timestamp));
 
             /* The first time we find an overflow record, discard the underlying blocks. */

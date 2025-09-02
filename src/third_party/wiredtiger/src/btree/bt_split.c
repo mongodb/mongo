@@ -1526,7 +1526,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             /*
              * If we have written a prepared update, we need to retain the next update that is not a
              * tombstone. Otherwise, we don't have anything to write in the next reconciliation if
-             * the prepared update is reverted.
+             * the prepared update is reverted. If the next value update is a modify, we need to
+             * retain all the older updates until a full value is found.
              */
             if (WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw)) {
                 for (tmp = supd->onpage_upd->next; tmp != NULL; tmp = tmp->next) {
@@ -1542,11 +1543,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
                     if (txnid == supd->tw.start_txn)
                         continue;
 
-                    /* We are looking for a full update. */
-                    if (tmp->type == WT_UPDATE_TOMBSTONE)
-                        continue;
-
-                    break;
+                    if (tmp->type == WT_UPDATE_STANDARD)
+                        break;
                 }
 
                 if (tmp != NULL) {
@@ -1557,10 +1555,20 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
                 /*
                  * If we write a prepared tombstone, we still need to retain the update it deletes
                  * on the update chain. Otherwise, if the prepared update is aborted, we will have
-                 * nothing to write in the next reconciliation.
+                 * nothing to write in the next reconciliation. If the update is a modify, we need
+                 * to retain all the older updates until a full value is found.
                  */
-                supd->free_upds = supd->onpage_upd->next;
-                supd->onpage_upd->next = NULL;
+                for (tmp = supd->onpage_upd; tmp != NULL; tmp = tmp->next) {
+                    if (tmp->txnid == WT_TXN_ABORTED)
+                        continue;
+
+                    if (WT_UPDATE_DATA_VALUE(tmp))
+                        break;
+                }
+                if (tmp != NULL) {
+                    supd->free_upds = tmp->next;
+                    tmp->next = NULL;
+                }
             } else {
                 /*
                  * For non-prepared case, free the on-page value and the on-page tombstone if there
@@ -1617,7 +1625,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
              * will find we have already instantiated a prepared update (possibly with a prepared
              * tombstone) by the page in-memory code. Discard the re-instantiated prepared updates.
              */
-            if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED))
+            if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+              WT_TIME_WINDOW_HAS_PREPARE(&supd->tw))
                 for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
                     ;
 
@@ -1650,7 +1659,9 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
              * it as well. FIXME-WT-14885: no need to consider the delta case after we have
              * implemented delta consolidation
              */
-            if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) || WT_DELTA_LEAF_ENABLED(session))
+            if ((F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+                  WT_TIME_WINDOW_HAS_PREPARE(&supd->tw)) ||
+              WT_DELTA_LEAF_ENABLED(session))
                 for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
                     ;
 
