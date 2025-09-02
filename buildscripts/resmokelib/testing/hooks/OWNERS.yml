@@ -56,7 +56,7 @@ filters:
       - 10gen/devprod-performance-analysis
   - "replicaset_transition_to_and_from_csrs.py":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "drop_sessions_collection.py":
     approvers:
       - 10gen/server-catalog-and-routing

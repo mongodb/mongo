@@ -424,6 +424,7 @@ class _TransitionThread(threading.Thread):
         config["configsvr"] = True
         config["version"] = config["version"] + 1
         client.admin.command({"replSetReconfig": config})
+        rs_fixture.await_last_op_committed()
         self.logger.info(
             "Successfully reconfigured primary on port %d of replica set '%s'.",
             rs_fixture.get_primary().port,
@@ -448,6 +449,7 @@ class _TransitionThread(threading.Thread):
         del config["configsvr"]
         config["version"] = config["version"] + 1
         client.admin.command({"replSetReconfig": config})
+        rs_fixture.await_last_op_committed()
         self.logger.info(
             "Successfully reconfigured primary on port %d of replica set '%s'.",
             rs_fixture.get_primary().port,
