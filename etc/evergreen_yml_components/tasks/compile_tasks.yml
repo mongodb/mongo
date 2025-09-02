@@ -1190,6 +1190,53 @@ tasks:
           filenames:
             - "src/mongo_crypt_shared_v1-${push_name}-${push_arch}*"
 
+  # Sys-perf relies on this task for uploading pgo data please reach out before changing it.
+  - name: upload_pgo_bolt_data
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    run_on: amazon2023-arm64-latest-small
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-profile_data
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/install-profile_data/bin/bolt.fdata
+          remote_file: profiling_data/bolt/mongod_${revision}_${build_arch}_clang_thinlto_pgo_bolt_${version}.fdata
+          bucket: mdb-build-public
+          permissions: public-read
+          skip_existing: true
+          content_type: text/plain
+          display_name: Bolt
+          optional: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/install-profile_data/bin/clang_pgo.profdata
+          remote_file: profiling_data/pgo/mongod_${revision}_${build_arch}_clang_thinlto_pgo_${version}.profdata
+          bucket: mdb-build-public
+          permissions: public-read
+          skip_existing: true
+          content_type: text/plain
+          display_name: clang_pgo
+          optional: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/install-profile_data/bin/pgo_gcda.tgz
+          remote_file: profiling_data/pgo/mongod_${revision}_${build_arch}_gcc_lto_pgo_${version}.tgz
+          bucket: mdb-build-public
+          permissions: public-read
+          skip_existing: true
+          content_type: application/tar
+          display_name: gcc_pgo
+          optional: true
+
 ################################################
 #                 Task Groups                  #
 ################################################
@@ -1432,6 +1479,11 @@ task_groups:
       - compile_dbtest
       - run_dbtest
       - archive_dbtest
+
+  - <<: *compile_task_group_template
+    name: upload_pgo_bolt_data_TG
+    tasks:
+      - upload_pgo_bolt_data
 
   - name: crypt_build_debug_and_test
     setup_task:

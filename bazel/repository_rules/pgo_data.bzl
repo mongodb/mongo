@@ -1,6 +1,5 @@
-# TODO(SERVER-107522): Get perf data from the actual training pipeline
-DEFAULT_CLANG_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/pgolto.profdata"
-DEFAULT_CLANG_PGO_DATA_CHECKSUM = "9ce0bbfce69b4b4d3032f2b2078a6de3aeae3aa8cf16b00bd1016ee5fcb839da"
+DEFAULT_CLANG_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_116f96eddd1d9874aefd658a13128bdb3bf51f08_aarch64_clang_thinlto_pgo_8.3.0-alpha0-853-g116f96e-patch-68b241eebc6b210007c6d29a.profdata"
+DEFAULT_CLANG_PGO_DATA_CHECKSUM = "1f49c6e5a29a43219101c7ed817b30bbb6b3519590d66c19d7d6da2cd09cb8be"
 
 DEFAULT_GCC_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/pgo_gcda.tgz"
 DEFAULT_GCC_PGO_DATA_CHECKSUM = "4a0f3191776d2b8cc36fe2d69b07034b325c9989252e412bacfef35826362c35"
@@ -8,6 +7,33 @@ DEFAULT_GCC_PGO_DATA_CHECKSUM = "4a0f3191776d2b8cc36fe2d69b07034b325c9989252e412
 # TODO(SERVER-107582): Get llvm-profdata from actual pipeline build
 LLVM_PROFDATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/llvm-profdata"
 LLVM_PROFDATA_CHECKSUM = "90ff926b362ca728c60dc7869184560d3b63436a6ea20606c7cd9b9524c5f470"
+
+# This is used so we can tell when the build created new pgo files vs. using ones from stored url
+CREATED_FILEGROUP = """
+filegroup(
+    name = "created_clang_pgo_files",
+    srcs = glob(["**/*.profdata"]),
+)
+
+filegroup(
+    name = "created_gcc_pgo_files",
+    srcs = glob(["**/*.gcda"]),
+)
+"""
+
+EMPTY_CREATED_FILEGROUP = """
+filegroup(
+    name = "created_clang_pgo_files",
+    srcs = [],
+    target_compatible_with = ["@platforms//:incompatible"],
+)
+
+filegroup(
+    name = "created_gcc_pgo_files",
+    srcs = [],
+    target_compatible_with = ["@platforms//:incompatible"],
+)
+"""
 
 # recursion and while loops are not allowed, we can only count files to a certain depth
 def get_all_files(root_path, depth):
@@ -30,6 +56,7 @@ def _setup_pgo_data(repository_ctx):
     # This potentially contains multiple urls, separated by a | eg. url1|url2|url3
     pgo_urls_env = repository_ctx.os.environ.get("pgo_profile_url", None)
     clang_profdata_filename = "clang_pgo.profdata"
+    created_files = EMPTY_CREATED_FILEGROUP
 
     # We should be using the default pgo data because we are not being passed pgo data
     if pgo_urls_env == None:
@@ -47,6 +74,7 @@ def _setup_pgo_data(repository_ctx):
         # but this is currently unsupported by us
 
         pgo_urls = pgo_urls_env.split("|")
+        created_files = CREATED_FILEGROUP
 
         # They are passing us a single clang profdata file, just download the file
         if len(pgo_urls) == 1 and pgo_urls[0].endswith(".profdata"):
@@ -89,7 +117,8 @@ filegroup(
     name = "gcc_pgo_files",
     srcs = glob(["**/*.gcda"]),
 )
-""",
+
+""" + created_files,
     )
 
 setup_pgo_data = repository_rule(

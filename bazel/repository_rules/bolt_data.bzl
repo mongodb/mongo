@@ -1,8 +1,23 @@
 load("//bazel/repository_rules:pgo_data.bzl", "get_all_files")
 
-# TODO(SERVER-107522): Get perf data from the actual training pipeline
-DEFAULT_BOLT_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/ltopgobolt.fdata"
-DEFAULT_BOLT_DATA_CHECKSUM = "e2e0ea260d0436d77bd8a3a6513fed60de39ffbc04425663c03f9608d6a20f39"
+DEFAULT_BOLT_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_116f96eddd1d9874aefd658a13128bdb3bf51f08_aarch64_clang_thinlto_pgo_bolt_8.3.0-alpha0-853-g116f96e-patch-68b241eebc6b210007c6d29a.fdata"
+DEFAULT_BOLT_DATA_CHECKSUM = "6f369d307d0c38c55d925d34bbe79b1e175e5863eae20166798c36047b29cab9"
+
+# This is used so we can tell when the build created new bolt files vs. using ones from stored url
+CREATED_FILEGROUP = """
+filegroup(
+    name = "created_bolt_fdata",
+    srcs = glob(["**/*.fdata"]),
+)
+"""
+
+EMPTY_CREATED_FILEGROUP = """
+filegroup(
+    name = "created_bolt_fdata",
+    srcs = [],
+    target_compatible_with = ["@platforms//:incompatible"],
+)
+"""
 
 def _setup_bolt_data(repository_ctx):
     bolt_fdata_filename = "bolt.fdata"
@@ -15,6 +30,8 @@ def _setup_bolt_data(repository_ctx):
 
     # Incase you want to bolt a binary instead of the main binary mongod
     bolt_binary_name = repository_ctx.os.environ.get("bolt_binary_name", None)
+
+    created_files = EMPTY_CREATED_FILEGROUP
 
     # Perf2bolt will use the path to call the perf tool
     path_env = repository_ctx.os.environ.get("PATH", None)
@@ -36,6 +53,7 @@ def _setup_bolt_data(repository_ctx):
         # into a single fdata file using merge-fdata
 
         bolt_urls = bolt_profile_urls_env.split("|")
+        created_files = CREATED_FILEGROUP
 
         # They are passing us a single bolt fdata file, just download the file
         if len(bolt_urls) == 1 and bolt_urls[0].endswith(".fdata"):
@@ -100,7 +118,7 @@ filegroup(
     name = "bolt_fdata",
     srcs = glob(["**/*.fdata"]),
 )
-""",
+""" + created_files,
     )
 
 setup_bolt_data = repository_rule(

@@ -4,6 +4,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
 load("@npm//:prettier/package_json.bzl", prettier = "bin")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
 load("//bazel/config:render_template.bzl", "render_template")
@@ -556,4 +557,22 @@ bolt_optimize(
 filegroup(
     name = "clang_tidy_config_files",
     srcs = [],
+)
+
+# This target only does anything meaningful if you pass pgo_profile_url and bolt_profile_url
+# as repo_envs to the build
+mongo_install(
+    name = "profile_data",
+    srcs = ["@bolt_data//:created_bolt_fdata"] + select({
+        "//bazel/config:compiler_type_gcc": ["created_pgo_gcda"],
+        "//bazel/config:compiler_type_clang": ["@pgo_data//:created_clang_pgo_files"],
+        "//conditions:default": [],
+    }),
+)
+
+pkg_tar(
+    name = "created_pgo_gcda",
+    srcs = ["@pgo_data//:created_gcc_pgo_files"],
+    extension = "tgz",
+    package_dir = "mongod_perf",
 )
