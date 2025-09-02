@@ -1407,6 +1407,7 @@ public:
         return std::make_unique<SDesc>(options, ComparatorDesc{}, BoundMakerDesc{}, checkInput);
     }
 
+    SorterTracker sorterTracker;
     std::unique_ptr<S> sorter = makeAsc({});
 };
 TEST_F(BoundedSorterTest, Empty) {
@@ -1518,7 +1519,6 @@ TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
 }
 
 TEST_F(BoundedSorterTest, SpillSorted) {
-    SorterTracker sorterTracker;
     auto options = SortOptions()
                        .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
@@ -1565,7 +1565,6 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
 }
 
 TEST_F(BoundedSorterTest, SpillAlmostSorted) {
-    SorterTracker sorterTracker;
     auto options = SortOptions()
                        .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
@@ -1631,7 +1630,6 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
 }
 
 TEST_F(BoundedSorterTest, LimitNoSpill) {
-    SorterTracker sorterTracker;
     auto options = SortOptions()
                        .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
@@ -1664,7 +1662,6 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
 }
 
 TEST_F(BoundedSorterTest, LimitSpill) {
-    SorterTracker sorterTracker;
     auto options = SortOptions()
                        .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
@@ -1939,7 +1936,6 @@ TEST_F(BoundedSorterTest, CompoundLimit) {
 }
 
 TEST_F(BoundedSorterTest, CompoundSpill) {
-    SorterTracker sorterTracker;
     auto options = SortOptions()
                        .ExtSortAllowed()
                        .TempDir("unused_temp_dir")
