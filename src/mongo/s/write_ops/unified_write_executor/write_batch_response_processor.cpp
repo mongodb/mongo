@@ -187,7 +187,7 @@ Result WriteBatchResponseProcessor::handleLocalError(OperationContext* opCtx,
         return {ErrorType::kStopProcessing, {}, {}};
     }
     noteErrorResponseOnAbort(op.getId(), status);
-    return {};
+    return {ErrorType::kUnrecoverable};
 }
 
 Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,

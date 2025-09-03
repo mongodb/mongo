@@ -237,12 +237,6 @@ selector:
     - jstests/core/query/bulk/bulk_write_non_retryable_cursor.js
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
     - jstests/core/query/bulk/bulk_write.js
-    # TODO: SERVER-104120 require writes without shard key.
-    - jstests/core/query/inc/inc_negative_overflow.js
-    - jstests/core/query/update/update_inc_implicit_subfield.js
-    # TODO: SERVER-104120 same as above, many of these run updates without shard key.
-    - jstests/core/query/pull/**/*.js
-    - jstests/core/query/push/**/*.js
     # TODO: SERVER-108068 correctly handle collection uuid mismatch errors.
     - jstests/core/query/parsing/collection_uuid_write_commands.js
 
