@@ -70,7 +70,7 @@ During multiplanning, each `QuerySolution` is evaluated by running each candidat
 
 > ### Aside: Yielding
 >
-> "Yielding" refers to releasing locks on storage resources during execution to prevent long-running queries from blocking other queries. By default, queries are intended to yield every 10ms or 1000 iterations.
+> "Yielding" refers to releasing locks on storage resources during execution to prevent long-running queries from blocking other queries. By default, queries are intended to yield every 10ms.
 >
 > During multiplanning, [`tryYield()`](https://github.com/mongodb/mongo/blob/804e6f131091af60245b44ebada26cbdd2d34307/src/mongo/db/exec/multi_plan.cpp#L207) is called both between `work()` calls and when a `work()` returns `NEED_YIELD`, in order to ensure yielding is performed adequately. `tryYield()` takes a [`PlanYieldPolicy`](https://github.com/mongodb/mongo/blob/804e6f131091af60245b44ebada26cbdd2d34307/src/mongo/db/query/plan_yield_policy.h#L78), which is passed through `work()` to indicate to the executor whether to yield under the current configuration.
 

@@ -27,7 +27,7 @@ Content to be added by [SERVER-98884](https://jira.mongodb.org/browse/SERVER-988
 
 Yielding means releasing database locks during the execution of a query, i.e. locks on storage resources. This includes unlocking the storage snapshot being used for the query. It is done to prevent long-running queries from hogging locks and snapshots that would significantly block progress by other queries and/or prevent storage from reclaiming the space from old snapshots. It is possible that after a yield, if the snapshot previously being used is no longer available, the query may be unable to resume and therefore will fail.
 
-Queries are intended to yield at least every 10 ms or every 1,000 iterations by default. These are configurable via the **internalQueryExecYieldPeriodMS** and **internalQueryExecYieldIterations** [query knobs](https://github.com/mongodb/mongo/blob/60cb097488030c1b3e3096073a96cbeff603458d/src/mongo/db/query/query_knobs.idl#L399-L413), respectively.
+Queries are intended to yield at least every 10 ms by default. Yielding is configurable via the **internalQueryExecYieldPeriodMS** and **internalQueryExecYieldIterations** [query knobs](https://github.com/mongodb/mongo/blob/60cb097488030c1b3e3096073a96cbeff603458d/src/mongo/db/query/query_knobs.idl#L399-L413), respectively.
 
 **PlanExecutorImpl** and **PlanExecutorSBE**, in the mongo::PlanStage or sbe::PlanStage stages they are executing, yield by calling down into **PlanYieldPolicy::yieldOrInterrupt()**, which itself may call down into **PlanYieldPolicy::performYield()** or **PlanYieldPolicy::performYieldWithAcquisitions()**, which perform the actual yields as follows:
 
