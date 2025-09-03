@@ -35,6 +35,15 @@
 
 namespace mongo::ce {
 
+enum class NoProjection {};
+
+using TopLevelFieldsProjection = StringSet;
+
+/**
+ * std::variant type used to specify whether we should project fields when generating the sample.
+ */
+using ProjectionParams = std::variant<NoProjection, TopLevelFieldsProjection>;
+
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 
 class SamplingEstimator {
@@ -81,6 +90,8 @@ public:
     virtual std::vector<CardinalityEstimate> estimateRIDs(
         const std::vector<const IndexBounds*>& bounds,
         const std::vector<const MatchExpression*>& expressions) const = 0;
+
+    virtual void generateSample(ce::ProjectionParams projectionParams) = 0;
 };
 
 }  // namespace mongo::ce

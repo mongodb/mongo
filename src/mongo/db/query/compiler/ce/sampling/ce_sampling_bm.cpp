@@ -30,6 +30,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -1213,6 +1214,8 @@ void BM_RunAllConfigs(benchmark::State& state) {
                         samplingStyle.first,
                         samplingStyle.second,
                         SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+                    samplingEstimator.generateSample(ce::NoProjection{});
+
                     auto createSample_end = high_resolution_clock::now();
                     duration<double, std::milli> ms_doubleCREATESAMPLE =
                         createSample_end - createSample_start;
@@ -1304,6 +1307,7 @@ void BM_CreateSample(benchmark::State& state) {
             sampling.first,
             sampling.second,
             SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+        samplingEstimator.generateSample(ce::NoProjection{});
     }
 }
 
@@ -1351,6 +1355,7 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
         sampling.first,
         sampling.second,
         SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate queries.
     std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals =
@@ -1403,11 +1408,10 @@ void BM_RunCardinalityEstimationOnSampleWithProjection(benchmark::State& state) 
     auto sampling =
         iniitalizeSamplingAlgoBasedOnChunks(/*samplingAlgo-numOfChunks*/ state.range(3));
 
-    std::vector<std::string> queryFieldNames;
+    StringSet queryFieldNames;
     for (const auto& queryField : workloadConfig.queryConfig.queryFields) {
-        queryFieldNames.push_back(queryField.fieldName);
+        queryFieldNames.insert(queryField.fieldName);
     }
-
 
     // Create sample from the provided collection
     SamplingEstimatorImpl samplingEstimator(
@@ -1417,8 +1421,8 @@ void BM_RunCardinalityEstimationOnSampleWithProjection(benchmark::State& state) 
         sampleSize,
         sampling.first,
         sampling.second,
-        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
-        queryFieldNames);
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+    samplingEstimator.generateSample(queryFieldNames);
 
     // Generate queries.
     std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals =

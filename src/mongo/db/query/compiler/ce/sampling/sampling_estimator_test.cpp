@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -54,7 +57,7 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const size_t kSampleSize = 5;
 const int numChunks = 10;
-const std::vector<std::string> includedSampleFields = {"_id", "a", "b", "obj"};
+const StringSet includedSampleFields = {"_id", "a", "b", "obj"};
 
 TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(10));
@@ -73,6 +76,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
@@ -94,8 +98,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  includedSampleFields);
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(includedSampleFields);
 
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
@@ -128,6 +132,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
                                                       SamplingEstimatorImpl::SamplingStyle::kChunk,
                                                       chunkNum,
                                                       makeCardinalityEstimate(2000));
+        samplingEstimator.generateSample(ce::NoProjection{});
 
         auto sample = samplingEstimator.getSample();
         bool chunkHitEOF = false;
@@ -182,8 +187,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
                                                       sampleSize,
                                                       SamplingEstimatorImpl::SamplingStyle::kChunk,
                                                       chunkNum,
-                                                      makeCardinalityEstimate(2000),
-                                                      includedSampleFields);
+                                                      makeCardinalityEstimate(2000));
+        samplingEstimator.generateSample(includedSampleFields);
 
         auto sample = samplingEstimator.getSample();
         for (auto& doc : sample) {
@@ -245,6 +250,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   boost::none, /* numChunks */
                                                   makeCardinalityEstimate(collectionSize));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
     // The SamplingEstimator should scan the collection and collect all the documents to generate
@@ -271,8 +277,8 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
                                                   sampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   boost::none, /* numChunks */
-                                                  makeCardinalityEstimate(collectionSize),
-                                                  includedSampleFields);
+                                                  makeCardinalityEstimate(collectionSize));
+    samplingEstimator.generateSample(includedSampleFields);
 
     auto sample = samplingEstimator.getSample();
     // The SamplingEstimator should scan the collection and collect all the documents to generate
@@ -297,16 +303,15 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
                                             {});
 
 
-    const auto topLevelSampleFieldNames =
-        std::vector<std::string>{"_id", "a", "b", "nil", "arr", "obj"};
+    const auto topLevelSampleFieldNames = StringSet{"_id", "a", "b", "nil", "arr", "obj"};
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  topLevelSampleFieldNames);
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
     // The SamplingEstimator should scan the collection and collect all the documents to generate
@@ -330,7 +335,7 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
                                             false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                             {});
 
-    const auto topLevelSampleFieldNames = std::vector<std::string>{"a"};
+    const auto topLevelSampleFieldNames = StringSet{"a"};
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -338,8 +343,8 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  topLevelSampleFieldNames);
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
     // The SamplingEstimator should scan the collection and collect all the documents to generate
@@ -351,7 +356,7 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
     }
 }
 
-TEST_F(SamplingEstimatorTest, ProjectEmptySetRandomSampling) {
+TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
     AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
@@ -361,15 +366,14 @@ TEST_F(SamplingEstimatorTest, ProjectEmptySetRandomSampling) {
                                             false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                             {});
 
-    const auto topLevelSampleFieldNames = std::vector<std::string>{};
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  topLevelSampleFieldNames);
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
     // The SamplingEstimator should scan the collection and collect all the documents to generate
@@ -382,7 +386,6 @@ TEST_F(SamplingEstimatorTest, ProjectEmptySetRandomSampling) {
     }
 }
 
-
 TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
@@ -393,6 +396,7 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
                                             false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                             {});
 
+    const auto topLevelSampleFieldNames = StringSet{"c"};
     // Project field "c" which does not exist on any documents in the collection.
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -400,8 +404,8 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  std::vector<std::string>{"c"});
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
     // The SamplingEstimator should scan the collection and collect all the documents to generate
@@ -431,6 +435,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
@@ -478,6 +483,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // All documents in the collection satisfy the predicate.
         auto operand = BSON("$lt" << 100);
@@ -534,6 +540,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
@@ -542,8 +549,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
-        makeCardinalityEstimate(card),
-        std::vector<std::string>{"a", "b"});
+        makeCardinalityEstimate(card));
+    samplingEstimatorWithProjection.generateSample(StringSet{"a", "b"});
 
     {  // All documents in the collection satisfy the predicate.
         auto operand = BSON("$lt" << 100);
@@ -615,6 +622,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // Range predicate on "a" with 20% selectivity: a > 40 && a < 60.
         auto operand1 = BSON("$gte" << 40);
@@ -697,6 +705,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 30);
     LTMatchExpression lt("a"_sd, operand1["$lt"]);
@@ -750,6 +759,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
         colls,
@@ -757,8 +767,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
-        makeCardinalityEstimate(card),
-        std::vector<std::string>{"nil"});
+        makeCardinalityEstimate(card));
+    samplingEstimatorWithProjection.generateSample(StringSet{"nil"});
 
     // 1 doc that does not have field "nil".
     auto expectedEstimate = makeCardinalityEstimate(samplingEstimator.getCollCard() - 1);
@@ -790,6 +800,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     // Test IndexBounds with single field.
     OrderedIntervalList list("a");
@@ -880,7 +891,7 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
-
+    samplingEstimator.generateSample(ce::NoProjection{});
     // Test IndexBounds with single field.
     OrderedIntervalList list("arr");
     list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
@@ -937,6 +948,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 20);
     LTMatchExpression lt("a"_sd, operand1["$lt"]);
@@ -1025,6 +1037,54 @@ TEST_F(SamplingEstimatorTest, IndexKeysGenerationTest) {
     }
 }
 
+TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionDottedPath) {
+    auto filter = fromjson("{a: 1, b: {c: 2}, b: {c: {d: 3}}}");
+    auto expr = parse(filter);
+    auto topLevelFields = ce::extractTopLevelFieldsFromMatchExpression(expr.get());
+    // Expect only top level fields, a and b to be included.
+    std::set<std::string> expectedFields{"a", "b"};
+
+    ASSERT_EQUALS(topLevelFields.size(), expectedFields.size());
+    for (const auto& topLevelField : topLevelFields) {
+        ASSERT_TRUE(expectedFields.contains(topLevelField));
+    }
+}
+
+TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionRootedOr) {
+    auto filter = fromjson("{$or: [{a: 1}, {b: 2}, {c: 3}]}");
+    auto expr = parse(filter);
+    auto topLevelFields = ce::extractTopLevelFieldsFromMatchExpression(expr.get());
+
+    std::set<std::string> expectedFields{"a", "b", "c"};
+
+    ASSERT_EQUALS(topLevelFields.size(), expectedFields.size());
+    for (const auto& topLevelField : topLevelFields) {
+        ASSERT_TRUE(expectedFields.contains(topLevelField));
+    }
+}
+
+TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionDuplicateField) {
+    auto filter = fromjson("{$or: [{a: 1}, {a: 2}, {a: 3}]}");
+    auto expr = parse(filter);
+    auto topLevelFields = ce::extractTopLevelFieldsFromMatchExpression(expr.get());
+
+    // Duplicate field names should not be included.
+    ASSERT_EQUALS(topLevelFields.size(), 1);
+    ASSERT_EQUALS(*topLevelFields.begin(), "a"_sd);
+}
+
+TEST_F(SamplingEstimatorTest, ExtractTopLevelFieldsFromMatchExpressionNestedAndOr) {
+    auto filter = fromjson("{$and: [{$or: [{a: 1}, {$and: [{b: 2}, {c: 3}]}]}, {d: 4}]}");
+    auto expr = parse(filter);
+    auto topLevelFields = ce::extractTopLevelFieldsFromMatchExpression(expr.get());
+    std::set<std::string> expectedFields{"a", "b", "c", "d"};
+
+    ASSERT_EQUALS(topLevelFields.size(), expectedFields.size());
+    for (const auto& topLevelField : topLevelFields) {
+        ASSERT_TRUE(expectedFields.contains(topLevelField));
+    }
+}
+
 DEATH_TEST_F(SamplingEstimatorTest,
              IndexBoundsAlignedWithMatchExpression,
              "bounds and expressions should have equal size.") {
@@ -1044,6 +1104,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     OrderedIntervalList list("a");
     list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
@@ -1077,8 +1138,30 @@ DEATH_TEST_F(SamplingEstimatorTest,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  std::vector<std::string>{"a", "b.c"});
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{"a", "b.c"});
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             TopLevelSampleFieldNamesIsEmpty,
+             "topLevelSampleFieldNames must be a non-empty set if specified.") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{});
 }
 
 DEATH_TEST_F(SamplingEstimatorTest,
@@ -1099,8 +1182,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  std::vector<std::string>{"a"});
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{"a"});
+
     auto operand = BSON("$eq" << 5);
     EqualityMatchExpression eq("b"_sd, operand["$eq"]);
     samplingEstimator.estimateCardinality(&eq);
@@ -1124,8 +1208,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  std::vector<std::string>{"a"});
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{"a"});
+
     auto operand = BSON("$eq" << 5);
     EqualityMatchExpression eq("b"_sd, operand["$eq"]);
     samplingEstimator.estimateCardinality(std::vector<const MatchExpression*>{&eq});
@@ -1149,8 +1234,8 @@ DEATH_TEST_F(SamplingEstimatorTest,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10),
-                                                  std::vector<std::string>{"a"});
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{"a"});
     auto operand = BSON("$eq" << 5);
     EqualityMatchExpression eq("b"_sd, operand["$eq"]);
     OrderedIntervalList list("b");
@@ -1161,5 +1246,168 @@ DEATH_TEST_F(SamplingEstimatorTest,
     IndexBounds bounds;
     bounds.fields.push_back(list);
     samplingEstimator.estimateRIDs(bounds, &eq);
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             SampleDoesNotContainFieldInIndexBoundsEstimateRIDs,
+             "Field in index bounds should be included in the set of sampled fields") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{"a", "b"});
+
+    const auto filter = fromjson("{a: 1, b: 2}");
+    const auto expr = parse(filter);
+
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
+    OrderedIntervalList listB("b");
+    listB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 2 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
+    // Index bounds contain field c but sample does not.
+    OrderedIntervalList listC("c");
+    listC.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields = {listA, listB, listC};
+    samplingEstimator.estimateRIDs(bounds, expr.get());
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             SampleDoesNotContainFieldInIndexBoundsEstimateKeysScanned,
+             "Field in index bounds should be included in the set of sampled fields") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+    samplingEstimator.generateSample(StringSet{"a", "b"});
+
+    const auto filter = fromjson("{a: 1, b: 2}");
+    const auto expr = parse(filter);
+
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
+    OrderedIntervalList listB("b");
+    listB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 2 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
+    // Index bounds contain field c but sample does not.
+    OrderedIntervalList listC("c");
+    listC.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields = {listA, listB, listC};
+    samplingEstimator.estimateKeysScanned(bounds);
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             SampleNotGeneratedEstimateKeysScanned,
+             "Sample must be generated before calling") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+
+    const auto filter = fromjson("{a: 1}");
+    const auto expr = parse(filter);
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields = {listA};
+    samplingEstimator.estimateKeysScanned(bounds);
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             SampleNotGeneratedEstimateRIDs,
+             "Sample must be generated before calling") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+
+    const auto filter = fromjson("{a: 1}");
+    const auto expr = parse(filter);
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields = {listA};
+    samplingEstimator.estimateRIDs(bounds, expr.get());
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             SampleNotGeneratedEstimateCardinality,
+             "Sample must be generated before calling") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+
+    const auto filter = fromjson("{a: 1}");
+    const auto expr = parse(filter);
+    samplingEstimator.estimateCardinality(expr.get());
 }
 }  // namespace mongo::ce

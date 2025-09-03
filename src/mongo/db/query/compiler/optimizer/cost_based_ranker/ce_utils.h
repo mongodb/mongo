@@ -53,4 +53,5 @@ SelectivityEstimate conjExponentialBackoff(std::span<SelectivityEstimate> conjSe
  */
 SelectivityEstimate disjExponentialBackoff(std::span<SelectivityEstimate> disjSelectivities);
 
+void addFieldsToRelevantIndexOutput(const BSONObj& keyPattern, StringSet& relevantIndexOutput);
 }  // namespace mongo::cost_based_ranker

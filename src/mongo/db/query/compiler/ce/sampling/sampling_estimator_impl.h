@@ -37,6 +37,10 @@
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::ce {
+/**
+ * Helper function to extract the top level fields from a given MatchExpression.
+ */
+StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
 
 /**
  * This CE Estimator estimates cardinality of predicates by running a filter/MatchExpression against
@@ -51,9 +55,7 @@ public:
     /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
      * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
-     * sampling method. 'topLevelSampleFieldNames' is the set of top level field names that we want
-     * to include in the sampled documents. We assume that topLevelSampleFieldNames are all the top
-     * level predicate fields of a given query.
+     * sampling method.
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -62,8 +64,7 @@ public:
                           CardinalityEstimate collectionCard,
                           SamplingConfidenceIntervalEnum ci,
                           double marginOfError,
-                          boost::optional<int> numChunks,
-                          std::vector<std::string> topLevelSampleFieldNames = {});
+                          boost::optional<int> numChunks);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -77,8 +78,7 @@ public:
                           size_t sampleSize,
                           SamplingStyle samplingStyle,
                           boost::optional<int> numChunks,
-                          CardinalityEstimate collectionCard,
-                          std::vector<std::string> topLevelSampleFieldNames = {});
+                          CardinalityEstimate collectionCard);
     ~SamplingEstimatorImpl() override;
 
     /**
@@ -133,6 +133,15 @@ public:
      */
     void generateChunkSample(size_t sampleSize);
     void generateChunkSample();
+
+    /*
+     * Generates a sample of documents from the collection using random, chunk-based, sequential
+     * scan or full collection scan sampling strategies based on configuration. 'projectionParams'
+     * is a std::variant that specifies whether we want to project the top level fields in a sample.
+     * If the variant type is TopLevelFieldsProjection we expect a set of top level fields that we
+     * want to include in the sampled documents.
+     */
+    void generateSample(ce::ProjectionParams projectionParams) override;
 
     /*
      * Returns the sample size calculated by SamplingEstimator.
@@ -252,9 +261,11 @@ private:
     // optimized.
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    SamplingStyle _samplingStyle;
     size_t _sampleSize;
     // The set of top level fields that we want to include in the sampled documents.
-    std::vector<std::string> _topLevelSampleFieldNames;
+    StringSet _topLevelSampleFieldNames;
+    bool _isSampleGenerated = false;
 
     boost::optional<int> _numChunks;
 

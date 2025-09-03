@@ -102,4 +102,13 @@ SelectivityEstimate disjExponentialBackoff(std::span<SelectivityEstimate> disjSe
     return expBackoffInternal<false /*isConjunction*/>(disjSelectivities);
 }
 
+void addFieldsToRelevantIndexOutput(const BSONObj& keyPattern, StringSet& relevantIndexOutput) {
+    const auto& keyNames = keyPattern.getFieldNames<StringSet>();
+    for (const auto& keyName : keyNames) {
+        auto dotPos = keyName.find('.');
+        relevantIndexOutput.insert(
+            keyName.substr(0, dotPos != std::string::npos ? dotPos : keyName.size()));
+    }
+}
+
 }  // namespace mongo::cost_based_ranker

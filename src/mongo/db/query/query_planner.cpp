@@ -937,9 +937,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
     return attemptCollectionScan(query, isTailable, params);
 }
 
-
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
-    const CanonicalQuery& query, const QueryPlannerParams& params) {
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    boost::optional<StringSet&> relevantIndexOutput) {
     LOGV2_DEBUG(20967,
                 5,
                 "Beginning planning",
@@ -1113,6 +1114,13 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                     "Relevant index",
                     "indexNumber"_attr = i,
                     "index"_attr = relevantIndices[i].toString());
+
+        // If the relevantIndexOutput argument is given, then we populate it with the top level
+        // field names of all the keys in the set of relevantIndices.
+        if (relevantIndexOutput) {
+            cost_based_ranker::addFieldsToRelevantIndexOutput(relevantIndices[i].keyPattern,
+                                                              relevantIndexOutput.get());
+        }
     }
 
     // Figure out how useful each index is to each predicate.
@@ -1431,10 +1439,19 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
                     LOGV2_DEBUG(
                         20981, 5, "Planner: outputting soln that uses index to provide sort");
-                    auto soln = buildWholeIXSoln(fullIndexList[i], query, params, direction);
+                    auto index = fullIndexList[i];
+                    auto soln = buildWholeIXSoln(index, query, params, direction);
                     // If the solution was created to satisfy a sort requirement for distinct scan,
                     // ensure we have a distinct scan plan.
                     if (soln && (providesSort || soln->hasNode(STAGE_DISTINCT_SCAN))) {
+                        if (relevantIndexOutput) {
+                            // We generated a plan that used an index that was not over any of the
+                            // predicates in the query and thus not in the list of relevantIndices.
+                            // As a result, we need to add the fields of this index to the
+                            // relevantIndexOutput set.
+                            cost_based_ranker::addFieldsToRelevantIndexOutput(
+                                index.keyPattern, relevantIndexOutput.get());
+                        }
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                         indexTree->setIndexEntry(fullIndexList[i]);
                         SolutionCacheData* scd = new SolutionCacheData();
@@ -1478,6 +1495,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             if (soln && !soln->root()->fetched()) {
                 LOGV2_DEBUG(
                     20983, 5, "Planner: outputting soln that uses index to provide projection");
+                if (relevantIndexOutput) {
+                    // We generated a plan that used an index that was not over any of the
+                    // predicates in the query and thus not in the list of relevantIndices used.
+                    // As a result, we need to add the fields of this index to the
+                    // relevantIndexOutput set.
+                    cost_based_ranker::addFieldsToRelevantIndexOutput(index.keyPattern,
+                                                                      relevantIndexOutput.get());
+                }
                 PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                 indexTree->setIndexEntry(index);
 
@@ -1602,15 +1627,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedRanking(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
-    const ce::SamplingEstimator* samplingEstimator,
-    const ce::ExactCardinalityEstimator* exactCardinality) {
+    ce::SamplingEstimator* samplingEstimator,
+    const ce::ExactCardinalityEstimator* exactCardinality,
+    StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns) {
     using namespace cost_based_ranker;
-
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(query, params);
-    if (!statusWithMultiPlanSolns.isOK()) {
-        return statusWithMultiPlanSolns.getStatus();
-    }
-
     auto cbrMode = params.planRankerMode;
     EstimateMap estimates;
     const auto& collInfo = params.mainCollectionInfo;
@@ -1996,8 +2016,9 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     const CollectionPtr& collection,
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
-    const ce::SamplingEstimator* samplingEstimator,
-    const ce::ExactCardinalityEstimator* exactCardinality) {
+    ce::SamplingEstimator* samplingEstimator,
+    const ce::ExactCardinalityEstimator* exactCardinality,
+    boost::optional<StringSet&> topLevelSampleFieldNames) {
     invariant(query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
     invariant(query.getPrimaryMatchExpression()->numChildren(),
               "Cannot plan subqueries for an $or with no children");
@@ -2061,28 +2082,18 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             // considering any plan that's a collscan.
             invariant(branchResult->solutions.empty());
 
-            auto cbrMode = params.planRankerMode;
-            if (cbrMode != QueryPlanRankerModeEnum::kMultiPlanning) {
-                auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-                    *branchResult->canonicalQuery, params, samplingEstimator, exactCardinality);
-                if (!statusWithCBRSolns.isOK()) {
-                    str::stream ss;
-                    ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString()
-                       << " " << statusWithCBRSolns.getStatus().reason();
-                    return statusWithCBRSolns.getStatus().withContext(ss);
-                }
-                branchResult->solutions = std::move(statusWithCBRSolns.getValue().solutions);
-            } else {
-                auto statusWithMultiPlanSolns =
-                    QueryPlanner::plan(*branchResult->canonicalQuery, params);
-                if (!statusWithMultiPlanSolns.isOK()) {
-                    str::stream ss;
-                    ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString()
-                       << " " << statusWithMultiPlanSolns.getStatus().reason();
-                    return Status(ErrorCodes::BadValue, ss);
-                }
-                branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
+            auto statusWithMultiPlanSolns = samplingEstimator
+                ? QueryPlanner::plan(
+                      *branchResult->canonicalQuery, params, topLevelSampleFieldNames)
+                : QueryPlanner::plan(*branchResult->canonicalQuery, params);
+
+            if (!statusWithMultiPlanSolns.isOK()) {
+                str::stream ss;
+                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
+                   << statusWithMultiPlanSolns.getStatus().reason();
+                return Status(ErrorCodes::BadValue, ss);
             }
+            branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
 
             LOGV2_DEBUG(20601,
                         5,

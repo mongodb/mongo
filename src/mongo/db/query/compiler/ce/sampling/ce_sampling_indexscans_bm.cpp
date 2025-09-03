@@ -316,6 +316,7 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
         samplingStyle.first,
         samplingStyle.second,
         SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate query intervals.
     // One vector element per query field, each element is a vector of numberOfQueries intervals.
@@ -385,6 +386,7 @@ void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& s
         samplingStyle.first,
         samplingStyle.second,
         SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+    samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate query intervals.
     // One vector element per query field, each element is a vector of numberOfQueries intervals.

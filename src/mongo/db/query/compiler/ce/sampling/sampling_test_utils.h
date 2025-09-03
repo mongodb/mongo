@@ -170,8 +170,8 @@ public:
     /**
      * Helper to create sampling estimator for unit tests.
      */
-    SamplingEstimatorForTesting createSamplingEstimatorForTesting(size_t collCard,
-                                                                  size_t sampleSize);
+    SamplingEstimatorForTesting createSamplingEstimatorForTesting(
+        size_t collCard, size_t sampleSize, ce::ProjectionParams projectionParams);
 
     NamespaceString _kTestNss;
 };

@@ -203,18 +203,24 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         return nullptr;
     };
 
+    auto multiCollectionAccessor = [&]() -> MultipleCollectionAccessor {
+        if (collection().isAcquisition()) {
+            return MultipleCollectionAccessor{collection().getAcquisition()};
+        }
+        return MultipleCollectionAccessor{collection().getCollectionPtr()};
+    }();
     auto rankerMode = _query->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
+    // Populating the 'topLevelSampleFieldNames' requires 2 steps:
+    //  1. Extract the set of top level fields from the filter, sort and project components of the
+    //  CanonicalQuery.
+    //  2. Extract the fields of the relevant indexes for each branch of the rooted $or by passing
+    //  in the pointer to 'topLevelSampleFieldNames' to planSubqueries().
+    StringSet topLevelSampleFieldNames;
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
     if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
         rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         using namespace cost_based_ranker;
-        auto multiCollectionAccessor = [&]() -> MultipleCollectionAccessor {
-            if (collection().isAcquisition()) {
-                return MultipleCollectionAccessor{collection().getAcquisition()};
-            }
-            return MultipleCollectionAccessor{collection().getCollectionPtr()};
-        }();
         auto samplingMode =
             _query->getExpCtx()->getQueryKnobConfiguration().getInternalQuerySamplingCEMethod();
         samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
@@ -230,18 +236,63 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             _query->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
             samplingMarginOfError.load(),
             internalQueryNumChunksForChunkBasedSampling.load());
+        topLevelSampleFieldNames =
+            ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
     } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
         exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
             collectionPtr(), *_query, expCtx()->getOperationContext());
     }
+
+    auto subplanningStatus = samplingEstimator
+        ? QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
+                                       getSolutionCachedData,
+                                       collectionPtr(),
+                                       *_query,
+                                       plannerParams,
+                                       samplingEstimator.get(),
+                                       exactCardinality.get(),
+                                       topLevelSampleFieldNames)
+        : QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
+                                       getSolutionCachedData,
+                                       collectionPtr(),
+                                       *_query,
+                                       plannerParams,
+                                       samplingEstimator.get(),
+                                       exactCardinality.get());
+
+
     // Plan each branch of the $or.
-    auto subplanningStatus = QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
-                                                          getSolutionCachedData,
-                                                          collectionPtr(),
-                                                          *_query,
-                                                          plannerParams,
-                                                          samplingEstimator.get(),
-                                                          exactCardinality.get());
+    if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning && subplanningStatus.isOK()) {
+        if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+            // If we do not have any fields that we want to sample then we just include all the
+            // fields in the sample. This can occur if we encounter a find all query with no project
+            // or sort specified.
+            // TODO: SERVER-108819 We can skip generating the sample entirely in this case and
+            // instead use collection cardinality.
+            samplingEstimator->generateSample(
+                topLevelSampleFieldNames.empty()
+                    ? ce::ProjectionParams{ce::NoProjection{}}
+                    : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+        }
+
+        for (const auto& branchResult : subplanningStatus.getValue().branches) {
+            auto statusWithCBRSolns =
+                QueryPlanner::planWithCostBasedRanking(*branchResult->canonicalQuery,
+                                                       plannerParams,
+                                                       samplingEstimator.get(),
+                                                       exactCardinality.get(),
+                                                       std::move(branchResult->solutions));
+            if (!statusWithCBRSolns.isOK()) {
+                str::stream ss;
+                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
+                   << statusWithCBRSolns.getStatus().reason();
+                subplanningStatus = statusWithCBRSolns.getStatus().withContext(ss);
+                break;
+            }
+            branchResult->solutions = std::move(statusWithCBRSolns.getValue().solutions);
+        }
+    }
+
     if (!subplanningStatus.isOK()) {
         return choosePlanWholeQuery(
             plannerParams, yieldPolicy, shouldConstructClassicExecutableTree);

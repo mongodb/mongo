@@ -133,19 +133,22 @@ public:
      * Uses the indices and other data in 'params' to determine the set of available plans.
      */
     static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> plan(
-        const CanonicalQuery& query, const QueryPlannerParams& params);
+        const CanonicalQuery& query,
+        const QueryPlannerParams& params,
+        boost::optional<StringSet&> relevantIndexOutput = boost::none);
 
     /**
-     * Invokes 'QueryPlanner::plan()' to enumerate the set of possible plans. Then estimate each
-     * plan's cost using the cardinality estimation (CE) and costing modules. The return value
-     * contains a list of plans that were rejected on the basis of cost, as well as any non-rejected
-     * plans from which the caller can select a winner.
+     * Given a set of possible plans, estimate the cost of each plan using the cardinality
+     * estimation (CE) and costing modules. The return value contains a list of plans that were
+     * rejected on the basis of cost, as well as any non-rejected plans from which the caller can
+     * select a winner.
      */
     static StatusWith<CostBasedRankerResult> planWithCostBasedRanking(
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
-        const ce::SamplingEstimator* samplingEstimator,
-        const ce::ExactCardinalityEstimator* exactCardinality);
+        ce::SamplingEstimator* samplingEstimator,
+        const ce::ExactCardinalityEstimator* exactCardinality,
+        StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns);
 
     /**
      * Generates and returns a query solution, given data retrieved from the plan cache.
@@ -173,8 +176,9 @@ public:
         const CollectionPtr& collection,
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
-        const ce::SamplingEstimator* samplingEstimator,
-        const ce::ExactCardinalityEstimator* exactCardinality);
+        ce::SamplingEstimator* samplingEstimator,
+        const ce::ExactCardinalityEstimator* exactCardinality,
+        boost::optional<StringSet&> topLevelSampleFieldNames = boost::none);
 
     /**
      * Generates and returns the index tag tree that will be inserted into the plan cache. This data

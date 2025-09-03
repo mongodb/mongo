@@ -153,8 +153,19 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
             .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
         },
     };
+
+    // Handle sample generation.
+    auto topLevelSampleFieldNames =
+        ce::extractTopLevelFieldsFromMatchExpression(cq->getPrimaryMatchExpression());
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames);
+    samplingEstimator->generateSample(
+        topLevelSampleFieldNames.empty()
+            ? ce::ProjectionParams{ce::NoProjection{}}
+            : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+
     auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-        *cq, plannerParams, samplingEstimator.get(), nullptr);
+        *cq, plannerParams, samplingEstimator.get(), nullptr, std::move(statusWithMultiPlanSolns));
     ASSERT(statusWithCBRSolns.isOK());
     auto solutions = std::move(statusWithCBRSolns.getValue().solutions);
     ASSERT(solutions.size() == 1);

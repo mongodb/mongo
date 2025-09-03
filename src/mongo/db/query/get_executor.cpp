@@ -488,8 +488,37 @@ public:
                     getCollections().getMainCollection(), *_cq, _opCtx);
             }
 
-            auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-                *_cq, *_plannerParams, samplingEstimator.get(), exactCardinality.get());
+            // Populating the 'topLevelSampleFields' requires 2 steps:
+            //  1. Extract the set of top level fields from the filter, sort and project
+            //  components of the CanonicalQuery.
+            //  2. Extract the fields of the relevant indexes from the plan() function by passing in
+            //  the pointer to 'topLevelSampleFieldNames' as an output parameter.
+            auto topLevelSampleFieldNames =
+                ce::extractTopLevelFieldsFromMatchExpression(_cq->getPrimaryMatchExpression());
+            auto statusWithMultiPlanSolns =
+                QueryPlanner::plan(*_cq, *_plannerParams, topLevelSampleFieldNames);
+            if (!statusWithMultiPlanSolns.isOK()) {
+                return statusWithMultiPlanSolns.getStatus().withContext(
+                    str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
+                                  << " planner returned error");
+            }
+            if (samplingEstimator) {
+                // If we do not have any fields that we want to sample then we just include all the
+                // fields in the sample. This can occur if we encounter a find all query with no
+                // project or sort specified.
+                // TODO: SERVER-108819 We can skip generating the sample entirely in this case and
+                // instead use collection cardinality.
+                samplingEstimator->generateSample(
+                    topLevelSampleFieldNames.empty()
+                        ? ce::ProjectionParams{ce::NoProjection{}}
+                        : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+            }
+            auto statusWithCBRSolns =
+                QueryPlanner::planWithCostBasedRanking(*_cq,
+                                                       *_plannerParams,
+                                                       samplingEstimator.get(),
+                                                       exactCardinality.get(),
+                                                       std::move(statusWithMultiPlanSolns));
             if (!statusWithCBRSolns.isOK()) {
                 return statusWithCBRSolns.getStatus();
             }
