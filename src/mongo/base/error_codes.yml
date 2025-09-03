@@ -936,6 +936,11 @@ error_codes:
       name: IngressRequestRateLimitExceeded,
       categories: [SystemOverloadedError, RetriableError],
     }
+  - {
+      code: 463,
+      name: StreamProcessorKinesisRetryableError,
+      categories: [StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
