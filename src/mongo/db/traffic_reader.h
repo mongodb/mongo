@@ -38,9 +38,12 @@
 #pragma once
 
 namespace mongo {
+static const std::string kSessionStartOpType = "sessionStart";
+static const std::string kSessionEndOpType = "sessionEnd";
 
 // Packet struct
 struct TrafficReaderPacket {
+    EventType eventType;
     uint64_t id;
     StringData session;
     Date_t date;

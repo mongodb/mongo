@@ -411,6 +411,9 @@ public:
     }
 
     void start() {
+        // Record a session start event.
+        TrafficRecorder::get(_serviceContext)
+            .observe(session(), Message(), _serviceContext, EventType::kSessionStart);
         _scheduleIteration();
     }
 
@@ -922,6 +925,10 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
 void SessionWorkflow::Impl::terminate() {
     if (_isTerminated.swap(true))
         return;
+
+    // Record a session end event.
+    TrafficRecorder::get(_serviceContext)
+        .observe(session(), Message(), _serviceContext, EventType::kSessionEnd);
 
     session()->end();
 }

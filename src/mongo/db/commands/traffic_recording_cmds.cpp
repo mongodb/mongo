@@ -61,7 +61,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            TrafficRecorder::get(opCtx->getServiceContext()).start(request());
+            TrafficRecorder::get(opCtx->getServiceContext())
+                .start(request(), opCtx->getServiceContext());
             LOGV2(20506,
                   "** Warning: The recording file contains unencrypted user traffic. We recommend "
                   "that you limit retention of this file and store it on an encrypted filesystem "
@@ -102,7 +103,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            TrafficRecorder::get(opCtx->getServiceContext()).stop();
+            TrafficRecorder::get(opCtx->getServiceContext()).stop(opCtx->getServiceContext());
         }
 
     private:

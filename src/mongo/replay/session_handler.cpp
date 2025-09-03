@@ -57,7 +57,7 @@ void SessionHandler::onSessionStart(const ReplayCommand& command) {
 void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
     uassert(ErrorCodes::ReplayClientSessionSimulationError,
             "Error, failed the command does not represent a stop recording event.",
-            stopCommand.isStopRecording());
+            stopCommand.isSessionEnd());
 
     const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(stopCommand);
     auto& session = getSessionSimulator(sessionId);
@@ -70,11 +70,9 @@ void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
 void SessionHandler::onBsonCommand(const ReplayCommand& command) {
     // just run the command. the Session simulator will make sure things work.
     const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
-    if (!isSessionActive(sessionId)) {
-        // TODO SERVER-105627: When session start event will be added remove this code. This is
-        // needed for making integration tests pass.
-        createNewSessionOnNewCommand(timestamp, sessionId);
-    }
+    uassert(ErrorCodes::ReplayClientSessionSimulationError,
+            "Error, the session should be active",
+            isSessionActive(sessionId));
     auto& session = getSessionSimulator(sessionId);
     session.run(command, timestamp);
 }
@@ -123,10 +121,4 @@ bool SessionHandler::isSessionActive(SessionHandler::key_t key) {
 bool SessionHandler::isSessionActive(SessionHandler::key_t key) const {
     return _runningSessions.contains(key);
 }
-
-void SessionHandler::createNewSessionOnNewCommand(Date_t timestamp, int64_t sessionId) {
-    onSessionStart(timestamp, sessionId);
-}
-
-
 }  // namespace mongo

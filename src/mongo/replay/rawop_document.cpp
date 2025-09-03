@@ -109,6 +109,10 @@ void RawOpDocument::updateOpType(const std::string& newOpType) {
     updateField(_document, "opType", newOpType);
 }
 
+void RawOpDocument::updateEvent(int event) {
+    updateField(_document, "event", event);
+}
+
 void RawOpDocument::updateSeenField(const Date_t& time, int64_t nanoseconds /* = 0 */) {
     // total number of seconds
     constexpr long long unixToInternal =

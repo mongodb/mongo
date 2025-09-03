@@ -44,6 +44,7 @@ public:
     void updateOpType(const std::string& newOpType);
     void updateSessionId(int64_t id);
     void updateSeenField(const Date_t& time, int64_t nanoseconds = 0);
+    void updateEvent(int event);
 
 private:
     /** Represents the `rawop` part. */

@@ -101,6 +101,7 @@ void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
     Message toWrite = packet.message;
 
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
+    uassertStatusOK(db.writeAndAdvance<EventType>(packet.eventType));
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.id));
     uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(StringData(packet.session)));
     uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.now.toMillisSinceEpoch()));
@@ -241,12 +242,14 @@ public:
     /**
      * pushRecord returns false if the queue was full.  This is ultimately fatal to the recording
      */
-    bool pushRecord(const std::shared_ptr<transport::Session>& ts,
+    bool pushRecord(const uint64_t id,
+                    const std::string session,
                     Date_t now,
                     const uint64_t order,
-                    const Message& message) {
+                    const Message& message,
+                    EventType eventType = EventType::kRegular) {
         try {
-            _pcqPipe.producer.push({ts->id(), ts->toBSON().toString(), now, order, message});
+            _pcqPipe.producer.push({eventType, id, session, now, order, message});
             return true;
         } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueProducerQueueDepthExceeded>&) {
             invariant(!shouldAlwaysRecordTraffic);
@@ -295,7 +298,7 @@ public:
 private:
     struct CostFunction {
         size_t operator()(const TrafficRecordingPacket& packet) const {
-            return packet.message.size();
+            return sizeof(TrafficRecordingPacket) + packet.message.size();
         }
     };
 
@@ -346,7 +349,7 @@ TrafficRecorder::~TrafficRecorder() {
     }
 }
 
-void TrafficRecorder::start(const StartTrafficRecording& options) {
+void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
     invariant(!shouldAlwaysRecordTraffic);
 
     uassert(ErrorCodes::BadValue,
@@ -359,12 +362,46 @@ void TrafficRecorder::start(const StartTrafficRecording& options) {
         *rec = std::make_shared<Recording>(options);
         (*rec)->run();
     }
-
     _shouldRecord.store(true);
+    {
+        // Record SessionStart events if exists any active session.
+        stdx::lock_guard<stdx::recursive_mutex> sessionLk(_openSessionsLk);
+        for (const auto& [id, session] : _openSessions) {
+            observe(id, session, Message(), svcCtx, EventType::kSessionStart);
+        }
+    }
 }
 
-void TrafficRecorder::stop() {
+void TrafficRecorder::updateOpenSessions(uint64_t id,
+                                         const std::string& session,
+                                         EventType eventType) {
+    if (eventType == EventType::kSessionEnd) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
+        auto sessionItr = _openSessions.find(id);
+        if (sessionItr != _openSessions.end()) {
+            _openSessions.erase(sessionItr);
+        }
+    }
+
+    if (eventType == EventType::kSessionStart) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
+        _openSessions.emplace(id, session);
+    }
+}
+
+void TrafficRecorder::stop(ServiceContext* svcCtx) {
     invariant(!shouldAlwaysRecordTraffic);
+    // Record SessionEnd events if exists any active session.
+    {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
+        // A copy of open sessions to remove from '_openSessionsLk' while observing a SessionEnd
+        // event for each open session. 'observe()' will modify '_openSessions'.
+        stdx::unordered_map<uint64_t, std::string> sessions(_openSessions);
+
+        for (const auto& [id, session] : sessions) {
+            observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
+        }
+    }
 
     _shouldRecord.store(false);
 
@@ -380,7 +417,21 @@ void TrafficRecorder::stop() {
 
 void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
                               const Message& message,
-                              ServiceContext* svcCtx) {
+                              ServiceContext* svcCtx,
+                              EventType eventType) {
+    observe(ts->id(), ts->toBSON().toString(), message, svcCtx, eventType);
+}
+
+void TrafficRecorder::observe(uint64_t id,
+                              const std::string& session,
+                              const Message& message,
+                              ServiceContext* svcCtx,
+                              EventType eventType) {
+    // Keep track of active sessions not recording anything. Session start/end events will be
+    // recorded on the start/stop of the traffic recording.
+    if (eventType == EventType::kSessionEnd || eventType == EventType::kSessionStart) {
+        updateOpenSessions(id, session, eventType);
+    }
     if (shouldAlwaysRecordTraffic) {
         auto rec = _recording.synchronize();
 
@@ -393,11 +444,14 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
             (*rec)->run();
         }
 
-        invariant((*rec)->pushRecord(
-            ts, svcCtx->getPreciseClockSource()->now(), (*rec)->order.addAndFetch(1), message));
+        invariant((*rec)->pushRecord(id,
+                                     session,
+                                     svcCtx->getPreciseClockSource()->now(),
+                                     (*rec)->order.addAndFetch(1),
+                                     message,
+                                     eventType));
         return;
     }
-
     if (!_shouldRecord.load()) {
         return;
     }
@@ -410,8 +464,12 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
     }
 
     // Try to record the message
-    if (recording->pushRecord(
-            ts, svcCtx->getPreciseClockSource()->now(), recording->order.addAndFetch(1), message)) {
+    if (recording->pushRecord(id,
+                              session,
+                              svcCtx->getPreciseClockSource()->now(),
+                              recording->order.addAndFetch(1),
+                              message,
+                              eventType)) {
         return;
     }
 

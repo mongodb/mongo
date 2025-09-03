@@ -63,12 +63,37 @@ jsTest.log("Recording file path: " + recordingFilePath);
 // Pass filepath to traffic_reader helper method to get recorded info in BSON
 let res = convertTrafficRecordingToBSON(recordingFilePath);
 
+const eventType = {
+    Regular: 0,
+    SessionStart: 1,
+    SessionEnd: 2,
+};
+let startEventRecorded = false;
+let endEventRecorded = false;
 // Iterate through the results and assert the above commands are properly recorded
 res.forEach((obj) => {
-    assert.eq(obj["rawop"]["header"]["opcode"], 2013);
-    assert.eq(obj["seenconnectionnum"], 1);
-    opTypes[obj["opType"]] = (opTypes[obj["opType"]] || 0) + 1;
+    // The "event" field indicates the type of the event.
+    if (obj["event"] === eventType.SessionStart) {
+        assert(!endEventRecorded);
+        startEventRecorded = true;
+        assert.eq(obj["opType"], "sessionStart");
+    } else if (obj["event"] === eventType.SessionEnd) {
+        assert(startEventRecorded);
+        endEventRecorded = true;
+        assert.eq(obj["opType"], "sessionEnd");
+    } else {
+        // The session start event should be recorded first.
+        assert.eq(startEventRecorded, true);
+        // The session end event should be recorded last.
+        assert.eq(endEventRecorded, false);
+        assert.eq(obj["event"], eventType.Regular);
+        assert.eq(obj["rawop"]["header"]["opcode"], 2013);
+        assert.eq(obj["seenconnectionnum"], 1);
+        opTypes[obj["opType"]] = (opTypes[obj["opType"]] || 0) + 1;
+    }
 });
+assert(startEventRecorded);
+assert(endEventRecorded);
 
 // Assert there is a response for every request
 assert.eq(numResponse, numRequest);

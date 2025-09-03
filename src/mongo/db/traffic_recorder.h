@@ -34,18 +34,28 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <queue>
 #include <string>
 
 #include <boost/optional.hpp>
 
 namespace mongo {
 
+enum class EventType : uint8_t {
+    kRegular = 0,       // A regular event.
+    kSessionStart = 1,  // A non-message event indicating the start of a session.
+    kSessionEnd = 2,    // A non-message event indicating the end of a session.
+
+    kMax,  // Not a valid event type, used to check values are in-range.
+};
 struct TrafficRecordingPacket {
+    EventType eventType;
     uint64_t id;
     std::string session;
     Date_t now;
@@ -66,6 +76,8 @@ void appendPacketHeader(DataBuilder& builder, const TrafficRecordingPacket& pack
  */
 class TrafficRecorder {
 public:
+    // The Recorder may record some special events that are required by the replay client.
+
     static TrafficRecorder& get(ServiceContext* svc);
 
     TrafficRecorder();
@@ -74,23 +86,36 @@ public:
     // Start and stop block until the associate operation has succeeded or failed
     //
     // On failure these methods throw
-    void start(const StartTrafficRecording& options);
-    void stop();
+    void start(const StartTrafficRecording& options, ServiceContext* svcCtx);
+    void stop(ServiceContext* svcCtx);
 
+    void observe(uint64_t id,
+                 const std::string& session,
+                 const Message& message,
+                 ServiceContext* svcCtx,
+                 EventType eventType = EventType::kRegular);
+
+    // This is the main interface to record a message. It also maintains open sessions in order to
+    // record 'kSessionStart' and 'kSessionEnd' events.
     void observe(const std::shared_ptr<transport::Session>& ts,
                  const Message& message,
-                 ServiceContext* svcCtx);
+                 ServiceContext* svcCtx,
+                 EventType eventType = EventType::kRegular);
 
     class TrafficRecorderSSS;
 
+
 private:
     class Recording;
+
+    void updateOpenSessions(uint64_t id, const std::string& session, EventType eventType);
 
     std::shared_ptr<Recording> _getCurrentRecording() const;
 
     AtomicWord<bool> _shouldRecord;
 
+    mutable stdx::recursive_mutex _openSessionsLk;
+    stdx::unordered_map<uint64_t, std::string> _openSessions;
     mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
 };
-
 }  // namespace mongo

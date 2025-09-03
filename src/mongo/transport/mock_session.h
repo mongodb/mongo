@@ -95,7 +95,9 @@ public:
     }
 
     void appendToBSON(BSONObjBuilder& bb) const override {
-        MONGO_UNIMPLEMENTED;
+        bb.append("id", static_cast<int32_t>(id()));
+        bb.append("remote", _remote.toString());
+        bb.append("local", _local.toString());
     }
 
     bool isExemptedByCIDRList(const CIDRList& exemptions) const override {

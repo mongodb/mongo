@@ -31,6 +31,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/db/traffic_recorder.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/time_support.h"
@@ -41,6 +42,8 @@
 namespace mongo {
 class ReplayCommand {
 public:
+    static constexpr auto kEventFieldName = "event"_sd;
+
     explicit ReplayCommand(TrafficReaderPacket packet) : _packet(std::move(packet)) {}
     /*
      * Converts a command to replay into an internal server msg request that is used to execute the
@@ -59,21 +62,16 @@ public:
 
     /** Use this method to know if the command represents a start recording, this starts the session
      * simulation. */
-    bool isStartRecording() const;
+    bool isSessionStart() const;
 
     /** Use this method to know if the command represents a stop recording, this ends the session
      * simulation. */
-    bool isStopRecording() const;
+    bool isSessionEnd() const;
 
     /** Mostly for debugging purposes, converts the replay command to string. */
     std::string toString() const;
 
-    /**
-     * Extract opType. It represents the type of the command to execute. Start and Stop recording
-     * are 2 special commands to start and stop the simulation. OpType cannot be an empty string.
-     */
     std::string parseOpType() const;
-
 
 private:
     /** Extract the actual message body containing the actual bson command containing the query */

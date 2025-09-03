@@ -67,6 +67,12 @@ uint64_t ReplayCommand::fetchMessageId() const {
 }
 
 std::string ReplayCommand::toString() const {
+    if (isSessionStart()) {
+        return "{\"sessionStart\": 1}";
+    }
+    if (isSessionEnd()) {
+        return "{\"sessionEnd\": 1}";
+    }
     OpMsgRequest messageRequest = fetchMsgRequest();
     return messageRequest.body.toString();
 }
@@ -82,6 +88,12 @@ OpMsgRequest ReplayCommand::parseBody() const {
 }
 
 std::string ReplayCommand::parseOpType() const {
+    if (_packet.eventType == EventType::kSessionStart) {
+        return kSessionStartOpType;
+    }
+    if (_packet.eventType == EventType::kSessionEnd) {
+        return kSessionEndOpType;
+    }
     if (_packet.message.getNetworkOp() == dbMsg) {
         return std::string(parseBody().getCommandName());
     } else {
@@ -89,12 +101,12 @@ std::string ReplayCommand::parseOpType() const {
     }
 }
 
-bool ReplayCommand::isStartRecording() const {
-    return parseOpType() == "startTrafficRecording";
+bool ReplayCommand::isSessionStart() const {
+    return _packet.eventType == EventType::kSessionStart;
 }
 
-bool ReplayCommand::isStopRecording() const {
-    return parseOpType() == "stopTrafficRecording";
+bool ReplayCommand::isSessionEnd() const {
+    return _packet.eventType == EventType::kSessionEnd;
 }
 
 std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand& command) {
@@ -102,5 +114,4 @@ std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCom
     const int64_t sessionId = command.fetchRequestSessionId();
     return {timestamp, sessionId};
 }
-
 }  // namespace mongo

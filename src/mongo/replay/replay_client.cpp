@@ -172,8 +172,15 @@ private:
 // 3. n/ok commands. These are just responses.
 // 4. isWritablePrimary/isMaster. These are mostly diagnostic commands that we don't want.
 // NOLINTNEXTLINE needs audit
-static std::unordered_set<std::string> forbiddenKeywords{
-    "legacy", "cursor", "endSessions", "ok", "isWritablePrimary", "n", "isMaster", "ismaster"};
+static std::unordered_set<std::string> forbiddenKeywords{"legacy",
+                                                         "cursor",
+                                                         "endSessions",
+                                                         "ok",
+                                                         "isWritablePrimary",
+                                                         "n",
+                                                         "isMaster",
+                                                         "ismaster",
+                                                         "stopTrafficRecording"};
 
 bool isReplayable(const std::string& commandType) {
     return !commandType.empty() && !forbiddenKeywords.contains(commandType);
@@ -215,12 +222,12 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
             if (!isReplayable(command.parseOpType())) {
                 continue;
             }
-            if (command.isStartRecording()) {
+            if (command.isSessionStart()) {
                 // will associated the URI to a session task and run all the commands associated
                 // with this session id.
                 const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
                 sessionHandler.onSessionStart(timestamp, sessionId);
-            } else if (command.isStopRecording()) {
+            } else if (command.isSessionEnd()) {
                 // stop commad will reset the complete the simulation and reset the connection.
                 sessionHandler.onSessionStop(command);
             } else {

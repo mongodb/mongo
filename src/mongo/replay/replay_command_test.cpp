@@ -99,18 +99,16 @@ TEST(ReplayCommandTest, TestAggregate) {
     ASSERT_TRUE(m.body.toString() == command.toString());
 }
 
-TEST(ReplayCommandTest, TestStartRecording) {
+TEST(ReplayCommandTest, TestSessionStartEvent) {
     auto command = cmds::start({});
     OpMsgRequest m = command.fetchMsgRequest();
-    ASSERT_TRUE(m.body.toString() == command.toString());
-    ASSERT_TRUE(command.isStartRecording());
+    ASSERT_TRUE(command.isSessionStart());
 }
 
-TEST(ReplayCommandTest, TestStopRecording) {
+TEST(ReplayCommandTest, TestSessionEnd) {
     auto command = cmds::stop({});
     OpMsgRequest m = command.fetchMsgRequest();
-    ASSERT_TRUE(m.body.toString() == command.toString());
-    ASSERT_TRUE(command.isStopRecording());
+    ASSERT_TRUE(command.isSessionEnd());
 }
 
 }  // namespace mongo

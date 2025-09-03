@@ -95,7 +95,5 @@ private:
 
     SessionSimulator& getSessionSimulator(key_t);
     const SessionSimulator& getSessionSimulator(key_t) const;
-
-    void createNewSessionOnNewCommand(Date_t timestamp, int64_t sessionId);
 };
 }  // namespace mongo

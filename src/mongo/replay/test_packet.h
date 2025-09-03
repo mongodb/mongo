@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/db/traffic_recorder.h"
 #include "mongo/replay/rawop_document.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
@@ -72,15 +73,9 @@ public:
 };
 
 namespace cmds {
-static const auto startRecordingPkt = TestReaderPacket::make(
-    BSON("startTrafficRecording" << "1.0" << "destination" << "rec" << "lsid"
-                                 << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")")
-                                 << "$db" << "admin"));
+static const auto startRecordingPkt = TestReaderPacket::make(BSON("sessionStart" << "1.0"));
 
-static const auto stopRecordingPkt = TestReaderPacket::make(
-    BSON("stopTrafficRecording" << "1.0" << "destination" << "rec" << "lsid"
-                                << BSON("id" << "UUID(\"a8ac2bdc-5457-4a86-9b1c-b0a3253bc43e\")")
-                                << "$db" << "admin"));
+static const auto stopRecordingPkt = TestReaderPacket::make(BSON("sessionEnd" << "1.0"));
 
 // Helper for taking the relevant parts of a Packet as arguments - e.g.,
 //  foobar({.id = 1, .date = now})
@@ -94,6 +89,7 @@ inline TestReplayCommand start(PacketArgs args) {
 
     startRecording.id = args.id;
     startRecording.date = args.date;
+    startRecording.eventType = EventType::kSessionStart;
     return TestReplayCommand{startRecording};
 }
 
@@ -102,6 +98,7 @@ inline TestReplayCommand stop(PacketArgs args) {
 
     stopRecording.id = args.id;
     stopRecording.date = args.date;
+    stopRecording.eventType = EventType::kSessionEnd;
     return TestReplayCommand{stopRecording};
 }
 

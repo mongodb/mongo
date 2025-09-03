@@ -124,7 +124,8 @@ assert.eq(initialResults.opTypes["delete"], 1);
 assert.eq(initialResults.opTypes["aggregate"], 1);
 assert.eq(initialResults.opTypes["update"], 1);
 assert.eq(initialResults.opTypes["stopTrafficRecording"], 1);
-// ======================================================================================== //
+assert.eq(initialResults.opTypes["sessionStart"], 1);
+assert.eq(initialResults.opTypes["sessionEnd"], 1);
 
 // ======================================================================================== //
 // Replaying
@@ -147,6 +148,8 @@ assert.eq(replayResults.opTypes["delete"], 1);
 assert.eq(replayResults.opTypes["aggregate"], 1);
 assert.eq(replayResults.opTypes["update"], 1);
 assert.eq(replayResults.opTypes["stopTrafficRecording"], 1);
+assert.eq(initialResults.opTypes["sessionStart"], 1);
+assert.eq(initialResults.opTypes["sessionEnd"], 1);
 // ======================================================================================== //
 
 cleanUpDirectory(initialResults.recordingDirGlobal);
