@@ -85,8 +85,8 @@ server_parameters:
         redact: false
 
     maxRoundsWithoutProgressParameter:
-        description: "Max num rounds without progress"
-        test_only: true
+        description: "Maximum number of retries for batch write operations without progress"
+        test_only: false
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: "gMaxRoundsWithoutProgress"
