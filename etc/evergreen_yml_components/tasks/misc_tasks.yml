@@ -436,7 +436,7 @@ tasks:
         "assigned_to_jira_team_server_repl",
         "experimental",
         "jepsen_docker",
-        "uses_docker",
+        "requires_extra_system_deps",
       ]
     commands:
       - func: "do setup"
@@ -525,7 +525,7 @@ tasks:
         "assigned_to_jira_team_server_repl",
         "experimental",
         "jepsen_docker",
-        "uses_docker",
+        "requires_extra_system_deps",
       ]
     commands:
       - func: "do setup"

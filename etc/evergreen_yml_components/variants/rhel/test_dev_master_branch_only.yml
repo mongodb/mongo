@@ -303,8 +303,8 @@ buildvariants:
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
           - rhel8.8-medium
-      - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
-      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
         distros:
           - rhel8.8-medium
 

@@ -2356,7 +2356,7 @@ tasks:
         "default",
         "large",
         "clustered_collections",
-        "uses_docker",
+        "requires_extra_system_deps",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2366,7 +2366,12 @@ tasks:
 
   - <<: *task_template
     name: disagg_repl_jscore_passthrough
-    tags: ["assigned_to_jira_team_server_disagg", "default", "uses_docker"]
+    tags:
+      [
+        "assigned_to_jira_team_server_disagg",
+        "default",
+        "requires_extra_system_deps",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"

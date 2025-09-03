@@ -160,25 +160,44 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
     tasks:
-      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
-      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
-      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .default !.requires_large_host .uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
-        distros:
-          - amazon2023-arm64-latest-small
-      - name: .default .requires_large_host .uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .fuzzer_deterministic
+
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps
+    display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags, extra system deps)"
+    run_on:
+      - amazon2023-arm64-latest-small
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      large_distro_name: amazon2023-arm64-latest-large
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
+    tasks:
+      - name: .requires_extra_system_deps .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-latest-large
-      - name: .fuzzer_deterministic
+      - name: .requires_extra_system_deps .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-large
+      - name: .requires_extra_system_deps .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-large
 
   - name: amazon-linux2023-arm64-tests-lto-pgo-bolt
     display_name: "Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) LTO/PGO/BOLT"
@@ -251,8 +270,8 @@ buildvariants:
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_all_feature_flags
         distros:
           - amazon2023-arm64-latest-large
-      - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_all_feature_flags
-      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_all_feature_flags
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_all_feature_flags
         distros:
           - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic
@@ -277,8 +296,8 @@ buildvariants:
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.multiversion !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-atlas-latest-large
-      - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.multiversion !.suggested_excluding_required__for_devprod_mitigation_only
-      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.multiversion !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.multiversion !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.multiversion !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-atlas-latest-large
       - name: .fuzzer_deterministic
@@ -582,8 +601,8 @@ buildvariants:
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-large
-      - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
-      - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-large
       - name: .fuzzer_deterministic !.multiversion
@@ -606,8 +625,8 @@ buildvariants:
   #     - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #       distros:
   #         - amazon2023-arm64-atlas-latest-large
-  #     - name: .default !.requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-  #     - name: .default .requires_large_host !.uses_docker !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #     - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #     - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #       distros:
   #         - amazon2023-arm64-atlas-latest-large
   #   expansions:
