@@ -51,6 +51,7 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
 
     scenarios = make_scenarios(types, txn_end)
 
+    @wttest.only_for_hook("disagg", "FIXME-WT-15343 disable RTS when precise checkpoint is on")
     def test_prepare_discover01(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))

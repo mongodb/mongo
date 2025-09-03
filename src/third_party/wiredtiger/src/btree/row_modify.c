@@ -414,7 +414,7 @@ __wt_update_obsolete_check(
         if (upd->txnid == WT_TXN_NONE && upd->upd_start_ts == WT_TS_NONE &&
           upd->type == WT_UPDATE_TOMBSTONE && upd->next != NULL &&
           upd->next->txnid == WT_TXN_ABORTED) {
-            WT_ACQUIRE_READ(prepare_state, upd->prepare_state);
+            WT_ACQUIRE_READ(prepare_state, upd->next->prepare_state);
             /* We may see a locked prepare state if we race with prepare rollback. */
             if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
                 continue;

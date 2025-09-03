@@ -923,6 +923,18 @@ def skip_for_hook(hookname, description):
     else:
         return runit_decorator
 
+def only_for_hook(hookname, description):
+    """
+    Used as a function decorator, e.g., @wttest.only_for_hook("tiered", "only runs with tiered hook").
+    The test will be skipped unless the specified hook is active.
+    """
+    def runit_decorator(func):
+        return func
+    if hookname not in WiredTigerTestCase.hook_names:
+        return unittest.skip(f"only runs with hook '{hookname}': {description}")
+    else:
+        return runit_decorator
+
 # Override a test's setUp function to instead skip and report the reason for skipping
 def register_skipped_test(test, hook, skip_reason):
 
