@@ -261,11 +261,18 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     writeConflictRetry(opCtx, "implicit collection creation", ns, [&opCtx, &ns] {
         AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
 
-        assertCanWrite_inlock(opCtx, ns);
-        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                opCtx, ns)) {  // someone else may have beat us to it.
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
+        uassert(ErrorCodes::PrimarySteppedDown,
+                str::stream() << "Not primary while writing to " << ns.toStringForErrorMsg(),
+                repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                    ->canAcceptWritesFor(opCtx, ns));
+
+        if (!collection.exists()) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(opCtx, ns));
             // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
             // TODO (SERVER-82066): Update handling for direct connections.
