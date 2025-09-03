@@ -223,13 +223,6 @@ public:
                                           CachedCollectionProperties* collPropertiesCache);
 
     /**
-     * Returns the namespace string for this oplogEntry; if it has a UUID it looks up the
-     * corresponding namespace and returns it, otherwise it returns the oplog entry 'nss'.  If
-     * there is a UUID and no namespace with that ID is found, throws NamespaceNotFound.
-     */
-    static NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEntry);
-
-    /**
      * If the oplog entry has a UUID, returns the UUID with the database from 'nss'.  Otherwise
      * returns 'nss'
      */

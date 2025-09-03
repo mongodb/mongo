@@ -341,7 +341,6 @@ public:
     void appendSecondaryInfoData(BSONObjBuilder* result) override;
 
     ReplSetConfig getConfig() const override;
-    ReplSetConfig getConfig(WithLock) const;
 
     ConnectionString getConfigConnectionString() const override;
 
@@ -809,8 +808,6 @@ private:
             WithLock lk,
             std::function<bool(WithLock, const OpTime&, const SharedWaiterHandle&)> func,
             boost::optional<OpTime> opTime = boost::none);
-        // Signals all waiters from the list and fulfills promises with OK status.
-        void setValueAll(WithLock lk);
         // Signals all waiters from the list and fulfills promises with Error status.
         void setErrorAll(WithLock lk, Status status);
 
@@ -847,8 +844,6 @@ private:
             WithLock lk,
             std::function<bool(WithLock, const OpTime&, const WriteConcernOptions&)> func,
             boost::optional<OpTime> opTime = boost::none);
-        // Signals all waiters from the list and fulfills promises with OK status.
-        void setValueAll(WithLock lk);
         // Signals all waiters from the list and fulfills promises with Error status.
         void setErrorAll(WithLock lk, Status status);
 
@@ -1657,12 +1652,6 @@ private:
      * Otherwise aborts on non-shutdown error.
      */
     EventHandle _makeEvent();
-
-    /**
-     * Wrap a function into executor callback.
-     * If the callback is cancelled, the given function won't run.
-     */
-    executor::TaskExecutor::CallbackFn _wrapAsCallbackFn(const std::function<void()>& work);
 
     /**
      * Finish catch-up mode and start drain mode.

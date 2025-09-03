@@ -104,37 +104,6 @@ std::pair<bool, BSONObj> expectedFound(const T& expected, const T& found) {
     return std::pair<bool, BSONObj>(expected == found, obj);
 }
 
-template <>
-std::pair<bool, BSONObj> expectedFound(const BSONObj& expected, const BSONObj& found) {
-    auto obj = BSON("expected" << expected << "found" << found);
-    return std::pair<bool, BSONObj>(expected.woCompare(found) == 0, obj);
-}
-
-/**
- * An overload for boost::optionals, which omits boost::none fields.
- */
-template <typename T>
-std::pair<bool, BSONObj> expectedFound(const boost::optional<T>& expected,
-                                       const boost::optional<T>& found) {
-    BSONObjBuilder builder;
-    if (expected) {
-        builder << "expected" << *expected;
-    }
-    if (found) {
-        builder << "found" << *found;
-    }
-
-    auto obj = builder.obj();
-
-    if (expected && found) {
-        return std::pair<bool, BSONObj>(*expected == *found, obj);
-    } else if (expected || found) {
-        return std::pair<bool, BSONObj>(false, obj);
-    }
-
-    return std::pair<bool, BSONObj>(true, obj);
-}
-
 }  // namespace
 
 /**
@@ -152,18 +121,6 @@ std::string renderForHealthLog(OplogEntriesEnum op) {
             return "dbCheckStop";
     }
 
-    MONGO_UNREACHABLE;
-}
-
-std::string renderForHealthLog(DbCheckValidationModeEnum validateMode) {
-    switch (validateMode) {
-        case DbCheckValidationModeEnum::dataConsistency:
-            return "dataConsistency";
-        case DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:
-            return "dataConsistencyAndMissingIndexKeysCheck";
-        case DbCheckValidationModeEnum::extraIndexKeysCheck:
-            return "extraIndexKeysCheck";
-    }
     MONGO_UNREACHABLE;
 }
 
@@ -461,18 +418,8 @@ DbCheckHasher::DbCheckHasher(
     }
 }
 
-void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
-    if (uuid) {
-        md5_append(state, md5Cast(uuid->toCDR().data()), uuid->toCDR().length());
-    }
-}
-
 BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering) {
     return key_string::toBsonSafe(keyString.getView(), ordering, keyString.getTypeBits());
-}
-
-BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Ordering& ordering) {
-    return key_string::toBsonSafe(builder.getView(), ordering, builder.getTypeBits());
 }
 
 boost::optional<KeyStringEntry> _getNextDistinctKeyInIndex(

@@ -2428,11 +2428,6 @@ protected:
         return config;
     }
 
-    executor::RemoteCommandResponse makeFreshnessScanResponse(OpTime opTime) {
-        // OpTime part of replSetGetStatus.
-        return makeResponseStatus(BSON("optimes" << BSON("appliedOpTime" << opTime)));
-    }
-
     void processHeartbeatRequests(NetworkRequestFn onHeartbeatRequest) {
         NetworkInterfaceMock* net = getNet();
         net->enterNetwork();

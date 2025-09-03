@@ -283,63 +283,6 @@ OplogEntry makeNewPrimaryBatchEntry(int t) {
 }
 
 /**
- * Generates an update oplog entry with the given number used for the timestamp, and the given
- * pre- and post- image optimes.
- */
-OplogEntry makeUpdateOplogEntry(int t,
-                                const NamespaceString& nss,
-                                boost::optional<UUID> uuid,
-                                boost::optional<OpTime> preImageOpTime,
-                                boost::optional<OpTime> postImageOpTime) {
-    BSONObj oField = BSON("_id" << t << "a" << t);
-    BSONObj o2Field = BSON("_id" << t);
-    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              OpTypeEnum::kUpdate,         // op type
-                              nss,                         // namespace
-                              uuid,                        // uuid
-                              boost::none,                 // fromMigrate
-                              boost::none,                 // checkExistenceForDiffInsert
-                              boost::none,                 // versionContext
-                              OplogEntry::kOplogVersion,   // version
-                              oField,                      // o
-                              boost::none,                 // o2
-                              {},                          // sessionInfo
-                              boost::none,                 // upsert
-                              Date_t() + Seconds(t),       // wall clock time
-                              {},                          // statement ids
-                              boost::none,  // optime of previous write within same transaction
-                              preImageOpTime,
-                              postImageOpTime,
-                              boost::none,    // ShardId of resharding recipient
-                              boost::none,    // _id
-                              boost::none)};  // needsRetryImage
-}
-
-OplogEntry makeNoopOplogEntry(int t, StringData msg) {
-    BSONObj oField = BSON("msg" << msg << "count" << t);
-    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              OpTypeEnum::kNoop,           // op type
-                              NamespaceString::kEmpty,     // namespace
-                              boost::none,                 // uuid
-                              boost::none,                 // fromMigrate
-                              boost::none,                 // checkExistenceForDiffInsert
-                              boost::none,                 // versionContext
-                              OplogEntry::kOplogVersion,   // version
-                              oField,                      // o
-                              boost::none,                 // o2
-                              {},                          // sessionInfo
-                              boost::none,                 // upsert
-                              Date_t() + Seconds(t),       // wall clock time
-                              {},                          // statement ids
-                              boost::none,    // optime of previous write within same transaction
-                              boost::none,    // pre-image optime
-                              boost::none,    // post-image optime
-                              boost::none,    // ShardId of resharding recipient
-                              boost::none,    // _id
-                              boost::none)};  // needsRetryImage
-}
-
-/**
  * Generates an applyOps oplog entry with the given number used for the timestamp.
  */
 OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEntry>& innerOps) {
@@ -581,49 +524,6 @@ std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
     for (int i = 0; i < count; i++) {
         vec.push_back(makeLargeTransactionOplogEntries(
             t + i, prepared, i == 0, i == count - 1, i + 1, count, {}));
-    }
-    return vec;
-}
-
-/**
- * Generates a mock large-transaction which has more than one oplog entry and contains the
- * operations in innerOps.
- */
-std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
-    int t,
-    const DatabaseName& dbName,
-    bool prepared,
-    std::vector<std::vector<OplogEntry>> innerOps) {
-    std::size_t count = innerOps.size() + (prepared ? 1 : 0);
-    ASSERT_GTE(count, 2);
-    std::vector<OplogEntry> vec;
-    for (std::size_t i = 0; i < count; i++) {
-        vec.push_back(makeLargeTransactionOplogEntries(
-            t + i,
-            prepared,
-            i == 0,
-            i == count - 1,
-            i + 1,
-            count,
-            i < innerOps.size() ? innerOps[i] : std::vector<OplogEntry>()));
-    }
-    return vec;
-}
-
-/**
- * Generates a mock applyOps retryable write which contains the operations in innerOps.
- */
-std::vector<OplogEntry> makeRetryableApplyOpsOplogEntries(
-    int t,
-    const DatabaseName& dbName,
-    const OperationSessionInfo& sessionInfo,
-    std::vector<std::vector<OplogEntry>> innerOps) {
-    StmtId nextStmtId{0};
-    std::vector<OplogEntry> vec;
-    for (std::size_t i = 0; i < innerOps.size(); i++) {
-        vec.push_back(makeLargeRetryableWriteOplogEntries(
-            t + i, i == 0, sessionInfo, nextStmtId, innerOps[i]));
-        nextStmtId += innerOps[i].size();
     }
     return vec;
 }

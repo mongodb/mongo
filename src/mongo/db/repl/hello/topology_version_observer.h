@@ -109,8 +109,6 @@ public:
 
     ReplSetConfig getReplSetConfig();
 
-    std::string toString() const;
-
     /**
      * Returns true if this TopologyVersionObserver background thread has stopped.
      *

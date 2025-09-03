@@ -156,23 +156,11 @@ public:
     static ReadConcernArgs fromIDLThrows(ReadConcernIdl readConcern);
 
     /**
-     * Sets the mechanism we should use to satisfy 'majority' reads.
-     *
-     * Invalid to call unless the read concern level is 'kMajorityReadConcern'.
-     */
-    void setMajorityReadMechanism(MajorityReadMechanism m);
-
-    /**
      * Returns the mechanism to use for satisfying 'majority' read concern.
      *
      * Invalid to call unless the read concern level is 'kMajorityReadConcern'.
      */
     MajorityReadMechanism getMajorityReadMechanism() const;
-
-    /**
-     * Returns whether the read concern is speculative 'majority'.
-     */
-    bool isSpeculativeMajority() const;
 
     /**
      * Appends level, afterOpTime, and any other sub-fields in a 'readConcern' sub-object.

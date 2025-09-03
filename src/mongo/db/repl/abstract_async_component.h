@@ -108,11 +108,6 @@ protected:
     executor::TaskExecutor* _getExecutor();
 
     /**
-     * Returns the name of the component passed in at construction.
-     */
-    std::string _getComponentName() const;
-
-    /**
      * Returns true if this component is currently running or in the process of shutting down.
      */
     bool _isActive(WithLock lk) noexcept;

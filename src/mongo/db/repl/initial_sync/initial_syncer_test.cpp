@@ -266,16 +266,6 @@ public:
                               RemoteCommandResponse::make_forTest(errorStatus));
     }
 
-    void processNetworkResponse(std::string cmdName, const BSONObj& obj) {
-        scheduleNetworkResponse(cmdName, obj);
-        finishProcessingNetworkResponse();
-    }
-
-    void processNetworkResponse(std::string cmdName, Status errorStatus) {
-        scheduleNetworkResponse(cmdName, errorStatus);
-        finishProcessingNetworkResponse();
-    }
-
     /**
      * Schedules and processes a successful response to the network request sent by InitialSyncer's
      * last oplog entry fetcher. Also validates the find command arguments in the request.
@@ -315,10 +305,6 @@ public:
 
     DataReplicatorExternalStateMock* getExternalState() {
         return _externalState;
-    }
-
-    StorageInterface& getStorage() {
-        return *_storageInterface;
     }
 
 protected:

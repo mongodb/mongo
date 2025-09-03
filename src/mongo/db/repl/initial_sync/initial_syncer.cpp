@@ -408,20 +408,6 @@ bool InitialSyncer::_isShuttingDown(WithLock lk) const {
     return State::kShuttingDown == _state;
 }
 
-std::string InitialSyncer::getDiagnosticString() const {
-    LockGuard lk(_mutex);
-    str::stream out;
-    out << "InitialSyncer -"
-        << " oplogFetcher: " << _oplogFetcher->toString()
-        << " opsBuffered: " << _oplogBuffer->getSize() << " active: " << _isActive(lk)
-        << " shutting down: " << _isShuttingDown(lk);
-    if (_initialSyncState) {
-        out << " opsAppied: " << _initialSyncState->appliedOps;
-    }
-
-    return out;
-}
-
 BSONObj InitialSyncer::getInitialSyncProgress() const {
     LockGuard lk(_mutex);
 
@@ -2163,10 +2149,6 @@ Status InitialSyncer::_enqueueDocuments(OplogFetcher::Documents::const_iterator 
     return Status::OK();
 }
 
-std::string InitialSyncer::Stats::toString() const {
-    return toBSON().toString();
-}
-
 BSONObj InitialSyncer::Stats::toBSON() const {
     BSONObjBuilder bob;
     append(&bob);
@@ -2197,10 +2179,6 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
         arrBuilder.append(initialSyncAttemptInfos[i].toBSON());
     }
     arrBuilder.doneFast();
-}
-
-std::string InitialSyncer::InitialSyncAttemptInfo::toString() const {
-    return toBSON().toString();
 }
 
 BSONObj InitialSyncer::InitialSyncAttemptInfo::toBSON() const {

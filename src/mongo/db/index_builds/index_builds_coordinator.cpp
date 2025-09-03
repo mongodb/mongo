@@ -74,7 +74,6 @@
 #include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/initial_sync/cloner_utils.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"

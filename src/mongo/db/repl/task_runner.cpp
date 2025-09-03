@@ -75,13 +75,6 @@ TaskRunner::NextAction runSingleTask(const TaskRunner::Task& task,
 
 }  // namespace
 
-// static
-TaskRunner::Task TaskRunner::makeCancelTask() {
-    return [](OperationContext* opCtx, const Status& status) {
-        return NextAction::kCancel;
-    };
-}
-
 TaskRunner::TaskRunner(ThreadPool* threadPool)
     : _threadPool(threadPool), _active(false), _cancelRequested(false) {
     uassert(ErrorCodes::BadValue, "null thread pool", threadPool);

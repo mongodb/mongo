@@ -35,31 +35,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-template <typename T>
-class StreamPutter {
-public:
-    StreamPutter(const ReplSetTagConfig& tagConfig, const T& item)
-        : _tagConfig(&tagConfig), _item(&item) {}
-    void put(std::ostream& os) const {
-        _tagConfig->put(*_item, os);
-    }
-
-private:
-    const ReplSetTagConfig* _tagConfig;
-    const T* _item;
-};
-
-template <typename T>
-StreamPutter<T> streamput(const ReplSetTagConfig& tagConfig, const T& item) {
-    return StreamPutter<T>(tagConfig, item);
-}
-
-template <typename T>
-std::ostream& operator<<(std::ostream& os, const StreamPutter<T>& putter) {
-    putter.put(os);
-    return os;
-}
-
 TEST(ReplSetTagConfigTest, MakeAndFindTags) {
     ReplSetTagConfig tagConfig;
     ReplSetTag dcNY = tagConfig.makeTag("dc", "ny");

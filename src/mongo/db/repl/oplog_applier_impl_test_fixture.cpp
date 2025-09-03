@@ -349,13 +349,6 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     ASSERT_EQ(applyOpCalled->load(), expectedApplyOpCalled);
 }
 
-Status failedApplyCommand(OperationContext* opCtx,
-                          const BSONObj& theOperation,
-                          OplogApplication::Mode) {
-    FAIL("applyCommand unexpectedly invoked.");
-    return Status::OK();
-}
-
 Status OplogApplierImplTest::runOpSteadyState(const OplogEntry& op) {
     return runOpsSteadyState({op});
 }

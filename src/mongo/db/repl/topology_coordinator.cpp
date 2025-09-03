@@ -2720,10 +2720,6 @@ void TopologyCoordinator::setPing_forTest(const HostAndPort& host, const Millise
     pingStats.set_forTest(ping);
 }
 
-void TopologyCoordinator::_setElectionTime(const Timestamp& newElectionTime) {
-    _electionTime = newElectionTime;
-}
-
 bool TopologyCoordinator::isSteppingDownUnconditionally() const {
     return _leaderMode == LeaderMode::kSteppingDown;
 }

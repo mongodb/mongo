@@ -155,10 +155,6 @@ bool operator==(const CollectionState& lhs, const CollectionState& rhs) {
     return collectionOptionsEqual && indexSpecsEqual && dataHashEqual && existsEqual;
 }
 
-bool operator!=(const CollectionState& lhs, const CollectionState& rhs) {
-    return !(lhs == rhs);
-}
-
 std::ostream& operator<<(std::ostream& stream, const CollectionState& state) {
     return stream << state.toString();
 }
@@ -221,10 +217,6 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
 
 OplogEntry IdempotencyTest::createCollection(UUID uuid) {
     return makeCreateCollectionOplogEntry(nextOpTime(), _nss, uuid);
-}
-
-OplogEntry IdempotencyTest::dropCollection() {
-    return makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()));
 }
 
 OplogEntry IdempotencyTest::insert(const BSONObj& obj) {

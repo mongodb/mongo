@@ -428,26 +428,6 @@ public:
         }
     }
 
-    void dumpOplog() {
-        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
-        shard_role_details::getRecoveryUnit(_opCtx)->beginUnitOfWork(_opCtx->readOnly());
-        LOGV2(8423335, "Dumping oplog collection");
-        const auto oplogCollAcq = acquireCollForRead(_opCtx, NamespaceString::kRsOplogNamespace);
-        const CollectionPtr& oplogColl = oplogCollAcq.getCollectionPtr();
-        auto oplogRs = oplogColl->getRecordStore();
-        auto oplogCursor = oplogRs->getCursor(_opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
-
-        while (true) {
-            auto doc = oplogCursor->next();
-            if (doc) {
-                LOGV2(8423329, "\tOplog Entry", "oplog"_attr = doc->data.toBson());
-            } else {
-                break;
-            }
-        }
-        shard_role_details::getRecoveryUnit(_opCtx)->abortUnitOfWork();
-    }
-
     void create(NamespaceString nss) const {
         ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss, [&] {
             shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(

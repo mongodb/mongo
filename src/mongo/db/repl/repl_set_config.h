@@ -365,12 +365,6 @@ public:
     int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
 
     /**
-     * Returns a MemberConfig index position corresponding to the member with the given
-     * _id in the config, or -1 if there is no member with that address.
-     */
-    int findMemberIndexByConfigId(int configId) const;
-
-    /**
      * Gets the default write concern for the replica set described by this configuration.
      */
     const WriteConcernOptions& getDefaultWriteConcern() const {

@@ -94,23 +94,9 @@ public:
                                         const std::vector<std::string>& fieldNames);
 
     /**
-     * Inserts and deletes documents but skips cleaning up corresponding index tables to generate
-     * extra index entries.
-     */
-    void insertExtraIndexKeys(OperationContext* opCtx,
-                              int startIDNum,
-                              int numDocs,
-                              const std::vector<std::string>& fieldNames);
-
-    /**
      * Builds an index on kNss. 'indexKey' specifies the index key, e.g. {'a': 1};
      */
     void createIndex(OperationContext* opCtx, const BSONObj& indexKey);
-
-    /**
-     *  Drops the index on kNss.
-     */
-    void dropIndex(OperationContext* opCtx, const std::string& indexName);
 
     /**
      * Runs hashing and the missing keys check for kNss.

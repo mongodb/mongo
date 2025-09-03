@@ -204,7 +204,7 @@ public:
      * message to indicate that we are in the middle of shutting down.
      */
     bool isShutdownInProgress() const {
-        return _shutdownInProgress;
+        return false;
     }
 
 
@@ -255,13 +255,6 @@ public:
      */
     void markAsNoConfig();
 
-    /**
-     * Marks _shutdownInProgress as true, which will cause future calls to toBSON/addToBSON to
-     * ignore all other member variables and output a hardcoded response indicating that we are
-     * in the middle of shutting down.
-     */
-    void markAsShutdownInProgress();
-
 private:
     bool _isWritablePrimary;
     bool _isWritablePrimarySet;
@@ -301,9 +294,6 @@ private:
     // If _configSet is false this means we don't have a valid repl set config, so toBSON
     // will return a set of hardcoded values that indicate this.
     bool _configSet;
-    // If _shutdownInProgress is true toBSON will return a set of hardcoded values to indicate
-    // that we are mid shutdown
-    bool _shutdownInProgress;
 };
 
 }  // namespace repl

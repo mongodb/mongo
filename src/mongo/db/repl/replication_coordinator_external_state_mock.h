@@ -159,11 +159,6 @@ public:
     void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);
 
     /**
-     * Sets the return value for subsequent calls to getClientHostAndPort().
-     */
-    void setClientHostAndPort(const HostAndPort& clientHostAndPort);
-
-    /**
      * Sets the return value for subsequent calls to loadLastOpTimeApplied.
      */
     void setLastOpTimeAndWallTime(const StatusWith<OpTime>& lastApplied,
@@ -180,12 +175,6 @@ public:
      * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
      */
     void setStoreLocalLastVoteDocumentStatus(Status status);
-
-    /**
-     * Sets whether or not subsequent calls to storeLocalLastVoteDocument() should hang
-     * indefinitely or not based on the value of "hang".
-     */
-    void setStoreLocalLastVoteDocumentToHang(bool hang);
 
     void setFirstOpTimeOfMyTerm(const OpTime& opTime);
 

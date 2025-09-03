@@ -140,10 +140,6 @@ ReplSetConfig TopologyVersionObserver::getReplSetConfig() {
     return _replCoordinator->getConfig();
 }
 
-std::string TopologyVersionObserver::toString() const {
-    return str::stream() << kTopologyVersionObserverName;
-}
-
 void TopologyVersionObserver::_handleTopologyUpdate(
     OperationContext* opCtx, boost::optional<TopologyVersion> topologyVersion) try {
     invariant(opCtx);

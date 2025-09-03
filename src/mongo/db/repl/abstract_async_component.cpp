@@ -49,10 +49,6 @@ executor::TaskExecutor* AbstractAsyncComponent::_getExecutor() {
     return _executor;
 }
 
-std::string AbstractAsyncComponent::_getComponentName() const {
-    return _componentName;
-}
-
 bool AbstractAsyncComponent::isActive() noexcept {
     stdx::lock_guard<stdx::mutex> lock(*_getMutex());
     return _isActive(lock);

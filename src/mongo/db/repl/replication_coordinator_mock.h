@@ -231,8 +231,6 @@ public:
     Status awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) override;
     OID getElectionId() override;
 
-    virtual OID getMyRID() const;
-
     int getMyId() const override;
 
     HostAndPort getMyHostAndPort() const override;
@@ -298,8 +296,6 @@ public:
     Status processReplSetReconfig(OperationContext* opCtx,
                                   const ReplSetReconfigArgs& args,
                                   BSONObjBuilder* resultObj) override;
-
-    BSONObj getLatestReconfig();
 
     Status doReplSetReconfig(OperationContext* opCtx,
                              GetNewConfigFn getNewConfig,
@@ -407,8 +403,6 @@ public:
                               const BSONObj& cmdObj,
                               OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                               OnRemoteCmdCompleteFn onRemoteCmdComplete)>;
-    void setRunCmdOnPrimaryAndAwaitResponseFunction(
-        RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction);
 
     /**
      * Always allow writes even if this node is a writable primary. Used by sharding unit tests.

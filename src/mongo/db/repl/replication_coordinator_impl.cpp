@@ -308,15 +308,6 @@ void ReplicationCoordinatorImpl::WaiterList::setValueIf(
     _waiterCountMetric.decrementRelaxed(erased);
 }
 
-void ReplicationCoordinatorImpl::WaiterList::setValueAll(WithLock lk) {
-    for (auto& [opTime, waiter] : _waiters) {
-        waiter->promise.emplaceValue();
-    }
-    // Not using setToZero() as the metric could be shared by multiple waiterLists.
-    _waiterCountMetric.decrementRelaxed(_waiters.size());
-    _waiters.clear();
-}
-
 void ReplicationCoordinatorImpl::WaiterList::setErrorAll(WithLock lk, Status status) {
     invariant(!status.isOK());
     for (auto& [opTime, waiter] : _waiters) {
@@ -391,17 +382,6 @@ void ReplicationCoordinatorImpl::WriteConcernWaiterList::setValueIf(
         waiterList.erase(waiterList.begin(), it);
     }
     _waiterCountMetric.decrementRelaxed(erased);
-}
-
-void ReplicationCoordinatorImpl::WriteConcernWaiterList::setValueAll(WithLock lk) {
-    for (auto& waiterListEntry : _waiters) {
-        auto& waiterList = waiterListEntry.second;
-        for (auto& [opTime, waiter] : waiterList) {
-            waiter->promise.emplaceValue();
-        }
-    }
-    _waiters.clear();
-    _waiterCountMetric.setToZero();
 }
 
 void ReplicationCoordinatorImpl::WriteConcernWaiterList::setErrorAll(WithLock lk, Status status) {
@@ -2935,20 +2915,6 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
     return _readWriteAbility->canAcceptNonLocalWrites(lk);
 }
 
-namespace {
-bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
-    if (nsOrUUID.isNamespaceString()) {
-        return nsOrUUID.nss().isSystemDotProfile();
-    }
-
-    if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, nsOrUUID.uuid())) {
-        return ns->isSystemDotProfile();
-    }
-
-    return false;
-}
-}  // namespace
-
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
     // Writes on unreplicated collections are always permitted.
@@ -3233,10 +3199,6 @@ void ReplicationCoordinatorImpl::appendSecondaryInfoData(BSONObjBuilder* result)
 
 ReplSetConfig ReplicationCoordinatorImpl::getConfig() const {
     return _getReplSetConfig();
-}
-
-ReplSetConfig ReplicationCoordinatorImpl::getConfig(WithLock lk) const {
-    return _rsConfig.unsafePeek();
 }
 
 ConnectionString ReplicationCoordinatorImpl::getConfigConnectionString() const {
@@ -5788,16 +5750,6 @@ WriteConcernOptions ReplicationCoordinatorImpl::_populateUnsetWriteConcernOption
         }
     }
     return writeConcern;
-}
-
-CallbackFn ReplicationCoordinatorImpl::_wrapAsCallbackFn(const std::function<void()>& work) {
-    return [work](const CallbackArgs& cbData) {
-        if (cbData.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-
-        work();
-    };
 }
 
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded(

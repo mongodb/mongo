@@ -558,17 +558,6 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     return -1;
 }
 
-int ReplSetConfig::findMemberIndexByConfigId(int configId) const {
-    int x = 0;
-    for (const auto& member : getMembers()) {
-        if (member.getId() == MemberId(configId)) {
-            return x;
-        }
-        ++x;
-    }
-    return -1;
-}
-
 const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
     int idx = findMemberIndexByHostAndPort(hap);
     return idx != -1 ? &getMemberAt(idx) : nullptr;

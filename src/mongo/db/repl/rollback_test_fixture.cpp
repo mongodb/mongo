@@ -252,36 +252,6 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
     return coll;
 }
 
-Collection* RollbackTest::_createCollection(OperationContext* opCtx,
-                                            const std::string& nss,
-                                            const CollectionOptions& options) {
-    return _createCollection(opCtx, NamespaceString::createNamespaceString_forTest(nss), options);
-}
-
-void RollbackTest::_insertDocument(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const BSONObj& doc) {
-    const auto collection = [&]() {
-        while (true) {
-            auto collection = acquireCollection(opCtx,
-                                                CollectionAcquisitionRequest::fromOpCtx(
-                                                    opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                                MODE_IX);
-            if (collection.exists()) {
-                return collection;
-            }
-
-            CollectionOptions options;
-            options.uuid = UUID::gen();
-            _createCollection(opCtx, nss, options);
-        }
-    }();
-
-    WriteUnitOfWork wuow(opCtx);
-    ASSERT_OK(Helpers::insert(opCtx, collection, doc));
-    wuow.commit();
-}
-
 Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {
     TimestampedBSONObj obj;
     obj.obj = doc;
@@ -290,45 +260,5 @@ Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {
         _opCtx.get(), NamespaceString::kRsOplogNamespace, obj, 0);
 }
 
-RollbackSourceMock::RollbackSourceMock(std::unique_ptr<OplogInterface> oplog)
-    : _oplog(std::move(oplog)) {}
-
-const OplogInterface& RollbackSourceMock::getOplog() const {
-    return *_oplog;
-}
-
-const HostAndPort& RollbackSourceMock::getSource() const {
-    return _source;
-}
-
-int RollbackSourceMock::getRollbackId() const {
-    return 0;
-}
-
-BSONObj RollbackSourceMock::getLastOperation() const {
-    auto iter = _oplog->makeIterator();
-    auto result = iter->next();
-    ASSERT_OK(result.getStatus());
-    return result.getValue().first;
-}
-
-BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& filter) const {
-    return BSONObj();
-}
-
-std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const DatabaseName& db,
-                                                                      UUID uuid,
-                                                                      const BSONObj& filter) const {
-    return {BSONObj(), NamespaceString::kEmpty};
-}
-
-StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {
-    return BSON("name" << nss.ns_forTest() << "options" << BSONObj());
-}
-
-StatusWith<BSONObj> RollbackSourceMock::getCollectionInfoByUUID(const DatabaseName& dbName,
-                                                                const UUID& uuid) const {
-    return BSON("options" << BSONObj() << "info" << BSON("uuid" << uuid));
-}
 }  // namespace repl
 }  // namespace mongo

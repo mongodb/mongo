@@ -67,18 +67,6 @@ public:
         _progressMap[memberId] = ProgressInfo(lastDurableOpTime, lastAppliedOpTime);
     }
 
-    void clear() {
-        _progressMap.clear();
-    }
-
-    long long getConfigVersion() const {
-        return _configVersion;
-    }
-
-    void setConfigVersion(long long configVersion) {
-        _configVersion = configVersion;
-    }
-
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() {
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append(UpdatePositionArgs::kCommandFieldName, 1);

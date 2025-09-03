@@ -60,7 +60,6 @@ public:
         long long dataSize{0};
         std::vector<DatabaseCloner::Stats> databaseStats;
 
-        BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
     };
 
@@ -138,8 +137,6 @@ private:
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
         return "admin db: { " + stage->getName() + ": 1 }";
     }
-
-    void handleAdminDbNotValid(const Status& errorStatus);
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

@@ -72,7 +72,6 @@ class OpTime;
  * Converts OplogEntriesEnum or DbCheckValidationModeEnum into string for health log.
  */
 std::string renderForHealthLog(OplogEntriesEnum op);
-std::string renderForHealthLog(DbCheckValidationModeEnum validateMode);
 
 /**
  * Logs an entry into 'local.system.healthLog'.
@@ -149,7 +148,6 @@ struct ReadSourceWithTimestamp {
  * BSON back to keystring format, that keystring will not have a RecordId.
  */
 BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering);
-BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Ordering& ordering);
 
 /**
  * Helper for getting the next distinct key in the index after currKeyStringBson.

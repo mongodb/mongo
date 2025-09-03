@@ -141,19 +141,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
-    BSONElement tsArray;
-    Status status =
-        bsonExtractTypedField(obj, OpTime::kTimestampFieldName, BSONType::array, &tsArray);
-    ASSERT_OK(status);
-
-    BSONElement termArray;
-    status = bsonExtractTypedField(obj, OpTime::kTermFieldName, BSONType::array, &termArray);
-    ASSERT_OK(status);
-
-    return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
-};
-
 CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
     return acquireCollection(
         opCtx,

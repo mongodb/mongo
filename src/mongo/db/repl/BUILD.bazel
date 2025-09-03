@@ -1250,24 +1250,30 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "rollback_source_impl",
+    name = "rollback_test_fixture",
     srcs = [
-        "rollback_source_impl.cpp",
+        "rollback_test_fixture.cpp",
     ],
     hdrs = [
         "rollback_source.h",
-        "rollback_source_impl.h",
+        "rollback_test_fixture.h",
     ],
     deps = [
-        ":oplog",
-        ":oplog_interface_remote",
-        ":repl_coordinator_interface",
-        ":replication_auth",
-        "//src/mongo:base",
+        ":oplog_interface_mock",
+        ":optime",
+        ":replication_process",
+        ":replication_recovery",
+        ":replmocks",
+        ":storage_interface_impl",
         "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:multitenancy",
         "//src/mongo/db:query_exec",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db:read_write_concern_defaults_mock",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
     ],
 )
 
@@ -1460,7 +1466,6 @@ mongo_cc_library(
         ":repl_coordinator_interface",
         ":repl_server_parameters",
         ":rollback_impl",
-        ":rollback_source_impl",
         ":storage_interface",
         ":sync_source_resolver",
         "//src/mongo/client:fetcher",
@@ -1518,7 +1523,6 @@ mongo_cc_library(
         ":replication_process",
         ":replication_recovery",
         ":reporter",
-        ":rollback_source_impl",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:change_stream_change_collection_manager",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
@@ -1740,34 +1744,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/unittest:task_executor_proxy",
-    ],
-)
-
-mongo_cc_library(
-    name = "rollback_test_fixture",
-    srcs = [
-        "rollback_test_fixture.cpp",
-    ],
-    hdrs = [
-        "rollback_source.h",
-        "rollback_test_fixture.h",
-    ],
-    deps = [
-        ":oplog_interface_mock",
-        ":optime",
-        ":replication_process",
-        ":replication_recovery",
-        ":replmocks",
-        ":storage_interface_impl",
-        "//src/mongo/db:dbhelpers",
-        "//src/mongo/db:multitenancy",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db:read_write_concern_defaults_mock",
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/collection_crud",
-        "//src/mongo/db/op_observer",
-        "//src/mongo/db/session:session_catalog_mongod",
-        "//src/mongo/db/transaction",
     ],
 )
 
@@ -2279,6 +2255,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":oplog_interface_local",
+        ":oplog_interface_mock",
         ":oplog_interface_remote",
         ":repl_coordinator_impl",
         ":repl_coordinator_test_fixture",

@@ -539,25 +539,6 @@ public:
         return noi;
     }
 
-    BSONObj makeHeartbeatResponseWithConfig(const ReplSetConfig& config) {
-        ReplSetHeartbeatResponse hbResp;
-        hbResp.setSetName(_donorSetName);
-        hbResp.setState(MemberState::RS_PRIMARY);
-        hbResp.setConfigVersion(config.getConfigVersion());
-        hbResp.setConfigTerm(config.getConfigTerm());
-        // The smallest valid optime in PV1.
-        OpTime opTime(Timestamp(1, 1), 0);
-        hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
-        hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
-        hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
-
-        BSONObjBuilder responseBuilder;
-        responseBuilder << "ok" << 1;
-        hbResp.addToBSON(&responseBuilder);
-        responseBuilder.append("config", config.toBSON());
-        return responseBuilder.obj();
-    }
-
     BSONObj makeConfigObj(long long version, boost::optional<long long> term) {
         BSONObjBuilder bob;
         bob.appendElements(BSON("_id" << "mySet"

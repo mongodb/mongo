@@ -882,9 +882,6 @@ public:
                                                      const Timestamp& electionTime = Timestamp(0,
                                                                                                0));
 
-    // Sets "_electionTime" to "newElectionTime".  Only for testing.
-    MONGO_MOD_PRIVATE void _setElectionTime(const Timestamp& newElectionTime);
-
     // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
     // TODO(spencer): Remove this once we can easily call for an election in unit tests to
     // set the current primary.

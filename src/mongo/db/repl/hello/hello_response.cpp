@@ -112,8 +112,7 @@ HelloResponse::HelloResponse()
       _tagsSet(false),
       _meSet(false),
       _electionId(OID()),
-      _configSet(true),
-      _shutdownInProgress(false) {}
+      _configSet(true) {}
 
 void HelloResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFields) const {
     if (_topologyVersion) {
@@ -145,12 +144,6 @@ void HelloResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFie
 
     if (_setNameSet) {
         builder->append(kSetNameFieldName, _setName);
-    }
-
-    if (_shutdownInProgress) {
-        builder->append(kCodeFieldName, ErrorCodes::ShutdownInProgress);
-        builder->append(kErrmsgFieldName, "replication shutdown in progress");
-        return;
     }
 
     if (!_configSet) {
@@ -606,10 +599,6 @@ void HelloResponse::setLastMajorityWrite(const OpTime& lastMajorityWriteOpTime,
 
 void HelloResponse::markAsNoConfig() {
     _configSet = false;
-}
-
-void HelloResponse::markAsShutdownInProgress() {
-    _shutdownInProgress = true;
 }
 
 }  // namespace repl

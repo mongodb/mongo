@@ -193,14 +193,5 @@ JournalListener* DataReplicatorExternalStateImpl::getReplicationJournalListener(
     return _replicationCoordinatorExternalState->getReplicationJournalListener();
 }
 
-ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {
-    return _replicationCoordinator;
-}
-
-ReplicationCoordinatorExternalState*
-DataReplicatorExternalStateImpl::getReplicationCoordinatorExternalState() const {
-    return _replicationCoordinatorExternalState;
-}
-
 }  // namespace repl
 }  // namespace mongo

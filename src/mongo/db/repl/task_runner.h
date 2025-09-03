@@ -62,15 +62,6 @@ public:
 
     using Task = unique_function<NextAction(OperationContext*, const Status&)>;
 
-    /**
-     * Creates a Task returning kCancel. This is useful in shutting down the task runner after
-     * running a series of tasks.
-     *
-     * Without a cancellation task, the client would need to coordinate the completion of the
-     * last task with calling cancel() on the task runner.
-     */
-    static Task makeCancelTask();
-
     explicit TaskRunner(ThreadPool* threadPool);
 
     virtual ~TaskRunner();

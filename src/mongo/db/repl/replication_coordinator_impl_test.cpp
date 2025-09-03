@@ -128,10 +128,6 @@ struct OpTimeWithTermOne {
     Timestamp timestamp;
 };
 
-OpTimeAndWallTime makeOpTimeAndWallTime(OpTime opTime, Date_t wallTime = Date_t()) {
-    return {opTime, wallTime};
-}
-
 /**
  * Helper that kills an operation, taking the necessary locks.
  */

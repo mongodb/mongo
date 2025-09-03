@@ -398,22 +398,6 @@ void OplogApplierUtils::addDerivedCommitsOrAborts(
     addTopLevelCommitOrAbort(opCtx, commitOrAbortOp, writerVectors);
 }
 
-NamespaceString OplogApplierUtils::parseUUIDOrNs(OperationContext* opCtx,
-                                                 const OplogEntry& oplogEntry) {
-    auto optionalUuid = oplogEntry.getUuid();
-    if (!optionalUuid) {
-        return oplogEntry.getNss();
-    }
-
-    const auto& uuid = optionalUuid.value();
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "No namespace with UUID " << uuid.toString(),
-            nss);
-    return *nss;
-}
-
 NamespaceStringOrUUID OplogApplierUtils::getNsOrUUID(const NamespaceString& nss,
                                                      const OplogEntry& op) {
     if (auto ui = op.getUuid()) {

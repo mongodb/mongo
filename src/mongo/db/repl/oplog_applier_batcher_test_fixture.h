@@ -107,14 +107,6 @@ OplogEntry makeDBCheckBatchEntry(int t,
 
 OplogEntry makeNewPrimaryBatchEntry(int t);
 
-OplogEntry makeUpdateOplogEntry(int t,
-                                const NamespaceString& nss,
-                                boost::optional<UUID> uuid = boost::none,
-                                boost::optional<OpTime> preImageOpTime = boost::none,
-                                boost::optional<OpTime> postImageOpTime = boost::none);
-
-OplogEntry makeNoopOplogEntry(int t, StringData msg);
-
 OplogEntry makeApplyOpsOplogEntry(int t,
                                   bool prepare,
                                   const std::vector<OplogEntry>& innerOps = {});
@@ -131,16 +123,6 @@ std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
                                                               bool prepared,
                                                               int count);
 
-std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
-    int t,
-    const DatabaseName& dbName,
-    bool prepared,
-    std::vector<std::vector<OplogEntry>> innerOps);
-std::vector<OplogEntry> makeRetryableApplyOpsOplogEntries(
-    int t,
-    const DatabaseName& dbName,
-    const OperationSessionInfo& sessionInfo,
-    std::vector<std::vector<OplogEntry>> innerOps);
 std::string toString(const std::vector<OplogEntry>& ops);
 }  // namespace repl
 }  // namespace mongo

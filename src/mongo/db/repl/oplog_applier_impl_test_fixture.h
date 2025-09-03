@@ -327,10 +327,6 @@ private:
 
 namespace MONGO_MOD_PUB repl {
 
-Status failedApplyCommand(OperationContext* opCtx,
-                          const BSONObj& theOperation,
-                          OplogApplication::Mode);
-
 void checkTxnTable(OperationContext* opCtx,
                    const LogicalSessionId& lsid,
                    const TxnNumber& txnNum,

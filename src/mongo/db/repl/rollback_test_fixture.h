@@ -311,27 +311,5 @@ private:
     ErrorCodes::Error _failSetFollowerModeWithThisCode = ErrorCodes::InternalError;
 };
 
-class RollbackSourceMock : public RollbackSource {
-public:
-    RollbackSourceMock(std::unique_ptr<OplogInterface> oplog);
-    int getRollbackId() const override;
-    const OplogInterface& getOplog() const override;
-    const HostAndPort& getSource() const override;
-    BSONObj getLastOperation() const override;
-    BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
-
-    std::pair<BSONObj, NamespaceString> findOneByUUID(const DatabaseName& db,
-                                                      UUID uuid,
-                                                      const BSONObj& filter) const override;
-
-    StatusWith<BSONObj> getCollectionInfoByUUID(const DatabaseName& dbName,
-                                                const UUID& uuid) const override;
-    StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
-
-private:
-    std::unique_ptr<OplogInterface> _oplog;
-    HostAndPort _source;
-};
-
 }  // namespace repl
 }  // namespace mongo

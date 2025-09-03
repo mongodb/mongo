@@ -222,11 +222,6 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
     return kContinueNormally;
 }
 
-void AllDatabaseCloner::handleAdminDbNotValid(const Status& errorStatus) {
-    LOGV2_DEBUG(21059, 1, "Validation failed on 'admin' db", "error"_attr = errorStatus);
-    setSyncFailedStatus(errorStatus);
-}
-
 void AllDatabaseCloner::postStage() {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -314,12 +309,6 @@ std::string AllDatabaseCloner::toString() const {
                          << " source:" << getSource()
                          << " db cloners remaining:" << _stats.databasesToClone
                          << " db cloners completed:" << _stats.databasesCloned;
-}
-
-BSONObj AllDatabaseCloner::Stats::toBSON() const {
-    BSONObjBuilder bob;
-    append(&bob);
-    return bob.obj();
 }
 
 void AllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {

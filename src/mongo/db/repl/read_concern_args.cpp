@@ -226,19 +226,9 @@ ReadConcernArgs ReadConcernArgs::fromIDLThrows(ReadConcernIdl readConcern) {
     return rc;
 }
 
-void ReadConcernArgs::setMajorityReadMechanism(MajorityReadMechanism mechanism) {
-    invariant(*_level == ReadConcernLevel::kMajorityReadConcern);
-    _majorityReadMechanism = mechanism;
-}
-
 ReadConcernArgs::MajorityReadMechanism ReadConcernArgs::getMajorityReadMechanism() const {
     invariant(*_level == ReadConcernLevel::kMajorityReadConcern);
     return _majorityReadMechanism;
-}
-
-bool ReadConcernArgs::isSpeculativeMajority() const {
-    return _level && *_level == ReadConcernLevel::kMajorityReadConcern &&
-        _majorityReadMechanism == MajorityReadMechanism::kSpeculative;
 }
 
 ReadConcernIdl ReadConcernArgs::toReadConcernIdl() const {

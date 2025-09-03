@@ -114,10 +114,6 @@ public:
 
     JournalListener* getReplicationJournalListener() override;
 
-protected:
-    ReplicationCoordinator* getReplicationCoordinator() const;
-    ReplicationCoordinatorExternalState* getReplicationCoordinatorExternalState() const;
-
 private:
     // Not owned by us.
     ReplicationCoordinator* _replicationCoordinator;

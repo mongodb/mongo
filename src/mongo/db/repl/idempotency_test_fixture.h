@@ -93,7 +93,6 @@ struct CollectionState {
 };
 
 bool operator==(const CollectionState& lhs, const CollectionState& rhs);
-bool operator!=(const CollectionState& lhs, const CollectionState& rhs);
 std::ostream& operator<<(std::ostream& stream, const CollectionState& state);
 StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
@@ -115,7 +114,6 @@ public:
 protected:
     enum class SequenceType : int { kEntireSequence, kAnyPrefix, kAnySuffix, kAnyPrefixOrSuffix };
     OplogEntry createCollection(UUID uuid = UUID::gen());
-    OplogEntry dropCollection();
     OplogEntry insert(const BSONObj& obj);
     template <class IdType>
     OplogEntry update(IdType _id, const BSONObj& obj);

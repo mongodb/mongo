@@ -168,16 +168,28 @@ void DbCheckTest::insertDocsWithMissingIndexKeys(OperationContext* opCtx,
     insertDocs(opCtx, startIDNum, numDocs, fieldNames);
 }
 
-void DbCheckTest::insertExtraIndexKeys(OperationContext* opCtx,
-                                       int startIDNum,
-                                       int numDocs,
-                                       const std::vector<std::string>& fieldNames) {
-    FailPointEnableBlock skipIndexFp("skipUnindexingDocumentWhenDeleted",
-                                     BSON("indexName" << "a_1"));
-    // Insert then delete docs. The failpoint will cause the docs' keystrings to remain in the index
-    // table, creating dangling keystrings.
-    insertDocs(opCtx, startIDNum, numDocs, fieldNames);
-    deleteDocs(opCtx, startIDNum, numDocs);
+DbCheckCollectionInfo DbCheckTest::createDbCheckCollectionInfo(
+    OperationContext* opCtx,
+    const BSONObj& start,
+    const BSONObj& end,
+    const SecondaryIndexCheckParameters& params) {
+    auto swUUID = storageInterface()->getCollectionUUID(opCtx, kNss);
+    ASSERT_OK(swUUID);
+
+    DbCheckCollectionInfo info = {
+        .nss = kNss,
+        .uuid = swUUID.getValue(),
+        .start = start,
+        .end = end,
+        .maxCount = kDefaultMaxCount,
+        .maxSize = kDefaultMaxSize,
+        .maxDocsPerBatch = kDefaultMaxDocsPerBatch,
+        .maxBatchTimeMillis = kDefaultMaxBatchTimeMillis,
+        .writeConcern = WriteConcernOptions(),
+        .secondaryIndexCheckParameters = params,
+        .dataThrottle = DataThrottle(opCtx, []() { return 0; }),
+    };
+    return info;
 }
 
 /**
@@ -195,28 +207,6 @@ void DbCheckTest::createIndex(OperationContext* opCtx, const BSONObj& indexKey) 
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
     auto fromMigrate = false;
     indexBuildsCoord->createIndex(opCtx, collection->uuid(), spec, indexConstraints, fromMigrate);
-}
-
-/**
- * Drops index 'indexName' in kNss.
- */
-void DbCheckTest::dropIndex(OperationContext* opCtx, const std::string& indexName) {
-    AutoGetCollection collection(opCtx, kNss, MODE_X);
-
-    WriteUnitOfWork wuow(opCtx);
-
-    CollectionWriter collWriter{opCtx, collection};
-    auto writableCollection = collWriter.getWritableCollection(opCtx);
-    auto writableEntry =
-        writableCollection->getIndexCatalog()->getWritableEntryByName(opCtx, indexName);
-    ASSERT(writableEntry);
-    ASSERT_OK(writableCollection->getIndexCatalog()->dropIndexEntry(
-        opCtx, writableCollection, writableEntry));
-
-    ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
-        repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));
-
-    wuow.commit();
 }
 
 Status DbCheckTest::runHashForCollectionCheck(
@@ -284,30 +274,6 @@ SecondaryIndexCheckParameters DbCheckTest::createSecondaryIndexCheckParams(
     params.setSkipLookupForExtraKeys(skipLookupForExtraKeys);
     params.setBsonValidateMode(bsonValidateMode);
     return params;
-}
-
-DbCheckCollectionInfo DbCheckTest::createDbCheckCollectionInfo(
-    OperationContext* opCtx,
-    const BSONObj& start,
-    const BSONObj& end,
-    const SecondaryIndexCheckParameters& params) {
-    auto swUUID = storageInterface()->getCollectionUUID(opCtx, kNss);
-    ASSERT_OK(swUUID);
-
-    DbCheckCollectionInfo info = {
-        .nss = kNss,
-        .uuid = swUUID.getValue(),
-        .start = start,
-        .end = end,
-        .maxCount = kDefaultMaxCount,
-        .maxSize = kDefaultMaxSize,
-        .maxDocsPerBatch = kDefaultMaxDocsPerBatch,
-        .maxBatchTimeMillis = kDefaultMaxBatchTimeMillis,
-        .writeConcern = WriteConcernOptions(),
-        .secondaryIndexCheckParameters = params,
-        .dataThrottle = DataThrottle(opCtx, []() { return 0; }),
-    };
-    return info;
 }
 
 int DbCheckTest::getNumDocsFoundInHealthLog(OperationContext* opCtx, const BSONObj& query) {

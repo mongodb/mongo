@@ -177,11 +177,6 @@ void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
     _awaitReplicationReturnValueFunction = std::move(returnValueFunction);
 }
 
-void ReplicationCoordinatorMock::setRunCmdOnPrimaryAndAwaitResponseFunction(
-    RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction) {
-    _runCmdOnPrimaryAndAwaitResponseFn = std::move(runCmdFunction);
-}
-
 SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeout(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     auto opCtx = cc().makeOperationContext();
@@ -418,10 +413,6 @@ OID ReplicationCoordinatorMock::getElectionId() {
     return OID();
 }
 
-OID ReplicationCoordinatorMock::getMyRID() const {
-    return OID();
-}
-
 int ReplicationCoordinatorMock::getMyId() const {
     return 0;
 }
@@ -562,12 +553,6 @@ Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* opCt
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _latestReconfig = args.newConfigObj;
     return Status::OK();
-}
-
-BSONObj ReplicationCoordinatorMock::getLatestReconfig() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    return _latestReconfig;
 }
 
 Status ReplicationCoordinatorMock::doReplSetReconfig(OperationContext* opCtx,

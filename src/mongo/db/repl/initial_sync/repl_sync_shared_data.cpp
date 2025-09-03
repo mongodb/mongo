@@ -44,10 +44,6 @@ Status ReplSyncSharedData::getStatus(WithLock lk) {
     return _status;
 }
 
-void ReplSyncSharedData::setStatus(WithLock lk, Status newStatus) {
-    _status = newStatus;
-}
-
 void ReplSyncSharedData::setStatusIfOK(WithLock lk, Status newStatus) {
     if (_status.isOK())
         _status = newStatus;

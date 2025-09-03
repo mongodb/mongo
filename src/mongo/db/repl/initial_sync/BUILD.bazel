@@ -20,12 +20,10 @@ idl_generator(
 mongo_cc_library(
     name = "cloner_utils",
     srcs = [
-        "cloner_utils.cpp",
         "database_cloner_common.cpp",
         "database_cloner_gen",
     ],
     hdrs = [
-        "cloner_utils.h",
         "database_cloner_common.h",
     ],
     deps = [

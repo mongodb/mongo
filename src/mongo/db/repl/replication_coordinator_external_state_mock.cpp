@@ -135,11 +135,6 @@ HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
     return _clientHostAndPort;
 }
 
-void ReplicationCoordinatorExternalStateMock::setClientHostAndPort(
-    const HostAndPort& clientHostAndPort) {
-    _clientHostAndPort = clientHostAndPort;
-}
-
 StatusWith<BSONObj> ReplicationCoordinatorExternalStateMock::loadLocalConfigDocument(
     OperationContext* opCtx) {
     return _localRsConfigDocument;
@@ -243,14 +238,6 @@ bool ReplicationCoordinatorExternalStateMock::threadsStarted() const {
 
 void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentStatus(Status status) {
     _storeLocalLastVoteDocumentStatus = status;
-}
-
-void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentToHang(bool hang) {
-    stdx::unique_lock<stdx::mutex> lock(_shouldHangLastVoteMutex);
-    _storeLocalLastVoteDocumentShouldHang = hang;
-    if (!hang) {
-        _shouldHangLastVoteCondVar.notify_all();
-    }
 }
 
 void ReplicationCoordinatorExternalStateMock::setFirstOpTimeOfMyTerm(const OpTime& opTime) {

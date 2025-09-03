@@ -126,8 +126,6 @@ public:
         _topo = std::make_unique<TopologyCoordinator>(_options);
         _now = Date_t();
         _selfIndex = -1;
-        _cbData = std::make_unique<executor::TaskExecutor::CallbackArgs>(
-            nullptr, executor::TaskExecutor::CallbackHandle(), Status::OK());
 
         // Set 'changeSyncSourceThresholdMillis' to 0 by default to avoid running ping time checks
         // in unrelated tests. Tests for changing a sync source due to long ping times should set
@@ -137,15 +135,11 @@ public:
 
     void tearDown() override {
         _topo = nullptr;
-        _cbData = nullptr;
     }
 
 protected:
     TopologyCoordinator& getTopoCoord() {
         return *_topo;
-    }
-    executor::TaskExecutor::CallbackArgs cbData() {
-        return *_cbData;
     }
     Date_t& now() {
         return _now;
@@ -237,10 +231,6 @@ protected:
 
     int getSelfIndex() {
         return _selfIndex;
-    }
-
-    HostAndPort getCurrentPrimaryHost() {
-        return _currentConfig.getMemberAt(getTopoCoord().getCurrentPrimaryIndex()).getHostAndPort();
     }
 
     BSONObj addProtocolVersion(const BSONObj& configDoc) {
@@ -441,7 +431,6 @@ private:
 
 private:
     unique_ptr<TopologyCoordinator> _topo;
-    unique_ptr<executor::TaskExecutor::CallbackArgs> _cbData;
     ReplSetConfig _currentConfig;
     Date_t _now;
     int _selfIndex;

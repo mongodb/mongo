@@ -63,8 +63,6 @@ public:
 
     Status getStatus(WithLock lk);
 
-    void setStatus(WithLock lk, Status newStatus);
-
     /**
      * Sets the status to the new status if and only if the old status is "OK".
      */
