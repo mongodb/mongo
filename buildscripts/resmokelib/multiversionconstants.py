@@ -91,8 +91,12 @@ def generate_releases_file():
 
 def in_git_root_dir():
     """Return True if we are in the root of a git directory."""
-    if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
-        # We are not in a git directory.
+    try:
+        if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
+            # We are not in a git directory.
+            return False
+    except FileNotFoundError:
+        # Git is not even installed.
         return False
 
     git_root_dir = os.path.realpath(

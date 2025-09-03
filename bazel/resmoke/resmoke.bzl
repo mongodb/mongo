@@ -107,13 +107,17 @@ def resmoke_suite_test(
         # the `srcs` are expected to be Python files only.
         srcs = [resmoke_shim],
         data = data + srcs + [
+            config,
             generated_config,
             "//bazel/resmoke:on_feature_flags",
             "//bazel/resmoke:off_feature_flags",
             "//bazel/resmoke:unreleased_ifr_flags",
             "//bazel/resmoke:volatile_status",
             "//bazel/resmoke:test_runtimes",
-            "//buildscripts/resmokeconfig:all_files",  # This needs to be reduced, SERVER-103610
+            "//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml",
+            "//buildscripts/resmokeconfig:resmoke_modules.yml",
+            "//buildscripts/resmokeconfig/evg_task_doc:all_files",
+            "//buildscripts/resmokeconfig/loggers:all_files",
             "//src/mongo/util/version:releases.yml",
             "//:generated_resmoke_config",
         ] + select({
@@ -137,6 +141,7 @@ def resmoke_suite_test(
         size = size,
         env = {
             "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
+            "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
         },
         **kwargs
     )

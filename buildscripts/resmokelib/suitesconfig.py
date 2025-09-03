@@ -276,6 +276,8 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
                 suites_dirs = [os.path.join(_config.CONFIG_DIR, "suites")] + _config.MODULE_SUITE_DIRS
                 for suites_dir in suites_dirs:
                     root = os.path.abspath(suites_dir)
+                    if not os.path.exists(root):
+                        continue
                     files = os.listdir(root)
                     for filename in files:
                         (short_name, ext) = os.path.splitext(filename)
@@ -355,6 +357,8 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     def get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
         suites_dir = cls.get_suites_dir()
+        if not os.path.exists(suites_dir):
+            return None
         matrix_suite = cls.parse_mappings_file(suites_dir, suite_name)
         if not matrix_suite:
             return None
