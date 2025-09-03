@@ -328,12 +328,15 @@ public:
                        << " QueryClass=" << queryClassToString(queryClass) << " Threads="
                        << state.threads << " HitOrMiss=" << (isTestingHitCase ? "Hit" : "Miss"));
 
+        auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx.get());
         while (state.KeepRunning()) {
             query_shape::DeferredQueryShape deferredShape{[&]() {
                 return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
             }};
-            benchmark::DoNotOptimize(query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-                expCtx, deferredShape, ns));
+            auto queryShapeHash =
+                deferredShape().getValue()->sha256Hash(opCtx.get(), kSerializationContext);
+            benchmark::DoNotOptimize(querySettingsService.lookupQuerySettingsWithRejectionCheck(
+                expCtx, queryShapeHash, ns));
         }
     }
 

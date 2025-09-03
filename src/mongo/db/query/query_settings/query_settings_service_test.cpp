@@ -215,6 +215,10 @@ public:
             boost::none, kDbName, kCollName, kSerializationContext);
     }
 
+    query_shape::QueryShapeHash hashForShape(const query_shape::DeferredQueryShape& shape) {
+        return shape().getValue()->sha256Hash(opCtx(), kSerializationContext);
+    }
+
     QueryShapeConfiguration makeQueryShapeConfiguration(
         const BSONObj& cmdBSON,
         const QuerySettings& querySettings,
@@ -273,7 +277,8 @@ public:
         useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
 
         // Ensure empty settings are returned if no settings are present in the system.
-        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(expCtx(), deferredShape, nss),
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                      expCtx(), hashForShape(deferredShape), nss),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdForSettingsBSON'.
@@ -282,7 +287,8 @@ public:
 
         // Ensure that 'forceClassicEngineSettings' are returned during the lookup, after query
         // settings have been populated.
-        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(expCtx(), deferredShape, nss),
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                      expCtx(), hashForShape(deferredShape), nss),
                   forceClassicEngineSettings);
     }
 
@@ -305,7 +311,7 @@ public:
 
         // Ensure empty settings are returned if no settings are present in the system.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), deferredShape, nss, QuerySettings()),
+                      expCtx(), hashForShape(deferredShape), nss, QuerySettings()),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdForSettingsBSON'.
@@ -313,10 +319,12 @@ public:
             opCtx(), {makeQueryShapeConfiguration(cmdForSettingsBSON, forceClassicEngineSettings)});
 
         // Ensure that in case of a replica set case, a regular query settings lookup is performed.
-        ASSERT_EQ(
-            service().lookupQuerySettingsWithRejectionCheck(
-                expCtx(), deferredShape, nss, boost::none /* querySettingsFromOriginalCommand */),
-            forceClassicEngineSettings);
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                      expCtx(),
+                      hashForShape(deferredShape),
+                      nss,
+                      boost::none /* querySettingsFromOriginalCommand */),
+                  forceClassicEngineSettings);
 
         // Simulate performing QuerySettings lookup on the shard in sharded cluster.
         {
@@ -325,14 +333,14 @@ public:
             // Ensure that settings passed to the method are being returned as opposed to performing
             // the QuerySettings lookup.
             ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                          expCtx(), deferredShape, nss, useSbeEngineSettings),
+                          expCtx(), hashForShape(deferredShape), nss, useSbeEngineSettings),
                       useSbeEngineSettings);
 
             // Ensure that empty settings are returned if original command did not have any settings
             // specified as opposed to performing QuerySettings lookup.
             ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                           expCtx(),
-                          deferredShape,
+                          hashForShape(deferredShape),
                           nss,
                           boost::none /* querySettingsFromOriginalCommand */),
                       QuerySettings());
@@ -359,13 +367,13 @@ public:
         // Ensure query is not rejected if an explain query is run, otherwise is rejected by
         // throwing an exception with QueryRejectedBySettings error code.
         if (isExplain) {
-            ASSERT_DOES_NOT_THROW(
-                lookupQuerySettingsWithRejectionCheckOnRouter(expCtx(), deferredShape, nss));
+            ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
+                expCtx(), hashForShape(deferredShape), nss));
         } else {
-            ASSERT_THROWS_CODE(
-                lookupQuerySettingsWithRejectionCheckOnRouter(expCtx(), deferredShape, nss),
-                DBException,
-                ErrorCodes::QueryRejectedBySettings);
+            ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
+                                   expCtx(), hashForShape(deferredShape), nss),
+                               DBException,
+                               ErrorCodes::QueryRejectedBySettings);
         }
     }
 
@@ -389,12 +397,15 @@ public:
         // Ensure query is not rejected if an explain query is run, otherwise is rejected by
         // throwing an exception with QueryRejectedBySettings error code.
         if (isExplain) {
-            ASSERT_DOES_NOT_THROW(lookupQuerySettingsWithRejectionCheckOnShard(
-                expCtx(), deferredShape, nss, boost::none /* querySettingsFromOriginalCommand */));
+            ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
+                expCtx(),
+                hashForShape(deferredShape),
+                nss,
+                boost::none /* querySettingsFromOriginalCommand */));
         } else {
-            ASSERT_THROWS_CODE(lookupQuerySettingsWithRejectionCheckOnShard(
+            ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
                                    expCtx(),
-                                   deferredShape,
+                                   hashForShape(deferredShape),
                                    nss,
                                    boost::none /* querySettingsFromOriginalCommand */),
                                DBException,
@@ -404,10 +415,13 @@ public:
         // Ensure query is not rejected on the shard in sharded cluster.
         {
             InternalClientScope internalClientScope(opCtx());
-            ASSERT_DOES_NOT_THROW(lookupQuerySettingsWithRejectionCheckOnShard(
-                expCtx(), deferredShape, nss, querySettingsWithReject));
-            ASSERT_DOES_NOT_THROW(lookupQuerySettingsWithRejectionCheckOnShard(
-                expCtx(), deferredShape, nss, boost::none /* querySettingsFromOriginalCommand */));
+            ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
+                expCtx(), hashForShape(deferredShape), nss, querySettingsWithReject));
+            ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
+                expCtx(),
+                hashForShape(deferredShape),
+                nss,
+                boost::none /* querySettingsFromOriginalCommand */));
         }
     }
 

@@ -148,11 +148,18 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
+    // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
     }};
-    expCtx->setQuerySettingsIfNotPresent(
-        query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(expCtx, deferredShape, nss));
+    auto queryShapeHash = shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
+    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+    auto querySettings =
+        querySettingsService.lookupQuerySettingsWithRejectionCheck(expCtx, queryShapeHash, nss);
+    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // We do not collect queryStats on explain for distinct.
     if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(

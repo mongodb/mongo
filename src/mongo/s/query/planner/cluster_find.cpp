@@ -718,14 +718,18 @@ std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(
         expCtx, {.findCommand = std::move(cmdRequest), .allowedFeatures = allowedFeatures}));
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
     }};
+    auto queryShapeHash = shape_helpers::computeQueryShapeHash(expCtx, deferredShape, origNss);
+    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
 
-    auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-        expCtx, deferredShape, origNss);
-    expCtx->setQuerySettingsIfNotPresent(querySettings);
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+    auto querySettings =
+        querySettingsService.lookupQuerySettingsWithRejectionCheck(expCtx, queryShapeHash, origNss);
+    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     if (mustRegisterRequestToQueryStats) {
         query_stats::registerRequest(

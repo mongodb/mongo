@@ -97,11 +97,11 @@ public:
                                 Request::kCommandName),
                     request().getCommandParameter().nFields() == 1);
 
+            auto querySettingsClusterParameterName =
+                query_settings::QuerySettingsService::getQuerySettingsClusterParameterName();
             uassert(ErrorCodes::NoSuchKey,
-                    fmt::format("Unknown server parameter: {}",
-                                query_settings::getQuerySettingsClusterParameterName()),
-                    !request().getCommandParameter()
-                         [query_settings::getQuerySettingsClusterParameterName()]);
+                    fmt::format("Unknown server parameter: {}", querySettingsClusterParameterName),
+                    !request().getCommandParameter()[querySettingsClusterParameterName]);
 
             {
                 bool ignore;

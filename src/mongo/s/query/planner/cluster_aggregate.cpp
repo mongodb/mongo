@@ -519,16 +519,22 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         pipeline->validateWithCollectionMetadata(cri.get());
     }
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
-    // In case query settings have already been looked up (in case the agg request is
-    // running over a view) we avoid performing query settings lookup.
+    // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
             request, nsStruct.executionNss, involvedNamespaces, *pipeline, expCtx);
     }};
+    auto queryShapeHash =
+        shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
+    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    // In case query settings have already been looked up (in case the agg request is
+    // running over a view) we avoid performing query settings lookup.
     expCtx->setQuerySettingsIfNotPresent(std::move(request.getQuerySettings()).value_or_eval([&] {
-        return query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-            expCtx, deferredShape, nsStruct.executionNss);
+        auto& service = query_settings::QuerySettingsService::get(opCtx);
+        return service.lookupQuerySettingsWithRejectionCheck(
+            expCtx, queryShapeHash, nsStruct.executionNss);
     }));
 
     // Skip query stats recording for queryable encryption queries.

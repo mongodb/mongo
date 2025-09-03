@@ -29,10 +29,20 @@
 
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/query_shape_gen.h"
 
 namespace mongo::shape_helpers {
+
+namespace {
+// SerializationContext used when computing QueryShapeHash.
+const auto kSerializationContext =
+    SerializationContext{SerializationContext::Source::Command,
+                         SerializationContext::CallerType::Request,
+                         SerializationContext::Prefix::ExcludePrefix};
+}  // namespace
 
 static constexpr StringData hintSpecialField = "$hint"_sd;
 // A "Flat" object is one with only top-level fields. We won't descend recursively to shapify any
@@ -90,6 +100,44 @@ void appendNamespaceShape(BSONObjBuilder& bob,
     // included into query shape.
     bob.append("db", opts.serializeIdentifier(nss.dbName().serializeWithoutTenantPrefix_UNSAFE()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
+}
+
+boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const query_shape::DeferredQueryShape& deferredShape,
+    const NamespaceString& nss) {
+    // QueryShapeHash is not computed for:
+    // - intenal clients, i.e. queries coming from mongos
+    // and
+    // - queries executed via DBDirectClient.
+    auto* opCtx = expCtx->getOperationContext();
+    auto* client = opCtx->getClient();
+    if (client->isInternalClient() || client->isInDirectClient()) {
+        return boost::none;
+    }
+
+    // TODO: SERVER-102484 Provide fast path QueryShape and QueryShapeHash computation for Express
+    // queries.
+    if (expCtx->isIdHackQuery()) {
+        return boost::none;
+    }
+
+    // QueryShapeHash is not computed for queries with encryption information.
+    if (expCtx->isFleQuery()) {
+        return boost::none;
+    }
+
+    // QueryShapeHash is not computed for internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return boost::none;
+    }
+
+    const auto& shapePtr = deferredShape();
+    if (!shapePtr.isOK()) {
+        return boost::none;
+    }
+
+    return shapePtr.getValue()->sha256Hash(opCtx, kSerializationContext);
 }
 
 }  // namespace mongo::shape_helpers

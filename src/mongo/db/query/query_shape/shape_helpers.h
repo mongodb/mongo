@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/logv2/log.h"
@@ -113,4 +114,12 @@ void appendNamespaceShape(BSONObjBuilder& bob,
                           const NamespaceString& nss,
                           const SerializationOptions& opts);
 
+/**
+ * Evaluates the 'deferredShape' and computes a QueryShapeHash if both the shape and the client
+ * are eligible. If not eligible, returns boost::none.
+ */
+boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const query_shape::DeferredQueryShape& deferredShape,
+    const NamespaceString& nss);
 }  // namespace mongo::shape_helpers

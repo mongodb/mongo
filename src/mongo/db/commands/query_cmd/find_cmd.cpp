@@ -205,13 +205,18 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // properly initialized.
     expCtx->initializeReferencedSystemVariables();
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx);
     }};
-    expCtx->setQuerySettingsIfNotPresent(
-        query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
-            expCtx, deferredShape, nss, parsedRequest->findCommandRequest->getQuerySettings()));
+    auto queryShapeHash = shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
+    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+        expCtx, queryShapeHash, nss, parsedRequest->findCommandRequest->getQuerySettings());
+    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // Register query stats collection. Exclude queries with encrypted fields as indicated by the
     // inclusion of encryptionInformation in the request.
@@ -519,17 +524,20 @@ public:
             // properly initialized.
             expCtx->initializeReferencedSystemVariables();
 
-            // Perform the query settings lookup and attach it to 'expCtx'.
+            // Compute QueryShapeHash and record it in CurOp.
             query_shape::DeferredQueryShape deferredShape{[&]() {
                 return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest,
                                                                               expCtx);
             }};
-            expCtx->setQuerySettingsIfNotPresent(
-                query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
-                    expCtx,
-                    deferredShape,
-                    ns,
-                    parsedRequest->findCommandRequest->getQuerySettings()));
+            auto queryShapeHash = shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+            CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+
+            // Perform the query settings lookup and attach it to 'expCtx'.
+            auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+            auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+                expCtx, queryShapeHash, ns, parsedRequest->findCommandRequest->getQuerySettings());
+            expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
+
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
 

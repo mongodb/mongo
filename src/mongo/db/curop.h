@@ -698,8 +698,16 @@ public:
         return _queryShapeHash;
     }
 
-    void setQueryShapeHash(const query_shape::QueryShapeHash& hash) {
-        _queryShapeHash = hash;
+    /**
+     * Convenience method that sets '_queryShapeHash' if 'hash' is not boost::none and
+     * '_queryShapeHash' has not been previously set. Currently QueryShapeHash for a given command
+     * may be computed twice (due to view resolution). By preventing new QueryShapeHash overwrites
+     * we ensure that original QueryShapeHash is recorded in CurOp.
+     */
+    void setQueryShapeHashIfNotPresent(const boost::optional<query_shape::QueryShapeHash>& hash) {
+        if (hash && !_queryShapeHash) {
+            _queryShapeHash = hash;
+        }
     }
 
     /**

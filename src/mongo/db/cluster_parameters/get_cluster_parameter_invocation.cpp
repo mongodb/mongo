@@ -84,7 +84,9 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
 
         // The persistent query settings are stored in a cluster parameter, however, since this is
         // an implementation detail, we don't want to expose it to our users.
-        if (requestedParameter->name() == query_settings::getQuerySettingsClusterParameterName()) {
+        auto querySettingsClusterParameterName =
+            query_settings::QuerySettingsService::getQuerySettingsClusterParameterName();
+        if (requestedParameter->name() == querySettingsClusterParameterName) {
             uassert(ErrorCodes::NoSuchKey,
                     str::stream() << "Unknown server parameter: " << requestedParameter->name(),
                     skipOnError);

@@ -104,6 +104,14 @@ public:
     static std::string getQuerySettingsClusterParameterName();
 
     /**
+     * Checks the query settings eligibility of the current command referred by 'expCtx' for
+     * namespace 'nss'. Query settings are not eligible for IDHACK/Express queries, encrypted
+     * queries and queries run on internal or system collections.
+     */
+    static bool isEligbleForQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          const NamespaceString& nss);
+
+    /**
      * Returns a set of system and administrative aggregation pipeline stages that, if used as the
      * initial stage, prevent the query from being rejected via query settings.
      *
@@ -136,11 +144,9 @@ public:
     /**
      * Returns the appropriate QuerySettings:
      *
-     * - On router and shard in replica set deployment performs QuerySettings lookup for a specified
-     * 'queryShape'. If no settings are found or if the 'queryShape' is ineligible (e.g., IDHACK
-     * queries), returns empty QuerySettings. If the QuerySettings include 'reject: true' and is not
-     * run in explain, a uassert is thrown with the QueryRejectedBySettings error code, rejecting
-     * the query. Additionally, records the QueryShapeHash within the CurOp
+     * - On router and shard in replica set deployment performs QuerySettings lookup for
+     * QueryShapeHash. If the QuerySettings include 'reject: true' and is not run in explain, a
+     * uassert is thrown with the QueryRejectedBySettings error code, rejecting the query.
      *
      * - On shard in sharded cluster returns 'querySettingsFromOriginalCommand'. This corresponds to
      * the QuerySettings looked up on the router and passed to shards as part of the command.
@@ -149,10 +155,29 @@ public:
      */
     virtual QuerySettings lookupQuerySettingsWithRejectionCheck(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const query_shape::DeferredQueryShape& queryShape,
+        const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
             boost::none) const = 0;
+
+    /**
+     * Convenience overload that skips settings lookup if 'queryShapeHash' is boost::none, returning
+     * default settings. This method simplifies call sites by avoiding manual checks for
+     * QueryShapeHash presence.
+     */
+    QuerySettings lookupQuerySettingsWithRejectionCheck(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
+        const NamespaceString& nss,
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
+            boost::none) const {
+        if (!queryShapeHash) {
+            return querySettingsFromOriginalCommand.value_or(QuerySettings());
+        }
+
+        return lookupQuerySettingsWithRejectionCheck(
+            expCtx, *queryShapeHash, nss, querySettingsFromOriginalCommand);
+    }
 
     /**
      * Returns all the query shape configurations and the timestamp of the last modification.
@@ -283,43 +308,6 @@ public:
     void sanitizeQuerySettingsHints(
         std::vector<QueryShapeConfiguration>& queryShapeConfigurations) const;
 };
-
-/**
- * Retrieves the QuerySettings for a specified 'queryShape' over namespace 'nss'. If no settings are
- * found or if the 'queryShape' is ineligible (e.g., IDHACK queries), returns empty QuerySettings.
- * If the QuerySettings include 'reject: true' and is not run in explain, a uassert is thrown with
- * the QueryRejectedBySettings error code, rejecting the query. Additionally, records the
- * QueryShapeHash within the CurOp.
- */
-QuerySettings lookupQuerySettingsWithRejectionCheckOnRouter(
-    const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
-    const query_shape::DeferredQueryShape& queryShape,
-    const NamespaceString& nss);
-
-/**
- * Returns the appropriate QuerySettings based on deployment:
- *
- * - Sharded cluster: returns 'querySettingsFromOriginalCommand'. This corresponds to the
- * QuerySettings looked up on the router and passed to shards as part of the command. Rejection
- * check is not performed here, as queries with 'reject: true' in their QuerySettings would already
- * have been rejected by the router.
- *
- * - Replica set: retrieves the QuerySettings for a specified 'queryShape' over namespace 'nss'. If
- * no settings are found or if the 'queryShape' is ineligible (e.g., IDHACK queries), returns empty
- * QuerySettings. If the QuerySettings include 'reject: true' and is not run in explain, a uassert
- * is thrown with the QueryRejectedBySettings error code, rejecting the query. Additionally, records
- * the QueryShapeHash within the CurOp.
- */
-QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
-    const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
-    const query_shape::DeferredQueryShape& queryShape,
-    const NamespaceString& nss,
-    const boost::optional<QuerySettings>& querySettingsFromOriginalCommand);
-
-/**
- * Returns the name of the cluster parameter that stores QuerySettings for all QueryShapes.
- */
-std::string getQuerySettingsClusterParameterName();
 
 /**
  * Returns true if the aggregation pipeline 'pipeline' does not start with rejection incompatible

@@ -147,7 +147,6 @@ public:
         return h;
     }
 
-
     // Not shapified but it is an identifier so it may be transformed.
     NamespaceStringOrUUID nssOrUUID;
 

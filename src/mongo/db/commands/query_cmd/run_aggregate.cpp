@@ -895,6 +895,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // Pipeline::parse() will first check if a view exists directly on the stage specification and
     // if none is found, will then check for the view using the expCtx. As such, it's necessary to
     // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
+    auto* opCtx = expCtx->getOperationContext();
     const bool isHybridSearchPipeline = aggExState.isHybridSearchPipeline();
     if (isHybridSearchPipeline) {
         uassert(10557301,
@@ -912,7 +913,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                     "$rankFusion and $scoreFusion are currently unsupported on views",
                     feature_flags::gFeatureFlagSearchHybridScoringFull
                         .isEnabledUseLatestFCVWhenUninitialized(
-                            VersionContext::getDecoration(expCtx->getOperationContext()),
+                            VersionContext::getDecoration(opCtx),
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             // This insertion into the ExpressionContext ResolvedNamespaceMap is to handle cases
@@ -947,7 +948,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     auto pipeline = Pipeline::parse(requestForQueryStats.getPipeline(), expCtx);
     expCtx->stopExpressionCounters();
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
             requestForQueryStats,
@@ -956,12 +957,18 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             *pipeline,
             expCtx);
     }};
-    expCtx->setQuerySettingsIfNotPresent(
-        query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
-            expCtx,
-            deferredShape,
-            aggExState.getOriginalNss(),
-            requestForQueryStats.getQuerySettings()));
+    auto queryShapeHash =
+        shape_helpers::computeQueryShapeHash(expCtx, deferredShape, aggExState.getOriginalNss());
+    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+        expCtx,
+        queryShapeHash,
+        aggExState.getOriginalNss(),
+        requestForQueryStats.getQuerySettings());
+    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // Register query stats with the pre-optimized pipeline. Exclude queries with encrypted fields
     // as indicated by the inclusion of encryptionInformation in the request. We still collect query
