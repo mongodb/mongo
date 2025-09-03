@@ -889,7 +889,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     return;
 }
 
-IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIsAvailable(
+IndexBuildAction IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     auto future = replState->getNextActionFuture();
 
@@ -915,10 +915,15 @@ IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIs
     // allows the critical section of committing, which must drain the remainder of the side writes,
     // to be as short as possible.
     while (!waitUntilNextActionIsReady()) {
+        if (replState->getGenerateTableWrites()) {
+            _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+        }
+    }
+
+    if (replState->getGenerateTableWrites()) {
+        // Final chance to catch up before taking an X lock.
         _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     }
-    // Final chance to catch up before taking an X lock.
-    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     return nextAction;
 }
 
@@ -948,7 +953,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
         auto const nextAction = [&] {
             _incWaitForCommitQuorum();
             // Future wait can be interrupted.
-            return _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
+            return _waitForNextIndexBuildAction(opCtx, replState);
         }();
         LOGV2(3856204,
               "Index build: received signal",

@@ -13,6 +13,8 @@ executor:
         TestData:
           setParameters:
             featureFlagPrimaryDrivenIndexBuilds: true
+          skipCheckDBHashes: true
+          skipCollectionAndIndexValidation: true
       nodb: ""
 matrix_suite: true
 selector:

@@ -1,6 +1,10 @@
 /*
  * Test that primary rollbacks before receiving any votes from the replica set should not
  * make createIndexes command's commit quorum value to be lost.
+ * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

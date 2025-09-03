@@ -233,6 +233,16 @@ void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
     _indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
 }
 
+void ReplIndexBuildState::setGenerateTableWrites(bool generateTableWrites) {
+    stdx::lock_guard lk(_mutex);
+    _generateTableWrites = generateTableWrites;
+}
+
+bool ReplIndexBuildState::getGenerateTableWrites() const {
+    stdx::lock_guard lk(_mutex);
+    return _generateTableWrites;
+}
+
 void ReplIndexBuildState::setPostFailureState(const Status& status) {
     stdx::lock_guard lk(_mutex);
     if (_indexBuildState.isFailureCleanUp() || _indexBuildState.isExternalAbort() ||

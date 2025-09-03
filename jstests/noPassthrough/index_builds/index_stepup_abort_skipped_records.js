@@ -3,6 +3,8 @@
  * skipped records that still cause key generation errors.
  *
  * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
  *   requires_commit_quorum,
  *   requires_fcv_71,

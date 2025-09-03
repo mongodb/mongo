@@ -2,6 +2,8 @@
  * Confirms that unique index builds fail after a primary steps down during the collection
  * scan phase. The new primary will discover a duplicate key violation and abort the build.
  * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

@@ -6,7 +6,7 @@
  *     requires_persistence,
  *     requires_replication,
  *     requires_wiredtiger,
- *     # Primary-driven index builds don't write unfinished indexes to the catalog.
+ *     # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
  *     primary_driven_index_builds_incompatible,
  * ]
  */

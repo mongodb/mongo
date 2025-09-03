@@ -15,6 +15,8 @@
  *    step-up from ocurring.
  *
  * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

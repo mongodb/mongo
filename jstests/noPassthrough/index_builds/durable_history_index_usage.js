@@ -2,8 +2,10 @@
  * Tests index usage with durable history across restarts.
  *
  * @tags: [
- *     requires_persistence,
- *     requires_replication,
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
+ *   requires_persistence,
+ *   requires_replication,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

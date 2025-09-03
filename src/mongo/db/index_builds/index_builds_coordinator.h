@@ -718,14 +718,15 @@ protected:
                              const boost::optional<ResumeIndexInfo>& resumeInfo);
 
     /**
-     * Resumes the index build from the phase that it was in when the node cleanly shut down. By the
-     * time this function is called, the in-memory state of the index build should already have been
-     * reconstructed.
+     * Resumes a kHybrid index build from the phase that it was in when the node cleanly shut down.
+     * By the time this function is called, the in-memory state of the index build should already
+     * have been reconstructed.
+     * TODO(SERVER-109664): Rename it to _resumeTwoPhaseIndexBuildFromPhase().
      */
-    void _resumeIndexBuildFromPhase(OperationContext* opCtx,
-                                    std::shared_ptr<ReplIndexBuildState> replState,
-                                    const IndexBuildOptions& indexBuildOptions,
-                                    const ResumeIndexInfo& resumeInfo);
+    void _resumeHybridIndexBuildFromPhase(OperationContext* opCtx,
+                                          std::shared_ptr<ReplIndexBuildState> replState,
+                                          const IndexBuildOptions& indexBuildOptions,
+                                          const ResumeIndexInfo& resumeInfo);
 
     /**
      * Cleans up the index build after a failure. If a shutdown happens during clean-up, defaults to
@@ -779,11 +780,20 @@ protected:
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**
-     * Modularizes the _indexBuildsManager calls part of _runIndexBuildInner. Throws on error.
+     * Builds an index using kHybrid index build method. Modularizes the _indexBuildsManager calls
+     * part of _runIndexBuildInner. Throws on error.
+     * TODO(SERVER-109664): Rename it to _buildTwoPhaseIndex().
      */
-    void _buildIndex(OperationContext* opCtx,
-                     std::shared_ptr<ReplIndexBuildState> replState,
-                     const IndexBuildOptions& indexBuildOptions);
+    void _buildHybridIndex(OperationContext* opCtx,
+                           std::shared_ptr<ReplIndexBuildState> replState,
+                           const IndexBuildOptions& indexBuildOptions);
+
+    /**
+     * Builds an index using kPrimaryDriven index build method.
+     */
+    void _buildPrimaryDrivenIndex(OperationContext* opCtx,
+                                  std::shared_ptr<ReplIndexBuildState> replState,
+                                  const IndexBuildOptions& indexBuildOptions);
 
     /**
      * First phase is the collection scan and insertion of the keys into the sorter.
@@ -851,7 +861,7 @@ protected:
     /**
      * Drains the side-writes table periodically while waiting for the IndexBuildAction to be ready.
      */
-    virtual IndexBuildAction _drainSideWritesUntilNextActionIsAvailable(
+    virtual IndexBuildAction _waitForNextIndexBuildAction(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
 
     /**

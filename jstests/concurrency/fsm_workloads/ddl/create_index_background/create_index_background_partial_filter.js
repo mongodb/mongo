@@ -6,6 +6,8 @@
  * isn't guaranteed to be true when they are run in parallel with other workloads. Therefore
  * it can't be run in concurrency simultaneous suites.
  * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   assumes_balancer_off,
  *   creates_background_indexes,
  *   requires_getmore,

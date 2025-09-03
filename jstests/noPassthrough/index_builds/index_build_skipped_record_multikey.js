@@ -10,6 +10,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({
@@ -28,7 +29,8 @@ replTest.startSet();
 replTest.initiate();
 
 const primary = replTest.getPrimary();
-const coll = primary.getDB("test")[jsTestName()];
+const primaryDB = primary.getDB("test");
+const coll = primaryDB[jsTestName()];
 
 assert.commandWorked(
     coll.insert([
@@ -90,9 +92,12 @@ const awaitCreateIndex = startParallelShell(
 );
 fpSecondaryDrain.wait();
 
-// Two documents are scanned but only one key is inserted.
-checkLog.containsJson(secondary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
-checkLog.containsJson(secondary, 20685, {namespace: coll.getFullName(), keysInserted: 1});
+// TODO(SERVER-107055): Re-enable this check again.
+if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
+    // Two documents are scanned but only one key is inserted.
+    checkLog.containsJson(secondary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
+    checkLog.containsJson(secondary, 20685, {namespace: coll.getFullName(), keysInserted: 1});
+}
 
 // Allows 'a.loc' to be indexed as a 2dsphere and flips the index to multikey.
 assert.commandWorked(
@@ -108,8 +113,11 @@ fpSecondaryDrain.off();
 fpPrimarySetup.off();
 awaitCreateIndex();
 
-// The skipped document is resolved, and causes the index to flip to multikey.
-// "Index set to multi key ..."
-checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
+// TODO(SERVER-107055): Re-enable this check again.
+if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
+    // The skipped document is resolved, and causes the index to flip to multikey.
+    // "Index set to multi key ..."
+    checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
+}
 
 replTest.stopSet();

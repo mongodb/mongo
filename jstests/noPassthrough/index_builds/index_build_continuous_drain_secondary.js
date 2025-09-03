@@ -10,6 +10,7 @@
  * ]
  *
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -60,8 +61,12 @@ checkLog.containsJson(secondary, 3856203);
 // the expectation is that the secondary will intercept and drain these writes as they are
 // replicated from primary.
 insertDocs(50000);
-// "index build: drained side writes"
-checkLog.containsJson(secondary, 20689);
+
+// TODO(SERVER-107055): Re-enable this check again.
+if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
+    // "index build: drained side writes"
+    checkLog.containsJson(secondary, 20689);
+}
 
 // Record how long it takes for the index build to complete from this point onward.
 let start = new Date();

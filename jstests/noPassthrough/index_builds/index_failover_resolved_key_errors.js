@@ -7,6 +7,8 @@
  * build for the entire replica set.
  *
  * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

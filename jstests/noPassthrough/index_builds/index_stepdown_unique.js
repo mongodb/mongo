@@ -2,6 +2,8 @@
  * Confirms that unique index builds are committed when a primary steps down during the collection
  * scan phase. This applies to both two phase and single phase index builds.
  * @tags: [
+ *   # TODO(SERVER-107055): Primary-driven index builds don't support failover yet.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

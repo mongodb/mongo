@@ -95,7 +95,7 @@ void IndexBuildsCoordinatorMock::_signalPrimaryForAbortAndWaitForExternalAbort(
 void IndexBuildsCoordinatorMock::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {}
 
-IndexBuildAction IndexBuildsCoordinatorMock::_drainSideWritesUntilNextActionIsAvailable(
+IndexBuildAction IndexBuildsCoordinatorMock::_waitForNextIndexBuildAction(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     return IndexBuildAction::kNoAction;
 }
