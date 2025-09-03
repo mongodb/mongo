@@ -19,9 +19,18 @@ idl_generator(
     src = "trace_settings.idl",
 )
 
+idl_generator(
+    name = "tracing_feature_flag_gen",
+    src = "tracing_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "tracing",
     srcs = [
+        ":tracing_feature_flag_gen",
         "trace_initialization.cpp",
         "trace_settings_gen",
         "tracing.cpp",
