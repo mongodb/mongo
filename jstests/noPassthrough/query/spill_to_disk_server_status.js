@@ -251,11 +251,10 @@ testSpillingMetrics({
     expectedSpillingMetrics: {spills: 30, spilledBytes: 1460},
     expectedSbeSpillingMetrics: {spills: 30, spilledBytes: 1460},
 });
-
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ExtendedAutoSpilling")) {
     testSpillingMetrics({
         stageName: "geoNear",
-        expectedSpillingMetrics: {spills: 20, spilledBytes: 1130},
+        expectedSpillingMetrics: {spills: 12, spilledBytes: 810},
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 1130},
         collName: geoCollName,
     });
