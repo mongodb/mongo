@@ -210,7 +210,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!boost::filesystem::exists(tmpFile));
 
 #ifdef _WIN32
-    auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(nss, ident, options);
+    auto status =
+        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
 
@@ -281,7 +282,8 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
-    auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(nss, ident, options);
+    auto status =
+        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
     // The ident may not get immediately dropped, so ensure it is completely gone.
