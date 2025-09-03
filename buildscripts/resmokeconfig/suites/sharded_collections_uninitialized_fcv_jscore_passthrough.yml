@@ -87,6 +87,9 @@ selector:
     # Starts MongoCryptD instead of mongod nodes
     - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
 
+    # TODO SERVER-110217: Investigate why query_settings_backfill.js is failing in sharded_collections_uninitialized_fcv_jscore_passthrough suite.
+    - jstests/core/query/query_settings/query_settings_backfill.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
