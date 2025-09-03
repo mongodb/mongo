@@ -17,7 +17,7 @@ import {
     assertFooStageRejected,
     fooExtensionNodeOptions,
     setupCollection,
-} from "jstests/multiVersion/genericBinVersion/extensions_api/upgrade_enables_extension_foo.js";
+} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/upgrade_enables_extension_foo_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 

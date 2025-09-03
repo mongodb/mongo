@@ -35,6 +35,12 @@ export function testPerformReplSetRollingRestart({
     afterPrimariesHaveRestarted,
     afterFCVBump = null,
 }) {
+    jsTest.log.info(
+        "Starting a replica set with all nodes on version " +
+            tojsononeline(startingVersion) +
+            " with options " +
+            tojsononeline(startingNodeOptions),
+    );
     const rst = new ReplSetTest({
         name: jsTestName(),
         nodes: [
@@ -54,39 +60,63 @@ export function testPerformReplSetRollingRestart({
 
     let primaryConnection = rst.getPrimary();
 
+    jsTest.log.info("Calling the setup function");
     setupFn(primaryConnection);
+
+    jsTest.log.info("Calling the beforeRestart function");
     beforeRestart(primaryConnection);
 
     // Restart the secondaries only.
     // Create a copy of the options since the callee may modify them.
+    jsTest.log.info(
+        "Restarting the secondaries with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
     rst.upgradeSecondaries({...restartVersion, ...copyJSON(restartNodeOptions)});
     primaryConnection = rst.getPrimary();
+
+    jsTest.log.info("Calling the afterSecondariesHaveRestarted function");
     afterSecondariesHaveRestarted(primaryConnection);
 
     // TODO SERVER-109457 Try a scenario where you force election here so that the restarted
     // secondary could become primary while another active secondary has not restarted yet. This
     // will probably require adding a third node.
 
-    // Restart the primaries.
+    // Restart the primary.
     // Create a copy of the options since the callee may modify them.
+    jsTest.log.info(
+        "Restarting the primary with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
     rst.upgradeSet({...restartVersion, ...copyJSON(restartNodeOptions)});
     primaryConnection = rst.getPrimary();
+
+    jsTest.log.info("Calling the afterPrimariesHaveRestarted function");
     afterPrimariesHaveRestarted(primaryConnection);
 
     if (afterFCVBump) {
         const getAdminDB = () => primaryConnection.getDB("admin");
 
         // Upgrade the FCV.
+        jsTest.log.info("Upgrading the FCV to " + tojsononeline(latestFCV));
         assert.commandWorked(getAdminDB().runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
+        jsTest.log.info("Calling the afterFCVBump function");
         afterFCVBump(primaryConnection);
 
         // Downgrade FCV without restarting.
+        jsTest.log.info("Downgrading the FCV to " + tojsononeline(lastLTSFCV));
         assert.commandWorked(getAdminDB().runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
+        jsTest.log.info("Calling the afterPrimariesHaveRestarted function");
         afterPrimariesHaveRestarted(primaryConnection);
     }
 
+    jsTest.log.info("Stopping the replica set");
     rst.stopSet();
 }
 

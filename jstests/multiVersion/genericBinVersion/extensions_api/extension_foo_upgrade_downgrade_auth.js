@@ -18,7 +18,7 @@ import {
     fooV1Options,
     fooV2Options,
     setupCollection,
-} from "jstests/multiVersion/genericBinVersion/extensions_api/extension_foo_upgrade_downgrade.js";
+} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
 import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 

@@ -41,6 +41,12 @@ export function testPerformShardedClusterRollingRestart({
     afterMongosHasRestarted,
     afterFCVBump = null,
 }) {
+    jsTest.log.info(
+        "Starting a 2-shard cluster with all nodes on version " +
+            tojsononeline(startingVersion) +
+            " with options " +
+            tojsononeline(startingNodeOptions),
+    );
     // Create a copy of the options each time they're passed since the callees may modify them.
     const st = new ShardingTest({
         shards: 2,
@@ -55,8 +61,10 @@ export function testPerformShardedClusterRollingRestart({
     });
     st.configRS.awaitReplication();
 
+    jsTest.log.info("Calling the setup function");
     setupFn(st.s, st);
 
+    jsTest.log.info("Calling the beforeRestart function");
     beforeRestart(st.s);
 
     const justWaitForStable = {
@@ -66,40 +74,73 @@ export function testPerformShardedClusterRollingRestart({
         waitUntilStable: true,
     };
 
-    // Upgrade the configs.
+    // Upgrade the config server.
+    jsTest.log.info(
+        "Restarting the config server with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
     st.upgradeCluster(
         restartVersion.binVersion,
         {...justWaitForStable, upgradeConfigs: true},
         copyJSON(restartNodeOptions),
     );
+
+    jsTest.log.info("Calling the afterConfigHasRestarted function");
     afterConfigHasRestarted(st.s);
 
     // Upgrade the secondary shard.
+    jsTest.log.info(
+        "Restarting the secondary shard with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
     st.upgradeCluster(
         restartVersion.binVersion,
         {...justWaitForStable, upgradeOneShard: st.rs1},
         copyJSON(restartNodeOptions),
     );
+
+    jsTest.log.info("Calling the afterSecondaryShardHasRestarted function");
     afterSecondaryShardHasRestarted(st.s);
 
     // Upgrade the rest of the cluster.
+    jsTest.log.info(
+        "Restarting the primary shard with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
     st.upgradeCluster(
         restartVersion.binVersion,
         {...justWaitForStable, upgradeShards: true},
         copyJSON(restartNodeOptions),
     );
+
+    jsTest.log.info("Calling the afterPrimaryShardHasRestarted function");
     afterPrimaryShardHasRestarted(st.s);
 
     // Upgrade mongos.
+    jsTest.log.info(
+        "Restarting the mongos with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
     st.upgradeCluster(
         restartVersion.binVersion,
         {...justWaitForStable, upgradeMongos: true},
         copyJSON(restartNodeOptions),
     );
+
+    jsTest.log.info("Calling the afterMongosHasRestarted function");
     afterMongosHasRestarted(st.s);
 
     if (afterFCVBump) {
         // Upgrade the FCV.
+        jsTest.log.info("Upgrading the FCV to " + tojsononeline(latestFCV));
         assert.commandWorked(
             st.s.getDB(jsTestName()).adminCommand({
                 setFeatureCompatibilityVersion: latestFCV,
@@ -107,9 +148,11 @@ export function testPerformShardedClusterRollingRestart({
             }),
         );
 
+        jsTest.log.info("Calling the afterFCVBump function");
         afterFCVBump(st.s);
 
         // Downgrade FCV without restarting.
+        jsTest.log.info("Downgrading the FCV to " + tojsononeline(lastLTSFCV));
         assert.commandWorked(
             st.s.getDB(jsTestName()).adminCommand({
                 setFeatureCompatibilityVersion: lastLTSFCV,
@@ -117,6 +160,7 @@ export function testPerformShardedClusterRollingRestart({
             }),
         );
 
+        jsTest.log.info("Calling the afterMongosHasRestarted function");
         afterMongosHasRestarted(st.s);
     }
 
