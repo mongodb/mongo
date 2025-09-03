@@ -25,7 +25,7 @@ $component_links
 
 ## WiredTiger Vendored Test Libraries
 
-The following Python libraries are transitively included by WiredTiger,
+The following libraries are transitively included by WiredTiger,
 and are used by that component for testing. They don't appear in
 released binary artifacts.
 
