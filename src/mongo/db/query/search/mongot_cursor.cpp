@@ -387,7 +387,7 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));
     auto scheduleResult = taskExecutor->scheduleRemoteCommand(
-        std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
+        request, [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
     if (!scheduleResult.isOK()) {
         // Since the command failed to be scheduled, the callback above did not and will not run.
         // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
