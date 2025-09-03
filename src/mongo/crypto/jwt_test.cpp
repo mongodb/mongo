@@ -69,7 +69,24 @@ BSONObj getCompleteTestJWKSet() {
             "cwiosz8uboBbchp7wsATieGVF8x3BUtf0ry94BGYXKbCGY_Mq-TSxcM_3afZiJA1COVZWN7d4GTEw");
         key.doneFast();
     }
-
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "EC");
+        key.append("kid", "ec-prime256v1");
+        key.append("crv", "P-256");
+        key.append("x", "YIq56eQHNCUKUhvpbXssCWvnCHaJkD-5KKoLxwRENxc");
+        key.append("y", "ZoGRVDgfGRZ8OsJN8O3DH6nFfo_LWbVK_e8Bk3ZyT1k");
+        key.doneFast();
+    }
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "EC");
+        key.append("kid", "ec-secp384r1");
+        key.append("crv", "P-384");
+        key.append("x", "INQz_7Dh89R9A4ONlGgYdQKKE9ttkoe0-rPzop9x8OY7fQJ1U5cczA5lJeqAREot");
+        key.append("y", "8SHZNb0g6u-ZB_gg0268dP5RzJJE13_-jYC0GyZ_48B3JGPDGcROMifXwzMPadtX");
+        key.doneFast();
+    }
     keys.doneFast();
     return set.obj();
 }
@@ -77,7 +94,6 @@ BSONObj getCompleteTestJWKSet() {
 BSONObj getPartialTestJWKSet() {
     BSONObjBuilder set;
     BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
-
     {
         BSONObjBuilder key(keys.subobjStart());
         key.append("kty", "RSA");
@@ -93,6 +109,53 @@ BSONObj getPartialTestJWKSet() {
         key.doneFast();
     }
 
+    keys.doneFast();
+    return set.obj();
+}
+
+// Try to load keys for a supported algorithm (EC) but unsupported curve (P-521)
+BSONObj getUnsupportedCurveJWKSet() {
+    BSONObjBuilder set;
+    BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "EC");
+        key.append("kid", "ec-secp521r1");
+        key.append("crv", "P-521");
+        key.append("alg", "ES512");
+        key.append("x",
+                   "AEu5vZ_bVcV3d5z5pLNrF1q7Jabh1ZjGN8kwdwrXnd9jRIXTD2t-"
+                   "T3B2TAajO2jzQhOq29FIeycUrcgFCp8ItAtX");
+        key.append("y",
+                   "AOaLCQqebglolZIkUHX-APj_gYZdG0DyC0CL9AZagtKcHMQMuUjhofka-"
+                   "hVCr0xKIvQlhq3U3Y5ggR1IR8vpQ0R9");
+        key.doneFast();
+    }
+    keys.doneFast();
+    return set.obj();
+}
+
+// Try to load keys for an unsupported protocol HS256
+BSONObj getUnsupportedProtocolJWKSet() {
+    BSONObjBuilder set;
+    BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "EC");
+        key.append("kid", "ec-prime256v1");
+        key.append("crv", "P-256");
+        key.append("x", "YIq56eQHNCUKUhvpbXssCWvnCHaJkD-5KKoLxwRENxc");
+        key.append("y", "ZoGRVDgfGRZ8OsJN8O3DH6nFfo_LWbVK_e8Bk3ZyT1k");
+        key.doneFast();
+    }
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "oct");
+        key.append("kid", "hs256");
+        key.append("alg", "HS256");
+        key.append("k", "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIK");
+        key.doneFast();
+    }
     keys.doneFast();
     return set.obj();
 }
@@ -128,7 +191,7 @@ TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
     // keys getting updated correctly.
     jwksFetcher()->setShouldFail(false);
     ASSERT_OK(jwkManager()->loadKeys());
-    ASSERT_EQ(jwkManager()->size(), 2);
+    ASSERT_EQ(jwkManager()->size(), 4);
 
     BSONObjBuilder successfulLoadKeysBob;
     jwkManager()->serialize(&successfulLoadKeysBob);
@@ -139,7 +202,7 @@ TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
     // leave the manager's keys untouched.
     jwksFetcher()->setShouldFail(true);
     ASSERT_NOT_OK(jwkManager()->loadKeys());
-    ASSERT_EQ(jwkManager()->size(), 2);
+    ASSERT_EQ(jwkManager()->size(), 4);
 
     BSONObjBuilder failedLoadKeysBob;
     jwkManager()->serialize(&failedLoadKeysBob);
@@ -157,8 +220,9 @@ TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
     // load.
     jwksFetcher()->setKeys(getPartialTestJWKSet());
     getClock()->advance(Seconds{3});
-    ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-secp384r1"_sd));
     ASSERT_EQ(jwkManager()->size(), 1);
 
     // Add second key at time < quiesce period. Fetcher should not update.
@@ -172,7 +236,28 @@ TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
     getClock()->advance(Seconds{3});
     ASSERT_OK(jwkManager()->getValidator("custom-key-1"_sd));
     ASSERT_OK(jwkManager()->getValidator("custom-key-2"_sd));
-    ASSERT_EQ(jwkManager()->size(), 2);
+    ASSERT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
+    ASSERT_OK(jwkManager()->getValidator("ec-secp384r1"_sd));
+    ASSERT_EQ(jwkManager()->size(), 4);
+}
+
+TEST_F(JWKManagerTest, parseJWKSetUnsupportedCurve) {
+    auto data = getUnsupportedCurveJWKSet();
+    jwksFetcher()->setKeys(data);
+    Status st = jwkManager()->loadKeys();
+    ASSERT_NOT_OK(st);
+    ASSERT_EQ(st.code(), 10858402);
+    ASSERT_NOT_OK(jwkManager()->getValidator("ec-secp521r1"_sd));
+}
+
+TEST_F(JWKManagerTest, parseJWKSetUnsupportedProtocol) {
+    auto data = getUnsupportedProtocolJWKSet();
+    jwksFetcher()->setKeys(data);
+    Status st = jwkManager()->loadKeys();
+    // Unsupported protocol should be skipped
+    ASSERT_OK(st);
+    ASSERT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
+    ASSERT_NOT_OK(jwkManager()->getValidator("hs256"_sd));
 }
 
 }  // namespace
