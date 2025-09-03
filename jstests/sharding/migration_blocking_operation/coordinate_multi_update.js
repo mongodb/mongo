@@ -35,10 +35,13 @@ assert.commandWorked(
         ]),
 );
 
+const databaseVersion = assert.commandWorked(st.s.adminCommand({getDatabaseVersion: dbName})).dbVersion;
+
 function assertCoordinateMultiUpdateReturns(connection, code) {
     const response = connection.adminCommand({
         _shardsvrCoordinateMultiUpdate: namespace,
         uuid: UUID(),
+        databaseVersion,
         command: {
             update: collName,
             updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}],

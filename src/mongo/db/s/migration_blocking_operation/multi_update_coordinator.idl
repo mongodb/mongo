@@ -56,6 +56,10 @@ structs:
                 type: uuid
                 description: Unique identifier for the operation.
                 cpp_name: id
+            databaseVersion:
+                description: Database version of the original request from mongos.
+                type: DatabaseVersion
+                optional: true
             updateCommand:
                 type: object_owned
                 description: The original multi update command that triggered the coordinator.

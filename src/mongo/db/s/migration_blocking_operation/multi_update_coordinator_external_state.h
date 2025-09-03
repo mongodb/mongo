@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
 
@@ -41,11 +42,9 @@ public:
     virtual Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
                                                                 const Message& message) const = 0;
     virtual void startBlockingMigrations(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const UUID& operationId) = 0;
+                                         const MultiUpdateCoordinatorMetadata& metadata) = 0;
     virtual void stopBlockingMigrations(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const UUID& operationId) = 0;
+                                        const MultiUpdateCoordinatorMetadata& metadata) = 0;
     virtual bool isUpdatePending(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  AggregateCommandRequest& request) const = 0;
@@ -65,11 +64,9 @@ public:
     Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
                                                         const Message& message) const override;
     void startBlockingMigrations(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const UUID& operationId) override;
+                                 const MultiUpdateCoordinatorMetadata& metadata) override;
     void stopBlockingMigrations(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const UUID& operationId) override;
+                                const MultiUpdateCoordinatorMetadata& metadata) override;
     bool isUpdatePending(OperationContext* opCtx,
                          const NamespaceString& nss,
                          AggregateCommandRequest& request) const override;

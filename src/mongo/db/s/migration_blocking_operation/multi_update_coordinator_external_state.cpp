@@ -36,6 +36,7 @@
 #include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/service_entry_point_router_role.h"
 
@@ -44,23 +45,31 @@
 namespace mongo {
 
 namespace {
-auto runDDLOperationWithRetry(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              BSONObj command) {
-    auto cmdName = command.firstElement().fieldNameStringData();
+auto getDatabaseVersion(OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) {
+    // TODO SERVER-110173: Only keep this branch to support older behavior in multiversion testing
+    // where the MultiUpdateCoordinator did not store the database version. Once these changes are
+    // in last LTS, the database version should always be set and this branch can be removed.
+    if (!metadata.getDatabaseVersion().has_value()) {
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, metadata.getNss().dbName()));
+        return dbInfo->getVersion();
+    }
+    return *metadata.getDatabaseVersion();
+}
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-    router.route(opCtx, cmdName, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-        auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-            opCtx,
-            DatabaseName::kAdmin,
-            cdb,
-            command,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent);
-        const auto remoteResponse = uassertStatusOK(response.swResponse);
-        return uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-    });
+template <typename Command>
+auto runDDLOperationOnCurrentShard(OperationContext* opCtx,
+                                   const DatabaseVersion& databaseVersion,
+                                   Command command) {
+    auto selfId = ShardingState::get(opCtx)->shardId();
+    auto self = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, selfId));
+    generic_argument_util::setMajorityWriteConcern(command, &opCtx->getWriteConcern());
+    generic_argument_util::setDbVersionIfPresent(command, databaseVersion);
+    return uassertStatusOK(self->runCommand(opCtx,
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                            DatabaseName::kAdmin,
+                                            command.toBSON(),
+                                            Shard::RetryPolicy::kIdempotent));
 }
 }  // namespace
 
@@ -75,20 +84,20 @@ Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCom
         opCtx, message, opCtx->fastClockSource().now());
 }
 
-void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(OperationContext* opCtx,
-                                                                      const NamespaceString& nss,
-                                                                      const UUID& operationId) {
-    ShardsvrBeginMigrationBlockingOperation beginMigrationCmd(nss, operationId);
-    generic_argument_util::setMajorityWriteConcern(beginMigrationCmd, &opCtx->getWriteConcern());
-    runDDLOperationWithRetry(opCtx, nss, beginMigrationCmd.toBSON());
+void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(
+    OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) {
+    runDDLOperationOnCurrentShard(
+        opCtx,
+        getDatabaseVersion(opCtx, metadata),
+        ShardsvrBeginMigrationBlockingOperation{metadata.getNss(), metadata.getId()});
 }
 
-void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations(OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     const UUID& operationId) {
-    ShardsvrEndMigrationBlockingOperation endMigrationCmd(nss, operationId);
-    generic_argument_util::setMajorityWriteConcern(endMigrationCmd, &opCtx->getWriteConcern());
-    runDDLOperationWithRetry(opCtx, nss, endMigrationCmd.toBSON());
+void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations(
+    OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) {
+    runDDLOperationOnCurrentShard(
+        opCtx,
+        getDatabaseVersion(opCtx, metadata),
+        ShardsvrEndMigrationBlockingOperation{metadata.getNss(), metadata.getId()});
 }
 
 bool MultiUpdateCoordinatorExternalStateImpl::isUpdatePending(

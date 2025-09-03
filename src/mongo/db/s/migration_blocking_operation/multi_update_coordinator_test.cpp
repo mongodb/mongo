@@ -203,14 +203,12 @@ public:
     }
 
     void startBlockingMigrations(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const UUID& operationId) override {
+                                 const MultiUpdateCoordinatorMetadata& metadata) override {
         _fakeState->startBlockingMigrations();
     }
 
     void stopBlockingMigrations(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const UUID& operationId) override {
+                                const MultiUpdateCoordinatorMetadata& metadata) override {
         _fakeState->stopBlockingMigrations();
     }
 
@@ -317,6 +315,7 @@ protected:
     MultiUpdateCoordinatorMetadata createMetadata() {
         MultiUpdateCoordinatorMetadata metadata;
         metadata.setId(UUID::gen());
+        metadata.setDatabaseVersion(DatabaseVersion{UUID::gen(), Timestamp(1, 1)});
 
         const BSONObj query = BSON("member" << "abc123");
         const BSONObj update = BSON("$set" << BSON("points" << 50));

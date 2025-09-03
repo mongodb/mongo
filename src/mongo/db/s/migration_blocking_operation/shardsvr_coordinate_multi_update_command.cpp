@@ -73,8 +73,9 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
-            auto metadata = MultiUpdateCoordinatorMetadata();
+            MultiUpdateCoordinatorMetadata metadata;
             metadata.setId(request().getUuid());
+            metadata.setDatabaseVersion(request().getDatabaseVersion());
             metadata.setUpdateCommand(request().getCommand());
             metadata.setNss(ns());
 
@@ -85,7 +86,7 @@ public:
                 metadata.setIsUpsert(updates.front().Obj().getBoolField("upsert"));
             }
 
-            auto coordinatorDoc = MultiUpdateCoordinatorDocument();
+            MultiUpdateCoordinatorDocument coordinatorDoc;
             coordinatorDoc.setMetadata(metadata);
 
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());

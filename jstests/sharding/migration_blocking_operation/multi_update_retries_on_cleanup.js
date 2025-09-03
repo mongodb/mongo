@@ -36,11 +36,13 @@ assert.commandWorked(
 function coordinateMultiUpdateShell() {
     return startParallelShell(
         funWithArgs(
-            function (ns, collName) {
+            function (dbName, collName) {
+                const databaseVersion = assert.commandWorked(db.adminCommand({getDatabaseVersion: dbName})).dbVersion;
                 assert.commandWorked(
                     db.adminCommand({
-                        _shardsvrCoordinateMultiUpdate: ns,
+                        _shardsvrCoordinateMultiUpdate: `${dbName}.${collName}`,
                         uuid: UUID(),
+                        databaseVersion,
                         command: {
                             update: collName,
                             updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}],
@@ -48,7 +50,7 @@ function coordinateMultiUpdateShell() {
                     }),
                 );
             },
-            namespace,
+            dbName,
             collName,
         ),
         shard0Primary.port,

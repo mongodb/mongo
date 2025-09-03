@@ -260,7 +260,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_doBlockMigrationsPhase() {
             _externalState->createCollection(opCtx.get(), _metadata.getNss());
         }
 
-        _externalState->startBlockingMigrations(opCtx.get(), _metadata.getNss(), _metadata.getId());
+        _externalState->startBlockingMigrations(opCtx.get(), _metadata);
         hangAfterBlockingMigrations.pauseWhileSet();
 
         // Ensure that the collection still exists after the DDL lock has been acquired through
@@ -348,8 +348,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_stopBlockingMigrationsIfNe
                 return;
             }
             auto opCtx = factory.makeOperationContext(&cc());
-            _externalState->stopBlockingMigrations(
-                opCtx.get(), _metadata.getNss(), _metadata.getId());
+            _externalState->stopBlockingMigrations(opCtx.get(), _metadata);
             LOGV2(9554706,
                   "MultiUpdateCoordinator ended request for migrations to be blocked",
                   "id"_attr = _metadata.getId());
