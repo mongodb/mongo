@@ -243,12 +243,8 @@ public:
     /**
      * Decrypt a regular document.
      */
-    static StatusWith<ESCDocument> decryptDocument(const ValueToken& valueToken, BSONObj& doc);
-
-    /**
-     * Decrypt a regular document.
-     */
-    static StatusWith<ESCDocument> decryptDocument(const ValueToken& valueToken, BSONObj&& doc);
+    static StatusWith<ESCDocument> decryptDocument(const ValueToken& valueToken,
+                                                   const BSONObj& doc);
 
     /**
      * Generate the _id value for an anchor record
@@ -277,7 +273,7 @@ public:
      * anchor position (apos), and ESCDocument.count is the cpos.
      */
     static StatusWith<ESCDocument> decryptAnchorDocument(const ValueToken& valueToken,
-                                                         BSONObj& doc);
+                                                         const BSONObj& doc);
 
     /**
      * Reads the anchor document identified by anchorId, and if found, decrypts the value
@@ -346,13 +342,7 @@ public:
      * Decrypt the null document.
      */
     static StatusWith<ESCNullDocument> decryptNullDocument(
-        const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
-
-    /**
-     * Decrypt the null document.
-     */
-    static StatusWith<ESCNullDocument> decryptNullDocument(
-        const ESCTwiceDerivedValueToken& valueToken, BSONObj&& doc);
+        const ESCTwiceDerivedValueToken& valueToken, const BSONObj& doc);
 
     // ===== Protocol Version 2 =====
     /**
@@ -564,7 +554,7 @@ public:
     /**
      * Decrypts a document. Only supports FLE2.
      */
-    static BSONObj decryptDocument(BSONObj& doc, FLEKeyVault* keyVault);
+    static BSONObj decryptDocument(const BSONObj& doc, FLEKeyVault* keyVault);
 
     /**
      * Validate the tags array exists and is of the right type.
