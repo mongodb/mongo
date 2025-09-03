@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
@@ -113,6 +114,53 @@ void encodeIndexabilityRecursive(const MatchExpression* tree,
     }
 }
 
+void encodePartialIndexDiscriminatorHelper(
+    const MatchExpression* tree,
+    CompositeIndexabilityDiscriminator partialIndexDiscriminator,
+    bool inNegationOrElemMatchObj,
+    StringBuilder* keyBuilder) {
+    // At this point, we know the subexpression is not a subset of the partial filter. Mark this in
+    // discriminator.
+    *keyBuilder << false;
+    inNegationOrElemMatchObj |= Indexability::nodeIsNegationOrElemMatchObj(tree);
+    const bool isOrExpression = tree->matchType() == MatchExpression::OR;
+    for (size_t i = 0; i < tree->numChildren(); ++i) {
+        const auto curChild = tree->getChild(i);
+        // If a subexpression is an $or that is not under $elemMatch, $not, or $nor, then mark it as
+        // eligible, just like the planner does.
+        if (!inNegationOrElemMatchObj && isOrExpression &&
+            partialIndexDiscriminator.isMatchCompatibleWithIndex(curChild)) {
+            *keyBuilder << true;
+            continue;
+        }
+        // Recursively encode the query's children. There may be a subexpression deeper in the tree
+        // that is eligible for the partial index.
+        encodePartialIndexDiscriminatorHelper(
+            curChild, partialIndexDiscriminator, inNegationOrElemMatchObj, keyBuilder);
+    }
+}
+
+// Encode partial index discriminator using the same algorithm that is used in
+// 'QueryPlannerIXSelect::stripInvalidAssignmentsToPartialIndexRoot()'. This is to ensure that the
+// plan cache key agrees with the decisions that the planner makes around index eligibility.
+void encodePartialIndexDiscriminator(const MatchExpression* tree,
+                                     CompositeIndexabilityDiscriminator partialIndexDiscriminator,
+                                     StringBuilder* keyBuilder) {
+    // If the query is a subset of the partial filter, then we are done.
+    if (partialIndexDiscriminator.isMatchCompatibleWithIndex(tree)) {
+        *keyBuilder << true;
+        return;
+    }
+    // Otherwise, walk the query and check if subexpressions are subsets of the partial filter and
+    // encode the subexpressions' eligibility in the discriminator. This matches the planner's
+    // ability to use a partial index for a subexpression of a query even when the original query is
+    // not a subset of the partial filter expression.
+    encodePartialIndexDiscriminatorHelper(tree,
+                                          partialIndexDiscriminator,
+                                          Indexability::nodeIsNegationOrElemMatchObj(tree),
+                                          keyBuilder);
+}
+
 void encodeIndexability(const MatchExpression* tree,
                         const PlanCacheIndexabilityState& indexabilityState,
                         StringBuilder* keyBuilder) {
@@ -123,7 +171,7 @@ void encodeIndexability(const MatchExpression* tree,
     if (!globalDiscriminators.empty()) {
         *keyBuilder << kEncodeGlobalDiscriminatorsBegin;
         for (auto&& indexAndDiscriminatorPair : globalDiscriminators) {
-            *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
+            encodePartialIndexDiscriminator(tree, indexAndDiscriminatorPair.second, keyBuilder);
         }
         *keyBuilder << kEncodeGlobalDiscriminatorsEnd;
     }

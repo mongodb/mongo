@@ -241,6 +241,12 @@ public:
             ime->hasEmptyArray();
     }
 
+    static bool nodeIsNegationOrElemMatchObj(const MatchExpression* node) {
+        return (node->matchType() == MatchExpression::NOT ||
+                node->matchType() == MatchExpression::NOR ||
+                node->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
+    }
+
 private:
     /**
      * Returns true if 'me' is "sargable" but is not a negation and

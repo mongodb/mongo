@@ -968,19 +968,13 @@ static void removeIndexRelevantTag(MatchExpression* node, size_t idx) {
 
 namespace {
 
-bool nodeIsNegationOrElemMatchObj(const MatchExpression* node) {
-    return (node->matchType() == MatchExpression::NOT ||
-            node->matchType() == MatchExpression::NOR ||
-            node->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
-}
-
 void stripInvalidAssignmentsToPartialIndexNode(MatchExpression* node,
                                                size_t idxNo,
                                                const IndexEntry& idxEntry,
                                                bool inNegationOrElemMatchObj) {
     removeIndexRelevantTag(node, idxNo);
 
-    inNegationOrElemMatchObj |= nodeIsNegationOrElemMatchObj(node);
+    inNegationOrElemMatchObj |= Indexability::nodeIsNegationOrElemMatchObj(node);
     for (size_t i = 0; i < node->numChildren(); ++i) {
         // If 'node' is an OR and our current clause satisfies the filter expression, then we may be
         // able to spare this clause from being stripped.  We only support such sparing if we're not
@@ -1016,7 +1010,7 @@ void stripInvalidAssignmentsToPartialIndexRoot(MatchExpression* root,
     if (expression::isSubsetOf(root, idxEntry.filterExpr)) {
         return;
     }
-    const bool inNegationOrElemMatchObj = nodeIsNegationOrElemMatchObj(root);
+    const bool inNegationOrElemMatchObj = Indexability::nodeIsNegationOrElemMatchObj(root);
     stripInvalidAssignmentsToPartialIndexNode(root, idxNo, idxEntry, inNegationOrElemMatchObj);
 }
 
