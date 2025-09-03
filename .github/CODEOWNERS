@@ -3126,8 +3126,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/libmongocrypt/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/third_party/scripts/OWNERS.yml
-/src/third_party/scripts/**/gen_thirdpartyreadme.py @10gen/code-review-team-ssdlc @svc-auto-approve-bot
-/src/third_party/scripts/**/README.third_party.md.template @10gen/code-review-team-ssdlc @svc-auto-approve-bot
+/src/third_party/scripts/**/gen_thirdpartyreadme.py @10gen/server-security @svc-auto-approve-bot
+/src/third_party/scripts/**/README.third_party.md.template @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./tools/OWNERS.yml
 /tools/**/* @10gen/devprod-build @svc-auto-approve-bot
