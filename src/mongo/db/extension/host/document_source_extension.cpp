@@ -30,20 +30,15 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/extension/host/byte_buf.h"
-#include "mongo/db/extension/host/extension_status.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
-#include "mongo/util/scopeguard.h"
-
-#include <cstdint>
 
 namespace mongo::extension::host {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(extension, DocumentSourceExtension::id);
 
 stdx::unordered_set<NamespaceString> DocumentSourceExtension::LiteParsed::getInvolvedNamespaces()
     const {
     return stdx::unordered_set<NamespaceString>();
 }
-
 
 PrivilegeVector DocumentSourceExtension::LiteParsed::requiredPrivileges(
     bool isMongos, bool bypassDocumentValidation) const {
@@ -104,7 +99,6 @@ DocumentSourceExtension::DocumentSourceExtension(
     BSONObj rawStage,
     extension::host::ExtensionAggregationStageDescriptorHandle staticDescriptor)
     : DocumentSource(name, exprCtx),
-      exec::agg::Stage(name, exprCtx),
       _stageName(std::string(name)),
       _id(id),
       _raw_stage(rawStage.getOwned()),
@@ -116,14 +110,7 @@ const char* DocumentSourceExtension::getSourceName() const {
 }
 
 DocumentSource::Id DocumentSourceExtension::getId() const {
-    return _id;
-}
-
-DocumentSource::GetNextResult DocumentSourceExtension::doGetNext() {
-    if (pSource) {
-        return pSource->getNext();
-    }
-    return GetNextResult::makeEOF();
+    return id;
 }
 
 Value DocumentSourceExtension::serialize(const SerializationOptions& opts) const {

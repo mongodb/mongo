@@ -43,7 +43,7 @@ namespace extension::host {
  * A DocumentSource implementation for an extension aggregation stage. DocumentSourceExtension is a
  * facade around handles to extension API objects.
  */
-class DocumentSourceExtension : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceExtension : public DocumentSource {
 public:
     /**
      * A LiteParsedDocumentSource implementation for source and transformation extension stages.
@@ -128,9 +128,9 @@ public:
 
     const char* getSourceName() const override;
 
-    Id getId() const override;
+    static const Id& id;
 
-    GetNextResult doGetNext() override;
+    Id getId() const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override;
 

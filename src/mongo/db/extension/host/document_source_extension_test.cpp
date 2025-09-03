@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/extension/host/host_portal.h"
@@ -215,18 +216,14 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
     const auto* documentSourceExtension =
         dynamic_cast<const mongo::extension::host::DocumentSourceExtension*>(stagePtr);
     ASSERT_TRUE(documentSourceExtension != nullptr);
+    auto extensionStage = exec::agg::buildStage(
+        const_cast<mongo::extension::host::DocumentSourceExtension*>(documentSourceExtension));
     // Ensure our stage is indeed a NoOp.
-    ASSERT_TRUE(
-        const_cast<mongo::extension::host::DocumentSourceExtension*>(documentSourceExtension)
-            ->getNext()
-            .isEOF());
+    ASSERT_TRUE(extensionStage->getNext().isEOF());
     Document inputDoc = Document{{"foo", 1}};
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    const_cast<mongo::extension::host::DocumentSourceExtension*>(documentSourceExtension)
-        ->setSource(mock.get());
-    auto next =
-        const_cast<mongo::extension::host::DocumentSourceExtension*>(documentSourceExtension)
-            ->getNext();
+    extensionStage->setSource(mock.get());
+    auto next = extensionStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), inputDoc);
 

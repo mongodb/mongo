@@ -10,6 +10,7 @@ mongo_cc_library(
     name = "api",
     srcs = [
         "document_source_extension.cpp",
+        "extension_stage.cpp",
         "host_portal.cpp",
     ],
     hdrs = [
@@ -17,6 +18,7 @@ mongo_cc_library(
         "byte_buf.h",
         "document_source_extension.h",
         "extension_handle.h",
+        "extension_stage.h",
         "extension_status.h",
         "handle.h",
         "host_portal.h",
