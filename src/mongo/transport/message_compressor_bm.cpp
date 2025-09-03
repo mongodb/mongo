@@ -30,6 +30,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -38,7 +39,9 @@
 #include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <utility>
@@ -97,6 +100,12 @@ Message genericMsg() {
     return msg;
 }
 
+Message copyMessage(const Message& original) {
+    auto resultBuffer = SharedBuffer::allocate(original.size());
+    std::copy_n(original.buf(), original.size(), resultBuffer.get());
+    return Message(std::move(resultBuffer));
+}
+
 void setCompressor(MessageCompressorRegistry& registry,
                    std::unique_ptr<MessageCompressorBase> compressorType) {
     registry.setSupportedCompressors({compressorType->getName()});
@@ -140,6 +149,17 @@ void runDecompressBM(benchmark::State& state,
     state.SetBytesProcessed(totalSize);
 }
 
+void BM_copy(benchmark::State& state) {
+    size_t totalSize = 0;
+    Message input = genericMsg();
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(copyMessage(input));
+        totalSize += input.size();
+    }
+    state.SetBytesProcessed(totalSize);
+}
+
 void BM_snappy_compress(benchmark::State& state) {
     runCompressBM(state, std::make_unique<SnappyMessageCompressor>());
 }
@@ -164,13 +184,15 @@ void BM_zstd_decompress(benchmark::State& state) {
     runDecompressBM(state, std::make_unique<ZstdMessageCompressor>());
 }
 
-BENCHMARK(BM_snappy_compress)->Ranges({{1, 1000}});
-BENCHMARK(BM_snappy_decompress)->Ranges({{1, 1000}});
+BENCHMARK(BM_copy);
 
-BENCHMARK(BM_zlib_compress)->Ranges({{1, 1000}});
-BENCHMARK(BM_zlib_decompress)->Ranges({{1, 1000}});
+BENCHMARK(BM_snappy_compress);
+BENCHMARK(BM_snappy_decompress);
 
-BENCHMARK(BM_zstd_compress)->Ranges({{1, 1000}});
-BENCHMARK(BM_zstd_decompress)->Ranges({{1, 1000}});
+BENCHMARK(BM_zlib_compress);
+BENCHMARK(BM_zlib_decompress);
+
+BENCHMARK(BM_zstd_compress);
+BENCHMARK(BM_zstd_decompress);
 }  // namespace
 }  // namespace mongo
