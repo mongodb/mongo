@@ -434,6 +434,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
+        --remote_execution_priority=3
       evergreen_remote_exec: on
       skip_debug_link: true
     run_on:
@@ -453,6 +454,7 @@ buildvariants:
         --define=MONGO_DISTMOD=amazon2023
         --release=True
         --build_atlas=True
+        --remote_execution_priority=3
       evergreen_remote_exec: on
       skip_debug_link: true
     run_on:
@@ -472,6 +474,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
+        --remote_execution_priority=3
       evergreen_remote_exec: on
       skip_debug_link: true
     run_on:
