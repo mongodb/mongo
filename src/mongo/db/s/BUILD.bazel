@@ -1471,8 +1471,15 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_metrics_test.cpp",
     ],
     tags = [
+        # TODO(SERVER-110202): Remove "incompatible_with_bazel_remote_test" tag once this is compatible with remote exec
         "mongo_unittest_fourth_group",
+        "incompatible_with_bazel_remote_test",
     ],
+    # TODO(SERVER-110202): Remove target_compatible_with select once this is compatible with remote exec
+    target_compatible_with = select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":db_s_shard_server_test_deps",
         ":sharding_test_helpers",
