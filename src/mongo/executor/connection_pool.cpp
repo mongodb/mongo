@@ -514,6 +514,13 @@ private:
         return {std::make_shared<ConnWrap>(std::move(h), shared_from_this()), ptr};
     }
 
+    // Special case for getConnection when the forceExecutorConnectionPoolTimeout FailPoint is set.
+    Future<ConnectionHandle> setGetConnectionTimeout(WithLock,
+                                                     FailPoint::LockHandle sfp,
+                                                     Milliseconds timeout,
+                                                     bool lease,
+                                                     const CancellationToken& token);
+
     /**
      * Establishes connections until the ControllerInterface's target is met.
      */
@@ -1002,33 +1009,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     _lastActiveTime = now;
 
     if (auto sfp = forceExecutorConnectionPoolTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
-        const Milliseconds failpointTimeout{sfp.getData()["timeout"].numberInt()};
-        const Status failpointStatus{
-            ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
-            "Connection timed out due to forceExecutorConnectionPoolTimeout failpoint"};
-        if (failpointTimeout == Milliseconds(0)) {
-            return Future<ConnectionPool::ConnectionHandle>::makeReady(failpointStatus);
-        }
-        auto pf = makePromiseFuture<ConnectionHandle>();
-        auto request = std::make_shared<Request>(0, std::move(pf.promise), false, token);
-        auto timeoutTimer = _parent->_factory->makeTimer();
-        timeoutTimer->setTimeout(failpointTimeout,
-                                 [request, timeoutTimer, failpointStatus]() mutable {
-                                     request->promise.setError(failpointStatus);
-                                 });
-        // We don't support cancellation when the forceExecutorConnectionPoolTimeout failpoint is
-        // enabled. The purpose of this failpoint is to evaluate the behavior of ConnectionPool
-        // when a connection cannot be retrieved within the timeout, so cancellation shouldn't
-        // ever be necessary in this context. Further, implementing cancellation would require
-        // invasive changes to the timer system that is used to implement the failpoint logic.
-        request->source.token().onCancel().unsafeToInlineFuture().getAsync([](Status s) {
-            if (!s.isOK()) {
-                return;
-            }
-            LOGV2(9257003,
-                  "Ignoring cancellation due to forceExecutorConnectionPoolTimeout failpoint");
-        });
-        return std::move(pf.future);
+        return setGetConnectionTimeout(lk, std::move(sfp), timeout, lease, token);
     }
 
     // If we've already been cancelled or we do not have requests, then we can fulfill immediately.
@@ -1452,6 +1433,39 @@ void ConnectionPool::SpecificPool::fulfillRequests(
         // won't race against us fulfilling the promise outside of the lock.
         toFulfill.emplace_back(popRequest(lk, it), std::move(conn));
     }
+}
+
+Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::setGetConnectionTimeout(
+    WithLock,
+    FailPoint::LockHandle sfp,
+    Milliseconds timeout,
+    bool lease,
+    const CancellationToken& token) {
+    const Milliseconds failpointTimeout{sfp.getData()["timeout"].numberInt()};
+    const Status failpointStatus{
+        ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
+        "Connection timed out due to forceExecutorConnectionPoolTimeout failpoint"};
+    if (failpointTimeout == Milliseconds(0)) {
+        return Future<ConnectionPool::ConnectionHandle>::makeReady(failpointStatus);
+    }
+    auto pf = makePromiseFuture<ConnectionHandle>();
+    auto request = std::make_shared<Request>(0, std::move(pf.promise), false, token);
+    auto timeoutTimer = _parent->_factory->makeTimer();
+    timeoutTimer->setTimeout(failpointTimeout, [request, timeoutTimer, failpointStatus]() mutable {
+        request->promise.setError(failpointStatus);
+    });
+    // We don't support cancellation when the forceExecutorConnectionPoolTimeout failpoint is
+    // enabled. The purpose of this failpoint is to evaluate the behavior of ConnectionPool
+    // when a connection cannot be retrieved within the timeout, so cancellation shouldn't
+    // ever be necessary in this context. Further, implementing cancellation would require
+    // invasive changes to the timer system that is used to implement the failpoint logic.
+    request->source.token().onCancel().unsafeToInlineFuture().getAsync([](Status s) {
+        if (!s.isOK()) {
+            return;
+        }
+        LOGV2(9257003, "Ignoring cancellation due to forceExecutorConnectionPoolTimeout failpoint");
+    });
+    return std::move(pf.future);
 }
 
 // spawn enough connections to satisfy open requests and minpool, while honoring maxpool
