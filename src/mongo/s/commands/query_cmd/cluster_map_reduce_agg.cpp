@@ -324,23 +324,11 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                         dbName.tenantId(),
                                                         SerializationContext::stateDefault()));
     const auto& nss = parsedMr.getNamespace();
-    stdx::unordered_set<NamespaceString> involvedNamespaces{nss};
-    auto resolvedOutNss = parsedMr.getOutOptions().getDatabaseName()
-        ? NamespaceStringUtil::deserialize(boost::none,
-                                           *(parsedMr.getOutOptions().getDatabaseName()),
-                                           parsedMr.getOutOptions().getCollectionName(),
-                                           SerializationContext::stateDefault())
-        : NamespaceStringUtil::deserialize(nss.dbName(),
-                                           parsedMr.getOutOptions().getCollectionName());
 
     if (_sampler.tick()) {
         LOGV2_WARNING(5725800,
                       "The map reduce command is deprecated. For more information, see "
                       "https://docs.mongodb.com/manual/core/map-reduce/");
-    }
-
-    if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        involvedNamespaces.insert(resolvedOutNss);
     }
 
     sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};

@@ -995,19 +995,6 @@ DEATH_TEST_F(RouterRoleTestTxn,
                        10292300);
 }
 
-DEATH_TEST_F(RouterRoleTestTxn,
-             CannotAcquireCRIForCollectionlessAggregate,
-             "Incorrectly attempted to acquire a CollectionRoutingInfo for a collectionless "
-             "aggregate, which is not a real namespace.") {
-    const auto opCtx = operationContext();
-    const auto nss = NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
-
-    ASSERT_THROWS_CODE(routing_context_utils::withValidatedRoutingContext(
-                           opCtx, std::vector{nss}, [&](RoutingContext& routingCtx) {}),
-                       AssertionException,
-                       10292500);
-}
-
 TEST_F(RouterRoleTestTxn, CannotAccessUndeclaredNssOnRoutingContext) {
     const auto opCtx = operationContext();
 

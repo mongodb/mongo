@@ -201,17 +201,6 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                             BSONObjBuilder* result);
 
 /**
- * Returns the proper routing table to use for targeting shards: either a historical routing table
- * based on the global read timestamp if there is an active transaction with snapshot level read
- * concern or the latest routing table otherwise.
- *
- * Returns 'ShardNotFound' or 'NamespaceNotFound' if there are no shards in the cluster or if
- * collection 'execNss' does not exist, respectively.
- */
-StatusWith<std::unique_ptr<RoutingContext>> getExecutionNsRoutingCtx(
-    OperationContext* opCtx, const NamespaceString& execNss);
-
-/**
  * Returns true if an aggregation over 'nss' must run on all shards.
  */
 bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pipelineDataSource);

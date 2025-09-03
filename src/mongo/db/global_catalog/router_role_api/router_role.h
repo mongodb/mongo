@@ -158,13 +158,7 @@ public:
             const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
                 shard_role_details::getLocker(opCtx)->isLocked();
 
-            // Construct an empty RoutingContext if nss is a collectionless aggregate namespace.
-            std::vector<NamespaceString> nssList;
-            if (!_targetedNamespaces.front().isCollectionlessAggregateNS()) {
-                nssList.push_back(_targetedNamespaces.front());
-            }
-
-            RoutingContext routingCtx(opCtx, nssList, allowLocks);
+            RoutingContext routingCtx(opCtx, _targetedNamespaces, allowLocks);
             return routing_context_utils::runAndValidate(
                 routingCtx, [&](RoutingContext& ctx) { return callbackFn(opCtx, ctx); });
         });

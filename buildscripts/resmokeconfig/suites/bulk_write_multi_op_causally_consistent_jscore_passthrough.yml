@@ -97,6 +97,7 @@ selector:
 
     # errors out due to invalid DB name
     - jstests/core/query/invalid_db_name.js
+    - jstests/core/query/collectionless_agg_ns.js
 
     # parallel processing causes race conditions in these tests
     - jstests/core/query/local_tail_capped.js

@@ -1609,29 +1609,6 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         });
 }
 
-StatusWith<std::unique_ptr<RoutingContext>> getExecutionNsRoutingCtx(
-    OperationContext* opCtx, const NamespaceString& execNss) {
-    // First, verify that there are shards present in the cluster. If not, then we return the
-    // stronger 'ShardNotFound' error rather than 'NamespaceNotFound'. We must do this because
-    // $changeStream aggregations ignore NamespaceNotFound in order to allow streams to be opened on
-    // a collection before its enclosing database is created. However, if there are no shards
-    // present, then $changeStream should immediately return an empty cursor just as other
-    // aggregations do when the database does not exist.
-    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    if (shardIds.empty()) {
-        return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
-    }
-
-    // Construct an empty RoutingContext if execNss is a collectionless aggregate namespace.
-    std::vector<NamespaceString> nssList;
-    if (!execNss.isCollectionlessAggregateNS()) {
-        nssList.push_back(execNss);
-    }
-
-    // This call to getRoutingContextForTxnCmd will return !OK if the database does not exist
-    return getRoutingContextForTxnCmd(opCtx, nssList);
-}
-
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
     // The idempotent retry policy will retry even for writeConcern failures, so only set it if the
     // pipeline does not support writeConcern.
