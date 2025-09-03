@@ -46,7 +46,6 @@ std::unique_ptr<CellBlock> MaterializedCellBlock::clone() const {
     return ret;
 }
 
-namespace {
 std::string pathToString(const CellBlock::Path& p) {
     std::string out;
     size_t idx = 0;
@@ -68,7 +67,11 @@ std::string pathToString(const CellBlock::Path& p) {
     }
     return out;
 }
-}  // namespace
+
+std::ostream& operator<<(std::ostream& os, const CellBlock::Path& path) {
+    os << pathToString(path);
+    return os;
+};
 
 std::string CellBlock::PathRequest::toString() const {
     return str::stream() << (type == kFilter ? "FilterPath" : "ProjectPath") << "("

@@ -30,7 +30,10 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/util.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::value {
 /**
@@ -118,6 +121,38 @@ struct ProjectionPositionInfoRecorder {
     std::vector<std::unique_ptr<value::Array>> arrayStack;
 };
 
+template <class T>
+void ProjectionPositionInfoRecorder<T>::recordValue(TypeTags tag, Value val) {
+    static_cast<T*>(this)->onNewValue();
+    auto [cpyTag, cpyVal] = copyValue(tag, val);
+    if (arrayStack.empty()) {
+        static_cast<T*>(this)->saveValue(cpyTag, cpyVal);
+    } else {
+        arrayStack.back()->push_back(cpyTag, cpyVal);
+    }
+}
+
+template <class T>
+void ProjectionPositionInfoRecorder<T>::startArray() {
+    static_cast<T*>(this)->onNewValue();
+    arrayStack.push_back(std::make_unique<Array>());
+}
+
+template <class T>
+void ProjectionPositionInfoRecorder<T>::endArray() {
+    tassert(10926200, "expects nonempty arrayStack", !arrayStack.empty());
+    if (arrayStack.size() > 1) {
+        // For a nested array, we cram it into its parent.
+        auto releasedArray = arrayStack.back().release();
+        arrayStack.pop_back();
+        arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
+    } else {
+        static_cast<T*>(this)->saveValue(TypeTags::Array,
+                                         bitcastFrom<Array*>(arrayStack.front().release()));
+        arrayStack.clear();
+    }
+}
+
 /**
  * Implements the 'ProjectionPositionInfoRecorder' interface for block processing. Multiple
  * documents are processed. Projected values are stored in 'outputArr.'
@@ -152,11 +187,12 @@ struct ScalarProjectionPositionInfoRecorder final
     }
 };
 
+template <class ProjectionRecorder>
 struct BsonWalkNode {
     FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
 
-    std::vector<BlockProjectionPositionInfoRecorder*> childProjRecorders;
-    BlockProjectionPositionInfoRecorder* projRecorder = nullptr;
+    std::vector<ProjectionRecorder*> childProjRecorders;
+    ProjectionRecorder* projRecorder = nullptr;
 
     // Children which are Get nodes.
     StringMap<std::unique_ptr<BsonWalkNode>> getChildren;
@@ -166,7 +202,133 @@ struct BsonWalkNode {
 
     void add(const CellBlock::Path& path,
              FilterPositionInfoRecorder* recorder,
-             BlockProjectionPositionInfoRecorder* outProjBlockRecorder,
+             ProjectionRecorder* outProjBlockRecorder,
              size_t pathIdx = 0);
 };
+
+template <class ProjectionRecorder>
+void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
+                                           FilterPositionInfoRecorder* recorder,
+                                           ProjectionRecorder* outProjBlockRecorder,
+                                           size_t pathIdx /*= 0*/) {
+    if (pathIdx == 0) {
+        // Check some invariants about the path.
+        tassert(7953501, "Cannot be given empty path", !path.empty());
+        tassert(7953502, "Path must end with Id", holds_alternative<CellBlock::Id>(path.back()));
+    }
+
+    if (holds_alternative<CellBlock::Get>(path[pathIdx])) {
+        auto& get = std::get<CellBlock::Get>(path[pathIdx]);
+        auto [it, inserted] = getChildren.insert(
+            std::pair(get.field, std::make_unique<BsonWalkNode<ProjectionRecorder>>()));
+        it->second->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
+    } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
+        invariant(pathIdx != 0);
+        if (!traverseChild) {
+            traverseChild = std::make_unique<BsonWalkNode<ProjectionRecorder>>();
+        }
+        if (outProjBlockRecorder) {
+            // Each node must know about all projection recorders below it, not just ones
+            // directly below.
+            childProjRecorders.push_back(outProjBlockRecorder);
+        }
+
+        traverseChild->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
+    } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
+        invariant(pathIdx != 0);
+
+        if (recorder) {
+            filterPosInfoRecorder = recorder;
+        }
+        if (outProjBlockRecorder) {
+            projRecorder = outProjBlockRecorder;
+        }
+        invariant(pathIdx == path.size() - 1);
+    }
+}
+
+template <class ProjectionRecorder, class Cb>
+void walkField(BsonWalkNode<ProjectionRecorder>* node,
+               TypeTags eltTag,
+               Value eltVal,
+               const char* bsonPtr,
+               const Cb& cb);
+
+template <class ProjectionRecorder, class Cb>
+void walkObj(BsonWalkNode<ProjectionRecorder>* node, const char* be, const Cb& cb) {
+    const auto end = bson::bsonEnd(be);
+    // Skip document length.
+    be += 4;
+
+    while (be != end - 1) {
+        auto fieldName = bson::fieldNameAndLength(be);
+        auto it = node->getChildren.find(fieldName);
+        if (it != node->getChildren.end()) {
+            auto [eltTag, eltVal] = bson::convertFrom<true>(be, end, fieldName.size());
+            walkField<ProjectionRecorder>(it->second.get(), eltTag, eltVal, be, cb);
+        }
+
+        be = bson::advance(be, fieldName.size());
+    }
+}
+
+template <class ProjectionRecorder, class Cb>
+void walkField(BsonWalkNode<ProjectionRecorder>* node,
+               TypeTags eltTag,
+               Value eltVal,
+               const char* bsonPtr,
+               const Cb& cb) {
+    if (value::isObject(eltTag)) {
+        invariant(eltTag == TypeTags::bsonObject);  // Only BSON is supported for now.
+
+        walkObj<ProjectionRecorder>(node, value::bitcastTo<const char*>(eltVal), cb);
+        if (node->traverseChild) {
+            walkField<ProjectionRecorder>(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
+        }
+    } else if (value::isArray(eltTag)) {
+        invariant(eltTag == TypeTags::bsonArray);
+        if (node->traverseChild) {
+            // The projection traversal semantics are "special" in that the leaf must know
+            // when there is an array higher up in the tree.
+            for (auto& projRecorder : node->childProjRecorders) {
+                projRecorder->startArray();
+            }
+
+            bool isArrayEmpty = true;
+            {
+                auto arrayBson = value::bitcastTo<const char*>(eltVal);
+                const auto arrayEnd = bson::bsonEnd(arrayBson);
+
+                // Follow "traverse" semantics by invoking our children on direct array elements.
+                arrayBson += 4;
+
+                while (arrayBson != arrayEnd - 1) {
+                    auto sv = bson::fieldNameAndLength(arrayBson);
+                    auto [arrEltTag, arrEltVal] =
+                        bson::convertFrom<true>(arrayBson, arrayEnd, sv.size());
+                    walkField<ProjectionRecorder>(
+                        node->traverseChild.get(), arrEltTag, arrEltVal, arrayBson, cb);
+
+                    arrayBson = bson::advance(arrayBson, sv.size());
+                    isArrayEmpty = false;
+                }
+            }
+
+            if (isArrayEmpty && node->traverseChild->filterPosInfoRecorder) {
+                // If the array was empty, indicate that we saw an empty array to the
+                // filterPosInfoRecorder.
+                node->traverseChild->filterPosInfoRecorder->emptyArraySeen();
+            }
+
+            for (auto& projRecorder : node->childProjRecorders) {
+                projRecorder->endArray();
+            }
+        }
+    } else if (node->traverseChild) {
+        // We didn't see an array, so we apply the node below the traverse to this scalar.
+        walkField<ProjectionRecorder>(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
+    }
+    cb(node, eltTag, eltVal, bsonPtr);
+}
+
 }  // namespace mongo::sbe::value

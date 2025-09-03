@@ -145,6 +145,9 @@ struct CellBlock {
     virtual const std::vector<int32_t>& filterPositionInfo() = 0;
 };
 
+std::string pathToString(const CellBlock::Path& p);
+std::ostream& operator<<(std::ostream& os, const CellBlock::Path& path);
+
 /*
  * Represents a single path through a block of objects. Stores all of the values found at
  * the given path with eagerly materialized projection and filter position info.

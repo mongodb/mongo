@@ -437,6 +437,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/util:stage_results_printer_test.cpp",
         "//src/mongo/db/exec/sbe/values:block_test.cpp",
         "//src/mongo/db/exec/sbe/values:bsoncolumn_materializer_test.cpp",
+        "//src/mongo/db/exec/sbe/values:extract_field_paths_test.cpp",
         "//src/mongo/db/exec/sbe/values:row_test.cpp",
         "//src/mongo/db/exec/sbe/values:slot_printer_test.cpp",
         "//src/mongo/db/exec/sbe/values:slot_test.cpp",
@@ -493,5 +494,22 @@ mongo_cc_benchmark(
         ":query_sbe",
         "//src/mongo/db/query/collation:collator_icu",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sbe_extract_field_paths_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/values:extract_field_paths_bm.cpp",
+    ],
+    deps = [
+        ":sbe_plan_stage_test",
+        ":sbe_unittest_base",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/exec:expression_bm_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest",
+        "//src/mongo/util:pcre_wrapper",
     ],
 )

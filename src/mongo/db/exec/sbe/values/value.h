@@ -461,7 +461,8 @@ private:
 };
 
 /**
- * The same as ValueGuard, but with a move constructor and move assignment operator.
+ * The same as ValueGuard, but with a move constructor, move assignment operator, and default
+ * constructor.
  */
 class MoveableValueGuard {
 public:
@@ -474,7 +475,9 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(
         const FastTuple<bool, value::TypeTags, value::Value>& tuple)
         : MoveableValueGuard(tuple.a, tuple.b, tuple.c) {}
-    MoveableValueGuard() = delete;
+    MoveableValueGuard() {
+        shallowClear();
+    };
     MoveableValueGuard(const MoveableValueGuard&) = delete;
     MoveableValueGuard(MoveableValueGuard&& other) : _tag(other._tag), _value(other._value) {
         other.shallowClear();
@@ -492,6 +495,9 @@ public:
             other.shallowClear();
         }
         return *this;
+    }
+    std::pair<TypeTags, Value> get() const {
+        return {_tag, _value};
     }
 
 private:
