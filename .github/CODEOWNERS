@@ -3080,6 +3080,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/benchmark @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/boost @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/cares @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/cpptrace @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/croaring @10gen/query-execution @svc-auto-approve-bot
 /src/third_party/**/fmt @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/folly @10gen/server-workload-resilience @svc-auto-approve-bot

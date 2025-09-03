@@ -2894,6 +2894,49 @@
         ]
       },
       "scope": "excluded"
+    },
+    {
+      "name": "cpptrace",
+      "supplier": {
+        "name": "Organization: github"
+      },
+      "version": "v1.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Programmability"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/jeremy-rifkin/cpptrace"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/cpptrace/scripts/import.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "ae9c7977-70ac-4706-9231-a7d10f05542b",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/cpptrace"
+          }
+        ]
+      },
+      "scope": "excluded"
     }
   ],
   "dependencies": [

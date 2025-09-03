@@ -21,6 +21,9 @@ filters:
   - "cares":
     approvers:
       - 10gen/server-networking-and-observability
+  - "cpptrace":
+    approvers:
+      - 10gen/server-programmability
   - "croaring":
     approvers:
       - 10gen/query-execution

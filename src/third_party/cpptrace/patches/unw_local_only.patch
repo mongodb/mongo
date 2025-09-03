@@ -1,0 +1,12 @@
+diff --git a/src/third_party/cpptrace/dist/src/unwind/unwind_with_libunwind.cpp b/src/third_party/cpptrace/dist/src/unwind/unwind_with_libunwind.cpp
+index f33a5f22ac1..0720ede9369 100644
+--- a/src/third_party/cpptrace/dist/src/unwind/unwind_with_libunwind.cpp
++++ b/src/third_party/cpptrace/dist/src/unwind/unwind_with_libunwind.cpp
+@@ -10,6 +10,7 @@
+ #include <cstddef>
+ #include <vector>
+ 
++#define UNW_LOCAL_ONLY
+ #include <libunwind.h>
+ 
+ CPPTRACE_BEGIN_NAMESPACE
