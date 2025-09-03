@@ -68,6 +68,16 @@ selector:
     - jstests/core/administrative/roles_info.js
     - jstests/core/catalog/views/views_all_commands.js
 
+    # TODO SERVER-109839: Remove these once the sub-queries for reopening buckets can no longer
+    # pollute the insert OperationContext's rawData value.
+    # As of SERVER-103711, the fcv command takes the database critical section (using cloneAuthoritativeMetadata)
+    # which can cause the bucket reopening DbDirectClient call to fail after having changed the isRawDataOperation
+    # value for the OperationContext, causing the higher level insert to be incorrectly retried as a rawData request.
+    # The fcv command may not be the only command that can cause this, but in practice only this suite has caused
+    # this particular failure to arise.
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_extended_range.js
+
     # Sharding specific failed:
     #
     # $unionWith explain output does not check whether the collection is sharded in a sharded
