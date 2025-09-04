@@ -2041,9 +2041,8 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    wtRu.getSessionNoTxn()->closeAllCursors(uri);
-
-    WiredTigerSession session(_connection.get());
+    auto& session = *wtRu.getSessionNoTxn();
+    session.closeAllCursors(uri);
 
     Status status = _drop(session, uri.c_str(), "checkpoint_wait=false");
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
@@ -2075,9 +2074,8 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
     const std::string uri = WiredTigerUtil::buildTableUri(ident);
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(&ru);
-    wtRu->getSessionNoTxn()->closeAllCursors(uri);
-
-    WiredTigerSession session(_connection.get());
+    auto& session = *wtRu->getSessionNoTxn();
+    session.closeAllCursors(uri);
 
     // Don't wait for the global checkpoint lock to be obtained in WiredTiger as it can take a
     // substantial amount of time to be obtained if there is a concurrent checkpoint running. We
