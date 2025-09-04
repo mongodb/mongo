@@ -89,11 +89,16 @@ public:
     }
 
     /**
-     * Requesting multiple copies for the same ident is a rules violation; Calling on a
-     * non-created ident is invalid and may crash.
+     * Creates a RecordStore instance for the given ident. The ident must exist, and the behavior if
+     * it does not is undefined.
      *
-     * Trying to access this record store in the future will retrieve the pointer from the
-     * collection object, and therefore this function can only be called once per namespace.
+     * At most one non-point-in-time RecordStore should exist for a given ident at a time. Multiple
+     * instances do not synchronize with each other, and writing via multiple instances or writing
+     * via one instance while reading from another (non-PIT) instance may break in surprising ways.
+     *
+     * Instantiating RecordStores is expensive, and the returned pointer should be cached by the
+     * caller if it will be used multiple times. In normal usage, this is managed by Collection and
+     * RecordSTore instances should be obtained via that.
      */
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                         const NamespaceString& nss,
