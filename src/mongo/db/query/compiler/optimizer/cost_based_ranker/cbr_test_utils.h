@@ -63,6 +63,13 @@ std::unique_ptr<QuerySolution> makeIndexScanFetchPlan(
     std::unique_ptr<MatchExpression> indexFilter = nullptr,
     std::unique_ptr<MatchExpression> fetchFilter = nullptr);
 
+std::unique_ptr<QuerySolution> makeMultiKeyIndexScanFetchPlan(
+    IndexBounds bounds,
+    std::vector<std::string> indexFields,
+    std::string multikeyField,
+    std::unique_ptr<MatchExpression> indexFilter = nullptr,
+    std::unique_ptr<MatchExpression> fetchFilter = nullptr);
+
 std::unique_ptr<QuerySolution> makeCollScanPlan(std::unique_ptr<MatchExpression> filter);
 
 std::unique_ptr<QuerySolution> makeVirtualCollScanPlan(size_t size,

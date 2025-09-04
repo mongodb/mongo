@@ -425,6 +425,15 @@ bool isIndexScanSupported(const IndexScanNode& node) {
         indexEntry.version == IndexDescriptor::IndexVersion::kV2;  // prevent old index formats
 }
 
+bool hasOnlyPointPredicates(const IndexBounds* node) {
+    for (auto&& oil : node->fields) {
+        if (!oil.isPoint()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     if (!isIndexScanSupported(*node)) {
         // Fallback to multiplanning
@@ -445,17 +454,23 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // Ignore selectivities pushed by other operators up to this point
     size_t selOffset = _conjSels.size();
 
-    // Estimate the number of keys in the scan's interval.
-    auto ceRes1 = estimate(&node->bounds);
-    if (!ceRes1.isOK()) {
-        return ceRes1;
+    // Estimate the number of keys in the index scan interval.
+    // We can avoid computing input selectivity for sampling CE on point queries over non-multikey
+    // fields without residual filter, as input cardinality is equal to output cardinality.
+    if (_rankerMode != QueryPlanRankerModeEnum::kSamplingCE || node->index.multikey ||
+        !hasOnlyPointPredicates(&node->bounds) || node->filter || !node->bounds.size()) {
+        auto ceRes1 = estimate(&node->bounds);
+        if (!ceRes1.isOK()) {
+            return ceRes1;
+        }
+        est.inCE = ceRes1.getValue();
     }
-    est.inCE = ceRes1.getValue();
 
-    // Sampling will attempt to get an estimate for the number of RIDs that the scan returns after
-    // deduplication and applying the filter. This approach does not combine selectivity computed
-    // from the index scan.
+    // Estimate the output cardinality of IndexScan + Residual filter.
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+        // Sampling will attempt to get an estimate for the number of RIDs that the scan returns
+        // after deduplication and applying the filter. This approach does not combine selectivity
+        // computed from the index scan.
         auto ridsEst = [&]() -> CardinalityEstimate {
             // TODO: remove the flag _useIndexBounds when SPM-4214 finishes.
             if (!_useIndexBounds) {
@@ -474,6 +489,13 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
 
         _conjSels.emplace_back(ridsEst / _inputCard);
         est.outCE = ridsEst;
+
+        if (!est.inCE.has_value()) {
+            // Special case for sampling CE for point queries over non-multikey fields without
+            // residual filter. The number of keys scanned is equal to the resulting docs.
+            est.inCE = est.outCE;
+        }
+
         CardinalityEstimate outCE{est.outCE};
         _qsnEstimates.emplace(node, std::move(est));
         return outCE;
@@ -497,7 +519,6 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     est.outCE = conjCard(selOffset, _inputCard);
     CardinalityEstimate outCE{est.outCE};
     _qsnEstimates.emplace(node, std::move(est));
-
     return outCE;
 }
 

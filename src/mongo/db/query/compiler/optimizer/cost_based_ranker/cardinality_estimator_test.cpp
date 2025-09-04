@@ -690,5 +690,71 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
     ASSERT_EQUALS(estIB, estME);
 }
 
+TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimization) {
+    size_t collCard = 1000;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    auto samplingEstimator =
+        samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200, ce::NoProjection{});
+
+    // Incrementally compare that all the following cases for index scan cardinality estimation
+    // return the same results.
+
+    // 1. check sampling cardinality estimates of index scan
+    // for non-multikey
+    // without residual filter (on index scan)
+    // with query including only point predicates
+    CardinalityEstimate indexScanNonMultiKeyNoFilterPoint(CardinalityType{0.0},
+                                                          EstimationSource::Sampling);
+    {
+        std::vector<std::string> indexFields = {"a", "b"};
+        IndexBounds bounds;
+        bounds.fields.push_back(makePointInterval(50, indexFields[0]));
+
+        auto plan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+        indexScanNonMultiKeyNoFilterPoint =
+            getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+    }
+
+    // 2. check sampling cardinality estimates of index scan
+    // for non-multikey
+    // without residual filter (on index scan)
+    // with query including range predicates
+    CardinalityEstimate indexScanNonMultiKeyNoFilterRange(CardinalityType{0.0},
+                                                          EstimationSource::Sampling);
+    {
+        std::vector<std::string> indexFields = {"a", "b"};
+        IndexBounds bounds;
+        bounds.fields.push_back(makePointInterval(50, indexFields[0]));
+        OrderedIntervalList oilRange(indexFields[1]);
+        oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            BSON("" << 0 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys));
+        bounds.fields.push_back(oilRange);
+
+        auto plan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+        indexScanNonMultiKeyNoFilterRange =
+            getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+    }
+
+    ASSERT_EQUALS(indexScanNonMultiKeyNoFilterPoint, indexScanNonMultiKeyNoFilterRange);
+
+    // 3. check sampling cardinality estimates of index scan
+    // for multikey field
+    CardinalityEstimate indexScanMultiKey(CardinalityType{0.0}, EstimationSource::Sampling);
+    {
+        // Create query.
+        std::vector<std::string> indexFields = {"a", "b"};
+        IndexBounds bounds;
+        bounds.fields.push_back(makePointInterval(50, indexFields[0]));
+
+        auto plan = makeMultiKeyIndexScanFetchPlan(std::move(bounds), std::move(indexFields), "a");
+        // Use cardinalityEstimator that uses index bounds.
+        indexScanMultiKey =
+            getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+    }
+
+    ASSERT_EQUALS(indexScanNonMultiKeyNoFilterRange, indexScanMultiKey);
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker
