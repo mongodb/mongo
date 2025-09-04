@@ -230,6 +230,9 @@ struct QueryStatsSnapshot {
     int64_t totalAcquisitionDelinquencyMillis;
     int64_t maxAcquisitionDelinquencyMillis;
 
+    uint64_t numInterruptChecks;
+    int64_t overdueInterruptApproxMaxMillis;
+
     bool hasSortStage;
     bool usedDisk;
     bool fromMultiPlanner;

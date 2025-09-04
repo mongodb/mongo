@@ -51,8 +51,11 @@ struct DataBearingNodeMetrics {
     Nanoseconds cpuNanos{0};
 
     uint64_t delinquentAcquisitions{0};
-    Milliseconds totalAcquisitionDelinquencyMillis{0};
-    Milliseconds maxAcquisitionDelinquencyMillis{0};
+    Milliseconds totalAcquisitionDelinquency{0};
+    Milliseconds maxAcquisitionDelinquency{0};
+
+    uint64_t numInterruptChecks{0};
+    Milliseconds overdueInterruptApproxMax{0};
 
     bool hasSortStage : 1 = false;
     bool usedDisk : 1 = false;
@@ -71,10 +74,12 @@ struct DataBearingNodeMetrics {
         clusterWorkingTime += other.clusterWorkingTime;
         cpuNanos += other.cpuNanos;
         delinquentAcquisitions += other.delinquentAcquisitions;
-        totalAcquisitionDelinquencyMillis += other.totalAcquisitionDelinquencyMillis;
-        maxAcquisitionDelinquencyMillis =
-            Milliseconds{std::max(maxAcquisitionDelinquencyMillis.count(),
-                                  other.maxAcquisitionDelinquencyMillis.count())};
+        totalAcquisitionDelinquency += other.totalAcquisitionDelinquency;
+        maxAcquisitionDelinquency =
+            std::max(maxAcquisitionDelinquency, other.maxAcquisitionDelinquency);
+        numInterruptChecks += other.numInterruptChecks;
+        overdueInterruptApproxMax =
+            std::max(overdueInterruptApproxMax, other.overdueInterruptApproxMax);
         hasSortStage = hasSortStage || other.hasSortStage;
         usedDisk = usedDisk || other.usedDisk;
         fromMultiPlanner = fromMultiPlanner || other.fromMultiPlanner;
@@ -99,10 +104,12 @@ struct DataBearingNodeMetrics {
         clusterWorkingTime += Milliseconds(metrics.getWorkingTimeMillis());
         cpuNanos += Nanoseconds(metrics.getCpuNanos());
         delinquentAcquisitions += metrics.getDelinquentAcquisitions();
-        totalAcquisitionDelinquencyMillis +=
-            Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis());
-        maxAcquisitionDelinquencyMillis = Milliseconds(std::max(
-            maxAcquisitionDelinquencyMillis.count(), metrics.getMaxAcquisitionDelinquencyMillis()));
+        totalAcquisitionDelinquency += Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis());
+        maxAcquisitionDelinquency = Milliseconds(std::max(
+            maxAcquisitionDelinquency.count(), metrics.getMaxAcquisitionDelinquencyMillis()));
+        numInterruptChecks += metrics.getNumInterruptChecks();
+        overdueInterruptApproxMax = Milliseconds{std::max(
+            overdueInterruptApproxMax.count(), metrics.getOverdueInterruptApproxMaxMillis())};
         hasSortStage = hasSortStage || metrics.getHasSortStage();
         usedDisk = usedDisk || metrics.getUsedDisk();
         fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();

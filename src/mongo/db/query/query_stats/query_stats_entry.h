@@ -126,6 +126,12 @@ struct QueryStatsEntry {
     AggregatedMetric<int64_t> maxAcquisitionDelinquencyMillis;
 
     /**
+     * Aggregates the checkForInterrupt stats including getMore requests.
+     */
+    AggregatedMetric<uint64_t> numInterruptChecksPerSec;
+    AggregatedMetric<int64_t> overdueInterruptApproxMaxMillis;
+
+    /**
      * Counts the frequency of the boolean value hasSortStage.
      */
     AggregatedBool hasSortStage;

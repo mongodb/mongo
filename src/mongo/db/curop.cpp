@@ -495,7 +495,8 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
 
         if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
-            admCtx.getDelinquentAcquisitions() > 0 && !opCtx()->inMultiDocumentTransaction()) {
+            admCtx.getDelinquentAcquisitions() > 0 && !opCtx()->inMultiDocumentTransaction() &&
+            !parent()) {
             // Note that we don't record delinquency stats around ticketing when in a
             // multi-document transaction, since operations within multi-document transactions hold
             // tickets for a long time by design and reporting them as delinquent will just create
@@ -503,12 +504,22 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
 
             metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
                 static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
-            metrics.totalAcquisitionDelinquencyMillis =
-                metrics.totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)) +
+            metrics.totalAcquisitionDelinquency =
+                metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)) +
                 Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
-            metrics.maxAcquisitionDelinquencyMillis = Milliseconds{
-                std::max(metrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
+            metrics.maxAcquisitionDelinquency = Milliseconds{
+                std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
                          admCtx.getMaxAcquisitionDelinquencyMillis())};
+        }
+
+        if (!parent()) {
+            metrics.numInterruptChecks = opCtx()->numInterruptChecks();
+            if (const auto* stats = opCtx()->overdueInterruptCheckStats();
+                stats && stats->overdueInterruptChecks.loadRelaxed() > 0) {
+                metrics.overdueInterruptApproxMax =
+                    std::max(metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)),
+                             stats->overdueMaxTime.loadRelaxed());
+            }
         }
 
         try {

@@ -63,7 +63,9 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     cpuNanos: {"$numberLong": "18"},
     delinquentAcquisitions: {"$numberLong": "0"},
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
-    maxAcquisitionDelinquencyMillis: {"$numberLong": "0"}
+    maxAcquisitionDelinquencyMillis: {"$numberLong": "0"},
+    numInterruptChecks: {"$numberLong": "0"},
+    overdueInterruptApproxMaxMillis: {"$numberLong": "0"}
 })");
 
 static const std::string defaultNssStr = "db.coll";
@@ -317,6 +319,8 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(metrics.getMaxAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(metrics.getNumInterruptChecks(), 0);
+    ASSERT_EQ(metrics.getOverdueInterruptApproxMaxMillis(), 0);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -351,7 +355,8 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsIncomplete) {
                                    CursorMetrics::kUsedDiskFieldName,
                                    CursorMetrics::kFromMultiPlannerFieldName,
                                    CursorMetrics::kFromPlanCacheFieldName,
-                                   CursorMetrics::kCpuNanosFieldName};
+                                   CursorMetrics::kCpuNanosFieldName,
+                                   CursorMetrics::kNumInterruptChecksFieldName};
     for (auto fieldName : fields) {
         auto badMetrics = metrics.copy().removeField(fieldName);
         auto badCursor = makeCursorBSON(badMetrics);
@@ -933,7 +938,8 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
                           true /* usedDisk */,
                           true /* fromMultiPlanner */,
                           false /* fromPlanCache */,
-                          -1 /* cpuNanos */);
+                          -1 /* cpuNanos */,
+                          15 /* numInterruptChecks */);
 
     auto pbrToken = BSON("n" << 1);
     builder.setPostBatchResumeToken(pbrToken);
@@ -966,6 +972,8 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getDelinquentAcquisitions(), 0);
     ASSERT_EQ(parsedMetrics->getTotalAcquisitionDelinquencyMillis(), 0);
     ASSERT_EQ(parsedMetrics->getMaxAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(parsedMetrics->getNumInterruptChecks(), 15);
+    ASSERT_EQ(parsedMetrics->getOverdueInterruptApproxMaxMillis(), 0);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

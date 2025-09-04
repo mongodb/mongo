@@ -273,6 +273,15 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
         snapshot.totalAcquisitionDelinquencyMillis);
     toUpdate.maxAcquisitionDelinquencyMillis.aggregate(snapshot.maxAcquisitionDelinquencyMillis);
 
+    // Store the number of interrupt checks per second as a rate, this can give us a better sense of
+    // how often interrupts are being checked relative to the total execution time across multiple
+    // query runs.
+    auto secondCount = durationCount<Seconds>(Milliseconds{snapshot.workingTimeMillis});
+    auto numInterruptChecksPerSec =
+        secondCount == 0 ? 0 : snapshot.numInterruptChecks / (static_cast<double>(secondCount));
+    toUpdate.numInterruptChecksPerSec.aggregate(numInterruptChecksPerSec);
+    toUpdate.overdueInterruptApproxMaxMillis.aggregate(snapshot.overdueInterruptApproxMaxMillis);
+
     toUpdate.hasSortStage.aggregate(snapshot.hasSortStage);
     toUpdate.usedDisk.aggregate(snapshot.usedDisk);
     toUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
@@ -445,8 +454,10 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         metrics.clusterWorkingTime.value_or(Milliseconds(0)).count(),
         nanosecondsToInt64(metrics.cpuNanos),
         metrics.delinquentAcquisitions.value_or(0),
-        metrics.totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
-        metrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
+        metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+        metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+        metrics.numInterruptChecks.value_or(0),
+        metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)).count(),
         metrics.hasSortStage,
         metrics.usedDisk,
         metrics.fromMultiPlanner,

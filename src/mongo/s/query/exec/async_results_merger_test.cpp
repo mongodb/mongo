@@ -3254,11 +3254,13 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               true /* usedDisk */,
                               true /* fromMultiPlanner */,
                               true /* fromPlanCache */,
-                              37 /*cpuNanos */
+                              37 /*cpuNanos */,
+                              3 /* numInterruptChecks */
         );
         metrics.setDelinquentAcquisitions(3);
         metrics.setTotalAcquisitionDelinquencyMillis(100);
         metrics.setMaxAcquisitionDelinquencyMillis(80);
+        metrics.setOverdueInterruptApproxMaxMillis(100);
         scheduleResponse(id, {fromjson("{_id: 1}")}, std::move(metrics));
     }
 
@@ -3282,8 +3284,10 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.fromPlanCache, true);
         ASSERT_EQ(remoteMetrics.cpuNanos, Nanoseconds(37));
         ASSERT_EQ(remoteMetrics.delinquentAcquisitions, 3);
-        ASSERT_EQ(remoteMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(100));
-        ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(80));
+        ASSERT_EQ(remoteMetrics.totalAcquisitionDelinquency, Milliseconds(100));
+        ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquency, Milliseconds(80));
+        ASSERT_EQ(remoteMetrics.numInterruptChecks, 3);
+        ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(100));
     }
 
     // Schedule a second response.
@@ -3297,11 +3301,13 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               true /* usedDisk */,
                               true /* fromMultiPlanner */,
                               false /* fromPlanCache */,
-                              121 /*cpuNanos */
+                              121 /*cpuNanos */,
+                              2 /* numInterruptChecks */
         );
         metrics.setDelinquentAcquisitions(2);
         metrics.setTotalAcquisitionDelinquencyMillis(150);
         metrics.setMaxAcquisitionDelinquencyMillis(120);
+        metrics.setOverdueInterruptApproxMaxMillis(200);
         scheduleResponse(CursorId(0), {fromjson("{_id: 2}")}, std::move(metrics));
     }
 
@@ -3323,8 +3329,10 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.fromPlanCache, false);
         ASSERT_EQ(remoteMetrics.cpuNanos, Nanoseconds(158));
         ASSERT_EQ(remoteMetrics.delinquentAcquisitions, 5);
-        ASSERT_EQ(remoteMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(250));
-        ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(120));
+        ASSERT_EQ(remoteMetrics.totalAcquisitionDelinquency, Milliseconds(250));
+        ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquency, Milliseconds(120));
+        ASSERT_EQ(remoteMetrics.numInterruptChecks, 5);
+        ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(200));
     }
 
     {
@@ -3339,8 +3347,10 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.fromPlanCache, true);
         ASSERT_EQ(remoteMetrics.cpuNanos, Nanoseconds(0));
         ASSERT_EQ(remoteMetrics.delinquentAcquisitions, 0);
-        ASSERT_EQ(remoteMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(0));
-        ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(0));
+        ASSERT_EQ(remoteMetrics.totalAcquisitionDelinquency, Milliseconds(0));
+        ASSERT_EQ(remoteMetrics.maxAcquisitionDelinquency, Milliseconds(0));
+        ASSERT_EQ(remoteMetrics.numInterruptChecks, 0);
+        ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(0));
     }
 
     // Read the EOF

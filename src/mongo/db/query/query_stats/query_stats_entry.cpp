@@ -55,6 +55,9 @@ BSONObj QueryStatsEntry::toBSON() const {
     totalAcquisitionDelinquencyMillis.appendTo(builder, "totalAcquisitionDelinquencyMillis");
     maxAcquisitionDelinquencyMillis.appendTo(builder, "maxAcquisitionDelinquencyMillis");
 
+    numInterruptChecksPerSec.appendTo(builder, "numInterruptChecksPerSec");
+    overdueInterruptApproxMaxMillis.appendTo(builder, "overdueInterruptApproxMaxMillis");
+
     hasSortStage.appendTo(builder, "hasSortStage");
     usedDisk.appendTo(builder, "usedDisk");
     fromMultiPlanner.appendTo(builder, "fromMultiPlanner");

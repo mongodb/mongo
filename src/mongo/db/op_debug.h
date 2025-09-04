@@ -222,8 +222,11 @@ public:
         // across the cluster. It's only collected in mongod shard and aggregated of all shard in
         // mongos.
         boost::optional<uint64_t> delinquentAcquisitions;
-        boost::optional<Milliseconds> totalAcquisitionDelinquencyMillis;
-        boost::optional<Milliseconds> maxAcquisitionDelinquencyMillis;
+        boost::optional<Milliseconds> totalAcquisitionDelinquency;
+        boost::optional<Milliseconds> maxAcquisitionDelinquency;
+
+        boost::optional<uint64_t> numInterruptChecks;
+        boost::optional<Milliseconds> overdueInterruptApproxMax;
     };
 
     OpDebug() = default;

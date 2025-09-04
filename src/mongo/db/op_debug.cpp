@@ -1289,9 +1289,13 @@ CursorMetrics OpDebug::getCursorMetrics() const {
 
     metrics.setDelinquentAcquisitions(additiveMetrics.delinquentAcquisitions.value_or(0));
     metrics.setTotalAcquisitionDelinquencyMillis(
-        additiveMetrics.totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count());
+        additiveMetrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)).count());
     metrics.setMaxAcquisitionDelinquencyMillis(
-        additiveMetrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count());
+        additiveMetrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count());
+
+    metrics.setNumInterruptChecks(additiveMetrics.numInterruptChecks.value_or(0));
+    metrics.setOverdueInterruptApproxMaxMillis(
+        additiveMetrics.overdueInterruptApproxMax.value_or(Milliseconds(0)).count());
 
     metrics.setHasSortStage(additiveMetrics.hasSortStage);
     metrics.setUsedDisk(additiveMetrics.usedDisk);
@@ -1389,14 +1393,19 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     cpuNanos = addOptionals(cpuNanos, otherMetrics.cpuNanos);
     executionTime = addOptionals(executionTime, otherMetrics.executionTime);
 
+    numInterruptChecks = addOptionals(numInterruptChecks, otherMetrics.numInterruptChecks);
+    if (otherMetrics.overdueInterruptApproxMax.has_value()) {
+        overdueInterruptApproxMax = std::max(overdueInterruptApproxMax.value_or(Milliseconds(0)),
+                                             *otherMetrics.overdueInterruptApproxMax);
+    }
+
     delinquentAcquisitions =
         addOptionals(delinquentAcquisitions, otherMetrics.delinquentAcquisitions);
-    totalAcquisitionDelinquencyMillis = addOptionals(
-        totalAcquisitionDelinquencyMillis, otherMetrics.totalAcquisitionDelinquencyMillis);
-    if (otherMetrics.maxAcquisitionDelinquencyMillis.has_value()) {
-        maxAcquisitionDelinquencyMillis =
-            Milliseconds{std::max(maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
-                                  otherMetrics.maxAcquisitionDelinquencyMillis->count())};
+    totalAcquisitionDelinquency =
+        addOptionals(totalAcquisitionDelinquency, otherMetrics.totalAcquisitionDelinquency);
+    if (otherMetrics.maxAcquisitionDelinquency.has_value()) {
+        maxAcquisitionDelinquency = std::max(maxAcquisitionDelinquency.value_or(Milliseconds(0)),
+                                             *otherMetrics.maxAcquisitionDelinquency);
     }
 
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
@@ -1421,12 +1430,14 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     cpuNanos = cpuNanos.value_or(Nanoseconds(0)) + metrics.cpuNanos;
 
     delinquentAcquisitions = delinquentAcquisitions.value_or(0) + metrics.delinquentAcquisitions;
-    totalAcquisitionDelinquencyMillis =
-        totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)) +
-        metrics.totalAcquisitionDelinquencyMillis;
-    maxAcquisitionDelinquencyMillis =
-        Milliseconds{std::max(maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
-                              metrics.maxAcquisitionDelinquencyMillis.count())};
+    totalAcquisitionDelinquency =
+        totalAcquisitionDelinquency.value_or(Milliseconds(0)) + metrics.totalAcquisitionDelinquency;
+    maxAcquisitionDelinquency = std::max(maxAcquisitionDelinquency.value_or(Milliseconds(0)),
+                                         metrics.maxAcquisitionDelinquency);
+
+    numInterruptChecks = numInterruptChecks.value_or(0) + metrics.numInterruptChecks;
+    overdueInterruptApproxMax = std::max(overdueInterruptApproxMax.value_or(Milliseconds(0)),
+                                         metrics.overdueInterruptApproxMax);
 
     hasSortStage = hasSortStage || metrics.hasSortStage;
     usedDisk = usedDisk || metrics.usedDisk;
@@ -1458,6 +1469,8 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         static_cast<uint64_t>(metrics.getDelinquentAcquisitions()),
         Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis()),
         Milliseconds(metrics.getMaxAcquisitionDelinquencyMillis()),
+        static_cast<uint64_t>(metrics.getNumInterruptChecks()),
+        Milliseconds(metrics.getOverdueInterruptApproxMaxMillis()),
         metrics.getHasSortStage(),
         metrics.getUsedDisk(),
         metrics.getFromMultiPlanner(),

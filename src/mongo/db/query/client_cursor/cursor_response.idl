@@ -105,6 +105,15 @@ structs:
                 type: long
                 stability: unstable
                 default: 0
+            numInterruptChecks:
+                description: "Number of checkForInterrupt is call by a query operation."
+                type: long
+                stability: unstable
+            overdueInterruptApproxMaxMillis:
+                description: "Maximum time in milliseconds that checkForInterrupt was delayed for a sampled query operation."
+                type: long
+                stability: unstable
+                default: 0
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

@@ -247,6 +247,15 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             tojson(queryStats),
         );
         assert.gte(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max, waitPerIterationMs, tojson(queryStats));
+
+        // For first batch, numInterruptChecks >=4, time ~=600ms
+        // For second batch, numInterruptChecks >=3, time~=400ms
+        assert.gte(queryStats[0].metrics.numInterruptChecksPerSec.sum, 7, tojson(queryStats));
+        assert.gte(
+            queryStats[0].metrics.overdueInterruptApproxMaxMillis.max,
+            waitPerIterationMs - delinquentIntervalMs,
+            tojson(queryStats),
+        );
     }
 
     {
@@ -286,7 +295,10 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             "command": "find",
         });
         const parsedLine = JSON.parse(line);
-        assert(!("delinquencyInfo" in parsedLine.attr), parsedLine);
+        assert(
+            !("delinquencyInfo" in parsedLine.attr) || !("delinquentAcquisitions" in parsedLine.attr.delinquencyInfo),
+            parsedLine,
+        );
 
         // Check that the server status counters were not bumped. Here we can only do a loose check.
         {

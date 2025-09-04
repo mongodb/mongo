@@ -100,10 +100,14 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.cpuNanos = Nanoseconds{21};
     currentAdditiveMetrics.delinquentAcquisitions = 1;
     additiveMetricsToAdd.delinquentAcquisitions = 2;
-    currentAdditiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds{300};
-    additiveMetricsToAdd.totalAcquisitionDelinquencyMillis = Milliseconds{200};
-    currentAdditiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds{300};
-    additiveMetricsToAdd.maxAcquisitionDelinquencyMillis = Milliseconds{100};
+    currentAdditiveMetrics.totalAcquisitionDelinquency = Milliseconds{300};
+    additiveMetricsToAdd.totalAcquisitionDelinquency = Milliseconds{200};
+    currentAdditiveMetrics.maxAcquisitionDelinquency = Milliseconds{300};
+    additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds{100};
+    currentAdditiveMetrics.numInterruptChecks = 1;
+    additiveMetricsToAdd.numInterruptChecks = 2;
+    currentAdditiveMetrics.overdueInterruptApproxMax = Milliseconds{100};
+    additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds{300};
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -143,12 +147,18 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(*currentAdditiveMetrics.delinquentAcquisitions,
               *additiveMetricsBeforeAdd.delinquentAcquisitions +
                   *additiveMetricsToAdd.delinquentAcquisitions);
-    ASSERT_EQ(*currentAdditiveMetrics.totalAcquisitionDelinquencyMillis,
-              *additiveMetricsBeforeAdd.totalAcquisitionDelinquencyMillis +
-                  *additiveMetricsToAdd.totalAcquisitionDelinquencyMillis);
-    ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquencyMillis,
-              std::max(*additiveMetricsBeforeAdd.maxAcquisitionDelinquencyMillis,
-                       *additiveMetricsToAdd.maxAcquisitionDelinquencyMillis));
+    ASSERT_EQ(*currentAdditiveMetrics.totalAcquisitionDelinquency,
+              *additiveMetricsBeforeAdd.totalAcquisitionDelinquency +
+                  *additiveMetricsToAdd.totalAcquisitionDelinquency);
+    ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquency,
+              std::max(*additiveMetricsBeforeAdd.maxAcquisitionDelinquency,
+                       *additiveMetricsToAdd.maxAcquisitionDelinquency));
+    ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks,
+              *additiveMetricsBeforeAdd.numInterruptChecks +
+                  *additiveMetricsToAdd.numInterruptChecks);
+    ASSERT_EQ(*currentAdditiveMetrics.overdueInterruptApproxMax,
+              std::max(*additiveMetricsBeforeAdd.overdueInterruptApproxMax,
+                       *additiveMetricsToAdd.overdueInterruptApproxMax));
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -168,8 +178,10 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.keysDeleted = 2;
     additiveMetricsToAdd.cpuNanos = Nanoseconds(1);
     additiveMetricsToAdd.delinquentAcquisitions = 1;
-    additiveMetricsToAdd.totalAcquisitionDelinquencyMillis = Milliseconds(100);
-    additiveMetricsToAdd.maxAcquisitionDelinquencyMillis = Milliseconds(100);
+    additiveMetricsToAdd.totalAcquisitionDelinquency = Milliseconds(100);
+    additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds(100);
+    additiveMetricsToAdd.numInterruptChecks = 1;
+    additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds(100);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -219,10 +231,13 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // should be treated as zero.
     ASSERT_EQ(*currentAdditiveMetrics.delinquentAcquisitions,
               *additiveMetricsToAdd.delinquentAcquisitions);
-    ASSERT_EQ(*currentAdditiveMetrics.totalAcquisitionDelinquencyMillis,
-              *additiveMetricsToAdd.totalAcquisitionDelinquencyMillis);
-    ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquencyMillis,
-              *additiveMetricsToAdd.maxAcquisitionDelinquencyMillis);
+    ASSERT_EQ(*currentAdditiveMetrics.totalAcquisitionDelinquency,
+              *additiveMetricsToAdd.totalAcquisitionDelinquency);
+    ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquency,
+              *additiveMetricsToAdd.maxAcquisitionDelinquency);
+    ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks, *additiveMetricsToAdd.numInterruptChecks);
+    ASSERT_EQ(*currentAdditiveMetrics.overdueInterruptApproxMax,
+              *additiveMetricsToAdd.overdueInterruptApproxMax);
 }
 
 TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
@@ -260,8 +275,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.usedDisk = false;
     additiveMetrics.cpuNanos = Nanoseconds(8);
     additiveMetrics.delinquentAcquisitions = 2;
-    additiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(400);
-    additiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(300);
+    additiveMetrics.totalAcquisitionDelinquency = Milliseconds(400);
+    additiveMetrics.maxAcquisitionDelinquency = Milliseconds(300);
+    additiveMetrics.numInterruptChecks = 2;
+    additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -272,10 +289,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
-                                9 /* cpuNanos */);
+                                9 /* cpuNanos */,
+                                3 /* numInterruptChecks */);
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
     cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
+    cursorMetrics.setOverdueInterruptApproxMaxMillis(200);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -288,8 +307,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(additiveMetrics.usedDisk, false);
     ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(17));
     ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 5);
-    ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(800));
-    ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquency, Milliseconds(800));
+    ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquency, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 5);
+    ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(200));
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -307,7 +328,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
-                                -1 /* cpuNanos */);
+                                -1 /* cpuNanos */,
+                                3 /* numInterruptChecks */);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
     ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(-2));
@@ -329,7 +351,8 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
-                                10 /* cpuNanos */);
+                                10 /* cpuNanos */,
+                                3 /* numInterruptChecks */);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -348,8 +371,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.usedDisk = false;
     additiveMetrics.cpuNanos = Nanoseconds(5);
     additiveMetrics.delinquentAcquisitions = 2;
-    additiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(400);
-    additiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(200);
+    additiveMetrics.totalAcquisitionDelinquency = Milliseconds(400);
+    additiveMetrics.maxAcquisitionDelinquency = Milliseconds(200);
+    additiveMetrics.numInterruptChecks = 2;
+    additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -359,8 +384,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.usedDisk = false;
     remoteMetrics.cpuNanos = Nanoseconds(6);
     remoteMetrics.delinquentAcquisitions = 1;
-    remoteMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(300);
-    remoteMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(300);
+    remoteMetrics.totalAcquisitionDelinquency = Milliseconds(300);
+    remoteMetrics.maxAcquisitionDelinquency = Milliseconds(300);
+    remoteMetrics.numInterruptChecks = 1;
+    remoteMetrics.overdueInterruptApproxMax = Milliseconds(300);
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -371,8 +398,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.usedDisk, false);
     ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(11));
     ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 3);
-    ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(700));
-    ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquency, Milliseconds(700));
+    ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquency, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
+    ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(300));
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {
