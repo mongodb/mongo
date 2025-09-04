@@ -229,6 +229,9 @@
       DatabaseName::kConfig,                                                                       \
       "change_stream_coordinator"_sd)                                                              \
                                                                                                    \
+    /*  Namespace used to store change stream pre-images */                                        \
+    X(kChangeStreamPreImagesNamespace, DatabaseName::kConfig, "system.preimages"_sd)               \
+                                                                                                   \
     /*  Namespace used by an analyzeShardKey command to store the split points for the shard       \
      *  being analyzed. */                                                                         \
     X(kConfigAnalyzeShardKeySplitPointsNamespace,                                                  \

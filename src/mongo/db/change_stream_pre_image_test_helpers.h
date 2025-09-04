@@ -142,10 +142,9 @@ bool activelyTrackingPreImage(const PreImagesTruncateMarkersPerNsUUID& nsUUIDTru
                               const ChangeStreamPreImage& preImage);
 
 /**
- * Performs a direct write to the pre-images collection for 'tenantId'.
+ * Performs a direct write to the pre-images collection.
  */
 void insertDirectlyToPreImagesCollection(OperationContext* opCtx,
-                                         boost::optional<TenantId> tenantId,
                                          const ChangeStreamPreImage& preImage);
 
 ChangeStreamPreImage makePreImage(const UUID& nsUUID,
@@ -155,7 +154,7 @@ ChangeStreamPreImage makePreImage(const UUID& nsUUID,
 CollectionTruncateMarkers::RecordIdAndWallTime extractRecordIdAndWallTime(
     const ChangeStreamPreImage& preImage);
 
-void createPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
+void createPreImagesCollection(OperationContext* opCtx);
 
 /**
  * Returns the size of the 'preImage' in bytes.

@@ -40,13 +40,10 @@ namespace mongo {
 namespace {
 
 /**
- * Inserts the document into the pre-images collection. The document is inserted into the
- * tenant's pre-images collection if the 'tenantId' is specified.
+ * Inserts the document into the pre-images collection.
  */
-void writeChangeStreamPreImageEntry(OperationContext* opCtx,
-                                    boost::optional<TenantId> tenantId,
-                                    const ChangeStreamPreImage& preImage) {
-    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, tenantId, preImage);
+void writeChangeStreamPreImageEntry(OperationContext* opCtx, const ChangeStreamPreImage& preImage) {
+    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, preImage);
 }
 
 /**
@@ -69,10 +66,9 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
             !operation.getNss().isTemporaryReshardingCollection()) {
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
-
+            invariant(operation.getTid() == boost::none);
             writeChangeStreamPreImageEntry(
                 opCtx,
-                operation.getTid(),
                 ChangeStreamPreImage{
                     ChangeStreamPreImageId{*operation.getUuid(), applyOpsTimestamp, applyOpsIndex},
                     operationTime,
@@ -149,8 +145,8 @@ void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
 
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
         ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, preImageDoc);
-
-        writeChangeStreamPreImageEntry(opCtx, args.coll->ns().tenantId(), preImage);
+        invariant(args.coll->ns().tenantId() == boost::none);
+        writeChangeStreamPreImageEntry(opCtx, preImage);
     }
 }
 
@@ -194,7 +190,8 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
         ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, doc);
 
-        writeChangeStreamPreImageEntry(opCtx, nss.tenantId(), preImage);
+        invariant(nss.tenantId() == boost::none);
+        writeChangeStreamPreImageEntry(opCtx, preImage);
     }
 }
 

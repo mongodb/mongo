@@ -337,7 +337,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionAndDocExist) {
     // Setup the pre-images collection.
     ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
-        .createPreImagesCollection(_opCtx.get(), boost::none /* tenantId */);
+        .createPreImagesCollection(_opCtx.get());
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     createCollection(
         _opCtx.get(), nss, createRecordChangeStreamPreAndPostImagesCollectionOptions());
@@ -460,7 +460,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionLockedByUUID) {
     // Setup the pre-images collection.
     ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
-        .createPreImagesCollection(_opCtx.get(), boost::none /* tenantId */);
+        .createPreImagesCollection(_opCtx.get());
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options = createRecordChangeStreamPreAndPostImagesCollectionOptions();
     options.uuid = kUuid;
@@ -479,7 +479,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
 TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
     // Setup the pre-images collection.
     ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
-        .createPreImagesCollection(_opCtx.get(), boost::none /* tenantId */);
+        .createPreImagesCollection(_opCtx.get());
 
     // Create the collection.
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
@@ -550,10 +550,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
         WriteUnitOfWork wuow{_opCtx.get()};
         ChangeStreamPreImageId preImageId{*(options.uuid), op.getOpTime().getTimestamp(), 0};
         BSONObj preImageDocumentKey = BSON("_id" << preImageId.toBSON());
-        auto preImageLoadResult = getStorageInterface()->deleteById(
-            _opCtx.get(),
-            NamespaceString::makePreImageCollectionNSS(boost::none),
-            preImageDocumentKey.firstElement());
+        auto preImageLoadResult =
+            getStorageInterface()->deleteById(_opCtx.get(),
+                                              NamespaceString::kChangeStreamPreImagesNamespace,
+                                              preImageDocumentKey.firstElement());
         repl::getNextOpTime(_opCtx.get());
         wuow.commit();
 
@@ -1403,20 +1403,13 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorr
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
-    // Setup the pre-images collection.
     const TenantId tid(OID::gen());
-    ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
-        .createPreImagesCollection(_opCtx.get(), tid);
     setServerParameter("multitenancySupport", true);
     setServerParameter("featureFlagRequireTenantID", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.t");
     BSONObj doc = BSON("_id" << 0);
 
-    // this allows us to set deleteArgs.deletedDoc needed by the onDeleteFn validation function in
-    // _testApplyOplogEntryOrGroupedInsertsCrudOperation below
-    CollectionOptions options = createRecordChangeStreamPreAndPostImagesCollectionOptions();
-
-    repl::createCollection(_opCtx.get(), nss, options);
+    repl::createCollection(_opCtx.get(), nss, CollectionOptions{});
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
 
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, boost::none);

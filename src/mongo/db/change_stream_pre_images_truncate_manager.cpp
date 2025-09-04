@@ -166,16 +166,17 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(
 
 std::shared_ptr<PreImagesTenantMarkers> PreImagesTruncateManager::_createAndInstallMarkers(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    const auto nss = NamespaceString::makePreImageCollectionNSS(tenantId);
+    // TODO SERVER-109191: Remove tenantId parameter.
+    invariant(tenantId == boost::none);
     return writeConflictRetry(
         opCtx,
         "Generating and installing pre image truncate markers for tenant",
-        nss,
+        NamespaceString::kChangeStreamPreImagesNamespace,
         [&]() -> std::shared_ptr<PreImagesTenantMarkers> {
             const auto preImagesCollection =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
-                                      std::move(nss),
+                                      NamespaceString::kChangeStreamPreImagesNamespace,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
                                       AcquisitionPrerequisites::kRead),

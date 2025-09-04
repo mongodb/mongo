@@ -73,9 +73,6 @@ public:
     // Name for the system.js collection
     static constexpr StringData kSystemDotJavascriptCollectionName = "system.js"_sd;
 
-    // Name of the pre-images collection.
-    static constexpr StringData kPreImagesCollectionName = "system.preimages"_sd;
-
     // Prefix for the collection storing collection statistics.
     static constexpr StringData kStatisticsCollectionPrefix = "system.statistics."_sd;
 
@@ -213,12 +210,6 @@ public:
      * Constructs the change collection namespace for the specified tenant.
      */
     static NamespaceString makeChangeCollectionNSS(const boost::optional<TenantId>& tenantId);
-
-    /**
-     * Constructs the pre-images collection namespace for a tenant if the 'tenantId' is specified,
-     * otherwise creates a default pre-images collection namespace.
-     */
-    static NamespaceString makePreImageCollectionNSS(const boost::optional<TenantId>& tenantId);
 
     /**
      * Constructs a NamespaceString representing a listCollections namespace. The format for this

@@ -210,12 +210,6 @@ NamespaceString NamespaceString::makeChangeCollectionNSS(
     return NamespaceString{tenantId, DatabaseName::kConfig.db(omitTenant), kChangeCollectionName};
 }
 
-NamespaceString NamespaceString::makePreImageCollectionNSS(
-    const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{
-        tenantId, DatabaseName::kConfig.db(omitTenant), kPreImagesCollectionName};
-}
-
 NamespaceString NamespaceString::makeReshardingLocalOplogBufferNSS(
     const UUID& existingUUID, const std::string& donorShardId) {
     return NamespaceString(DatabaseName::kConfig,
@@ -321,7 +315,7 @@ bool NamespaceString::isTimeseriesBucketsCollection() const {
 }
 
 bool NamespaceString::isChangeStreamPreImagesCollection() const {
-    return isConfigDB() && coll() == kPreImagesCollectionName;
+    return ns() == kChangeStreamPreImagesNamespace.ns();
 }
 
 bool NamespaceString::isChangeCollection() const {

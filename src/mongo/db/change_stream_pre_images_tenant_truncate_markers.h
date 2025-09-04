@@ -181,7 +181,11 @@ private:
     PreImagesTenantMarkers(boost::optional<TenantId> tenantId, const UUID& preImagesCollectionUUID)
         : _tenantId{tenantId},
           _preImagesCollectionUUID{preImagesCollectionUUID},
-          _preImagesCollectionNss(NamespaceString::makePreImageCollectionNSS(tenantId)) {}
+          _preImagesCollectionNss{NamespaceString::kChangeStreamPreImagesNamespace} {
+        // TODO SERVER-109191: Remove tenantId as a parameter and the _preImagesCollectionNss
+        // member.
+        invariant(tenantId == boost::none);
+    }
 
     boost::optional<TenantId> _tenantId;
 
