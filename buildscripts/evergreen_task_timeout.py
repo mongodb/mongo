@@ -50,7 +50,7 @@ DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
 
 # An idle timeout will expire in the presence of an exceptionally long running test in a resmoke task.
 # This helps prevent the introduction of new long-running tests in required build variants.
-DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT = timedelta(minutes=16)
+MAXIMUM_REQUIRED_BUILD_IDLE_TIMEOUT = timedelta(minutes=16)
 
 
 class TimeoutOverride(BaseModel):
@@ -296,14 +296,14 @@ class TaskTimeoutOrchestrator:
             LOGGER.info("Overriding configured timeout", idle_timeout_secs=override.total_seconds())
             determined_timeout = override
 
-        elif self._is_required_build_variant(variant) and (
-            determined_timeout is None or determined_timeout > DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT
+        if self._is_required_build_variant(variant) and (
+            determined_timeout is None or determined_timeout > MAXIMUM_REQUIRED_BUILD_IDLE_TIMEOUT
         ):
             LOGGER.info(
                 "Overriding required-builder idle timeout",
-                idle_timeout_secs=DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT.total_seconds(),
+                idle_timeout_secs=MAXIMUM_REQUIRED_BUILD_IDLE_TIMEOUT.total_seconds(),
             )
-            determined_timeout = DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT
+            determined_timeout = MAXIMUM_REQUIRED_BUILD_IDLE_TIMEOUT
 
         return determined_timeout
 

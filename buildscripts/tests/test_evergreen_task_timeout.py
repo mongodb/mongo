@@ -409,7 +409,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             build_variant="variant-required",
             display_name="! required",
             timeout_override=None,
-            expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT,
+            expected_timeout=under_test.MAXIMUM_REQUIRED_BUILD_IDLE_TIMEOUT,
         )
 
     def test_prefer_shorter_that_default_on_required_variants(self):
