@@ -159,9 +159,8 @@ public:
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
                                      LookupRequirement::kNotAllowed,
-                                     UnionRequirement::kNotAllowed,
+                                     UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kDenylist);
-        constraints.unionRequirement = UnionRequirement::kAllowed;
         constraints.setConstraintsForNoInputSources();
         // All search stages are unsupported on timeseries collections.
         constraints.canRunOnTimeseries = false;
