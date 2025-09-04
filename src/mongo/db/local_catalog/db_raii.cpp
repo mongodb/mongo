@@ -53,6 +53,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -155,13 +156,37 @@ boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
     return std::move(resolvedSecondaryNamespaces);
 }
 
-bool haveAcquiredConsistentCatalogAndSnapshot(OperationContext* opCtx,
-                                              const CollectionCatalog* catalogBeforeSnapshot,
-                                              const CollectionCatalog* catalogAfterSnapshot,
-                                              long long replTermBeforeSnapshot,
-                                              long long replTermAfterSnapshot) {
-    return catalogBeforeSnapshot == catalogAfterSnapshot &&
-        replTermBeforeSnapshot == replTermAfterSnapshot;
+bool haveAcquiredConsistentCatalogAndSnapshot(
+    OperationContext* opCtx,
+    const CollectionCatalog* catalogBeforeSnapshot,
+    const CollectionCatalog* catalogAfterSnapshot,
+    long long replTermBeforeSnapshot,
+    long long replTermAfterSnapshot,
+    boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot,
+    boost::optional<OperationContext*> activeStateTransitionAfterSnapshot) {
+    // The catalog and replication term are equal before and after opening the snapshot.
+    bool catalogEqual = catalogBeforeSnapshot == catalogAfterSnapshot;
+    bool replTermEqual = replTermBeforeSnapshot == replTermAfterSnapshot;
+
+    // There was no active state transition while opening the snapshot.
+    bool noStateTransition =
+        !activeStateTransitionBeforeSnapshot && !activeStateTransitionAfterSnapshot;
+
+    // If there is an active transition, if our opCtx is the interruption's opCtx, we permit the
+    // read so the transition can complete.
+    bool isStateTransitionThread = activeStateTransitionBeforeSnapshot
+        ? (opCtx == activeStateTransitionBeforeSnapshot.get())
+        : false;
+
+    // If this operation should not be killed during an interruption (it's allowed to see an
+    // inconsistent state), permit the read (ex: FTDC thread).
+    bool canKillOperationInStepdown = opCtx->getClient()->canKillOperationInStepdown();
+
+    // Confirm this thread has not been interrupted already.
+    opCtx->checkForInterrupt();
+
+    return catalogEqual && replTermEqual &&
+        (noStateTransition || isStateTransitionThread || !canKillOperationInStepdown);
 }
 
 void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
@@ -543,6 +568,13 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // state beforehand, to compare with afterwards.
         const auto replTermBeforeSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
+        boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot = boost::none;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            activeStateTransitionBeforeSnapshot =
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .replicationStateTransitionInterruptionCtx();
+        }
+
         const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
 
         // When a query yields it releases its snapshot, and any point-in-time instantiated
@@ -607,11 +639,20 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
 
         const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
+        boost::optional<OperationContext*> activeStateTransitionAfterSnapshot = boost::none;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            activeStateTransitionAfterSnapshot =
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .replicationStateTransitionInterruptionCtx();
+        }
+
         if (haveAcquiredConsistentCatalogAndSnapshot(opCtx,
                                                      catalogBeforeSnapshot.get(),
                                                      catalogAfterSnapshot.get(),
                                                      replTermBeforeSnapshot,
-                                                     replTermAfterSnapshot)) {
+                                                     replTermAfterSnapshot,
+                                                     activeStateTransitionBeforeSnapshot,
+                                                     activeStateTransitionAfterSnapshot)) {
             bool isAnySecondaryNamespaceAView = !resolvedSecondaryNamespaces.has_value();
             return {catalogBeforeSnapshot, isAnySecondaryNamespaceAView, readSource, readTimestamp};
         } else {
@@ -637,8 +678,15 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
     while (true) {
         // AutoGetCollectionForReadBase can choose a read source based on the current replication
         // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
-        long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+        const long long replTermBeforeSnapshot =
+            repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
+        boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot = boost::none;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            activeStateTransitionBeforeSnapshot =
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .replicationStateTransitionInterruptionCtx();
+        }
         auto catalog = CollectionCatalog::get(opCtx);
 
         // Check that the sharding database version matches our read.
@@ -657,12 +705,23 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         // catalog is unchanged, then the requested Collection is also guaranteed to be the same.
         auto newCatalog = CollectionCatalog::get(opCtx);
 
-        if (haveAcquiredConsistentCatalogAndSnapshot(
-                opCtx,
-                catalog.get(),
-                newCatalog.get(),
-                replTerm,
-                repl::ReplicationCoordinator::get(opCtx)->getTerm())) {
+        // Verify that that the replication state stayed the same while we opened the storage
+        // snapshot.
+        const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+        boost::optional<OperationContext*> activeStateTransitionAfterSnapshot = boost::none;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            activeStateTransitionAfterSnapshot =
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .replicationStateTransitionInterruptionCtx();
+        }
+
+        if (haveAcquiredConsistentCatalogAndSnapshot(opCtx,
+                                                     catalog.get(),
+                                                     newCatalog.get(),
+                                                     replTermBeforeSnapshot,
+                                                     replTermAfterSnapshot,
+                                                     activeStateTransitionBeforeSnapshot,
+                                                     activeStateTransitionAfterSnapshot)) {
             CollectionCatalog::stash(opCtx, std::move(catalog));
             return;
         }
