@@ -64,6 +64,14 @@ enum class ValidateMode {
     // count is equal to the number of records (as opposed to correcting the fast count if it is
     // incorrect).
     kForegroundFullEnforceFastCount,
+
+    // Performs an extended validate where a total collection hash is computed and returned,
+    // alongside the behavior performed in kForegroundFull.
+    kCollectionHash,
+
+    // Part of extended validate, perform drill down operations to isolate documents where
+    // inconsistencies are found. Performs no other validation checks.
+    kHashDrillDown,
 };
 
 /**
@@ -93,7 +101,9 @@ public:
                       RepairMode repairMode,
                       bool logDiagnostics,
                       ValidationVersion validationVersion = currentValidationVersion,
-                      boost::optional<std::string> verifyConfigurationOverride = boost::none);
+                      boost::optional<std::string> verifyConfigurationOverride = boost::none,
+                      boost::optional<std::vector<BSONElement>> hashPrefixes = boost::none,
+                      boost::optional<std::vector<BSONElement>> unhash = boost::none);
 
     virtual ~ValidationOptions() = default;
 
@@ -108,7 +118,8 @@ public:
 
     bool isFullValidation() const {
         return _validateMode == ValidateMode::kForegroundFull ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
+            _validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
+            _validateMode == ValidateMode::kCollectionHash;
     }
 
     bool isFullIndexValidation() const {
@@ -118,6 +129,19 @@ public:
     bool isBSONConformanceValidation() const {
         return isFullValidation() || _validateMode == ValidateMode::kBackgroundCheckBSON ||
             _validateMode == ValidateMode::kForegroundCheckBSON;
+    }
+
+    bool isExtendedValidation() const {
+        return _validateMode == ValidateMode::kCollectionHash ||
+            _validateMode == ValidateMode::kHashDrillDown;
+    }
+
+    bool isCollHashValidation() const {
+        return _validateMode == ValidateMode::kCollectionHash;
+    }
+
+    bool isHashDrillDown() const {
+        return _validateMode == ValidateMode::kHashDrillDown;
     }
 
     /**
@@ -167,6 +191,9 @@ private:
     const ValidationVersion _validationVersion;
 
     const boost::optional<std::string> _verifyConfigurationOverride;
+
+    const boost::optional<std::vector<BSONElement>> _hashPrefixes;
+    const boost::optional<std::vector<BSONElement>> _unhash;
 };
 
 }  // namespace mongo::CollectionValidation

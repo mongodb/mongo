@@ -49,6 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/validate/collection_validation.h"
+#include "mongo/db/validate/validate_options.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -213,6 +214,8 @@ public:
             << "\tAdd {fixMultikey: true} to fix the multi key.\n"
             << "\tAdd {checkBSONConformance: true} to validate BSON documents more thoroughly.\n"
             << "\tAdd {metadata: true} to only check collection metadata.\n"
+            << "\tAdd {collHash: true} to generate a full hash of the documents in the "
+               "collection.\n"
             << "Cannot specify both {full: true, background: true}.";
     }
 
@@ -367,9 +370,66 @@ public:
                                     << "is not supported on unreplicated collections");
         }
 
+        // collHash parameter.
+        const bool collHash = cmdObj["collHash"].trueValue();
+
+        // hashPrefixes parameter.
+        const auto rawHashPrefixes = cmdObj["hashPrefixes"];
+        boost::optional<std::vector<BSONElement>> hashPrefixes = boost::none;
+        if (rawHashPrefixes) {
+            hashPrefixes = rawHashPrefixes.Array();
+        }
+        if (rawHashPrefixes && replCoord->getSettings().isReplSet()) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with { hashPrefixes: [] } can only be"
+                          << " performed in standalone mode.");
+        }
+        if (rawHashPrefixes && !collHash) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Running the validate command with { hashPrefixes: [] }"
+                                    << " requires {collHash: true}.");
+        }
+
+        // unhash parameter.
+        const auto rawUnhash = cmdObj["unhash"];
+        boost::optional<std::vector<BSONElement>> unhash = boost::none;
+        if (rawUnhash) {
+            unhash = rawUnhash.Array();
+        }
+        if (rawUnhash && replCoord->getSettings().isReplSet()) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with { unhash: [] } can only be"
+                          << " performed in standalone mode.");
+        }
+        if (rawUnhash && !collHash) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Running the validate command with { unhash: [] }"
+                                    << " requires {collHash: true}.");
+        }
+        if (rawUnhash && rawHashPrefixes) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with { unhash: [] } cannot be done with"
+                          << " {hashPrefixes: []}.");
+        }
+        if (rawUnhash && unhash.get().empty()) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with { unhash: [] } cannot be done with"
+                          << " an empty array provided.");
+        }
+
         auto validateMode = [&] {
             if (metadata) {
                 return CollectionValidation::ValidateMode::kMetadata;
+            }
+            if (hashPrefixes) {
+                return CollectionValidation::ValidateMode::kHashDrillDown;
+            }
+            if (collHash) {
+                return CollectionValidation::ValidateMode::kCollectionHash;
             }
             if (background) {
                 if (checkBSONConformance) {
@@ -396,6 +456,8 @@ public:
             }
             switch (validateMode) {
                 case CollectionValidation::ValidateMode::kForeground:
+                case CollectionValidation::ValidateMode::kCollectionHash:
+                case CollectionValidation::ValidateMode::kHashDrillDown:
                 case CollectionValidation::ValidateMode::kForegroundCheckBSON:
                 case CollectionValidation::ValidateMode::kForegroundFull:
                 case CollectionValidation::ValidateMode::kForegroundFullIndexOnly:
@@ -422,7 +484,9 @@ public:
             logDiagnostics,
             getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
                                      : currentValidationVersion,
-            getConfigOverrideOrThrow(rawConfigOverride));
+            getConfigOverrideOrThrow(rawConfigOverride),
+            hashPrefixes,
+            unhash);
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
@@ -430,6 +494,7 @@ public:
                   logAttrs(nss),
                   "background"_attr = options.isBackground(),
                   "full"_attr = options.isFullValidation(),
+                  "extended"_attr = options.isExtendedValidation(),
                   "enforceFastCount"_attr = options.enforceFastCountRequested(),
                   "checkBSONConformance"_attr = options.isBSONConformanceValidation(),
                   "fixMultiKey"_attr = options.adjustMultikey(),
