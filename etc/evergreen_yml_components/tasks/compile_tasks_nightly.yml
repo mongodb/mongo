@@ -151,10 +151,6 @@ tasks:
       - name: jsCore
       - name: run_dbtest
       - name: replica_sets_jscore_passthrough_gen
-      - name: test_windows_msi
-        variant: "windows"
-      - name: test_windows_msi
-        variant: "enterprise-windows"
     stepback: false
     commands:
       - command: manifest.load
