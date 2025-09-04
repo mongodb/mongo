@@ -212,12 +212,12 @@ QuerySettingsStage::createQueryShapeRepresentativeQueriesCursor(OperationContext
         findRepresentativeQueriesCmd.setReadConcern(readConcernArgs);
 
         auto configShard = grid->shardRegistry()->getConfigShard();
-        auto shardResponse = uassertStatusOK(configShard->runCommand(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.dbName(),
-            findRepresentativeQueriesCmd.toBSON(),
-            Shard::RetryPolicy::kIdempotent));
+        auto shardResponse = uassertStatusOK(
+            configShard->runCommand(opCtx,
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    nss.dbName(),
+                                    findRepresentativeQueriesCmd.toBSON(),
+                                    Shard::RetryPolicy::kIdempotent));
         CursorResponse cursorResponse =
             uassertStatusOK(CursorResponse::parseFromBSON(shardResponse.response));
 

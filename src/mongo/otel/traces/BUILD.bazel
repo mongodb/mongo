@@ -30,10 +30,10 @@ idl_generator(
 mongo_cc_library(
     name = "tracing",
     srcs = [
-        ":tracing_feature_flag_gen",
         "trace_initialization.cpp",
         "trace_settings_gen",
         "tracing.cpp",
+        ":tracing_feature_flag_gen",
     ],
     hdrs = [
         "trace_initialization.h",

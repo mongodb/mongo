@@ -1400,13 +1400,13 @@ long long runCountCommandOnConfig(OperationContext* opCtx,
     countBuilder.append("count", nss.coll());
     countBuilder.append("query", query);
 
-    auto resultStatus = localConfigShard->runCommand(
-        opCtx,
-        kConfigReadSelector,
-        nss.dbName(),
-        countBuilder.done(),
-        Shard::getConfiguredTimeoutForOperationOnNamespace(nss),
-        Shard::RetryPolicy::kIdempotent);
+    auto resultStatus =
+        localConfigShard->runCommand(opCtx,
+                                     kConfigReadSelector,
+                                     nss.dbName(),
+                                     countBuilder.done(),
+                                     Shard::getConfiguredTimeoutForOperationOnNamespace(nss),
+                                     Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(resultStatus));
 

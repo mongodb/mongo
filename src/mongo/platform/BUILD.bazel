@@ -124,13 +124,13 @@ mongo_cc_unit_test(
         "rwmutex_test.cpp",
         "//src/mongo/unittest:join_thread.h",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     tags = [
         "mongo_unittest_sixth_group",
         "server-programmability",
     ],
-    minimum_test_resources = {
-        "cpu_cores": 2,
-    },
     deps = [
         "//src/mongo:base",
     ],

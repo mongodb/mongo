@@ -210,16 +210,11 @@ def main() -> int:
     if files_to_format != "all":
         files_to_format = [str(file) for file in files_to_format if os.path.isfile(file)]
 
-    try:
-        run_rules_lint(
-            args.rules_lint_format, args.rules_lint_format_check, args.check, files_to_format
-        )
-    except:
-        return 1
-
     return (
         0
-        if run_prettier(prettier_path, args.check, files_to_format)
+        if run_prettier(prettier_path, args.check, files_to_format) and run_rules_lint(
+            args.rules_lint_format, args.rules_lint_format_check, args.check, files_to_format
+        )
         else 1
     )
 

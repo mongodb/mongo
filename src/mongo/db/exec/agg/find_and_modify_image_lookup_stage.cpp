@@ -262,8 +262,7 @@ Document FindAndModifyImageLookupStage::downConvertIfNeedsRetryImage(Document in
         for (size_t i = 0; i < operationDocs.size(); i++) {
             auto op = repl::DurableReplOperation::parse(
                 operationDocs[i],
-                IDLParserContext{
-                    "FindAndModifyImageLookupStage::downConvertIfNeedsRetryImage"});
+                IDLParserContext{"FindAndModifyImageLookupStage::downConvertIfNeedsRetryImage"});
 
             const auto imageType = op.getNeedsRetryImage();
             if (!imageType) {

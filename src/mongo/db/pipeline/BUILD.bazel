@@ -895,12 +895,12 @@ idl_generator(
 mongo_cc_library(
     name = "document_source_internal_apply_oplog_update",
     srcs = [
-        "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.cpp",
         "document_source_internal_apply_oplog_update.cpp",
+        "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.cpp",
     ],
     hdrs = [
-        "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.h",
         "document_source_internal_apply_oplog_update.h",
+        "//src/mongo/db/exec/agg:internal_apply_oplog_update_stage.h",
     ],
     deps = [
         "//src/mongo/db:multitenancy",
@@ -1591,15 +1591,15 @@ mongo_cc_unit_test(
         "//src/mongo/s/query/exec:document_source_merge_cursors_test.cpp",
         "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
     tags = [
         # Trying to access /data/db/ is incompatible with the sandbox
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98846",
         "mongo_unittest_seventh_group",
     ],
-    minimum_test_resources = {
-        "cpu_cores": 2,
-    },
     deps = [
         ":accumulator",
         ":aggregation_context_fixture",

@@ -107,7 +107,7 @@ private:
     friend boost::intrusive_ptr<exec::agg::Stage>
     documentSourceInternalApplyOplogUpdateGroupToStageFn(
         const boost::intrusive_ptr<DocumentSource>&);
-        
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     BSONObj _oplogUpdate;

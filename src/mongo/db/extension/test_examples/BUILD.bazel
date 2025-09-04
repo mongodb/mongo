@@ -42,7 +42,7 @@ mongo_cc_extension_shared_library(
     for extension_name in [
         "hostVersionSucceeds",
         "loadTwoStages",
-        "loadHighestCompatibleVersion"
+        "loadHighestCompatibleVersion",
     ]
 ]
 
@@ -66,6 +66,6 @@ mongo_cc_extension_shared_library(
         "initialize_version_fails",
         "null_stage_descriptor",
         "duplicate_version",
-        "no_compatible_version"
+        "no_compatible_version",
     ]
 ]

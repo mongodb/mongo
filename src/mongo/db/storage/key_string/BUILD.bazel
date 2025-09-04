@@ -57,12 +57,12 @@ mongo_cc_unit_test(
     srcs = [
         "key_string_long_running_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_eighth_group",
-    ],
     minimum_test_resources = {
         "cpu_cores": 2,
     },
+    tags = [
+        "mongo_unittest_eighth_group",
+    ],
     deps = [
         ":key_string_test_util",
     ],
