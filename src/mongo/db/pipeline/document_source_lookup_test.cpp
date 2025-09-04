@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_lookup.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -235,61 +234,6 @@ TEST_F(DocumentSourceLookUpTest, LookupWithOutInPipelineNotAllowed) {
             expCtx),
         AssertionException,
         ERROR_CODE_OUT_BANNED_IN_LOOKUP);
-}
-
-TEST_F(DocumentSourceLookUpTest, GeneralCrossDBLookupNotAllowedInView) {
-    auto expCtx = getExpCtx();
-    expCtx->setIsParsingViewDefinition(true);
-    NamespaceString fromNs =
-        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_THROWS_CODE(
-        DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from" << BSON("db" << "other db" << "coll" << "other_coll")
-                                          << "pipeline"
-                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                          << "as"))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
-
-TEST_F(DocumentSourceLookUpTest, SpecialNamespaceCrossDBLookupAllowedInView) {
-    auto expCtx = getExpCtx();
-    expCtx->setIsParsingViewDefinition(true);
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
-        boost::none, "config", "cache.chunks.randomNameBecauseAnyNameShouldWork");
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_DOES_NOT_THROW(DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << BSON("db" << "config" << "coll"
-                                            << "cache.chunks.randomNameBecauseAnyNameShouldWork")
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
-            .firstElement(),
-        expCtx));
-    NamespaceString fromNs2 =
-        NamespaceString::createNamespaceString_forTest(boost::none, "local", "oplog.rs");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs2, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_DOES_NOT_THROW(DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs") << "pipeline"
-                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                      << "as"))
-            .firstElement(),
-        expCtx));
-    // must be exactly oplog.rs!
-    ASSERT_THROWS_CODE(
-        DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs1")
-                                          << "pipeline"
-                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                          << "as"))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedNamespaces) {
@@ -826,17 +770,17 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithFieldsA
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
-// Tests that $lookup with 'from' syntax from: {db: 'db', coll: 'coll'} can
+// Tests that $lookup with special 'from' syntax from: {db: config, coll: cache.chunks.*} can
 // be round tripped.
 TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs =
-        NamespaceString::createNamespaceString_forTest(boost::none, "db", "coll");
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "config", "cache.chunks.test.foo");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    auto originalBSON = BSON("$lookup" << BSON("from" << BSON("db" << "db"
+    auto originalBSON = BSON("$lookup" << BSON("from" << BSON("db" << "config"
                                                                    << "coll"
-                                                                   << "coll")
+                                                                   << "cache.chunks.test.foo")
                                                       << "localField"
                                                       << "x"
                                                       << "foreignField"
@@ -863,18 +807,18 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) 
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
-// Tests that $lookup with 'let' and special 'from' syntax from: {db: 'db', coll: 'coll'}
+// Tests that $lookup with 'let' and special 'from' syntax from: {db: config, coll: cache.chunks.*}
 // can be round tripped.
 TEST_F(DocumentSourceLookUpTest, LookupWithLetReParseSerializedStageWithFromDBAndColl) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs =
-        NamespaceString::createNamespaceString_forTest(boost::none, "db", "coll");
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "config", "cache.chunks.test.foo");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto originalBSON =
-        BSON("$lookup" << BSON("from" << BSON("db" << "db"
+        BSON("$lookup" << BSON("from" << BSON("db" << "config"
                                                    << "coll"
-                                                   << "coll")
+                                                   << "cache.chunks.test.foo")
                                       << "let" << BSON("local_x" << "$x") << "pipeline"
                                       << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                       << "as"));
@@ -992,6 +936,129 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
+// config.cache.chunks*.
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDBAndColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'test', coll: 'coll'}, as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::LiteParsed::parse(expCtx->getNamespaceString(),
+                                                               stageSpec.firstElement(),
+                                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace when "coll" is
+// "cache.chunks.*" but "db" is not "config".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "config", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'config', coll: 'coll'}, as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::LiteParsed::parse(expCtx->getNamespaceString(),
+                                                               stageSpec.firstElement(),
+                                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax fails when "db" is config but "coll" is
+// not "cache.chunks.*".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDB) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "test", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec = fromjson(
+        "{$lookup: {from: {db: 'test', coll: 'cache.chunks.test.foo'}, "
+        "as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::LiteParsed::parse(expCtx->getNamespaceString(),
+                                                               stageSpec.firstElement(),
+                                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from: {db: <>, coll: <>}} syntax is allowed when parseCtx.allowGenericForeignDbLookup
+// or expCtx.allowGenericForeignDbLookup is true.
+TEST_F(DocumentSourceLookUpTest, AllowsPipelineFromDBAndCollWithContextFlag) {
+    auto expCtx = getExpCtx();
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'test2', coll: 'target_coll'}, as: 'as', pipeline: []}}");
+
+    auto fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test2", "target_coll");
+
+    {
+        // Lite parsing
+        LiteParserOptions options{.allowGenericForeignDbLookup = true};
+        auto liteParsedLookup = DocumentSourceLookUp::LiteParsed::parse(
+            expCtx->getNamespaceString(), stageSpec.firstElement(), options);
+        auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+
+        ASSERT_EQ(1ul, namespaceSet.count(fromNs));
+    }
+
+    {
+        // "Heavy" parsing
+        expCtx->setAllowGenericForeignDbLookup_forTest(true);
+        expCtx->setResolvedNamespaces(
+            ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+        auto docSource = DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx);
+        auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+        ASSERT(lookupStage);
+
+        ASSERT_EQ(lookupStage->getFromNs(), fromNs);
+    }
+}
+
+// Tests that $lookup distributedPlanLogic() is boost::none, allowing for the stage to run on each
+// shard, when it reads from config.cache.chunks.* namespaces using from: {db: <> , coll: <> }
+// syntax.
+TEST_F(DocumentSourceLookUpTest, FromDBAndCollDistributedPlanLogic) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "config", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << BSON("db" << "config"
+                                                   << "coll"
+                                                   << "cache.chunks.test.foo")
+                                      << "let" << BSON("local_x" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                      << "as"))
+            .firstElement(),
+        expCtx);
+
+    ASSERT(!lookupStage->distributedPlanLogic());
+}
 
 // Tests $lookup distributedPlanLogic() is prohibited from executing on the shardsStage for standard
 // $lookup with from: <string> syntax.
@@ -1810,6 +1877,44 @@ TEST_F(DocumentSourceLookUpServerlessTest,
               namespaceSet.count(NamespaceString::createNamespaceString_forTest(
                   expCtx->getNamespaceString().dbName(), "namespace2")));
     ASSERT_EQ(2ul, namespaceSet.size());
+}
+
+TEST_F(
+    DocumentSourceLookUpServerlessTest,
+    LiteParsedDocumentSourceLookupObjExpectedNamespacesInServerlessWhenPassingInNssWithTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+
+    auto stageSpec = BSON(
+        "$lookup" << BSON(
+            "from" << BSON("db" << "config"
+                                << "coll"
+                                << "cache.chunks.test.foo")
+                   << "pipeline"
+                   << BSON_ARRAY(BSON("$lookup" << BSON(
+                                          "from" << BSON("db" << "local"
+                                                              << "coll"
+                                                              << "oplog.rs")
+                                                 << "as"
+                                                 << "lookup2"
+                                                 << "pipeline"
+                                                 << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                   << "as"
+                   << "lookup1"));
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        // The result must match one of several system const NamespaceStrings, which means parse()
+        // will fail an assertion if nss contains any tenantId.
+        ASSERT_THROWS_CODE(DocumentSourceLookUp::LiteParsed::parse(expCtx->getNamespaceString(),
+                                                                   stageSpec.firstElement(),
+                                                                   LiteParserOptions{}),
+                           AssertionException,
+                           ErrorCodes::FailedToParse);
+    }
 }
 
 TEST_F(DocumentSourceLookUpServerlessTest,

@@ -91,20 +91,18 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const BSONArray& valu
     return orBuilder.obj();
 }
 
-// Parses $lookup 'from' field. The 'from' field must be a string or an object with the following
-// syntax {from: {db: "dbName", coll: "collName"}, ...}
-//
-// In a view defintion, we only allow the object format when the namespace is either
-// {from: {db: "config", coll: "cache.chunks.*"}}
-// {from: {fb: "local", coll: "oplog.rs"}}
-// because a view cycle could not be detected in the general case when the 'from' field is an object
-// due to However sharded view resolution works.
+// Parses $lookup 'from' field. The 'from' field must be a string or one of the following
+// exceptions:
+// {from: {db: "config", coll: "cache.chunks.*"}, ...} or
+// {from: {db: "local", coll: "oplog.rs"}, ...}
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
-                                                   bool allowGenericForeignDbLookup,
-                                                   bool isView) {
+                                                   bool allowGenericForeignDbLookup) {
+    // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs'
+    //  which are not user namespaces so object type is
+    // omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "$lookup 'from' field must be a string or object, but found "
+            str::stream() << "$lookup 'from' field must be a string, but found "
                           << typeName(elem.type()),
             elem.type() == BSONType::string || elem.type() == BSONType::object);
 
@@ -112,7 +110,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         return NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData());
     }
 
-
+    // Valdate the db and coll names.
     const auto tenantId = defaultDb.tenantId();
     const auto vts = tenantId
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
@@ -124,23 +122,16 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
             elem.fieldNameStringData(), vts, tenantId, SerializationContext::stateDefault()});
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
-
-    // If we are in a view definition, we can only allow the cases nss == config.collections and nss
-    // == config.chunks to avoid possible undetectable view cycles. This could be relaxed to other
-    // known namespaces in the future, but these are maintained to not create a breaking change with
-    // past behavior.
+    // In the cases nss == config.collections and nss == config.chunks we can proceed with the
+    // lookup as the merge will be done on the config server
     bool isConfigSvrSupportedCollection = nss == NamespaceString::kConfigsvrCollectionsNamespace ||
         nss == NamespaceString::kConfigsvrChunksNamespace;
-    // TODO SERVER-110301: make it safe to use cross db in view definitions and remove this
-    // assert
-    uassert(ErrorCodes::FailedToParse,
-            str::stream()
-                << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: '"
-                << nss.dbName().toStringForErrorMsg() << "' and coll: '" << nss.coll()
-                << "' in a view definition",
-            !isView || nss.isConfigDotCacheDotChunks() ||
-                nss == NamespaceString::kRsOplogNamespace || isConfigSvrSupportedCollection ||
-                allowGenericForeignDbLookup);
+    uassert(
+        ErrorCodes::FailedToParse,
+        str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
+                      << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
+        nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
+            isConfigSvrSupportedCollection || allowGenericForeignDbLookup);
     return nss;
 }
 
@@ -448,7 +439,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
         fromNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
     } else {
         fromNss = parseLookupFromAndResolveNamespace(
-            fromElement, nss.dbName(), options.allowGenericForeignDbLookup, false);
+            fromElement, nss.dbName(), options.allowGenericForeignDbLookup);
     }
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
@@ -1111,13 +1102,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
 
     // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See helper
     // hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
+
     auto lookupSpec = DocumentSourceLookupSpec::parse(elem.Obj(), IDLParserContext(kStageName));
 
     if (lookupSpec.getFrom().has_value()) {
         fromNs = parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),
                                                     pExpCtx->getNamespaceString().dbName(),
-                                                    pExpCtx->getAllowGenericForeignDbLookup(),
-                                                    pExpCtx->getIsParsingViewDefinition());
+                                                    pExpCtx->getAllowGenericForeignDbLookup());
     }
 
     as = std::string{lookupSpec.getAs()};
