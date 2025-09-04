@@ -46,6 +46,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -58,7 +59,7 @@
 namespace mongo {
 namespace repl {
 
-class StorageInterfaceImpl : public StorageInterface {
+class MONGO_MOD_OPEN StorageInterfaceImpl : public StorageInterface {
     StorageInterfaceImpl(const StorageInterfaceImpl&) = delete;
     StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
 

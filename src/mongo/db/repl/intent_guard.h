@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/intent_registry.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
@@ -39,7 +40,7 @@ namespace mongo::rss::consensus {
  * RAII class used to handle registering and deregistering intents with the IntentRegistration
  * system.
  */
-class IntentGuard {
+class MONGO_MOD_PUB IntentGuard {
 public:
     /**
      * Registers an intent. If the intent is not granted, an exception will be thrown. It will be up
@@ -89,7 +90,7 @@ private:
 /**
  * A wrapper class around IntentGuard that is only used for Write Intents.
  */
-class WriteIntentGuard : public IntentGuard {
+class MONGO_MOD_PUB WriteIntentGuard : public IntentGuard {
 public:
     explicit WriteIntentGuard(OperationContext* opCtx)
         : IntentGuard(IntentRegistry::Intent::Write, opCtx) {}

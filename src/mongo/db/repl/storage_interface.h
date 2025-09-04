@@ -46,6 +46,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -61,7 +62,7 @@
 namespace mongo {
 namespace repl {
 
-struct TimestampedBSONObj {
+struct MONGO_MOD_PUB TimestampedBSONObj {
     BSONObj obj;
     Timestamp timestamp;
 };
@@ -78,7 +79,7 @@ struct TimestampedBSONObj {
  *      * Drop a collection
  *      * Insert documents into a collection
  */
-class StorageInterface {
+class MONGO_MOD_OPEN StorageInterface {
     StorageInterface(const StorageInterface&) = delete;
     StorageInterface& operator=(const StorageInterface&) = delete;
 

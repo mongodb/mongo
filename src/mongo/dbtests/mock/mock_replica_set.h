@@ -36,6 +36,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
@@ -43,7 +44,7 @@
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class ClockSource;
 
@@ -168,4 +169,4 @@ private:
 
     std::string _primaryHost;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

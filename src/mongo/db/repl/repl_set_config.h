@@ -43,6 +43,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -72,7 +73,7 @@ namespace repl {
  *
  * This can be used to compare two ReplSetConfig objects to determine which is logically newer.
  */
-class ConfigVersionAndTerm {
+class MONGO_MOD_PUB ConfigVersionAndTerm {
 public:
     ConfigVersionAndTerm() : _version(0), _term(OpTime::kUninitializedTerm) {}
     ConfigVersionAndTerm(long long version, long long term) : _version(version), _term(term) {}
@@ -135,7 +136,7 @@ using ReplSetConfigPtr = std::shared_ptr<ReplSetConfig>;
  * to get a mutable copy, mutate it, and use the ReplSetConfig(MutableReplSetConfig&&) constructor
  * to get a usable immutable config from it.
  */
-class MutableReplSetConfig : public ReplSetConfigBase {
+class MONGO_MOD_PUB MutableReplSetConfig : public ReplSetConfigBase {
 public:
     ReplSetConfigSettings& getMutableSettings() {
         invariant(ReplSetConfigBase::getSettings());
@@ -170,7 +171,7 @@ protected:
 /**
  * Representation of the configuration information about a particular replica set.
  */
-class ReplSetConfig : private MutableReplSetConfig {
+class MONGO_MOD_PUB ReplSetConfig : private MutableReplSetConfig {
 public:
     typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 

@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -41,7 +42,7 @@ class OperationContext;
 
 namespace repl {
 
-class ReplClientInfo {
+class MONGO_MOD_PUB ReplClientInfo {
 public:
     static const Client::Decoration<ReplClientInfo> forClient;
 
@@ -96,7 +97,7 @@ public:
      * Resets the last op set explicitly flag on this client.
      * Used for tests only.
      */
-    void clearLastOpSetFlag_forTest(OperationContext* opCtx);
+    MONGO_MOD_NEEDS_REPLACEMENT void clearLastOpSetFlag_forTest(OperationContext* opCtx);
 
     /**
      * Use this to set the LastOp to the latest known OpTime in the oplog. On primary, The OpTime

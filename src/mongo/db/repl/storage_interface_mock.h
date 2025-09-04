@@ -48,6 +48,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdlib>
@@ -96,7 +97,7 @@ public:
     };
 };
 
-class StorageInterfaceMock : public StorageInterface {
+class MONGO_MOD_PUB StorageInterfaceMock : public StorageInterface {
     StorageInterfaceMock(const StorageInterfaceMock&) = delete;
     StorageInterfaceMock& operator=(const StorageInterfaceMock&) = delete;
 

@@ -35,7 +35,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class ServiceContext;
 
@@ -134,4 +134,4 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
     HostAndPort ownHost,
     ServiceContext* ctx);
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

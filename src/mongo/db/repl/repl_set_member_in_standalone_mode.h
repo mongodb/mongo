@@ -29,7 +29,9 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUB mongo {
 
 class ServiceContext;
 
@@ -49,4 +51,4 @@ bool getReplSetMemberInStandaloneMode(ServiceContext* serviceCtx);
 void setReplSetMemberInStandaloneMode(ServiceContext* serviceCtx,
                                       bool isReplSetMemberInStandaloneMode);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

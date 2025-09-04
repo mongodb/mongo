@@ -30,6 +30,7 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/client/read_preference.h"
         - "mongo/client/read_preference_validators.h"

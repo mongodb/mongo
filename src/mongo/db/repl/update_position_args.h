@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <vector>
@@ -40,7 +41,7 @@ namespace mongo {
 
 class Status;
 
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * Arguments to the update position command.
@@ -109,5 +110,5 @@ private:
     std::vector<UpdateInfo> _updates;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

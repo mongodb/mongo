@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 class ReplSettings {
@@ -74,4 +76,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

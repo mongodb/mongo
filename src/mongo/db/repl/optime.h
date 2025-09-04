@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <compare>
@@ -51,7 +52,7 @@ namespace mongo::repl {
  * label every op in an oplog with a unique identifier.
  */
 
-class OpTime {
+class MONGO_MOD_PUB OpTime {
 public:
     static constexpr auto kTermFieldName = "t"_sd;
     static constexpr auto kTimestampFieldName = "ts"_sd;
@@ -177,7 +178,7 @@ private:
     long long _term = kInitialTerm;
 };
 
-class OpTimeAndWallTime {
+class MONGO_MOD_PUB OpTimeAndWallTime {
 public:
     static constexpr auto kWallClockTimeFieldName = "wall"_sd;
 
@@ -214,7 +215,7 @@ public:
 std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
 
 // A convenience class for holding both a Timestamp and a Date_t.
-struct TimestampAndWallTime {
+struct MONGO_MOD_PUB TimestampAndWallTime {
     Timestamp timestamp;
     Date_t wallTime;
 };

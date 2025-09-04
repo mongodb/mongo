@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <span>
 

@@ -51,7 +51,7 @@ namespace repl {
 /**
  * Base class for repl set commands.
  */
-class ReplSetCommand : public BasicCommand {
+class MONGO_MOD_OPEN ReplSetCommand : public BasicCommand {
 protected:
     ReplSetCommand(const char* s) : BasicCommand(s) {}
 

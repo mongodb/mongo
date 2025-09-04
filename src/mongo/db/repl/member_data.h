@@ -41,7 +41,7 @@
 
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -377,4 +377,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

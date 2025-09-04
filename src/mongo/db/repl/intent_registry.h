@@ -39,11 +39,12 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace rss {
 namespace consensus {
 
@@ -234,4 +235,4 @@ private:
 };
 }  // namespace consensus
 }  // namespace rss
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

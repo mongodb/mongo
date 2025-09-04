@@ -49,6 +49,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -63,7 +64,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_OPEN mongo {
 
 class DocumentKey;
 struct IndexBuildInfo;
@@ -777,4 +778,4 @@ private:
     Times& _times;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

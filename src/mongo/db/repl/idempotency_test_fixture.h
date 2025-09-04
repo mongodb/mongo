@@ -46,6 +46,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <initializer_list>
@@ -56,7 +57,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class Collection;
 class CollectionPtr;
@@ -96,7 +97,7 @@ bool operator==(const CollectionState& lhs, const CollectionState& rhs);
 std::ostream& operator<<(std::ostream& stream, const CollectionState& state);
 StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
-class IdempotencyTest : public OplogApplierImplTest {
+class MONGO_MOD_OPEN IdempotencyTest : public OplogApplierImplTest {
 public:
     IdempotencyTest()
         : _nss(NamespaceString::createNamespaceString_forTest(boost::none, "test.foo")) {
@@ -177,4 +178,4 @@ protected:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

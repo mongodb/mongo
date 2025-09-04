@@ -36,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
 #include <cstddef>
@@ -44,7 +45,7 @@
 #include <boost/optional/optional.hpp>
 
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 // Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
 // that an operation is holding back replication by causing oplog holes to remain open for
@@ -168,4 +169,4 @@ private:
     repl::OplogVisibilityManager _oplogVisibilityManager;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

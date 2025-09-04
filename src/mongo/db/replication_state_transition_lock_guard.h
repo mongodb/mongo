@@ -31,6 +31,7 @@
 
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <boost/optional.hpp>
@@ -45,7 +46,7 @@ namespace repl {
  * This object handles acquiring the RSTL for replication state transitions, as well as any actions
  * that need to happen in between enqueuing the RSTL request and waiting for it to be granted.
  */
-class ReplicationStateTransitionLockGuard {
+class MONGO_MOD_PUB ReplicationStateTransitionLockGuard {
     ReplicationStateTransitionLockGuard(const ReplicationStateTransitionLockGuard&) = delete;
     ReplicationStateTransitionLockGuard& operator=(const ReplicationStateTransitionLockGuard&) =
         delete;

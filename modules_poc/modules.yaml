@@ -186,7 +186,6 @@ query:
     - src/mongo/db/memory_tracking/
     - src/mongo/db/multi_key_path_tracker*
     - src/mongo/db/modules/enterprise/src/fle/query_analysis
-    - src/mongo/db/op_debug*
     - src/mongo/db/pipeline/
     - src/mongo/db/profile_*
     - src/mongo/db/query/
@@ -999,24 +998,6 @@ replicated_storage_service:
   files:
     - src/mongo/db/rss
 
-replication:
-  meta:
-    slack: server-replication
-    jira: Replication
-  files:
-    - src/mongo/db/repl/ # excluding ./dbcheck*
-    - src/mongo/db/command_can_run_here*
-    - src/mongo/db/commands/snapshot_management.cpp
-    - src/mongo/db/commands/test_api_version_2_commands.cpp
-    - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
-    - src/mongo/db/mongod_options_replication*
-    - src/mongo/db/replication_state_transition_lock_guard*
-    - src/mongo/db/incremental_rollout_metrics.cpp
-    - src/mongo/dbtests/mock_replica_set_test.cpp
-    - src/mongo/dbtests/replica_set_tests.cpp
-    - src/mongo/dbtests/repltests.cpp
-    - src/mongo/dbtests/mock/mock_replica_set*
-
 replication.hello:
   meta:
     slack: server-replication
@@ -1032,6 +1013,24 @@ replication.initial_sync:
   files:
     - src/mongo/db/modules/enterprise/src/fcbis/
     - src/mongo/db/repl/initial_sync/
+    - src/mongo/db/repl/*multiapplier*
+    - src/mongo/db/repl/*storage_interface*
+    - src/mongo/db/repl/*collection_bulk_loader*
+
+replication.configs:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*repl_set_config*
+    - src/mongo/db/repl/*member_config*
+    - src/mongo/db/repl/*member_data*
+    - src/mongo/db/repl/*member_id*
+    - src/mongo/db/repl/repl_server_parameters.idl
+    - src/mongo/db/repl/*member_state*
+    - src/mongo/db/repl/*repl_settings*
+    - src/mongo/db/repl/*repl_set_tag*
+    - src/mongo/db/repl/*repl_set_config*
 
 replication.oplog:
   meta:
@@ -1048,7 +1047,19 @@ replication.oplog:
     - src/mongo/db/repl/*bgsync*
     - src/mongo/db/repl/*sync_source*
     - src/mongo/s/commands/cluster_oplog_note_cmd.cpp
+    - src/mongo/db/op_debug*
     - src/mongo/s/commands/cluster_repl_set_get_status_cmd.cpp
+    - src/mongo/db/repl/*insert_group*
+    - src/mongo/db/repl/*apply_ops*
+    - src/mongo/db/repl/*oplog_visibility_manager*
+    - src/mongo/db/repl/*slotted_timestamp_list*
+    - src/mongo/db/repl/*session_update_tracker*
+    - src/mongo/db/repl/*consistency_markers*
+    - src/mongo/db/repl/*optime*
+    - src/mongo/db/repl/apply_container_ops_test.cpp
+    - src/mongo/db/repl/*reporter*
+    - src/mongo/db/repl/*idempotency_test_fixture*
+    - src/mongo/db/repl/*get_next_optimes_test*
 
 replication.server_rw_concerns:
   meta:
@@ -1060,6 +1071,7 @@ replication.server_rw_concerns:
     - src/mongo/db/read_write_concern*
     - src/mongo/db/repl/*read_concern*
     - src/mongo/db/repl/*write_concern*
+    - src/mongo/db/repl/*speculative_majority_read_info*
     - src/mongo/db/stats/server_write_concern*
     - src/mongo/db/stats/server_read_concern*
     - src/mongo/db/write_concern*
@@ -1073,24 +1085,6 @@ replication.rs_aware_service:
     - src/mongo/db/repl/*replica_set_aware_service*
     - src/mongo/db/s/primary_only_service_helpers
 
-replication.replication_coordinator:
-  meta:
-    slack: server-replication
-    jira: Replication
-  files:
-    - src/mongo/db/repl/*replication_coordinator*
-    - src/mongo/db/repl/*external_state*
-    - src/mongo/db/repl/*heartbeat*
-    - src/mongo/db/repl/*topology_coordinator*
-    - src/mongo/db/repl/*member_data*
-    - src/mongo/db/repl/*check_quorum_for_config_change*
-    - src/mongo/db/repl/*scatter_gather*
-    - src/mongo/db/repl/*vote_requester*
-    - src/mongo/db/repl/*parsing_utils*
-    - src/mongo/db/repl/*repl_set_config_checks*
-    - src/mongo/db/repl/*repl_set_commands*
-    - src/mongo/db/repl/replication_waiter_list_bm.cpp
-
 replication.recovery:
   meta:
     slack: server-replication
@@ -1100,6 +1094,86 @@ replication.recovery:
     - src/mongo/db/repl/*rollback*
     - src/mongo/db/modules/enterprise/src/magic_restore
     - src/mongo/dbtests/rollbacktests.cpp
+    - src/mongo/db/repl/*roll_back_local_operations*
+    - src/mongo/db/repl/*timestamp_block*
+
+replication.replication_coordinator:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*replication_coordinator*
+    - src/mongo/db/repl/*external_state*
+    - src/mongo/db/repl/*heartbeat*
+    - src/mongo/db/repl/*topology_coordinator*
+    - src/mongo/db/repl/*check_quorum_for_config_change*
+    - src/mongo/db/repl/*auto_get_rstl_for_stepup_stepdown*
+    - src/mongo/db/repl/*repl_set_heartbeat*
+    - src/mongo/db/repl/*vote_requester*
+    - src/mongo/db/repl/*last_vote*
+    - src/mongo/db/repl/*scatter_gather*
+    - src/mongo/db/repl/*split_prepare_session_manager*
+    - src/mongo/db/repl/*replication_metrics*
+    - src/mongo/db/repl/*election_reason*
+    - src/mongo/db/repl/*repl_set_request_votes*
+    - src/mongo/db/command_can_run_here*
+    - src/mongo/db/repl/*always_allow_non_local_writes*
+    - src/mongo/db/repl/*isself*
+    - src/mongo/db/repl/replication_waiter_list_bm.cpp
+
+replication.utils:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*parsing_utils*
+    - src/mongo/db/repl/*delayable_timeout_callback*
+    - src/mongo/db/repl/*abstract_async_component*
+    - src/mongo/db/repl/*wait_for_majority_service*
+    - src/mongo/db/repl/*idempotency*
+    - src/mongo/db/repl/*task_runner*
+    - src/mongo/db/repl/*task_executor_mock*
+    - src/mongo/db/repl/*replication_auth*
+    - src/mongo/db/repl/*replication_process*
+    - src/mongo/db/repl/*collection_utils*
+    - src/mongo/db/repl/*replication_types*
+    - src/mongo/db/*mongod_options_replication*
+    - src/mongo/db/op_observer/find_and_modify_images_op_observer*
+    - src/mongo/db/incremental_rollout_metrics.cpp
+
+replication.repl_client_info:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*repl_client_info*
+    - src/mongo/db/repl/*repl_set_member_in_standalone_mode*
+
+replication.commands:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*repl_set_command*
+    - src/mongo/db/repl/*repl_set_commands*
+    - src/mongo/db/repl/*update_position_args*
+    - src/mongo/db/commands/snapshot_management.cpp
+    - src/mongo/db/commands/test_api_version_2_commands.cpp
+    - src/mongo/db/repl/repl_set_get_status_cmd.cpp
+
+replication.testing:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*mock_repl_coord*
+    - src/mongo/db/repl/*repl_set_test_egress*
+    - src/mongo/db/repl/*storage_timestamp_test*
+    - src/mongo/db/repl/image_collection_entry.idl
+    - src/mongo/dbtests/mock/mock_replica_set*
+    - src/mongo/dbtests/mock_replica_set_test.cpp
+    - src/mongo/dbtests/replica_set_tests.cpp
+    - src/mongo/dbtests/repltests.cpp
 
 replication.split_horizon:
   meta:
@@ -1107,3 +1181,11 @@ replication.split_horizon:
     jira: Replication
   files:
     - src/mongo/db/repl/split_horizon/
+
+replication.intent:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*intent*
+    - src/mongo/db/replication_state_transition_lock_guard*
