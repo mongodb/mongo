@@ -377,7 +377,7 @@ class FilesTree(Tree):
             label = f":page_facing_up: [gray]{path.parent}[/]/[bold bright_white]{path.name}[/]"
 
             if self.mod == "ALL":
-                "[i]mod:[/]{file.mod}"
+                label += f" [i]mod:[/]{file.mod}"
             else:
                 # Don't show mod if single mod is selected
                 assert file.mod == self.mod
@@ -474,7 +474,7 @@ class FilesTree(Tree):
             )
         if file.detached_decls:
             add_decl_nodes(
-                node.add("detached decls ({len(file.detached_decls)})", expand=True),
+                node.add(f"detached decls ({len(file.detached_decls)})", expand=True),
                 file.detached_decls,
             )
         # Show flat lists of all decls grouped by visibility.
