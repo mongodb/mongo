@@ -97,7 +97,6 @@ TimeseriesTest.run((insert) => {
 
     // Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
     // the raw indexes over the bucket documents of the time-series collection.
-    // TODO (SERVER-103876): Remove the rawData from $indexStats.
     const bucketIndexStatsDocs = getTimeseriesCollForRawOps(coll)
         .aggregate([{$indexStats: {}}], kRawOperationSpec)
         .toArray();
