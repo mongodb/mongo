@@ -1,7 +1,7 @@
 ## 1. Collection setup
 Inserting documents
 ```json
-[ { "_id" : 0, "a" : 0 } ]
+[ { "_id" : 1, "a" : 0 } ]
 ```
 ## 2. Queries with no indexes
 ### Query
@@ -46,7 +46,7 @@ Inserting documents
 ```
 ### Results
 ```json
-[ { "_id" : 0, "a" : 0 } ]
+[ { "_id" : 1, "a" : 0 } ]
 ```
 ## 3. Index setup
 Creating Index
@@ -254,12 +254,12 @@ Verify that 2nd query does not use cached partial index plan and returns the cor
 ```
 ### Results
 ```json
-[ { "_id" : 0, "a" : 0 } ]
+[ { "_id" : 1, "a" : 0 } ]
 ```
 ## 5. Collection setup
 Inserting documents
 ```json
-[ { "_id" : 0, "a" : 0 } ]
+[ { "_id" : 1, "a" : 0 } ]
 ```
 Creating Index
 ```json
@@ -531,7 +531,7 @@ Verifying that the plan cache contains an entry with the partial index
 			}
 		},
 		"isActive" : true,
-		"planCacheKey" : "243DBFC9"
+		"planCacheKey" : "BFDF7AB4"
 	}
 ]
 ```
@@ -568,5 +568,5 @@ Verify that 2nd pipeline does not use cached partial index plan and returns the 
 ```
 ### Results
 ```json
-[ { "_id" : 0, "a" : 0 } ]
+[ { "_id" : 1, "a" : 0 } ]
 ```
