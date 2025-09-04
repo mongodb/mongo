@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/local_catalog/database_holder.h"
 #include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -85,7 +86,12 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                                               .allowedFeatures =
                                                   MatchExpressionParser::kBanAllSpecialFeatures},
     });
-    AutoGetCollectionForReadMaybeLockFree oplogRead(opCtx, NamespaceString::kRsOplogNamespace);
+    const auto oplogRead = acquireCollectionOrViewMaybeLockFree(
+        opCtx,
+        CollectionOrViewAcquisitionRequest(NamespaceString::kRsOplogNamespace,
+                                           PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                           repl::ReadConcernArgs::get(opCtx),
+                                           AcquisitionPrerequisites::kRead));
 
     const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, DatabaseName::kLocal);
     invariant(localDb);
@@ -99,8 +105,8 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
 
     const auto yieldPolicy = permitYield ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
                                          : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
-    auto exec = uassertStatusOK(getExecutorFind(
-        opCtx, MultipleCollectionAccessor{&oplogRead.getCollection()}, std::move(cq), yieldPolicy));
+    auto exec = uassertStatusOK(
+        getExecutorFind(opCtx, MultipleCollectionAccessor{oplogRead}, std::move(cq), yieldPolicy));
 
     PlanExecutor::ExecState getNextResult;
     try {

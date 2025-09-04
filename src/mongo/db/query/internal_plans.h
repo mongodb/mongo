@@ -116,7 +116,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> sampleCollection(
         OperationContext* opCtx,
-        const VariantCollectionPtrOrAcquisition& collection,
+        const CollectionAcquisition& collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         boost::optional<int64_t> numSamples = boost::none);
 

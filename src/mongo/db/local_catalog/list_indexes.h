@@ -28,9 +28,9 @@
  */
 
 #pragma once
-#include "mongo/base/status_with.h"
+
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 
@@ -45,9 +45,9 @@ namespace mongo {
 enum ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
 
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     const CollectionPtr& collection,
-                                     const NamespaceString& nss,
+                                     const CollectionAcquisition& collectionAcquisition,
                                      ListIndexesInclude additionalInclude);
+
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
                                                  ListIndexesInclude additionalInclude);

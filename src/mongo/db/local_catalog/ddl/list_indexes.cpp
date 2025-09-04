@@ -139,7 +139,7 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
 
     const auto& collectionPtr = collAcq.getCollectionPtr();
     const auto& nss = collAcq.nss();
-    auto indexList = listIndexesInLock(opCtx, collectionPtr, nss, additionalInclude);
+    auto indexList = listIndexesInLock(opCtx, collAcq, additionalInclude);
 
     if (collectionPtr->isTimeseriesCollection() && !timeseries::isRawDataRequest(opCtx, cmd)) {
 

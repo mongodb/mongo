@@ -68,11 +68,16 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 namespace mongo {
 
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     const CollectionPtr& collection,
-                                     const NamespaceString& nss,
+                                     const CollectionAcquisition& collectionAcquisition,
                                      ListIndexesInclude additionalInclude) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, nss);
+        &hangBeforeListIndexes,
+        opCtx,
+        "hangBeforeListIndexes",
+        []() {},
+        collectionAcquisition.nss());
+
+    const auto& collection = collectionAcquisition.getCollectionPtr();
 
     std::vector<std::string> indexNames;
     std::list<BSONObj> indexSpecs;
@@ -153,12 +158,13 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
                                                  ListIndexesInclude additionalInclude) {
-    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
-    if (!collection) {
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+    if (!collection.exists()) {
         return {};
     }
 
-    return listIndexesInLock(
-        opCtx, collection.getCollection(), collection.getNss(), additionalInclude);
+    return listIndexesInLock(opCtx, collection, additionalInclude);
 }
 }  // namespace mongo

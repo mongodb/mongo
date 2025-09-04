@@ -366,17 +366,17 @@ DbCheckHasher::DbCheckHasher(
     // Get the MD5 hasher set up.
     md5_init_state(&_state);
 
-    auto& collection = acquisition.collection().getCollectionPtr();
+    auto& collectionPtr = acquisition.collection().getCollectionPtr();
 
     if (!indexName) {
-        if (!collection->isClustered()) {
+        if (!collectionPtr->isClustered()) {
             // Get the _id index.
-            const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+            const IndexDescriptor* desc = collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
             uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
 
             // Set up a simple index scan on that.
             _exec = InternalPlanner::indexScan(opCtx,
-                                               &collection,
+                                               acquisition.collection(),
                                                desc,
                                                start,
                                                end,
@@ -388,15 +388,17 @@ DbCheckHasher::DbCheckHasher(
             CollectionScanParams params;
             params.minRecord = RecordIdBound(uassertStatusOK(
                 record_id_helpers::keyForDoc(start,
-                                             collection->getClusteredInfo()->getIndexSpec(),
-                                             collection->getDefaultCollator())));
+                                             collectionPtr->getClusteredInfo()->getIndexSpec(),
+                                             collectionPtr->getDefaultCollator())));
             params.maxRecord = RecordIdBound(uassertStatusOK(
                 record_id_helpers::keyForDoc(end,
-                                             collection->getClusteredInfo()->getIndexSpec(),
-                                             collection->getDefaultCollator())));
+                                             collectionPtr->getClusteredInfo()->getIndexSpec(),
+                                             collectionPtr->getDefaultCollator())));
             params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
-            _exec = InternalPlanner::collectionScan(
-                opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+            _exec = InternalPlanner::collectionScan(opCtx,
+                                                    acquisition.collection(),
+                                                    params,
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         }
     }
 
@@ -404,7 +406,7 @@ DbCheckHasher::DbCheckHasher(
     if (_secondaryIndexCheckParameters &&
         _secondaryIndexCheckParameters.value().getValidateMode() ==
             DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck) {
-        for (auto indexIterator = collection->getIndexCatalog()->getIndexIterator(
+        for (auto indexIterator = collectionPtr->getIndexCatalog()->getIndexIterator(
                  IndexCatalog::InclusionPolicy::kReady);
              indexIterator->more();) {
             const auto entry = indexIterator->next();
@@ -986,8 +988,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const BSONObj& lastKeyChecked) {
     auto msg = "replication consistency check";
 
-    // Set up the hasher,
-    boost::optional<DbCheckHasher> hasher;
     // Disable throttling for secondaries.
     DataThrottle dataThrottle(opCtx, []() { return 0; });
 
@@ -1003,6 +1003,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             // entry is replicated.
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
+        // Set up the hasher,
+        boost::optional<DbCheckHasher> hasher;
 
         if (!acquisition.collection().exists()) {
             const auto msg = "Collection under dbCheck no longer exists";

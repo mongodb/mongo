@@ -63,13 +63,18 @@ public:
     StatusWith<Value> next() override;
 
 private:
-    AutoGetOplogFastPath _oplogRead;
+    CollectionAcquisition _oplogRead;
     AutoStatsTracker _tracker;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
-    : _oplogRead(opCtx, OplogAccessMode::kRead),
+    : _oplogRead(acquireCollectionMaybeLockFree(
+          opCtx,
+          CollectionAcquisitionRequest(NamespaceString::kRsOplogNamespace,
+                                       PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kRead))),
       _tracker(opCtx,
                NamespaceString::kRsOplogNamespace,
                shard_role_details::getLocker(opCtx)->isWriteLocked() ? Top::LockType::WriteLocked
@@ -77,9 +82,9 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                DatabaseProfileSettings::get(opCtx->getServiceContext())
                    .getDatabaseProfileLevel(NamespaceString::kRsOplogNamespace.dbName())),
-      _exec(_oplogRead.getCollection()
+      _exec(_oplogRead.exists()
                 ? InternalPlanner::collectionScan(opCtx,
-                                                  &_oplogRead.getCollection(),
+                                                  _oplogRead,
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                   InternalPlanner::BACKWARD)
                 : nullptr) {}

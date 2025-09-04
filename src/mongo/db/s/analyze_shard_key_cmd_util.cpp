@@ -711,7 +711,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* o
  */
 MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
                                           const UUID& analyzeShardKeyId,
-                                          const CollectionPtr& collection,
+                                          const CollectionAcquisition& collection,
                                           const BSONObj& shardKey,
                                           boost::optional<double> sampleRate,
                                           boost::optional<int64_t> sampleSize) {
@@ -719,7 +719,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
     LOGV2(6915304,
           "Calculating monotonicity",
-          logAttrs(collection->ns()),
+          logAttrs(collection.nss()),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey,
           "sampleRate"_attr = sampleRate,
@@ -727,7 +727,8 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
     MonotonicityMetrics metrics;
 
-    if (collection->isClustered()) {
+    const auto& collectionPtr = collection.getCollectionPtr();
+    if (collectionPtr->isClustered()) {
         metrics.setType(MonotonicityTypeEnum::kUnknown);
         return metrics;
     }
@@ -745,7 +746,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     }
 
     const auto index = findShardKeyPrefixedIndex(opCtx,
-                                                 collection,
+                                                 collectionPtr,
                                                  shardKey,
                                                  /*requireSingleKey=*/true);
 
@@ -760,7 +761,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     bool scannedMultipleShardKeys = false;
     BSONObj firstShardKey;
 
-    const int64_t numRecordsTotal = collection->numRecords(opCtx);
+    const int64_t numRecordsTotal = collectionPtr->numRecords(opCtx);
     uassert(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)
                 ? ErrorCodes::CollectionIsEmptyLocally
                 : ErrorCodes::IllegalOperation,
@@ -774,7 +775,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
     LOGV2(7826504,
           "Start scanning the supporting index to get record ids",
-          logAttrs(collection->ns()),
+          logAttrs(collection.nss()),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey,
           "indexKey"_attr = index->keyPattern(),
@@ -784,7 +785,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
     KeyPattern indexKeyPattern(index->keyPattern());
     auto exec = InternalPlanner::indexScan(opCtx,
-                                           &collection,
+                                           collection,
                                            index->descriptor(),
                                            indexKeyPattern.globalMin(),
                                            indexKeyPattern.globalMax(),
@@ -822,7 +823,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
             }
         }
     } catch (DBException& ex) {
-        LOGV2_WARNING(6875301, "Internal error while reading", "ns"_attr = collection->ns());
+        LOGV2_WARNING(6875301, "Internal error while reading", "ns"_attr = collection.nss());
         ex.addContext("Executor error while reading during 'analyzeShardKey' command");
         throw;
     }
@@ -834,7 +835,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     LOGV2(779009,
           "Finished scanning the supporting index. Start calculating correlation coefficient for "
           "the record ids in the supporting index",
-          logAttrs(collection->ns()),
+          logAttrs(collection.nss()),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey,
           "indexKey"_attr = indexKeyPattern,
@@ -856,7 +857,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
     LOGV2(6875302,
           "Finished calculating correlation coefficient for the record ids in the supporting index",
-          logAttrs(collection->ns()),
+          logAttrs(collection.nss()),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "coefficient"_attr = metrics.getRecordIdCorrelationCoefficient(),
           "coefficientThreshold"_attr = coefficientThreshold);
@@ -1134,7 +1135,7 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
               logAttrs(nss),
               "analyzeShardKeyId"_attr = analyzeShardKeyId);
         auto monotonicityMetrics = calculateMonotonicity(
-            opCtx, analyzeShardKeyId, collectionPtr, shardKeyBson, sampleRate, sampleSize);
+            opCtx, analyzeShardKeyId, collection, shardKeyBson, sampleRate, sampleSize);
         LOGV2(7790002,
               "Finished calculating metrics about the monotonicity of the shard key",
               logAttrs(nss),
