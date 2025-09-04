@@ -764,6 +764,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/local_catalog:catalog_test_fixture",
         "//src/mongo/db/local_catalog:collection_options",
         "//src/mongo/db/local_catalog:durable_catalog",
+        "//src/mongo/db/rss:persistence_provider_impl",
+        "//src/mongo/db/rss:service_lifecycle_impl",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_engine_direct_crud",
         "//src/mongo/db/storage:storage_engine_impl",
