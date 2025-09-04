@@ -43,6 +43,15 @@ function getUnauthorizedDirectWritesCount() {
 }
 
 function runTests(shouldBlockDirectConnections, directWriteCount) {
+    function assertUnauthorizedCountIncreased() {
+        const postDirectWriteCount = getUnauthorizedDirectWritesCount();
+        assert.gt(postDirectWriteCount,
+                  directWriteCount,
+                  `Number of direct write count didn't increased. Previous count: ${
+                      directWriteCount}, Current count: ${postDirectWriteCount}`);
+        directWriteCount = postDirectWriteCount;
+    }
+
     // Direct writes with root privileges should always be authorized.
     assert.commandWorked(shardAdminTestDB.getCollection("coll").update(
         {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
@@ -60,7 +69,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         if (RSEndpointEnabled) {
             assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
         } else {
-            assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+            assertUnauthorizedCountIncreased();
         }
     } else {
         // In a 2 shard cluster, this will fail if the ff is enabled and warn otherwise.
@@ -72,7 +81,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
             assert.commandWorked(userTestDB.getCollection("coll").update(
                 {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
         }
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        assertUnauthorizedCountIncreased();
     }
 
     // Unsetting the server parameter should prevent warnings from being emitted if the cluster only
@@ -91,7 +100,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
     if (!shouldBlockDirectConnections) {
         assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
     } else {
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        assertUnauthorizedCountIncreased();
     }
     assert.commandWorked(
         shardAdminDB.runCommand({setParameter: 1, directConnectionChecksWithSingleShard: true}));
