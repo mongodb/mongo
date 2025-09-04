@@ -94,7 +94,7 @@ public:
     const boost::optional<std::string>& metaField() const;
     boost::optional<HashedFieldName> metaFieldHashed() const;
 
-    void setFieldSet(std::set<std::string>& fieldSet) {
+    void setFieldSet(std::set<std::string> fieldSet) {
         _fieldSet = std::move(fieldSet);
     }
 

@@ -717,7 +717,7 @@ TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithInclusiveProje
 
     auto spec = unpacker.bucketSpec();
     std::set<std::string> includeFields{std::string{kUserDefinedTimeName}, "bye"};
-    spec.setFieldSet(includeFields);
+    spec.setFieldSet(std::move(includeFields));
     spec.setBehavior(BucketSpec::Behavior::kInclude);
 
     // This calls eraseUnneededComputedMetaProjFields().
@@ -750,7 +750,7 @@ TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithExclusiveProje
 
     auto spec = unpacker.bucketSpec();
     std::set<std::string> excludeFields{std::string{kUserDefinedTimeName}, "bye"};
-    spec.setFieldSet(excludeFields);
+    spec.setFieldSet(std::move(excludeFields));
     spec.setBehavior(BucketSpec::Behavior::kExclude);
 
     // This calls eraseUnneededComputedMetaProjFields().

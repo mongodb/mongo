@@ -1128,7 +1128,7 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 
     // Update '_bucketUnpacker' state with the new fields and behavior.
     auto spec = _sharedState->_bucketUnpacker.bucketSpec();
-    spec.setFieldSet(fields);
+    spec.setFieldSet(std::move(fields));
     spec.setBehavior(isInclusion ? BucketSpec::Behavior::kInclude : BucketSpec::Behavior::kExclude);
     _sharedState->_bucketUnpacker.setBucketSpec(std::move(spec));
 }
