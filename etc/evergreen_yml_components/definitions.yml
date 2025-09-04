@@ -1640,6 +1640,8 @@ functions:
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
         author_email: ${author_email}
+        github_pr_head_branch: ${github_pr_head_branch}
+        github_pr_base_branch: ${github_pr_base_branch}
       args:
         - "src/evergreen/bazel_compile.sh"
 
@@ -1652,6 +1654,8 @@ functions:
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
         author_email: ${author_email}
+        github_pr_head_branch: ${github_pr_head_branch}
+        github_pr_base_branch: ${github_pr_base_branch}
       args:
         - "src/evergreen/bazel_test.sh"
 
@@ -1722,6 +1726,8 @@ functions:
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
         author_email: ${author_email}
+        github_pr_head_branch: ${github_pr_head_branch}
+        github_pr_base_branch: ${github_pr_base_branch}
       args:
         - "src/evergreen/bazel_run.sh"
 

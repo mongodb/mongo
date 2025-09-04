@@ -23,6 +23,7 @@ def write_workstation_bazelrc(args):
     commit = "Unknown"
     user = "Unknown"
     hostname = "Unknown"
+    base_branch = "Unknown"
     try:
         repo = git.Repo()
     except Exception:
@@ -64,6 +65,10 @@ def write_workstation_bazelrc(args):
 
     if os.environ.get("CI") is not None:
         user = os.environ.get("author_email", "Unknown")
+        # This is the branch that the PR is merging into
+        base_branch = os.environ.get("github_pr_base_branch", "Unknown")
+        # Replace the branch with the head branch if this is a PR check / merge queue run
+        branch = os.environ.get("github_pr_head_branch", branch)
 
     try:
         hostname = socket.gethostname()
@@ -87,6 +92,7 @@ common --bes_keywords=engflow:BuildScmBranch={branch}
 common --bes_keywords=engflow:BuildScmRevision={commit}
 common --bes_keywords=engflow:BuildScmStatus={status}
 common --bes_keywords=rawCommandLineBase64={b64_cmd_line}
+common --bes_keywords=base_branch={base_branch}
 """
 
     if developer_build:
