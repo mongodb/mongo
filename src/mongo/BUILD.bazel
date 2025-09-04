@@ -735,6 +735,7 @@ filegroup(
         "//src/mongo/db/storage:backup_cursor_hooks.h",
         "//src/mongo/db/storage:backup_cursor_state.h",
         "//src/mongo/db/storage:compact_options.h",
+        "//src/mongo/db/storage:container.h",
         "//src/mongo/db/storage:duplicate_key_error_info.h",
         "//src/mongo/db/storage:ident.h",
         "//src/mongo/db/storage:index_entry_comparison.h",

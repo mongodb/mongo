@@ -38,11 +38,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_base.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_container.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
@@ -154,15 +156,22 @@ public:
     }
 
     KeyFormat keyFormat() const override {
-        return _keyFormat;
+        return std::visit(OverloadedVisitor(
+                              [](const WiredTigerIntegerKeyedContainer& v) -> KeyFormat {
+                                  return KeyFormat::Long;
+                              },
+                              [](const WiredTigerStringKeyedContainer& v) -> KeyFormat {
+                                  return KeyFormat::String;
+                              }),
+                          _container);
     }
 
-    const std::string& getURI() const {
-        return _uri;
+    StringData getURI() const {
+        return std::visit([](const auto& v) -> StringData { return v.uri(); }, _container);
     }
 
     uint64_t tableId() const {
-        return _tableId;
+        return std::visit([](const auto& v) -> uint64_t { return v.tableId(); }, _container);
     }
 
     long long dataSize() const override;
@@ -236,6 +245,8 @@ public:
      * Sets the new data size and flushes the size storer.
      */
     void setDataSize(long long dataSize);
+
+    RecordStore::RecordStoreContainer getContainer() override;
 
 protected:
     // Encapsulates statistics for an operation performed on this RecordStore instance.
@@ -365,10 +376,8 @@ protected:
      */
     void _updateLargestRecordId(OperationContext* opCtx, RecoveryUnit& ru, long long largestSeen);
 
-    const std::string _uri;
-    const uint64_t _tableId;  // not persisted
     const std::string _engineName;
-    const KeyFormat _keyFormat;
+    std::variant<WiredTigerIntegerKeyedContainer, WiredTigerStringKeyedContainer> _container;
     const bool _overwrite;
     const bool _isLogged;
     const bool _forceUpdateWithFullDocument;
@@ -382,6 +391,10 @@ protected:
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
     bool _tracksSizeAdjustments;
     WiredTigerKVEngineBase* _kvEngine;  // not owned.
+
+private:
+    std::variant<WiredTigerIntegerKeyedContainer, WiredTigerStringKeyedContainer> _makeContainer(
+        Params& params);
 };
 
 class WiredTigerRecordStore::Capped : public WiredTigerRecordStore, public RecordStoreBase::Capped {

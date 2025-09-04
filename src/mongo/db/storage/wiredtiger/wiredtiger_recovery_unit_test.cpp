@@ -786,7 +786,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, StorageStatsSubsequentTransactions) {
     auto opCtx = clientAndCtx1.second.get();
 
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.storage_stats"));
-    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     // Insert a record.
     StorageWriteTransaction txn1(*ru1);
@@ -823,7 +822,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     auto opCtx = clientAndCtx1.second.get();
 
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.read_once"));
-    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
 
     // Insert a record.
     StorageWriteTransaction txn(*ru1);

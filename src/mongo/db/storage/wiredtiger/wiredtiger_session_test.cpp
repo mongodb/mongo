@@ -43,7 +43,7 @@ TEST(WiredTigerSessionTest, CacheMixedOverwrite) {
     WiredTigerHarnessHelper helper;
     std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
     std::unique_ptr<RecordStore> rs = helper.newRecordStore();
-    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
 
     // Close all cached cursors to establish a 'before' state.
     auto session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();

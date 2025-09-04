@@ -37,11 +37,17 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+std::variant<ExternalIntegerKeyedContainer, ExternalStringKeyedContainer>
+ExternalRecordStore::_makeContainer() {
+    auto container = ExternalIntegerKeyedContainer();
+    return container;
+}
 // 'ident' is an identifer to WT table and a virtual collection does not have any persistent data
 // in WT. So, we set the "dummy" ident for a virtual collection.
 ExternalRecordStore::ExternalRecordStore(boost::optional<UUID> uuid,
                                          const VirtualCollectionOptions& vopts)
-    : _vopts(vopts) {}
+    : _vopts(vopts), _container(_makeContainer()) {}
 
 /**
  * Returns a MultiBsonStreamCursor for this record store. Reverse scans are not currently supported
@@ -55,6 +61,9 @@ std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationCo
     }
     tasserted(6968302, "MultiBsonStreamCursor does not support reverse scans");
     return nullptr;
+}
+RecordStore::RecordStoreContainer ExternalRecordStore::getContainer() {
+    return std::visit([](auto& v) -> RecordStore::RecordStoreContainer { return v; }, _container);
 }
 
 }  // namespace mongo

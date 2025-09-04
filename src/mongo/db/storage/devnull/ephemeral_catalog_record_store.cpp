@@ -270,12 +270,19 @@ private:
 // RecordStore
 //
 
+std::variant<EphemeralForTestIntegerKeyedContainer, EphemeralForTestStringKeyedContainer>
+EphemeralForTestRecordStore::_makeContainer() {
+    auto container = EphemeralForTestIntegerKeyedContainer();
+    return container;
+}
+
 EphemeralForTestRecordStore::EphemeralForTestRecordStore(boost::optional<UUID> uuid,
                                                          StringData identName,
                                                          std::shared_ptr<void>* dataInOut,
                                                          bool isCapped,
                                                          bool isOplog)
     : RecordStoreBase(uuid, identName),
+      _container(_makeContainer()),
       _isCapped(isCapped),
       _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data(isOplog)) {
     // NOTE : The static_cast here assumes that `dataInOut`, which is a void pointer. As of now,
@@ -534,4 +541,9 @@ RecordId EphemeralForTestRecordStore::allocateLoc(WithLock) {
     invariant(out.isValid());
     return out;
 }
+
+RecordStore::RecordStoreContainer EphemeralForTestRecordStore::getContainer() {
+    return std::visit([](auto& v) -> RecordStore::RecordStoreContainer { return v; }, _container);
+}
+
 }  // namespace mongo

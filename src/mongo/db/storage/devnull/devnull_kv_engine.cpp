@@ -54,6 +54,7 @@
 #include <cstddef>
 #include <memory>
 #include <set>
+#include <variant>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -61,6 +62,7 @@
 
 namespace mongo {
 
+// TODO(SERVER-110243): Use TestIntegerKeyedContainer
 class DevNullIntegerKeyedContainer : public IntegerKeyedContainerBase {
 public:
     DevNullIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
@@ -113,7 +115,7 @@ public:
     class Oplog;
 
     DevNullRecordStore(boost::optional<UUID> uuid, StringData ident, KeyFormat keyFormat)
-        : RecordStoreBase(uuid, ident), _keyFormat(keyFormat) {
+        : RecordStoreBase(uuid, ident), _container(_makeContainer(keyFormat)) {
         _numInserts = 0;
         _dummy = BSON("_id" << 1);
     }
@@ -137,7 +139,13 @@ public:
     }
 
     KeyFormat keyFormat() const override {
-        return _keyFormat;
+        return std::visit(
+            OverloadedVisitor(
+                [](const DevNullIntegerKeyedContainer& v) -> KeyFormat { return KeyFormat::Long; },
+                [](const DevNullStringKeyedContainer& v) -> KeyFormat {
+                    return KeyFormat::String;
+                }),
+            _container);
     }
 
     int64_t storageSize(RecoveryUnit& ru,
@@ -215,6 +223,11 @@ public:
         }
     };
 
+    RecordStore::RecordStoreContainer getContainer() override {
+        return std::visit([](auto& v) -> RecordStore::RecordStoreContainer { return v; },
+                          _container);
+    };
+
 private:
     void _deleteRecord(OperationContext* opCtx, RecoveryUnit& ru, const RecordId& dl) override {}
 
@@ -263,7 +276,22 @@ private:
         return Status::OK();
     }
 
-    KeyFormat _keyFormat;
+    std::variant<DevNullIntegerKeyedContainer, DevNullStringKeyedContainer> _makeContainer(
+        KeyFormat& keyFormat) {
+        switch (keyFormat) {
+            case KeyFormat::Long: {
+                auto container = DevNullIntegerKeyedContainer();
+                return container;
+            }
+            case KeyFormat::String: {
+                auto container = DevNullStringKeyedContainer();
+                return container;
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    std::variant<DevNullIntegerKeyedContainer, DevNullStringKeyedContainer> _container;
     long long _numInserts;
     BSONObj _dummy;
 };

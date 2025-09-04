@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/container_base.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
@@ -49,6 +50,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <variant>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -56,6 +58,33 @@
 #include <boost/smart_ptr/shared_array.hpp>
 
 namespace mongo {
+
+// TODO(SERVER-110243): Use TestIntegerKeyedContainer
+class EphemeralForTestIntegerKeyedContainer : public IntegerKeyedContainerBase {
+public:
+    EphemeralForTestIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
+
+    Status insert(RecoveryUnit& ru, int64_t key, std::span<const char> value) final {
+        return Status::OK();
+    }
+
+    Status remove(RecoveryUnit& ru, int64_t key) final {
+        return Status::OK();
+    }
+};
+
+class EphemeralForTestStringKeyedContainer : public StringKeyedContainerBase {
+public:
+    EphemeralForTestStringKeyedContainer() : StringKeyedContainerBase(nullptr) {}
+
+    Status insert(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) final {
+        return Status::OK();
+    }
+
+    Status remove(RecoveryUnit& ru, std::span<const char> key) final {
+        return Status::OK();
+    }
+};
 
 /**
  * A RecordStore that stores all data in-memory.
@@ -167,6 +196,8 @@ public:
         return nullptr;
     }
 
+    RecordStore::RecordStoreContainer getContainer() override;
+
 protected:
     struct EphemeralForTestRecord {
         EphemeralForTestRecord() : size(0) {}
@@ -182,6 +213,8 @@ protected:
 
     virtual const EphemeralForTestRecord* recordFor(WithLock, const RecordId& loc) const;
     virtual EphemeralForTestRecord* recordFor(WithLock, const RecordId& loc);
+    std::variant<EphemeralForTestIntegerKeyedContainer, EphemeralForTestStringKeyedContainer>
+        _container;
 
 public:
     //
@@ -200,6 +233,9 @@ private:
 
     class Cursor;
     class ReverseCursor;
+
+    std::variant<EphemeralForTestIntegerKeyedContainer, EphemeralForTestStringKeyedContainer>
+    _makeContainer();
 
     StatusWith<RecordId> extractAndCheckLocForOplog(WithLock, const char* data, int len) const;
 

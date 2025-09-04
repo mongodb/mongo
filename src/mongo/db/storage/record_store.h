@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/compact_options.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
@@ -308,6 +309,8 @@ class RecordStore {
 public:
     class Capped;
     class Oplog;
+    using RecordStoreContainer = std::variant<std::reference_wrapper<IntegerKeyedContainer>,
+                                              std::reference_wrapper<StringKeyedContainer>>;
 
     /**
      * Options for generating a new RecordStore. Each RecordStore subclass is responsible for
@@ -637,6 +640,11 @@ public:
      * Returns nullptr if this record store is not the oplog.
      */
     virtual Oplog* oplog() = 0;
+
+    /**
+     * Returns the underlying container.
+     */
+    virtual RecordStoreContainer getContainer() = 0;
 };
 
 class RecordStore::Capped {
