@@ -45,15 +45,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalShredDocuments, DocumentSourceInternalShred
 
 DocumentSourceInternalShredDocuments::DocumentSourceInternalShredDocuments(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx) {}
-
-DocumentSource::GetNextResult DocumentSourceInternalShredDocuments::doGetNext() {
-    auto next = pSource->getNext();
-    if (next.isAdvanced()) {
-        return GetNextResult(next.getDocument().shred());
-    }
-    return next;
-}
+    : DocumentSource(kStageName, pExpCtx) {}
 
 Value DocumentSourceInternalShredDocuments::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
