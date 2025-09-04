@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/sequential_document_cache.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -41,9 +41,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <memory>
 #include <set>
 
 #include <boost/none.hpp>
+#include <boost/none_t.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -58,8 +60,9 @@ namespace mongo {
  * return results directly from the cache rather than from a preceding stage. It does not have a
  * registered parser and cannot be created from BSON.
  */
-class DocumentSourceSequentialDocumentCache final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceSequentialDocumentCache final : public DocumentSource {
 public:
+    using SequentialDocumentCachePtr = std::shared_ptr<SequentialDocumentCache>;
     static constexpr StringData kStageName = "$sequentialCache"_sd;
 
     const char* getSourceName() const final {
@@ -96,7 +99,7 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourceSequentialDocumentCache> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, SequentialDocumentCache* cache) {
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, SequentialDocumentCachePtr cache) {
         return new DocumentSourceSequentialDocumentCache(pExpCtx, cache);
     }
 
@@ -116,10 +119,9 @@ public:
      */
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final {
-        auto newStage = create(newExpCtx ? newExpCtx : pExpCtx, _cache);
+        auto newStage = create(newExpCtx ? newExpCtx : getExpCtx(), _cache);
         // Keep the position flag so in case the containing pipeline is cloned post-optimization.
         newStage->_hasOptimizedPos = _hasOptimizedPos;
-        newStage->_cacheIsEOF = _cacheIsEOF;
         return newStage;
     }
 
@@ -130,23 +132,20 @@ public:
     }
 
 protected:
-    GetNextResult doGetNext() final;
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
 
 private:
     DocumentSourceSequentialDocumentCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          SequentialDocumentCache* cache);
+                                          SequentialDocumentCachePtr cache);
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    SequentialDocumentCache* _cache;
-
-    // This flag is set to prevent the cache stage from immediately serving from the cache after it
-    // has exhausted input from its source for the first time.
-    bool _cacheIsEOF = false;
-
+    SequentialDocumentCachePtr _cache;
     bool _hasOptimizedPos = false;
+
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSequentialDocumentCacheToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 };
 
 }  // namespace mongo

@@ -29,15 +29,15 @@
 
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
-#include <iterator>
 #include <list>
-#include <utility>
+#include <set>
 
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -47,8 +47,8 @@ ALLOCATE_DOCUMENT_SOURCE_ID(sequentialCache, DocumentSourceSequentialDocumentCac
 constexpr StringData DocumentSourceSequentialDocumentCache::kStageName;
 
 DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, SequentialDocumentCache* cache)
-    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx), _cache(cache) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, SequentialDocumentCachePtr cache)
+    : DocumentSource(kStageName, expCtx), _cache(std::move(cache)) {
     invariant(_cache);
 
     if (_cache->isServing()) {
@@ -60,49 +60,11 @@ DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
         !searchMetaVal.missing()) {
         tassert(6381601,
                 "SEARCH_META variable should not have been set in this expCtx yet.",
-                pExpCtx->variables.getValue(Variables::kSearchMetaId).missing());
-        pExpCtx->variables.setReservedValue(Variables::kSearchMetaId, searchMetaVal, true);
+                expCtx->variables.getValue(Variables::kSearchMetaId).missing());
+        expCtx->variables.setReservedValue(Variables::kSearchMetaId, searchMetaVal, true);
     }
 }
 
-DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::doGetNext() {
-    // Either we're reading from the cache, or we have an input source to build the cache from.
-    invariant(pSource || _cache->isServing());
-
-    if (_cacheIsEOF) {
-        return GetNextResult::makeEOF();
-    }
-
-    if (_cache->isServing()) {
-        auto nextDoc = _cache->getNext();
-        if (nextDoc) {
-            return std::move(*nextDoc);
-        }
-        _cacheIsEOF = true;
-        return GetNextResult::makeEOF();
-    }
-
-    auto nextResult = pSource->getNext();
-
-    if (!_cache->isAbandoned()) {
-        if (nextResult.isEOF()) {
-            _cache->freeze();
-            _cacheIsEOF = true;
-
-            // SearchMeta may be set in the expCtx, and it should be persisted through the cache. If
-            // not persisted, SearchMeta will be missing when it may be needed for future executions
-            // of the pipeline.
-            if (auto searchMetaVal = pExpCtx->variables.getValue(Variables::kSearchMetaId);
-                !searchMetaVal.missing()) {
-                _cache->setCachedVariableValue(Variables::kSearchMetaId, searchMetaVal);
-            }
-        } else {
-            _cache->add(nextResult.getDocument());
-        }
-    }
-
-    return nextResult;
-}
 
 DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
@@ -131,7 +93,7 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptim
     container->erase(itr);
 
     // Get all variable IDs defined in this scope.
-    auto varIDs = pExpCtx->variablesParseState.getDefinedVariableIDs();
+    auto varIDs = getExpCtx()->variablesParseState.getDefinedVariableIDs();
 
     auto prefixSplit = container->begin();
 

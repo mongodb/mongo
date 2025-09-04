@@ -195,7 +195,7 @@ private:
     // first iteration, up to a specified size limit in bytes. If this limit is not exceeded by the
     // time we hit EOF, subsequent iterations of the pipeline will draw from the cache rather than
     // from a cursor source.
-    boost::optional<SequentialDocumentCache> _cache;
+    std::shared_ptr<SequentialDocumentCache> _cache;
 };
 
 }  // namespace mongo::exec::agg

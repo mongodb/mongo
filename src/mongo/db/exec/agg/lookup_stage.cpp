@@ -114,7 +114,8 @@ LookUpStage::LookUpStage(StringData stageName,
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
         // so we enable the cache.
-        _cache.emplace(loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
+        _cache = std::make_shared<SequentialDocumentCache>(
+            loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes));
     }
 };
 
@@ -494,8 +495,7 @@ void LookUpStage::addCacheStageAndOptimize(mongo::Pipeline& pipeline) {
         // TODO SERVER-84113: We will no longer have separate logic based on if a cache is present
         // in doOptimizeAt(), so we can instead only add and optimize the cache after
         // optimizeContainer is called.
-        pipeline.addFinalSource(
-            DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
+        pipeline.addFinalSource(DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache));
 
         auto& container = pipeline.getSources();
 
@@ -590,7 +590,7 @@ void LookUpStage::resolveLetVariables(const Document& localDoc, Variables* varia
 void LookUpStage::reInitializeCache_forTest(size_t maxCacheSizeBytes) {
     invariant(!hasLocalFieldForeignFieldJoin());
     invariant(!_cache || (_cache->isBuilding() && _cache->sizeBytes() == 0));
-    _cache.emplace(maxCacheSizeBytes);
+    _cache = std::make_shared<SequentialDocumentCache>(maxCacheSizeBytes);
 }
 
 }  // namespace exec::agg
