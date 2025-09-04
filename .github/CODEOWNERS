@@ -1705,7 +1705,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/cluster_auth_mode_option* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/fle* @10gen/query-integration-extensions @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/keyfile_option* @10gen/server-security @svc-auto-approve-bot
-/src/mongo/db/**/server_options* @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/**/server_options* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/server_parameter* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/system_index* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/*change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot

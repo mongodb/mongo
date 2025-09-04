@@ -164,7 +164,7 @@ filters:
       - 10gen/server-security
   - "server_options*":
     approvers:
-      - 10gen/server-security
+      - 10gen/server-programmability
   - "server_parameter*":
     approvers:
       - 10gen/server-security
