@@ -199,14 +199,6 @@ size_t peekASIOStream(Stream& stream, const MutableBufferSequence& buffers) {
     return bytesRead;
 }
 
-#ifdef MONGO_CONFIG_SSL
-/**
- * Peeks at a fragment of a client issued TLS handshake packet. Returns a TLS alert
- * packet if the client has selected a protocol which has been disabled by the server.
- */
-boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const asio::const_buffer& buffer);
-#endif
-
 /**
  * setSocketOption failed. Log the error.
  * This is in the .cpp file just to keep LOGV2 out of this header.

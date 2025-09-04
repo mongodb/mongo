@@ -87,6 +87,31 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
 
                 // Operation is complete. Return result to caller.
                 core.engine_.map_error_code(ec);
+
+                // If an error is encountered, continue to flush the BIO to the ASIO socket so
+                // that any protocol_version Alert messages will be sent to the client
+                if (ec) {
+                    // We want to retain the original error code, so we use a temporary error
+                    // code here
+                    asio::error_code myEC;
+                    size_t orig_core_output_size = core.output_.size();
+                    while (core.output_.size()) {
+                        core.output_ += asio::write(next_layer, core.output_, myEC);
+                        // Some operating systems like Linux (running various flavors of OpenSSL
+                        // including OSSL 1.0.2, 1.1.1 and 3.0) will allow flushing of the BIO when
+                        // an error has occurred, and then emit any alerts like a protocol version
+                        // alert when the BIO is flushed. However, other operating systems like
+                        // Windows (running SChannel) will not - they will no longer read any input
+                        // when an error is encountered, but will emit alerts as soon as the error
+                        // is encountered. Attempting to read the input within the while loop will
+                        // cause mongod to get into an infinite loop. For a general solution,
+                        // therefore, we need to break out of this loop as soon as we detect that
+                        // no progress is being made
+                        if (core.output_.size() == orig_core_output_size) {
+                            break;
+                        }
+                    }
+                }
                 return bytes_transferred;
 
             default:

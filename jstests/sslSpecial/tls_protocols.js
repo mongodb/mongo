@@ -50,7 +50,15 @@ function test(serverDisabledProtocols, clientDisabledProtocols, shouldStart, sho
     try {
         mongod = MongoRunner.runMongod(serverOpts);
     } catch (e) {
-        assert(!shouldStart, "Failed to start mongod with " + configStr);
+        let mongoOutput = rawMongoProgramOutput(".*");
+        if (
+            mongoOutput.match(/All valid TLS modes disabled/) ||
+            mongoOutput.match(/All supported TLS protocols have been disabled/)
+        ) {
+            jsTest.log.info("All valid TLS modes disabled, returning");
+        } else {
+            assert(!shouldStart, "Failed to start mongod with " + configStr);
+        }
         return;
     }
     assert(mongod);
