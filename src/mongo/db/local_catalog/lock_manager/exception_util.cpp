@@ -267,6 +267,9 @@ void WriteConflictRetryAlgorithm::_handleStorageUnavailable(const Status& status
  */
 void WriteConflictRetryAlgorithm::_handleWriteConflictException(const Status& s) {
     ++_wceCount;
+    if (MONGO_unlikely(_dumpStateRetryCount && (_wceCount % _dumpStateRetryCount) == 0)) {
+        _opCtx->getServiceContext()->getStorageEngine()->dump();
+    }
     recordWriteConflict(_opCtx);
     _recoveryUnit().abandonSnapshot();
     _emitLog(s.reason());

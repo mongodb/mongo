@@ -242,7 +242,8 @@ Status _applyOps(OperationContext* opCtx,
                             return Status::OK();
                     }
                     MONGO_UNREACHABLE;
-                });
+                },
+                oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
         } catch (const DBException& ex) {
             ab.append(false);
             result->append("applied", ++(*numApplied));
