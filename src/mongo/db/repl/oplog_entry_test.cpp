@@ -403,7 +403,7 @@ TEST_F(OplogEntryTest, ContainerOpMissingContainer) {
     }();
 
     auto result = DurableOplogEntry::parse(oplogBson);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(result.getStatus().code(), 10704701);
 }
 
 TEST_F(OplogEntryTest, ApplyOpsNotInSession) {

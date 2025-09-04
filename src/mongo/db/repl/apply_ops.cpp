@@ -46,6 +46,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -131,10 +132,26 @@ Status _applyOps(OperationContext* opCtx,
 
                     switch (entry.getOpType()) {
                         case OpTypeEnum::kContainerInsert:
-                        case OpTypeEnum::kContainerDelete:
-                            uassertStatusOK(applyContainerOperation(
+                        case OpTypeEnum::kContainerDelete: {
+                            if (const auto fcv =
+                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                                !(fcv.isVersionInitialized() &&
+                                  ::mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                      .isEnabled(VersionContext::getDecoration(opCtx), fcv)) &&
+                                oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
+                                uasserted(ErrorCodes::InvalidOptions,
+                                          "Container ops are not enabled");
+                            }
+                            auto coll = acquireCollection(opCtx,
+                                                          {nss,
+                                                           PlacementConcern::kPretendUnsharded,
+                                                           ReadConcernArgs::get(opCtx),
+                                                           AcquisitionPrerequisites::kWrite},
+                                                          MODE_IX);
+                            uassertStatusOK(applyContainerOperation_inlock(
                                 opCtx, ApplierOperation{&entry}, oplogApplicationMode));
                             return Status::OK();
+                        }
                         case OpTypeEnum::kCommand: {
                             if (entry.getCommandType() == OplogEntry::CommandType::kDropDatabase) {
                                 invariant(info.getOperations().size() == 1,

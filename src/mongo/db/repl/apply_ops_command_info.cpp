@@ -59,24 +59,22 @@ bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
     for (const auto& elem : applyOpCmd.firstElement().Obj()) {
         const char* opType = elem.Obj().getStringField("op").data();
 
-        // All atomic ops have an opType of length 1.
-        if (opType[0] == '\0' || opType[1] != '\0')
+        if (opType == "i"_sd) {
+            continue;
+        } else if (opType == "ci"_sd) {
+            continue;
+        } else if (opType == "d"_sd) {
+            continue;
+        } else if (opType == "cd"_sd) {
+            continue;
+        } else if (opType == "u"_sd) {
+            continue;
+        } else if (opType == "n"_sd) {
+            continue;
+        } else {
             return false;
-
-        // Only consider CRUD operations.
-        switch (*opType) {
-            case 'd':
-            case 'n':
-            case 'u':
-                break;
-            case 'i':
-                break;
-            // Fallthrough.
-            default:
-                return false;
         }
     }
-
     return true;
 }
 

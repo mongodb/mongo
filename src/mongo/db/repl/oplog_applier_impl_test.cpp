@@ -103,6 +103,7 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -2022,20 +2023,28 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
     ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
 }
 
+// TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
+// candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    const char k1[] = "K";
-    const char v1[] = "V";
+    // TODO (SERVER-103670): Remove.
+    RAIIServerParameterControllerForTest ff("featureFlagPrimaryDrivenIndexBuilds", true);
 
-    BSONArray innerOps =
-        BSON_ARRAY(BSON("op" << "ci"
-                             << "ns" << nss.ns_forTest() << "container" << "t_ident"
-                             << "o"
-                             << BSON("k" << BSONBinData(k1, 1, BinDataGeneral) << "v"
-                                         << BSONBinData(v1, 1, BinDataGeneral)))
-                   << BSON("op" << "cd"
-                                << "ns" << nss.ns_forTest() << "container" << "t_ident"
-                                << "o" << BSON("k" << BSONBinData(k1, 1, BinDataGeneral))));
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+
+    auto storageEngine = serviceContext->getStorageEngine();
+    auto ident = storageEngine->generateNewInternalIdent();
+    auto ru = storageEngine->newRecoveryUnit();
+    auto trs = storageEngine->getEngine()->makeTemporaryRecordStore(*ru, ident, KeyFormat::String);
+
+    auto k = BSONBinData("K", 1, BinDataGeneral);
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    BSONArray innerOps = BSON_ARRAY(BSON("op" << "ci"
+                                              << "ns" << nss.ns_forTest() << "container" << ident
+                                              << "o" << BSON("k" << k << "v" << v))
+                                    << BSON("op" << "cd"
+                                                 << "ns" << nss.ns_forTest() << "container" << ident
+                                                 << "o" << BSON("k" << k)));
 
     BSONObj applyOpsCmd = BSON("applyOps" << innerOps);
     auto entry = makeCommandOplogEntry(nextOpTime(), nss, applyOpsCmd, boost::none, boost::none);
@@ -2044,13 +2053,23 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
 }
 
+// TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
+// candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
-    auto nss = NamespaceString::createNamespaceString_forTest("test");
-    StringData containerIdent = "test";
+    // TODO (SERVER-103670): Remove.
+    RAIIServerParameterControllerForTest ff("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.t");
+
+    auto storageEngine = serviceContext->getStorageEngine();
+    auto ident = storageEngine->generateNewInternalIdent();
+    auto ru = storageEngine->newRecoveryUnit();
+    auto trs = storageEngine->getEngine()->makeTemporaryRecordStore(*ru, ident, KeyFormat::String);
+
     auto k = BSONBinData("K", 1, BinDataGeneral);
     auto v = BSONBinData("V", 1, BinDataGeneral);
-    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), nss, containerIdent, k, v);
-    auto deleteEntry = makeContainerDeleteOplogEntry(nextOpTime(), nss, containerIdent, k);
+    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), nss, ident, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident, k);
 
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&insertEntry}, OplogApplication::Mode::kSecondary));

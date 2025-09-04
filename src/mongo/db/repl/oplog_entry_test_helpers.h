@@ -87,8 +87,19 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
                                          StringData containerIdent,
+                                         int64_t key,
+                                         BSONBinData value);
+
+OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
                                          BSONBinData key,
                                          BSONBinData value);
+
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         int64_t key);
 
 OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,

@@ -348,10 +348,38 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
         _commandType = parseCommandType(getObject());
     }
 
-    if (isContainerOpType(getOpType())) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Container oplog entries must have a 'container' field: " << _raw,
-                getContainer());
+    if (auto opType = getOpType(); isContainerOpType(opType)) {
+        uassert(10704701, "container ops must specify a container field", getContainer());
+
+        const BSONObj& o = getObject();
+        const BSONElement k = o["k"];
+        uassert(10704702, str::stream() << "missing key element in oplog entry: " << redact(o), k);
+
+        uassert(10704706,
+                str::stream() << "invalid key type for container operation: " << typeName(k.type()),
+                k.type() == BSONType::binData || k.type() == BSONType::numberLong);
+
+        switch (opType) {
+            case OpTypeEnum::kContainerInsert: {
+                const BSONElement vBSON = o["v"];
+                uassert(10704703,
+                        str::stream() << "missing value element for insert: " << redact(o),
+                        vBSON);
+                uassert(10704707,
+                        str::stream()
+                            << "value must be type binData, got " << typeName(vBSON.type()),
+                        vBSON.type() == BSONType::binData);
+                break;
+            }
+            case OpTypeEnum::kContainerDelete: {
+                uassert(10704704,
+                        str::stream() << "delete should not contain value: " << redact(o),
+                        !o["v"]);
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 }
 
@@ -694,6 +722,10 @@ const mongo::NamespaceString& OplogEntry::getNss() const {
 
 const boost::optional<mongo::UUID>& OplogEntry::getUuid() const {
     return _entry.getUuid();
+}
+
+boost::optional<StringData> OplogEntry::getContainer() const {
+    return _entry.getContainer();
 }
 
 const mongo::BSONObj& OplogEntry::getObject() const {

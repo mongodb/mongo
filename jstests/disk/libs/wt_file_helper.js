@@ -461,3 +461,41 @@ export let rewriteCatalogTable = function (conn, modifyCatalogEntry) {
     runWiredTigerTool("-h", conn.dbpath, "load", "-f", newTableFile, "-r", uri);
     runWiredTigerTool("-h", conn.dbpath, "alter", fullURI, "write_timestamp_usage=none");
 };
+
+/**
+ * Extracts KV record lines from a WiredTiger dump output.
+ */
+export function wtExtractRecordsFromDump(lines) {
+    const start = lines.findIndex((l) => l.trim() === "Data");
+    if (start < 0) return [];
+    return lines.slice(start + 1).filter((l) => l.trim() !== "");
+}
+
+/**
+ * Dumps a WiredTiger table in the specified format.
+ */
+export function dumpWtTable(ident, dbpath, dumpType = "hex") {
+    const DUMP_FLAGS = Object.freeze({
+        "hex": ["-x"],
+        "json": ["-j"],
+        "pretty": ["-p"],
+        "pretty-hex": ["-p", "-x"],
+        "plain": [],
+    });
+    const flags = DUMP_FLAGS[dumpType];
+    if (!flags) {
+        throw new Error(`Invalid dumpType: ${dumpType}. Use one of: ${Object.keys(DUMP_FLAGS).join(", ")}`);
+    }
+
+    const sep = _isWindows() ? "\\" : "/";
+    const tmp = dbpath + sep + "temp_dump.hex";
+    runWiredTigerTool("-h", dbpath, "-r", "dump", ...flags, "-f", tmp, "table:" + ident);
+    return cat(tmp).split("\n");
+}
+
+/**
+ * Creates a new WiredTiger table with the specified ident and config string.
+ */
+export function createWtTable(dbpath, ident, cfg) {
+    runWiredTigerTool("-h", dbpath, "create", "-c", cfg, "table:" + ident);
+}

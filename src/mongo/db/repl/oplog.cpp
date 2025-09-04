@@ -113,9 +113,11 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -1227,6 +1229,22 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
     ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
         opCtx, oplogEntry.getTid(), preImageDocument);
 }
+
+Status withKey(const BSONElement& k, auto&& f) {
+    switch (k.type()) {
+        case BSONType::binData: {
+            int len = 0;
+            auto p = k.binData(len);
+            return f(std::span<const char>{p, static_cast<size_t>(len)});
+        }
+        case BSONType::numberLong: {
+            return f(k.Long());
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace
 
 constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
@@ -2106,13 +2124,48 @@ Status applyOperation_inlock(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status applyContainerOperation(OperationContext* opCtx,
-                               const ApplierOperation& op,
-                               OplogApplication::Mode oplogApplicationMode) {
-    // TODO (SERVER-107047): Apply the container ops. If this function assumes all necessary
-    // resources for it have been acquired, it should also be renamed to
-    // `applyContainerOperation_inlock` to conform to the existing pattern in this file.
-    return Status::OK();
+Status applyContainerOperation_inlock(OperationContext* opCtx,
+                                      const ApplierOperation& op,
+                                      OplogApplication::Mode mode) {
+    const auto nss = op->getNss();
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
+
+    auto ident = op->getContainer();
+    auto* engine = opCtx->getServiceContext()->getStorageEngine();
+    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
+    const BSONObj o = op->getObject();
+    const BSONElement k = o["k"];
+
+    WriteUnitOfWork wuow{opCtx};
+    Status s = Status::OK();
+
+    switch (op->getOpType()) {
+        case repl::OpTypeEnum::kContainerInsert: {
+            int vlen = 0;
+            const char* v = o["v"].binData(vlen);
+            const std::span<const char> val{v, static_cast<size_t>(vlen)};
+            s = withKey(k, [&](auto key) {
+                return storage_engine_direct_crud::insert(*engine, *ru, *ident, key, val);
+            });
+            break;
+        }
+        case repl::OpTypeEnum::kContainerDelete: {
+            s = withKey(k, [&](auto key) {
+                return storage_engine_direct_crud::remove(*engine, *ru, *ident, key);
+            });
+            break;
+        }
+        default:
+            uasserted(10704705,
+                      str::stream()
+                          << "Unsupported opType: " << OpType_serializer(op->getOpType()));
+    }
+
+    if (!s.isOK())
+        return s;
+
+    wuow.commit();
+    return s;
 }
 
 Status applyCommand_inlock(OperationContext* opCtx,

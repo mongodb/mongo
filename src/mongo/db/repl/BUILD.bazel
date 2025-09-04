@@ -976,6 +976,7 @@ mongo_cc_library(
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
+        "//src/mongo/db/storage:storage_engine_direct_crud",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/transaction",
         "//src/mongo/rpc:command_status",
@@ -2197,6 +2198,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "oplog_application_test",
     srcs = [
+        "apply_container_ops_test.cpp",
         "multiapplier_test.cpp",
         "oplog_applier_impl_test.cpp",
         "oplog_applier_test.cpp",
