@@ -851,9 +851,7 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 }
 
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
-    // In case of step-down, this operation could be re-executed and trigger the invariant in case
-    // the new primary runs a DDL that acquires the critical section in the old primary shard
-    const bool clearDbMetadata =
+    const bool clearDbMetadata = _doc.getPhase() >= Phase::kCommit &&
         _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
@@ -869,6 +867,8 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
         _csReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
         *actionPtr,
+        // In case of step-down, this operation could be re-executed and trigger a tassert if
+        // the new primary runs a DDL that acquires the critical section in the old primary shard
         false /*throwIfReasonDiffers*/);
 }
 
