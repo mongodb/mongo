@@ -1668,6 +1668,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/default_baton* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/diagnostic_printers_test.cpp @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/**/keypattern.h @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/**/error_labels* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/field_parser* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/generic_argument_util.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/index_names.* @10gen/query-execution-write-exec @svc-auto-approve-bot

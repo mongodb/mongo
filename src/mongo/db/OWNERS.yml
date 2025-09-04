@@ -49,6 +49,9 @@ filters:
     approvers:
       - 10gen/query-optimization
       - 10gen/query-execution
+  - "error_labels*":
+    approvers:
+      - 10gen/server-programmability
   - "field_parser*":
     approvers:
       - 10gen/server-programmability
