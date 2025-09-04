@@ -316,7 +316,7 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
         --mongodSetParameters="{maxRoundsWithoutProgressParameter: 20}"
-        --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
       - name: jsCore_in_parts_gen
       - name: jsCore_txns
@@ -331,7 +331,9 @@ buildvariants:
       - rhel8.8-large
     expansions:
       <<: *aubsan-lite-required-expansions
-      test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan
+      test_flags: >-
+        --excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
@@ -365,6 +367,7 @@ buildvariants:
         --disableUnreleasedIFRFlags
         --excludeWithAnyTags=incompatible_aubsan
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
@@ -395,6 +398,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=requires_increased_memlock_limits
         --excludeWithAnyTags=incompatible_aubsan
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
       - name: .multiversion_fuzzer
       - name: .multiversion_passthrough
@@ -458,6 +462,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
         --excludeWithAnyTags=corrupts_data
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
       hang_analyzer_dump_core: false
       compile_variant: *rhel8-debug-aubsan-lite_fuzzer
@@ -628,6 +633,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine, internalQueryEnableAggressiveSpillsInGroup: true, maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
         --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan
     tasks:
       - name: .aggregation !.sbe_only
