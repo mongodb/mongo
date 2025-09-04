@@ -29,27 +29,20 @@
 
 #include "mongo/db/pipeline/document_source_sample.h"
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/client.h"
-#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/platform/random.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <list>
-
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -59,7 +52,7 @@ using boost::intrusive_ptr;
 constexpr StringData DocumentSourceSample::kStageName;
 
 DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx), _size(0) {}
+    : DocumentSource(kStageName, pExpCtx), _size(0) {}
 
 REGISTER_DOCUMENT_SOURCE(sample,
                          LiteParsedDocumentSourceDefault::parse,
@@ -67,48 +60,9 @@ REGISTER_DOCUMENT_SOURCE(sample,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(sample, DocumentSourceSample::id)
 
-DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
-    if (_size == 0) {
-        pSource->dispose();
-        return GetNextResult::makeEOF();
-    }
-
-    if (!_sortStage->isPopulated()) {
-        // Exhaust source stage, add random metadata, and push all into sorter.
-        PseudoRandom& prng = pExpCtx->getOperationContext()->getClient()->getPrng();
-        auto nextInput = pSource->getNext();
-        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-            MutableDocument doc(nextInput.releaseDocument());
-            doc.metadata().setRandVal(prng.nextCanonicalDouble());
-            _sortStage->loadDocument(doc.freeze());
-        }
-        switch (nextInput.getStatus()) {
-            case GetNextResult::ReturnStatus::kAdvanced: {
-                MONGO_UNREACHABLE;  // We consumed all advances above.
-            }
-            case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
-                tasserted(10358901, "Sample does not support control events");
-            }
-            case GetNextResult::ReturnStatus::kPauseExecution: {
-                return nextInput;  // Propagate the pause.
-            }
-            case GetNextResult::ReturnStatus::kEOF: {
-                _sortStage->loadingDone();
-            }
-        }
-    }
-
-    invariant(_sortStage->isPopulated());
-    return _sortStage->getNext();
-}
-
 Value DocumentSourceSample::serialize(const SerializationOptions& opts) const {
     return Value(DOC(kStageName << DOC("size" << opts.serializeLiteral(_size))));
 }
-
-namespace {
-const BSONObj randSortSpec = BSON("$rand" << BSON("$meta" << "randVal"));
-}  // namespace
 
 intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
     BSONElement specElem, const intrusive_ptr<ExpressionContext>& expCtx) {
@@ -140,9 +94,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSample::create(
 
     intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
     sample->_size = size;
-    sample->_sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
-        exec::agg::buildStage(DocumentSourceSort::create(
-            expCtx, {randSortSpec, expCtx}, {.limit = static_cast<uint64_t>(sample->_size)})));
     return sample;
 }
 
@@ -152,7 +103,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::dist
     DistributedPlanLogic logic;
     logic.shardsStage = this;
     if (_size > 0) {
-        logic.mergingStages = {DocumentSourceLimit::create(pExpCtx, _size)};
+        logic.mergingStages = {DocumentSourceLimit::create(getExpCtx(), _size)};
     }
 
     // Here we don't use 'randSortSpec' because it uses a metadata sort which the merging logic does

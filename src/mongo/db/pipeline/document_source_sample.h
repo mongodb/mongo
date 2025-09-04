@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-class DocumentSourceSample final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceSample final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sample"_sd;
 
@@ -98,12 +98,6 @@ public:
 private:
     explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    GetNextResult doGetNext() final;
-
     long long _size;
-
-    // Uses a $sort stage to randomly sort the documents.
-    boost::intrusive_ptr<exec::agg::SortStage> _sortStage;
 };
-
 }  // namespace mongo

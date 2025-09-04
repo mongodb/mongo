@@ -133,7 +133,7 @@ private:
      * created with.
      */
     void checkBsonRepresentation(const BSONObj& spec) {
-        Value serialized = static_cast<DocumentSourceSample*>(sampleStage())->serialize();
+        Value serialized = static_cast<DocumentSourceSample*>(sampleDocumentSource())->serialize();
         auto generatedSpec = serialized.getDocument().toBson();
         ASSERT_BSONOBJ_EQ(spec, generatedSpec);
     }
