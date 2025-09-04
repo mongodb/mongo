@@ -12,7 +12,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
     run_on:
-      - rhel8.8-xlarge
+      - amazon2023-arm64-latest-m8g-8xlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
       - name: compile_test_parallel_core_stream_TG
@@ -87,17 +87,17 @@ variables:
     unittest_compile_flags: >-
       --linkstatic=False
 
-  - &linux_x86_debug_compile_variant_dependency
+  - &linux_arm64_debug_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &linux_x86_debug_compile_variant_name linux-x86-debug-compile-required
+        variant: &linux_arm64_debug_compile_variant_name linux-arm64-debug-compile-required
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: linux-x86-debug-compile-required
+    #   variant: linux-arm64-debug-compile-required
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
@@ -206,13 +206,13 @@ variables:
 
 buildvariants:
   - <<: *generic_linux_compile_params
-    name: &linux-x86-debug-compile-required linux-x86-debug-compile-required # TODO: replace with Sanitizer.
-    display_name: "! Linux x86 DEBUG Compile"
+    name: &linux-arm64-debug-compile-required linux-arm64-debug-compile-required # TODO: replace with Sanitizer.
+    display_name: "! Amazon Linux 2023 arm64 DEBUG Compile"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     stepback: false
     expansions:
       <<: *linux_debug_community_compile_expansions
-      compile_variant: *linux-x86-debug-compile-required
+      compile_variant: *linux-arm64-debug-compile-required
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on
@@ -226,11 +226,11 @@ buildvariants:
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - rhel8.8-xlarge
+          - amazon2023-arm64-latest-m8g-8xlarge
       - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
-          - rhel8.8-xlarge
+          - amazon2023-arm64-latest-m8g-8xlarge
 
   - <<: *generic_linux_compile_params
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
@@ -270,13 +270,13 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - <<: *linux_x86_debug_compile_variant_dependency
+  - <<: *linux_arm64_debug_compile_variant_dependency
     name: linux-64-debug-required
-    display_name: "! Linux x86 Static Library DEBUG"
+    display_name: "! Amazon Linux 2023 arm64 DEBUG"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - rhel8.8-medium
+      - amazon2023-arm64-latest-medium-m8g
     expansions:
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       test_flags: >-
@@ -285,18 +285,18 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       target_resmoke_time: 15
       max_sub_suites: 5
-      large_distro_name: rhel8.8-medium
-      core_analyzer_distro_name: rhel8.8-xlarge
-      compile_variant: *linux_x86_debug_compile_variant_name
+      large_distro_name: amazon2023-arm64-latest-medium-m8g
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      compile_variant: *linux_arm64_debug_compile_variant_name
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - rhel8.8-medium
+          - amazon2023-arm64-latest-medium-m8g
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
-          - rhel8.8-medium
+          - amazon2023-arm64-latest-medium-m8g
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-lite-all-feature-flags-required
