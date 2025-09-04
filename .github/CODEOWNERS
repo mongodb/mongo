@@ -291,11 +291,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/building.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/cpp_style.md @10gen/server-programmability @svc-auto-approve-bot
 /docs/**/exception_architecture.md @10gen/server-programmability @svc-auto-approve-bot
+/docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
 /docs/**/idl.md @10gen/server-programmability @svc-auto-approve-bot
-/docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/linting.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/owners/** @10gen/devprod-correctness @svc-auto-approve-bot
-/docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
+/docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
+/docs/**/server_parameters.md @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./docs/evergreen-testing/OWNERS.yml
 /docs/evergreen-testing/ @10gen/devprod-correctness @svc-auto-approve-bot

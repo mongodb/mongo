@@ -9,18 +9,21 @@ filters:
   - "exception_architecture.md":
     approvers:
       - 10gen/server-programmability
+  - "golden_data_test_framework.md":
+    approvers:
+      - 10gen/query-optimization
   - "idl.md":
     approvers:
       - 10gen/server-programmability
-  - "poetry_execution.md":
-    approvers:
-      - 10gen/devprod-correctness
   - "linting.md":
     approvers:
       - 10gen/devprod-build
   - "owners/**":
     approvers:
       - 10gen/devprod-correctness
-  - "golden_data_test_framework.md":
+  - "poetry_execution.md":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/devprod-correctness
+  - "server_parameters.md":
+    approvers:
+      - 10gen/server-programmability

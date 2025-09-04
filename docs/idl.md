@@ -276,7 +276,7 @@ A IDL file consist of a series of top-level sections (i.e. YAML maps).
 - `types` - List of types which instruct IDL how deserialize/serialize primitives
 - `structs` - List of BSON documents to deserialize/serialize to C++ classes
 - `commands` - List of BSON commands used by MongoDB RPC to deserialize/serialize to C++ classes
-- `server_parameters` - See [docs/server-parameters.md](../../../docs/server-parameters.md)
+- `server_parameters` - See [docs/server_parameters.md](../../../docs/server_parameters.md)
 - `configs` - TODO SERVER-79135
 - `feature_flags` - TODO SERVER-79135
 
