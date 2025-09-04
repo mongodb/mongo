@@ -209,7 +209,7 @@ CostEstimate CostEstimator::filterCost(const MatchExpression* filter,
     }
 
     CostEstimate res = zeroCost;
-    // TODO: Take into account the cost of different types of predicates.
+    // TODO SERVER-110320: Take into account the cost of different types of predicates.
     for (size_t i = 0; i < filter->numChildren(); i++) {
         res += filterCost(filter->getChild(i), ce);
     }
