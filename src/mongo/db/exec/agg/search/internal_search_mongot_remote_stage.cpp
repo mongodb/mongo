@@ -190,10 +190,11 @@ GetNextResult InternalSearchMongotRemoteStage::doGetNext() {
     }
 
     // If the collection is sharded we should have a cursor already. Otherwise establish it now.
-    if (!_sharedState->_cursor && !_sharedState->_dispatchedQuery) {
+    if (!_sharedState->_cursor) {
         LOGV2_DEBUG(8569403, 4, "Establishing Cursor");
         _sharedState->_cursor = establishCursor();
-        _sharedState->_dispatchedQuery = true;
+        tassert(
+            10912600, "Expected to have cursor after cursor establishment", _sharedState->_cursor);
     }
     tryToSetSearchMetaVar();
 

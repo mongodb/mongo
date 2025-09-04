@@ -403,10 +403,6 @@ std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
     // results and metadata.
     tassert(6253500, "Expected less than or exactly two cursors from mongot", cursors.size() <= 2);
 
-    if (cursors.size() == 0) {
-        origSearchStage->markCollectionEmpty();
-    }
-
     std::unique_ptr<Pipeline> newPipeline = nullptr;
     for (auto& cursor : cursors) {
         auto maybeCursorLabel = cursor->getType();

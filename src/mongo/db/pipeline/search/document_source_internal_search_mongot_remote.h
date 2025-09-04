@@ -48,12 +48,6 @@ namespace mongo {
 struct InternalSearchMongotRemoteSharedState {
     // TODO SERVER-94874: This does not need to be shared anymore when the ticket is done.
     std::unique_ptr<executor::TaskExecutorCursor> _cursor;
-
-    /**
-     * Track whether either the stage or an earlier caller issues a mongot remote request. This
-     * can be true even if '_cursor' is nullptr, which can happen if no documents are returned.
-     */
-    bool _dispatchedQuery = false;
 };
 
 /**
@@ -127,15 +121,6 @@ public:
 
     void setCursor(std::unique_ptr<executor::TaskExecutorCursor> cursor) {
         _sharedState->_cursor = std::move(cursor);
-        _sharedState->_dispatchedQuery = true;
-    }
-
-    /**
-     * If a cursor establishment phase was run and returned no documents, make sure we don't later
-     * repeat the query to mongot.
-     */
-    void markCollectionEmpty() {
-        _sharedState->_dispatchedQuery = true;
     }
 
     /**
