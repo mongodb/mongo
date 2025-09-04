@@ -181,27 +181,24 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     spec.append("name", indexName);
     spec.appendElementsUnique(options);
 
-    BSONObj indexInfo;
     boost::optional<BSONObj> o2;
     if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
-        indexInfo = BSON("createIndexes" << nss.coll() << "spec" << spec.obj());
         o2 = BSON("indexIdent" << ident::generateNewIndexIdent(
                                       nss.dbName(), directoryPerDB, directoryForIndexes)
                                << "directoryPerDB" << directoryPerDB << "directoryForIndexes"
                                << directoryForIndexes);
-    } else {
-        BSONObjBuilder builder;
-        builder.append("createIndexes", nss.coll());
-        builder.appendElements(spec.obj());
-        indexInfo = builder.obj();
     }
+
+    BSONObjBuilder oBuilder;
+    oBuilder.append("createIndexes", nss.coll());
+    oBuilder.appendElements(spec.obj());
 
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kCommand,
         .nss = nss.getCommandNS(),
         .uuid = uuid,
-        .oField = indexInfo,
+        .oField = oBuilder.obj(),
         .o2Field = o2,
         .wallClockTime = Date_t::now(),
     }}};

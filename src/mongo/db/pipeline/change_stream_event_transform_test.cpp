@@ -171,19 +171,6 @@ TEST(ChangeStreamEventTransformTest, TestCreateIndexTransform) {
                          {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
-
-    // Verify that transforming "createIndexes" oplog entry with "spec" field results in the same
-    // "createIndexes" change event document.
-    oplogEntry =
-        makeOplogEntry(repl::OpTypeEnum::kCommand,  // op type
-                       commandNss,                  // namespace
-                       BSON("createIndexes" << nss.coll() << "spec"
-                                            << BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
-                                                        << "a_1")),  // o
-                       testUuid(),                                   // uuid
-                       boost::none,                                  // fromMigrate
-                       boost::none);                                 // o2
-    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {

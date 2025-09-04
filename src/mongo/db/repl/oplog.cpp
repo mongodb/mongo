@@ -915,14 +915,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           uassert(ErrorCodes::InvalidNamespace,
                   "createIndexes value must be a string",
                   first.type() == BSONType::string);
-
-          // The index spec may either be appended to the object or nested in the spec field
-          // depending on the version which wrote the oplog entry
-          auto specField = cmd.getField("spec");
-          BSONObj indexSpec = specField.eoo()
-              ? cmd.removeField("createIndexes")
-              : getObjWithSanitizedStorageEngineOptions(opCtx, specField.Obj());
-
+          BSONObj indexSpec = cmd.removeField("createIndexes");
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           boost::optional<Lock::CollectionLock> collLock;
           if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(

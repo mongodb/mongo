@@ -431,14 +431,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
-
-                Value indexSpec;
-                if (auto specField = oField.getField("spec"); !specField.missing()) {
-                    indexSpec = specField;
-                } else {
-                    indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
-                }
                 // Wrap the index spec in an "indexes" array for consistency with commitIndexBuild.
+                auto indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("commitIndexBuild"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;

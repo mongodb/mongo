@@ -42,20 +42,16 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/time_support.h"
 
 #include <cstddef>
 #include <memory>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>

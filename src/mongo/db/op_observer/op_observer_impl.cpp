@@ -338,11 +338,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     BSONObjBuilder builder;
     // Note that despite using this constant, we are not building a CreateIndexCommand here
     builder.append(CreateIndexesCommand::kCommandName, nss.coll());
-    if (replicateLocalCatalogIdentifiers) {
-        builder.append("spec", indexBuildInfo.spec);
-    } else {
-        builder.appendElements(indexBuildInfo.spec);
-    }
+    builder.appendElements(indexBuildInfo.spec);
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

@@ -72,7 +72,6 @@
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -115,7 +114,6 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/damage_vector.h"
-#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -123,7 +121,6 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -137,11 +134,8 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/interruptible.h"
@@ -154,7 +148,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <initializer_list>
 #include <iterator>
 #include <list>
@@ -166,8 +159,10 @@
 #include <utility>
 #include <vector>
 
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
 #include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -321,8 +316,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 void assertIndexMetaDataMissing(std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData,
                                 StringData indexName) {
     const auto idxOffset = collMetaData->findIndexOffset(indexName);
-    ASSERT_EQUALS(-1, idxOffset) << indexName
-                                 << ". Collection Metadata: " << collMetaData->toBSON();
+    ASSERT_EQUALS(-1, idxOffset) << indexName << ". Collection Metdata: " << collMetaData->toBSON();
 }
 
 durable_catalog::CatalogEntryMetaData::IndexMetaData getIndexMetaData(
@@ -894,14 +888,6 @@ public:
                              << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths)));
         }
         ASSERT_TRUE(match);
-    }
-
-    StringData indexNameOplogField() const {
-        return shouldReplicateLocalCatalogIdentifers(
-                   rss::ReplicatedStorageService::get(_opCtx).getPersistenceProvider(),
-                   VersionContext::getDecoration(_opCtx))
-            ? "o.spec.name"
-            : "o.name";
     }
 
 private:
@@ -2366,7 +2352,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // supports 2 phase index build.
     const auto createIndexesDocument =
         queryOplog(BSON("ns" << renamedNss.db_forTest() + ".$cmd" << "o.createIndexes"
-                             << BSON("$exists" << true) << indexNameOplogField() << "b_1"));
+                             << BSON("$exists" << true) << "o.name" << "b_1"));
     const auto tmpCollName =
         createIndexesDocument.getObjectField("o").getStringField("createIndexes");
     tmpName = NamespaceString::createNamespaceString_forTest(renamedNss.db_forTest(), tmpCollName);

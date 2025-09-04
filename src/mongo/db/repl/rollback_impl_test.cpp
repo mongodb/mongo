@@ -68,7 +68,6 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -2250,22 +2249,10 @@ TEST_F(RollbackImplObserverInfoTest,
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto uuid = UUID::gen();
 
-    BSONObj indexObj;
-    if (shouldReplicateLocalCatalogIdentifers(
-            rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider(),
-            VersionContext::getDecoration(_opCtx.get()))) {
-        indexObj = BSON("createIndexes" << nss.coll() << "spec"
-                                        << BSON("v" << 2 << "key"
-                                                    << "x"
-                                                    << "name"
-                                                    << "x_1"));
-    } else {
-        indexObj = BSON("createIndexes" << nss.coll() << "v" << 2 << "key"
-                                        << "x"
-                                        << "name"
-                                        << "x_1");
-    }
-
+    BSONObj indexObj = BSON("createIndexes" << nss.coll() << "v" << 2 << "key"
+                                            << "x"
+                                            << "name"
+                                            << "x_1");
     auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, nss.getCommandNS(), indexObj, 2);
 
     std::set<NamespaceString> expectedNamespaces = {nss};
