@@ -29,6 +29,7 @@
 #pragma once
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/sdk/handle.h"
 
 #include <cstddef>
 #include <string_view>
@@ -39,23 +40,68 @@ namespace mongo::extension::sdk {
 class VecByteBuf final : public ::MongoExtensionByteBuf {
 public:
     static const ::MongoExtensionByteBufVTable VTABLE;
-    // TODO: Fill out VecByteBuf interface as needed.
-    VecByteBuf() : ::MongoExtensionByteBuf{&VTABLE}, _buffer() {}
-    std::string_view getView() const {
-        return std::string_view{reinterpret_cast<const char*>(_buffer.data()), _buffer.size()};
-    }
+
+    VecByteBuf();
+    VecByteBuf(const uint8_t* data, size_t len);
+    /**
+     * Constructs a VecByteBuf from a BSONObj. The BSONObj must be safe to copy (it must own its
+     * data or the data must outlive this VecByteBuf).
+     */
+    VecByteBuf(const BSONObj& obj);
+
+    /**
+     * Replace contents with [data, data+len). If len==0, clears the buffer.
+     * Precondition: data must be non-null when len > 0.
+     */
+    void assign(const uint8_t* data, size_t len);
 
 private:
-    static void _extDestroy(::MongoExtensionByteBuf* buf) noexcept {
-        delete static_cast<extension::sdk::VecByteBuf*>(buf);
+    static void _extDestroy(::MongoExtensionByteBuf* buf) noexcept;
+    static MongoExtensionByteView _extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept;
+
+    std::vector<uint8_t> _buffer;
+};
+
+/**
+ * VecByteBufHandle is an owned handle wrapper around a VecByteBuf.
+ * Typically this is a handle around a VecByteBuf allocated by the host whose ownership
+ * has been transferred to the extension.
+ */
+class VecByteBufHandle : public OwnedHandle<VecByteBuf> {
+public:
+    VecByteBufHandle(VecByteBuf* buf) : OwnedHandle<VecByteBuf>(buf) {
+        _assertValidVTable();
     }
 
-    static MongoExtensionByteView _extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept {
-        const auto viewSd = static_cast<const extension::sdk::VecByteBuf*>(byteBufPtr)->getView();
-        return MongoExtensionByteView{.data = reinterpret_cast<const uint8_t*>(viewSd.data()),
-                                      .len = viewSd.length()};
+    /**
+     * Get a read-only byte view of the contents of VecByteBuf.
+     */
+    MongoExtensionByteView getByteView() const {
+        assertValid();
+        return vtable().get_view(get());
     }
-    std::vector<uint8_t> _buffer;
+
+    /**
+     * Get a read-only string view of the contents of VecByteBuf.
+     */
+    std::string_view getStringView() const {
+        assertValid();
+        return byteViewAsStringView(vtable().get_view(get()));
+    }
+
+    /**
+     * Destroy VecByteBuf and free all associated resources.
+     */
+    void destroy() const {
+        assertValid();
+        vtable().destroy(get());
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10806301, "VecByteBuf 'get_view' is null", vtable.get_view != nullptr);
+        tassert(10806302, "VecByteBuf 'destroy' is null", vtable.destroy != nullptr);
+    };
 };
 
 }  // namespace mongo::extension::sdk
