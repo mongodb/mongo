@@ -27,20 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/sbe/sbe_unittest.h"
-#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
-#include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
-#include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
 
 #include <benchmark/benchmark.h>
 #include <boost/algorithm/string/join.hpp>
@@ -131,7 +122,7 @@ void ExtractFieldPathsFixture::perfectTree(benchmark::State& state,
     // Extract paths from input data in a single pass.
     for (auto _ : state) {
         walkField<value::ScalarProjectionPositionInfoRecorder>(
-            &tree, inputTag, inputVal, nullptr, callback);
+            &tree, inputTag, inputVal, nullptr /* bsonPtr */, callback);
     }
 }
 

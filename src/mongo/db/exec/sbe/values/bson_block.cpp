@@ -158,7 +158,7 @@ void visitElementExtractorCallback(BsonWalkNode<BlockProjectionPositionInfoRecor
                                    TypeTags eltTag,
                                    Value eltVal,
                                    const char* bson) {
-    if (auto rec = node->filterPosInfoRecorder) {
+    if (auto rec = node->filterRecorder) {
         rec->recordValue(eltTag, eltVal);
     }
 
@@ -188,8 +188,11 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
             rec.newDoc();
         }
 
-        walkField<BlockProjectionPositionInfoRecorder>(
-            node->second.get(), tags[i], vals[i], nullptr, visitElementExtractorCallback);
+        walkField<BlockProjectionPositionInfoRecorder>(node->second.get(),
+                                                       tags[i],
+                                                       vals[i],
+                                                       nullptr /* bsonPtr */,
+                                                       visitElementExtractorCallback);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -280,7 +283,7 @@ std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
                         value::TypeTags eltTag,
                         Value eltVal,
                         const char* bson) {
-            if (node->filterPosInfoRecorder) {
+            if (node->filterRecorder) {
                 bsonPointers.push_back(bson::getValue(bson));
             }
             if (node->projRecorder) {

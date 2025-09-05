@@ -476,11 +476,11 @@ public:
         const FastTuple<bool, value::TypeTags, value::Value>& tuple)
         : MoveableValueGuard(tuple.a, tuple.b, tuple.c) {}
     MoveableValueGuard() {
-        shallowClear();
+        disown();
     };
     MoveableValueGuard(const MoveableValueGuard&) = delete;
     MoveableValueGuard(MoveableValueGuard&& other) : _tag(other._tag), _value(other._value) {
-        other.shallowClear();
+        other.disown();
     }
     MONGO_COMPILER_ALWAYS_INLINE ~MoveableValueGuard() {
         releaseValue(_tag, _value);
@@ -492,20 +492,27 @@ public:
             releaseValue(_tag, _value);
             _tag = other._tag;
             _value = other._value;
-            other.shallowClear();
+            other.disown();
         }
         return *this;
     }
     std::pair<TypeTags, Value> get() const {
         return {_tag, _value};
     }
+    TypeTags tag() const {
+        return _tag;
+    }
+    Value value() const {
+        return _value;
+    }
 
-private:
-    void shallowClear() {
+    // Used when ownership needs to be transferred away from this MovableValueGuard.
+    void disown() {
         _tag = TypeTags::Nothing;
         _value = 0;
     }
 
+private:
     TypeTags _tag;
     Value _value;
 };

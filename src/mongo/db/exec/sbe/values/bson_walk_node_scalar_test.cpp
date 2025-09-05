@@ -27,17 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/column/bsoncolumn.h"
-#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
-#include "mongo/db/exec/sbe/sbe_unittest.h"
-#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
-#include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
-#include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
@@ -64,7 +56,7 @@ void dummyCallBack(value::BsonWalkNode<value::ScalarProjectionPositionInfoRecord
     }
 }
 
-class FieldPathExtractionTest : public mongo::unittest::Test {
+class BsonWalkNodeScalarTest : public mongo::unittest::Test {
 public:
     void testPaths(const std::vector<PathTestCase>& testCases,
                    const BSONObj& data,
@@ -81,8 +73,8 @@ public:
         value::ValueGuard vg{inputTag, inputVal};  // Free input value's memory on exit.
 
         // Extract paths from input data in a single pass.
-        walkField<value::ScalarProjectionPositionInfoRecorder>(
-            &root, inputTag, inputVal, nullptr, dummyCallBack);
+        value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+            &root, inputTag, inputVal, nullptr /* bsonPtr */, dummyCallBack);
 
         // Verify the extracted values are correct.
         size_t idx = 0;
@@ -100,7 +92,7 @@ public:
     }
 };
 
-TEST_F(FieldPathExtractionTest, Sanity) {
+TEST_F(BsonWalkNodeScalarTest, Sanity) {
     {
         BSONObj inputObj = fromjson("{a: [{b: 1}, {b: [{c: 3}]}]}");
         std::vector<PathTestCase> tests{
@@ -215,7 +207,7 @@ TEST_F(FieldPathExtractionTest, Sanity) {
     }
 }
 
-TEST_F(FieldPathExtractionTest, NestedArrays) {
+TEST_F(BsonWalkNodeScalarTest, NestedArrays) {
     {
         BSONObj inputObj = fromjson("{a: [[{b: 1}], {b: 2}]}");
         std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
@@ -239,7 +231,7 @@ TEST_F(FieldPathExtractionTest, NestedArrays) {
     }
 }
 
-TEST_F(FieldPathExtractionTest, DottedFieldNames) {
+TEST_F(BsonWalkNodeScalarTest, DottedFieldNames) {
     {
         // Dotted toplevel field name.
         BSONObj inputObj = BSON("a.b" << 1);
@@ -267,7 +259,7 @@ TEST_F(FieldPathExtractionTest, DottedFieldNames) {
     }
 }
 
-TEST_F(FieldPathExtractionTest, RandomlyGenerated) {
+TEST_F(BsonWalkNodeScalarTest, RandomlyGenerated) {
     {
         BSONObj inputObj = fromjson(
             "{ f0 : [ 1, { f0 : 2, f1 : [ [ 3, 4 ] ] }, [ [ 5, [ 6, 7 ] ] ] ], f1 : [ { f0 : [ [ "
@@ -339,7 +331,7 @@ TEST_F(FieldPathExtractionTest, RandomlyGenerated) {
     }
 }
 
-TEST_F(FieldPathExtractionTest, DuplicateFields) {
+TEST_F(BsonWalkNodeScalarTest, DuplicateFields) {
     {
         // Duplicate toplevel field names
         BSONObj inputObj = BSON("a" << 1 << "a" << 2);
@@ -410,7 +402,7 @@ TEST_F(FieldPathExtractionTest, DuplicateFields) {
 }
 
 // Test accessing every field from a single level document with many fields.
-TEST_F(FieldPathExtractionTest, BigFlat) {
+TEST_F(BsonWalkNodeScalarTest, BigFlat) {
     int n = 1000;
     BSONObjBuilder bob;
     std::vector<PathTestCase> tests;
@@ -427,7 +419,7 @@ TEST_F(FieldPathExtractionTest, BigFlat) {
 }
 
 // Project every leaf node of a perfect N-ary tree document.
-TEST_F(FieldPathExtractionTest, PerfectTree) {
+TEST_F(BsonWalkNodeScalarTest, PerfectTree) {
     BSONObjBuilder bob;
     int curIdx = 0;
     int depth = 4;

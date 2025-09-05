@@ -189,7 +189,7 @@ struct ScalarProjectionPositionInfoRecorder final
 
 template <class ProjectionRecorder>
 struct BsonWalkNode {
-    FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
+    FilterPositionInfoRecorder* filterRecorder = nullptr;
 
     std::vector<ProjectionRecorder*> childProjRecorders;
     ProjectionRecorder* projRecorder = nullptr;
@@ -201,15 +201,15 @@ struct BsonWalkNode {
     std::unique_ptr<BsonWalkNode> traverseChild;
 
     void add(const CellBlock::Path& path,
-             FilterPositionInfoRecorder* recorder,
+             FilterPositionInfoRecorder* filterRecorder,
              ProjectionRecorder* outProjBlockRecorder,
              size_t pathIdx = 0);
 };
 
 template <class ProjectionRecorder>
 void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
-                                           FilterPositionInfoRecorder* recorder,
-                                           ProjectionRecorder* outProjBlockRecorder,
+                                           FilterPositionInfoRecorder* outFilterRecorder,
+                                           ProjectionRecorder* outProjRecorder,
                                            size_t pathIdx /*= 0*/) {
     if (pathIdx == 0) {
         // Check some invariants about the path.
@@ -221,27 +221,27 @@ void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
         auto& get = std::get<CellBlock::Get>(path[pathIdx]);
         auto [it, inserted] = getChildren.insert(
             std::pair(get.field, std::make_unique<BsonWalkNode<ProjectionRecorder>>()));
-        it->second->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
+        it->second->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
     } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
         invariant(pathIdx != 0);
         if (!traverseChild) {
             traverseChild = std::make_unique<BsonWalkNode<ProjectionRecorder>>();
         }
-        if (outProjBlockRecorder) {
-            // Each node must know about all projection recorders below it, not just ones
-            // directly below.
-            childProjRecorders.push_back(outProjBlockRecorder);
+        if (outProjRecorder) {
+            // Each node must know about all projection recorders below it, not just ones directly
+            // below.
+            childProjRecorders.push_back(outProjRecorder);
         }
 
-        traverseChild->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
+        traverseChild->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
     } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
         invariant(pathIdx != 0);
 
-        if (recorder) {
-            filterPosInfoRecorder = recorder;
+        if (outFilterRecorder) {
+            filterRecorder = outFilterRecorder;
         }
-        if (outProjBlockRecorder) {
-            projRecorder = outProjBlockRecorder;
+        if (outProjRecorder) {
+            projRecorder = outProjRecorder;
         }
         invariant(pathIdx == path.size() - 1);
     }
@@ -314,10 +314,10 @@ void walkField(BsonWalkNode<ProjectionRecorder>* node,
                 }
             }
 
-            if (isArrayEmpty && node->traverseChild->filterPosInfoRecorder) {
+            if (isArrayEmpty && node->traverseChild->filterRecorder) {
                 // If the array was empty, indicate that we saw an empty array to the
-                // filterPosInfoRecorder.
-                node->traverseChild->filterPosInfoRecorder->emptyArraySeen();
+                // filterRecorder.
+                node->traverseChild->filterRecorder->emptyArraySeen();
             }
 
             for (auto& projRecorder : node->childProjRecorders) {
