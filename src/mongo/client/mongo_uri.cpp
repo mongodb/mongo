@@ -695,7 +695,7 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
             if (username.empty()) {
                 // In practice, this won't actually occur since
                 // this block corresponds to GSSAPI, while username
-                // may only be omitted with MOGNODB-X509.
+                // may only be omitted with MONGODB-X509.
                 return boost::none;
             }
             username.append("@").append(parsed[kAuthServiceRealm].String());

@@ -40,12 +40,12 @@ In each of platform or build variant group directory there can be these files:
 - `test_dev.yml`
 
   - these files are merged into `etc/evergreen.yml` which is used for `mongodb-mongo-master` project on master branch
-  - after branching on all new branches these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mognodb-mongo-vX.Y` project
+  - after branching on all new branches these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mongodb-mongo-vX.Y` project
 
 - `test_dev_master_and_lts_branches_only.yml`
 
   - these files are merged into `etc/evergreen.yml` which is used for `mongodb-mongo-master` project on master branch
-  - after branching for LTS release (v7.0, v8.0 etc.) on a new branch these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mognodb-mongo-vX.Y` project
+  - after branching for LTS release (v7.0, v8.0 etc.) on a new branch these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mongodb-mongo-vX.Y` project
   - **important**: all tests that are running on these build variants will NOT run on a new Rapid release (v7.1, v7.2, v7.3, v8.1, v8.2, v8.3 etc.) branch projects
 
 - `test_dev_master_branch_only.yml`
@@ -57,12 +57,12 @@ In each of platform or build variant group directory there can be these files:
 - `test_release.yml`
 
   - these files are merged into `etc/evergreen_nightly.yml` which is used for `mongodb-mongo-master-nightly` project on master branch
-  - after branching on all new branches these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mognodb-mongo-vX.Y` project
+  - after branching on all new branches these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mongodb-mongo-vX.Y` project
 
 - `test_release_master_and_lts_branches_only.yml`
 
   - these files are merged into `etc/evergreen_nightly.yml` which is used for `mongodb-mongo-master-nightly` project on master branch
-  - after branching for LTS release (v7.0, v8.0 etc.) on a new branch these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mognodb-mongo-vX.Y` project
+  - after branching for LTS release (v7.0, v8.0 etc.) on a new branch these files are merged into `etc/evergreen_nightly.yml` which is used for a new branch `mongodb-mongo-vX.Y` project
   - **important**: all tests that are running on these build variants will NOT run on a new Rapid release (v7.1, v7.2, v7.3, v8.1, v8.2, v8.3 etc.) branch projects
 
 - `test_release_master_branch_only.yml`
