@@ -13,7 +13,10 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
-      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+        --additionalFeatureFlags "featureFlagRankFusionBasic"
+        --additionalFeatureFlags "featureFlagRankFusionFull"
       has_packages: true
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
@@ -68,6 +71,8 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
         --enableEnterpriseTests=off
+        --additionalFeatureFlags "featureFlagRankFusionBasic"
+        --additionalFeatureFlags "featureFlagRankFusionFull"
       has_packages: false
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
@@ -119,6 +124,9 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
+      test_flags: >-
+        --additionalFeatureFlags "featureFlagRankFusionBasic"
+        --additionalFeatureFlags "featureFlagRankFusionFull"
       has_packages: false
       jstestfuzz_num_generated_files: 40
       jstestfuzz_concurrent_num_files: 10
@@ -169,7 +177,10 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
-      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+        --additionalFeatureFlags "featureFlagRankFusionBasic"
+        --additionalFeatureFlags "featureFlagRankFusionFull"
       has_packages: false
       multiversion_platform: amazon2
       multiversion_edition: enterprise

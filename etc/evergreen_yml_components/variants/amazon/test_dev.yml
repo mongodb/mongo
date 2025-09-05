@@ -122,7 +122,7 @@ buildvariants:
   run_on:
     - amazon2023-arm64-atlas-latest-small
   stepback: true
-  expansions: &enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+  expansions: &enterprise-amazon-linux2-arm64-expansions
     <<: *amazon_linux2_arm64_dynamic_expansions
     has_packages: false
     jstestfuzz_num_generated_files: 40
@@ -140,6 +140,32 @@ buildvariants:
     distros:
     - amazon2-arm64-latest-large
   - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+
+- <<: *amazon_linux2023_arm64_dynamic_compile_variant_dependency
+  name: enterprise-amazon-linux2023-arm64-rank-fusion
+  display_name: "Amazon Linux 2023 atlas arm64 Enterprise (Rank Fusion)"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  run_on:
+    - amazon2023-arm64-atlas-latest-small
+  stepback: true
+  expansions:
+    <<: *enterprise-amazon-linux2-arm64-expansions
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool,incompatible_with_atlas_environment
+      --additionalFeatureFlags "featureFlagRankFusionBasic"
+      --additionalFeatureFlags "featureFlagRankFusionFull"
+  tasks:
+    - name: .aggregation !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.experimental !.multiversion
+    - name: .auth !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.experimental !.multiversion
+    - name: .jscore !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.experimental !.multiversion
+    - name: .mongot_e2e_tests
+    - name: search
+    - name: search_auth
+    - name: search_pinned_connections_auth
+    - name: search_ssl
+    - name: vector_search
+    - name: vector_search_auth
+    - name: vector_search_ssl
 
 - name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
