@@ -31,6 +31,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "recipientVoteImportedFiles",
     "configureBackgroundTask",
     "mergeChunks",
+    "testCommandFeatureFlaggedOnLatestFCV",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the
@@ -57,4 +58,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_configsvrStopShardDraining",
     "_shardsvrMergeChunks",
     "_configsvrCommitShardRemoval",
+    "testCommandFeatureFlaggedOnLatestFCV83",
 ];

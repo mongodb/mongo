@@ -762,7 +762,7 @@ let viewsCommandTests = {
     startTrafficRecording: {skip: isUnrelated},
     stopTrafficRecording: {skip: isUnrelated},
     sysprofile: {skip: isAnInternalCommand},
-    testCommandFeatureFlaggedOnLatestFCV: {skip: isAnInternalCommand},
+    testCommandFeatureFlaggedOnLatestFCV83: {skip: isAnInternalCommand},
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},

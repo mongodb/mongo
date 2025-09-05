@@ -439,7 +439,7 @@ const allCommands = {
     startSession: {skip: isNotAUserDataRead},
     stopTrafficRecording: {skip: isNotAUserDataRead},
     sysprofile: {skip: isAnInternalCommand},
-    testCommandFeatureFlaggedOnLatestFCV: {skip: isAnInternalCommand},
+    testCommandFeatureFlaggedOnLatestFCV83: {skip: isAnInternalCommand},
     testDeprecation: {skip: isNotAUserDataRead},
     testDeprecationInVersion2: {skip: isNotAUserDataRead},
     testInternalTransactions: {skip: isNotAUserDataRead},

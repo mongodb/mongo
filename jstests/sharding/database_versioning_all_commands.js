@@ -1235,7 +1235,7 @@ const allTestCases = {
         streams_updateFeatureFlags: {skip: "TODO", conditional: true},
         streams_writeCheckpoint: {skip: "TODO", conditional: true},
         sysprofile: {skip: "TODO"},
-        testCommandFeatureFlaggedOnLatestFCV: {skip: "TODO", conditional: true},
+        testCommandFeatureFlaggedOnLatestFCV83: {skip: "internal command", conditional: true},
         testDeprecation: {skip: "TODO", conditional: true},
         testDeprecationInVersion2: {skip: "TODO", conditional: true},
         testInternalTransactions: {skip: "TODO", conditional: true},
