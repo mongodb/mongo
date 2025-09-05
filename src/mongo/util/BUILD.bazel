@@ -1335,11 +1335,12 @@ mongo_cc_library(
     name = "varint",
     srcs = [
         "varint.cpp",
+        "varint_details.cpp",
+        "varint_details.h",
     ],
     hdrs = ["varint.h"],
     deps = [
         "//src/mongo:base",
-        "//src/third_party/s2",
     ],
 )
 

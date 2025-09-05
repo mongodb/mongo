@@ -165,14 +165,16 @@ class Linter:
             if not re.fullmatch(lic_re, src_line):
                 self._license_error(
                     linenum,
-                    "Incorrect license header.\n" '  Expected: "{}"\n' '  Received: "{}"\n'.format(
+                    'Incorrect license header.\n  Expected: "{}"\n  Received: "{}"\n'.format(
                         lic_line, src_line
                     ),
                 )
                 return linenum
 
         # Warn if SSPL appears in Enterprise code, which has a different license.
-        expect_sspl_license = "enterprise" not in self.file_name and "modules/atlas" not in self.file_name
+        expect_sspl_license = (
+            "enterprise" not in self.file_name and "modules/atlas" not in self.file_name
+        )
         if not expect_sspl_license:
             self._license_error(
                 linenum,
@@ -222,7 +224,7 @@ class Linter:
 
         if category == "legal/license":
             # Enterprise module does not have the SSPL license
-            if "enterprise" in self.file_name or "modules/atlas" in self.file_name :
+            if "enterprise" in self.file_name or "modules/atlas" in self.file_name:
                 return
 
             # The following files are in the src/mongo/ directory but technically belong
@@ -236,6 +238,8 @@ class Linter:
                     "src/mongo/shell/mk_wcwidth.h",
                     "src/mongo/util/net/ssl_stream.cpp",
                     "src/mongo/util/scopeguard.h",
+                    "src/mongo/util/varint_details.cpp",
+                    "src/mongo/util/varint_details.h",
                 ]
             )
 

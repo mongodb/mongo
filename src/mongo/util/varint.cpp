@@ -30,9 +30,7 @@
 #include "mongo/util/varint.h"
 
 #include "mongo/util/assert_util.h"
-
-#include <base/integral_types.h>
-#include <util/coding/varint.h>
+#include "mongo/util/varint_details.h"
 
 namespace mongo {
 
@@ -40,8 +38,8 @@ Status DataType::Handler<VarInt>::load(
     VarInt* t, const char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
     std::uint64_t value;
 
-    const char* newptr =
-        Varint::Parse64WithLimit(ptr, ptr + length, reinterpret_cast<uint64*>(&value));
+    const char* newptr = varint_details::Varint::Parse64WithLimit(
+        ptr, ptr + length, reinterpret_cast<varint_details::uint64*>(&value));
 
     if (!newptr) {
         return DataType::makeTrivialLoadStatus(VarInt::kMaxSizeBytes64, length, debug_offset);
@@ -70,11 +68,9 @@ Status DataType::Handler<VarInt>::store(
         return DataType::makeTrivialStoreStatus(VarInt::kMaxSizeBytes64, length, debug_offset);
     }
 
-    // Use a dassert since static_assert does not work because the expression does not have a
-    // constant value
-    dassert(Varint::kMax64 == VarInt::kMaxSizeBytes64);
+    static_assert(varint_details::Varint::kMax64 == VarInt::kMaxSizeBytes64);
 
-    const char* newptr = Varint::Encode64(ptr, t);
+    const char* newptr = varint_details::Varint::Encode64(ptr, t);
 
     if (advanced) {
         *advanced = newptr - ptr;
