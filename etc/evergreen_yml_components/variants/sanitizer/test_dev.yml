@@ -12,6 +12,18 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
     run_on:
+      - rhel8.8-xlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  # TODO(SERVER-110366): Consolidate this into the above variant once all variants that use this are swapped over
+  # to m8g.
+  - &generic_linux_compile_params_m8g
+    run_on:
       - amazon2023-arm64-latest-m8g-8xlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
@@ -205,7 +217,7 @@ variables:
     multiversion_edition: enterprise
 
 buildvariants:
-  - <<: *generic_linux_compile_params
+  - <<: *generic_linux_compile_params_m8g
     name: &linux-arm64-debug-compile-required linux-arm64-debug-compile-required # TODO: replace with Sanitizer.
     display_name: "! Amazon Linux 2023 arm64 DEBUG Compile"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
