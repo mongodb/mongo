@@ -96,6 +96,8 @@ def get_execution_stats(
                 execution_time=enode.get_execution_time(),
                 n_returned=enode.n_returned,
                 n_processed=enode.n_processed,
+                # Seeks will be None for any node but IXSCAN.
+                seeks=enode.seeks,
             )
         )
     return result

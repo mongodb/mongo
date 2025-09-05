@@ -163,6 +163,14 @@ def create_index_scan_collection_template(name: str, cardinality: int) -> config
         name=name,
         fields=[
             config.FieldTemplate(
+                name="int_uniform",
+                data_type=config.DataType.INTEGER,
+                distribution=RandomDistribution.uniform(
+                    RangeGenerator(DataType.INTEGER, 0, cardinality)
+                ),
+                indexed=True,
+            ),
+            config.FieldTemplate(
                 name="choice", data_type=config.DataType.STRING, distribution=distr, indexed=True
             ),
             config.FieldTemplate(
@@ -322,7 +330,7 @@ workload_execution = config.WorkloadExecutionConfig(
     enabled=True,
     output_collection_name="calibrationData",
     write_mode=config.WriteMode.REPLACE,
-    warmup_runs=5,
+    warmup_runs=10,
     runs=100,
 )
 
@@ -338,7 +346,22 @@ qsn_nodes = [
     config.QsNodeCalibrationConfig(type="SUBPLAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_FORWARD", type="COLLSCAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_BACKWARD", type="COLLSCAN"),
-    config.QsNodeCalibrationConfig(type="IXSCAN"),
+    config.QsNodeCalibrationConfig(
+        name="IXSCAN_FORWARD",
+        type="IXSCAN",
+        variables_override=lambda df: pd.concat(
+            [df["n_processed"].rename("Keys Examined"), df["seeks"].rename("Number of seeks")],
+            axis=1,
+        ),
+    ),
+    config.QsNodeCalibrationConfig(
+        name="IXSCAN_BACKWARD",
+        type="IXSCAN",
+        variables_override=lambda df: pd.concat(
+            [df["n_processed"].rename("Keys Examined"), df["seeks"].rename("Number of seeks")],
+            axis=1,
+        ),
+    ),
     config.QsNodeCalibrationConfig(type="FETCH"),
     config.QsNodeCalibrationConfig(type="AND_HASH"),
     config.QsNodeCalibrationConfig(type="AND_SORTED"),

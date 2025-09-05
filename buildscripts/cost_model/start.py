@@ -33,6 +33,7 @@ import dataclasses
 import os
 from typing import Mapping, Sequence
 
+import numpy as np
 import parameters_extractor_classic
 import qsn_calibrator
 import workload_execution
@@ -64,32 +65,6 @@ def save_to_csv(parameters: Mapping[str, Sequence[CostModelParameters]], filepat
                 )
                 fields[qsn_type_name] = qsn_type
                 writer.writerow(fields)
-
-
-async def execute_index_scan_queries(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
-    collection = [ci for ci in collections if ci.name.startswith("index_scan")][0]
-    fields = [f for f in collection.fields if f.name == "choice"]
-
-    requests = []
-
-    for field in fields:
-        for val in field.distribution.get_values():
-            if val.startswith("_"):
-                continue
-            keys_length = len(val) + 2
-            requests.append(
-                Query(
-                    pipeline=[{"$match": {field.name: val}}],
-                    keys_length_in_bytes=keys_length,
-                    note="IndexScan",
-                )
-            )
-
-    await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
-    )
 
 
 async def execute_index_intersections_with_requests(
@@ -134,6 +109,48 @@ async def execute_index_intersections(
     await execute_index_intersections_with_requests(database, collections, requests)
 
 
+async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collection = [c for c in collections if c.name.startswith("index_scan")][0]
+    field = [f for f in collection.fields if f.name == "int_uniform"][0]
+    requests = []
+    cards = [25, 50, 100, 200, 300]
+    # For every query, we run it as both a forward and backward scan.
+    for direction, note in [(1, "FORWARD"), (-1, "BACKWARD")]:
+        for card in cards:
+            requests.append(
+                Query(
+                    {"filter": {field.name: {"$lt": card}}, "sort": {field.name: direction}},
+                    note=f"IXSCAN_{note}",
+                )
+            )
+            # In order to calibrate the cost of seeks, we uniformly sample for an $in query so that the
+            # index scan will examine the same number of keys as the range query,
+            # but instead of being able to traverse the leaves, it has to do a seek for each one.
+            # The reason for the `// 2` is because on each seek it examines 2 keys, after the first one it additionally checks the next key
+            # to try and avoid an unnecessary seek. Lastly, the casting is due to BSON not understanding numpy integer types.
+            seeks = [
+                int(key)
+                for key in np.linspace(
+                    0,
+                    collection.documents_count,
+                    endpoint=False,
+                    dtype=np.dtype(int),
+                    # We need this max as otherwise we will generate an empty $in query (which turns into an EOF plan) for
+                    # cardinality 1.
+                    num=max(1, card // 2),
+                )
+            ]
+            requests.append(
+                Query(
+                    {"filter": {field.name: {"$in": seeks}}, "sort": {field.name: direction}},
+                    note=f"IXSCAN_{note}",
+                )
+            )
+    await workload_execution.execute(
+        database, main_config.workload_execution, [collection], requests
+    )
+
+
 async def execute_collection_scans(
     database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
@@ -153,7 +170,7 @@ async def execute_collection_scans(
 
 async def execute_limits(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
-    limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500, 1000] #, 2500, 5000, 10000]
+    limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500, 1000]
 
     requests = [Query({"limit": limit}, note="LIMIT") for limit in limits]
     await workload_execution.execute(
@@ -197,7 +214,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
                 note="PROJECTION_COVERED",
             )
         )
-    
+
     # Default projections, these are the only ones that can handle computed projections,
     # so that is how we calibrate them. We assume that the computation will be constant across
     # the enumerated plans and thus keep it very simple.
@@ -228,6 +245,7 @@ async def main():
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
         execution_query_functions = [
+            execute_index_seeks,
             execute_projections,
             execute_collection_scans,
             execute_limits,
@@ -240,8 +258,10 @@ async def main():
         # Reads the explains stored on the previous step (this run and/or previous runs),
         # parses the explains, and calibrates the cost model for the QS nodes.
         models = await qsn_calibrator.calibrate(main_config.qs_calibrator, database)
+        # Pad all QSN names to be nice and pretty.
+        pad = max(len(node) for node in models) + 8
         for qsn, model in models.items():
-            print(f"{qsn}\t\t{model}")
+            print(f"{qsn:<{pad}}{model}")
 
         parameters = await parameters_extractor_classic.extract_parameters(
             main_config.qs_calibrator, database, []

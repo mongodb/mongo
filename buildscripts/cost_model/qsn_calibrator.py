@@ -49,7 +49,7 @@ async def calibrate(config: QuerySolutionCalibrationConfig, database: DatabaseIn
         return {}
 
     df = await exp.load_calibration_data(database, config.input_collection_name)
-    noout_df = exp.remove_outliers(df, 0.0, 0.90)
+    noout_df = exp.remove_outliers(df, 0.1, 0.90)
     qsn_df = exp.extract_qsn_nodes(noout_df)
     result = {}
     for node_config in config.nodes:
