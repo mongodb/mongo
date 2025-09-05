@@ -29,6 +29,7 @@ assert.eq(res.length, 10, res);
     const metrics = testDB.serverStatus().metrics.queryStats;
     assert.eq(metrics.numEvicted, 0, metrics);
     assert.gt(metrics.queryStatsStoreSizeEstimateBytes, 0, metrics);
+    assert.eq(metrics.numEntries, 11, metrics);
 }
 
 // Command to clear the cache.
@@ -38,8 +39,9 @@ assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryStatsCac
 // cleared.
 {
     const metrics = testDB.serverStatus().metrics.queryStats;
-    assert.gte(metrics.numEvicted, 11, metrics);
+    assert.eq(metrics.numEvicted, 11, metrics);
     assert.eq(metrics.queryStatsStoreSizeEstimateBytes, 0, metrics);
+    assert.eq(metrics.numEntries, 0, metrics);
 }
 
 // Calling $queryStats should fail when the query stats store size is 0 bytes.
