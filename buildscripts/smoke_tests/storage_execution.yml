@@ -131,7 +131,7 @@ suites:
     - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_retryable_writes_restart.js
     - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
     - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
-    - jstests/noPassthrough/timeseries/create/timeseries_create_drop.js
+    - jstests/noPassthrough/timeseries/create/timeseries_create_drop_only_buckets.js
     - jstests/noPassthrough/timeseries/create/timeseries_server_parameters.js
     - jstests/noPassthrough/timeseries/create/timeseries_startup.js
     - jstests/noPassthrough/timeseries/data_integrity/intermediate_data_consistency_checks_skips.js

@@ -7,6 +7,9 @@
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_replication,
+ *     # Tests a state of partial creation (timeseries buckets exists, timeseries view does not)
+ *     # which can't happen with viewless timeseries collections, since they are created atomically.
+ *     featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

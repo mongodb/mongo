@@ -7,6 +7,10 @@
  *   requires_timeseries,
  *   requires_persistence,
  *   requires_fcv_80,
+ *   # This test is for the special cleanup behavior of $out for legacy timeseries collections,
+ *   # in which both the main namespace and the system.buckets namespace need to be created.
+ *   # Viewless timeseries collections have a single namespace and reuse the regular cleanup logic.
+ *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
