@@ -108,7 +108,7 @@ commands:
 server_parameters:
     trafficRecordingDirectory:
         description: "Path to directory where traffic recordings will be saved"
-        set_at: startup
+        set_at: [startup, runtime]
         cpp_vartype: std::string
         cpp_varname: gTrafficRecordingDirectory
         validator:
