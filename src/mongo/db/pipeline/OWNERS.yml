@@ -1,11 +1,12 @@
 version: 1.0.0
 filters:
-  # The files implementing DocumentSource each contain code related to parsing, validation, and
-  # optimization (QO concerns) as well as execution (QE). Therefore, we give default ownership
-  # of files in this directory to the entire query team.
+  # The files implementing DocumentSource each contain code related to pipeline parsing,
+  # validation, and optimization (QO concerns). Therefore, we give default ownership of files
+  # in this directory to the entire query-optimization team. The special-purpose or special-feature
+  # stages are owned by the dedicated teams.
   - "*":
     approvers:
-      - 10gen/query
+      - 10gen/query-optimization
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads

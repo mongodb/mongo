@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  # The files implementing Stage each contain code related to pipeline execution (QE). Therefore,
+  # we give default ownership of files in this directory to the entire query-execution-classic
+  # team. The special-purpose or special-feature stages are owned by the dedicated teams.
   - "*":
     approvers:
       - 10gen/query-execution-classic

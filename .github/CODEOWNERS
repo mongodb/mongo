@@ -2212,7 +2212,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/op_observer/**/operation_logger* @10gen/server-oplog @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/pipeline/OWNERS.yml
-/src/mongo/db/pipeline/**/* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*.idl @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/accumulation_statement* @10gen/query-optimization @svc-auto-approve-bot
