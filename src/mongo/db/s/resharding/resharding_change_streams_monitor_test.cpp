@@ -59,6 +59,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -370,16 +371,16 @@ public:
                 }
             } else if (typeStr == "op") {
                 auto opStr = doc.getStringField("op");
+                auto command = doc["command"].Obj();
 
-                BSONObj aggregation;
+                StringData targetedNS;
                 if (opStr == "getmore") {
-                    // For getmore ops, look at the originiation agg command.
-                    aggregation = doc["originatingCommand"].Obj();
+                    targetedNS = command.getStringField("collection");
                 } else if (opStr == "command") {
-                    aggregation = doc["command"].Obj();
+                    targetedNS = command.getStringField("aggregate");
                 }
 
-                if (aggregation.getStringField("aggregate") == nss.coll()) {
+                if (targetedNS == nss.coll()) {
                     LOGV2(
                         10764601, "Found active cursor command", "ns"_attr = nss, "doc"_attr = doc);
                     openCursorExists = true;
@@ -574,6 +575,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     auto cancelSource1 = CancellationSource();
     auto factory1 = CancelableOperationContextFactory(cancelSource1.token(), markKilledExecutor);
 
+    auto teardownGuard = ScopeGuard([&] { tearDownExecutors({executor1, cleanupExecutor1}); });
+
     auto monitor1 = std::make_shared<ReshardingChangeStreamsMonitor>(
         reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);
     auto awaitCompletion1 =
@@ -586,8 +589,6 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
 
     // Verify that the cursor from the previous try got killed.
     ASSERT_FALSE(hasOpenCursor(tempNss, monitor0->makeAggregateComment(reshardingUUID)));
-
-    tearDownExecutors({executor1, cleanupExecutor1});
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) {
@@ -601,6 +602,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
     auto donorCancelSource = CancellationSource();
     auto donorFactory =
         CancelableOperationContextFactory(cancelSource.token(), donorMarkKilledExecutor);
+    auto donorGuard = ScopeGuard(
+        [&] { tearDownExecutors({donorExecutor, donorCleanupExecutor, donorMarkKilledExecutor}); });
 
     int donorDelta = 0;
     auto donorCallback = [&](const auto& batch) {
@@ -621,6 +624,10 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
     auto recipientCancelSource = CancellationSource();
     auto recipientFactory =
         CancelableOperationContextFactory(cancelSource.token(), recipientMarkKilledExecutor);
+    auto recipientGuard = ScopeGuard([&] {
+        tearDownExecutors(
+            {recipientExecutor, recipientCleanupExecutor, recipientMarkKilledExecutor});
+    });
 
     int recipientDelta = 0;
     auto recipientCallback = [&](const auto& batch) {
@@ -658,7 +665,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
 
     // Verify that the donor monitor's cursor got killed but the recipient monitor's cursor did not.
     ASSERT(!hasOpenCursor(sourceNss, donorMonitor->makeAggregateComment(reshardingUUID)));
-    ASSERT(hasOpenCursor(tempNss, recipientMonitor->makeAggregateComment(reshardingUUID)));
+    resharding_test_util::assertSoon(opCtx, [&] {
+        return hasOpenCursor(tempNss, recipientMonitor->makeAggregateComment(reshardingUUID));
+    });
 
     client.insert(tempNss, BSON("_id" << 11));
 
@@ -671,9 +680,6 @@ TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) 
 
     ASSERT(!hasOpenCursor(sourceNss, donorMonitor->makeAggregateComment(reshardingUUID)));
     ASSERT(!hasOpenCursor(tempNss, recipientMonitor->makeAggregateComment(reshardingUUID)));
-
-    tearDownExecutors({donorExecutor, donorCleanupExecutor, donorMarkKilledExecutor});
-    tearDownExecutors({recipientExecutor, recipientCleanupExecutor, recipientMarkKilledExecutor});
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessSingleInsert) {
