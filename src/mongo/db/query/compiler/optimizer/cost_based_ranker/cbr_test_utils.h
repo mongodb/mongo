@@ -94,8 +94,7 @@ CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const Collecti
 
 CardinalityEstimate getPlanSamplingCE(const QuerySolution& plan,
                                       double collCard,
-                                      ce::SamplingEstimator* samplingEstimator,
-                                      bool useIndexBounds);
+                                      ce::SamplingEstimator* samplingEstimator);
 
 std::unique_ptr<stats::CollectionStatistics> makeCollStats(double collCard);
 std::unique_ptr<stats::CollectionStatistics> makeCollStatsWithHistograms(

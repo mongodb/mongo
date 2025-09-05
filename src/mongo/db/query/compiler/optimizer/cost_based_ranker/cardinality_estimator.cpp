@@ -45,16 +45,14 @@ namespace mongo::cost_based_ranker {
 CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
-                                           QueryPlanRankerModeEnum rankerMode,
-                                           bool useIndexBounds)
+                                           QueryPlanRankerModeEnum rankerMode)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
       _collInfo(collInfo),
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
-      _rankerMode(rankerMode),
-      _useIndexBounds(useIndexBounds) {
+      _rankerMode(rankerMode) {
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
         _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         tassert(9746501,
@@ -472,16 +470,13 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
         // after deduplication and applying the filter. This approach does not combine selectivity
         // computed from the index scan.
         auto ridsEst = [&]() -> CardinalityEstimate {
-            // TODO: remove the flag _useIndexBounds when SPM-4214 finishes.
-            if (!_useIndexBounds) {
-                // Try to estimate using transformation to match expression.
-                auto matchExpr = getMatchExpressionFromBounds(node->bounds, node->filter.get());
-                if (matchExpr) {
-                    const auto matchExprPtr = matchExpr.get();
-                    return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                        return _samplingEstimator->estimateCardinality(matchExprPtr);
-                    });
-                }
+            // Try to estimate using transformation to match expression.
+            auto matchExpr = getMatchExpressionFromBounds(node->bounds, node->filter.get());
+            if (matchExpr) {
+                const auto matchExprPtr = matchExpr.get();
+                return _ceCache.getOrCompute(std::move(matchExpr), [&] {
+                    return _samplingEstimator->estimateCardinality(matchExprPtr);
+                });
             }
             // Rare case, CE not cached.
             return _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
@@ -547,16 +542,13 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
 
         auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
         auto ce = [&]() -> CardinalityEstimate {
-            // TODO: remove the flag _useIndexBounds when SPM-4214 finishes.
-            if (!_useIndexBounds) {
-                // Try to estimate using transformation to match expression.
-                auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
-                if (matchExpr) {
-                    const auto matchExprPtr = matchExpr.get();
-                    return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                        return _samplingEstimator->estimateCardinality(matchExprPtr);
-                    });
-                }
+            // Try to estimate using transformation to match expression.
+            auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
+            if (matchExpr) {
+                const auto matchExprPtr = matchExpr.get();
+                return _ceCache.getOrCompute(std::move(matchExpr), [&] {
+                    return _samplingEstimator->estimateCardinality(matchExprPtr);
+                });
             }
             // Rare case, CE not cached.
             return _samplingEstimator->estimateRIDs(bounds, node->filter.get());

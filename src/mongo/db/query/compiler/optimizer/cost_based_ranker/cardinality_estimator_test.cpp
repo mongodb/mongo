@@ -655,16 +655,16 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScans) {
     oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 4 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilRange);
+    auto indexedPlan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+    auto estIndexedPlan = getPlanSamplingCE(*indexedPlan, collCard, &samplingEstimator);
 
-    auto plan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+    // Create collection scan plan with match expression equivalent to the index bounds.
+    BSONObj query = fromjson("{a: 50, b: {$gte: 4, $lte: 6}}");
+    auto expr = parse(query);
+    auto collPlan = makeCollScanPlan(std::move(expr));
+    auto estCollScan = getPlanSamplingCE(*collPlan, collCard, &samplingEstimator);
 
-    // Use cardinalityEstimator that uses index bounds.
-    auto estIB = getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
-
-    // Use cardinalityEstimator that uses match expression conversion.
-    auto estME = getPlanSamplingCE(*plan, collCard, &samplingEstimator, false /*_useIndexBounds*/);
-
-    ASSERT_EQUALS(estIB, estME);
+    ASSERT_EQUALS(estIndexedPlan, estCollScan);
 }
 
 TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
@@ -678,16 +678,18 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
     std::vector<std::string> indexFields = {"a"};
     BSONObj fetchCond = fromjson("{$or: [{b: 5}, {c: 'xyz'}]}");
     auto fetchExpr = parse(fetchCond);
-    auto plan = makeIndexScanFetchPlan(
+    auto indexedPlan = makeIndexScanFetchPlan(
         makePointIntervalBounds(50.0, indexFields[0]), indexFields, nullptr, std::move(fetchExpr));
+    auto estIndexedPlan = getPlanSamplingCE(*indexedPlan, collCard, &samplingEstimator);
 
-    // Use cardinalityEstimator that uses index bounds.
-    auto estIB = getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+    // Create collection scan plan with match expression that is a conjunction of the index bounds
+    // and the fetch expression.
+    BSONObj query = fromjson("{$and: [{a: 50}, {$or: [{b: 5}, {c: 'xyz'}]}]}");
+    auto expr = parse(query);
+    auto collPlan = makeCollScanPlan(std::move(expr));
+    auto estCollScan = getPlanSamplingCE(*collPlan, collCard, &samplingEstimator);
 
-    // Use cardinalityEstimator that uses match expression conversion.
-    auto estME = getPlanSamplingCE(*plan, collCard, &samplingEstimator, false /*_useIndexBounds*/);
-
-    ASSERT_EQUALS(estIB, estME);
+    ASSERT_EQUALS(estIndexedPlan, estCollScan);
 }
 
 TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimization) {
@@ -712,8 +714,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
         bounds.fields.push_back(makePointInterval(50, indexFields[0]));
 
         auto plan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
-        indexScanNonMultiKeyNoFilterPoint =
-            getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+        indexScanNonMultiKeyNoFilterPoint = getPlanSamplingCE(*plan, collCard, &samplingEstimator);
     }
 
     // 2. check sampling cardinality estimates of index scan
@@ -732,8 +733,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
         bounds.fields.push_back(oilRange);
 
         auto plan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
-        indexScanNonMultiKeyNoFilterRange =
-            getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+        indexScanNonMultiKeyNoFilterRange = getPlanSamplingCE(*plan, collCard, &samplingEstimator);
     }
 
     ASSERT_EQUALS(indexScanNonMultiKeyNoFilterPoint, indexScanNonMultiKeyNoFilterRange);
@@ -749,8 +749,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
 
         auto plan = makeMultiKeyIndexScanFetchPlan(std::move(bounds), std::move(indexFields), "a");
         // Use cardinalityEstimator that uses index bounds.
-        indexScanMultiKey =
-            getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+        indexScanMultiKey = getPlanSamplingCE(*plan, collCard, &samplingEstimator);
     }
 
     ASSERT_EQUALS(indexScanNonMultiKeyNoFilterRange, indexScanMultiKey);

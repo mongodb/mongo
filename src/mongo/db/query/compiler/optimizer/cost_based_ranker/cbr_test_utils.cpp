@@ -249,20 +249,15 @@ CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const Collecti
 
 CardinalityEstimate getPlanSamplingCE(const QuerySolution& plan,
                                       double collCard,
-                                      ce::SamplingEstimator* samplingEstimator,
-                                      bool useIndexBounds) {
+                                      ce::SamplingEstimator* samplingEstimator) {
     EstimateMap qsnEstimates;
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
-    CardinalityEstimator estimator{collInfo,
-                                   samplingEstimator,
-                                   qsnEstimates,
-                                   QueryPlanRankerModeEnum::kSamplingCE,
-                                   useIndexBounds};
+    CardinalityEstimator estimator{
+        collInfo, samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
     const auto ceRes = estimator.estimatePlan(plan);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
 }
-
 
 std::unique_ptr<stats::CollectionStatistics> makeCollStats(double collCard) {
     return makeCollStatsWithHistograms({}, collCard);
