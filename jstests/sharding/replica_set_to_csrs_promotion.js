@@ -8,7 +8,13 @@ import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalit
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility tests", function () {
+    afterEach(() => {
+        TestData.cleanUpCoreDumpsFromExpectedCrash = false;
+    });
+
     it("incompatible with standalone", () => {
+        TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
         const error = assert.throws(() => {
             MongoRunner.runMongod({replicaSetConfigShardMaintenanceMode: ""});
         });
@@ -17,6 +23,8 @@ describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility test
     });
 
     it("incompatible with shardsvr flag", () => {
+        TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
         const rs = new ReplSetTest({nodes: 1});
 
         const error = assert.throws(() => {
