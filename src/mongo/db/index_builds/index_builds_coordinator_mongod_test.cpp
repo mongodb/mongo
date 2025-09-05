@@ -207,11 +207,18 @@ TEST_F(IndexBuildsCoordinatorMongodTest, RestartIndexBuild_HandlesPendingIndexBu
     ASSERT_TRUE(
         _indexBuildsCoord->inProgForCollection(_testFooUUID, IndexBuildProtocol::kTwoPhase));
 
+    auto failPoint = globalFailPointRegistry().find("hangBeforeCompletingAbort");
+    failPoint->setMode(FailPoint::Mode::alwaysOn);
+
     auto thread = stdx::thread([&] {
         // We would not be able to restart the index build.
         auto indexBuilds = _indexBuildsCoord->restartAllTwoPhaseIndexBuilds(operationContext());
         ASSERT_EQ(1, indexBuilds.size());
     });
+
+    // Wait until the index build is aborted.
+    failPoint->waitForTimesEntered(1);
+    failPoint->setMode(FailPoint::Mode::off);
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
