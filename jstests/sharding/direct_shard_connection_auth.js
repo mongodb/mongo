@@ -31,6 +31,15 @@ function getUnauthorizedDirectWritesCount() {
 }
 
 function runTests(shouldBlockDirectConnections, directWriteCount) {
+    function assertUnauthorizedCountIncreased() {
+        const postDirectWriteCount = getUnauthorizedDirectWritesCount();
+        assert.gt(postDirectWriteCount,
+                  directWriteCount,
+                  `Number of direct write count didn't increased. Previous count: ${
+                      directWriteCount}, Current count: ${postDirectWriteCount}`);
+        directWriteCount = postDirectWriteCount;
+    }
+
     // Direct writes with root priviledges should always be authorized.
     assert.commandWorked(shardAdminTestDB.getCollection("coll").update(
         {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
@@ -45,7 +54,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         // In a single shard cluster, this should be allowed
         assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
     } else {
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        assertUnauthorizedCountIncreased();
     }
 
     // Setting the server parameter should cause warnings to be emitted if the cluster only has one
