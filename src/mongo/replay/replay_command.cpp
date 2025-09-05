@@ -54,8 +54,15 @@ OpMsgRequest ReplayCommand::fetchMsgRequest() const {
     }
 }
 
-Date_t ReplayCommand::fetchRequestTimestamp() const {
-    return _packet.date;
+Microseconds ReplayCommand::fetchRequestOffset() const {
+    try {
+        return parseOffset();
+    } catch (const DBException& e) {
+        auto lastError = e.toStatus();
+        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
+    } catch (const std::exception& e) {
+        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, e.what());
+    }
 }
 
 uint64_t ReplayCommand::fetchRequestSessionId() const {
@@ -86,6 +93,13 @@ OpMsgRequest ReplayCommand::parseBody() const {
     // TODO: SERVER-109756 remove unused fields such as lsid.
     return rpc::opMsgRequestFromAnyProtocol(message);
 }
+Microseconds ReplayCommand::parseOffset() const {
+    return _packet.offset;
+}
+
+int64_t ReplayCommand::parseSessionId() const {
+    return _packet.id;
+}
 
 std::string ReplayCommand::parseOpType() const {
     if (_packet.eventType == EventType::kSessionStart) {
@@ -109,9 +123,9 @@ bool ReplayCommand::isSessionEnd() const {
     return _packet.eventType == EventType::kSessionEnd;
 }
 
-std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand& command) {
-    const Date_t timestamp = command.fetchRequestTimestamp();
+std::pair<Microseconds, int64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command) {
+    const Microseconds offset = command.fetchRequestOffset();
     const int64_t sessionId = command.fetchRequestSessionId();
-    return {timestamp, sessionId};
+    return {offset, sessionId};
 }
 }  // namespace mongo

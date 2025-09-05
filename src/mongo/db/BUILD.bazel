@@ -4054,6 +4054,21 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "traffic_recorder_test",
+    srcs = [
+        "traffic_recorder_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":traffic_recorder",
+        "//src/mongo:base",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:tick_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "default_baton_test",
     srcs = [
         "default_baton_test.cpp",

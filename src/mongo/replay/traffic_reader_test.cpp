@@ -34,6 +34,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source_mock.h"
 #include "mongo/util/uuid.h"
 
 #include <filesystem>
@@ -96,7 +97,7 @@ public:
         appendToRecording(os,
                           {.id = 1,
                            .session = "test-session",
-                           .now = csm.now(),
+                           .offset = tsm.ticksTo<Microseconds>(tsm.getTicks()),
                            .order = messageCounter++,
                            .message = makeMessage()});
     }
@@ -126,7 +127,7 @@ public:
     }
 
 
-    ClockSourceMock csm;
+    TickSourceMock<> tsm;
     size_t fileCounter = 0;
     size_t messageCounter = 0;
     // When writing to disk, packets will also be stashed here.

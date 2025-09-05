@@ -39,19 +39,21 @@
 #include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <ratio>
 
 namespace mongo {
 TEST(SessionHandlerTest, StartAndStopSession) {
     ReplayTestServer server;
 
-    auto startRecording = cmds::start({.date = Date_t::now()});
-    auto stopRecording = cmds::stop({.date = Date_t::now() + Milliseconds(5)});
+    auto startRecording = cmds::start({.offset = Milliseconds(0)});
+    auto stopRecording = cmds::stop({.offset = Milliseconds(5)});
 
     {
         const auto uri = server.getConnectionString();
         SessionHandler sessionHandler{uri};
-        sessionHandler.setStartTime(startRecording.fetchRequestTimestamp());
         sessionHandler.onSessionStart(startRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
         sessionHandler.onSessionStop(stopRecording);
@@ -66,20 +68,19 @@ TEST(SessionHandlerTest, StartSessionSameSessionIDError) {
     ReplayTestServer server;
     const auto uri = server.getConnectionString();
 
-    auto commandStart1 = cmds::start({.date = Date_t::now()});
+    auto commandStart1 = cmds::start({.offset = Microseconds(0)});
 
     {
         SessionHandler sessionHandler{uri};
-        sessionHandler.setStartTime(commandStart1.fetchRequestTimestamp());
         sessionHandler.onSessionStart(commandStart1);
-        auto commandStart2 = cmds::start({.date = Date_t::now() + Milliseconds(100)});
+        auto commandStart2 = cmds::start({.offset = Milliseconds(100)});
         // this will throw. we can't have different sessions with same session id.
         ASSERT_THROWS_CODE(sessionHandler.onSessionStart(commandStart2),
                            DBException,
                            ErrorCodes::ReplayClientSessionSimulationError);
 
         // closing the first session and starting again with the same sessionId will work.
-        auto commandStop1 = cmds::stop({.date = Date_t::now()});
+        auto commandStop1 = cmds::stop({.offset = Microseconds(0)});
         sessionHandler.onSessionStop(commandStop1);
         // there should be 0 active sessions and 1 free session simulator to be re-used
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
@@ -96,17 +97,16 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
     const auto uri = server.getConnectionString();
 
     // start command from session 1
-    auto commandStart1 = cmds::start({.id = 1, .date = Date_t::now()});
+    auto commandStart1 = cmds::start({.id = 1, .offset = Microseconds(0)});
 
     // start command from session2
-    auto commandStart2 = cmds::start({.id = 2, .date = Date_t::now()});
+    auto commandStart2 = cmds::start({.id = 2, .offset = Microseconds(50)});
 
     // stop command from session1
-    auto commandStop1 = cmds::stop({.date = Date_t::now()});
+    auto commandStop1 = cmds::stop({.offset = Microseconds(100)});
 
     {
         SessionHandler sessionHandler{uri};
-        sessionHandler.setStartTime(commandStart1.fetchRequestTimestamp());
         sessionHandler.onSessionStart(commandStart1);
 
         sessionHandler.onSessionStop(commandStop1);
@@ -125,14 +125,14 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
 
 TEST(SessionHandlerTest, ExecuteCommand) {
     // start
-    auto startRecording = cmds::start({.date = Date_t::now()});
+    auto startRecording = cmds::start({.offset = Microseconds(0)});
 
     // stop
-    auto stopRecording = cmds::stop({.date = Date_t::now() + Milliseconds(20)});
+    auto stopRecording = cmds::stop({.offset = Milliseconds(20)});
 
     // find
     BSONObj filterBSON = BSON("name" << "Alice");
-    auto findCommand = cmds::find({.date = Date_t::now() + Milliseconds(10)}, filterBSON);
+    auto findCommand = cmds::find({.offset = Milliseconds(10)}, filterBSON);
 
 
     std::string jsonStr = R"([{
@@ -147,7 +147,6 @@ TEST(SessionHandlerTest, ExecuteCommand) {
 
     {
         SessionHandler sessionHandler{uri};
-        sessionHandler.setStartTime(startRecording.fetchRequestTimestamp());
         sessionHandler.onSessionStart(startRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
 

@@ -73,10 +73,9 @@ public:
 
     void start(StringData uri,
                std::chrono::steady_clock::time_point replayStartTime,
-               const Date_t& recordStartTime,
-               const Date_t& eventTimestamp);
-    void stop(const Date_t& sessionEnd);
-    void run(const ReplayCommand&, const Date_t& commandTimeStamp);
+               const Microseconds& eventOffset);
+    void stop(const Microseconds& sessionEndOffset);
+    void run(const ReplayCommand&, const Microseconds& commandOffset);
 
 protected:
     /**
@@ -90,19 +89,13 @@ protected:
 private:
     virtual std::chrono::steady_clock::time_point now() const;
     virtual void sleepFor(std::chrono::steady_clock::duration duration) const;
-    void waitIfNeeded(Date_t) const;
-    void onRecordingStarted(Date_t);
+    void waitIfNeeded(Microseconds) const;
 
     bool _running = false;
     // Timepoint used for computing when events should occur.
     // Derived from steady_clock not system_clock as the replay should
     // not be affected by clock manipulation (e.g., by NTP).
     std::chrono::steady_clock::time_point _replayStartTime;
-    // TODO SERVER-106897: will change the recording format to use
-    // "offset from start" for each event, rather than a wall clock
-    // time point, making the wall clock recording start time
-    // unnecessary.
-    Date_t _recordStartTime;
     std::unique_ptr<ReplayCommandExecutor> _commandExecutor;
     std::unique_ptr<SessionScheduler> _sessionScheduler;
     std::unique_ptr<PerformanceReporter> _perfReporter;

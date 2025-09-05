@@ -39,8 +39,12 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/tick_source.h"
 
+#include <chrono>
 #include <cstdint>
+#include <ratio>
 #include <string>
 
 namespace mongo {
@@ -81,14 +85,15 @@ static const auto stopRecordingPkt = TestReaderPacket::make(BSON("sessionEnd" <<
 //  foobar({.id = 1, .date = now})
 struct PacketArgs {
     uint64_t id = 1;
-    Date_t date = Date_t::now();
+    Microseconds offset{
+        durationCount<Microseconds>(std::chrono::steady_clock::now().time_since_epoch())};
 };
 
 inline TestReplayCommand start(PacketArgs args) {
     auto startRecording = startRecordingPkt;
 
     startRecording.id = args.id;
-    startRecording.date = args.date;
+    startRecording.offset = args.offset;
     startRecording.eventType = EventType::kSessionStart;
     return TestReplayCommand{startRecording};
 }
@@ -97,7 +102,7 @@ inline TestReplayCommand stop(PacketArgs args) {
     auto stopRecording = stopRecordingPkt;
 
     stopRecording.id = args.id;
-    stopRecording.date = args.date;
+    stopRecording.offset = args.offset;
     stopRecording.eventType = EventType::kSessionEnd;
     return TestReplayCommand{stopRecording};
 }
@@ -107,7 +112,7 @@ auto find(PacketArgs args, OtherArgs&&... otherArgs) {
     auto packet = TestReaderPacket::find(std::forward<OtherArgs>(otherArgs)...);
 
     packet.id = args.id;
-    packet.date = args.date;
+    packet.offset = args.offset;
     return TestReplayCommand{packet};
 }
 
@@ -116,7 +121,7 @@ auto insert(PacketArgs args, OtherArgs&&... otherArgs) {
     auto packet = TestReaderPacket::insert(std::forward<OtherArgs>(otherArgs)...);
 
     packet.id = args.id;
-    packet.date = args.date;
+    packet.offset = args.offset;
     return TestReplayCommand{packet};
 }
 
@@ -125,7 +130,7 @@ auto aggregate(PacketArgs args, OtherArgs&&... otherArgs) {
     auto packet = TestReaderPacket::aggregate(std::forward<OtherArgs>(otherArgs)...);
 
     packet.id = args.id;
-    packet.date = args.date;
+    packet.offset = args.offset;
     return TestReplayCommand{packet};
 }
 
@@ -134,7 +139,7 @@ auto del(PacketArgs args, OtherArgs&&... otherArgs) {
     auto packet = TestReaderPacket::del(std::forward<OtherArgs>(otherArgs)...);
 
     packet.id = args.id;
-    packet.date = args.date;
+    packet.offset = args.offset;
     return TestReplayCommand{packet};
 }
 

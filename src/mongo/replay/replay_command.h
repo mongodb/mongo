@@ -52,7 +52,7 @@ public:
     OpMsgRequest fetchMsgRequest() const;
 
     /** Extract only the timestamp. Useful for session simulation. */
-    Date_t fetchRequestTimestamp() const;
+    Microseconds fetchRequestOffset() const;
 
     /** Extract the session id for the current command */
     uint64_t fetchRequestSessionId() const;
@@ -76,9 +76,22 @@ public:
 private:
     /** Extract the actual message body containing the actual bson command containing the query */
     OpMsgRequest parseBody() const;
+
+    /*
+     * Extract timestamp of when the command was recorded on the server and use it for deciding
+     * whether to replay the command or not
+     */
+    Microseconds parseOffset() const;
+
+    /*
+     * Extract sessionId. Used for pinning the command to a session simulator
+     */
+    int64_t parseSessionId() const;
+
+
     TrafficReaderPacket _packet;
 };
 
-std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand& command);
+std::pair<Microseconds, int64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command);
 
 }  // namespace mongo

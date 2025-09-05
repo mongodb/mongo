@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/util/duration.h"
+
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
@@ -90,19 +92,18 @@ TrafficReaderPacket readPacket(ConstDataRangeCursor cdr) {
     EventType eventType = cdr.readAndAdvance<EventType>();
     uint64_t id = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     StringData session = cdr.readAndAdvance<Terminated<'\0', StringData>>();
-    uint64_t date = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    int64_t offsetMicrosCount = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+    Microseconds offset{offsetMicrosCount};
     uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     MsgData::ConstView message(cdr.data());
     tassert(10562701,
             "The value of 'eventType' can only be a value of existent event type",
             eventType < EventType::kMax);
 
-    return TrafficReaderPacket{
-        eventType, id, session, Date_t::fromMillisSinceEpoch(date), order, message};
+    return TrafficReaderPacket{eventType, id, session, offset, order, message};
 }
 
 namespace {
-
 bool readBytes(size_t toRead, char* buf, int fd) {
     while (toRead) {
 #ifdef _WIN32
@@ -166,18 +167,9 @@ void getBSONObjFromPacket(TrafficReaderPacket& packet, BSONObjBuilder* builder) 
         }
     }
 
-    // The seen field represents the time that the operation took place
-    // Trying to re-create the way mongoreplay does this
-    {
-        BSONObjBuilder seen(builder->subobjStart("seen"));
-        seen.append("sec",
-                    static_cast<int64_t>((packet.date.toMillisSinceEpoch()) + unixToInternal));
-        seen.append("nsec", static_cast<int32_t>(packet.order));
-    }
-
     builder->append("event", static_cast<int32_t>(packet.eventType));
     builder->append("session", packet.session);
-    // Fill out the remaining fields
+    builder->append("offset", durationCount<Microseconds>(packet.offset));
     builder->append("order", static_cast<int64_t>(packet.order));
     builder->append("seenconnectionnum", static_cast<int64_t>(packet.id));
     builder->append("playedconnectionnum", static_cast<int64_t>(0));
@@ -211,8 +203,8 @@ bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& r
     std::string_view readData(read.message.data(), read.message.dataLen());
     MsgData::ConstView recordedView(recorded.message.buf());
     std::string_view recordedData(recordedView.data(), recordedView.dataLen());
-    return std::tie(read.id, read.session, read.date, read.order, readData) ==
-        std::tie(recorded.id, recorded.session, recorded.now, recorded.order, recordedData);
+    return std::tie(read.id, read.session, read.offset, read.order, readData) ==
+        std::tie(recorded.id, recorded.session, recorded.offset, recorded.order, recordedData);
 }
 
 BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {

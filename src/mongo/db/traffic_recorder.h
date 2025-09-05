@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/platform/atomic_word.h"
@@ -36,7 +37,9 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/synchronized_value.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -56,11 +59,11 @@ enum class EventType : uint8_t {
 };
 struct TrafficRecordingPacket {
     EventType eventType;
-    uint64_t id;
-    std::string session;
-    Date_t now;
-    uint64_t order;
-    Message message;
+    const uint64_t id;
+    const std::string session;
+    const Microseconds offset;  // Offset from the start of the recording in microseconds.
+    const uint64_t order;
+    const Message message;
 };
 
 class DataBuilder;
@@ -81,7 +84,7 @@ public:
     static TrafficRecorder& get(ServiceContext* svc);
 
     TrafficRecorder();
-    ~TrafficRecorder();
+    virtual ~TrafficRecorder();
 
     // Start and stop block until the associate operation has succeeded or failed
     //
@@ -97,6 +100,8 @@ public:
 
     // This is the main interface to record a message. It also maintains open sessions in order to
     // record 'kSessionStart' and 'kSessionEnd' events.
+    // TODO SERVER-106769: change usage of TickSource/std::chrono::steady_clock to solution proposed
+    // in SERVER-106769
     void observe(const std::shared_ptr<transport::Session>& ts,
                  const Message& message,
                  ServiceContext* svcCtx,
@@ -104,9 +109,64 @@ public:
 
     class TrafficRecorderSSS;
 
+protected:
+    /**
+     * The Recording class represents a single recording that the recorder is exposing.  It's made
+     * up of a background thread which flushes records to disk, and helper methods to push to that
+     * thread, expose stats, and stop the recording.
+     */
+    class Recording {
+    public:
+        Recording(const StartTrafficRecording& options, TickSource* tickSource);
+        virtual ~Recording() = default;
 
-private:
-    class Recording;
+        virtual void run();
+        virtual Status shutdown();
+
+        /**
+         * pushRecord returns false if the queue was full.  This is ultimately fatal to the
+         * recording
+         */
+        bool pushRecord(uint64_t id,
+                        std::string session,
+                        Microseconds offset,
+                        const uint64_t& order,
+                        const Message& message,
+                        EventType eventType = EventType::kRegular);
+
+        BSONObj getStats();
+
+        AtomicWord<uint64_t> order{0};
+        AtomicWord<Microseconds> startTime{
+            Microseconds::zero()};  // Start time of the recording in microseconds since the epoch.
+    protected:
+        struct CostFunction {
+            size_t operator()(const TrafficRecordingPacket& packet) const {
+                return sizeof(TrafficRecordingPacket) + packet.message.size();
+            }
+        };
+
+        MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe _pcqPipe;
+
+
+    private:
+        static std::string _getPath(const std::string& filename);
+
+        const std::string _path;
+        const int64_t _maxLogSize;
+
+        stdx::thread _thread;
+
+        stdx::mutex _mutex;
+        bool _inShutdown = false;
+        TrafficRecorderStats _trafficStats;
+        int64_t _written = 0;
+        Status _result = Status::OK();
+    };
+
+    // Helper method to be overridden in tests
+    virtual std::shared_ptr<Recording> _makeRecording(const StartTrafficRecording& options,
+                                                      TickSource* tickSource) const;
 
     void updateOpenSessions(uint64_t id, const std::string& session, EventType eventType);
 
@@ -117,5 +177,31 @@ private:
     mutable stdx::recursive_mutex _openSessionsLk;
     stdx::unordered_map<uint64_t, std::string> _openSessions;
     mongo::synchronized_value<std::shared_ptr<Recording>> _recording;
+};
+
+class TrafficRecorderForTest : public TrafficRecorder {
+public:
+    TrafficRecorderForTest() = default;
+    ~TrafficRecorderForTest() override = default;
+
+
+    class RecordingForTest : public TrafficRecorder::Recording {
+    public:
+        RecordingForTest(const StartTrafficRecording& options, TickSource* tickSource);
+
+        // Accessor for testing purposes
+        MultiProducerSingleConsumerQueue<TrafficRecordingPacket,
+                                         TrafficRecorder::Recording::CostFunction>::Pipe&
+        getPcqPipe();
+
+        void run() override;
+
+        Status shutdown() override;
+    };
+
+    std::shared_ptr<RecordingForTest> getCurrentRecording() const;
+
+    std::shared_ptr<Recording> _makeRecording(const StartTrafficRecording& options,
+                                              TickSource* tickSource) const override;
 };
 }  // namespace mongo

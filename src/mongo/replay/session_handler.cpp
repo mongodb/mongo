@@ -37,21 +37,16 @@
 
 namespace mongo {
 
-void SessionHandler::setStartTime(Date_t recordStartTime) {
-    _replayStartTime = std::chrono::steady_clock::now();
-    _recordStartTime = recordStartTime;
-}
-
-void SessionHandler::onSessionStart(Date_t eventTimestamp, int64_t sessionId) {
+void SessionHandler::onSessionStart(Microseconds offset, int64_t sessionId) {
     addToRunningSessionCache(sessionId);
     // now initialize the session.
     auto& session = getSessionSimulator(sessionId);
     // connects to the server
-    session.start(_uri, _replayStartTime, _recordStartTime, eventTimestamp);
+    session.start(_uri, _replayStartTime, offset);
 }
 void SessionHandler::onSessionStart(const ReplayCommand& command) {
-    const auto& [ts, sid] = extractTimeStampAndSessionFromCommand(command);
-    onSessionStart(ts, sid);
+    const auto& [offset, sid] = extractOffsetAndSessionFromCommand(command);
+    onSessionStart(offset, sid);
 }
 
 void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
@@ -59,9 +54,9 @@ void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
             "Error, failed the command does not represent a stop recording event.",
             stopCommand.isSessionEnd());
 
-    const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(stopCommand);
+    const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(stopCommand);
     auto& session = getSessionSimulator(sessionId);
-    session.stop(timestamp);
+    session.stop(offset);
     // this is correct, because the scheduler will wait until the stop command would have run. In
     // case of errors, the session will need to be deleted either way.
     removeFromRunningSessionCache(sessionId);
@@ -69,12 +64,12 @@ void SessionHandler::onSessionStop(const ReplayCommand& stopCommand) {
 
 void SessionHandler::onBsonCommand(const ReplayCommand& command) {
     // just run the command. the Session simulator will make sure things work.
-    const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
+    const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(command);
     uassert(ErrorCodes::ReplayClientSessionSimulationError,
             "Error, the session should be active",
             isSessionActive(sessionId));
     auto& session = getSessionSimulator(sessionId);
-    session.run(command, timestamp);
+    session.run(command, offset);
 }
 
 void SessionHandler::clear() {

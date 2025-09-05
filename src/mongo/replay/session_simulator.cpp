@@ -75,17 +75,15 @@ void SessionSimulator::shutdown() {
 
 void SessionSimulator::start(StringData uri,
                              std::chrono::steady_clock::time_point replayStartTime,
-                             const Date_t& recordStartTime,
-                             const Date_t& eventTimestamp) {
+                             const Microseconds& offset) {
     // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
     // read member variables, because there is only one thread. Beware about spawning multiple
     // threads. Order of commands can be different than the ones recorded and a mutex must be used
     // for supporting multiple threads.
-    auto f = [this, uri = std::string(uri), replayStartTime, recordStartTime, eventTimestamp]() {
+    auto f = [this, uri = std::string(uri), replayStartTime, offset]() {
         _replayStartTime = replayStartTime;
-        _recordStartTime = recordStartTime;
         // wait if simulation and recording start time have diverged.
-        waitIfNeeded(eventTimestamp);
+        waitIfNeeded(offset);
         // connect
         _commandExecutor->connect(uri);
         // set running flag.
@@ -95,32 +93,32 @@ void SessionSimulator::start(StringData uri,
     _sessionScheduler->submit([f]() { handleErrors(f); });
 }
 
-void SessionSimulator::stop(const Date_t& sessionEnd) {
+void SessionSimulator::stop(const Microseconds& sessionEndOffset) {
     // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
     // read member variables, because there is only one thread. Beware about spawning multiple
     // threads. Order of commands can be different than the ones recorded and a mutex must be used
     // for supporting multiple threads.
-    auto f = [this, sessionEnd]() {
+    auto f = [this, sessionEndOffset]() {
         uassert(ErrorCodes::ReplayClientSessionSimulationError,
                 "SessionSimulator is not connected to a valid mongod/s instance.",
                 _running);
-        waitIfNeeded(sessionEnd);
+        waitIfNeeded(sessionEndOffset);
         _commandExecutor->reset();
     };
 
     _sessionScheduler->submit([f]() { handleErrors(f); });
 }
 
-void SessionSimulator::run(const ReplayCommand& command, const Date_t& commandTimeStamp) {
+void SessionSimulator::run(const ReplayCommand& command, const Microseconds& commandOffset) {
     // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
     // read member variables, because there is only one thread. Beware about spawning multiple
     // threads. Order of commands can be different than the ones recorded and a mutex must be used
     // for supporting multiple threads.
-    auto f = [this, command, commandTimeStamp]() {
+    auto f = [this, command, commandOffset]() {
         uassert(ErrorCodes::ReplayClientSessionSimulationError,
                 "SessionSimulator is not connected to a valid mongod/s instance.",
                 _running);
-        waitIfNeeded(commandTimeStamp);
+        waitIfNeeded(commandOffset);
         _perfReporter->executeAndRecordPerf(
             [this](const ReplayCommand& command) { return _commandExecutor->runCommand(command); },
             command);
@@ -137,14 +135,9 @@ void SessionSimulator::sleepFor(std::chrono::steady_clock::duration duration) co
     stdx::this_thread::sleep_for(duration);
 }
 
-void SessionSimulator::waitIfNeeded(Date_t eventTimestamp) const {
+void SessionSimulator::waitIfNeeded(Microseconds recordingOffset) const {
 
-    // TODO SERVER-106897: Date_t precision is only milliseconds; traffic reader will change the
-    // recording format to use "offset from start" for each event with higher precision.
-    auto recordingOffset =
-        mongo::duration_cast<Microseconds>(eventTimestamp - _recordStartTime).toSystemDuration();
-
-    auto targetTime = _replayStartTime + recordingOffset;
+    auto targetTime = _replayStartTime + recordingOffset.toSystemDuration();
     auto requiredDelay = targetTime - now();
     // wait if needed
     if (requiredDelay > requiredDelay.zero()) {

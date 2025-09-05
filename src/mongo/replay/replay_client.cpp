@@ -207,12 +207,9 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
             return;
         }
 
-        // setup recording and replaying starting time
-        auto firstCommand = *iter;
         // create a new session handler for mananging the recording.
         SessionHandler sessionHandler{replayConfig.mongoURI,
                                       replayConfig.enablePerformanceRecording};
-        sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
 
         for (const auto& packet : iter) {
             if (stop.stop_requested()) {
@@ -225,8 +222,8 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
             if (command.isSessionStart()) {
                 // will associated the URI to a session task and run all the commands associated
                 // with this session id.
-                const auto& [timestamp, sessionId] = extractTimeStampAndSessionFromCommand(command);
-                sessionHandler.onSessionStart(timestamp, sessionId);
+                const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(command);
+                sessionHandler.onSessionStart(offset, sessionId);
             } else if (command.isSessionEnd()) {
                 // stop commad will reset the complete the simulation and reset the connection.
                 sessionHandler.onSessionStop(command);

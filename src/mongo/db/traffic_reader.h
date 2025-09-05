@@ -46,7 +46,7 @@ struct TrafficReaderPacket {
     EventType eventType;
     uint64_t id;
     StringData session;
-    Date_t date;
+    Microseconds offset;  // offset from the start of the recording in microseconds
     uint64_t order;
     MsgData::ConstView message;
 };
