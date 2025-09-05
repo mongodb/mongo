@@ -1302,6 +1302,11 @@ bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery&
         return false;
     }
 
+    // Find and aggregate queries with the $_startAt parameter are not supported in SBE.
+    if (!cq.getFindCommandRequest().getStartAt().isEmpty()) {
+        return false;
+    }
+
     const auto& sortPattern = cq.getSortPattern();
     return !sortPattern || isSortSbeCompatible(*sortPattern);
 }
