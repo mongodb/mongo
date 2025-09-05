@@ -1079,6 +1079,13 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
                                     boost::none /* shardVersion */,
                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
+    // TODO SERVER-108928 - Handle this inside of prepareCmdObjForPassthrough.
+    if (isRawDataOperation(opCtx)) {
+        BSONObjBuilder bob(cmdObjForPassthrough);
+        bob.append(kRawDataFieldName, true);
+        cmdObjForPassthrough = bob.obj();
+    }
+
     boost::optional<WriteConcernErrorDetail> wce;
     auto swRes =
         write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough, wce);

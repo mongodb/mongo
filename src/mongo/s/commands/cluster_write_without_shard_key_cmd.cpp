@@ -282,7 +282,8 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
 
             return bulkWriteRequest->toBSON();
         } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
-            if (isRawDataOperation(opCtx) && isTrackedTimeseries) {
+            if (isRawDataOperation(opCtx) && isTrackedTimeseries &&
+                nss.isTimeseriesBucketsCollection()) {
                 opMsgRequest.body =
                     rewriteCommandForRawDataOperation<write_ops::UpdateCommandRequest>(
                         opMsgRequest.body, nss.coll());
@@ -326,7 +327,8 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
             batchedCommandRequest.setShardVersion(shardVersion);
             return batchedCommandRequest.toBSON();
         } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
-            if (isRawDataOperation(opCtx) && isTrackedTimeseries) {
+            if (isRawDataOperation(opCtx) && isTrackedTimeseries &&
+                nss.isTimeseriesBucketsCollection()) {
                 opMsgRequest.body =
                     rewriteCommandForRawDataOperation<write_ops::DeleteCommandRequest>(
                         opMsgRequest.body, nss.coll());
@@ -363,7 +365,8 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
             return batchedCommandRequest.toBSON();
         } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                    commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
-            if (isRawDataOperation(opCtx) && isTrackedTimeseries) {
+            if (isRawDataOperation(opCtx) && isTrackedTimeseries &&
+                nss.isTimeseriesBucketsCollection()) {
                 opMsgRequest.body =
                     rewriteCommandForRawDataOperation<write_ops::FindAndModifyCommandRequest>(
                         opMsgRequest.body, nss.coll());
@@ -456,6 +459,10 @@ public:
                         "Running write phase for a write without a shard key.",
                         "clientWriteRequest"_attr = redact(writeCmd),
                         "shardId"_attr = redact(shardId));
+
+            if (OptionalBool::parseFromBSON(writeCmd[kRawDataFieldName])) {
+                isRawDataOperation(opCtx) = true;
+            }
 
             const auto targetedWriteRequest =
                 makeTargetWriteRequest(opCtx, shardId, ns().dbName(), writeCmd, targetDocId);

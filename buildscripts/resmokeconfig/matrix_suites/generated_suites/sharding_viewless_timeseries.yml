@@ -39,6 +39,7 @@ selector:
     - jstests/sharding/resharding_timeseries/resharding_ts_txn_cloner.js
     - jstests/sharding/resharding_timeseries/unshard_timeseries.js
     - jstests/sharding/timeseries/timeseries_balancer.js
+    - jstests/sharding/timeseries/timeseries_buckets_find_and_modify.js
     - jstests/sharding/timeseries/timeseries_buckets_modification_with_id.js
     - jstests/sharding/timeseries/timeseries_change_stream_no_orphans.js
     - jstests/sharding/timeseries/timeseries_cluster_collstats.js
@@ -50,6 +51,7 @@ selector:
     - jstests/sharding/timeseries/timeseries_delete_one_without_shard_key.js
     - jstests/sharding/timeseries/timeseries_delete_with_meta.js
     - jstests/sharding/timeseries/timeseries_drop.js
+    - jstests/sharding/timeseries/timeseries_find_and_modify_raw_data_explain_without_shard_key.js
     - jstests/sharding/timeseries/timeseries_find_and_modify_remove.js
     - jstests/sharding/timeseries/timeseries_find_and_modify_update.js
     - jstests/sharding/timeseries/timeseries_indexes.js
