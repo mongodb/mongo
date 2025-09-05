@@ -265,7 +265,7 @@ class TestTestTimeout(_ResmokeSelftest):
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_test_timeout.yml",
             "--taskId=123",
             "--originSuite=resmoke_end2end_tests",
-            "--testTimeout=2",
+            "--testTimeout=5",
             "--internalParam=test_analysis",
             "--continueOnFailure",
             f"--reportFile={reportFile}",
