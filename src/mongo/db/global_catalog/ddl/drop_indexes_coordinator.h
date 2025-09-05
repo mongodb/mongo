@@ -50,10 +50,8 @@ public:
 
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
-    BSONObj getResult(OperationContext* opCtx) {
-        getCompletionFuture().get(opCtx);
-        tassert(10695001, "dropIndexes result unavailable", _result.is_initialized());
-        return *_result;
+    boost::optional<BSONObj> getResult(OperationContext* opCtx) {
+        return _getDoc().getResult();
     }
 
 private:
@@ -64,11 +62,14 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    void _dropIndexesPhase(OperationContext* opCtx,
-                           std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                           const CancellationToken& token);
+    void _dropIndexes(OperationContext* opCtx,
+                      std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                      const CancellationToken& token);
+
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
 
     const DropIndexesRequest _request;
-    boost::optional<BSONObj> _result;
 };
 }  // namespace mongo

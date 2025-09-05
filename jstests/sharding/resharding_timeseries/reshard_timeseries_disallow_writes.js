@@ -129,8 +129,17 @@ reshardingTest.withReshardingInBackground(
             jsTestLog("Completed operations");
         },
         afterReshardingFn: () => {
-            jsTestLog("Join possible ongoing collMod command");
+            jsTestLog("Join possible ongoing collMod command and dropIndexes commands");
             assert.commandWorked(coll.runCommand("collMod"));
+            // TODO SERVER-107420: Remove IndexNotFound from acceptable dropIndexes errors once 9.0
+            // becomes LTS
+            assert.commandWorkedOrFailedWithCode(
+                coll.runCommand({
+                    dropIndexes: coll.getName(),
+                    index: {indexToDropDuringResharding: 1},
+                }),
+                ErrorCodes.IndexNotFound,
+            );
         },
     },
 );

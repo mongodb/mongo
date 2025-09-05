@@ -46,7 +46,9 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kFreezeMigrations: "freezeMigrations"
             kDropIndexes: "dropIndexes"
+            kResumeMigrations: "resumeMigrations"
 
 structs:
     DropIndexesCoordinatorDocument:
@@ -62,3 +64,9 @@ structs:
             dropIndexesRequest:
                 type: DropIndexesRequest
                 description: "Initial dropIndexes request."
+            result:
+                type: object
+                description: >-
+                    Contains the dropIndexes results from all the shards.
+                    It's necessary to populate the 'raw' field returned to the driver.
+                optional: true

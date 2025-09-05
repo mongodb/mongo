@@ -182,6 +182,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     // increase in order to be logged in "<db>.system.profile".
     CurOp::get(opCtx)->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                                .getDatabaseProfileLevel(ns().dbName()));
+
     while (true) {
         boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
 
@@ -218,7 +219,16 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             }
 
             optFixedFcvRegion.reset();
-            return Response(coordinator->getResult(opCtx));
+            auto completionStatus = coordinator->getCompletionFuture().getNoThrow(opCtx);
+            auto result = coordinator->getResult(opCtx);
+
+            if (!result) {
+                uassertStatusOK(completionStatus);
+
+                // Result must be populated if the coordinator succeeded.
+                tasserted(10710101, "DropIndexes result unavailable");
+            }
+            return Response(result->getOwned());
         }
 
         optFixedFcvRegion.reset();

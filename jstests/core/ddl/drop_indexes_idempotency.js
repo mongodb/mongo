@@ -3,8 +3,6 @@
  *
  * @tags: [
  * requires_fcv_83,
- * # TODO SERVER-107101: Remove when dropIndexes supports balancer
- * assumes_balancer_off,
  * ]
  */
 

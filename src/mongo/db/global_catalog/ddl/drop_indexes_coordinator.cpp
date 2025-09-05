@@ -67,10 +67,9 @@ void DropIndexesCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) c
     cmdInfoBuilder->appendElements(_request.toBSON());
 };
 
-void DropIndexesCoordinator::_dropIndexesPhase(
-    OperationContext* opCtx,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) {
+void DropIndexesCoordinator::_dropIndexes(OperationContext* opCtx,
+                                          std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                          const CancellationToken& token) {
     auto dropIndexesRequest = _request;
     auto targetNss = nss();
 
@@ -90,7 +89,6 @@ void DropIndexesCoordinator::_dropIndexesPhase(
             const auto chunkManager = cri.getChunkManager();
             std::map<ShardId, ShardVersion> shardIdsToShardVersions;
 
-
             if (chunkManager.hasRoutingTable()) {
                 std::set<ShardId> shardIds;
                 chunkManager.getAllShardIds(&shardIds);
@@ -102,6 +100,7 @@ void DropIndexesCoordinator::_dropIndexesPhase(
                 shardIdsToShardVersions[ShardingState::get(opCtx)->shardId()] =
                     ShardVersion::UNSHARDED();
             }
+
             const auto session = getNewSession(opCtx);
 
             ShardsvrDropIndexesParticipant dropIndexesParticipantRequest(targetNss);
@@ -136,11 +135,30 @@ void DropIndexesCoordinator::_dropIndexesPhase(
 
             CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
 
-            _result = result.obj();
+            DropIndexesCoordinatorDocument newDoc = _getDoc();
+            newDoc.setResult(result.obj());
+            _updateStateDocument(opCtx, std::move(newDoc));
 
             for (const auto& cmdResponse : responses) {
                 uassertStatusOK(cmdResponse.swResponse);
             }
+        });
+}
+
+ExecutorFuture<void> DropIndexesCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, status, anchor = shared_from_this(), executor] {
+            const auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            // Ensure migrations are resumed before terminating the coordinator.
+            const auto session = getNewSession(opCtx);
+            sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none /* uuid */, session);
+
+            return Status::OK();
         });
 }
 
@@ -149,15 +167,31 @@ ExecutorFuture<void> mongo::DropIndexesCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
+            Phase::kFreezeMigrations,
+            [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::stopMigrations(opCtx, nss(), boost::none, session);
+            }))
+        .then(_buildPhaseHandler(
             Phase::kDropIndexes,
             [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
-                _dropIndexesPhase(opCtx, executor, token);
+                _dropIndexes(opCtx, executor, token);
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kResumeMigrations,
+            [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
-            if (_result) {
-                // The status will be propagated through _result if it's been populated. We do this
-                // in order to ensure the raw field is returned.
-                return Status::OK();
+            if (_doc.getPhase() < Phase::kFreezeMigrations) {
+                return status;
+            }
+
+            if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {
+                const auto opCtxHolder = makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                triggerCleanup(opCtx, status);
             }
             return status;
         });

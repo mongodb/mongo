@@ -10,6 +10,7 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
@@ -46,7 +47,7 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     ShardVersioningUtil.assertShardVersionEquals(st.shard0, ns, Timestamp(0, 0));
 
     // The donor shard for the last moveChunk will have the latest collection version.
-    const latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
+    let latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
 
     // Assert that besides the latest donor shard (shard1), all shards have stale collection
     // version.
@@ -57,6 +58,10 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
         testCase.setUpFuncForCheckShardVersionTest();
     }
     assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
+
+    if (testCase.bumpExpectedCollectionVersionAfterCommand) {
+        latestCollectionVersion = testCase.bumpExpectedCollectionVersionAfterCommand(latestCollectionVersion);
+    }
 
     // Assert that the targeted shards have the latest collection version after the command is
     // run.
@@ -73,6 +78,11 @@ function assertCommandBlocksIfCriticalSectionInProgress(st, staticMongod, dbName
     const ns = dbName + "." + collName;
     const fromShard = st.shard0;
     const toShard = st.shard1;
+
+    if (testCase.skipCriticalSectionTest && testCase.skipCriticalSectionTest()) {
+        jsTestLog(`Skipping critical section test for ${tojson(testCase.command)}`);
+        return;
+    }
 
     if (testCase.setUpFuncForCriticalSectionTest) {
         testCase.setUpFuncForCriticalSectionTest();
@@ -150,6 +160,13 @@ const testCases = {
         };
         return {
             command: {dropIndexes: collName, index: index.name},
+            bumpExpectedCollectionVersionAfterCommand: (expectedCollVersion) => {
+                if (FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator")) {
+                    // When the dropIndexes command spawns a sharding DDL coordinator, the collection version will be bumped twice: once for stopping migrations, and once for resuming migrations.
+                    return new Timestamp(expectedCollVersion.getTime(), expectedCollVersion.getInc() + 2);
+                }
+                return expectedCollVersion;
+            },
             setUpFuncForCheckShardVersionTest: () => {
                 // Create the index directly on all the shards. Note that this will not cause stale
                 // shards to refresh their shard versions.
@@ -180,6 +197,14 @@ const testCases = {
 
                 // Create the index directly on all the shards so shards.
                 createIndexOnAllShards();
+            },
+            skipCriticalSectionTest: () => {
+                if (FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator")) {
+                    // The dropIndexes command spawns a sharding DDL coordintaor, which doesn't timeout.
+                    // Therefore, we can't run this test case which relies on the command timing out.
+                    return true;
+                }
+                return false;
             },
             assertCommandRanOnShard: (shard) => {
                 ShardedIndexUtil.assertIndexDoesNotExistOnShard(shard, dbName, collName, index.key);

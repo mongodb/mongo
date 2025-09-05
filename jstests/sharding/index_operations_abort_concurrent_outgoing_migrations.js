@@ -8,6 +8,7 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -82,6 +83,11 @@ const stepNames = [moveChunkStepNames.startedMoveChunk, moveChunkStepNames.reach
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
+// The dropIndexes test cases need to be skipped when dropIndexes run in a sharding ddl coordinator.
+// This is because the ddl coordinator will wait for the migration to terminate instead of just
+// throwing a fire and forget abort migration signal, which is the old dropIndexes behavior.
+const skipDropIndexesTests = FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator");
+
 stepNames.forEach((stepName) => {
     jsTest.log(`Testing that createIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`);
     const collName = "testCreateIndexesMoveChunkStep" + stepName;
@@ -143,16 +149,19 @@ stepNames.forEach((stepName) => {
 });
 
 stepNames.forEach((stepName) => {
+    if (skipDropIndexesTests) {
+        jsTest.log("Skipping dropIndexes tests because the dropIndexes operation runs on a sharding DDL coordinator.");
+        return;
+    }
+
     jsTest.log(`Testing that dropIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`);
     const collName = "testDropIndexesMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-
     // Create the index on the primary shard prior to the migration so that the migration is not
     // aborted because of createIndexes instead of dropIndexes.
     assert.commandWorked(st.shard0.getCollection(ns).createIndexes([index]));
-
     assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
         assert.commandWorked(st.s.getCollection(ns).dropIndexes(index));
     });
@@ -171,6 +180,11 @@ stepNames.forEach((stepName) => {
 });
 
 stepNames.forEach((stepName) => {
+    if (skipDropIndexesTests) {
+        jsTest.log("Skippine dropIndexes tests because the dropIndexes operation runs on a sharding DDL coordinator.");
+        return;
+    }
+
     jsTest.log(
         `Testing that dropIndex of a hashed shard key index aborts concurrent outgoing migrations that are in step ${
             stepName
