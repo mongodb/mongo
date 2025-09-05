@@ -193,9 +193,8 @@ Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     std::string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    wtRu.getSessionNoTxn()->closeAllCursors(uri);
-
-    WiredTigerSession session(_connection.get());
+    auto& session = *wtRu.getSessionNoTxn();
+    session.closeAllCursors(uri);
 
     int ret = session.drop(uri.c_str(), "checkpoint_wait=false,force=true");
     Status status = Status::OK();
