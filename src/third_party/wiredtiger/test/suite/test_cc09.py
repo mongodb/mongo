@@ -78,9 +78,11 @@ class test_cc09(test_cc_base):
         # Restart to have everything on disk.
         self.reopen_conn()
 
-        # Open the table as we need the dhandle to be open for checkpoint cleanup to process the
-        # table.
+        # Open the table and perform a read as we need the dhandle to be open for checkpoint cleanup
+        # to process the table.
         cursor = self.session.open_cursor(uri, None, None)
+        self.assertEqual(cursor.next(), 0)
+        self.assertEqual(cursor.reset(), 0)
 
         if self.has_delete:
             self.session.begin_transaction()

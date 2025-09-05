@@ -373,7 +373,6 @@ __wt_update_obsolete_check(
     wt_timestamp_t prune_timestamp;
     size_t delta_upd_size, size, upd_size;
     uint64_t oldest_id;
-    uint8_t prepare_state;
     u_int count;
 
     next = NULL;
@@ -403,22 +402,14 @@ __wt_update_obsolete_check(
             continue;
 
         /*
-         * WiredTiger internal operations such as rollback to stable and prepare transaction
-         * rollback adds a globally visible tombstone to the update chain to remove the entire key.
-         * Treating these globally visible tombstones as obsolete and trimming update list can cause
-         * problems if the update chain is getting accessed somewhere else. To avoid this problem,
-         * skip these globally visible tombstones from the update obsolete check that were generated
-         * from prepare transaction rollback but not from RTS, because there are no concurrent
-         * operations run in parallel to the RTS to be affected.
+         * Prepare transaction rollback adds a globally visible tombstone to the update chain to
+         * remove the entire key. Treating these globally visible tombstones as obsolete and
+         * trimming update list can cause problems if the update chain is getting accessed somewhere
+         * else. To avoid this problem, skip these globally visible tombstones from the update
+         * obsolete check.
          */
-        if (upd->txnid == WT_TXN_NONE && upd->upd_start_ts == WT_TS_NONE &&
-          upd->type == WT_UPDATE_TOMBSTONE && upd->next != NULL &&
-          upd->next->txnid == WT_TXN_ABORTED) {
-            WT_ACQUIRE_READ(prepare_state, upd->next->prepare_state);
-            /* We may see a locked prepare state if we race with prepare rollback. */
-            if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
-                continue;
-        }
+        if (F_ISSET(upd, WT_UPDATE_PREPARE_ROLLBACK))
+            continue;
 
         /*
          * If a table has garbage collection enabled, then trim updates as possible. We should check

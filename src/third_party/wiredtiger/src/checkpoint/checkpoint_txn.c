@@ -814,11 +814,11 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
         /* Precise checkpoint doesn't support non-timestamped checkpoint. */
         if (!use_timestamp)
-            return (EINVAL);
+            WT_ERR(EINVAL);
 
         /* Precise checkpoint needs the stable timestamp. */
         if (txn_global->stable_timestamp == WT_TS_NONE)
-            return (EINVAL);
+            WT_ERR_MSG(session, EINVAL, "Precise checkpoint requires a stable timestamp");
     }
 
     /*
@@ -1650,8 +1650,21 @@ err:
     }
 
     /*
-     * Update the global checkpoint ID in disaggregated storage. This has to be done after
-     * checkpoint resolve, which happens when we turn off metadata tracking above.
+     * If the stable timestamp advanced, ensure that we reflect it in the checkpoint metadata in
+     * disaggregated storage, even if there were no other changes.
+     */
+    WT_ACQUIRE_READ(num_meta_put, conn->disaggregated_storage.num_meta_put);
+    if (!failed && __wt_conn_is_disagg(session) &&
+      conn->disaggregated_storage.num_meta_put_at_ckpt_begin == num_meta_put &&
+      ckpt_tmp_ts != conn->disaggregated_storage.last_checkpoint_timestamp) {
+        WT_TRET(__wt_disagg_put_checkpoint_meta(
+          session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_tmp_ts));
+    }
+
+    /*
+     * Advance to the next checkpoint in disaggregated storage if we updated the checkpoint metadata
+     * in the page log. This has to be done after checkpoint resolve, which happens when we turn off
+     * metadata tracking above.
      *
      * Ensure that turning off meta tracking worked.
      */

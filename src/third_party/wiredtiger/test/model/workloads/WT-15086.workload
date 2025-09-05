@@ -1,0 +1,6 @@
+config("database", "disaggregated=true")
+set_stable_timestamp(683999)
+restart()
+set_stable_timestamp(688849)
+restart()
+set_oldest_timestamp(684401)

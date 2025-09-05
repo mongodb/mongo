@@ -104,9 +104,9 @@ build_branch()
     git checkout --quiet "${git_tag}"
 
     build_system=$(get_build_system $1)
+    config=""
     if [ "$build_system" == "cmake" ]; then
         . ./test/evergreen/find_cmake.sh
-        config=""
         config+="-DENABLE_SNAPPY=1 "
         # Need to disable configs since WT-9455 enabled additional items by default.
         # Old releases didn't have these enabled, need to make it consistent.
@@ -540,6 +540,68 @@ upgrade_downgrade()
     done
 }
 
+# test/format manually specifies paths to loadable extensions. It also relies on WiredTiger.basecfg
+# existing, so the result is a bunch of paths to .so files in WiredTiger.basecfg. This is fine, but
+# the change from autoconf to cmake resulted in these files living in different directories. It's a
+# bit awful, but this method fixes up the paths in WiredTiger.basecfg when upgrading between
+# versions built with different build systems. This whole thing can go away once we stop caring
+# about 5.0.
+fixup_format_extension_paths()
+{
+    local src_branch="$1"
+    local dst_branch="$2"
+    local working_dir="$3"
+
+    local src_build_system=$(get_build_system "$src_branch")
+    local dst_build_system=$(get_build_system "$dst_branch")
+
+    if [ "$src_build_system" != "$dst_build_system" ]; then
+        if [ "$src_build_system" = "autoconf" ]; then
+            sed --in-place -e 's/\/\.libs//g' "$working_dir"/WiredTiger.basecfg
+        fi
+
+        # We don't need to make the inverse translation when going from cmake to autoconf, since
+        # autoconf puts the libraries in both the .libs/ directory, and the root of the extension's
+        # build directory. Thus, when a newer version saves a path without .libs/ it'll still find
+        # the right shared library.
+    fi
+}
+
+# Run test/format from $src_branch, and crash. Recover using test/format from $dst_branch.
+test_dirty_restart()
+{
+    local src_branch="$1"
+    local dst_branch="$2"
+
+    # We can reuse these flags for the dst branch. We're going to restart it from the source
+    # branch's working directory, and test/format will automatically pick up that config.
+    local flags="-1q $(bflag $src_branch)"
+    local config_file="../../../../CONFIG_${src_branch}"
+
+    # Run format on the source branch until it aborts.
+    pushd "${src_branch}/build/test/format"
+    local dir="RUNDIR.${src_branch}"
+
+    # Ignore the error resulting from the segfault. We set a few options: backup=0 since it's
+    # incompatible with verify, and the compatibility version in case $src_branch is newer than
+    # $dst_branch.
+    set +e
+    ./t ${flags} -c "$config_file" -C "compatibility=(release=10.0.0)" -h "$dir" format.abort=1 backup=0
+    set -e
+    popd
+
+    # We now have a directory with WT files that resulted from a crash. Run the newer version
+    # against those.
+    pushd "${dst_branch}/build/test/format"
+    local dir="../../../../${src_branch}/build/test/format/RUNDIR.${src_branch}"
+    fixup_format_extension_paths "$src_branch" "$dst_branch" "$dir"
+    ./t ${flags} -R -h "$dir" format.abort=0
+
+    # Remove the database so future runs don't try to use it.
+    rm -rf "$dir"
+    popd
+}
+
 #############################################################
 # test_upgrade_to_branch:
 #       arg1: release branch name
@@ -713,6 +775,7 @@ import_compatibility_test()
 }
 
 # Only one of below flags will be set by the 1st argument of the script.
+dirty_restart=false
 import=false
 older=false
 newer=false
@@ -759,6 +822,7 @@ test_checkpoint_release_branches=($TEST_CHECKPOINT_RELEASE_BRANCHES)
 upgrade_to_latest_upgrade_downgrade_release_branches=($UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
 
 declare -A scopes
+scopes[dirty_restart]="start from an unclean shutdown of a different version"
 scopes[import]="import files from previous versions"
 scopes[newer]="newer stable release branches"
 scopes[older]="older stable release branches"
@@ -810,7 +874,8 @@ get_build_system()
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-i|-n|-o|-p|-u|-w|-v]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-d|-i|-n|-o|-p|-u|-w|-v]"
+    echo -e "\t-d\trun compatibility tests for ${scopes[dirty_restart]}"
     echo -e "\t-i\trun compatibility tests for ${scopes[import]}"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
     echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
@@ -827,6 +892,12 @@ fi
 
 # Script argument processing
 case $1 in
+"-d")
+    dirty_restart=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[dirty_restart]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
 "-i")
     import=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -888,16 +959,9 @@ if [ "$import" = true ]; then
     done
 
     for i in ${!import_release_branches[@]}; do
-        newer=${import_release_branches[$i]}
-
-        # MongoDB v4.2 doesn't support live import so it should only ever be used as the "older" branch
-        # that we're importing from.
-        if [ $newer = mongodb-4.2 ]; then
-            continue
+        if [ $((i+1)) < ${#import_release_branches[@]} ]; then
+            (import_compatibility_test ${import_release_branches[$i+1]} ${import_release_branches[$i]})
         fi
-
-        older=${import_release_branches[$i+1]}
-        import_compatibility_test $older $newer
     done
 fi
 
@@ -915,6 +979,25 @@ if [ "$upgrade_to_latest" = true ]; then
         # cleanup.
         cd $test_root
         rm -rf $test_data_root
+    done
+fi
+
+if [ "$dirty_restart" = true ]; then
+    for b in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
+        create_configs "$b"
+        pushd .
+        build_branch "$b"
+        popd
+    done
+
+    # Go over the release branches, from pair to pair. If a pair has the LHS different to the RHS,
+    # treat that as a combination worth testing.
+    for b1 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
+        for b2 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
+            if [[ "$b1" != "$b2" ]]; then
+                test_dirty_restart "$b1" "$b2"
+            fi
+        done
     done
 fi
 

@@ -2794,6 +2794,13 @@ tasks:
             # By default the test_push_pull uses dir_store as a storage source.
             ./test_push_pull -PT
 
+  - name: compatibility-test-dirty-restart
+    commands:
+      - func: "get project"
+      - func: "compatibility test"
+        vars:
+          compat_test_args: -d
+
   - name: compatibility-test-for-newer-releases
     commands:
       - func: "get project"

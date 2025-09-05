@@ -2667,7 +2667,6 @@ __rec_copy_prev_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     case WT_PM_REC_REPLACE: /* 1-for-1 page swap */
         *multi->block_meta = page->disagg_info->block_meta;
         if (mod->mod_replace.block_cookie != NULL) {
-            WT_TIME_AGGREGATE_COPY(&multi->addr.ta, &mod->mod_replace.ta);
             WT_RET(__wt_memdup(session, mod->mod_replace.block_cookie,
               mod->mod_replace.block_cookie_size, &multi->addr.block_cookie));
             multi->addr.block_cookie_size = mod->mod_replace.block_cookie_size;
@@ -2681,7 +2680,6 @@ __rec_copy_prev_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
         WT_ASSERT(session, mod->mod_multi_entries == 1);
         *multi->block_meta = *mod->mod_multi->block_meta;
         if (mod->mod_multi->addr.block_cookie != NULL) {
-            WT_TIME_AGGREGATE_COPY(&multi->addr.ta, &mod->mod_multi->addr.ta);
             WT_RET(__wt_memdup(session, mod->mod_multi->addr.block_cookie,
               mod->mod_multi->addr.block_cookie_size, &multi->addr.block_cookie));
             multi->addr.block_cookie_size = mod->mod_multi->addr.block_cookie_size;

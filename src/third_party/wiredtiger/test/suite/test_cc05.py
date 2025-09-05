@@ -29,10 +29,12 @@
 from test_cc01 import test_cc_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
+import wttest
 
 # test_cc05.py
 # Verify a locked checkpoint is not removed during garbage collection.
 
+@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_cc05(test_cc_base):
     conn_config = 'cache_size=50MB,statistics=(all)'
 

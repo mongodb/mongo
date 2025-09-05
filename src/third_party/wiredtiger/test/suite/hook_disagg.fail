@@ -12,13 +12,7 @@ test_bug027.py
 test_bug033.py
 test_bulk01.py
 test_bulk02.py
-test_cc02.py
-test_cc04.py
-test_cc05.py
-test_cc06.py # uses statistics we don't support in disagg
-test_cc07.py
 test_cc08.py
-test_cc09.py
 test_compat05.py
 test_config02.py
 test_config09.py
@@ -116,7 +110,6 @@ test_timestamp03.py
 test_timestamp05.py
 test_timestamp06.py
 test_timestamp07.py
-test_timestamp08.py
 test_timestamp10.py
 test_timestamp12.py
 test_timestamp20.py

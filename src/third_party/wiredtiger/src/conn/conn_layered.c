@@ -217,6 +217,90 @@ __disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_I
 }
 
 /*
+ * __disagg_put_meta --
+ *     Write metadata to disaggregated storage.
+ */
+static int
+__disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *item, uint64_t *lsnp)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DISAGGREGATED_STORAGE *disagg;
+    WT_PAGE_LOG_PUT_ARGS put_args;
+
+    conn = S2C(session);
+    disagg = &conn->disaggregated_storage;
+
+    WT_CLEAR(put_args);
+    if (disagg->page_log_meta == NULL)
+        return (ENOTSUP);
+
+    WT_RET(disagg->page_log_meta->plh_put(
+      disagg->page_log_meta, &session->iface, page_id, 0, &put_args, item));
+    if (lsnp != NULL)
+        *lsnp = put_args.lsn;
+    __wt_atomic_addv64(&disagg->num_meta_put, 1);
+    return (0);
+}
+
+/*
+ * __wt_disagg_put_checkpoint_meta --
+ *     Write checkpoint information to the metadata page log and do the relevant bookkeeping.
+ */
+int
+__wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint_root,
+  size_t checkpoint_root_size, uint64_t checkpoint_timestamp)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(buf);
+    WT_DECL_RET;
+    WT_DISAGGREGATED_STORAGE *disagg;
+    uint64_t lsn;
+    char *checkpoint_root_copy;
+
+    buf = NULL;
+    checkpoint_root_copy = NULL;
+    conn = S2C(session);
+    disagg = &conn->disaggregated_storage;
+    lsn = 0;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    if (checkpoint_root == NULL) {
+        WT_ASSERT(session, checkpoint_root_size == 0);
+        checkpoint_root = "";
+    }
+    if (checkpoint_root_size == 0)
+        checkpoint_root_size = strlen(checkpoint_root);
+
+    WT_ERR(__wt_strndup(session, checkpoint_root, checkpoint_root_size, &checkpoint_root_copy));
+
+    WT_ERR(__wt_scr_alloc(session, 0, &buf));
+    WT_ERR(__wt_buf_fmt(session, buf,
+      "%s\n"
+      "timestamp=%" PRIx64,
+      checkpoint_root_copy, checkpoint_timestamp));
+
+    /*
+     * Write the metadata to disaggregated storage. This should be the last statement in this
+     * function that is allowed to fail.
+     */
+    WT_ERR(__disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, buf, &lsn));
+
+    /* Do the bookkeeping. */
+    WT_RELEASE_WRITE(disagg->last_checkpoint_meta_lsn, lsn);
+    WT_RELEASE_WRITE(disagg->last_checkpoint_timestamp, checkpoint_timestamp);
+
+    __wt_free(session, disagg->last_checkpoint_root);
+    disagg->last_checkpoint_root = checkpoint_root_copy;
+    checkpoint_root_copy = NULL;
+
+err:
+    __wt_free(session, checkpoint_root_copy);
+    __wt_scr_free(session, &buf);
+    return (ret);
+}
+
+/*
  * __disagg_pick_up_checkpoint --
  *     Pick up a new checkpoint.
  */
@@ -231,7 +315,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
     WT_SESSION_IMPL *internal_session, *shared_metadata_session;
     size_t len, metadata_value_cfg_len;
     uint64_t checkpoint_timestamp;
-    char *buf, *cfg_ret, *checkpoint_config, *metadata_value_cfg, *layered_ingest_uri;
+    char *buf, *cfg_ret, *checkpoint_config, *root, *metadata_value_cfg, *layered_ingest_uri;
     const char *cfg[3], *current_value, *metadata_key, *metadata_value;
 
     conn = S2C(session);
@@ -244,6 +328,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
     metadata_value = NULL;
     metadata_value_cfg = NULL;
     layered_ingest_uri = NULL;
+    root = NULL;
     shared_metadata_session = NULL;
     cfg_ret = NULL;
     WT_CLEAR(item);
@@ -279,7 +364,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
 
     /* Save the metadata key-value pair. */
     metadata_key = WT_DISAGG_METADATA_URI;
-    metadata_value = buf;
+    metadata_value = root = buf;
 
     /* We need an internal session when modifying metadata. */
     WT_ERR(__wt_open_internal_session(conn, "checkpoint-pick-up", false, 0, 0, &internal_session));
@@ -407,6 +492,10 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
 
     /* Update the checkpoint timestamp. */
     WT_RELEASE_WRITE(conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);
+
+    /* Remember the root config of the last checkpoint. */
+    __wt_free(session, conn->disaggregated_storage.last_checkpoint_root);
+    WT_ERR(__wt_strdup(session, root, &conn->disaggregated_storage.last_checkpoint_root));
 
     /* Keep a record of past checkpoints, they will be needed for ingest garbage collection. */
     WT_ERR(__layered_track_checkpoint(session, checkpoint_timestamp));
@@ -1285,35 +1374,9 @@ __wti_disagg_destroy(WT_SESSION_IMPL *session)
         disagg->page_log_meta = NULL;
     }
 
+    __wt_free(session, disagg->last_checkpoint_root);
     __wt_free(session, disagg->page_log);
     return (ret);
-}
-
-/*
- * __wt_disagg_put_meta --
- *     Write metadata to disaggregated storage.
- */
-int
-__wt_disagg_put_meta(
-  WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *item, uint64_t *lsnp)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DISAGGREGATED_STORAGE *disagg;
-    WT_PAGE_LOG_PUT_ARGS put_args;
-
-    conn = S2C(session);
-    disagg = &conn->disaggregated_storage;
-
-    WT_CLEAR(put_args);
-    if (disagg->page_log_meta != NULL) {
-        WT_RET(disagg->page_log_meta->plh_put(
-          disagg->page_log_meta, &session->iface, page_id, 0, &put_args, item));
-        if (lsnp != NULL)
-            *lsnp = put_args.lsn;
-        __wt_atomic_addv64(&disagg->num_meta_put, 1);
-        return (0);
-    }
-    return (ENOTSUP);
 }
 
 /*
@@ -1332,7 +1395,6 @@ __wt_disagg_advance_checkpoint(WT_SESSION_IMPL *session, bool ckpt_success)
 
     conn = S2C(session);
     disagg = &conn->disaggregated_storage;
-    WT_RET(__wt_scr_alloc(session, 0, &meta));
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
@@ -1340,6 +1402,7 @@ __wt_disagg_advance_checkpoint(WT_SESSION_IMPL *session, bool ckpt_success)
     if (disagg->npage_log == NULL || !conn->layered_table_manager.leader)
         return (0);
 
+    WT_RET(__wt_scr_alloc(session, 0, &meta));
     WT_ACQUIRE_READ(meta_lsn, conn->disaggregated_storage.last_checkpoint_meta_lsn);
     WT_ACQUIRE_READ(checkpoint_timestamp, conn->disaggregated_storage.cur_checkpoint_timestamp);
     WT_ASSERT(session, meta_lsn > 0); /* The metadata page should be written by now. */
@@ -1823,6 +1886,7 @@ static int
 __layered_track_checkpoint(WT_SESSION_IMPL *session, uint64_t checkpoint_timestamp)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     WT_DISAGGREGATED_STORAGE *ds;
     int64_t order;
     uint32_t entry, expire;
@@ -1830,8 +1894,12 @@ __layered_track_checkpoint(WT_SESSION_IMPL *session, uint64_t checkpoint_timesta
     conn = S2C(session);
     ds = &conn->disaggregated_storage;
 
-    /* We never expect a not found error, as we just picked up a checkpoint. */
-    WT_RET(__layered_last_checkpoint_order(session, WT_DISAGG_METADATA_URI, &order));
+    WT_RET_NOTFOUND_OK(
+      ret = __layered_last_checkpoint_order(session, WT_DISAGG_METADATA_URI, &order));
+
+    /* If we didn't find a checkpoint, it means that there are no data in the shared storage. */
+    if (ret == WT_NOTFOUND)
+        return (0);
 
     /* Figure out how many entries at the beginning are no longer useful. */
     for (expire = 0; expire < ds->ckpt_track_cnt; ++expire) {

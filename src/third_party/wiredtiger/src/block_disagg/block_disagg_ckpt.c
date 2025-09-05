@@ -110,17 +110,15 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *md_cursor;
-    WT_DECL_ITEM(buf);
     WT_DECL_RET;
     size_t len;
-    uint64_t checkpoint_timestamp, lsn;
+    uint64_t checkpoint_timestamp;
     char *md_key;
     const char *md_value;
 
     block_disagg = (WT_BLOCK_DISAGG *)bm->block;
     conn = S2C(session);
 
-    buf = NULL;
     md_cursor = NULL;
     md_key = NULL;
 
@@ -152,14 +150,7 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
         /* Get the config we want to print to the metadata file */
         WT_ERR(__wt_config_getones(session, md_value, "checkpoint", &cval));
         checkpoint_timestamp = conn->disaggregated_storage.cur_checkpoint_timestamp;
-
-        WT_ERR(__wt_scr_alloc(session, 0, &buf));
-        WT_ERR(__wt_buf_fmt(session, buf,
-          "%.*s\n"
-          "timestamp=%" PRIx64,
-          (int)cval.len, cval.str, checkpoint_timestamp));
-        WT_ERR(__wt_disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, buf, &lsn));
-        WT_RELEASE_WRITE(conn->disaggregated_storage.last_checkpoint_meta_lsn, lsn);
+        WT_ERR(__wt_disagg_put_checkpoint_meta(session, cval.str, cval.len, checkpoint_timestamp));
     } else {
         /* Keep all metadata for regular tables. */
         WT_SAVE_DHANDLE(
@@ -182,7 +173,6 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
     }
 
 err:
-    __wt_scr_free(session, &buf);
     __wt_free(session, md_key);
     if (md_cursor != NULL)
         WT_TRET(__wt_metadata_cursor_release(session, &md_cursor));

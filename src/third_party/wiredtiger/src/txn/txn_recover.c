@@ -1189,7 +1189,9 @@ done:
      * 1. The connection is not read-only. A read-only connection expects that there shouldn't be
      *    any changes that need to be done on the database other than reading.
      * 2. The history store file was found in the metadata.
-     * 3. We are not using disaggregated storage or precise checkpoint.
+     * 3. We are not using disaggregated storage or precise checkpoint(In precise checkpoints,
+     * everything is stable except prepared txn. Disagg also uses precise checkpoint, so neither
+     * requires rollback to stable).
      * FIXME-WT-15343 Disable RTS for precise checkpoint when claim prepared is implemented in test
      * format
      */
@@ -1226,8 +1228,15 @@ done:
           "recovery rollback to stable has successfully finished and ran for %" PRIu64
           " milliseconds",
           conn->recovery_timeline.rts_ms);
-    } else if (disagg)
-        __wt_verbose_info(session, WT_VERB_RTS, "%s", "skipped recovery RTS due to disagg");
+    } else {
+        /* Although rollback to stable is not needed, we still need to set the durable timestamp. */
+        WT_TXN_GLOBAL *txn_global = &conn->txn_global;
+        txn_global->has_durable_timestamp = txn_global->has_stable_timestamp;
+        txn_global->durable_timestamp = txn_global->stable_timestamp;
+
+        if (disagg)
+            __wt_verbose_info(session, WT_VERB_RTS, "%s", "skipped recovery RTS due to disagg");
+    }
 
     /*
      * Sometimes eviction is triggered after doing a checkpoint. However, we don't want eviction to
