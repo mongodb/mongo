@@ -276,3 +276,9 @@ feature_flags:
         cpp_varname: gFeatureFlagExtendedAutoSpilling
         default: false
         fcv_gated: false
+
+    featureFlagQueryStatsWriteCommand:
+        description: "Feature flag to enable query stats for the write commands."
+        cpp_varname: gFeatureFlagQueryStatsWriteCommand
+        default: false
+        fcv_gated: true
