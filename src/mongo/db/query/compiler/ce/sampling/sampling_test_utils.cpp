@@ -420,13 +420,13 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
 
     createCollAndInsertDocuments(operationContext(), nss, dataBSON);
 
-    AutoGetCollection collPtr(operationContext(), nss, LockMode::MODE_IX);
-    auto collection =
-        MultipleCollectionAccessor(operationContext(),
-                                   &collPtr.getCollection(),
-                                   nss,
-                                   false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                   {});
+    auto acquisition =
+        acquireCollectionOrView(operationContext(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                LockMode::MODE_IX);
+    auto collection = MultipleCollectionAccessor(
+        acquisition, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     for (auto samplingAlgoAndChunk : samplingAlgoAndChunks) {
         for (auto sampleSize : sampleSizes) {
@@ -456,12 +456,13 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
     size_t collCard, size_t sampleSize, ce::ProjectionParams projectionParams) {
     insertDocuments(_kTestNss, createDocuments(collCard));
 
-    AutoGetCollection collPtr(operationContext(), _kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            _kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto collection =
+        acquireCollectionOrView(operationContext(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    operationContext(), _kTestNss, AcquisitionPrerequisites::kRead),
+                                MODE_IS);
+    auto colls = MultipleCollectionAccessor(
+        collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),

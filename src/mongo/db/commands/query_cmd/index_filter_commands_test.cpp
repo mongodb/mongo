@@ -44,6 +44,7 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
@@ -80,9 +81,13 @@ protected:
         _queryTestServiceContext = std::make_unique<QueryTestServiceContext>();
         _operationContext = _queryTestServiceContext->makeOperationContext();
         _collection = std::make_unique<CollectionMock>(_nss);
-        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        _collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
 
+        // The collection holder is guaranteed to be valid for the lifetime of the test. This
+        // initialization is safe.
+        CollectionPtr collptr = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
+        _collectionAcq =
+            std::make_unique<CollectionAcquisition>(shard_role_mock::acquireCollectionMocked(
+                _operationContext.get(), _nss, std::move(collptr)));
         _classicPlanCache = std::make_unique<PlanCache>(5000);
         _sbePlanCache = std::make_unique<sbe::PlanCache>(5000);
     }
@@ -91,24 +96,25 @@ protected:
         _sbePlanCache.reset();
         _classicPlanCache.reset();
 
-        _collectionPtr.reset();
+        _collectionAcq.reset();
         _collection.reset();
         _operationContext.reset();
         _queryTestServiceContext.reset();
     }
 
     PlanCacheKey makeClassicKey(const CanonicalQuery& cq) {
-        return plan_cache_key_factory::make<PlanCacheKey>(cq, _collectionPtr);
+        return plan_cache_key_factory::make<PlanCacheKey>(cq, _collectionAcq->getCollectionPtr());
     }
 
     sbe::PlanCacheKey makeSbeKey(const CanonicalQuery& cq) {
         ASSERT_TRUE(cq.isSbeCompatible());
-        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq, _collectionPtr);
+        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq,
+                                                               _collectionAcq->getCollectionPtr());
     }
 
     Status clearIndexFilter(const std::string& cmdJson) {
         return ClearFilters::clear(_operationContext.get(),
-                                   _collectionPtr,
+                                   _collectionAcq->getCollectionPtr(),
                                    fromjson(cmdJson),
                                    &_querySettings,
                                    _classicPlanCache.get(),
@@ -121,7 +127,7 @@ protected:
      */
     void clearIndexFilterAndAssert(const std::string& cmdJson) {
         ASSERT_OK(ClearFilters::clear(_operationContext.get(),
-                                      _collectionPtr,
+                                      _collectionAcq->getCollectionPtr(),
                                       fromjson(cmdJson),
                                       &_querySettings,
                                       _classicPlanCache.get(),
@@ -130,7 +136,7 @@ protected:
 
     Status setIndexFilter(const std::string& cmdJson) {
         return SetFilter::set(_operationContext.get(),
-                              _collectionPtr,
+                              _collectionAcq->getCollectionPtr(),
                               fromjson(cmdJson),
                               &_querySettings,
                               _classicPlanCache.get(),
@@ -312,7 +318,7 @@ private:
             return plan.toString();
         };
         PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn, _collectionPtr};
+            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn, _collectionAcq->getCollectionPtr()};
         ASSERT_OK(_classicPlanCache->set(
             makeClassicKey(*cq),
             std::move(cacheData),
@@ -357,7 +363,7 @@ private:
         PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                                sbe::CachedSbePlan,
                                plan_cache_debug_info::DebugInfoSBE>
-            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn, _collectionPtr};
+            callbacks{*cq, buildDebugInfoFn, printCachedPlanFn, _collectionAcq->getCollectionPtr()};
 
         ASSERT_OK(_sbePlanCache->set(
             makeSbeKey(*cq),
@@ -373,7 +379,7 @@ private:
 
     ServiceContext::UniqueOperationContext _operationContext;
     std::unique_ptr<Collection> _collection;
-    CollectionPtr _collectionPtr;
+    std::unique_ptr<CollectionAcquisition> _collectionAcq;
 
     std::unique_ptr<PlanCache> _classicPlanCache;
     std::unique_ptr<sbe::PlanCache> _sbePlanCache;

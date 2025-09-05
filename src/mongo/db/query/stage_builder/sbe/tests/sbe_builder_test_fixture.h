@@ -122,7 +122,7 @@ public:
                    bool hasRecordId,
                    std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface,
                    std::unique_ptr<CollatorInterface> collator = nullptr) {
-        auto nullColl = MultipleCollectionAccessor(CollectionPtr::null);
+        auto nullColl = MultipleCollectionAccessor();
         return buildPlanStage(std::move(querySolution),
                               nullColl,
                               hasRecordId,

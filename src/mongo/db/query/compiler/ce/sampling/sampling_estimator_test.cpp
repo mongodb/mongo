@@ -59,15 +59,19 @@ const size_t kSampleSize = 5;
 const int numChunks = 10;
 const StringSet includedSampleFields = {"_id", "a", "b", "obj"};
 
+CollectionOrViewAcquisition acquireCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_IX);
+}
+
 TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -85,12 +89,9 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
 TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -115,12 +116,9 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
 TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(2000));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     auto optCtx = operationContext();
     auto testChunkBasedSampling = [&](int chunkNum, int sampleSize) {
@@ -171,12 +169,9 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
 TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
     insertDocuments(kTestNss, createDocuments(2000));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     auto optCtx = operationContext();
     auto testChunkBasedSampling = [&](int chunkNum, int sampleSize) {
@@ -233,12 +228,9 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
 TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(50));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     // Require a sample larger than the collection.
     const int sampleSize = 100;
@@ -261,12 +253,9 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
 TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
     insertDocuments(kTestNss, createDocuments(50));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     // Require a sample larger than the collection.
     const int sampleSize = 100;
@@ -295,12 +284,9 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
 TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
     const auto topLevelSampleFieldNames = StringSet{"_id", "a", "b", "nil", "arr", "obj"};
@@ -328,12 +314,9 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
 TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     const auto topLevelSampleFieldNames = StringSet{"a"};
 
@@ -359,12 +342,9 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
 TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -389,12 +369,9 @@ TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
 TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     const auto topLevelSampleFieldNames = StringSet{"c"};
     // Project field "c" which does not exist on any documents in the collection.
@@ -419,12 +396,9 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
 TEST_F(SamplingEstimatorTest, DrawANewSample) {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     // A sample was generated on construction with size being the pre-determined size.
     SamplingEstimatorForTesting samplingEstimator(
@@ -468,12 +442,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 400;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
@@ -525,12 +496,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 400;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
@@ -607,12 +575,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 400;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
@@ -690,12 +655,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 400;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
@@ -744,12 +706,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     const size_t sampleSize = 100;
 
     insertDocuments(kTestNss, docs);
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
@@ -784,12 +743,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 400;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
     SamplingEstimatorForTesting samplingEstimator(
@@ -875,12 +831,9 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 500;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
     SamplingEstimatorForTesting samplingEstimator(
@@ -932,12 +885,9 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     insertDocuments(kTestNss, createDocuments(card));
     const size_t sampleSize = 400;
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
     SamplingEstimatorForTesting samplingEstimator(
@@ -1090,12 +1040,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "bounds and expressions should have equal size.") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1125,12 +1072,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "topLevelSampleFieldNames should not contain a dotted field path") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1169,12 +1113,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "MatchExpression contains fields not present in topLevelSampleFieldNames") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1195,12 +1136,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "MatchExpression contains fields not present in topLevelSampleFieldNames") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1221,12 +1159,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "MatchExpression contains fields not present in topLevelSampleFieldNames") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1253,12 +1188,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "Field in index bounds should be included in the set of sampled fields") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1292,12 +1224,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "Field in index bounds should be included in the set of sampled fields") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1331,12 +1260,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "Sample must be generated before calling") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1361,12 +1287,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "Sample must be generated before calling") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1391,12 +1314,9 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "Sample must be generated before calling") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,

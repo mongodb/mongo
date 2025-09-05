@@ -49,6 +49,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -222,10 +223,14 @@ private:
  */
 class ChangeStreamMockStage : public exec::agg::MockStage {
 public:
-    // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // The collection holder is guaranteed to be valid for the lifetime of the test. The
+    // CollectionPtr initialization is safe.
     ChangeStreamMockStage(const boost::intrusive_ptr<ExpressionContextForTest>& expCtx)
         : exec::agg::MockStage("$changeStreamMock"_sd, expCtx, {}),
-          _collectionPtr(CollectionPtr::CollectionPtr_UNSAFE(&_collection)) {
+          _collectionAcq(shard_role_mock::acquireCollectionMocked(
+              pExpCtx->getOperationContext(),
+              _collection.ns(),
+              CollectionPtr::CollectionPtr_UNSAFE(&_collection))) {
         _filterExpr = BSON("ns" << kTestNs);
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
         _params.assertTsHasNotFallenOff = Timestamp(0);
@@ -261,12 +266,13 @@ public:
         return _collScan->getCommonStats()->isEOF;
     }
 
+
 protected:
     exec::agg::GetNextResult doGetNext() override {
         // If this is the first call to doGetNext, we must create the COLLSCAN.
         if (!_collScan) {
             _collScan = std::make_unique<CollectionScan>(
-                pExpCtx.get(), &_collectionPtr, _params, &_ws, _filter.get());
+                pExpCtx.get(), _collectionAcq, _params, &_ws, _filter.get());
         }
         while (true) {
             // If the next result is a pause, return it and don't collscan.
@@ -320,7 +326,7 @@ private:
     }
 
     ChangeStreamOplogCollectionMock _collection;
-    CollectionPtr _collectionPtr;
+    CollectionAcquisition _collectionAcq;
     std::unique_ptr<CollectionScan> _collScan;
     CollectionScanParams _params;
 

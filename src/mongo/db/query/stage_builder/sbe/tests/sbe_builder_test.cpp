@@ -689,9 +689,13 @@ public:
 
         auto querySolution = makeQuerySolution(std::move(root));
         // Translate the QuerySolution tree to an sbe::PlanStage.
-        AutoGetCollection localColl(operationContext(), _nss, LockMode::MODE_IS);
-        MultipleCollectionAccessor colls(localColl.getCollection());
-        _expCtx->setUUID(localColl.getCollection()->uuid());
+        auto localColl =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), _nss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        MultipleCollectionAccessor colls(localColl);
+        _expCtx->setUUID(localColl.uuid());
 
         auto [resultSlots, stage, data, _] = buildPlanStage(
             std::move(querySolution), colls, false /*hasRecordId*/, {.expCtx = _expCtx});
@@ -728,7 +732,7 @@ public:
         // Print the stage explain output and verify.
         _gctx->outStream() << data.debugString() << std::endl;
         auto explain = sbe::DebugPrinter().print(*stage.get());
-        _gctx->outStream() << replaceUuid(explain, localColl.getCollection()->uuid());
+        _gctx->outStream() << replaceUuid(explain, localColl.uuid());
         _gctx->outStream() << std::endl;
 
         stage->open(false);

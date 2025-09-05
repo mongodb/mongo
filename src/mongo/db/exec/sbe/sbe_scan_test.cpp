@@ -68,8 +68,8 @@ public:
         }
     }
 
-    std::pair<AutoGetCollection, MultipleCollectionAccessor> createCollection(
-        const std::vector<BSONObj>& docs, boost::optional<BSONObj> indexKeyPattern) {
+    MultipleCollectionAccessor createCollection(const std::vector<BSONObj>& docs,
+                                                boost::optional<BSONObj> indexKeyPattern) {
         // Create collection and index
         ASSERT_OK(
             storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
@@ -82,9 +82,13 @@ public:
         }
         insertDocuments(docs);
 
-        AutoGetCollection localColl(operationContext(), _nss, LockMode::MODE_IS);
-        MultipleCollectionAccessor colls(localColl.getCollection());
-        return {std::move(localColl), colls};
+        auto localColl =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), _nss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        MultipleCollectionAccessor colls(localColl);
+        return colls;
     }
 
 protected:
@@ -93,9 +97,9 @@ protected:
 };
 
 TEST_F(ScanStageTest, scanStage) {
-    auto [localColl, colls] =
+    auto colls =
         createCollection({fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}")}, boost::none);
-    UUID uuid = localColl.getCollection()->uuid();
+    UUID uuid = colls.getMainCollection()->uuid();
     DatabaseName dbName = _nss.dbName();
 
     auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
@@ -139,9 +143,9 @@ TEST_F(ScanStageTest, scanStage) {
 }
 
 TEST_F(ScanStageTest, ParallelScanStage) {
-    auto [localColl, colls] =
+    auto colls =
         createCollection({fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}")}, boost::none);
-    UUID uuid = localColl.getCollection()->uuid();
+    UUID uuid = colls.getMainCollection()->uuid();
     DatabaseName dbName = _nss.dbName();
 
     auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());

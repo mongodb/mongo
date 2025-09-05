@@ -173,19 +173,24 @@ public:
                       << std::endl;
         }
 
-        std::vector<NamespaceStringOrUUID> foreignNssVec({_foreignNss});
+        CollectionOrViewAcquisitionMap secondaryAcquisitions;
+        CollectionOrViewAcquisitionRequests acquisitionRequests;
+        // Emplace the main acquisition request.
+        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+            operationContext(), _nss, AcquisitionPrerequisites::kRead));
 
-        AutoGetCollection localColl(operationContext(),
-                                    _nss,
-                                    LockMode::MODE_IS,
-                                    AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                        foreignNssVec.cbegin(), foreignNssVec.cend()));
+        // Emplace a request for every secondary nss.
+        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+            operationContext(), _foreignNss, AcquisitionPrerequisites::kRead));
 
-        MultipleCollectionAccessor colls(operationContext(),
-                                         &localColl.getCollection(),
-                                         _nss,
-                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                         {_foreignNss});
+        // Acquire all the collection and extract the main acquisition
+        secondaryAcquisitions = makeAcquisitionMap(
+            acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
+        auto localColl = secondaryAcquisitions.extract(_nss).mapped();
+
+        MultipleCollectionAccessor colls(localColl,
+                                         secondaryAcquisitions,
+                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
         auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
         auto& stage = tree.stage;

@@ -105,11 +105,7 @@ public:
     }
 
     TextOrStage makeTextOr(size_t keyPrefixSize = 1, const MatchExpression* filter = nullptr) {
-        return TextOrStage(_expCtx.get(),
-                           keyPrefixSize,
-                           &_ws,
-                           filter,
-                           VariantCollectionPtrOrAcquisition(acquireCollForRead(kNss)));
+        return TextOrStage(_expCtx.get(), keyPrefixSize, &_ws, filter, acquireCollForRead(kNss));
     }
 
     /**

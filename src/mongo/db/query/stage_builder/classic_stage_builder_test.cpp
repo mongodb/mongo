@@ -40,6 +40,7 @@
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/local_catalog/index_catalog_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -100,10 +101,13 @@ public:
             .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        auto coll = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
+        // The collection holder is guaranteed to be valid for the lifetime of the test. This
+        // initialization is safe.
+        CollectionPtr collptr = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
+        auto coll =
+            shard_role_mock::acquireCollectionMocked(_opCtx.get(), kNss, std::move(collptr));
         stage_builder::ClassicStageBuilder builder{
-            opCtx(), &coll, *cq, *querySolution, workingSet(), &_planStageQsnMap};
+            opCtx(), coll, *cq, *querySolution, workingSet(), &_planStageQsnMap};
         return builder.build(querySolution->root());
     }
 

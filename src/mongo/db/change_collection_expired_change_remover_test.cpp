@@ -132,12 +132,17 @@ protected:
 
     std::vector<repl::OplogEntry> readChangeCollection(OperationContext* opCtx,
                                                        const TenantId& tenantId) {
-        auto changeCollection =
-            AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kRead, tenantId};
+        auto changeCollection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::makeChangeCollectionNSS(tenantId),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
 
         auto scanExecutor =
             InternalPlanner::collectionScan(opCtx,
-                                            &(*changeCollection),
+                                            changeCollection,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             InternalPlanner::Direction::FORWARD);
 

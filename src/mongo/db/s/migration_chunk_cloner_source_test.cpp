@@ -66,6 +66,7 @@
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
 #include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
@@ -589,40 +590,6 @@ CollectionAcquisition acquireCollection(OperationContext* opCtx,
 
     return acquireCollection(
         opCtx, CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, prerequisites), mode);
-}
-
-CollectionAcquisition acquireCollectionWithFault(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::unique_ptr<CollectionWithFault>& collHolder) {
-
-    // TODO(SERVER-103407): Investigate usage validity of
-    // CollectionPtr::CollectionPtr_UNSAFE
-    CollectionPtr collPtrWithFault = CollectionPtr::CollectionPtr_UNSAFE(collHolder.get());
-    auto& txnResources = shard_role_details::TransactionResources::get(opCtx);
-    const auto dbLockMode = MODE_IS;
-    auto dbLock = std::make_shared<Lock::DBLock>(opCtx, kNss.dbName(), dbLockMode);
-    Lock::CollectionLock collLock(opCtx, kNss, MODE_IS);
-    shard_role_details::AcquisitionLocks lockRequirements;
-    lockRequirements.dbLock = MODE_IS;
-    lockRequirements.collLock = MODE_IS;
-    auto prerequisites =
-        AcquisitionPrerequisites{kNss,
-                                 boost::none,
-                                 repl::ReadConcernArgs::get(opCtx),
-                                 PlacementConcern::kPretendUnsharded,
-                                 AcquisitionPrerequisites::kRead,
-                                 AcquisitionPrerequisites::ViewMode::kMustBeCollection};
-    auto currentAcquireCallNum = txnResources.increaseAcquireCollectionCallCount();
-    shard_role_details::AcquiredCollection& acquiredCollection =
-        txnResources.addAcquiredCollection({currentAcquireCallNum,
-                                            prerequisites,
-                                            std::move(dbLock),
-                                            std::move(collLock),
-                                            std::move(lockRequirements),
-                                            std::move(collPtrWithFault)});
-    const auto acquisitionWithFault = CollectionAcquisition(txnResources, acquiredCollection);
-    return acquisitionWithFault;
 }
 
 class MigrationChunkClonerSourceTest : public ShardServerTestFixture {
@@ -1372,8 +1339,11 @@ TEST_F(MigrationChunkClonerSourceTest, CloneShouldNotCrashWhenNextCloneBatchThro
             const auto coll = CollectionCatalog::get(operationContext())
                                   ->lookupCollectionByNamespace(operationContext(), kNss);
             auto collWithFault = std::make_unique<CollectionWithFault>(coll);
-            auto acquisitionWithFault =
-                acquireCollectionWithFault(operationContext(), kNss, collWithFault);
+            // The collection holder is guaranteed to be valid for the lifetime of the test. This
+            // initialization is safe.
+            auto collptr = CollectionPtr::CollectionPtr_UNSAFE(collWithFault.get());
+            auto acquisitionWithFault = shard_role_mock::acquireCollectionMocked(
+                operationContext(), kNss, std::move(collptr));
             // Note: findDoc currently doesn't have any interruption points, this test simulates
             // an exception being thrown while it is being called.
             collWithFault->setFindDocStatus({ErrorCodes::Interrupted, "fake interrupt"});

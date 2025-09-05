@@ -187,15 +187,6 @@ void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
         ->setFilteringMetadata(opCtx, collectionMetadata);
 }
 
-TEST_F(MultipleCollectionAccessorTest, mainCollectionViaAutoGetter) {
-    AutoGetCollection coll(operationContext(), mainNss, MODE_IX);
-
-    auto accessor = MultipleCollectionAccessor(coll.getCollection());
-    ASSERT_FALSE(accessor.isAcquisition());
-    ASSERT_EQ(coll.getCollection(), accessor.getMainCollection());
-    ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isCollectionPtr());
-}
-
 TEST_F(MultipleCollectionAccessorTest, mainCollectionViaAcquisition) {
     const auto acquisition =
         acquireCollection(operationContext(),
@@ -204,10 +195,8 @@ TEST_F(MultipleCollectionAccessorTest, mainCollectionViaAcquisition) {
                           MODE_IX);
 
     auto accessor = MultipleCollectionAccessor(acquisition);
-    ASSERT_TRUE(accessor.isAcquisition());
     ASSERT_EQ(acquisition.getCollectionPtr(), accessor.getMainCollection());
     ASSERT_EQ(acquisition.uuid(), accessor.getMainCollectionAcquisition().uuid());
-    ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isAcquisition());
 }
 
 TEST_F(MultipleCollectionAccessorTest, mainViewViaAcquisition) {
@@ -221,53 +210,7 @@ TEST_F(MultipleCollectionAccessorTest, mainViewViaAcquisition) {
                                 MODE_IX);
 
     auto accessor = MultipleCollectionAccessor(acquisition);
-    ASSERT_TRUE(accessor.isAcquisition());
     ASSERT_FALSE(accessor.hasMainCollection());
-}
-
-
-TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAutoGetter) {
-    AutoGetCollection coll(operationContext(), mainNss, MODE_IX);
-
-    const std::vector<NamespaceStringOrUUID> secondaryExecNssList = {secondaryNss1, secondaryNss2};
-    auto accessor = MultipleCollectionAccessor(
-        operationContext(), &coll.getCollection(), mainNss, false, secondaryExecNssList);
-    // Check the main collection is correctly returned.
-    ASSERT_FALSE(accessor.isAcquisition());
-    ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isCollectionPtr());
-
-    // Check the secondary collections are correctly returned.
-    auto secondaryCollectionMap = accessor.getSecondaryCollections();
-    ASSERT_EQ(2, secondaryCollectionMap.size());
-    ASSERT_EQ(secondaryNss1, secondaryCollectionMap[secondaryNss1]->ns());
-    ASSERT_EQ(secondaryNss2, secondaryCollectionMap[secondaryNss2]->ns());
-
-    // Check the lookup returns the correct acquisition by namespace.
-    ASSERT_EQ(secondaryNss1, accessor.lookupCollection(secondaryNss1)->ns());
-    ASSERT_EQ(secondaryNss2, accessor.lookupCollection(secondaryNss2)->ns());
-}
-
-TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAutoGetter) {
-    AutoGetCollection coll(operationContext(), mainNss, MODE_IX);
-
-    const std::vector<NamespaceStringOrUUID> secondaryExecNssList = {secondaryView1,
-                                                                     secondaryView2};
-    auto accessor = MultipleCollectionAccessor(
-        operationContext(), &coll.getCollection(), mainNss, false, secondaryExecNssList);
-
-    // Check the main collection is correctly returned.
-    ASSERT_FALSE(accessor.isAcquisition());
-    ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isCollectionPtr());
-
-    // Views return a null CollectionPtr.
-    auto secondaryCollectionMap = accessor.getSecondaryCollections();
-    ASSERT_EQ(2, secondaryCollectionMap.size());
-    ASSERT_FALSE(secondaryCollectionMap[secondaryView1]);
-    ASSERT_FALSE(secondaryCollectionMap[secondaryView2]);
-
-    // Views return a null CollectionPtr.
-    ASSERT_FALSE(accessor.lookupCollection(secondaryView1));
-    ASSERT_FALSE(accessor.lookupCollection(secondaryView2));
 }
 
 TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
@@ -292,8 +235,6 @@ TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
     auto accessor = MultipleCollectionAccessor(
         acquisitionMain, makeAcquisitionMap({acquisitionSecondary1, acquisitionSecondary2}), false);
     // Check the main collection is correctly returned.
-    ASSERT_TRUE(accessor.isAcquisition());
-    ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isAcquisition());
     ASSERT_EQ(acquisitionMain.getCollection().uuid(),
               accessor.getMainCollectionAcquisition().uuid());
 
@@ -339,10 +280,6 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
 
     auto accessor = MultipleCollectionAccessor(
         acquisitionMain, makeAcquisitionMap({acquisitionSecondary1, acquisitionSecondary2}), false);
-
-    // Check the main collection is correctly returned.
-    ASSERT_TRUE(accessor.isAcquisition());
-    ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isAcquisition());
 
     // Views return a null CollectionPtr.
     auto secondaryCollectionMap = accessor.getSecondaryCollections();

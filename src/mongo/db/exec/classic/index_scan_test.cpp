@@ -142,8 +142,7 @@ TEST_F(IndexScanTest, IndexScanStageReturnsEOF) {
     const auto* idxDesc = getIndexDescriptor(indexName);
     IndexScanParams params{_opCtx.get(), coll.getCollectionPtr(), idxDesc};
 
-    IndexScan indexScan(
-        _expCtx.get(), VariantCollectionPtrOrAcquisition(coll), std::move(params), &_ws, matchExpr);
+    IndexScan indexScan(_expCtx.get(), coll, std::move(params), &_ws, matchExpr);
     WorkingSetID wsid = WorkingSet::INVALID_ID;
     ASSERT_EQUALS(indexScan.work(&wsid), PlanStage::IS_EOF);
 }
@@ -162,8 +161,7 @@ TEST_F(IndexScanTest, BasicIndex) {
     const auto* idxDesc = getIndexDescriptor(indexName);
     IndexScanParams params{_opCtx.get(), coll.getCollectionPtr(), idxDesc};
 
-    IndexScan indexScan(
-        _expCtx.get(), VariantCollectionPtrOrAcquisition(coll), std::move(params), &_ws, matchExpr);
+    IndexScan indexScan(_expCtx.get(), coll, std::move(params), &_ws, matchExpr);
 
     std::vector<BSONObj> results = executeIndexScanStage(indexScan, false /*expectMemoryUsage*/);
 
@@ -195,8 +193,7 @@ TEST_F(IndexScanTest, BasicMultiKeyIndex) {
     IndexScanParams params{_opCtx.get(), coll.getCollectionPtr(), idxDesc};
     //'shouldDedup' should be true for multiKey indexes as there may be multiple keys per recordId.
     params.shouldDedup = true;
-    IndexScan indexScan(
-        _expCtx.get(), VariantCollectionPtrOrAcquisition(coll), std::move(params), &_ws, matchExpr);
+    IndexScan indexScan(_expCtx.get(), coll, std::move(params), &_ws, matchExpr);
 
     std::vector<BSONObj> results = executeIndexScanStage(indexScan, true /*expectMemoryUsage*/);
 

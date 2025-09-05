@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
@@ -54,12 +55,14 @@ public:
         auto catalog = CollectionCatalog::get(_opCtx.get());
         std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(nss);
         catalog->onCreateCollection(_opCtx.get(), coll);
-        _collectionPtr = CollectionPtr(catalog->establishConsistentCollection(
-            _opCtx.get(), nss, boost::none /* readTimestamp */));
+        auto collection = catalog->establishConsistentCollection(
+            _opCtx.get(), nss, boost::none /* readTimestamp */);
+        _collectionAcq = std::make_unique<CollectionAcquisition>(
+            shard_role_mock::acquireCollectionMocked(_opCtx.get(), nss, collection));
     }
 
     void tearDown() override {
-        _collectionPtr.reset();
+        _collectionAcq.reset();
     }
 
     OperationContext* opCtx() {
@@ -67,12 +70,13 @@ public:
     }
 
     PlanCacheKey makeClassicKey(CanonicalQuery& cq) {
-        return plan_cache_key_factory::make<PlanCacheKey>(cq, _collectionPtr);
+        return plan_cache_key_factory::make<PlanCacheKey>(cq, _collectionAcq->getCollectionPtr());
     }
+
 
 private:
     ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
-    CollectionPtr _collectionPtr;
+    std::unique_ptr<CollectionAcquisition> _collectionAcq;
 };
 
 TEST_F(PlanCacheCommandsTest, CannotCanonicalizeWithMissingQueryField) {

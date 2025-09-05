@@ -38,6 +38,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -85,7 +86,8 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
     if (param.shardFilterInterface) {
         auto shardFilterer = param.shardFilterInterface->makeShardFilterer(operationContext());
         collPtr.setShardKeyPattern(shardFilterer->getKeyPattern().toBSON());
-        colls = MultipleCollectionAccessor(collPtr);
+        colls = MultipleCollectionAccessor(
+            shard_role_mock::acquireCollectionMocked(operationContext(), _nss, std::move(collPtr)));
     }
 
     stage_builder::SlotBasedStageBuilder builder{
@@ -140,14 +142,17 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     auto querySolution = makeQuerySolution(std::move(root));
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
-    boost::optional<AutoGetCollection> localColl;
+    boost::optional<CollectionOrViewAcquisition> localColl;
     MultipleCollectionAccessor colls;
     if (_collInitialized) {
-        localColl.emplace(operationContext(), _nss, LockMode::MODE_IS);
-        colls = MultipleCollectionAccessor(localColl->getCollection());
-    } else {
-        colls = MultipleCollectionAccessor(CollectionPtr::null);
+        localColl.emplace(
+            acquireCollectionOrView(operationContext(),
+                                    CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                        operationContext(), _nss, AcquisitionPrerequisites::kRead),
+                                    MODE_IS));
+        colls = MultipleCollectionAccessor(*localColl);
     }
+
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), colls, false /*hasRecordId*/, std::move(param));
     auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
@@ -156,7 +161,7 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     // Print the stage explain output and verify.
     _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
     auto explain = sbe::DebugPrinter().print(*stage.get());
-    _gctx->outStream() << (localColl ? replaceUuid(explain, localColl->getCollection()->uuid())
+    _gctx->outStream() << (localColl ? replaceUuid(explain, localColl->getCollection().uuid())
                                      : explain);
     _gctx->outStream() << std::endl;
     _gctx->verifyOutput();

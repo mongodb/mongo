@@ -274,7 +274,7 @@ public:
 
         auto exec = InternalPlanner::indexScan(
             opCtx,
-            &coll.getCollectionPtr(),
+            coll,
             coll.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx),
             BSONObj(),
             BSONObj(),

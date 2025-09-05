@@ -45,6 +45,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -2182,19 +2183,23 @@ protected:
         auto collection = std::make_shared<CollectionMock>(_nss);
         auto catalog = CollectionCatalog::get(_operationContext.get());
         catalog->onCreateCollection(_operationContext.get(), collection);
-        _collectionPtr = CollectionPtr(catalog->establishConsistentCollection(
-            _operationContext.get(), _nss, boost::none /* readTimestamp */));
+        auto consistentColl = catalog->establishConsistentCollection(
+            _operationContext.get(), _nss, boost::none /* readTimestamp */);
+        _collectionAcq =
+            std::make_unique<CollectionAcquisition>(shard_role_mock::acquireCollectionMocked(
+                _operationContext.get(), _nss, consistentColl));
     }
 
     void tearDown() override {
-        _collectionPtr.reset();
+        _collectionAcq.reset();
         _operationContext.reset();
         _queryTestServiceContext.reset();
     }
 
     sbe::PlanCacheKey makeSbeKey(const CanonicalQuery& cq) {
         ASSERT_TRUE(cq.isSbeCompatible());
-        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq, _collectionPtr);
+        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq,
+                                                               _collectionAcq->getCollectionPtr());
     }
 
     /**
@@ -2266,7 +2271,7 @@ private:
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
 
     ServiceContext::UniqueOperationContext _operationContext;
-    CollectionPtr _collectionPtr;
+    std::unique_ptr<CollectionAcquisition> _collectionAcq;
 };
 
 const NamespaceString SbePlanCacheTest::_nss(

@@ -163,7 +163,7 @@ protected:
         return obj;
     };
 
-    std::string computeDataHash(const CollectionPtr& collection);
+    std::string computeDataHash(const CollectionAcquisition& collection);
     virtual std::string getStatesString(const std::vector<CollectionState>& state1,
                                         const std::vector<CollectionState>& state2,
                                         const std::vector<OplogEntry>& state1Ops,
