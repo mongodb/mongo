@@ -1178,6 +1178,8 @@ def _impl(ctx):
                             "-Wno-profile-instr-unprofiled",
                             "-Wno-profile-instr-out-of-date",
                             "-Wno-backend-plugin",
+                            "-mllvm",
+                            "-profile-accurate-for-symsinlist=false",
                         ] if ctx.attr.compiler == COMPILERS.CLANG else [
                             "-fprofile-use",
                             "-Wno-missing-profile",
