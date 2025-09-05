@@ -16,8 +16,10 @@ executor:
         TestData:
           setParameters:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagReplicateLocalCatalogIdentifiers: true
           setParametersMongos:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagReplicateLocalCatalogIdentifiers: true
           skipCheckDBHashes: true
           skipCollectionAndIndexValidation: true
       nodb: ""
