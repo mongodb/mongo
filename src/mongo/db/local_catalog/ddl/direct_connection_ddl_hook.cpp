@@ -61,9 +61,10 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx, const Namespac
 
     // Checks if the operation is allowed to proceed and throws ErrorCodes::Unauthorized if not.
     // Skip these checks if the feature flag is disabled.
-    if (feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         direct_connection_util::checkDirectShardDDLAllowed(opCtx, nss);
     }
 
