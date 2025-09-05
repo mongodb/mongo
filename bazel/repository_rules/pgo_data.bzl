@@ -1,8 +1,4 @@
-DEFAULT_CLANG_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_116f96eddd1d9874aefd658a13128bdb3bf51f08_aarch64_clang_thinlto_pgo_8.3.0-alpha0-853-g116f96e-patch-68b241eebc6b210007c6d29a.profdata"
-DEFAULT_CLANG_PGO_DATA_CHECKSUM = "1f49c6e5a29a43219101c7ed817b30bbb6b3519590d66c19d7d6da2cd09cb8be"
-
-DEFAULT_GCC_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/pgo_gcda.tgz"
-DEFAULT_GCC_PGO_DATA_CHECKSUM = "4a0f3191776d2b8cc36fe2d69b07034b325c9989252e412bacfef35826362c35"
+load("//bazel/repository_rules:profiling_data.bzl", "DEFAULT_CLANG_PGO_DATA_CHECKSUM", "DEFAULT_CLANG_PGO_DATA_URL", "DEFAULT_GCC_PGO_DATA_CHECKSUM", "DEFAULT_GCC_PGO_DATA_URL")
 
 # TODO(SERVER-107582): Get llvm-profdata from actual pipeline build
 LLVM_PROFDATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/llvm-profdata"

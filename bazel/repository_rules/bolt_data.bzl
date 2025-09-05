@@ -1,7 +1,5 @@
 load("//bazel/repository_rules:pgo_data.bzl", "get_all_files")
-
-DEFAULT_BOLT_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_116f96eddd1d9874aefd658a13128bdb3bf51f08_aarch64_clang_thinlto_pgo_bolt_8.3.0-alpha0-853-g116f96e-patch-68b241eebc6b210007c6d29a.fdata"
-DEFAULT_BOLT_DATA_CHECKSUM = "6f369d307d0c38c55d925d34bbe79b1e175e5863eae20166798c36047b29cab9"
+load("//bazel/repository_rules:profiling_data.bzl", "DEFAULT_BOLT_DATA_CHECKSUM", "DEFAULT_BOLT_DATA_URL")
 
 # This is used so we can tell when the build created new bolt files vs. using ones from stored url
 CREATED_FILEGROUP = """
