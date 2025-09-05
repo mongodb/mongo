@@ -67,22 +67,6 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceUniqueForThisTestMappingFn(
 }
 
 /**
- * Use default mapper for all unregistered document sources.
- * The default is to return static_cast<Stage*>(documentSourcePtr);
- *
- * TODO SERVER-108165 Remove this once all the stages have been mapped.
- */
-TEST(DocumentSourceToStageRegistryTest, DefaultMapper) {
-    auto fakeDS = DocumentSourceLimit::create(make_intrusive<ExpressionContextForTest>(), 10LL);
-    mappingFnCallCount = 0;
-
-    auto fakeStage = buildStage(fakeDS);
-
-    ASSERT_EQ(fakeDS.get(), dynamic_cast<DocumentSourceLimit*>(fakeStage.get()));
-    ASSERT_EQ(mappingFnCallCount, 0);
-}
-
-/**
  * Test that for the DocumentSources that do not have a registered mapping function, we hit the
  * tassert in the mapping function.
  */

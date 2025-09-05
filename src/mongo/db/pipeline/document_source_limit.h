@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-class DocumentSourceLimit final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceLimit final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$limit"_sd;
 
@@ -108,7 +108,7 @@ public:
         // order to produce correct pipeline output.
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{
-            this, DocumentSourceLimit::create(pExpCtx, _limit), boost::none};
+            this, DocumentSourceLimit::create(getExpCtx(), _limit), boost::none};
     }
 
     long long getLimit() const {
@@ -122,10 +122,8 @@ public:
 
 private:
     DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
-    GetNextResult doGetNext() final;
 
     long long _limit;
-    long long _nReturned = 0;
 };
 
 }  // namespace mongo

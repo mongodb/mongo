@@ -42,23 +42,6 @@ namespace mongo::test {
 
 using namespace exec::agg;
 
-// TODO SERVER-108165 Consider if this test if still needed after all splits.
-TEST(PipelineBuilderTest, OneStagePipeline) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto dsFake = DocumentSourceLimit::create(expCtx, 10LL);
-    std::list<boost::intrusive_ptr<DocumentSource>> sources{dsFake};
-    auto pipeline = mongo::Pipeline::create(std::move(sources), expCtx);
-
-    auto pl = exec::agg::buildPipeline(pipeline->freeze());
-
-    ASSERT_EQ(1UL, pl->getStages().size());
-
-    // The next assertion is only true for trivial (same object instance) mapping of not-yet
-    // refactored document sources during SPM-4106. After all stages are refactored, we must use
-    // more specific assertions.
-    ASSERT_EQ(dsFake.get(), dynamic_cast<DocumentSourceLimit*>(pl->getStages().back().get()));
-}
-
 class DocumentSourceMock1 : public DocumentSourceTestOptimizations {
 public:
     using DocumentSourceTestOptimizations::DocumentSourceTestOptimizations;

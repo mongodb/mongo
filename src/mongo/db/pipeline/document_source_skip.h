@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-class DocumentSourceSkip final : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceSkip final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$skip"_sd;
 
@@ -126,10 +126,7 @@ private:
     explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                 long long nToSkip);
 
-    GetNextResult doGetNext() final;
-
     long long _nToSkip = 0;
-    long long _nSkippedSoFar = 0;
 };
 
 }  // namespace mongo

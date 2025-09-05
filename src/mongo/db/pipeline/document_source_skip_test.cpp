@@ -30,9 +30,11 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 
 #include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/agg/skip_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
 
 #include <limits>
 
@@ -44,8 +46,13 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceSkipTest = AggregationContextFixture;
 
+boost::intrusive_ptr<mongo::exec::agg::SkipStage> createForTests(
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip) {
+    return make_intrusive<mongo::exec::agg::SkipStage>("$skip"_sd, pExpCtx, nToSkip);
+}
+
 TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
-    auto skip = DocumentSourceSkip::create(getExpCtx(), 2);
+    auto skipStage = createForTests(getExpCtx(), 2);
     auto mock =
         exec::agg::MockStage::createForTest({Document(),
                                              DocumentSource::GetNextResult::makePauseExecution(),
@@ -54,20 +61,20 @@ TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              DocumentSource::GetNextResult::makePauseExecution()},
                                             getExpCtx());
-    skip->setSource(mock.get());
+    skipStage->setSource(mock.get());
 
     // Skip the first document.
-    ASSERT_TRUE(skip->getNext().isPaused());
+    ASSERT_TRUE(skipStage->getNext().isPaused());
 
     // Skip one more, then advance.
-    ASSERT_TRUE(skip->getNext().isAdvanced());
+    ASSERT_TRUE(skipStage->getNext().isAdvanced());
 
-    ASSERT_TRUE(skip->getNext().isPaused());
-    ASSERT_TRUE(skip->getNext().isPaused());
+    ASSERT_TRUE(skipStage->getNext().isPaused());
+    ASSERT_TRUE(skipStage->getNext().isPaused());
 
-    ASSERT_TRUE(skip->getNext().isEOF());
-    ASSERT_TRUE(skip->getNext().isEOF());
-    ASSERT_TRUE(skip->getNext().isEOF());
+    ASSERT_TRUE(skipStage->getNext().isEOF());
+    ASSERT_TRUE(skipStage->getNext().isEOF());
+    ASSERT_TRUE(skipStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizing) {

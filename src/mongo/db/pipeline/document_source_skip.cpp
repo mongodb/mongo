@@ -51,9 +51,7 @@ using boost::intrusive_ptr;
 
 DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                        long long nToSkip)
-    : DocumentSource(kStageName, pExpCtx),
-      exec::agg::Stage(kStageName, pExpCtx),
-      _nToSkip(nToSkip) {}
+    : DocumentSource(kStageName, pExpCtx), _nToSkip(nToSkip) {}
 
 REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,
@@ -62,23 +60,6 @@ REGISTER_DOCUMENT_SOURCE(skip,
 ALLOCATE_DOCUMENT_SOURCE_ID(skip, DocumentSourceSkip::id)
 
 constexpr StringData DocumentSourceSkip::kStageName;
-
-DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
-    while (_nSkippedSoFar < _nToSkip) {
-        // For performance reasons, a streaming stage must not keep references to documents across
-        // calls to getNext(). Such stages must retrieve a result from their child and then release
-        // it (or return it) before asking for another result. Failing to do so can result in extra
-        // work, since the Document/Value library must copy data on write when that data has a
-        // refcount above one.
-        auto nextInput = pSource->getNext();
-        if (!nextInput.isAdvanced()) {
-            return nextInput;
-        }
-        ++_nSkippedSoFar;
-    }
-
-    return pSource->getNext();
-}
 
 Value DocumentSourceSkip::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));

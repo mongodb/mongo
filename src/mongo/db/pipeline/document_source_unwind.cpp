@@ -155,7 +155,7 @@ DocumentSourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     if (nextLimit && preserveNullAndEmptyArrays() && canPushLimitBack(nextLimit)) {
         _smallestLimitPushedDown = nextLimit->getLimit();
         auto newStageItr = container->insert(
-            itr, DocumentSourceLimit::create(nextLimit->getContext(), nextLimit->getLimit()));
+            itr, DocumentSourceLimit::create(nextLimit->getExpCtx(), nextLimit->getLimit()));
         return newStageItr == container->begin() ? newStageItr : std::prev(newStageItr);
     }
 

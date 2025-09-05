@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/limit_stage.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 #include <iterator>
 #include <list>
@@ -58,16 +60,21 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceLimitTest = AggregationContextFixture;
 
+boost::intrusive_ptr<mongo::exec::agg::LimitStage> createForTests(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, long long limit) {
+    return make_intrusive<mongo::exec::agg::LimitStage>("$limit", expCtx, limit);
+}
+
 TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
     auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
-    auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
-    limit->setSource(stage.get());
-    // The limit's result is as expected.
-    auto next = limit->getNext();
+    auto limitStage = createForTests(getExpCtx(), 1);
+    limitStage->setSource(stage.get());
+    // The limitStage's result is as expected.
+    auto next = limitStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
-    // The limit is exhausted.
-    ASSERT(limit->getNext().isEOF());
+    // The limitStage is exhausted.
+    ASSERT(limitStage->getNext().isEOF());
     // The stage has been disposed
     ASSERT_TRUE(stage->isDisposed);
 }
@@ -129,14 +136,14 @@ TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
     auto matchStage = exec::agg::buildStage(match);
     matchStage->setSource(stage.get());
 
-    auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
-    limit->setSource(matchStage.get());
-    // The limit is not exhausted.
-    auto next = limit->getNext();
+    auto limitStage = createForTests(getExpCtx(), 1);
+    limitStage->setSource(matchStage.get());
+    // The limitStage is not exhausted.
+    auto next = limitStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
-    // The limit is exhausted.
-    ASSERT(limit->getNext().isEOF());
+    // The limitStage is exhausted.
+    ASSERT(limitStage->getNext().isEOF());
     ASSERT_TRUE(stage->isDisposed);
 }
 
@@ -150,7 +157,7 @@ TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
-    auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
+    auto limitStage = createForTests(getExpCtx(), 2);
     auto mock =
         exec::agg::MockStage::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
                                              Document(),
@@ -159,18 +166,18 @@ TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document()},
                                             getExpCtx());
-    limit->setSource(mock.get());
+    limitStage->setSource(mock.get());
 
-    ASSERT_TRUE(limit->getNext().isPaused());
-    ASSERT_TRUE(limit->getNext().isAdvanced());
-    ASSERT_TRUE(limit->getNext().isPaused());
-    ASSERT_TRUE(limit->getNext().isAdvanced());
+    ASSERT_TRUE(limitStage->getNext().isPaused());
+    ASSERT_TRUE(limitStage->getNext().isAdvanced());
+    ASSERT_TRUE(limitStage->getNext().isPaused());
+    ASSERT_TRUE(limitStage->getNext().isAdvanced());
 
     // We've reached the limit.
     ASSERT_TRUE(mock->isDisposed);
-    ASSERT_TRUE(limit->getNext().isEOF());
-    ASSERT_TRUE(limit->getNext().isEOF());
-    ASSERT_TRUE(limit->getNext().isEOF());
+    ASSERT_TRUE(limitStage->getNext().isEOF());
+    ASSERT_TRUE(limitStage->getNext().isEOF());
+    ASSERT_TRUE(limitStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceLimitTest, RedactsCorrectly) {
