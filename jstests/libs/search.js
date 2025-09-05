@@ -170,7 +170,7 @@ export function dropSearchIndex(coll, keys) {
          * createSearchIndex library helper only returns the response from issuing the creation
          * command on the last shard. This is problematic for sharded configurations as a server dev
          * won't have all the IDs associated with the search index across all of the shards. To
-         * ensure correctness, the dropSearchIndex library helper will only accept specifiying
+         * ensure correctness, the dropSearchIndex library helper will only accept specifying
          * search index by name.
          */
         throw new Error("dropSearchIndex library helper only accepts a search index name");
@@ -220,4 +220,68 @@ export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
     }
 
     return _runAndReplicateSearchIndexCommand(coll, userCmd, name);
+}
+
+/**
+ * Testing functions to expect failure for search index commands.
+ */
+
+export function expectDropSearchIndexFails(coll, keys, errCodes = []) {
+    _validateSearchIndexCommandFailsArgs(coll, keys, errCodes);
+
+    if (!keys.hasOwnProperty("name")) {
+        throw new Error("expectDropSearchIndexFails must have a search index name");
+    }
+
+    let name = keys["name"];
+    let userCmd = {dropSearchIndex: coll.getName(), name};
+
+    _expectSearchIndexComamndFails(coll, userCmd, errCodes);
+}
+
+export function expectUpdateSearchIndexFails(coll, keys, errCodes = []) {
+    _validateSearchIndexCommandFailsArgs(coll, keys, errCodes);
+
+    if (!keys.hasOwnProperty("definition")) {
+        throw new Error("expectUpdateSearchIndexFails must have a definition");
+    }
+
+    const name = keys["name"];
+    let userCmd = {updateSearchIndex: coll.getName(), name, definition: keys["definition"]};
+
+    _expectSearchIndexComamndFails(coll, userCmd, errCodes);
+}
+
+export function expectCreateSearchIndexFails(coll, keys, errCodes = []) {
+    _validateSearchIndexCommandFailsArgs(coll, keys, errCodes);
+
+    if (!keys.hasOwnProperty("definition")) {
+        throw new Error("expectCreateSearchIndexFails must have a definition");
+    }
+
+    let userCmd = {createSearchIndexes: coll.getName(), indexes: [keys]};
+    let name = "default";
+    if ("name" in keys) {
+        name = keys["name"];
+    }
+
+    _expectSearchIndexComamndFails(coll, userCmd, errCodes);
+}
+
+function _validateSearchIndexCommandFailsArgs(coll, keys, errCodes) {
+    if (arguments.length > 3) {
+        throw new Error("expectSearchIndexCommandFails fn accepts up to 3 arguments");
+    }
+
+    if (!Array.isArray(errCodes)) {
+        throw new Error("'errCodes' must be typeof Array in expectSearchIndexCommandFails");
+    }
+}
+
+function _expectSearchIndexComamndFails(coll, userCmd, errCodes) {
+    if (errCodes.length === 0) {
+        assert.commandFailed(coll.getDB().runCommand(userCmd));
+    } else {
+        assert.commandFailedWithCode(coll.getDB().runCommand(userCmd), errCodes);
+    }
 }

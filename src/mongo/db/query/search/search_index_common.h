@@ -61,8 +61,14 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
  */
 void throwIfNotRunningWithRemoteSearchIndexManagement();
 
+/*
+ * Search related operations on timeseries collections may either fail or act as a no-op;
+ * so the 'failOnTsColl' flag indicates which behavior is appropriate if the collection
+ * ends up being timeseries upon lookup.
+ */
 StatusWith<std::tuple<UUID, const NamespaceString, boost::optional<SearchQueryViewSpec>>>
 retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
-                                     const NamespaceString& currentOperationNss);
+                                     const NamespaceString& currentOperationNss,
+                                     bool failOnTsColl = true);
 
 }  // namespace mongo

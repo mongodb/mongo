@@ -36,7 +36,10 @@ namespace mongo {
 class SearchIndexProcessRouter : public SearchIndexProcessInterface {
 public:
     std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
-    fetchCollectionUUIDAndResolveView(OperationContext* opCtx, const NamespaceString& nss) override;
+    fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      bool failOnTsColl = true) override;
+
     std::pair<UUID, boost::optional<ResolvedView>> fetchCollectionUUIDAndResolveViewOrThrow(
         OperationContext* opCtx, const NamespaceString& nss) override;
 };

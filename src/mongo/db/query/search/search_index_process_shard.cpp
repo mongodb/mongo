@@ -50,9 +50,17 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessShardImplementatio
 
 std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
+                                                           const NamespaceString& nss,
+                                                           bool failOnTsColl) {
     auto catalog = CollectionCatalog::get(opCtx);
+    auto coll = catalog->lookupCollectionByNamespace(opCtx, nss);
     auto view = catalog->lookupView(opCtx, nss);
+
+    uassert(10840701,
+            "search index commands are not allowed on timeseries collections",
+            !(failOnTsColl &&
+              ((coll && coll->isTimeseriesCollection()) || (view && view->timeseries()))));
+
     if (!view) {
         return std::make_pair(catalog->lookupUUIDByNSS(opCtx, nss), boost::none);
     } else {

@@ -56,9 +56,15 @@ public:
     /**
      * Returns the collection UUID (or boost::none if no collection is found) and optionally a
      * ResolvedView if query is on a view (or boost::none if query is on a normal collection).
+     *
+     * Search related operations on timeseries collections may either fail or act as a no-op;
+     * so the 'failOnTsColl' flag indicates which behavior is appropriate if the collection
+     * ends up being timeseries upon lookup.
      */
     virtual std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
-    fetchCollectionUUIDAndResolveView(OperationContext* opCtx, const NamespaceString& nss) = 0;
+    fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      bool failOnTsColl = true) = 0;
 };
 
 }  // namespace mongo

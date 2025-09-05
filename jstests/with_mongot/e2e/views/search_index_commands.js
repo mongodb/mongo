@@ -1,6 +1,6 @@
 /**
- * This test issues the search index management commands (createSearchIndex, updateSearchIndex) on
- * views.
+ * This test issues the search index management commands (createSearchIndex, dropSearchIndex,
+ * updateSearchIndex) on views.
  *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */

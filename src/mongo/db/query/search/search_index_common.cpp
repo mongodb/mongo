@@ -74,7 +74,8 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
 
 StatusWith<std::tuple<UUID, const NamespaceString, boost::optional<SearchQueryViewSpec>>>
 retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
-                                     const NamespaceString& currentOperationNss) {
+                                     const NamespaceString& currentOperationNss,
+                                     bool failOnTsColl) {
     // TLDR: on mongod, pass the viewName saved to expCtx. On mongos, pass the NSS saved to
     // expCtx.
     // On mongod, pExpCtx->getNamespaceString() represents the resolved namespace (the
@@ -88,7 +89,7 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
     // the view nss.
     auto collUUIDResolvedViewPair =
         SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
-            opCtx, currentOperationNss);
+            opCtx, currentOperationNss, failOnTsColl);
 
     // The caller of the function decides whether to escalate the error returned or not.
     if (!collUUIDResolvedViewPair.first) {
