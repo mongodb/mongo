@@ -1102,13 +1102,146 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 }
 
+namespace {
+
+BSONObj buildContainerOpObject(std::variant<int64_t, std::span<const char>> key,
+                               boost::optional<std::span<const char>> value = boost::none) {
+    BSONObjBuilder builder;
+    std::visit(OverloadedVisitor{[&builder](int64_t key) { builder.append("k", key); },
+                                 [&builder](std::span<const char> key) {
+                                     builder.appendBinData(
+                                         "k", key.size(), BinDataType::BinDataGeneral, key.data());
+                                 }},
+               key);
+    if (value) {
+        builder.appendBinData("v", value->size(), BinDataType::BinDataGeneral, value->data());
+    }
+    return builder.obj();
+}
+
+OpTimeBundle logContainerInsert(OperationContext* opCtx,
+                                const NamespaceString& ns,
+                                const UUID& uuid,
+                                StringData container,
+                                std::variant<int64_t, std::span<const char>> key,
+                                std::span<const char> value,
+                                OperationLogger& logger) {
+    MutableOplogEntry entry;
+    entry.setTid(ns.tenantId());
+    entry.setNss(ns);
+    entry.setUuid(uuid);
+    entry.setContainer(container);
+    entry.setOpType(repl::OpTypeEnum::kContainerInsert);
+    entry.setObject(buildContainerOpObject(key, value));
+
+    OpTimeBundle opTime;
+    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignWallClockTime*/, &logger);
+    opTime.wallClockTime = entry.getWallClockTime();
+
+    return opTime;
+}
+
+void _onContainerInsert(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const UUID& collUUID,
+                        StringData ident,
+                        std::variant<int64_t, std::span<const char>> key,
+                        std::span<const char> value,
+                        OperationLogger& logger) {
+    auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto inMultiDocumentTransaction =
+        txnParticipant && !oplogDisabled && txnParticipant.transactionIsOpen();
+    auto inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
+
+    uassert(10942700,
+            "Cannot insert into a container in a multi-document transaction",
+            !inMultiDocumentTransaction);
+
+    // TODO (SERVER-109748): Handle batched writes.
+    uassert(10942701, "Cannot insert into a container in a batched write", !inBatchedWrite);
+
+    if (_skipOplogOps(oplogDisabled,
+                      inBatchedWrite,
+                      inMultiDocumentTransaction,
+                      ns,
+                      {kUninitializedStmtId})) {
+        return;
+    }
+
+    auto opTime = logContainerInsert(opCtx, ns, collUUID, ident, key, value, logger);
+
+    SessionTxnRecord sessionTxnRecord;
+    sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
+    sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
+    onWriteOpCompleted(opCtx, {kUninitializedStmtId}, sessionTxnRecord, ns);
+}
+
+OpTimeBundle logContainerDelete(OperationContext* opCtx,
+                                const NamespaceString& ns,
+                                const UUID& uuid,
+                                StringData container,
+                                std::variant<int64_t, std::span<const char>> key,
+                                OperationLogger& logger) {
+    MutableOplogEntry entry;
+    entry.setTid(ns.tenantId());
+    entry.setNss(ns);
+    entry.setUuid(uuid);
+    entry.setContainer(container);
+    entry.setOpType(repl::OpTypeEnum::kContainerDelete);
+    entry.setObject(buildContainerOpObject(key));
+
+    OpTimeBundle opTime;
+    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignWallClockTime*/, &logger);
+    opTime.wallClockTime = entry.getWallClockTime();
+
+    return opTime;
+}
+
+void _onContainerDelete(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const UUID& collUUID,
+                        StringData ident,
+                        std::variant<int64_t, std::span<const char>> key,
+                        OperationLogger& logger) {
+    auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto inMultiDocumentTransaction =
+        txnParticipant && !oplogDisabled && txnParticipant.transactionIsOpen();
+    auto inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
+
+    uassert(10942702,
+            "Cannot delete from a container in a multi-document transaction",
+            !inMultiDocumentTransaction);
+
+    // TODO (SERVER-109748): Handle batched writes.
+    uassert(10942703, "Cannot delete from a container in a batched write", !inBatchedWrite);
+
+    if (_skipOplogOps(oplogDisabled,
+                      inBatchedWrite,
+                      inMultiDocumentTransaction,
+                      ns,
+                      {kUninitializedStmtId})) {
+        return;
+    }
+
+    auto opTime = logContainerDelete(opCtx, ns, collUUID, ident, key, logger);
+
+    SessionTxnRecord sessionTxnRecord;
+    sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
+    sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
+    onWriteOpCompleted(opCtx, {kUninitializedStmtId}, sessionTxnRecord, ns);
+}
+
+}  // namespace
+
 void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        const NamespaceString& ns,
                                        const UUID& collUUID,
                                        StringData ident,
                                        int64_t key,
                                        std::span<const char> value) {
-    // TODO (SERVER-109427): Generate an oplog entry.
+    _onContainerInsert(opCtx, ns, collUUID, ident, key, value, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
@@ -1117,7 +1250,7 @@ void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        StringData ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
-    // TODO (SERVER-109427): Generate an oplog entry.
+    _onContainerInsert(opCtx, ns, collUUID, ident, key, value, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
@@ -1125,7 +1258,7 @@ void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                                        const UUID& collUUID,
                                        StringData ident,
                                        int64_t key) {
-    // TODO (SERVER-109427): Generate an oplog entry.
+    _onContainerDelete(opCtx, ns, collUUID, ident, key, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
@@ -1133,7 +1266,7 @@ void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                                        const UUID& collUUID,
                                        StringData ident,
                                        std::span<const char> key) {
-    // TODO (SERVER-109427): Generate an oplog entry.
+    _onContainerDelete(opCtx, ns, collUUID, ident, key, *_operationLogger);
 }
 
 void OpObserverImpl::onInternalOpMessage(
