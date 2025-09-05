@@ -535,30 +535,42 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         return ceRes1.getValue();
     }
 
-    if (node->children[0]->getType() == STAGE_IXSCAN &&
-        static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
-            nullptr &&  // TODO SERVER-98577: Remove this restriction
-        _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE &&
+        node->children[0]->getType() == STAGE_IXSCAN) {
+        // If the FetchNode does not have a filter then its output cardinality will be unchanged
+        // from its input cardinality.
+        if (node->filter == nullptr) {
+            est.outCE = ceRes1.getValue();
+            _qsnEstimates.emplace(node, std::move(est));
+            return ceRes1.getValue();
+        }
 
-        auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
-        auto ce = [&]() -> CardinalityEstimate {
-            // Try to estimate using transformation to match expression.
-            auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
-            if (matchExpr) {
-                const auto matchExprPtr = matchExpr.get();
-                return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                    return _samplingEstimator->estimateCardinality(matchExprPtr);
-                });
-            }
-            // Rare case, CE not cached.
-            return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
-        }();
+        // If the child IndexScan stage does not have a filter, then we can estimate the cardinality
+        // of the MatchExpression using the bounds of the IndexScan stage and the filter of the
+        // FetchNode.
+        if (static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
+            nullptr  // TODO SERVER-98577: Remove this restriction
+        ) {
+            auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
+            auto ce = [&]() -> CardinalityEstimate {
+                // Try to estimate using transformation to match expression.
+                auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
+                if (matchExpr) {
+                    const auto matchExprPtr = matchExpr.get();
+                    return _ceCache.getOrCompute(std::move(matchExpr), [&] {
+                        return _samplingEstimator->estimateCardinality(matchExprPtr);
+                    });
+                }
+                // Rare case, CE not cached.
+                return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
+            }();
 
-        popSelectivities();
-        _conjSels.emplace_back(ce / _inputCard);
-        est.outCE = ce;
-        _qsnEstimates.emplace(node, std::move(est));
-        return ce;
+            popSelectivities();
+            _conjSels.emplace_back(ce / _inputCard);
+            est.outCE = ce;
+            _qsnEstimates.emplace(node, std::move(est));
+            return ce;
+        }
     }
 
     if (const MatchExpression* filter = node->filter.get()) {

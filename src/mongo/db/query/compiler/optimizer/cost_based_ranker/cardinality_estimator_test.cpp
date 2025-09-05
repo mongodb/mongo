@@ -755,5 +755,29 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
     ASSERT_EQUALS(indexScanNonMultiKeyNoFilterRange, indexScanMultiKey);
 }
 
+TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanWithFetchNoFilter) {
+    size_t collCard = 100;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    auto samplingEstimator =
+        samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200, ce::NoProjection{});
+
+    // Create indexed plan with an empty fetch filter since the IndexScan bounds can be used to
+    // satisfy the predicate.
+    std::vector<std::string> indexFields = {"a"};
+    BSONObj fetchCond = fromjson("{}");
+    auto fetchExpr = parse(fetchCond);
+    auto indexPlan = makeIndexScanFetchPlan(
+        makePointIntervalBounds(50.0, indexFields[0]), indexFields, nullptr, std::move(fetchExpr));
+
+    BSONObj query = fromjson("{a: 50}");
+    auto expr = parse(query);
+    auto collPlan = makeCollScanPlan(std::move(expr));
+    // We expect that a Fetch + Index Scan plan where the bounds fully cover the predicate (i.e. no
+    // filter on FetchNode) is equal to a Collection Scan plan with the same predicate.
+    ASSERT_EQ(getPlanSamplingCE(*indexPlan, collCard, &samplingEstimator),
+              getPlanSamplingCE(*collPlan, collCard, &samplingEstimator));
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker
