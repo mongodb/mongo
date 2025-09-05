@@ -869,7 +869,8 @@ Collection* DatabaseImpl::_createCollection(
                 !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collectionPtr),
                 boost::none));
             IndexBuildInfo indexBuildInfo(fullIdIndexSpec, catalogIdentifierForColl->idIndexIdent);
-            indexBuildInfo.setInternalIdents(*opCtx->getServiceContext()->getStorageEngine());
+            indexBuildInfo.setInternalIdents(*opCtx->getServiceContext()->getStorageEngine(),
+                                             VersionContext::getDecoration(opCtx));
             uassertStatusOK(IndexBuildBlock::buildEmptyIndex(opCtx, collection, indexBuildInfo));
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.

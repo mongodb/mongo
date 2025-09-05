@@ -237,6 +237,10 @@ std::string generateNewInternalIdent(StringData identStem) {
     return fmt::format("{}-{}{}", kInternalIdentStem, identStem, UUID::gen().toString());
 }
 
+std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent) {
+    return fmt::format("{}-{}-{}", kInternalIdentStem, identStem, indexIdent);
+}
+
 bool isCollectionOrIndexIdent(StringData ident) {
     auto parsed = parseIdent(ident);
     return parsed &&

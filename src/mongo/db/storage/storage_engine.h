@@ -862,6 +862,11 @@ public:
         return ident::generateNewInternalIdent();
     }
 
+    std::string generateNewInternalIndexBuildIdent(StringData identStem,
+                                                   StringData indexIdent) const {
+        return ident::generateNewInternalIndexBuildIdent(identStem, indexIdent);
+    }
+
     virtual std::vector<std::string> generateNewIndexIdents(const DatabaseName& dbName,
                                                             size_t count) const {
         std::vector<std::string> idents;

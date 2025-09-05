@@ -195,7 +195,8 @@ Status createIndexFromSpec(OperationContext* opCtx,
     }
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexBuildInfo = IndexBuildInfo(spec, *storageEngine, nss.dbName());
+    auto indexBuildInfo =
+        IndexBuildInfo(spec, *storageEngine, nss.dbName(), VersionContext::getDecoration(opCtx));
     MultiIndexBlock indexer;
     CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit(
@@ -465,7 +466,8 @@ public:
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "name" << indexName << "key" << indexKey),
                            *storageEngine,
-                           coll->ns().dbName());
+                           coll->ns().dbName(),
+                           VersionContext::getDecoration(_opCtx));
 
         // Build an index.
         MultiIndexBlock indexer;
@@ -494,7 +496,8 @@ public:
                 coll.getWritableCollection(_opCtx),
                 [&](const BSONObj& indexSpec, StringData ident) {
                     auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
-                    indexBuildInfo.setInternalIdents(*storageEngine);
+                    indexBuildInfo.setInternalIdents(*storageEngine,
+                                                     VersionContext::getDecoration(_opCtx));
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                         _opCtx, coll->ns(), coll->uuid(), indexBuildInfo, false);
                 },
@@ -2074,7 +2077,7 @@ public:
                                                           << "a_1"
                                                           << "key" << BSON("a" << 1)),
                                                  indexIdent);
-            indexBuildInfo.setInternalIdents(*storageEngine);
+            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
             auto swIndexInfoObj = indexer.init(
                 _opCtx,
                 coll,
@@ -2104,7 +2107,8 @@ public:
                         // The timestamping responsibility for each index is placed
                         // on the caller.
                         auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
-                        indexBuildInfo.setInternalIdents(*storageEngine);
+                        indexBuildInfo.setInternalIdents(*storageEngine,
+                                                         VersionContext::getDecoration(_opCtx));
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                             _opCtx, nss, coll->uuid(), indexBuildInfo, false);
                     } else {
@@ -2727,7 +2731,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
                                                           << "ns" << collection->ns().ns_forTest()
                                                           << "key" << BSON("a" << 1 << "b" << 1)),
                                                  std::string{"index-ident"});
-            indexBuildInfo.setInternalIdents(*storageEngine);
+            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
             auto swSpecs = indexer.init(
                 _opCtx,
                 collection,
@@ -2821,7 +2825,8 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
             collection.getWritableCollection(_opCtx),
             [&](const BSONObj& indexSpec, StringData ident) {
                 auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(_opCtx));
                 _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                     _opCtx, collection->ns(), collection->uuid(), indexBuildInfo, false);
             },
@@ -2907,7 +2912,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         UUID indexBuildUUID = UUID::gen();
         const auto indexIdent = "index-ident"_sd;
         IndexBuildInfo indexBuildInfo(spec, std::string{indexIdent});
-        indexBuildInfo.setInternalIdents(*storageEngine);
+        indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
 
         // Wait for the index build thread to start the collection scan before proceeding with
         // checking the catalog and applying the commitIndexBuild oplog entry.

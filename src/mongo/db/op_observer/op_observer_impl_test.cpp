@@ -461,7 +461,7 @@ protected:
             IndexBuildInfo indexBuildInfo(
                 BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
                 fmt::format("index-{}", i + 1));
-            indexBuildInfo.setInternalIdents(*storageEngine);
+            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(opCtx));
             indexes.push_back(std::move(indexBuildInfo));
         }
         return indexes;

@@ -209,7 +209,8 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
                                  const BSONObj& spec,
                                  MultiIndexBlock::OnInitFn onInit) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexBuildInfo = IndexBuildInfo(spec, *storageEngine, collection->ns().dbName());
+    auto indexBuildInfo = IndexBuildInfo(
+        spec, *storageEngine, collection->ns().dbName(), VersionContext::getDecoration(opCtx));
     return indexer.init(opCtx, collection, {indexBuildInfo}, onInit).getStatus();
 }
 

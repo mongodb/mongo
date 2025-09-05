@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/version_context.h"
 
 #include <string>
 #include <vector>
@@ -47,8 +48,12 @@ struct IndexBuildInfo {
 
     /**
      * Generates new idents and initializes all ident-related member fields.
+     * TODO SERVER-106716: Remove VersionContext parameter
      */
-    IndexBuildInfo(BSONObj specObj, StorageEngine& storageEngine, const DatabaseName& dbName);
+    IndexBuildInfo(BSONObj specObj,
+                   StorageEngine& storageEngine,
+                   const DatabaseName& dbName,
+                   const VersionContext& vCtx);
 
     /**
      * Extracts index name from the spec and returns it.
@@ -57,8 +62,9 @@ struct IndexBuildInfo {
 
     /**
      * Generates new idents and initializes all member fields tracking idents of temporary tables.
+     * TODO SERVER-106716: Remove VersionContext parameter
      */
-    void setInternalIdents(StorageEngine& storageEngine);
+    void setInternalIdents(StorageEngine& storageEngine, const VersionContext& vCtx);
 
     /**
      * Initializes all member fields tracking idents of temporary tables with the given idents.
@@ -86,10 +92,12 @@ struct IndexBuildInfo {
 
 /**
  * Constructs IndexBuildInfo instances from the given index specs.
+ * TODO SERVER-106716: Remove VersionContext parameter
  */
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
                                                 StorageEngine& storageEngine,
-                                                const DatabaseName& dbName);
+                                                const DatabaseName& dbName,
+                                                const VersionContext& vCtx);
 
 /**
  * Same as above, but does not populate the ident fields in the IndexBuildInfo instances.

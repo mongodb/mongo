@@ -312,5 +312,49 @@ TEST_F(IdentGenerationTest, InvalidIdents) {
     // dbname containing characters that should have been escaped
     ASSERT_FALSE(ident::isValidIdent("db[name]/index/a"));
 }
+
+TEST_F(IdentGenerationTest, ValidInternalIndexBuildIdent) {
+    const auto testValidInternalIndexBuildIdents = [&](std::string indexIdent) {
+        auto sorterStem = "sorter";
+        auto sorterIdent = ident::generateNewInternalIndexBuildIdent(sorterStem, indexIdent);
+        ASSERT_TRUE(ident::isInternalIdent(sorterIdent, sorterStem)) << "ident: " << sorterIdent;
+        ASSERT_TRUE(ident::isValidIdent(sorterIdent)) << "ident: " << sorterIdent;
+
+        auto sideWritesStem = "sideWrites";
+        auto sideWritesIdent =
+            ident::generateNewInternalIndexBuildIdent(sideWritesStem, indexIdent);
+        ASSERT_TRUE(ident::isInternalIdent(sideWritesIdent, sideWritesStem))
+            << "ident: " << sideWritesIdent;
+        ASSERT_TRUE(ident::isValidIdent(sideWritesIdent)) << "ident: " << sideWritesIdent;
+
+        auto skippedRecordsTrackerStem = "skippedRecordsTracker";
+        auto skippedRecordsTrackerIdent =
+            ident::generateNewInternalIndexBuildIdent(skippedRecordsTrackerStem, indexIdent);
+        ASSERT_TRUE(ident::isInternalIdent(skippedRecordsTrackerIdent, skippedRecordsTrackerStem))
+            << "ident: " << skippedRecordsTrackerIdent;
+        ASSERT_TRUE(ident::isValidIdent(skippedRecordsTrackerIdent))
+            << "ident: " << skippedRecordsTrackerIdent;
+
+        auto constraintViolationsStem = "constraintViolations";
+        auto constraintViolationsIdent =
+            ident::generateNewInternalIndexBuildIdent(constraintViolationsStem, indexIdent);
+        ASSERT_TRUE(ident::isInternalIdent(constraintViolationsIdent, constraintViolationsStem))
+            << "ident: " << constraintViolationsIdent;
+        ASSERT_TRUE(ident::isValidIdent(constraintViolationsIdent))
+            << "ident: " << constraintViolationsIdent;
+    };
+
+    testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */));
+
+    // TODO SERVER-109146: Either reformat internal index build idents or disallow using with index
+    // idents with directoryPerDB or directoryForIndexes
+    // testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+    //     kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */));
+    // testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+    //     kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */));
+    // testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+    //     kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */));
+}
 }  // namespace
 }  // namespace mongo

@@ -251,8 +251,11 @@ public:
                         }
                     }
 
-                    indexes.push_back(IndexBuildInfo(
-                        bob.obj(), *opCtx->getServiceContext()->getStorageEngine(), dbName));
+                    indexes.push_back(
+                        IndexBuildInfo(bob.obj(),
+                                       *opCtx->getServiceContext()->getStorageEngine(),
+                                       dbName,
+                                       VersionContext::getDecoration(opCtx)));
                 }
 
                 const BSONObj key = spec.getObjectField("key");

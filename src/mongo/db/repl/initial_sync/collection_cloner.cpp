@@ -376,7 +376,10 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
         for (const auto& indexSpec : groupedIndexSpec.second) {
             // TODO(SERVER-107069): obtain the ident from the sync source rather than generating
             // them.
-            indexes.emplace_back(indexSpec.getOwned(), *storageEngine, _sourceNss.dbName());
+            indexes.emplace_back(indexSpec.getOwned(),
+                                 *storageEngine,
+                                 _sourceNss.dbName(),
+                                 VersionContext::getDecoration(opCtx.get()));
         }
 
         UnreplicatedWritesBlock uwb(opCtx.get());

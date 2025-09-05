@@ -510,8 +510,10 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
     CreateIndexesReply reply;
 
     auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
-    auto indexes = toIndexBuildInfoVec(
-        specs, *opCtx->getServiceContext()->getStorageEngine(), cmd.getDbName());
+    auto indexes = toIndexBuildInfoVec(specs,
+                                       *opCtx->getServiceContext()->getStorageEngine(),
+                                       cmd.getDbName(),
+                                       VersionContext::getDecoration(opCtx));
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto protocol = determineProtocol(opCtx, ns);

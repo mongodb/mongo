@@ -2172,7 +2172,8 @@ public:
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
@@ -2447,7 +2448,8 @@ public:
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
@@ -2777,7 +2779,8 @@ public:
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
@@ -2829,7 +2832,8 @@ public:
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexSpecB, entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
@@ -3432,7 +3436,8 @@ public:
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
                                               entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
@@ -3484,7 +3489,8 @@ public:
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 
@@ -4702,7 +4708,8 @@ public:
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod()->asSortedData();
                 IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine);
+                indexBuildInfo.setInternalIdents(*storageEngine,
+                                                 VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
                     &_opCtx, entry, indexBuildInfo, /*resume=*/false);
 

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
+#include "mongo/util/uuid.h"
 
 #include <string>
 
@@ -89,10 +90,15 @@ std::string generateNewIndexIdent(const DatabaseName& dbName,
  * Marking an ident as internal implies the underlying data is subject to different handling by the
  * server than that of standard collections and indexes.
  *
- * Generates a unique ident tagged with an 'internal-' prefix. Returns in ident in the form of
+ * Generates a unique ident tagged with an 'internal-' prefix. Returns an ident in the form of
  * 'internal-<identStem><unique identifier>'.
  */
 std::string generateNewInternalIdent(StringData identStem = ""_sd);
+
+/**
+ * Returns an ident in the form of 'internal-<identStem>-<indexIdent>'.
+ */
+std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent);
 
 /**
  * Returns true if the ident specifies a basic "collection" or "index" table type.

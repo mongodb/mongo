@@ -374,7 +374,10 @@ void createIndexForApplyOps(OperationContext* opCtx,
             !shouldReplicateLocalCatalogIdentifers(
                 rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
                 VersionContext::getDecoration(opCtx))) {
-            return IndexBuildInfo(indexSpec, *storageEngine, indexCollection->ns().dbName());
+            return IndexBuildInfo(indexSpec,
+                                  *storageEngine,
+                                  indexCollection->ns().dbName(),
+                                  VersionContext::getDecoration(opCtx));
         }
 
         auto parsedIndexMetadata = repl::CreateIndexesOplogEntryO2::parse(
@@ -386,7 +389,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
                     indexMetadata->toString(),
                 ident::isValidIdent(indexIdent));
         IndexBuildInfo indexBuildInfo(indexSpec, std::string{indexIdent});
-        indexBuildInfo.setInternalIdents(*storageEngine);
+        indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(opCtx));
         return indexBuildInfo;
     }();
 
@@ -986,7 +989,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   indexBuildInfo.indexIdent =
                       storageEngine->generateNewIndexIdent(entry.getNss().dbName());
               }
-              indexBuildInfo.setInternalIdents(*storageEngine);
+              indexBuildInfo.setInternalIdents(*storageEngine,
+                                               VersionContext::getDecoration(opCtx));
           }
 
           IndexBuildsCoordinator::ApplicationMode applicationMode =

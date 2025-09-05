@@ -996,7 +996,8 @@ public:
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             writableColl->ns(), indexSpec, IndexBuildMethodEnum::kForeground, UUID::gen());
-        IndexBuildInfo indexBuildInfo(indexSpec, *storageEngine, nss.dbName());
+        IndexBuildInfo indexBuildInfo(
+            indexSpec, *storageEngine, nss.dbName(), VersionContext::getDecoration(opCtx));
         uassertStatusOK(indexBuildBlock->init(opCtx,
                                               writableColl,
                                               indexBuildInfo,

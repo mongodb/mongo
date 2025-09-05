@@ -147,7 +147,8 @@ std::vector<IndexBuildInfo> IndexBuildsCoordinatorMongodTest::makeSpecs(
         IndexBuildInfo indexBuildInfo(
             BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
             fmt::format("index-{}", ids[i]));
-        indexBuildInfo.setInternalIdents(*storageEngine);
+        indexBuildInfo.setInternalIdents(*storageEngine,
+                                         VersionContext::getDecoration(operationContext()));
         indexes.push_back(std::move(indexBuildInfo));
     }
     return indexes;

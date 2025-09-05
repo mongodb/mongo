@@ -734,8 +734,10 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
         return statusWithSpec;
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    IndexBuildInfo indexBuildInfo(
-        statusWithSpec.getValue(), *storageEngine, collection->ns().dbName());
+    IndexBuildInfo indexBuildInfo(statusWithSpec.getValue(),
+                                  *storageEngine,
+                                  collection->ns().dbName(),
+                                  VersionContext::getDecoration(opCtx));
     if (auto status = IndexBuildBlock::buildEmptyIndex(opCtx, collection, indexBuildInfo);
         !status.isOK()) {
         return status;
