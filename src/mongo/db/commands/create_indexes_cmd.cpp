@@ -903,7 +903,7 @@ public:
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
             boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL> scopedReplicaSetDDL{
-                boost::in_place_init, opCtx, ns()};
+                boost::in_place_init, opCtx, std::vector<NamespaceString>{ns()}};
 
             uassert(ErrorCodes::Error(8293400),
                     str::stream()

@@ -152,7 +152,8 @@ public:
                         ->isAuthorizedForActionsOnNamespace(ns(), ActionType::dropDatabase));
         }
         Reply typedRun(OperationContext* opCtx) final {
-            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+                opCtx, std::vector<NamespaceString>{ns()});
 
             auto dbName = request().getDbName();
             // disallow dropping the config database
@@ -226,7 +227,8 @@ public:
                         ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
         }
         Reply typedRun(OperationContext* opCtx) final {
-            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+                opCtx, std::vector<NamespaceString>{ns()});
 
             if (request().getNamespace().isOplog()) {
                 uassert(5255000,

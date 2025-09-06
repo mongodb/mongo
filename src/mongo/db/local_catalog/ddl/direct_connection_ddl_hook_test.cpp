@@ -84,7 +84,7 @@ TEST_F(DirectConnectionDDLHookTestReplicaSet, BasicRegisterUnauthorizedShardingD
     makeUnauthorizedForDirectOps(operationContext.get()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext.get(), kNss);
+    hook.onBeginDDL(operationContext.get(), std::vector<NamespaceString>{kNss});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext.get()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
@@ -116,7 +116,7 @@ TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpAuthorizedDirectShardOps) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
@@ -125,15 +125,16 @@ TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpUnauthorized) {
     makeUnauthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    ASSERT_THROWS_CODE(
-        hook.onBeginDDL(operationContext(), kNss), DBException, ErrorCodes::Unauthorized);
+    ASSERT_THROWS_CODE(hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss}),
+                       DBException,
+                       ErrorCodes::Unauthorized);
 }
 
 TEST_F(DirectConnectionDDLHookTest, BasicRegisterOpNoAuth) {
     AuthorizationManager::get(getServiceContext()->getService())->setAuthEnabled(false);
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
@@ -142,7 +143,8 @@ TEST_F(DirectConnectionDDLHookTest, RegisterOpSessionsCollection) {
     makeUnauthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), NamespaceString::kLogicalSessionsNamespace);
+    hook.onBeginDDL(operationContext(),
+                    std::vector<NamespaceString>{NamespaceString::kLogicalSessionsNamespace});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
@@ -150,13 +152,13 @@ TEST_F(DirectConnectionDDLHookTest, RegisterMultiple) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
 
     auto secondClient = makeClient();
     auto secondOpCtx = secondClient->makeOperationContext();
     makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
 
-    hook.onBeginDDL(secondOpCtx.get(), kAnotherNss);
+    hook.onBeginDDL(secondOpCtx.get(), std::vector<NamespaceString>{kAnotherNss});
 
     ASSERT_EQ(hook.getOngoingOperations().size(), 2);
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1},
@@ -168,19 +170,19 @@ TEST_F(DirectConnectionDDLHookTest, RegisterReEntrant) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
 
     ASSERT_EQ(hook.getOngoingOperations().size(), 1);
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 2}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_EQ(hook.getOngoingOperations().size(), 1);
     expectedMap.at(operationContext()->getOpID()) = 1;
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
@@ -188,17 +190,18 @@ TEST_F(DirectConnectionDDLHookTest, BasicDeRegisterOp) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
 TEST_F(DirectConnectionDDLHookTest, DeRegisterEmpty) {
     DirectConnectionDDLHook hook;
     ASSERT_TRUE(hook.getOngoingOperations().empty());
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
-    hook.onEndDDL(operationContext(), NamespaceString::kLogicalSessionsNamespace);
+    hook.onEndDDL(operationContext(),
+                  std::vector<NamespaceString>{NamespaceString::kLogicalSessionsNamespace});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
@@ -206,15 +209,15 @@ TEST_F(DirectConnectionDDLHookTest, DeRegisterWrongOpId) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
 
     auto secondClient = makeClient();
     auto secondOpCtx = secondClient->makeOperationContext();
     makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
 
-    hook.onEndDDL(secondOpCtx.get(), kAnotherNss);
+    hook.onEndDDL(secondOpCtx.get(), std::vector<NamespaceString>{kAnotherNss});
     ASSERT_FALSE(hook.getOngoingOperations().empty());
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
@@ -227,10 +230,10 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureOneOp) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
     auto future = hook.getWaitForDrainedFuture(operationContext());
     ASSERT_FALSE(future.isReady());
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(future.isReady());
     ASSERT_TRUE(hook.getWaitForDrainedFuture(operationContext()).isReady());
 }
@@ -239,19 +242,19 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureMultipleOps) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
 
     auto secondClient = makeClient();
     auto secondOpCtx = secondClient->makeOperationContext();
     makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
 
-    hook.onBeginDDL(secondOpCtx.get(), kAnotherNss);
+    hook.onBeginDDL(secondOpCtx.get(), std::vector<NamespaceString>{kAnotherNss});
 
     auto future = hook.getWaitForDrainedFuture(operationContext());
     ASSERT_FALSE(future.isReady());
-    hook.onEndDDL(secondOpCtx.get(), kAnotherNss);
+    hook.onEndDDL(secondOpCtx.get(), std::vector<NamespaceString>{kAnotherNss});
     ASSERT_FALSE(future.isReady());
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(future.isReady());
 }
 
@@ -259,16 +262,16 @@ TEST_F(DirectConnectionDDLHookTest, GetWaitForDrainedFutureReEntrant) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
 
     auto future = hook.getWaitForDrainedFuture(operationContext());
     ASSERT_FALSE(future.isReady());
 
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_FALSE(future.isReady());
 
-    hook.onEndDDL(operationContext(), kNss);
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
     ASSERT_TRUE(future.isReady());
 }
 
@@ -276,7 +279,7 @@ TEST_F(DirectConnectionDDLHookTest, WaitForDrainedAllowedOpUnregistered) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
     DirectConnectionDDLHook hook;
-    hook.onBeginDDL(operationContext(), kNss);
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
 
     auto future = hook.getWaitForDrainedFuture(operationContext());
 
@@ -284,7 +287,7 @@ TEST_F(DirectConnectionDDLHookTest, WaitForDrainedAllowedOpUnregistered) {
     auto secondOpCtx = secondClient->makeOperationContext();
     makeAuthorizedForDirectOps(secondOpCtx.get()->getClient());
 
-    hook.onBeginDDL(secondOpCtx.get(), kAnotherNss);
+    hook.onBeginDDL(secondOpCtx.get(), std::vector<NamespaceString>{kAnotherNss});
     stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }

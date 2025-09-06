@@ -42,10 +42,13 @@ void DirectConnectionDDLHook::create(ServiceContext* serviceContext) {
 }
 
 
-void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx, const NamespaceString& nss) {
-    // Exception for "config.system.sessions" to allow for dropping this collection in support
-    // scenarios.
-    if (nss == NamespaceString::kLogicalSessionsNamespace) {
+void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx,
+                                         const std::vector<NamespaceString>& namespaces) {
+    // The "config.system.session" collection is managed internally, so direct DDL operations
+    // (representing the only way to modify such collection) do not introduce any correctness issue.
+    // This exception allows, for example, to drop the collection in support scenarios.
+    if (namespaces.size() == 1 &&
+        namespaces.front() == NamespaceString::kLogicalSessionsNamespace) {
         return;
     }
 
@@ -65,7 +68,9 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx, const Namespac
             .isEnabledUseLastLTSFCVWhenUninitialized(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        direct_connection_util::checkDirectShardDDLAllowed(opCtx, nss);
+        for (const auto& nss : namespaces) {
+            direct_connection_util::checkDirectShardDDLAllowed(opCtx, nss);
+        }
     }
 
     // Register the operation for later draining if needed. We skip registering the operation if
@@ -78,7 +83,8 @@ void DirectConnectionDDLHook::onBeginDDL(OperationContext* opCtx, const Namespac
     }
 }
 
-void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx, const NamespaceString& nss) {
+void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx,
+                                       const std::vector<NamespaceString>& namespaces) {
     const auto& opId = opCtx->getOpID();
     stdx::lock_guard lk(_mutex);
     auto ongoingOpIt = _ongoingOps.find(opId);

@@ -66,29 +66,33 @@ ReplicaSetDDLHook* ReplicaSetDDLTracker::lookupHookByName(const StringData hookN
     return servicePtr;
 }
 
-ReplicaSetDDLTracker::ScopedReplicaSetDDL::ScopedReplicaSetDDL(OperationContext* opCtx,
-                                                               const NamespaceString& nss)
-    : _ddlTracker(ReplicaSetDDLTracker::get(opCtx->getServiceContext())), _opCtx(opCtx), _nss(nss) {
+ReplicaSetDDLTracker::ScopedReplicaSetDDL::ScopedReplicaSetDDL(
+    OperationContext* opCtx, const std::vector<NamespaceString>& namespaces)
+    : _ddlTracker(ReplicaSetDDLTracker::get(opCtx->getServiceContext())),
+      _opCtx(opCtx),
+      _namespaces(namespaces) {
     if (_ddlTracker) {
-        _ddlTracker->onBeginDDL(_opCtx, _nss);
+        _ddlTracker->onBeginDDL(_opCtx, _namespaces);
     }
 }
 
 ReplicaSetDDLTracker::ScopedReplicaSetDDL::~ScopedReplicaSetDDL() {
     if (_ddlTracker) {
-        _ddlTracker->onEndDDL(_opCtx, _nss);
+        _ddlTracker->onEndDDL(_opCtx, _namespaces);
     }
 }
 
-void ReplicaSetDDLTracker::onBeginDDL(OperationContext* opCtx, const NamespaceString& nss) const {
+void ReplicaSetDDLTracker::onBeginDDL(OperationContext* opCtx,
+                                      const std::vector<NamespaceString>& namespaces) const {
     for (auto& hook : _ddlHooksByName) {
-        hook.second->onBeginDDL(opCtx, nss);
+        hook.second->onBeginDDL(opCtx, namespaces);
     }
 }
 
-void ReplicaSetDDLTracker::onEndDDL(OperationContext* opCtx, const NamespaceString& nss) const {
+void ReplicaSetDDLTracker::onEndDDL(OperationContext* opCtx,
+                                    const std::vector<NamespaceString>& namespaces) const {
     for (auto& hook : _ddlHooksByName) {
-        hook.second->onEndDDL(opCtx, nss);
+        hook.second->onEndDDL(opCtx, namespaces);
     }
 }
 

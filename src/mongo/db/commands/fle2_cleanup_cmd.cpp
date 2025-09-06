@@ -190,6 +190,14 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
             uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
     }
 
+    ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+        opCtx,
+        std::vector<NamespaceString>{namespaces.edcNss,
+                                     namespaces.escNss,
+                                     namespaces.ecocNss,
+                                     namespaces.ecocRenameNss,
+                                     namespaces.ecocLockNss});
+
     // Acquire exclusive lock on the associated 'ecoc.lock' namespace to serialize calls
     // to cleanup and compact on the same EDC namespace.
     Lock::CollectionLock compactionLock(opCtx, namespaces.ecocLockNss, MODE_X);
@@ -321,8 +329,6 @@ public:
         using TC::InvocationBase::request;
 
         Reply typedRun(OperationContext* opCtx) {
-            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
-
             return Reply(cleanupEncryptedCollection(opCtx, request()));
         }
 

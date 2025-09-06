@@ -132,7 +132,8 @@ public:
                                                             ActionType::dropIndex));
         }
         Reply typedRun(OperationContext* opCtx) final {
-            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, ns());
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+                opCtx, std::vector<NamespaceString>{ns()});
             return dropIndexes(opCtx,
                                request().getNamespace(),
                                request().getCollectionUUID(),
@@ -184,7 +185,7 @@ public:
             CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL> scopedReplicaSetDDL{
-            boost::in_place_init, opCtx, toReIndexNss};
+            boost::in_place_init, opCtx, std::vector<NamespaceString>{toReIndexNss}};
 
         LOGV2(20457, "CMD reIndex", logAttrs(toReIndexNss));
 

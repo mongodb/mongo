@@ -60,13 +60,13 @@ public:
      * Registers this operation (identified by the opId on the opCtx) as ongoing. Ignores operations
      * over the `config.system.sessions` namespace.
      */
-    void onBeginDDL(OperationContext* opCtx, const NamespaceString& nss) final;
+    void onBeginDDL(OperationContext* opCtx, const std::vector<NamespaceString>& namespaces) final;
 
     /**
      * If this operation was registered at start time, unregisters it. If this is the last operation
      * ongoing, fulfills the promise for tracking when operations are fully drained.
      */
-    void onEndDDL(OperationContext* opCtx, const NamespaceString& nss) final;
+    void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& namespaces) final;
 
     /**
      * Checks if there are any ongoing operations and returns a ready future if not. If there are

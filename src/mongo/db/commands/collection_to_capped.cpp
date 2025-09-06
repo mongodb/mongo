@@ -134,7 +134,8 @@ public:
         NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
         NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
 
-        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, fromNs);
+        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+            opCtx, std::vector<NamespaceString>{fromNs, toNs});
 
         CollectionAcquisitionRequests acquisitionRequests = {
             CollectionAcquisitionRequest::fromOpCtx(
@@ -207,7 +208,8 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx, nss);
+        ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+            opCtx, std::vector<NamespaceString>{nss});
 
         auto size = cmdObj.getField("size").safeNumberLong();
 

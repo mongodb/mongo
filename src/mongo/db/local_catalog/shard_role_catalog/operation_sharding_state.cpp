@@ -199,7 +199,7 @@ ScopedAllowImplicitCollectionCreate_UNSAFE::ScopedAllowImplicitCollectionCreate_
     OperationContext* opCtx,
     const NamespaceString& nss,
     bool forceCSRAsUnknownAfterCollectionCreation)
-    : _opCtx(opCtx), _scopedReplicaSetDDL(opCtx, nss) {
+    : _opCtx(opCtx), _scopedReplicaSetDDL(opCtx, std::vector<NamespaceString>{nss}) {
     auto& oss = get(_opCtx);
     // TODO (SERVER-82066): Re-enable invariant and remove recursion if possible after updating
     // direct connection handling.

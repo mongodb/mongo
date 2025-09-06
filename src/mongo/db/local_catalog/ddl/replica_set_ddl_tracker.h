@@ -43,8 +43,8 @@ class ReplicaSetDDLHook {
 public:
     virtual ~ReplicaSetDDLHook() = default;
     virtual StringData getName() const = 0;
-    virtual void onBeginDDL(OperationContext* opCtx, const NamespaceString& nss) = 0;
-    virtual void onEndDDL(OperationContext* opCtx, const NamespaceString& nss) = 0;
+    virtual void onBeginDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
+    virtual void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
 };
 
 class ReplicaSetDDLTracker {
@@ -72,21 +72,22 @@ public:
      */
     class ScopedReplicaSetDDL {
     public:
-        ScopedReplicaSetDDL(OperationContext* opCtx, const NamespaceString& nss);
+        ScopedReplicaSetDDL(OperationContext* opCtx,
+                            const std::vector<NamespaceString>& namespaces);
         ~ScopedReplicaSetDDL();
 
     private:
         const ReplicaSetDDLTracker* const _ddlTracker;
         OperationContext* const _opCtx;
-        const NamespaceString _nss;
+        const std::vector<NamespaceString> _namespaces;
     };
 
     /**
      * Calls onBeginDDL and onEndDDL for all registered hooks. The scoped helper above should be
      * preferred over direct calls to these functions.
      */
-    void onBeginDDL(OperationContext* opCtx, const NamespaceString& nss) const;
-    void onEndDDL(OperationContext* opCtx, const NamespaceString& nss) const;
+    void onBeginDDL(OperationContext* opCtx, const std::vector<NamespaceString>& namespaces) const;
+    void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& namespaces) const;
 
 private:
     StringMap<std::unique_ptr<ReplicaSetDDLHook>> _ddlHooksByName;

@@ -313,8 +313,8 @@ public:
             // Intentional copy of request made here, as request object can be modified below.
             auto cmd = request();
 
-            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(opCtx,
-                                                                          cmd.getNamespace());
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+                opCtx, std::vector<NamespaceString>{cmd.getNamespace()});
 
             auto createViewlessTimeseriesColl =
                 gFeatureFlagCreateViewlessTimeseriesCollections
