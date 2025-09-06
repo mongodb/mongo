@@ -170,7 +170,13 @@ functions:
       aws_secret: ${aws_secret}
       remote_file: ${mongo_artifacts}
       bucket: mciuploads
-      extract_to: "./"
+      local_file: "fetched_artifacts.tgz"
+
+  "extract artifacts": &extract_artifacts
+    command: shell.exec
+    params:
+      script: |
+        tar -xf fetched_artifacts.tgz
 
   "fetch venv": &fetch_venv
     command: s3.get
@@ -796,6 +802,7 @@ functions:
     - *generate_github_token
     - *conditionally_clone_repo
     - *fetch_artifacts
+    - *extract_artifacts
     - *kill_processes
     - *cleanup_environment
     - *fetch_venv
@@ -827,6 +834,7 @@ functions:
   "write and set downstream expansions":
     - *f_expansions_write
     - *fetch_artifacts
+    - *extract_artifacts
     - *kill_processes
     - *cleanup_environment
     - *fetch_venv
@@ -1385,6 +1393,7 @@ functions:
 
   "generate resmoke tasks":
     - *fetch_artifacts
+    - *extract_artifacts
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment

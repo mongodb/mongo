@@ -173,64 +173,63 @@ tasks:
       - func: "gen feature flags"
       - func: "fetch resmoke constants"
 
-      - command: archive.targz_pack
+      - command: shell.exec
         params:
-          target: "artifacts.tgz"
-          source_dir: "./"
-          include:
-            - "./**.gcno"
-            - "src/.bazel*"
-            - "src/.npmrc"
-            - "src/.resmoke_mongo_release_values.yml"
-            - "src/.resmoke_mongo_version.yml"
-            - "src/BUILD.bazel"
-            - "src/MODULE.bazel"
-            - "src/WORKSPACE.bazel"
-            - "src/bazel/**"
-            - "src/buildscripts/**"
-            - "src/docker_compose/**"
-            - "src/etc/*san.suppressions"
-            - "src/etc/backports_required_for_multiversion_tests.yml"
-            - "src/etc/evergreen.yml"
-            - "src/etc/evergreen_nightly.yml"
-            - "src/etc/evergreen_timeouts.yml"
-            - "src/etc/evergreen_yml_components/**"
-            - "src/etc/expansions.default.yml"
-            - "src/etc/macos_dev_entitlements.xml"
-            - "src/etc/repo_config.yaml"
-            - "src/evergreen/**"
-            - "src/jsconfig.json"
-            - "src/jstests/**"
-            - "src/package.json"
-            - "src/patch_files.txt"
-            - "src/patch_test_tags.tgz"
-            - "src/pnpm-lock.yaml"
-            - "src/poetry.lock"
-            - "src/poetry_requirements.txt"
-            - "src/pyproject.toml"
-            - "src/src/**.idl"
-            - "src/src/**.yml"
-            - "src/src/mongo/client/sdam/json_tests/sdam_tests/**"
-            - "src/src/mongo/client/sdam/json_tests/server_selection_tests/**"
-            - "src/src/mongo/db/modules/atlas/evergreen/**"
-            - "src/src/mongo/db/modules/atlas/jstests/**"
-            - "src/src/mongo/db/modules/enterprise/docs/**"
-            - "src/src/mongo/db/modules/enterprise/jstests/**"
-            - "src/src/mongo/db/modules/subscription/jstests/**"
-            - "src/src/mongo/db/query/benchmark/data_generator/**"
-            - "src/src/mongo/db/query/query_tester/tests/**"
-            - "src/src/mongo/util/options_parser/test_config_files/**"
-            - "src/src/mongo/util/version/**"
-            - "src/src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
-            - "src/src/third_party/abseil-cpp/**"
-            - "src/src/third_party/grpc/**"
-            - "src/src/third_party/mock_ocsp_responder/**"
-            - "src/src/third_party/protobuf/**"
-            - "src/src/third_party/schemastore.org/**"
-            - "src/tools/**"
-            - "src/x509/**"
-          exclude_files:
-            - "src/*_test.pdb"
+          script: |
+            shopt -s globstar
+            for f in ./**/*.gcno \
+              src/.bazel* \
+              src/.npmrc \
+              src/.resmoke_mongo_release_values.yml \
+              src/.resmoke_mongo_version.yml \
+              src/BUILD.bazel \
+              src/MODULE.bazel \
+              src/WORKSPACE.bazel \
+              src/bazel/**/* \
+              src/buildscripts/**/* \
+              src/docker_compose/**/* \
+              src/etc/*san.suppressions \
+              src/etc/backports_required_for_multiversion_tests.yml \
+              src/etc/evergreen.yml \
+              src/etc/evergreen_nightly.yml \
+              src/etc/evergreen_timeouts.yml \
+              src/etc/evergreen_yml_components/**/* \
+              src/etc/expansions.default.yml \
+              src/etc/macos_dev_entitlements.xml \
+              src/etc/repo_config.yaml \
+              src/evergreen/**/* \
+              src/jsconfig.json \
+              src/jstests/**/* \
+              src/package.json \
+              src/patch_files.txt \
+              src/patch_test_tags.tgz \
+              src/pnpm-lock.yaml \
+              src/poetry.lock \
+              src/poetry_requirements.txt \
+              src/pyproject.toml \
+              src/src/**/*.idl \
+              src/src/**/*.yml \
+              src/src/mongo/client/sdam/json_tests/sdam_tests/**/* \
+              src/src/mongo/client/sdam/json_tests/server_selection_tests/**/* \
+              src/src/mongo/db/modules/atlas/evergreen/**/* \
+              src/src/mongo/db/modules/atlas/jstests/**/* \
+              src/src/mongo/db/modules/enterprise/docs/**/* \
+              src/src/mongo/db/modules/enterprise/jstests/**/* \
+              src/src/mongo/db/modules/subscription/jstests/**/* \
+              src/src/mongo/db/query/benchmark/data_generator/**/* \
+              src/src/mongo/db/query/query_tester/tests/**/* \
+              src/src/mongo/util/options_parser/test_config_files/**/* \
+              src/src/mongo/util/version/**/* \
+              src/src/third_party/JSON-Schema-Test-Suite/tests/draft4/**/* \
+              src/src/third_party/abseil-cpp/**/* \
+              src/src/third_party/grpc/**/* \
+              src/src/third_party/mock_ocsp_responder/**/* \
+              src/src/third_party/protobuf/**/* \
+              src/src/third_party/schemastore.org/**/* \
+              src/tools/**/* \
+              src/x509/**/*; do echo "$f" >> file_list.txt; echo >> file_list.txt; done
+            tar -czf artifacts.tgz --exclude=*_test.pdb --ignore-failed-read --dereference -T file_list.txt
+            rm file_list.txt
 
       - command: s3.put
         params:
