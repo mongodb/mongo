@@ -1193,14 +1193,15 @@ void BM_RunAllConfigs(benchmark::State& state) {
                         /*samplingAlgo-numOfChunks*/ samplingStyleConfig[samplingStyleConfig_idx]);
 
                     // Initialize collection accessor
-                    auto opCtx = samplingEstimatorTest.getOperationContext();
-                    auto acquisition = acquireCollection(
-                        opCtx,
-                        CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                                samplingEstimatorTest._kTestNss,
-                                                                AcquisitionPrerequisites::kWrite),
-                        LockMode::MODE_IX);
-                    MultipleCollectionAccessor collection = MultipleCollectionAccessor(acquisition);
+                    AutoGetCollection collPtr(samplingEstimatorTest.getOperationContext(),
+                                              samplingEstimatorTest._kTestNss,
+                                              LockMode::MODE_IX);
+                    MultipleCollectionAccessor collection = MultipleCollectionAccessor(
+                        samplingEstimatorTest.getOperationContext(),
+                        &collPtr.getCollection(),
+                        samplingEstimatorTest._kTestNss,
+                        /*isAnySecondaryNamespaceAViewOrNotFullyLocal*/ false,
+                        /*secondaryExecNssList*/ {});
 
                     // CREATE SAMPLE ESTIMATOR
                     auto createSample_start = high_resolution_clock::now();
@@ -1286,13 +1287,15 @@ void BM_CreateSample(benchmark::State& state) {
     initializeSamplingEstimator(dataConfig, samplingEstimatorTest);
 
     // Initialize collection accessor
-    auto opCtx = samplingEstimatorTest.getOperationContext();
-    auto acquisition = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, samplingEstimatorTest._kTestNss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_IX);
-    MultipleCollectionAccessor collection = MultipleCollectionAccessor(acquisition);
+    AutoGetCollection collPtr(samplingEstimatorTest.getOperationContext(),
+                              samplingEstimatorTest._kTestNss,
+                              LockMode::MODE_IX);
+    MultipleCollectionAccessor collection =
+        MultipleCollectionAccessor(samplingEstimatorTest.getOperationContext(),
+                                   &collPtr.getCollection(),
+                                   samplingEstimatorTest._kTestNss,
+                                   /*isAnySecondaryNamespaceAViewOrNotFullyLocal*/ false,
+                                   /*secondaryExecNssList*/ {});
 
     for (auto _ : state) {
         // Create sample from the provided collection
@@ -1324,13 +1327,15 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
     initializeSamplingEstimator(dataConfig, samplingEstimatorTest);
 
     // Initialize collection accessor
-    auto opCtx = samplingEstimatorTest.getOperationContext();
-    auto acquisition = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, samplingEstimatorTest._kTestNss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_IX);
-    MultipleCollectionAccessor collection = MultipleCollectionAccessor(acquisition);
+    AutoGetCollection collPtr(samplingEstimatorTest.getOperationContext(),
+                              samplingEstimatorTest._kTestNss,
+                              LockMode::MODE_IX);
+    MultipleCollectionAccessor collection =
+        MultipleCollectionAccessor(samplingEstimatorTest.getOperationContext(),
+                                   &collPtr.getCollection(),
+                                   samplingEstimatorTest._kTestNss,
+                                   /*isAnySecondaryNamespaceAViewOrNotFullyLocal*/ false,
+                                   /*secondaryExecNssList*/ {});
 
     // Translate the sample size definition to corresponding sample size.
     auto sampleSize = translateSampleDefToActualSampleSize(
@@ -1384,13 +1389,15 @@ void BM_RunCardinalityEstimationOnSampleWithProjection(benchmark::State& state) 
     initializeSamplingEstimator(dataConfig, samplingEstimatorTest);
 
     // Initialize collection accessor
-    auto opCtx = samplingEstimatorTest.getOperationContext();
-    auto acquisition = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, samplingEstimatorTest._kTestNss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_IX);
-    MultipleCollectionAccessor collection = MultipleCollectionAccessor(acquisition);
+    AutoGetCollection collPtr(samplingEstimatorTest.getOperationContext(),
+                              samplingEstimatorTest._kTestNss,
+                              LockMode::MODE_IX);
+    MultipleCollectionAccessor collection =
+        MultipleCollectionAccessor(samplingEstimatorTest.getOperationContext(),
+                                   &collPtr.getCollection(),
+                                   samplingEstimatorTest._kTestNss,
+                                   /*isAnySecondaryNamespaceAViewOrNotFullyLocal*/ false,
+                                   /*secondaryExecNssList*/ {});
 
     // Translate the sample size definition to corresponding sample size.
     auto sampleSize = translateSampleDefToActualSampleSize(

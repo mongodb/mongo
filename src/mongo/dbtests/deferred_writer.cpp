@@ -138,18 +138,11 @@ public:
      * Just read the whole collection into memory.
      */
     std::vector<BSONObj> readCollection(void) {
-        const auto opCtx = _opCtx.get();
-        const auto coll = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest(kTestNamespace,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                         repl::ReadConcernArgs::get(opCtx),
-                                         AcquisitionPrerequisites::kRead),
-            MODE_IS);
-        ASSERT_TRUE(coll.exists());
+        AutoGetCollection agc(_opCtx.get(), kTestNamespace, MODE_IS);
+        ASSERT_TRUE(agc.getCollection());
 
         auto plan = InternalPlanner::collectionScan(
-            _opCtx.get(), coll, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+            _opCtx.get(), &agc.getCollection(), PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
         std::vector<BSONObj> result;
         BSONObj i;

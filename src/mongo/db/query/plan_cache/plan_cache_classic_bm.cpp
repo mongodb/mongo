@@ -368,13 +368,9 @@ void BM_PlanCacheClassic(benchmark::State& state) {
         std::make_shared<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
     auto catalog = CollectionCatalog::get(opCtx.get());
     catalog->onCreateCollection(opCtx.get(), collection);
-    const auto collectionAcquisition = acquireCollectionMaybeLockFree(
-        opCtx.get(),
-        CollectionAcquisitionRequest(kNss,
-                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                     repl::ReadConcernArgs::get(opCtx.get()),
-                                     AcquisitionPrerequisites::kRead));
-    auto collectionsAccessor = MultipleCollectionAccessor(collectionAcquisition);
+    auto collectionPtr = CollectionPtr(
+        catalog->establishConsistentCollection(opCtx.get(), kNss, boost::none /* readTimestamp */));
+    auto collectionsAccessor = MultipleCollectionAccessor(collectionPtr);
 
     // If there is an index specified, add it to the IndexCatalogMock.
     if (bmParams.index == kSingleFieldIndex || bmParams.index == kTwoFieldCompoundIndex ||

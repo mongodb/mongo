@@ -85,14 +85,14 @@ public:
         return _autoDb->getDb();
     }
 
-    CollectionAcquisition getOrCreateCollection(LockMode mode = MODE_IX);
-    CollectionAcquisition getCollection(LockMode mode = MODE_IX) const;
+    CollectionAcquisition getCollection() const;
 
 private:
     OperationContext* const _opCtx;
     const NamespaceString _nss;
 
     boost::optional<AutoGetDb> _autoDb;
+    boost::optional<Lock::CollectionLock> _collLock;
     boost::optional<AutoStatsTracker> _tracker;
 };
 

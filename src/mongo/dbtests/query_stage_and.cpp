@@ -207,13 +207,18 @@ class QueryStageAndHashDeleteDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        Database* db = ctx.db();
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            db->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
 
@@ -291,13 +296,16 @@ class QueryStageAndHashDeleteLookaheadDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("_id" << i << "foo" << i << "bar" << i << "baz" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("_id" << i << "foo" << i << "bar" << i << "baz" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         addIndex(BSON("baz" << 1));
@@ -371,13 +379,16 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -411,15 +422,18 @@ class QueryStageAndHashTwoLeafFirstChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
+        }
+
         // Generate large keys for {foo: 1, big: 1} index.
         std::string big(512, 'a');
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i << "big" << big));
-            }
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i << "big" << big));
         }
+
         addIndex(BSON("foo" << 1 << "big" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -456,15 +470,18 @@ class QueryStageAndHashTwoLeafLastChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
+        }
+
         // Generate large keys for {baz: 1, big: 1} index.
         std::string big(512, 'a');
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i << "big" << big));
-            }
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i << "big" << big));
         }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1 << "big" << 1));
         const auto coll = ctx.getCollection();
@@ -498,13 +515,16 @@ class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i << "baz" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i << "baz" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         addIndex(BSON("baz" << 1));
@@ -547,14 +567,17 @@ class QueryStageAndHashThreeLeafMiddleChildLargeKeys : public QueryStageAndBase 
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
+
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
+        }
+
         // Generate large keys for {bar: 1, big: 1} index.
         std::string big(512, 'a');
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i << "baz" << i << "big" << big));
-            }
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i << "baz" << i << "big" << big));
         }
 
         addIndex(BSON("foo" << 1));
@@ -598,13 +621,16 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << 20));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << 20));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -650,14 +676,17 @@ class QueryStageAndHashProducesNothing : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 10; ++i) {
-                insert(BSON("foo" << (100 + i)));
-                insert(BSON("bar" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 10; ++i) {
+            insert(BSON("foo" << (100 + i)));
+            insert(BSON("bar" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -694,12 +723,16 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -743,13 +776,16 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << i << "bar" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << i << "bar" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -789,7 +825,15 @@ class QueryStageAndHashDeadChild : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        auto coll = ctx.getCollection();
+        if (!coll.exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            db->createCollection(&_opCtx, nss());
+            wuow.commit();
+        }
+
+        coll = ctx.getCollection();
         const BSONObj dataObj = fromjson("{'foo': 'bar'}");
 
         // Confirm exception is thrown when children contain the following WorkingSetMembers:
@@ -904,13 +948,15 @@ class QueryStageAndSortedDeleteDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        {
-            auto coll = ctx.getOrCreateCollection();
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
+        }
 
-            // Insert a bunch of data.
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << 1 << "bar" << 1));
-            }
+        // Insert a bunch of data.
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << 1 << "bar" << 1));
         }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
@@ -1010,21 +1056,24 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            // Insert a bunch of data
-            for (int i = 0; i < 50; ++i) {
-                // Some data that'll show up but not be in all.
-                insert(BSON("foo" << 1 << "baz" << 1));
-                insert(BSON("foo" << 1 << "bar" << 1));
-                // The needle in the haystack.  Only these should be returned by the AND.
-                insert(BSON("foo" << 1 << "bar" << 1 << "baz" << 1));
-                insert(BSON("foo" << 1));
-                insert(BSON("bar" << 1));
-                insert(BSON("baz" << 1));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        // Insert a bunch of data
+        for (int i = 0; i < 50; ++i) {
+            // Some data that'll show up but not be in all.
+            insert(BSON("foo" << 1 << "baz" << 1));
+            insert(BSON("foo" << 1 << "bar" << 1));
+            // The needle in the haystack.  Only these should be returned by the AND.
+            insert(BSON("foo" << 1 << "bar" << 1 << "baz" << 1));
+            insert(BSON("foo" << 1));
+            insert(BSON("bar" << 1));
+            insert(BSON("baz" << 1));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         addIndex(BSON("baz" << 1));
@@ -1061,13 +1110,16 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << 8 << "bar" << 20));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << 8 << "bar" << 20));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -1097,17 +1149,20 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                // Insert data with foo=7, bar==20, but nothing with both.
-                insert(BSON("foo" << 8 << "bar" << 20));
-                insert(BSON("foo" << 7 << "bar" << 21));
-                insert(BSON("foo" << 7));
-                insert(BSON("bar" << 20));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            // Insert data with foo=7, bar==20, but nothing with both.
+            insert(BSON("foo" << 8 << "bar" << 20));
+            insert(BSON("foo" << 7 << "bar" << 21));
+            insert(BSON("foo" << 7));
+            insert(BSON("bar" << 20));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -1137,13 +1192,16 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << 1 << "bar" << i));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << 1 << "bar" << i));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -1196,14 +1254,17 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            // Insert a bunch of data
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << 1 << "bar" << 1));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        // Insert a bunch of data
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << 1 << "bar" << 1));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();
@@ -1246,14 +1307,17 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
-        {
-            auto coll = ctx.getOrCreateCollection();
-
-            // Insert a bunch of data
-            for (int i = 0; i < 50; ++i) {
-                insert(BSON("foo" << 1 << "bar" << 1));
-            }
+        if (!ctx.getCollection().exists()) {
+            WriteUnitOfWork wuow(&_opCtx);
+            ctx.db()->createCollection(&_opCtx, nss());
+            wuow.commit();
         }
+
+        // Insert a bunch of data
+        for (int i = 0; i < 50; ++i) {
+            insert(BSON("foo" << 1 << "bar" << 1));
+        }
+
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         const auto coll = ctx.getCollection();

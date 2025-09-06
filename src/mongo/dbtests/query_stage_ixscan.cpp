@@ -79,6 +79,7 @@ class IndexScanTest {
 public:
     IndexScanTest()
         : _autodb(&_opCtx, nss().dbName(), MODE_X),
+          _coll(nullptr),
           _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss()).build()) {}
 
     virtual ~IndexScanTest() {}
@@ -87,31 +88,28 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         _autodb.ensureDbExists(&_opCtx);
         _autodb.getDb()->dropCollection(&_opCtx, nss()).transitional_ignore();
-        auto coll = _autodb.getDb()->createCollection(&_opCtx, nss());
+        _coll = _autodb.getDb()->createCollection(&_opCtx, nss());
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _collPtr = CollectionPtr::CollectionPtr_UNSAFE(_coll);
 
-        ASSERT_OK(coll->getIndexCatalog()->createIndexOnEmptyCollection(
+        ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,
-            coll,
+            _coll,
             BSON("key" << BSON("x" << 1) << "name" << DBClientBase::genIndexName(BSON("x" << 1))
                        << "v" << static_cast<int>(kIndexVersion))));
 
         wunit.commit();
-
-        _collection = acquireCollection(
-            &_opCtx,
-            CollectionAcquisitionRequest(nss(),
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                         repl::ReadConcernArgs::get(&_opCtx),
-                                         AcquisitionPrerequisites::kWrite),
-            MODE_IX);
     }
 
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
         // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        ASSERT_OK(collection_internal::insertDocument(
-            &_opCtx, _collection->getCollectionPtr(), InsertStatement(doc), nullOpDebug, false));
+        ASSERT_OK(collection_internal::insertDocument(&_opCtx,
+                                                      CollectionPtr::CollectionPtr_UNSAFE(_coll),
+                                                      InsertStatement(doc),
+                                                      nullOpDebug,
+                                                      false));
         wunit.commit();
     }
 
@@ -146,14 +144,14 @@ public:
 
 
     IndexScan* createIndexScanSimpleRange(BSONObj startKey, BSONObj endKey) {
-        const IndexCatalog* catalog = _collection->getCollectionPtr()->getIndexCatalog();
+        IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(
             &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         // We are not testing indexing here so use maximal bounds
-        IndexScanParams params(&_opCtx, _collection->getCollectionPtr(), indexes[0]);
+        IndexScanParams params(&_opCtx, _collPtr, indexes[0]);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = startKey;
         params.bounds.endKey = endKey;
@@ -162,7 +160,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), *_collection, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), &_collPtr, params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -172,13 +170,13 @@ public:
                                int direction = 1,
                                bool dedup = false,
                                MatchExpression* filter = nullptr) {
-        const IndexCatalog* catalog = _collection->getCollectionPtr()->getIndexCatalog();
+        IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(
             &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
-        IndexScanParams params(&_opCtx, _collection->getCollectionPtr(), indexes[0]);
+        IndexScanParams params(&_opCtx, _collPtr, indexes[0]);
         params.direction = direction;
         params.shouldDedup = dedup;
 
@@ -189,7 +187,7 @@ public:
         oil.intervals.push_back(Interval(bob.obj(), startInclusive, endInclusive));
         params.bounds.fields.push_back(oil);
 
-        return new IndexScan(_expCtx.get(), *_collection, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), &_collPtr, params, &_ws, filter);
     }
 
     static const char* ns() {
@@ -204,7 +202,8 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
 
     AutoGetDb _autodb;
-    boost::optional<CollectionAcquisition> _collection;
+    Collection* _coll;
+    CollectionPtr _collPtr;
 
     WorkingSet _ws;
 
@@ -257,7 +256,7 @@ public:
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
         insert(fromjson("{_id: 5, x: 11}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState(nullptr);
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
@@ -290,7 +289,7 @@ public:
         // Save state and insert an indexed doc.
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 7}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState(nullptr);
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
@@ -323,7 +322,7 @@ public:
         // Save state and insert an indexed doc.
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState(nullptr);
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         // Ensure that we're EOF and we don't erroneously return {'': 12}.
         WorkingSetID id;
@@ -357,7 +356,7 @@ public:
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 6}"));
         insert(fromjson("{_id: 5, x: 9}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState(nullptr);
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         // Ensure that we don't erroneously return {'': 9} or {'':3}.
         member = getNext(ixscan.get());

@@ -83,15 +83,15 @@ static const NamespaceString nss =
 class PlanExecutorInvalidationTest : public unittest::Test {
 public:
     PlanExecutorInvalidationTest()
-        : _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build()) {
-        DBDirectClient client(&_opCtx);
-        client.dropCollection(nss);
+        : _client(&_opCtx), _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build()) {
+        _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
+        _client.dropCollection(nss);
 
         for (int i = 0; i < N(); ++i) {
-            client.insert(nss, BSON("foo" << i));
+            _client.insert(nss, BSON("foo" << i));
         }
 
-        _coll = acquireColl(&_opCtx, MODE_IX);
+        _refreshCollection();
     }
 
     /**
@@ -103,7 +103,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection(), params, ws.get(), nullptr));
+            new CollectionScan(_expCtx.get(), &collection(), params, ws.get(), nullptr));
 
         // Create a plan executor to hold it
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -116,7 +116,7 @@ public:
             plan_executor_factory::make(std::move(cq),
                                         std::move(ws),
                                         std::move(scan),
-                                        collection(),
+                                        &collection(),
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
 
@@ -127,12 +127,11 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIxscanPlan(BSONObj keyPattern,
                                                                         BSONObj startKey,
                                                                         BSONObj endKey) {
-        auto indexDescriptor =
-            collection().getCollectionPtr()->getIndexCatalog()->findIndexByKeyPatternAndOptions(
-                &_opCtx, keyPattern, _makeMinimalIndexSpec(keyPattern));
+        auto indexDescriptor = collection()->getIndexCatalog()->findIndexByKeyPatternAndOptions(
+            &_opCtx, keyPattern, _makeMinimalIndexSpec(keyPattern));
         ASSERT(indexDescriptor);
         return InternalPlanner::indexScan(&_opCtx,
-                                          collection(),
+                                          &collection(),
                                           indexDescriptor,
                                           startKey,
                                           endKey,
@@ -145,118 +144,78 @@ public:
     }
 
     bool dropDatabase(const std::string& dbname) {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        DBDirectClient client(opCtx2.get());
         bool res =
-            client.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, dbname));
+            _client.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, dbname));
+        _refreshCollection();
         return res;
     }
 
     bool dropCollection(StringData ns) {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        DBDirectClient client(opCtx2.get());
-        bool res = client.dropCollection(NamespaceString::createNamespaceString_forTest(ns));
+        bool res = _client.dropCollection(NamespaceString::createNamespaceString_forTest(ns));
+        _refreshCollection();
         return res;
     }
 
     void dropIndexes(const NamespaceString& nss) {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        DBDirectClient client(opCtx2.get());
-        client.dropIndexes(nss);
+        _client.dropIndexes(nss);
+        _refreshCollection();
     }
 
     void dropIndex(const NamespaceString& nss, BSONObj keys) {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        DBDirectClient client(opCtx2.get());
-        client.dropIndex(nss, keys);
+        _client.dropIndex(nss, keys);
+        _refreshCollection();
     }
 
     void renameCollection(const std::string& to) {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        DBDirectClient client(opCtx2.get());
         BSONObj info;
-
-        ASSERT_TRUE(client.runCommand(
+        ASSERT_TRUE(_client.runCommand(
             DatabaseName::kAdmin,
             BSON("renameCollection" << nss.ns_forTest() << "to" << to << "dropTarget" << true),
             info));
+        _refreshCollection();
     }
 
-    Status createIndex(StringData ns, const BSONObj& keys, bool unique = false) {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        auto coll = acquireColl(opCtx2.get(), MODE_X);
-        Status res = dbtests::createIndex(opCtx2.get(), ns, keys, unique);
+    Status createIndex(OperationContext* opCtx,
+                       StringData ns,
+                       const BSONObj& keys,
+                       bool unique = false) {
+        Status res = dbtests::createIndex(opCtx, ns, keys, unique);
+        _refreshCollection();
         return res;
     }
 
-    CollectionAcquisition acquireColl(OperationContext* opCtx, LockMode mode) {
-        return acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest(nss,
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                         repl::ReadConcernArgs::get(opCtx),
-                                         AcquisitionPrerequisites::kWrite),
-            mode);
-    }
-    const CollectionAcquisition& collection() const {
-        invariant(_coll);
-        return *_coll;
+    const CollectionPtr& collection() const {
+        return _coll;
     }
 
     void truncateCollection() {
-        // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-        // query.
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
-
-        auto coll = acquireColl(opCtx2.get(), MODE_X);
-        WriteUnitOfWork wunit(opCtx2.get());
-        CollectionWriter writer{opCtx2.get(), &coll};
-        auto collection = writer.getWritableCollection(opCtx2.get());
-        ASSERT_OK(collection->truncate(opCtx2.get()));
+        WriteUnitOfWork wunit(&_opCtx);
+        CollectionWriter writer{&_opCtx, nss};
+        auto collection = writer.getWritableCollection(&_opCtx);
+        ASSERT_OK(collection->truncate(&_opCtx));
         wunit.commit();
+        _refreshCollection();
     }
 
     // Order of these is important for initialization
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
+    unique_ptr<dbtests::WriteContextForTests> _ctx;
+    DBDirectClient _client;
 
-    boost::optional<CollectionAcquisition> _coll;
+    // We need to store a CollectionPtr because we need a stable pointer to write to in the
+    // restoreState() calls used in these tests
+    CollectionPtr _coll;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
 private:
+    void _refreshCollection() {
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
+    }
+
     BSONObj _makeMinimalIndexSpec(BSONObj keyPattern) {
         return BSON(IndexDescriptor::kKeyPatternFieldName
                     << keyPattern << IndexDescriptor::kIndexVersionFieldName
@@ -275,23 +234,12 @@ TEST_F(PlanExecutorInvalidationTest, ExecutorToleratesDeletedDocumentsDuringYiel
     }
 
     exec->saveState();
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
 
     // Delete some data, namely the next 2 things we'd expect.
-    // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
-    // query.
-    {
-        auto newClient = _opCtx.getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtx2 = cc().makeOperationContext();
+    _client.remove(nss, BSON("foo" << 10));
+    _client.remove(nss, BSON("foo" << 11));
 
-        DBDirectClient client(opCtx2.get());
-        client.remove(nss, BSON("foo" << 10));
-        client.remove(nss, BSON("foo" << 11));
-    }
-
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     // Make sure that the PlanExecutor moved forward over the deleted data.  We don't see foo==10 or
     // foo==11.
@@ -314,48 +262,37 @@ TEST_F(PlanExecutorInvalidationTest, PlanExecutorThrowsOnRestoreWhenCollectionIs
     }
 
     exec->saveState();
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
 
     // Drop a collection that's not ours.
     dropCollection("unittests.someboguscollection");
 
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
     ASSERT_EQUALS(10, obj["foo"].numberInt());
 
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
 
     dropCollection(nss.ns_forTest());
 
-    // Try to restore
-    ASSERT_THROWS_CODE(
-        restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2)),
-        DBException,
-        ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenAllIndicesDropped) {
-
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), BSON("foo" << 1)));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
-
     auto exec = getCollscan();
     BSONObj obj;
+
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("foo" << 1)));
 
     // Read some of it.
     for (int i = 0; i < 10; ++i) {
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
         ASSERT_EQUALS(i, obj["foo"].numberInt());
     }
+
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     dropIndexes(nss);
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     // Read the rest of the collection.
     for (int i = 10; i < N(); ++i) {
@@ -365,12 +302,10 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenAllIndicesDro
 }
 
 TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenOneIndexDropped) {
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), BSON("foo" << 1)));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
-
     auto exec = getCollscan();
     BSONObj obj;
+
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("foo" << 1)));
 
     // Read some of it.
     for (int i = 0; i < 10; ++i) {
@@ -379,10 +314,8 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenOneIndexDropp
     }
 
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     dropIndex(nss, BSON("foo" << 1));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     // Read the rest of the collection.
     for (int i = 10; i < N(); ++i) {
@@ -393,12 +326,10 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorDoesNotDieWhenOneIndexDropp
 
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenAllIndexesDropped) {
     BSONObj keyPattern = BSON("foo" << 1);
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), keyPattern));
     // Create a second index which is not used by the plan executor.
-    ASSERT_OK(createIndex(nss.ns_forTest(), BSON("bar" << 1)));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), BSON("bar" << 1)));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -411,21 +342,15 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenAllIndexesDropped) {
 
     // Drop the index which the plan executor is scanning while the executor is in a saved state.
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     dropIndexes(nss);
 
-    // Restore the ShardRole Transaction resources
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2));
-
     // Restoring the executor should throw.
-    ASSERT_THROWS_CODE(exec->restoreState(nullptr), DBException, ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenIndexBeingScannedIsDropped) {
     BSONObj keyPattern = BSON("foo" << 1);
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), keyPattern));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -438,23 +363,18 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorDiesWhenIndexBeingScannedIsDr
 
     // Drop all indexes while the executor is saved.
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     dropIndex(nss, keyPattern);
 
-    // Restore the ShardRole Transaction resources
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2));
-
     // Restoring the executor should throw.
-    ASSERT_THROWS_CODE(exec->restoreState(nullptr), DBException, ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesWhenUnrelatedIndexIsDropped) {
     BSONObj keyPatternFoo = BSON("foo" << 1);
     BSONObj keyPatternBar = BSON("bar" << 1);
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), keyPatternFoo));
-    ASSERT_OK(createIndex(nss.ns_forTest(), keyPatternBar));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPatternFoo));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPatternBar));
+
     auto exec = makeIxscanPlan(keyPatternFoo, BSON("foo" << 0), BSON("foo" << N()));
 
     // Start scanning the index.
@@ -467,10 +387,8 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesWhenUnrelatedIndexIsD
     // Drop an index which the plan executor is *not* scanning while the executor is in a saved
     // state.
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     dropIndex(nss, keyPatternBar);
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     // Scan the rest of the index.
     for (int i = 10; i < N(); ++i) {
@@ -490,29 +408,24 @@ TEST_F(PlanExecutorInvalidationTest, ExecutorThrowsOnRestoreWhenDatabaseIsDroppe
     }
 
     exec->saveState();
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
 
-    // Drop a DB that's not ours (yield and restore resources in between, this will release and
-    // re-acquire the locks)
+    // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
+    // requires a "global write lock."
+    _ctx.reset();
     dropDatabase("somesillydb");
-
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
-    exec->restoreState(nullptr);
+    _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
+    exec->restoreState(&collection());
 
     ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
     ASSERT_EQUALS(10, obj["foo"].numberInt());
 
-    // Drop our DB (yield and restore resources in between, this will release and re-acquire the
-    // locks)
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
 
+    // Drop our DB.  Once again, must give up the lock.
+    _ctx.reset();
     dropDatabase("unittests");
-
-    ASSERT_THROWS_CODE(
-        restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2)),
-        DBException,
-        ErrorCodes::QueryPlanKilled);
+    _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns_forTest()));
+    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
 // TODO SERVER-31695: Allow PlanExecutors to remain valid after collection rename.
@@ -528,22 +441,16 @@ TEST_F(PlanExecutorInvalidationTest, CollScanDiesOnCollectionRenameWithinDatabas
 
     // Rename the collection.
     exec->saveState();
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
     renameCollection("unittests.new_collection_name");
 
-    ASSERT_THROWS_CODE(
-        restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources)),
-        DBException,
-        ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
 // TODO SERVER-31695: Allow PlanExecutors to remain valid after collection rename.
 TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase) {
     BSONObj keyPattern = BSON("foo" << 1);
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), keyPattern));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
     // Partially scan the index.
@@ -555,20 +462,14 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase)
 
     // Rename the collection.
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     renameCollection("unittests.new_collection_name");
 
-    ASSERT_THROWS_CODE(
-        restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2)),
-        DBException,
-        ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesCollectionTruncate) {
     BSONObj keyPattern = BSON("foo" << 1);
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
-    ASSERT_OK(createIndex(nss.ns_forTest(), keyPattern));
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
+    ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
     auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
 
@@ -582,10 +483,8 @@ TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesCollectionTruncate) {
     // Call truncate() on the Collection during yield. The PlanExecutor should be restored
     // successfully.
     exec->saveState();
-    auto yieldedResources2 = yieldTransactionResourcesFromOperationContext(&_opCtx);
     truncateCollection();
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources2));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     // Since all documents in the collection have been deleted, the PlanExecutor should issue EOF.
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
@@ -604,10 +503,8 @@ TEST_F(PlanExecutorInvalidationTest, CollScanExecutorSurvivesCollectionTruncate)
     // Call truncate() on the Collection during yield. The PlanExecutor should be restored
     // successfully.
     exec->saveState();
-    auto yieldedResources = yieldTransactionResourcesFromOperationContext(&_opCtx);
     truncateCollection();
-    restoreTransactionResourcesToOperationContext(&_opCtx, std::move(yieldedResources));
-    exec->restoreState(nullptr);
+    exec->restoreState(&collection());
 
     // Since all documents in the collection have been deleted, the PlanExecutor should issue EOF.
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));

@@ -86,8 +86,8 @@ public:
         _client.dropCollection(nss());
     }
 
-    void getRecordIds(std::set<RecordId>* out, const CollectionAcquisition& coll) {
-        auto cursor = coll.getCollectionPtr()->getCursor(&_opCtx);
+    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
+        auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
         }
@@ -125,7 +125,18 @@ class FetchStageAlreadyFetched : public QueryStageFetchBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
+
         WorkingSet ws;
 
         // Add an object to the DB.
@@ -142,7 +153,7 @@ public:
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
             mockMember->recordId = *recordIds.begin();
-            auto snapshotBson = coll.getCollectionPtr()->docFor(&_opCtx, mockMember->recordId);
+            auto snapshotBson = coll->docFor(&_opCtx, mockMember->recordId);
             mockMember->doc = {snapshotBson.snapshotId(), Document{snapshotBson.value()}};
             ws.transitionToRecordIdAndObj(id);
             // Points into our DB.
@@ -159,7 +170,7 @@ public:
         }
 
         auto fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, coll);
+            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, &coll);
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state;
@@ -182,8 +193,18 @@ public:
 class FetchStageFilter : public QueryStageFetchBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        AutoGetDb autodb(&_opCtx, nss().dbName(), MODE_X);
+        Database* db = autodb.ensureDbExists(&_opCtx);
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
 
         WorkingSet ws;
 
@@ -218,7 +239,7 @@ public:
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), coll);
+            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), &coll);
 
         // First call should return a fetch request as it's not in memory.
         WorkingSetID id = WorkingSet::INVALID_ID;

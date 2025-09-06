@@ -149,12 +149,12 @@ public:
      * which is owned by the caller.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
-        const CollectionAcquisition& coll) {
+        const CollectionPtr& coll) {
         // Build the mock scan stage which feeds the data.
         auto ws = std::make_unique<WorkingSet>();
         _workingSet = ws.get();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
-        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll.getCollectionPtr());
+        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         auto sortPattern = BSON("foo" << 1);
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
@@ -174,7 +174,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(ss),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                         QueryPlannerParams::DEFAULT);
         invariant(statusWithPlanExecutor.getStatus());
@@ -216,7 +216,7 @@ public:
      *
      * Tests out both the default and "simple" sort.
      */
-    void sortAndCheck(int direction, const CollectionAcquisition& coll) {
+    void sortAndCheck(int direction, const CollectionPtr& coll) {
         // Test both default sort (which will use metadata if available) and simple sort, which
         // works with no metadata.
         doSortAndCheck<false /* default sort */>(direction, coll);
@@ -224,12 +224,12 @@ public:
     }
 
     template <bool useSortStageSimple>
-    void doSortAndCheck(int direction, const CollectionAcquisition& coll) {
+    void doSortAndCheck(int direction, const CollectionPtr& coll) {
         auto ws = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
 
         // Insert a mix of the various types of data.
-        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll.getCollectionPtr());
+        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         auto sortPattern = BSON("foo" << direction);
         std::unique_ptr<SortStage> sortStage;
@@ -259,14 +259,14 @@ public:
         const SimpleMemoryUsageTracker& memoryTracker = sortStage->getMemoryUsageTracker_forTest();
 
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
+            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -351,7 +351,17 @@ public:
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
 
         fillData();
         sortAndCheck(1, coll);
@@ -367,7 +377,17 @@ public:
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
 
         fillData();
         sortAndCheck(-1, coll);
@@ -392,7 +412,18 @@ public:
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
+
         fillData();
         sortAndCheck(-1, coll);
     }
@@ -410,13 +441,24 @@ public:
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
+        coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
 
         fillData();
 
         // The data we're going to later invalidate.
         std::set<RecordId> recordIds;
-        getRecordIds(&recordIds, coll.getCollectionPtr());
+        getRecordIds(&recordIds, coll);
 
         auto exec = makePlanExecutorWithSortStage(coll);
 
@@ -443,7 +485,7 @@ public:
         // Since it's in the WorkingSet, the updates should not be reflected in the output.
         exec->saveState();
         std::set<RecordId>::iterator it = recordIds.begin();
-        Snapshotted<BSONObj> oldDoc = coll.getCollectionPtr()->docFor(&_opCtx, *it);
+        Snapshotted<BSONObj> oldDoc = coll->docFor(&_opCtx, *it);
 
         const OID updatedId = oldDoc.value().getField("_id").OID();
         const SnapshotId idBeforeUpdate = oldDoc.snapshotId();
@@ -457,7 +499,7 @@ public:
         {
             WriteUnitOfWork wuow(&_opCtx);
             collection_internal::updateDocument(&_opCtx,
-                                                coll.getCollectionPtr(),
+                                                coll,
                                                 *it,
                                                 oldDoc,
                                                 newDoc(oldDoc),
@@ -467,7 +509,7 @@ public:
                                                 &args);
             wuow.commit();
         }
-        exec->restoreState(nullptr);
+        exec->restoreState(&coll);
 
         // Read the rest of the data from the queued data stage.
         while (!queuedDataStage->isEOF()) {
@@ -479,11 +521,11 @@ public:
         // should be fetched.
         exec->saveState();
         while (it != recordIds.end()) {
-            oldDoc = coll.getCollectionPtr()->docFor(&_opCtx, *it);
+            oldDoc = coll->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
                 collection_internal::updateDocument(&_opCtx,
-                                                    coll.getCollectionPtr(),
+                                                    coll,
                                                     *it++,
                                                     oldDoc,
                                                     newDoc(oldDoc),
@@ -494,7 +536,7 @@ public:
                 wuow.commit();
             }
         }
-        exec->restoreState(nullptr);
+        exec->restoreState(&coll);
 
         // Verify that it's sorted, the right number of documents are returned, and they're all
         // in the expected range.
@@ -534,13 +576,24 @@ public:
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
+        coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
 
         fillData();
 
         // The data we're going to later invalidate.
         std::set<RecordId> recordIds;
-        getRecordIds(&recordIds, coll.getCollectionPtr());
+        getRecordIds(&recordIds, coll);
 
         auto exec = makePlanExecutorWithSortStage(coll);
 
@@ -565,15 +618,16 @@ public:
 
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first.
         exec->saveState();
+
         OpDebug* const nullOpDebug = nullptr;
         std::set<RecordId>::iterator it = recordIds.begin();
         {
             WriteUnitOfWork wuow(&_opCtx);
             collection_internal::deleteDocument(
-                &_opCtx, coll.getCollectionPtr(), kUninitializedStmtId, *it++, nullOpDebug);
+                &_opCtx, coll, kUninitializedStmtId, *it++, nullOpDebug);
             wuow.commit();
         }
-        exec->restoreState(nullptr);
+        exec->restoreState(&coll);
 
         // Read the rest of the data from the queued data stage.
         while (!queuedDataStage->isEOF()) {
@@ -587,11 +641,11 @@ public:
             {
                 WriteUnitOfWork wuow(&_opCtx);
                 collection_internal::deleteDocument(
-                    &_opCtx, coll.getCollectionPtr(), kUninitializedStmtId, *it++, nullOpDebug);
+                    &_opCtx, coll, kUninitializedStmtId, *it++, nullOpDebug);
                 wuow.commit();
             }
         }
-        exec->restoreState(nullptr);
+        exec->restoreState(&coll);
 
         // Regardless of storage engine, all the documents should come back with their objects
         int count = 0;
@@ -633,7 +687,18 @@ public:
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        auto coll = ctx.getOrCreateCollection();
+        Database* db = ctx.db();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        if (!coll) {
+            WriteUnitOfWork wuow(&_opCtx);
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            wuow.commit();
+        }
+        coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
 
         auto ws = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
@@ -671,14 +736,14 @@ public:
                                                             std::move(keyGenStage));
 
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
+            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         auto exec = std::move(statusWithPlanExecutor.getValue());

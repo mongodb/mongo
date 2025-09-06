@@ -98,7 +98,8 @@ public:
     // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CountStageTest()
         : _autodb(&_opCtx, nss().dbName(), MODE_X),
-          _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build()) {}
+          _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build()),
+          _coll(CollectionPtr::CollectionPtr_UNSAFE(nullptr)) {}
 
     virtual ~CountStageTest() {}
 
@@ -117,14 +118,9 @@ public:
                                                       << "x_1"
                                                       << "v" << 1))
             .status_with_transitional_ignore();
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _coll = CollectionPtr::CollectionPtr_UNSAFE(coll);
 
-        _coll = acquireCollection(
-            &_opCtx,
-            CollectionAcquisitionRequest(nss(),
-                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
-                                         repl::ReadConcernArgs::get(&_opCtx),
-                                         AcquisitionPrerequisites::kWrite),
-            MODE_IX);
         for (int i = 0; i < kDocuments; i++) {
             insert(BSON("_id" << OID::gen() << "x" << i));
         }
@@ -141,7 +137,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), *_coll, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &_coll, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -156,8 +152,7 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        collection_internal::insertDocument(
-            &_opCtx, _coll->getCollectionPtr(), InsertStatement(doc), nullOpDebug)
+        collection_internal::insertDocument(&_opCtx, _coll, InsertStatement(doc), nullOpDebug)
             .transitional_ignore();
         wunit.commit();
     }
@@ -166,21 +161,20 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
         collection_internal::deleteDocument(
-            &_opCtx, _coll->getCollectionPtr(), kUninitializedStmtId, recordId, nullOpDebug);
+            &_opCtx, _coll, kUninitializedStmtId, recordId, nullOpDebug);
         wunit.commit();
     }
 
     void update(const RecordId& oldrecordId, const BSONObj& newDoc) {
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj oldDoc =
-            _coll->getCollectionPtr()
-                ->getRecordStore()
+            _coll->getRecordStore()
                 ->dataFor(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), oldrecordId)
                 .releaseToBson();
         CollectionUpdateArgs args{oldDoc};
         collection_internal::updateDocument(
             &_opCtx,
-            _coll->getCollectionPtr(),
+            _coll,
             oldrecordId,
             Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(&_opCtx)->getSnapshotId(),
                                  oldDoc),
@@ -247,14 +241,14 @@ public:
             }
 
             // Resume from yield.
-            countStage.restoreState(nullptr);
+            countStage.restoreState(&_coll);
         }
 
         return static_cast<const CountStats*>(countStage.getSpecificStats());
     }
 
     IndexScan* createIndexScan(MatchExpression* expr, WorkingSet* ws) {
-        const IndexCatalog* catalog = _coll->getCollectionPtr()->getIndexCatalog();
+        const IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(
             &_opCtx, BSON("x" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
@@ -262,7 +256,7 @@ public:
         auto descriptor = indexes[0];
 
         // We are not testing indexing here so use maximal bounds
-        IndexScanParams params(&_opCtx, _coll->getCollectionPtr(), descriptor);
+        IndexScanParams params(&_opCtx, _coll, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = BSON("" << 0);
         params.bounds.endKey = BSON("" << kDocuments + 1);
@@ -270,14 +264,14 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new IndexScan(_expCtx.get(), *_coll, params, ws, expr);
+        return new IndexScan(_expCtx.get(), &_coll, params, ws, expr);
     }
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {
         CollectionScanParams params;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new CollectionScan(_expCtx.get(), *_coll, params, ws, expr);
+        return new CollectionScan(_expCtx.get(), &_coll, params, ws, expr);
     }
 
     static const char* ns() {
@@ -294,7 +288,7 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
     AutoGetDb _autodb;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-    boost::optional<CollectionAcquisition> _coll;
+    CollectionPtr _coll;
 };
 
 class QueryStageCountNoChangeDuringYield : public CountStageTest {
@@ -394,18 +388,10 @@ public:
     // At the point which this is called we are in between the first and second record
     void interject(CountStage& count_stage, int interjection) override {
         if (interjection == 0) {
-            OID id1 = _coll->getCollectionPtr()
-                          ->docFor(&_opCtx, _recordIds[0])
-                          .value()
-                          .getField("_id")
-                          .OID();
+            OID id1 = _coll->docFor(&_opCtx, _recordIds[0]).value().getField("_id").OID();
             update(_recordIds[0], BSON("_id" << id1 << "x" << 100));
 
-            OID id2 = _coll->getCollectionPtr()
-                          ->docFor(&_opCtx, _recordIds[1])
-                          .value()
-                          .getField("_id")
-                          .OID();
+            OID id2 = _coll->docFor(&_opCtx, _recordIds[1]).value().getField("_id").OID();
             update(_recordIds[1], BSON("_id" << id2 << "x" << 100));
         }
     }

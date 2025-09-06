@@ -160,7 +160,7 @@ public:
         }
     }
 
-    void getRecordIds(const CollectionAcquisition& collection,
+    void getRecordIds(const CollectionPtr& collection,
                       CollectionScanParams::Direction direction,
                       std::vector<RecordId>* out) {
         WorkingSet ws;
@@ -170,7 +170,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -307,7 +307,7 @@ public:
 
             // Get the RecordIds that would be returned by an in-order scan.
             std::vector<RecordId> recordIds;
-            getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
+            getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
             auto request = UpdateRequest();
             request.setNamespaceString(nss);
@@ -436,7 +436,7 @@ public:
 
         // Get the RecordIds that would be returned by an in-order scan.
         std::vector<RecordId> recordIds;
-        getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
+        getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
         request.setQuery(query);
@@ -532,7 +532,7 @@ public:
 
         // Get the RecordIds that would be returned by an in-order scan.
         std::vector<RecordId> recordIds;
-        getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
+        getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
         request.setQuery(query);
