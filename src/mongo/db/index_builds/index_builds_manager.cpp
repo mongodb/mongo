@@ -424,6 +424,7 @@ void IndexBuildsManager::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* 
 }
 
 void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
+    std::lock_guard lk(_mutex);
     invariant(_builders.empty());
 }
 
