@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
@@ -57,8 +55,6 @@ public:
         _service = std::make_unique<ShardingDDLCoordinatorService>(
             getServiceContext(),
             std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>());
-
-        getServiceContext()->registerClientObserver(std::make_unique<ClientObserver>());
     }
 
     void tearDown() override {
@@ -118,19 +114,6 @@ protected:
     protected:
         ShardingDDLCoordinatorMetadata _shardingDDLCoordinatorMetadata;
         std::set<NamespaceString> _additionalNss;
-    };
-
-    class ClientObserver : public ServiceContext::ClientObserver {
-    public:
-        void onCreateClient(Client*) override {}
-
-        void onDestroyClient(Client*) override {}
-
-        void onCreateOperationContext(OperationContext* opCtx) override {
-            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-        }
-
-        void onDestroyOperationContext(OperationContext*) override {}
     };
 };
 
