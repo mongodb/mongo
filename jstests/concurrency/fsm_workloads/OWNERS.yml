@@ -5,7 +5,7 @@ filters:
       - 10gen/query-execution-router
   - "timeseries*":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "timeseries_agg*":
     approvers:
       - 10gen/query-integration-timeseries
@@ -14,7 +14,7 @@ filters:
       - 10gen/query-integration-timeseries
   - "crud/crud_clustered_collection.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
   - "cleanup_orphaned_with_balancer.js":
     approvers:
       - 10gen/server-catalog-and-routing

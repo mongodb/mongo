@@ -35,7 +35,7 @@ filters:
       - 10gen/server-replication
   - "generated_suites/*primary_driven_index_builds.yml":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
   - "generated_suites/*query_shape_hash_stability*":
     approvers:
       - 10gen/query-execution-query-settings

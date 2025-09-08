@@ -41,4 +41,4 @@ filters:
       - 10gen/server-replication
   - "primary_driven_index_builds.yml":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-index-builds
