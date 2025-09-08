@@ -518,6 +518,13 @@ create_database(const char *home, WT_CONNECTION **connp)
     if (GV(DISK_DATA_EXTEND))
         CONFIG_APPEND(p, ",file_extend=(data=8MB)");
 
+    if (GV(PRECISE_CHECKPOINT))
+        CONFIG_APPEND(p, ",precise_checkpoint=true");
+
+    /* If prepared is not enabled, this will be a no-op. */
+    if (GV(PRESERVE_PREPARED))
+        CONFIG_APPEND(p, ",preserve_prepared=true");
+
     /* Optional timing stress. */
     configure_timing_stress(&p, max);
 
@@ -680,17 +687,16 @@ create_object(TABLE *table, void *arg)
 }
 
 /*
- * disagg_conn_init --
- *     For disaggregated storage, do some extra initialization of a connection.
+ * precise_checkpoint_init --
+ *     If precise checkpoint is enabled, do some extra initialization of a connection.
  */
 static void
-disagg_conn_init(WT_CONNECTION *conn)
+precise_checkpoint_init(WT_CONNECTION *conn)
 {
     /*
      * We do a separate wiredtiger_open call to create the database and tables, and when we close
-     * that connection, a checkpoint is done. Disaggregated storage uses precise checkpoints, which
-     * require the stable timestamp to be set. Set it to the minimum value, which should not
-     * interfere with any later operations.
+     * that connection, a checkpoint is done. Precise checkpoints requires the stable timestamp to
+     * be set. Set it to the minimum value, which should not interfere with any later operations.
      */
     testutil_check(conn->set_timestamp(conn, "stable_timestamp=1"));
 }
@@ -715,8 +721,8 @@ wts_create_database(void)
     WT_CONNECTION *conn;
 
     create_database(g.home, &conn);
-    if (g.disagg_storage_config)
-        disagg_conn_init(conn);
+    if (GV(PRECISE_CHECKPOINT))
+        precise_checkpoint_init(conn);
 
     g.wts_conn = conn;
     tables_apply(create_object, g.wts_conn);
@@ -784,12 +790,13 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
             CONFIG_APPEND(p, ",%s", s);
         if (g.config_open != NULL)
             CONFIG_APPEND(p, ",%s", g.config_open);
-        /*
-         * FIXME-WT-14979: Precise checkpoints are incompatible with the on-disk block manager.
-         * Ideally we would not gate precise checkpoints on disagg also being enabled.
-         */
-        if (g.disagg_storage_config && GV(CHECKPOINT_PRECISE))
+
+        if (GV(PRECISE_CHECKPOINT))
             CONFIG_APPEND(p, ",precise_checkpoint=true");
+
+        /* If prepared is not enabled, this will be a no-op. */
+        if (GV(PRESERVE_PREPARED))
+            CONFIG_APPEND(p, ",preserve_prepared=true");
 
 #if WIREDTIGER_VERSION_MAJOR >= 10
         if (GV(OPS_VERIFY) && verify_metadata)

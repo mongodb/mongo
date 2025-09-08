@@ -167,8 +167,8 @@ struct __wti_reconcile {
     WT_PAGE *page;
     uint32_t flags; /* Caller's configuration */
 
-    /* Track the checkpoint pinned transaction id. */
-    uint64_t rec_start_ckpt_pinned_id;
+    /* Track the pinned id for the reconciliation if without a snapshot. */
+    uint64_t rec_start_pinned_id;
 
     /* Track the oldest id that is needed. */
     uint64_t rec_start_oldest_id;

@@ -147,6 +147,7 @@ struct __wt_txn_shared {
 struct __wt_pending_prepared_item {
     TAILQ_ENTRY(__wt_pending_prepared_item) hashq;
     uint64_t prepared_id;
+    wt_timestamp_t prepare_timestamp;
     WT_TXN_OP *mod;
     size_t mod_alloc;
     uint32_t mod_count;

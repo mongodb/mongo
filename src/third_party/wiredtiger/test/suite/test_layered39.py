@@ -91,7 +91,7 @@ class test_layered39(wttest.WiredTigerTestCase, DisaggConfigMixin):
         cursor.close()
 
         self.pr(f'cache_scrub_restore = {self.get_stat(wiredtiger.stat.conn.cache_scrub_restore)}')
-        self.pr(f'cache_eviction_blocked_checkpoint_precise = {self.get_stat(wiredtiger.stat.conn.cache_eviction_blocked_checkpoint_precise)}')
+        self.pr(f'cache_eviction_blocked_precise_checkpoint = {self.get_stat(wiredtiger.stat.conn.cache_eviction_blocked_precise_checkpoint)}')
         self.pr(f'checkpoint_pages_reconciled_bytes = {self.get_stat(wiredtiger.stat.conn.checkpoint_pages_reconciled_bytes)}')
 
         scrub_restore = self.get_stat(wiredtiger.stat.conn.cache_scrub_restore)

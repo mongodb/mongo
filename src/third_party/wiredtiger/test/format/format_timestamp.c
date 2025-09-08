@@ -141,7 +141,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
             oldest_timestamp -= (oldest_timestamp - g.oldest_timestamp) / 2;
     }
 
-    if (stable_timestamp == 0 && GV(CHECKPOINT_PRECISE))
+    if (stable_timestamp == 0 && GV(PRECISE_CHECKPOINT))
         stable_timestamp = 1;
 
     testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,

@@ -193,7 +193,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
                   (WT_DELTA_LEAF_ENABLED(session) && (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
                     F_ISSET(*upd_entry, WT_UPDATE_RESTORED_FROM_DS)) ||
                   (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
-                    (*upd_entry)->prepare_state == WT_PREPARE_INPROGRESS)),
+                    F_ISSET(*upd_entry, WT_UPDATE_PREPARE_RESTORED_FROM_DS))),
               "Illegal update on chain during update restore eviction");
 
             /*

@@ -26,33 +26,22 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_discover01.py
-#   Test that pending prepared transaction artifacts can be discovered after recovery
-#   and rolled back
+# test_prepare_discover03.py
+#   Test that prepare discover cursor should return an error when closed with unclaimed prepared transactions
 
-import random, sys
+import wiredtiger
 from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
 
-class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_prepare_discover01'
+class test_prepare_discover03(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_prepare_discover03'
     uri = 'table:' + tablename
     conn_config = 'precise_checkpoint=true,preserve_prepared=true'
-
-    types = [
-        ('row', dict(s_config='key_format=i,value_format=S')),
-    ]
-
-    # Transaction end types
-    txn_end = [
-        ('txn_commit', dict(txn_commit=True)),
-    ]
-
-    scenarios = make_scenarios(types, txn_end)
+    s_config = 'key_format=i,value_format=S'
 
     @wttest.only_for_hook("disagg", "FIXME-WT-15343 disable RTS when precise checkpoint is on")
-    def test_prepare_discover01(self):
+    def test_prepare_discover03(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
         self.session.create(self.uri, self.s_config)
@@ -70,19 +59,25 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
         c[5] = "prepare ts=100"
         # Prepare with a timestamp greater than current stable
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +',prepared_id=' + self.prepared_id_str(123))
+
+        session2 = self.conn.open_session()
+        c2 = session2.open_cursor(self.uri)
+        session2.begin_transaction()
+        c2[1] = "prepare ts=100"
+        c2[2] = "prepare ts=100"
+        session2.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +',prepared_id=' + self.prepared_id_str(150))
         # Move the stable timestamp to include the prepared transaction
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(150))
         # Create a checkpoint
-        session2 = self.conn.open_session()
-        session2.checkpoint()
+        session3 = self.conn.open_session()
+        session3.checkpoint()
 
         # Creating backup that will preserve artifacts
         backup_dir = 'bkp'
-        self.backup(backup_dir, session2)
+        self.backup(backup_dir, session3)
 
         # Opening backup database
         conn2 = self.wiredtiger_open(backup_dir, self.conn_config)
-
         c2s1 = conn2.open_session()
 
         # Opening prepared discover cursor
@@ -96,7 +91,11 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
             prepared_id = prepared_discover_cursor.get_key()
             self.assertEqual(prepared_id, 123)
             c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(prepared_id))
-            c2s2.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
+            c2s2.commit_transaction("commit_timestamp=" + self.timestamp_str(200)+",durable_timestamp=" + self.timestamp_str(210))
+            if count == 1:
+                break
         self.assertEqual(count, 1)
-
-        prepared_discover_cursor.close()
+        # Try to claim an already claimed prepared transaction, should return an error
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(123)), "")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: prepared_discover_cursor.close(), "/Found 1 unclaimed prepared transactions/")

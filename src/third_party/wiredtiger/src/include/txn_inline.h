@@ -1823,18 +1823,17 @@ __txn_remove_from_global_table(WT_SESSION_IMPL *session)
  *     Claim a prepared transaction.
  */
 static WT_INLINE int
-__wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, wt_timestamp_t prepared_transaction_id)
+__wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, uint64_t prepared_id)
 {
     WT_DECL_RET;
     WT_PENDING_PREPARED_ITEM *prepared_item;
     WT_TXN *txn;
     WT_TXN_OP *tmp_mod;
     txn = session->txn;
-    WT_RET(__wt_prepared_discover_find_item(session, prepared_transaction_id, &prepared_item));
-    F_SET(txn, WT_TXN_PREPARE | WT_TXN_HAS_PREPARED_ID | WT_TXN_RUNNING);
-    txn->prepared_id = prepared_transaction_id;
-    txn->prepare_timestamp = prepared_transaction_id;
-
+    WT_RET(__wt_prepared_discover_find_item(session, prepared_id, &prepared_item));
+    txn->prepared_id = prepared_id;
+    txn->prepare_timestamp = prepared_item->prepare_timestamp;
+    F_SET(txn, WT_TXN_PREPARE | WT_TXN_HAS_PREPARED_ID | WT_TXN_HAS_TS_PREPARE | WT_TXN_RUNNING);
     /*
      * Swap mod array with prepared_item to avoid double-free on cursor close and when
      * commit/rollback.
@@ -1848,6 +1847,7 @@ __wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, wt_timestamp_t prepared_tr
     prepared_item->mod = tmp_mod;
     prepared_item->mod_alloc = 0;
     prepared_item->mod_count = 0;
+    WT_RET(__wt_prepared_discover_remove_item(session, prepared_id));
 #ifdef HAVE_DIAGNOSTIC
     txn->prepare_count = prepared_item->prepare_count;
     prepared_item->prepare_count = 0;
@@ -1867,7 +1867,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 {
     WT_CONFIG_ITEM cval;
     WT_TXN *txn;
-    wt_timestamp_t prepared_transaction_id;
+    wt_timestamp_t prepared_id;
 
     txn = session->txn;
     txn->isolation = session->isolation;
@@ -1884,8 +1884,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
     if (conf != NULL) {
         WT_RET(__wt_conf_gets_def(session, conf, claim_prepared_id, 0, &cval));
         if (cval.len != 0) {
-            WT_RET(__wt_txn_parse_prepared_id(session, &prepared_transaction_id, &cval));
-            WT_RET(__wt_txn_claim_prepared_txn(session, prepared_transaction_id));
+            WT_RET(__wt_txn_parse_prepared_id(session, &prepared_id, &cval));
+            WT_RET(__wt_txn_claim_prepared_txn(session, prepared_id));
             return (0);
         }
     }

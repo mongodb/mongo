@@ -51,13 +51,15 @@ create_table(WT_SESSION *session, COOKIE *cookie)
     /*
      * If we're using timestamps, turn off logging for the table.
      */
-    if (g.use_timestamps)
+    if (g.use_timestamps) {
         testutil_snprintf(config, sizeof(config),
           "key_format=%s,value_format=%s,allocation_size=512,"
           "leaf_page_max=1KB,internal_page_max=1KB,"
           "memory_page_max=64KB,log=(enabled=false)",
           kf, vf);
-    else
+        if (g.opts.disagg_storage)
+            strcat(config, ",type=layered,block_manager=disagg");
+    } else
         testutil_snprintf(config, sizeof(config), "key_format=%s,value_format=%s", kf, vf);
 
     if ((ret = session->create(session, cookie->uri, config)) != 0)
@@ -282,7 +284,8 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
         if (g.sweep_stress)
             testutil_check(cursor->reset(cursor));
     } else {
-        if (new_val % 39 < 30) {
+        /* FIXME-WT-14467 should fix cursor->modify for layered tables. */
+        if (new_val % 39 < 30 && !g.opts.disagg_storage) {
             /* Do modify. */
             ret = cursor->search(cursor);
             if (ret == 0 && (type != FIX || !cursor_fix_at_zero(cursor))) {
@@ -355,17 +358,18 @@ real_worker(THREAD_DATA *td)
 {
     WT_CURSOR **cursors;
     WT_SESSION *session;
-    uint64_t base_ts;
+    uint64_t base_ts, prepared_id;
     u_int i, keyno, next_rnd;
     int j, ret, t_ret;
     char buf[128];
-    const char *begin_cfg;
-    bool reopen_cursors, new_txn, start_txn;
+    const char *begin_cfg, *rollback_cfg;
+    bool prepared, reopen_cursors, new_txn, start_txn;
 
     ret = t_ret = 0;
     reopen_cursors = false;
     start_txn = true;
     new_txn = false;
+    prepared = false;
 
     if ((cursors = calloc((size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
         return (log_print_err("malloc", ENOMEM, 1));
@@ -413,6 +417,7 @@ real_worker(THREAD_DATA *td)
             }
             new_txn = true;
             start_txn = false;
+            prepared = false;
         }
         keyno = __wt_random(&td->data_rnd) % td->key_range + td->start_key;
         /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
@@ -468,8 +473,10 @@ real_worker(THREAD_DATA *td)
                             base_ts = g.ts_stable + 1;
                         next_rnd = __wt_random(&td->data_rnd);
                         if (g.prepare && next_rnd % 2 == 0) {
-                            testutil_snprintf(
-                              buf, sizeof(buf), "prepare_timestamp=%" PRIx64, base_ts);
+                            prepared_id = __wt_atomic_addv64(&g.prepared_id, 1);
+                            testutil_snprintf(buf, sizeof(buf),
+                              "prepare_timestamp=%" PRIx64 ",prepared_id=%" PRIx64, base_ts,
+                              prepared_id);
                             if ((ret = session->prepare_transaction(session, buf)) != 0) {
                                 if (!g.predictable_replay)
                                     __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
@@ -479,6 +486,7 @@ real_worker(THREAD_DATA *td)
                             testutil_snprintf(buf, sizeof(buf),
                               "durable_timestamp=%" PRIx64 ",commit_timestamp=%" PRIx64,
                               base_ts + 2, base_ts);
+                            prepared = true;
                         } else
                             testutil_snprintf(
                               buf, sizeof(buf), "commit_timestamp=%" PRIx64, base_ts);
@@ -494,7 +502,13 @@ real_worker(THREAD_DATA *td)
                             if (g.predictable_replay)
                                 WT_RELEASE_WRITE_WITH_BARRIER(td->ts, base_ts);
                         } else {
-                            if ((ret = session->rollback_transaction(session, NULL)) != 0) {
+                            if (prepared) {
+                                testutil_snprintf(
+                                  buf, sizeof(buf), "rollback_timestamp=%" PRIx64, base_ts + 2);
+                                rollback_cfg = buf;
+                            } else
+                                rollback_cfg = NULL;
+                            if ((ret = session->rollback_transaction(session, rollback_cfg)) != 0) {
                                 if (!g.predictable_replay)
                                     __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:rollback_transaction", ret, 1);

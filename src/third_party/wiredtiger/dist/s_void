@@ -151,6 +151,7 @@ func_ok()
         -e '/int dir_store_file_lock$/d' \
         -e '/int dir_store_file_sync$/d' \
         -e '/int dir_store_fs_terminate$/d' \
+        -e '/int enable_disagg$/d' \
         -e '/int error_handler$/d' \
         -e '/int fail_file_lock$/d' \
         -e '/int fail_file_sync$/d' \

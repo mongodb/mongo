@@ -283,6 +283,8 @@ CONFIG configuration_list[] = {
 
 {"precise_checkpoint", "Precise checkpoint", C_BOOL, 50, 0, 0}
 
+{"preserve_prepared", "Preserve prepared", C_BOOL, 50, 0, 0}
+
 {"quiet", "quiet run (same as -q)", C_BOOL | C_IGNORE, 0, 0, 1}
 
 {"random.data_seed", "set random seed for data operations", 0x0, 0, 0, UINT_MAX}

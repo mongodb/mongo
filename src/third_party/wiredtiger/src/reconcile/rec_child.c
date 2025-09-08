@@ -57,8 +57,8 @@ __rec_child_deleted(
      * setting the page delete structure committed flag cannot overlap with us checking the flag.
      */
     if (__wt_page_del_committed_set(page_del)) {
-        if (F_ISSET(r, WT_REC_VISIBLE_CHECKPOINT)) {
-            visible = page_del->txnid < r->rec_start_ckpt_pinned_id;
+        if (F_ISSET(r, WT_REC_VISIBLE_NO_SNAPSHOT)) {
+            visible = page_del->txnid < r->rec_start_pinned_id;
 
             if (visible) {
                 WT_ACQUIRE_READ(prepare_state, page_del->prepare_state);

@@ -672,6 +672,10 @@ config_cache(void)
 
     /* Check if both min and max cache sizes have been specified and if they're consistent. */
     if (config_explicit(NULL, "cache")) {
+        if (GV(CACHE) < 4086) {
+            config_off(NULL, "preserve_prepared");
+            config_off(NULL, "precise_checkpoint");
+        }
         if (config_explicit(NULL, "cache.minimum") && GV(CACHE) < GV(CACHE_MINIMUM))
             testutil_die(EINVAL, "minimum cache set larger than cache (%" PRIu32 " > %" PRIu32 ")",
               GV(CACHE_MINIMUM), GV(CACHE));
@@ -722,17 +726,21 @@ config_cache(void)
     cache *= workers;
     cache *= 2;
 
-    if (GV(CHECKPOINT_PRECISE))
-        cache *= 4;
+    if (GV(PRECISE_CHECKPOINT))
+        cache *= 6;
 
     if (GV(CACHE) < cache)
         GV(CACHE) = (uint32_t)cache;
 
-    if (GV(CHECKPOINT_PRECISE) && GV(CACHE) < 2048)
-        GV(CACHE) = 2048;
+    if (GV(PRECISE_CHECKPOINT) && GV(CACHE) < 4086)
+        GV(CACHE) = 4086;
 
-    if (cache_maximum_explicit && GV(CACHE) > GV(CACHE_MAXIMUM))
-        GV(CACHE) = GV(CACHE_MAXIMUM);
+    if (cache_maximum_explicit && GV(CACHE) > GV(CACHE_MAXIMUM)) {
+        if (GV(PRECISE_CHECKPOINT) && GV(CACHE_MAXIMUM) < 4086)
+            config_off(NULL, "cache.maximum");
+        else
+            GV(CACHE) = GV(CACHE_MAXIMUM);
+    }
 
     /* Give any block cache 20% of the total cache size, over and above the cache. */
     if (GV(BLOCK_CACHE) != 0)
@@ -759,6 +767,11 @@ dirty_eviction_config:
           "avoid operation thread stalls.");
         config_single(NULL, "cache.eviction_dirty_trigger=95", false);
         config_single(NULL, "cache.eviction_updates_trigger=95", false);
+    }
+
+    if (GV(PRECISE_CHECKPOINT) && GV(CACHE) < 4086) {
+        WARN("%s", "Setting cache to minimum of 4086MB due to precise_checkpoint");
+        config_single(NULL, "cache=4086", false);
     }
 }
 
@@ -789,8 +802,8 @@ config_checkpoint(void)
             break;
         }
 
-    if (GV(OPS_PREPARE))
-        config_off(NULL, "precise_checkpoint");
+    if (!GV(PRECISE_CHECKPOINT))
+        config_off(NULL, "preserve_prepared");
 }
 
 /*
@@ -1603,6 +1616,7 @@ config_transaction(void)
     if (!GV(TRANSACTION_TIMESTAMPS)) {
         config_off(NULL, "ops.prepare");
         config_off(NULL, "precise_checkpoint");
+        config_off(NULL, "preserve_prepared");
     }
 
     /* Set a default transaction timeout limit if one is not specified. */
@@ -1611,6 +1625,7 @@ config_transaction(void)
 
     g.operation_timeout_ms = GV(TRANSACTION_OPERATION_TIMEOUT_MS);
     g.transaction_timestamps_config = GV(TRANSACTION_TIMESTAMPS) != 0;
+    g.prepared_id = 1;
 }
 
 /*

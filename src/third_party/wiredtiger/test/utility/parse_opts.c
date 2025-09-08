@@ -290,8 +290,10 @@ testutil_parse_end_opt(TEST_OPTS *opts)
     if (opts->tiered_storage) {
         if (opts->tiered_storage_source == NULL)
             opts->tiered_storage_source = dstrdup(DIR_STORE);
+    }
 
-        /* Deduce the build directory. */
+    if (opts->tiered_storage || opts->disagg_storage) {
+        /* Deduce the build directory (for extension loading). */
         testutil_deduce_build_dir(opts);
     }
 

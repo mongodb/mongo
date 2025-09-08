@@ -819,7 +819,7 @@ typedef enum {
     WT_TS_TXN_TYPE_DURABLE, /*!< Durable timestamp. */
     WT_TS_TXN_TYPE_PREPARE, /*!< Prepare timestamp. */
     WT_TS_TXN_TYPE_READ, /*!< Read timestamp. */
-    WT_TS_TXN_TYPE_ROLLBACK /*!< Rollback timestamp. */
+    WT_TS_TXN_TYPE_ROLLBACK, /*!< Rollback timestamp. */
 } WT_TS_TXN_TYPE;
 
 /*!
@@ -6708,7 +6708,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * cache: precise checkpoint caused an eviction to be skipped because any
  * dirty content needs to remain in cache
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_CHECKPOINT_PRECISE	1277
+#define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_PRECISE_CHECKPOINT	1277
 /*!
  * cache: realizing in-memory split after reconciliation failed due to
  * internal lock busy
@@ -8693,7 +8693,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * cache: precise checkpoint caused an eviction to be skipped because any
  * dirty content needs to remain in cache
  */
-#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_CHECKPOINT_PRECISE	2132
+#define	WT_STAT_DSRC_CACHE_EVICTION_BLOCKED_PRECISE_CHECKPOINT	2132
 /*!
  * cache: realizing in-memory split after reconciliation failed due to
  * internal lock busy

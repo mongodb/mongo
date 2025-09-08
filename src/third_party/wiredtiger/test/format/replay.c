@@ -307,7 +307,7 @@ replay_loop_begin(TINFO *tinfo, bool intxn)
          */
         testutil_assert(tinfo->replay_again == (tinfo->replay_ts != 0));
         /*
-         * Choose a unique timestamp for commits, based on the conditions above.
+         * Choose a unique timestamp for commits and rollbacks, based on the conditions above.
          */
         replay_pick_timestamp(tinfo);
 
@@ -430,6 +430,19 @@ replay_prepare_ts(TINFO *tinfo)
  */
 uint64_t
 replay_commit_ts(TINFO *tinfo)
+{
+    testutil_assert(GV(RUNS_PREDICTABLE_REPLAY));
+
+    testutil_assert(tinfo->replay_ts != 0);
+    return (tinfo->replay_ts);
+}
+
+/*
+ * replay_rollback_ts --
+ *     Return the rollback timestamp.
+ */
+uint64_t
+replay_rollback_ts(TINFO *tinfo)
 {
     testutil_assert(GV(RUNS_PREDICTABLE_REPLAY));
 

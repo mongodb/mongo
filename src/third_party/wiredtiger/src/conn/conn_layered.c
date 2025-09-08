@@ -389,6 +389,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
 
     /* Put our new config in */
     WT_ERR(__wt_metadata_insert(internal_session, metadata_key, cfg_ret));
+    __wt_free(session, cfg_ret);
 
     /*
      * Part 2: Get the metadata for other tables from the shared metadata table.

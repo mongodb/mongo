@@ -105,8 +105,8 @@ typedef struct {
 
     const char *progname;        /* Truncated program name */
     char *build_dir;             /* Build directory path */
-    char *disagg_mode;           /* Disaggregated storage mode */
-    char *disagg_page_log;       /* Page and log service for disaggregated storage */
+    const char *disagg_mode;     /* Disaggregated storage mode */
+    const char *disagg_page_log; /* Page and log service for disaggregated storage */
     char *tiered_storage_source; /* Tiered storage source */
 
     enum {
@@ -134,6 +134,7 @@ typedef struct {
     bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
     bool compat;               /* Compatibility */
     bool disagg_storage;       /* Uses disaggregated storage */
+    bool disagg_switch_mode;   /* Switching disaggregated storage mode during the test */
     bool do_data_ops;          /* Have schema ops use data */
     bool inmem;                /* In-memory */
     bool make_bucket_dir;      /* Create bucket when it is a directory */

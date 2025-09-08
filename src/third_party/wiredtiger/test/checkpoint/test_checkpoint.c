@@ -35,6 +35,7 @@ GLOBAL g;
 static int handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static int enable_disagg(const char *);
 static void cleanup(bool);
 static int usage(void);
 static void wt_connect(const char *);
@@ -75,20 +76,20 @@ init_thread_data(THREAD_DATA *td, int info)
 
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     Main function for the test program. See usage() for command line options.
  */
 int
 main(int argc, char *argv[])
 {
     table_type ttype;
     int base, ch, cnt, i, ret, runs;
-    const char *config_open;
+    char config_open[1024];
     char *end_number, *stop_arg;
     bool verify_only;
 
     (void)testutil_set_progname(argv);
 
-    config_open = NULL;
+    memset(config_open, 0, sizeof(config_open));
     ret = 0;
     ttype = MIX;
     g.checkpoint_name = "WiredTigerCheckpoint";
@@ -113,13 +114,18 @@ main(int argc, char *argv[])
     testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, &g.opts);
 
     while ((ch = __wt_getopt(
-              progname, argc, argv, "C:c:Dk:l:mn:pr:Rs:S:T:t:vW:xX" SHARED_PARSE_OPTIONS)) != EOF)
+              progname, argc, argv, "C:c:d:Dk:l:mn:pr:Rs:S:T:t:vW:xX" SHARED_PARSE_OPTIONS)) != EOF)
         switch (ch) {
         case 'c':
             g.checkpoint_name = __wt_optarg;
             break;
         case 'C': /* wiredtiger_open config */
-            config_open = __wt_optarg;
+            strcpy(config_open, __wt_optarg);
+            break;
+        case 'd': /* disaggregated storage options */
+            if (enable_disagg(__wt_optarg) != 0) {
+                return (usage());
+            }
             break;
         case 'D':
             g.debug_mode = true;
@@ -179,7 +185,7 @@ main(int argc, char *argv[])
                 stop_arg += 2;
             } else
                 base = 10;
-            g.stop_ts = (uint64_t)strtoll(stop_arg, &end_number, base);
+            g.stop_ts = strtoull(stop_arg, &end_number, base);
             if (*end_number)
                 return (usage());
             break;
@@ -240,9 +246,16 @@ main(int argc, char *argv[])
 
     testutil_work_dir_from_path(g.home, 512, (&g.opts)->home);
 
+    /*
+     * Always preserve home directory. Some tests rely on the home directory being present to
+     * compare results between runs.
+     */
+    g.opts.preserve = true;
+
     /* Start time at 1 since 0 is not a valid timestamp. */
     g.ts_stable = 1;
     g.ts_oldest = 1;
+    g.prepared_id = 1;
 
     printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
     if (g.predictable_replay)
@@ -327,7 +340,44 @@ run_complete:
     /* Ensure that cleanup is done on error. */
     (void)wt_shutdown();
     free(g.cookies);
+    testutil_cleanup(&g.opts);
+
     return (g.status);
+}
+
+/*
+ * enable_disagg --
+ *     Enable disaggregated storage with given mode.
+ */
+static int
+enable_disagg(const char *mode)
+{
+    if (strcmp(mode, "leader") == 0) {
+        g.opts.disagg_storage = true;
+        g.opts.disagg_switch_mode = false;
+        g.opts.disagg_mode = "leader";
+        g.opts.disagg_page_log = "palm";
+    } else if (strcmp(mode, "follower") == 0) {
+        g.opts.disagg_storage = true;
+        g.opts.disagg_mode = "follower";
+        g.opts.disagg_switch_mode = false;
+        g.opts.disagg_page_log = "palm";
+    } else if (strcmp(mode, "switch") == 0) {
+        g.opts.disagg_storage = true;
+        g.opts.disagg_switch_mode = true;
+        /* For switch mode, randomly pick initial role */
+        bool disagg_leader = (__wt_random(&g.opts.extra_rnd) % 2) == 0;
+        g.opts.disagg_mode = disagg_leader ? "leader" : "follower";
+        g.opts.disagg_page_log = "palm";
+        printf("Switch mode: starting as %s\n", g.opts.disagg_mode);
+    } else {
+        fprintf(stderr, "Invalid disaggregated mode: %s\n", mode);
+        return EINVAL;
+    }
+
+    g.opts.palm_map_size_mb = 2048; /* Set 2GB map size for palm by default. */
+
+    return 0;
 }
 
 #define DEBUG_MODE_CFG ",debug_mode=(eviction=true,table_logging=true),verbose=(recovery)"
@@ -642,6 +692,23 @@ flcs_modify(WT_MODIFY *entries, int nentries, uint8_t oldval)
 }
 
 /*
+ * disagg_switch_roles --
+ *     Toggle the current disagg role between "leader" and "follower".
+ */
+int
+disagg_switch_roles(void)
+{
+    testutil_assert(g.opts.disagg_storage);
+    testutil_assert(g.opts.disagg_switch_mode);
+
+    const char *disagg_role = strcmp(g.opts.disagg_mode, "leader") == 0 ? "follower" : "leader";
+    char disagg_cfg[64];
+    testutil_snprintf(disagg_cfg, sizeof(disagg_cfg), "disaggregated=(role=\"%s\")", disagg_role);
+
+    return (g.conn->reconfigure(g.conn, disagg_cfg));
+}
+
+/*
  * type_to_string --
  *     Return the string name of a table type.
  */
@@ -668,13 +735,15 @@ usage(void)
 {
     fprintf(stderr,
       "usage: %s\n"
-      "    [-DmpRvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
+      "    [-DmpRvXx] [-C wiredtiger-config] [-c checkpoint] [-d disagg-mode] [-h home] [-k keys] "
+      "[-l log]\n"
       "    [-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v]\n"
       "    [-W workers]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-C specify wiredtiger_open configuration arguments\n"
       "\t-c checkpoint name to used named checkpoints\n"
+      "\t-d disaggregated storage mode (leader | follower | switch)\n"
       "\t-D debug mode\n"
       "\t-h set a database home directory\n"
       "\t-k set number of keys to load\n"

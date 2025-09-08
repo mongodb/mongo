@@ -81,29 +81,36 @@ __cursor_prepared_discover_close(WT_CURSOR *cursor)
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_OP *op;
     uint64_t i, j;
+    uint64_t unclaimed_count;
     cursor_prepare = (WT_CURSOR_PREPARE_DISCOVERED *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 
     txn_global = &S2C(session)->txn_global;
     pending_prepare_items = &txn_global->pending_prepare_items;
+    unclaimed_count = 0;
     if (pending_prepare_items->hash != NULL) {
         for (i = 0; i < pending_prepare_items->hash_size; i++) {
             while ((item = TAILQ_FIRST(&pending_prepare_items->hash[i])) != NULL) {
+                /*
+                 * Claimed prepare transactions should have been removed from the hash map already.
+                 * Increase the counter if we find unclaimed item left in map.
+                 */
+                unclaimed_count++;
                 TAILQ_REMOVE(&pending_prepare_items->hash[i], item, hashq);
                 /* Clean up memory of unclaimed mod array */
                 for (j = 0, op = item->mod; j < item->mod_count; j++, op++) {
                     __wt_txn_op_free(session, op);
                 }
                 __wt_free(session, item->mod);
-                item->mod_alloc = 0;
-                item->mod_count = 0;
                 __wt_free(session, item);
             }
         }
         __wt_free(session, pending_prepare_items->hash);
         memset((void *)pending_prepare_items, 0, sizeof(WT_PENDING_PREPARED_MAP));
     }
-
+    if (unclaimed_count > 0)
+        WT_ERR_MSG(
+          session, WT_ERROR, "Found %" PRIu64 " unclaimed prepared transactions", unclaimed_count);
 err:
 
     __wt_free(session, cursor_prepare->list);

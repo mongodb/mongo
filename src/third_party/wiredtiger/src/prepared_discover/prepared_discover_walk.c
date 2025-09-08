@@ -71,7 +71,8 @@ __prepared_discover_process_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_
 
     /* Add an entry for this key to the transaction structure */
     if (rip != NULL)
-        WT_ERR(__wti_prepared_discover_add_artifact_ondisk_row(session, tw->start_ts, tw, key));
+        WT_ERR(
+          __wti_prepared_discover_add_artifact_ondisk_row(session, tw->start_prepared_id, tw, key));
     else
         WT_ASSERT_ALWAYS(
           session, false, "Column store prepared transaction discovery not supported");
@@ -118,13 +119,13 @@ __prepared_discover_check_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_RO
 static int
 __prepared_discover_process_prepared_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *upd)
 {
-    wt_timestamp_t prepare_timestamp;
+    uint64_t prepared_id;
 
     WT_ASSERT(
       session, upd->prepare_state != WT_PREPARE_INIT && upd->prepare_state != WT_PREPARE_RESOLVED);
 
-    prepare_timestamp = upd->prepare_ts;
-    WT_RET(__wti_prepared_discover_add_artifact_upd(session, prepare_timestamp, key, upd));
+    prepared_id = upd->prepared_id;
+    WT_RET(__wti_prepared_discover_add_artifact_upd(session, prepared_id, key, upd));
     return (0);
 }
 

@@ -875,7 +875,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     WT_ACQUIRE_READ(checkpoint_timestamp, conn->txn_global.checkpoint_timestamp);
     if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && checkpoint_timestamp != WT_TS_NONE &&
       page->modify->rec_pinned_stable_timestamp >= checkpoint_timestamp) {
-        WT_STAT_CONN_INCR(session, cache_eviction_blocked_checkpoint_precise);
+        WT_STAT_CONN_INCR(session, cache_eviction_blocked_precise_checkpoint);
         return (__wt_set_return(session, EBUSY));
     }
 
@@ -1018,7 +1018,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
             WT_ACQUIRE_READ(btree_ckpt_gen, btree->checkpoint_gen);
             ckpt_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
             if (btree_ckpt_gen < ckpt_gen)
-                LF_SET(WT_REC_VISIBLE_CHECKPOINT);
+                LF_SET(WT_REC_VISIBLE_NO_SNAPSHOT);
             else
                 __wt_txn_bump_snapshot(session);
         } else
@@ -1038,10 +1038,10 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
 
         LF_SET(WT_REC_APP_EVICTION_SNAPSHOT);
     } else if (!WT_SESSION_BTREE_SYNC(session))
-        LF_SET(WT_REC_VISIBLE_CHECKPOINT);
+        LF_SET(WT_REC_VISIBLE_NO_SNAPSHOT);
 
     WT_ASSERT(
-      session, LF_ISSET(WT_REC_VISIBLE_CHECKPOINT) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
+      session, LF_ISSET(WT_REC_VISIBLE_NO_SNAPSHOT) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* We should not be trying to evict using a checkpoint-cursor transaction. */
     WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT));
