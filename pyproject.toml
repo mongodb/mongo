@@ -120,6 +120,7 @@ tqdm = "*"
 colorama = "^0.4.6"
 evergreen-lint = "^0.1.10"
 ruff = "^0.6.7"
+license-expression = "^30.4.4"
 
 [tool.poetry.group.modules_poc.dependencies]
 codeowners = { version = "^0.8.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
