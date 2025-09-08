@@ -90,8 +90,8 @@ public:
     /**
      * A LiteParsedDocumentSource implementation for desugar extension stages. A derived class
      * should implement a parse() function that passes into the LiteParsedDesugar constructor a
-     * function of type signature DesugaredPipelineInitializerType that returns the desugared BSON
-     * pipeline representation of the stage.
+     * function of type signature DesugaredPipelineInitializerType that returns the desugared
+     * LiteParsedDocumentSource pipeline representation of the stage.
      *
      * See the following example:
      *
@@ -103,14 +103,16 @@ public:
      *                                          Deferred<DesugaredPipelineInitializerType>{[](BSONObj
      * spec) {
      *                                              // Create desugared pipeline from spec.
-     *                                                  return std::list<BSONObj>();
+     *                                                  return
+     * std::list<LiteParsedDocSrcPtr>();
      *                                              }});
      *   }
      * };
      */
     class LiteParsedDesugar : public LiteParsed {
     public:
-        using DesugaredPipelineInitializerType = std::function<std::list<BSONObj>(BSONObj)>;
+        using LiteParsedDocSrcPtr = std::unique_ptr<LiteParsedDocumentSource>;
+        using DesugaredPipelineInitializerType = std::function<std::list<LiteParsedDocSrcPtr>()>;
 
         LiteParsedDesugar(std::string stageName,
                           BSONObj ownedSpec,
@@ -118,8 +120,8 @@ public:
             : LiteParsed(std::move(stageName), std::move(ownedSpec)),
               _desugaredPipeline(std::move(init)) {}
 
-        const std::list<BSONObj>& getDesugaredPipeline() const {
-            return _desugaredPipeline.get(_ownedSpec);
+        const std::list<LiteParsedDocSrcPtr>& getDesugaredPipeline() const {
+            return _desugaredPipeline.get();
         }
 
     private:

@@ -110,14 +110,17 @@ public:
         return std::make_unique<LiteParsedDesugar>(
             spec.fieldName(),
             spec.Obj(),
-            Deferred<DesugaredPipelineInitializerType>{[](BSONObj spec) {
+            Deferred<DesugaredPipelineInitializerType>{[nss, options]() {
                 fooInitializationCounter++;
-                // Note that these stages can be anything.
-                // It could be a recursively defined extension desugar stage, or just a regular
-                // stage, or anything in between.
-                auto stage1 = BSON("$foo" << BSONObj());
-                auto stage2 = BSON("$bar" << BSONObj());
-                return std::list<BSONObj>{stage1, stage2};
+                // Note that these need to be existing server stages or explicitly defined extension
+                // stages.
+                auto stage1 = BSON("$match" << BSONObj());
+                auto stage2 = BSON("$project" << BSONObj());
+
+                std::list<LiteParsedDocSrcPtr> out;
+                out.push_back(LiteParsedDocumentSource::parse(nss, stage1, options));
+                out.push_back(LiteParsedDocumentSource::parse(nss, stage2, options));
+                return out;
             }});
     }
 };
@@ -176,13 +179,14 @@ TEST_F(DocumentSourceExtensionTest, liteParsedDesugarTest) {
         nss, spec.firstElement(), LiteParserOptions{});
 
     // Ensure that we can desugar once.
-    auto pipeline = lp->getDesugaredPipeline();
+    const auto& pipeline = lp->getDesugaredPipeline();
     ASSERT_EQUALS(pipeline.size(), 2);
     ASSERT_EQUALS(extension::host::fooInitializationCounter, 1);
 
     // Ensure that we do not do the work to desugar again the next time we try to access the
     // desugared pipeline.
-    auto pipelineAgain = lp->getDesugaredPipeline();
+    const auto& pipelineAgain = lp->getDesugaredPipeline();
+    ASSERT_EQ(&pipeline, &pipelineAgain);
     ASSERT_EQUALS(extension::host::fooInitializationCounter, 1);
 }
 
