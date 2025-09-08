@@ -71,7 +71,6 @@ auto split(ImplicitValue input, ImplicitValue separator) {
 
 TEST(ExpressionEvaluateSplitTest, ExpectsStringsOrNullish) {
     // If any argument is non-string non-nullish, it's an error.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     ASSERT_THROWS(split(1, ""_sd).second, AssertionException);
     ASSERT_THROWS(split(1, BSONRegEx()).second, AssertionException);
     ASSERT_THROWS(split(""_sd, 1).second, AssertionException);
@@ -80,8 +79,6 @@ TEST(ExpressionEvaluateSplitTest, ExpectsStringsOrNullish) {
 
 TEST(ExpressionEvaluateSplitTest, HandlesNullish) {
     // If any argument is nullish, the result is null.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(split(BSONNULL, ""_sd).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(split(BSONNULL, BSONRegEx()).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(split(""_sd, BSONNULL).second, Value(BSONNULL));
@@ -89,8 +86,6 @@ TEST(ExpressionEvaluateSplitTest, HandlesNullish) {
 
 TEST(ExpressionEvaluateSplitTest, SplitNothingWhenNoMatches) {
     // When there are no matches, the result is a list with only the input string.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(split(""_sd, "x"_sd).second, Value(std::vector<Value>{Value(""_sd)}));
     ASSERT_VALUE_EQ(split("a"_sd, "x"_sd).second, Value(std::vector<Value>{Value("a"_sd)}));
     ASSERT_VALUE_EQ(split("abcd"_sd, "x"_sd).second, Value(std::vector<Value>{Value("abcd"_sd)}));
@@ -108,8 +103,6 @@ TEST(ExpressionEvaluateSplitTest, SplitNothingWhenNoMatches) {
 }
 
 TEST(ExpressionEvaluateSplitTest, SplitUsingStringOrConstantRegex) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(split("x"_sd, "x"_sd).second,
                     Value(std::vector<Value>{Value(""_sd), Value(""_sd)}));
     ASSERT_VALUE_EQ(split("xyz"_sd, "xyz"_sd).second,
@@ -144,16 +137,12 @@ TEST(ExpressionEvaluateSplitTest, SplitUsingStringOrConstantRegex) {
 }
 
 TEST(ExpressionEvaluateSplitTest, SplitWithEmptyString) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_THROWS(split(""_sd, ""_sd).second, AssertionException);
     ASSERT_THROWS(split(".."_sd, ""_sd).second, AssertionException);
     ASSERT_VALUE_EQ(split(""_sd, "."_sd).second, Value(std::vector<Value>{Value(""_sd)}));
 }
 
 TEST(ExpressionEvaluateSplitTest, MatchPossiblyEmpty) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(split("x"_sd, BSONRegEx("x*")).second,
                     Value(std::vector<Value>{Value(""_sd), Value(""_sd), Value(""_sd)}));
     ASSERT_VALUE_EQ(split("..xyz.."_sd, BSONRegEx("[.y]*")).second,
@@ -181,8 +170,6 @@ TEST(ExpressionEvaluateSplitTest, MatchPossiblyEmpty) {
 }
 
 TEST(ExpressionEvaluateSplitTest, MatchWithSubGroups) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(split("x-y"_sd, BSONRegEx("(-)")).second,
                     Value(std::vector<Value>{Value("x"_sd), Value("-"_sd), Value("y"_sd)}));
     ASSERT_VALUE_EQ(split("xyz"_sd, BSONRegEx("(x*)")).second,
@@ -226,8 +213,6 @@ TEST(ExpressionEvaluateSplitTest, MatchWithSubGroups) {
 }
 
 TEST(ExpressionEvaluateSplitTest, SplitWithUnicode) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     StringData precomposedAcuteE = "é";
 
     ASSERT_VALUE_EQ(split("é"_sd, "e"_sd).second,

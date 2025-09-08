@@ -2108,7 +2108,6 @@ void ExpressionBenchmarkFixture::benchmarkReduceCreatingNestedObject8(benchmark:
  * replacement: "<a>"}]} against document {"_id": ObjectId(...), "input": _kLongHTMLString}
  */
 void ExpressionBenchmarkFixture::benchmarkMQLReplaceOneRegex(benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(
         BSON("$replaceOne" << BSON("input" << "$input" << "find" << BSONRegEx("<a.+>")
                                            << "replacement" << "<a>")),
@@ -2129,7 +2128,6 @@ void ExpressionBenchmarkFixture::benchmarkJSReplaceOneRegex(benchmark::State& st
  * replacement: "<a>"}]} against document {"_id": ObjectId(...), "input": _kLongHTMLString}
  */
 void ExpressionBenchmarkFixture::benchmarkMQLReplaceAllRegex(benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(
         BSON("$replaceAll" << BSON("input" << "$input" << "find" << BSONRegEx("<a.+>")
                                            << "replacement" << "<a>")),
@@ -2151,7 +2149,6 @@ void ExpressionBenchmarkFixture::benchmarkJSReplaceAllRegex(benchmark::State& st
  * {"_id": ObjectId(...), "input": _kLongHTMLString}
  */
 void ExpressionBenchmarkFixture::benchmarkMQLSplitRegex(benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(BSON("$split" << BSON_ARRAY("$input" << BSONRegEx("<a.+>"))),
                         state,
                         std::vector<Document>(1, {{"input"_sd, _kLongHTMLString}}));
@@ -2172,7 +2169,6 @@ void ExpressionBenchmarkFixture::benchmarkJSSplitRegex(benchmark::State& state) 
 void ExpressionBenchmarkFixture::benchmarkMQLConvertToString(int32_t base,
                                                              int32_t input,
                                                              benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(BSON("$convert" << BSON("input" << "$input" << "to"
                                                         << "string"
                                                         << "base" << base)),
@@ -2187,7 +2183,6 @@ void ExpressionBenchmarkFixture::benchmarkMQLConvertToString(int32_t base,
 void ExpressionBenchmarkFixture::benchmarkMQLConvertToInt(int32_t base,
                                                           StringData input,
                                                           benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(
         BSON("$convert" << BSON("input" << "$input" << "to" << "int" << "base" << base)),
         state,
@@ -2219,8 +2214,6 @@ void ExpressionBenchmarkFixture::benchmarkJSConvertToInt(int32_t base,
 }
 
 void ExpressionBenchmarkFixture::benchmarkMQLCreateObjectId(benchmark::State& state) {
-    // TODO(SERVER-105035): Delete this once the feature flag defaults to true.
-    registerExpressionForBenchmark("$createObjectId", ExpressionCreateObjectId::parse);
     benchmarkExpression(
         BSON("$createObjectId" << BSONObj()), state, std::vector<Document>(1, {{}}));
 }
@@ -2234,8 +2227,6 @@ void ExpressionBenchmarkFixture::benchmarkJSCreateObjectId(benchmark::State& sta
 }
 
 void ExpressionBenchmarkFixture::benchmarkMQLSubtype(benchmark::State& state) {
-    // TODO(SERVER-105035): Delete this once the feature flag defaults to true.
-    registerExpressionForBenchmark("$subtype", ExpressionSubtype::parse);
     benchmarkExpression(
         BSON("$subtype" << "$input"),
         state,
@@ -2256,7 +2247,6 @@ void ExpressionBenchmarkFixture::benchmarkJSSubtype(benchmark::State& state) {
 void ExpressionBenchmarkFixture::benchmarkMQLConvertObjectToString(size_t fields,
                                                                    size_t depth,
                                                                    benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(BSON("$convert" << BSON("input" << "$input" << "to"
                                                         << stdx::to_underlying(BSONType::string))),
                         state,
@@ -2277,7 +2267,6 @@ void ExpressionBenchmarkFixture::benchmarkJSConvertObjectToString(size_t fields,
 void ExpressionBenchmarkFixture::benchmarkMQLConvertStringToObject(size_t fields,
                                                                    size_t depth,
                                                                    benchmark::State& state) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     benchmarkExpression(
         BSON("$convert" << BSON("input" << "$input" << "to"
                                         << stdx::to_underlying(BSONType::object))),

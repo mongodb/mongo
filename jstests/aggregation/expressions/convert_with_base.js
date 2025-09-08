@@ -1,7 +1,6 @@
 /**
  * Tests behavior of BinData $convert.
  * @tags: [
- *   featureFlagMqlJsEngineGap,
  *   requires_fcv_83,
  * ]
  */

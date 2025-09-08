@@ -48,29 +48,7 @@
 
 namespace mongo {
 
-class ExpressionCreateObjectIdTest : public AggregationContextFixture {
-public:
-    ExpressionCreateObjectIdTest() {
-        // TODO(SERVER-105035): Delete this once the feature flag defaults to true.
-        // Use logic similar to registerSigmoidExpression to register the $createObject expression
-        // even though the feature flag defaults to off.
-        // $createObjectId is gated behind a feature flag and does
-        // not get put into the map as the flag is off by default. Changing the value of the feature
-        // flag with RAIIServerParameterControllerForTest() does not solve the issue because the
-        // registration logic is not re-hit.
-        try {
-            Expression::registerExpression("$createObjectId",
-                                           ExpressionCreateObjectId::parse,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           AllowedWithClientType::kAny,
-                                           nullptr /* featureFlag */);
-        } catch (const DBException& e) {
-            // Allow this exception, to allow multiple ExpressionCreateObjectIdTest instances
-            // to be created in this process.
-            ASSERT(e.reason() == "Duplicate expression ($createObjectId) registered.");
-        }
-    }
-};
+using ExpressionCreateObjectIdTest = AggregationContextFixture;
 
 TEST_F(ExpressionCreateObjectIdTest, Basic) {
     auto expCtx = getExpCtx();

@@ -2,7 +2,6 @@
  * Tests behavior of conversions to string to array and object.
  *
  * @tags: [
- *   featureFlagMqlJsEngineGap,
  *   requires_fcv_83,
  * ]
  */

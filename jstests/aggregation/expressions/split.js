@@ -2,7 +2,6 @@
 // error cases of the expression.
 /**
  * @tags: [
- *   featureFlagMqlJsEngineGap,
  *   requires_fcv_83
  * ]
  */

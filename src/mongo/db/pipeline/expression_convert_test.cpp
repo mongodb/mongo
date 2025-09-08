@@ -189,7 +189,6 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
 }
 
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithBase) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
 
     auto spec = BSON("$convert" << BSON("input" << "$path1"
@@ -322,7 +321,6 @@ TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithBaseOptimizesToExpressionConstant) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
 
     auto spec = BSON("$convert" << BSON("input" << 160 << "to"

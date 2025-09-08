@@ -1,7 +1,6 @@
 // Test $replaceOne aggregation expressions.
 /**
  * @tags: [
- *   featureFlagMqlJsEngineGap,
  *   requires_fcv_83
  * ]
  */

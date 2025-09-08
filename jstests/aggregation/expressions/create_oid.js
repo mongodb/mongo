@@ -1,7 +1,6 @@
 /**
  * Test the $createObjectId expression.
  * @tags: [
- *  featureFlagMqlJsEngineGap,
  *  requires_fcv_83
  * ]
  */

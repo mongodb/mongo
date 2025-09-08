@@ -1085,7 +1085,6 @@ TEST_F(EvaluateConvertTest, ConvertMaxKeyToBool) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertAnyLeafValueToString) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
 
     auto spec = BSON("$convert" << BSON("input" << "$path1"
@@ -1118,7 +1117,6 @@ TEST_F(EvaluateConvertTest, ConvertAnyLeafValueToString) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertAnyNestedValueToString) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
 
     auto spec = BSON("$convert" << BSON("input" << "$path1"
@@ -1171,7 +1169,6 @@ TEST_F(EvaluateConvertTest, ConvertAnyNestedValueToString) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertStringToObject) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << "$path1" << "to" << "object"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
@@ -1210,7 +1207,6 @@ TEST_F(EvaluateConvertTest, ConvertStringToObject) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertStringToArray) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
     auto spec = BSON("$convert" << BSON("input" << "$path1" << "to" << "array"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
@@ -1250,7 +1246,6 @@ TEST_F(EvaluateConvertTest, ConvertStringToArray) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertStringToObjectOrArrayNumberHandling) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
 
     auto toObjectSpec = BSON("$convert" << BSON("input" << "$path1" << "to" << "object"));
@@ -1300,7 +1295,6 @@ TEST_F(EvaluateConvertTest, ConvertStringToObjectOrArrayNumberHandling) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertStringToObjectOrArrayInvalidConversions) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
     auto expCtx = getExpCtx();
 
     auto toObjectExp = Expression::parseExpression(

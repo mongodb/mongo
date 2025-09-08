@@ -1,10 +1,6 @@
 /**
  * Verifies that features added in SPM-4257: Close feature gap between MQL and JS engine behave
  * correctly in FCV upgrade/downgrade scenarios.
- *
- * @tags: [
- *   featureFlagMqlJsEngineGap
- * ]
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

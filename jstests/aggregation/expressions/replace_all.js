@@ -1,7 +1,6 @@
 // Test $replaceAll aggregation expressions.
 /**
  * @tags: [
- *   featureFlagMqlJsEngineGap,
  *   requires_fcv_83
  * ]
  */

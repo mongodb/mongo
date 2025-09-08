@@ -86,8 +86,6 @@ auto replaceAll(ImplicitValue input, ImplicitValue find, ImplicitValue replaceme
 
 TEST(ExpressionEvaluateReplaceTest, ExpectsStringsOrNullish) {
     // If any argument is non-string non-nullish, it's an error.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_THROWS(replaceOne(1, BSONNULL, BSONNULL).second, AssertionException);
     ASSERT_THROWS(replaceOne(BSONNULL, 1, BSONNULL).second, AssertionException);
     ASSERT_THROWS(replaceOne(BSONNULL, BSONNULL, 1).second, AssertionException);
@@ -113,8 +111,6 @@ TEST(ExpressionEvaluateReplaceTest, ExpectsStringsOrNullish) {
 
 TEST(ExpressionEvaluateReplaceTest, HandlesNullish) {
     // If any argument is nullish, the result is null.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceOne(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(replaceOne(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, BSONNULL).second, Value(BSONNULL));
@@ -130,8 +126,6 @@ TEST(ExpressionEvaluateReplaceTest, HandlesNullish) {
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesNothingWhenNoMatches) {
     // When there are no matches, the result is the input, unchanged.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceOne(""_sd, "x"_sd, "y"_sd).second, Value(""_sd));
     ASSERT_VALUE_EQ(replaceOne("a"_sd, "x"_sd, "y"_sd).second, Value("a"_sd));
     ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "x"_sd, "y"_sd).second, Value("abcd"_sd));
@@ -158,8 +152,6 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesNothingWhenNoMatches) {
 }
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesOnlyMatch) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, "abc"_sd).second, Value("abc"_sd));
     ASSERT_VALUE_EQ(replaceOne("x"_sd, "x"_sd, "abc"_sd).second, Value("abc"_sd));
     ASSERT_VALUE_EQ(replaceOne("xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("abc"_sd));
@@ -192,8 +184,6 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesOnlyMatch) {
 }
 
 TEST(ExpressionReplaceOneTest, ReplacesFirstMatchOnly) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceOne("."_sd, ""_sd, "abc"_sd).second, Value("abc."_sd));
     ASSERT_VALUE_EQ(replaceOne(".."_sd, ""_sd, "abc"_sd).second, Value("abc.."_sd));
     ASSERT_VALUE_EQ(replaceOne(".."_sd, "."_sd, "abc"_sd).second, Value("abc."_sd));
@@ -208,8 +198,6 @@ TEST(ExpressionReplaceOneTest, ReplacesFirstMatchOnly) {
 }
 
 TEST(ExpressionReplaceAllTest, ReplacesAllMatches) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceAll("."_sd, ""_sd, "abc"_sd).second, Value("abc.abc"_sd));
     ASSERT_VALUE_EQ(replaceAll(".."_sd, ""_sd, "abc"_sd).second, Value("abc.abc.abc"_sd));
     ASSERT_VALUE_EQ(replaceAll(".."_sd, "."_sd, "abc"_sd).second, Value("abcabc"_sd));
@@ -224,8 +212,6 @@ TEST(ExpressionReplaceAllTest, ReplacesAllMatches) {
 }
 
 TEST(ExpressionEvaluateReplaceTest, DoesNotReplaceInTheReplacement) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b.c"_sd));
     ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b..c"_sd));
 
@@ -234,8 +220,6 @@ TEST(ExpressionEvaluateReplaceTest, DoesNotReplaceInTheReplacement) {
 }
 
 TEST(ExpressionEvaluateReplaceTest, DoesNotNormalizeUnicode) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     StringData combiningAcute = "́"_sd;
     StringData combinedAcuteE = "é"_sd;
     ASSERT_EQ(combinedAcuteE[0], 'e');
@@ -278,8 +262,6 @@ TEST(ExpressionEvaluateReplaceTest, DoesNotNormalizeUnicode) {
 }
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesWithVariableRegExPattern) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
-
     ASSERT_VALUE_EQ(replaceOne("xyz"_sd, BSONRegEx("x*"), "a"_sd).second, Value("ayz"_sd));
     ASSERT_VALUE_EQ(replaceOne("abcdefghij"_sd, BSONRegEx("...."), "<-->"_sd).second,
                     Value("<-->efghij"_sd));

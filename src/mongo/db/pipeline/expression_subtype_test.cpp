@@ -50,27 +50,6 @@ namespace mongo {
 
 class ExpressionSubtypeTest : public AggregationContextFixture {
 public:
-    ExpressionSubtypeTest() {
-        // TODO(SERVER-105035): Delete this once the feature flag defaults to true.
-        // Use logic similar to registerSigmoidExpression to register the $subtype expression
-        // even though the feature flag defaults to off.
-        // $subtype is gated behind a feature flag and does
-        // not get put into the map as the flag is off by default. Changing the value of the feature
-        // flag with RAIIServerParameterControllerForTest() does not solve the issue because the
-        // registration logic is not re-hit.
-        try {
-            Expression::registerExpression("$subtype",
-                                           ExpressionSubtype::parse,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           AllowedWithClientType::kAny,
-                                           nullptr /* featureFlag */);
-        } catch (const DBException& e) {
-            // Allow this exception, to allow multiple ExpressionSubtypeTest instances
-            // to be created in this process.
-            ASSERT(e.reason() == "Duplicate expression ($subtype) registered.");
-        }
-    }
-
     void assertEvaluateSubtype(Value operand, Value expectedSubtype) {
         auto expCtx = getExpCtx();
         BSONObj spec = BSON("$subtype" << operand);

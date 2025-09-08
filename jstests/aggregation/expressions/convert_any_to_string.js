@@ -2,7 +2,6 @@
  * Tests behavior of conversions to string that were added in SERVER-46079.
  *
  * @tags: [
- *   featureFlagMqlJsEngineGap,
  *   requires_fcv_83,
  * ]
  */

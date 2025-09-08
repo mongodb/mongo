@@ -1,7 +1,6 @@
 /**
  * Test the $subtype expression.
  * @tags: [
- *  featureFlagMqlJsEngineGap,
  *  requires_fcv_83
  * ]
  */
