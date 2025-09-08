@@ -19,7 +19,7 @@ const runTestCase = function (fn, isSharded = false) {
     if (!isSharded) {
         const replTest = new ReplSetTest({
             nodes: 1,
-            nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
+            nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}, slowms: 0},
         });
         replTest.startSet();
         replTest.initiate();
@@ -33,7 +33,7 @@ const runTestCase = function (fn, isSharded = false) {
             mongos: 1,
             config: 1,
             other: {
-                rsOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
+                rsOptions: {setParameter: {ttlMonitorSleepSecs: 1}, slowms: 0},
             },
         });
         const conn = st.s0;
@@ -42,6 +42,14 @@ const runTestCase = function (fn, isSharded = false) {
 
         st.stop();
     }
+};
+
+const countIndexKeysDeleted = function () {
+    const logs = rawMongoProgramOutput('".*"');
+    const indexKeyDeletedLogs = [...logs.matchAll(/"numKeysDeleted":(\d*)/g)];
+    const keysDeleted = indexKeyDeletedLogs.reduce((acc, curr) => acc + parseInt(curr[1]), 0);
+    clearRawMongoProgramOutput();
+    return keysDeleted;
 };
 
 const disableTTLBatchDeletes = function (conn) {
@@ -73,6 +81,7 @@ const triggerIndexScanTTL = function (db, doShardCollection = false) {
     assert.soon(function () {
         return coll.find().itcount() == 0;
     }, "TTL index on x didn't delete");
+    assert.eq(docCount * (doShardCollection ? 3 : 2), countIndexKeysDeleted());
 };
 
 const testTTLDeleteWithIndexScanBatched = function (conn) {
@@ -113,15 +122,19 @@ const triggerCollectionScanTTL = function (testDB, doShardCollection = false) {
     );
 
     if (doShardCollection) {
+        assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
         assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
     }
 
     const maxTime = new Date(new Date().getTime() - 1000 * defaultBucketMaxRange);
     const minTime = new Date(maxTime.getTime() - 1000 * 5 * 60);
-    for (let i = 0; i < docCount; i++) {
-        const time = new Date(minTime.getTime() + i);
-        assert.commandWorked(coll.insert({[timeFieldName]: time, [metaFieldName]: "localhost"}));
-    }
+    // Insert a single measurement to create a single bucket document. Inserting multiple measurements
+    // creates some flakiness in terms of how many buckets are ultimately created for this collection
+    // (i.e, depending on whether the TTL Monitor run before we've inserted all of our measurements
+    // which would result in two buckets being created and deleted, or whether we insert all measurements
+    // into a single bucket which then gets deleted).
+    const time = new Date(minTime.getTime());
+    assert.commandWorked(coll.insert({[timeFieldName]: time, [metaFieldName]: "localhost"}));
 
     assert.soon(function () {
         return coll.find().itcount() == 0;
@@ -129,6 +142,7 @@ const triggerCollectionScanTTL = function (testDB, doShardCollection = false) {
 
     assert.eq(0, coll.find().itcount());
     assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
+    assert.eq(doShardCollection ? 2 : 1, countIndexKeysDeleted());
 };
 
 const testTTLDeleteWithCollectionScanBatched = function (conn) {

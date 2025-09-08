@@ -60,6 +60,7 @@
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_debug.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
@@ -603,6 +604,8 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     auto params = std::make_unique<DeleteStageParams>();
+    OpDebug opDebug;
+    params->opDebug = &opDebug;
     params->isMulti = true;
     params->canonicalQuery = canonicalQuery.get();
 
@@ -628,6 +631,9 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
         ttlDeletedDocuments.increment(numDeleted);
 
         const auto duration = Milliseconds(timer.millis());
+        PlanSummaryStats summaryStats;
+        const auto& explainer = exec->getPlanExplainer();
+        explainer.getSummaryStats(&summaryStats);
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
                                         duration,
@@ -638,6 +644,9 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                   logAttrs(collection.nss()),
                   "index"_attr = indexName,
                   "numDeleted"_attr = numDeleted,
+                  "numKeysDeleted"_attr = opDebug.additiveMetrics.keysDeleted.value_or(0ll),
+                  "numKeysExamined"_attr = summaryStats.totalKeysExamined,
+                  "numDocsExamined"_attr = summaryStats.totalDocsExamined,
                   "duration"_attr = duration);
         }
 
@@ -740,6 +749,8 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
                                                    bool forward,
                                                    const MatchExpression* filter) {
     auto params = std::make_unique<DeleteStageParams>();
+    OpDebug opDebug;
+    params->opDebug = &opDebug;
     params->isMulti = true;
 
     // Maintain a consistent view of whether batching is enabled - batching depends on
@@ -767,6 +778,9 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
         ttlDeletedDocuments.increment(numDeleted);
 
         const auto duration = Milliseconds(timer.millis());
+        PlanSummaryStats summaryStats;
+        const auto& explainer = exec->getPlanExplainer();
+        explainer.getSummaryStats(&summaryStats);
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
                                         duration,
@@ -776,6 +790,9 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
                   "Deleted expired documents using clustered index scan",
                   logAttrs(collection.nss()),
                   "numDeleted"_attr = numDeleted,
+                  "numKeysDeleted"_attr = opDebug.additiveMetrics.keysDeleted.value_or(0ll),
+                  "numKeysExamined"_attr = summaryStats.totalKeysExamined,
+                  "numDocsExamined"_attr = summaryStats.totalDocsExamined,
                   "duration"_attr = duration,
                   "extendedRange"_attr =
                       collection.getCollectionPtr()->getRequiresTimeseriesExtendedRangeSupport());
