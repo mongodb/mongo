@@ -19,19 +19,6 @@
         }
       ],
       "cpe": "test_cpe",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/librdkafka"
-          }
-        ]
-      }
-    },
-    {
-      "type": "library",
-      "name": "protobuf",
-      "scope": "required",
-      "purl": "test_purl",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -41,22 +28,10 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/protobuf"
+            "location": "src/third_party/librdkafka"
           }
         ]
       }
-    },
-    {
-      "type": "library",
-      "name": "unicode",
-      "scope": "optional",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ]
     }
   ]
 }

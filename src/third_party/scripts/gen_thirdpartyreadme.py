@@ -65,22 +65,29 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
         name = component["name"]
         license_string = []
         for lic in component["licenses"]:
-            for key in ["id", "name"]:
-                if key in lic["license"]:
-                    license_string.append(lic["license"][key])
+            if "license" in lic:
+                for key in ["id", "name"]:
+                    if key in lic["license"]:
+                        license_string.append(lic["license"][key])
+            elif "expression" in lic:
+                license_string.append(lic["expression"])                
         license_string = ", ".join(license_string)
         version = component["version"]
-        emits_persisted_data = "unknown"
-        for prop in component["properties"]:
-            k, v = prop["name"], prop["value"]
-            if k == "emits_persisted_data":
-                emits_persisted_data = ("", "✗")[v == "true"]
+        if component["scope"] == "excluded":
+            emits_persisted_data = ""
+        else:
+            emits_persisted_data = "unknown"
+        if "properties" in component:
+            for prop in component["properties"]:
+                k, v = prop["name"], prop["value"]
+                if k == "emits_persisted_data":
+                    emits_persisted_data = ("", "✗")[v == "true"]
         distributed_in_release_binaries = ("", "✗")[component["scope"] == "required"]
 
         row = [
             item.replace("|", "")
             for item in [
-                f"[{name}]",
+                f"[{name}]".strip(),
                 license_string,
                 version,
                 emits_persisted_data,
@@ -123,7 +130,7 @@ def sbom_to_wiredtiger_chart(sbom: dict) -> list[list[str]]:
         locations = get_component_locations(component)
         for location in locations:
             if location.startswith("src/third_party/wiredtiger/"):
-                bisect.insort(wiredtiger_chart, [component["name"].replace("|", "")])
+                bisect.insort(wiredtiger_chart, ([component["name"].replace("|", "")+"@"+component["version"]]))
 
     return wiredtiger_chart
 
@@ -139,19 +146,22 @@ def check_component_validity(component) -> None:
 def get_component_info_link(component) -> str:
     name = component["name"]
     links = []
-    for prop in component["properties"]:
-        k, v = prop["name"], prop["value"]
-        if k == "info_link":
-            links.append(v)
-    if len(links) != 1:
-        logging.warning("Warning: Expected 1 info_link for %s. Got %d:", name, len(links))
-        if len(links) > 1:
-            logging.warning(" ".join(links))
-            logging.warning("Using first link only.")
-        else:
-            logging.warning("Falling back to `purl` value: %s", component["purl"])
-            links.append(component["purl"])
-    return links[0]
+    if "properties" in component:
+        for prop in component["properties"]:
+            k, v = prop["name"], prop["value"]
+            if k == "info_link":
+                links.append(v)
+        if len(links) != 1:
+            logging.warning("Warning: Expected 1 info_link for %s. Got %d:", name, len(links))
+            if len(links) > 1:
+                logging.warning(" ".join(links))
+                logging.warning("Using first link only.")
+            else:
+                logging.warning("Falling back to `purl` value: %s", component["purl"])
+                links.append(component["purl"])
+        return links[0]
+    else:
+        return ""
 
 
 def get_component_locations(component) -> list[str]:

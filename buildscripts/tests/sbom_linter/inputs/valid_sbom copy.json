@@ -1,0 +1,51 @@
+{
+  "properties": [
+    {
+      "name": "comment",
+      "value": "SBOM for MDB server product; this file should comply with the format specified here: https://cyclonedx.org/docs/1.5/json/#components_items_publisher; This file is still in development; see https://jira.mongodb.org/browse/DEVPROD-2623 for details."
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "supplier": {
+        "name": "Austin Appleby"
+      },
+      "author": "Austin Appleby",
+      "group": "aappleby",
+      "name": "MurmurHash3",
+      "version": "a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "licenses": [
+        {
+          "license": {
+            "name": "Public Domain"
+          }
+        }
+      ],
+      "copyright": "MurmurHash3 was written by Austin Appleby, and is placed in the public domain. The author hereby disclaims copyright to this source code.",
+      "purl": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Storage Execution"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/aappleby/smhasher/blob/a6bd3ce/"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/murmurhash3"
+          }
+        ]
+      },
+      "scope": "required"
+    }
+  ]
+}

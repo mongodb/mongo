@@ -12,6 +12,7 @@
     {
       "type": "library",
       "name": "kafka",
+      "version": "2.0.2",
       "scope": "required",
       "licenses": [
         {
@@ -19,6 +20,16 @@
         }
       ],
       "cpe": "test_cpe",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "server_security"
+        },
+        {
+          "name": "import_script_path",
+          "value": "buildscripts/tests/sbom_linter/inputs/kafka_missing_version_import.sh"
+        }
+      ],
       "evidence": {
         "occurrences": [
           {
@@ -26,37 +37,6 @@
           }
         ]
       }
-    },
-    {
-      "type": "library",
-      "name": "protobuf",
-      "scope": "required",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/protobuf"
-          }
-        ]
-      }
-    },
-    {
-      "type": "library",
-      "name": "unicode",
-      "scope": "optional",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ]
     }
   ]
 }

@@ -2,11 +2,11 @@
   "properties": [
     {
       "name": "comment",
-      "value": "SBOM for MDB server product; this file should comply with the format specified here: https://cyclonedx.org/docs/1.6/json/#components_items_publisher; This file is still in development; see https://jira.mongodb.org/browse/DEVPROD-2623 for details."
+      "value": "SBOM for MDB server product; this file should comply with the format specified here: https://cyclonedx.org/docs/1.5/json/#components_items_publisher; This file is still in development; see https://jira.mongodb.org/browse/DEVPROD-2623 for details."
     }
   ],
   "bomFormat": "CycloneDX",
-  "specVersion": "1.6",
+  "specVersion": "1.5",
   "version": 1,
   "components": [
     {
@@ -14,6 +14,11 @@
       "name": "kafka",
       "scope": "required",
       "cpe": "test_cpe",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause"
+        }
+      ],
       "properties": [
         {
           "name": "internal:team_responsible",
