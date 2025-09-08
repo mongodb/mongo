@@ -12,50 +12,40 @@
     {
       "type": "library",
       "name": "kafka",
+      "version": "v2.0.0",
       "scope": "required",
-      "cpe": "test_cpe",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
         }
       ],
+      "cpe": "test_cpe",
+      "pedigree": {
+        "descendants": [
+          {
+            "type": "library",
+            "name": "kafka-fork",
+            "version": "v2.0.2"
+          }
+        ]
+      },
       "properties": [
         {
           "name": "internal:team_responsible",
           "value": "server_security"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "protobuf",
-      "scope": "required",
-      "purl": "test_purl",
-      "properties": [
+        },
         {
-          "name": "internal:team_responsible",
-          "value": "server_security"
+          "name": "import_script_path",
+          "value": "buildscripts/tests/sbom_linter/inputs/kafka_valid_import.sh"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/protobuf"
+            "location": "src/third_party/kafka"
           }
         ]
       }
-    },
-    {
-      "type": "library",
-      "name": "unicode",
-      "scope": "optional",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ]
     }
   ]
 }

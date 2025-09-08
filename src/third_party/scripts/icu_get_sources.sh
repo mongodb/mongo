@@ -45,9 +45,9 @@ if [ "$KERNEL" != Linux ]; then
 fi
 
 NAME=icu4c
-MAJOR_VERSION=57
-MINOR_VERSION=1
-VERSION="${MAJOR_VERSION}.${MINOR_VERSION}"
+VERSION="57.1"
+# don't define MAJOR_VERSION/MINOR_VERSION before this point
+IFS="." read MAJOR_VERSION MINOR_VERSION <<<$VERSION
 
 TARBALL="${NAME}-${MAJOR_VERSION}_${MINOR_VERSION}-src.tgz"
 TARBALL_DOWNLOAD_URL="http://download.icu-project.org/files/${NAME}/${VERSION}/${TARBALL}"

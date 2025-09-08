@@ -13,24 +13,12 @@
       "type": "library",
       "name": "kafka",
       "scope": "required",
-      "cpe": "test_cpe",
       "licenses": [
         {
           "expression": "BSD-3-Clause"
         }
       ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "protobuf",
-      "scope": "required",
-      "purl": "test_purl",
+      "cpe": "test_cpe",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -40,22 +28,10 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/protobuf"
+            "location": "src/third_party/librdkafka"
           }
         ]
       }
-    },
-    {
-      "type": "library",
-      "name": "unicode",
-      "scope": "optional",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ]
     }
   ]
 }
