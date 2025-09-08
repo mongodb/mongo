@@ -33,7 +33,9 @@
 #include "mongo/db/extension/host/extension_status.h"
 #include "mongo/db/extension/host/handle.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 
 #include <absl/base/nullability.h>
 
@@ -81,6 +83,27 @@ public:
      */
     MongoExtensionAggregationStageType getType() const {
         return vtable().get_type(get());
+    }
+
+    /**
+     * Return the expanded pipeline BSON vector for this stage.
+     */
+    std::vector<BSONObj> getExpandedPipelineVec() const {
+        ::MongoExtensionByteBuf* buf;
+        const auto& vtbl = vtable();
+        auto* ptr = get();
+        sdk::enterC([&]() { return vtbl.expand(ptr, &buf); });
+
+        if (!buf) {
+            return std::vector<BSONObj>{};
+        }
+
+        sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
+        auto ownedBob = sdk::bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+
+        BSONArray arr(ownedBob);
+        auto wrappedPipeline = BSON("pipeline" << arr);
+        return parsePipelineFromBSON(wrappedPipeline.firstElement());
     }
 
     /**

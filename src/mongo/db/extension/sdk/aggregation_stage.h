@@ -29,7 +29,7 @@
 #pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
 #include <memory>
@@ -98,6 +98,12 @@ public:
 
     virtual std::unique_ptr<class LogicalAggregationStage> parse(BSONObj stageBson) const = 0;
 
+    // This function should only be called on a kDesugar descriptor and must be overridden by
+    // kDesugar stages. If the stage desugars into nothing, return an empty BSONArray.
+    virtual BSONArray expand() const {
+        tasserted(11038200, "expand() must be overridden for kDesugar stages.");
+    }
+
 protected:
     AggregationStageDescriptor(std::string name, ::MongoExtensionAggregationStageType type)
         : _name(std::move(name)), _type(type) {}
@@ -163,6 +169,28 @@ private:
                 std::make_unique<mongo::extension::sdk::ExtensionLogicalAggregationStage>(
                     std::move(logicalStagePtr))
                     .release();
+        });
+    }
+
+    static ::MongoExtensionStatus* _extExpand(
+        const ::MongoExtensionAggregationStageDescriptor* descriptor,
+        ::MongoExtensionByteBuf** expandedPipelineBSON) noexcept {
+        return extension::sdk::enterCXX([&]() {
+            *expandedPipelineBSON = nullptr;
+
+            const auto& impl =
+                static_cast<const extension::sdk::ExtensionAggregationStageDescriptor*>(descriptor)
+                    ->getImpl();
+
+            tassert(11038201,
+                    "Only kDesugar stages can override expand(). It is invalid to call expand() on "
+                    "any other stage type.",
+                    impl.getType() == ::MongoExtensionAggregationStageType::kDesugar);
+
+            // Only update expandedPipelineBSON with real memory once we have a successful code
+            // path.
+            auto tmp = std::make_unique<VecByteBuf>(impl.expand());
+            *expandedPipelineBSON = tmp.release();
         });
     }
 

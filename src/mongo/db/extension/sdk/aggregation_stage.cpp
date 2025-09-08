@@ -33,7 +33,8 @@ namespace mongo::extension::sdk {
 const ::MongoExtensionAggregationStageDescriptorVTable ExtensionAggregationStageDescriptor::VTABLE =
     {.get_type = &ExtensionAggregationStageDescriptor::_extGetType,
      .get_name = &ExtensionAggregationStageDescriptor::_extGetName,
-     .parse = &ExtensionAggregationStageDescriptor::_extParse};
+     .parse = &ExtensionAggregationStageDescriptor::_extParse,
+     .expand = &ExtensionAggregationStageDescriptor::_extExpand};
 
 const ::MongoExtensionLogicalAggregationStageVTable ExtensionLogicalAggregationStage::VTABLE = {
     .destroy = &ExtensionLogicalAggregationStage::_extDestroy};

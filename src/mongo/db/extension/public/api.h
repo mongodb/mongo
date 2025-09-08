@@ -152,6 +152,7 @@ typedef enum MongoExtensionAggregationStageType : uint32_t {
      * NoOp stage.
      */
     kNoOp = 0,
+    kDesugar = 1,
 } MongoExtensionAggregationStageType;
 
 /**
@@ -189,6 +190,15 @@ typedef struct MongoExtensionAggregationStageDescriptorVTable {
     MongoExtensionStatus* (*parse)(const MongoExtensionAggregationStageDescriptor* descriptor,
                                    MongoExtensionByteView stageBson,
                                    struct MongoExtensionLogicalAggregationStage** logicalStage);
+
+    /**
+     * Populates MongoExtensionByteBuf pointer with the stage's expanded pipeline as serialized BSON
+     * if it desugars. If the stage doesn't desugar, the pointer is not populated.
+     *
+     * Both the returned MongoExtensionStatus and expandedPipelineBSON are owned by the caller.
+     */
+    MongoExtensionStatus* (*expand)(const MongoExtensionAggregationStageDescriptor* descriptor,
+                                    MongoExtensionByteBuf** expandedPipelineBSON);
 } MongoExtensionAggregationStageDescriptorVTable;
 
 /**
