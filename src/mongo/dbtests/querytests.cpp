@@ -1415,6 +1415,7 @@ public:
 
         string err;
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        auto coll = ctx.getCollection();
 
         // note that extents are always at least 4KB now - so this will get rounded up
         // a bit.

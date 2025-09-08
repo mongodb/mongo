@@ -32,6 +32,7 @@
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/local_catalog/index_catalog_mock.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -368,9 +369,12 @@ void BM_PlanCacheClassic(benchmark::State& state) {
         std::make_shared<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
     auto catalog = CollectionCatalog::get(opCtx.get());
     catalog->onCreateCollection(opCtx.get(), collection);
-    auto collectionPtr = CollectionPtr(
-        catalog->establishConsistentCollection(opCtx.get(), kNss, boost::none /* readTimestamp */));
-    auto collectionsAccessor = MultipleCollectionAccessor(collectionPtr);
+    // The initialization of the CollectionPtr is SAFE. The lifetime of the Mocked Collection
+    // instance is managed by the test and guaranteed to be valid for the entire duration of the
+    // test.
+    const auto collectionAcquisition = shard_role_mock::acquireCollectionMocked(
+        opCtx.get(), kNss, CollectionPtr::CollectionPtr_UNSAFE(collection.get()));
+    auto collectionsAccessor = MultipleCollectionAccessor(collectionAcquisition);
 
     // If there is an index specified, add it to the IndexCatalogMock.
     if (bmParams.index == kSingleFieldIndex || bmParams.index == kTwoFieldCompoundIndex ||

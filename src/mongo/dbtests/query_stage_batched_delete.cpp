@@ -188,7 +188,7 @@ public:
     }
 
     void getRecordIds(OperationContext* opCtx,
-                      const CollectionPtr& collection,
+                      const CollectionAcquisition& collection,
                       CollectionScanParams::Direction direction,
                       std::vector<RecordId>* out) {
         WorkingSet ws;
@@ -196,9 +196,9 @@ public:
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
-        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collection->ns()).build();
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collection.nss()).build();
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(expCtx.get(), &collection, params, &ws, nullptr));
+            new CollectionScan(expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -325,7 +325,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeleted) {
 
     // Get the RecordIds that would be returned by an in-order scan.
     std::vector<RecordId> recordIds;
-    getRecordIds(&_opCtx, coll.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
+    getRecordIds(&_opCtx, coll, CollectionScanParams::FORWARD, &recordIds);
 
     WorkingSet ws;
     auto deleteStage = makeBatchedDeleteStage(&ws, coll);
@@ -394,10 +394,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
 
     // Get the RecordIds that would be returned by an in-order scan.
     std::vector<RecordId> recordIds;
-    getRecordIds(batchedDeleteOpCtx.get(),
-                 coll.getCollectionPtr(),
-                 CollectionScanParams::FORWARD,
-                 &recordIds);
+    getRecordIds(batchedDeleteOpCtx.get(), coll, CollectionScanParams::FORWARD, &recordIds);
 
 
     WorkingSet ws;

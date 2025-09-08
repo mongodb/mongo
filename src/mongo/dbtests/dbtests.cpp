@@ -218,7 +218,6 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     : _opCtx(opCtx), _nss(NamespaceString::createNamespaceString_forTest(ns)) {
     // Lock the database and collection
     _autoDb.emplace(opCtx, _nss.dbName(), MODE_IX);
-    _collLock.emplace(opCtx, _nss, MODE_X);
 
     _tracker.emplace(opCtx,
                      _nss,
@@ -231,11 +230,22 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     invariant(db, _nss.toStringForErrorMsg());
 }
 
-CollectionAcquisition WriteContextForTests::getCollection() const {
+CollectionAcquisition WriteContextForTests::getOrCreateCollection(LockMode mode) {
+    auto coll = getCollection(mode);
+    if (!coll.exists()) {
+        ScopedLocalCatalogWriteFence writeFence(_opCtx, &coll);
+        WriteUnitOfWork wuow(_opCtx);
+        _autoDb->getDb()->createCollection(_opCtx, _nss);
+        wuow.commit();
+    }
+    return coll;
+}
+
+CollectionAcquisition WriteContextForTests::getCollection(LockMode mode) const {
     return acquireCollection(_opCtx,
                              CollectionAcquisitionRequest::fromOpCtx(
                                  _opCtx, _nss, AcquisitionPrerequisites::OperationType::kWrite),
-                             MODE_IX);
+                             mode);
 }
 
 int dbtestsMain(int argc, char** argv) {

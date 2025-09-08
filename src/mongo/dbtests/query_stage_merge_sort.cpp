@@ -186,26 +186,22 @@ class QueryStageMergeSortPrefixIndex : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            insert(BSON("a" << 1 << "c" << i));
-            insert(BSON("b" << 1 << "c" << i));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "c" << i));
+                insert(BSON("b" << 1 << "c" << i));
+            }
         }
-
         BSONObj firstIndex = BSON("a" << 1 << "c" << 1);
         BSONObj secondIndex = BSON("b" << 1 << "c" << 1);
 
         addIndex(firstIndex);
         addIndex(secondIndex);
-        auto coll = ctx.getCollection();
+        auto coll = ctx.getCollection(MODE_IX);
 
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Sort by c:1
@@ -256,17 +252,15 @@ class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            insert(BSON("a" << 1 << "b" << 1 << "c" << i));
-            insert(BSON("a" << 1 << "b" << 1 << "c" << i));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "b" << 1 << "c" << i));
+                insert(BSON("a" << 1 << "b" << 1 << "c" << i));
+            }
         }
 
         BSONObj firstIndex = BSON("a" << 1 << "c" << 1);
@@ -274,7 +268,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
-        auto coll = ctx.getCollection();
+        auto coll = ctx.getCollection(MODE_IX);
 
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Sort by c:1
@@ -333,24 +327,21 @@ class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            insert(BSON("a" << 1 << "b" << 1 << "c" << i));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "b" << 1 << "c" << i));
+            }
         }
-
         BSONObj firstIndex = BSON("a" << 1 << "c" << 1);
         BSONObj secondIndex = BSON("b" << 1 << "c" << 1);
 
         addIndex(firstIndex);
         addIndex(secondIndex);
-        auto coll = ctx.getCollection();
+        auto coll = ctx.getCollection(MODE_IX);
 
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Sort by c:1
@@ -402,18 +393,16 @@ class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            // We insert a:1 c:i for i=0..49 but in reverse order for the heck of it.
-            insert(BSON("a" << 1 << "c" << N - i - 1));
-            insert(BSON("b" << 1 << "c" << i));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                // We insert a:1 c:i for i=0..49 but in reverse order for the heck of it.
+                insert(BSON("a" << 1 << "c" << N - i - 1));
+                insert(BSON("b" << 1 << "c" << i));
+            }
         }
 
         BSONObj firstIndex = BSON("a" << 1 << "c" << -1);
@@ -421,7 +410,7 @@ public:
 
         addIndex(firstIndex);
         addIndex(secondIndex);
-        auto coll = ctx.getCollection();
+        auto coll = ctx.getCollection(MODE_IX);
 
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Sort by c:-1
@@ -475,17 +464,15 @@ class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            insert(BSON("a" << 1 << "c" << i));
-            insert(BSON("b" << 1 << "c" << i));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "c" << i));
+                insert(BSON("b" << 1 << "c" << i));
+            }
         }
 
         BSONObj firstIndex = BSON("a" << 1 << "c" << 1);
@@ -542,11 +529,7 @@ class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        ctx.getOrCreateCollection(MODE_IX);
 
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Sort by foo:1
@@ -603,11 +586,7 @@ class QueryStageMergeSortDeletedDocument : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        ctx.getOrCreateCollection(MODE_IX);
 
         WorkingSet ws;
         // Sort by foo:1
@@ -726,16 +705,14 @@ class QueryStageMergeSortConcurrentUpdateDedup : public QueryStageMergeSortTestB
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        // Insert data.
-        insert(BSON("_id" << 4 << "a" << 4));
-        insert(BSON("_id" << 5 << "a" << 5));
-        insert(BSON("_id" << 6 << "a" << 6));
+            // Insert data.
+            insert(BSON("_id" << 4 << "a" << 4));
+            insert(BSON("_id" << 5 << "a" << 5));
+            insert(BSON("_id" << 6 << "a" << 6));
+        }
 
         addIndex(BSON("a" << 1));
         auto coll = ctx.getCollection();
@@ -827,19 +804,17 @@ class QueryStageMergeSortStringsWithNullCollation : public QueryStageMergeSortTe
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            insert(BSON("a" << 1 << "c" << i << "d"
-                            << "abc"));
-            insert(BSON("b" << 1 << "c" << i << "d"
-                            << "cba"));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "c" << i << "d"
+                                << "abc"));
+                insert(BSON("b" << 1 << "c" << i << "d"
+                                << "cba"));
+            }
         }
 
         BSONObj firstIndex = BSON("a" << 1 << "c" << 1 << "d" << 1);
@@ -898,21 +873,18 @@ class QueryStageMergeSortStringsRespectsCollation : public QueryStageMergeSortTe
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        if (!ctx.getCollection().exists()) {
-            WriteUnitOfWork wuow(&_opCtx);
-            ctx.db()->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         const int N = 50;
+        {
+            auto coll = ctx.getOrCreateCollection(MODE_IX);
 
-        for (int i = 0; i < N; ++i) {
-            insert(BSON("a" << 1 << "c" << i << "d"
-                            << "abc"));
-            insert(BSON("b" << 1 << "c" << i << "d"
-                            << "cba"));
+            // Insert data
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "c" << i << "d"
+                                << "abc"));
+                insert(BSON("b" << 1 << "c" << i << "d"
+                                << "cba"));
+            }
         }
-
         BSONObj firstIndex = BSON("a" << 1 << "c" << 1 << "d" << 1);
         BSONObj secondIndex = BSON("b" << 1 << "c" << 1 << "d" << 1);
 
