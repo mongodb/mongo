@@ -1422,19 +1422,47 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
 
+        // We take a Write intent on primary aborts of two-phase aborts because these
+        // must write to non-local tables.
+        // On single-phase builds we take only LocalWrite to avoid deadlocks with prepare conflicts
+        // and state transitions caused by taking a strong collection lock. See SERVER-42621.
+        auto desiredIntent = IndexBuildProtocol::kTwoPhase == replState->protocol &&
+                signalAction == IndexBuildAction::kPrimaryAbort
+            ? rss::consensus::IntentRegistry::Intent::Write
+            : rss::consensus::IntentRegistry::Intent::LocalWrite;
+
         // Only on single phase builds, skip RSTL to avoid deadlocks with prepare conflicts and
         // state transitions caused by taking a strong collection lock. See SERVER-42621.
         const auto lockOptions = makeAutoGetCollectionOptions(
-            IndexBuildProtocol::kSinglePhase == replState->protocol,
-            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
-                ? rss::consensus::IntentRegistry::Intent::Write
-                : rss::consensus::IntentRegistry::Intent::LocalWrite);
-        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_X, lockOptions);
-        // Same options used here in order to avoid locking the RSTL after having taken the Global
-        // lock.
-        AutoGetCollection indexBuildEntryColl(
-            opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, lockOptions);
+            IndexBuildProtocol::kSinglePhase == replState->protocol, desiredIntent);
+        boost::optional<AutoGetCollection> autoGetColl;
+        boost::optional<AutoGetCollection> indexBuildEntryColl;
+        boost::optional<rss::consensus::IntentGuard> abortIntentGuard;
+        try {
+            autoGetColl.emplace(opCtx, dbAndUUID, MODE_X, lockOptions);
+            // Same options used here in order to avoid locking the RSTL after having taken the
+            // Global lock.
+            indexBuildEntryColl.emplace(
+                opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, lockOptions);
+
+            // If we got this far in a two-phase primary abort, we have all our locks and either
+            // we're primary or a stepdown just happened and we're interrupted.  In the latter case
+            // this will throw NotWritablePrimary.  We register a BlockingWrite intent to indicate
+            // this operation should not be interrupted by step down.
+            // We cannot safely register a BlockingWrite intent until the collection lock has
+            // been acquired, or a deadlock can occur between stepdown, abort index build,
+            // and a prepared transaction including the collection.
+            if (gFeatureFlagIntentRegistration.isEnabled() &&
+                desiredIntent == rss::consensus::IntentRegistry::Intent::Write) {
+                abortIntentGuard.emplace(rss::consensus::IntentRegistry::Intent::BlockingWrite,
+                                         opCtx);
+            }
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            uassertStatusOK({ErrorCodes::NotWritablePrimary,
+                             str::stream()
+                                 << "Unable to abort index build because we are not primary: "
+                                 << buildUUID});
+        }
 
         hangAbortIndexBuildByBuildUUIDAfterLocks.pauseWhileSet();
 
@@ -1466,6 +1494,8 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
             if ((IndexBuildAction::kPrimaryAbort == signalAction) &&
                 !replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+                // TODO(SERVER-106669): Once we are using intents exclusively, this check
+                // will have been handled during the AutoGetCollection and can be removed.
                 uassertStatusOK({ErrorCodes::NotWritablePrimary,
                                  str::stream()
                                      << "Unable to abort index build because we are not primary: "
@@ -1497,7 +1527,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         }
 
         // At this point we must continue aborting the index build.
-        _completeExternalAbort(opCtx, replState, *indexBuildEntryColl, signalAction);
+        _completeExternalAbort(opCtx, replState, **indexBuildEntryColl, signalAction);
         break;
     }
 
@@ -1522,6 +1552,8 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
     // OpObservers may introduce lock acquisitions (i.e. sharding state locks) and cause an
     // interruption during cleanup. For correctness, we must perform these final writes. Temporarily
     // disable interrupts.
+    // TODO(SERVER-106669): Once we are using intents exclusively, this should be handled by
+    // our BlockingWrite intent and the UninterruptibleLockGuard should no longer be needed.
     UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
 
     CollectionWriter coll(opCtx, replState->collectionUUID);
