@@ -73,11 +73,11 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/find_command.h"
@@ -840,9 +840,7 @@ public:
     void run(OperationContext* opCtx,
              unique_function<Status(UMCTransactionClient&)> txnOpsCallback) final {
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-        auto sleepAndCleanupExecutor = serverGlobalParams.clusterRole.has(ClusterRole::None)
-            ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx->getServiceContext())
-            : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        auto sleepAndCleanupExecutor = getLocalExecutor(opCtx);
 
         // Constructing a SyncTransactionWithRetries causes it to store the write concern from the
         // supplied OperationContext and then wait for that write concern when running/committing

@@ -271,6 +271,7 @@ car_common:
     - src/mongo/db/sharding_environment/sharding_mongos_test_fixture.h
     - src/mongo/db/sharding_environment/sharding_types.idl
     - src/mongo/db/persistent_task_store*
+    - src/mongo/db/local_executor*
 
     # Observers overlaps between shard_catalog, ddl and routing_and_topology. Putting them in this
     # module because it is "generic infrastructure", but likely their contents need to be moved

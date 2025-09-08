@@ -149,6 +149,7 @@ mongo_cc_library(
     ],
     deps = [
         ":update_metrics",
+        "//src/mongo/db:local_executor",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/pipeline:lite_parsed_document_source",
@@ -254,6 +255,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:curop_metrics",
         "//src/mongo/db:fle_crud_mongod",
+        "//src/mongo/db:local_executor",
         "//src/mongo/db:not_primary_error_tracker",
         "//src/mongo/db:profile_collection",
         "//src/mongo/db:query_exec",

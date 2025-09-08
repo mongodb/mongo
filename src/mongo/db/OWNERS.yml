@@ -306,3 +306,6 @@ filters:
   - "replication_state_transition_lock_guard*":
     approvers:
       - 10gen/server-replication
+  - "local_executor*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
