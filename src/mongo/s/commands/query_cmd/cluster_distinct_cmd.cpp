@@ -153,7 +153,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         return shape_helpers::tryMakeShape<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
     }};
     auto queryShapeHash = shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
-    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, queryShapeHash);
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);

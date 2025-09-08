@@ -37,6 +37,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/platform/atomic_word.h"
@@ -265,7 +266,8 @@ public:
                 bool omitCommand,
                 BSONObjBuilder& builder) const;
 
-    static std::function<BSONObj(ProfileFilter::Args args)> appendStaged(StringSet requestedFields,
+    static std::function<BSONObj(ProfileFilter::Args args)> appendStaged(OperationContext* opCtx,
+                                                                         StringSet requestedFields,
                                                                          bool needWholeDocument);
     static void appendUserInfo(const CurOp&, BSONObjBuilder&, AuthorizationSession*);
 
@@ -309,6 +311,17 @@ public:
      * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
      */
     CursorMetrics getCursorMetrics() const;
+
+    boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
+
+    /**
+     * Convenience method that sets 'queryShapeHash' if 'queryShapeHash' has not been previously
+     * set. Currently QueryShapeHash for a given command may be computed twice (due to view
+     * resolution). By preventing new QueryShapeHash overwrites we ensure that original
+     * QueryShapeHash is recorded in CurOp::OpDebug.
+     */
+    void setQueryShapeHashIfNotPresent(OperationContext* opCtx,
+                                       const boost::optional<query_shape::QueryShapeHash>& hash);
 
     // -------------------
 
@@ -361,7 +374,8 @@ public:
     // The hash of the PlanCache key for the query being run. This may change depending on what
     // indexes are present.
     boost::optional<uint32_t> planCacheKey;
-    // The hash of the query's "stable" key. This represents the query's shape.
+
+    // The hash of the canonical query encoding CanonicalQuery::QueryShapeString
     boost::optional<uint32_t> planCacheShapeHash;
 
     /* The QueryStatsInfo struct was created to bundle all the queryStats related fields of CurOp &
@@ -518,5 +532,9 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
+
+private:
+    // The hash of query_shape::QueryShapeHash.
+    boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
 };
 }  // namespace mongo

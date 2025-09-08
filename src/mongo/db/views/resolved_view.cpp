@@ -298,6 +298,7 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
     expandedRequest.setIsMapReduceCommand(request.getIsMapReduceCommand());
     expandedRequest.setLet(request.getLet());
     expandedRequest.setIncludeQueryStatsMetrics(request.getIncludeQueryStatsMetrics());
+    expandedRequest.setComment(request.getComment());
 
     // Operations on a view must always use the default collation of the view. We must have already
     // checked that if the user's request specifies a collation, it matches the collation of the

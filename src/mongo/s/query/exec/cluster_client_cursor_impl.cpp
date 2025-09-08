@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/service_context.h"
@@ -91,6 +92,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
+      _queryShapeHash(CurOp::get(opCtx)->debug().getQueryShapeHash()),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
@@ -113,6 +115,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
+      _queryShapeHash(CurOp::get(opCtx)->debug().getQueryShapeHash()),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
@@ -268,6 +271,10 @@ void ClusterClientCursorImpl::setLastUseDate(Date_t now) {
 
 boost::optional<uint32_t> ClusterClientCursorImpl::getPlanCacheShapeHash() const {
     return _planCacheShapeHash;
+}
+
+boost::optional<query_shape::QueryShapeHash> ClusterClientCursorImpl::getQueryShapeHash() const {
+    return _queryShapeHash;
 }
 
 boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() const {

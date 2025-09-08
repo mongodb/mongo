@@ -131,8 +131,9 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
                             2,
                             {logv2::LogComponent::kQueryRejected},
                             "Query rejected by QuerySettings",
-                            "queryShapeHash"_attr = curOp->getQueryShapeHash()->toHexString(),
-                            "ns"_attr = CurOp::get(opCtx)->getNS(),
+                            "queryShapeHash"_attr =
+                                curOp->debug().getQueryShapeHash()->toHexString(),
+                            "ns"_attr = curOp->getNS(),
                             "command"_attr = redact(cmdToLog.getObject()));
         uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
     }

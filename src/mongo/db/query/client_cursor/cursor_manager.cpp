@@ -236,9 +236,11 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
         checkPinAllowed(*cursor);
     }
 
-    // Pass along the original 'planCacheShapeHash' and 'planCacheKey' for slow query logging.
+    // Pass along the original 'planCacheShapeHash', 'planCacheKey', 'queryShapeHash' for slow query
+    // logging.
     CurOp::get(opCtx)->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
     CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
+    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, cursor->_queryShapeHash);
 
     // Pass along queryStats context so it is retrievable after query execution for storing metrics.
     CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursor->_queryStatsKeyHash;

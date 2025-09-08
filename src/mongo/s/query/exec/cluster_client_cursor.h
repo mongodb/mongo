@@ -33,6 +33,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
@@ -226,6 +227,8 @@ public:
     virtual boost::optional<uint32_t> getPlanCacheShapeHash() const = 0;
 
     virtual boost::optional<std::size_t> getQueryStatsKeyHash() const = 0;
+
+    virtual boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const = 0;
 
     virtual bool getQueryStatsWillNeverExhaust() const = 0;
 

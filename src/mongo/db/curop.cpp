@@ -379,10 +379,6 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         // reportState is used to generate a command reply
         auto sc = SerializationContext::stateCommandReply(expCtx->getSerializationContext());
         CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
-
-        if (const auto& queryShapeHash = CurOp::get(clientOpCtx)->getQueryShapeHash()) {
-            infoBuilder->append("queryShapeHash", queryShapeHash->toHexString());
-        }
     }
 
     if (expCtx->getOperationContext()->routedByReplicaSetEndpoint()) {
@@ -1119,8 +1115,11 @@ void CurOp::reportState(BSONObjBuilder* builder,
         }
     }
 
-
     populateCurrentOpQueueStats(opCtx, _tickSource, builder);
+
+    if (auto&& queryShapeHash = _debug.getQueryShapeHash()) {
+        builder->append("queryShapeHash", queryShapeHash->toHexString());
+    }
 }
 
 CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(

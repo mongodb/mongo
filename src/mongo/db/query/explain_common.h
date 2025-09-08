@@ -57,7 +57,7 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
 /**
  * Adds the 'queryShapeHash' value to the BSON object being built by 'out'.
  */
-void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out);
+void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out);
 
 /**
  * Adds the 'peakTrackedMemBytes' value to the BSON object being built by 'out'.

@@ -111,6 +111,10 @@ boost::optional<uint32_t> ClusterClientCursorMock::getPlanCacheShapeHash() const
     return boost::none;
 }
 
+boost::optional<query_shape::QueryShapeHash> ClusterClientCursorMock::getQueryShapeHash() const {
+    return boost::none;
+}
+
 boost::optional<std::size_t> ClusterClientCursorMock::getQueryStatsKeyHash() const {
     return boost::none;
 }

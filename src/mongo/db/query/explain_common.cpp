@@ -69,8 +69,8 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
                       internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
 }
 
-void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out) {
-    if (auto queryShapeHash = mongo::CurOp::get(opCtx)->getQueryShapeHash()) {
+void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out) {
+    if (auto&& queryShapeHash = mongo::CurOp::get(opCtx)->debug().getQueryShapeHash()) {
         out->append("queryShapeHash", queryShapeHash->toHexString());
     }
 }

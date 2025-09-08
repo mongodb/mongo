@@ -694,22 +694,6 @@ public:
      */
     static bool shouldCurOpStackOmitDiagnosticInformation(CurOp*);
 
-    boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const {
-        return _queryShapeHash;
-    }
-
-    /**
-     * Convenience method that sets '_queryShapeHash' if 'hash' is not boost::none and
-     * '_queryShapeHash' has not been previously set. Currently QueryShapeHash for a given command
-     * may be computed twice (due to view resolution). By preventing new QueryShapeHash overwrites
-     * we ensure that original QueryShapeHash is recorded in CurOp.
-     */
-    void setQueryShapeHashIfNotPresent(const boost::optional<query_shape::QueryShapeHash>& hash) {
-        if (hash && !_queryShapeHash) {
-            _queryShapeHash = hash;
-        }
-    }
-
     /**
      * Returns storage metrics for the current operation by accounting for metrics accrued outside
      * of this operation.
@@ -893,9 +877,6 @@ private:
 
     // TODO SERVER-90937: Remove need to zero out blocked time prior to operation starting.
     Milliseconds _blockedTimeAtStart{0};
-
-    // The hash of the query's shape.
-    boost::optional<query_shape::QueryShapeHash> _queryShapeHash{boost::none};
 
     // These memory tracking metrics need to be in CurOp instead of OpDebug because they are
     // reported in $currentOp, and $currentOp only looks at CurOp. These memory tracking metrics are

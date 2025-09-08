@@ -36,6 +36,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -139,6 +140,8 @@ public:
 
     boost::optional<uint32_t> getPlanCacheShapeHash() const final;
 
+    boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const final;
+
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 
     bool getQueryStatsWillNeverExhaust() const final;
@@ -203,8 +206,12 @@ private:
     // The time when the cursor was last unpinned, i.e. the end of the last getMore.
     Date_t _lastUseDate;
 
-    // The hash of the query shape to be used for slow query logging.
+    // The hash of the canonical query encoding CanonicalQuery::QueryShapeString. To be used for
+    // slow query logging.
     boost::optional<uint32_t> _planCacheShapeHash;
+
+    // The hash of the query_shape::QueryShape.
+    boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
 
     // Whether ClusterClientCursor::next() was interrupted due to MaxTimeMSExpired.
     bool _maxTimeMSExpired = false;

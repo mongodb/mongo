@@ -311,6 +311,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 
     CurOp::get(opCtx)->debug().planCacheShapeHash = cursorGuard->getPlanCacheShapeHash();
     CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursorGuard->getQueryStatsKeyHash();
+    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx,
+                                                             cursorGuard->getQueryShapeHash());
 
     OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
                                                         cursorGuard->releaseMemoryUsageTracker());

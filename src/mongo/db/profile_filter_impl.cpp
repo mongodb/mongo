@@ -75,7 +75,8 @@ ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
     _needWholeDocument = deps.needWholeDocument;
 
     // Remember a list of functions we'll call whenever we need to build BSON from CurOp.
-    _makeBSON = OpDebug::appendStaged(_dependencies, _needWholeDocument);
+    _makeBSON = OpDebug::appendStaged(
+        parserExpCtx->getOperationContext(), _dependencies, _needWholeDocument);
 
     // The operation context is necessary for parsing, but should not be used for the rest of the
     // lifetime of the filter, since the filter exists for longer than a single operation.

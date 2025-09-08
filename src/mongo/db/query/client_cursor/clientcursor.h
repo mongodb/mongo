@@ -46,6 +46,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
@@ -486,11 +487,16 @@ private:
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _planCacheShapeHash;
 
+    // The hash of query_shape::QueryShapeHash.
+    boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
+
     // If boost::none, query stats should not be collected for this cursor.
     boost::optional<std::size_t> _queryStatsKeyHash;
+
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
+
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
 

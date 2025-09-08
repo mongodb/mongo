@@ -36,6 +36,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -127,6 +128,8 @@ public:
     void setLastUseDate(Date_t now) final;
 
     boost::optional<uint32_t> getPlanCacheShapeHash() const final;
+
+    boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const final;
 
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 

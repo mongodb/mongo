@@ -959,7 +959,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     }};
     auto queryShapeHash =
         shape_helpers::computeQueryShapeHash(expCtx, deferredShape, aggExState.getOriginalNss());
-    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, queryShapeHash);
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);

@@ -175,6 +175,10 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
         result.setExplain(boost::none);
     }
 
+    if (findCommand.getComment()) {
+        result.setComment(findCommand.getComment());
+    }
+
     return result;
 }
 

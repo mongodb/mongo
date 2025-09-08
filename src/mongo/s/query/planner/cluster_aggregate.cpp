@@ -526,7 +526,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     }};
     auto queryShapeHash =
         shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
-    CurOp::get(opCtx)->setQueryShapeHashIfNotPresent(queryShapeHash);
+    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, queryShapeHash);
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     // In case query settings have already been looked up (in case the agg request is

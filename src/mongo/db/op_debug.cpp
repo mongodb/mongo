@@ -209,8 +209,8 @@ void OpDebug::report(OperationContext* opCtx,
 
     auto query = curop_bson_helpers::appendCommentField(opCtx, curop.opDescription());
     if (!query.isEmpty()) {
-        if (const auto shapeHash = CurOp::get(opCtx)->getQueryShapeHash()) {
-            pAttrs->addDeepCopy("queryShapeHash", shapeHash->toHexString());
+        if (auto&& queryShapeHash = getQueryShapeHash()) {
+            pAttrs->addDeepCopy("queryShapeHash", queryShapeHash->toHexString());
         }
         if (iscommand) {
             const Command* curCommand = curop.getCommand();
@@ -628,8 +628,8 @@ void OpDebug::append(OperationContext* opCtx,
     if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
-    if (const auto shapeHash = CurOp::get(opCtx)->getQueryShapeHash()) {
-        b.append("queryShapeHash", shapeHash->toHexString());
+    if (auto&& queryShapeHash = getQueryShapeHash()) {
+        b.append("queryShapeHash", queryShapeHash->toHexString());
     }
 
     switch (queryFramework) {
@@ -790,7 +790,8 @@ void OpDebug::appendDelinquentInfo(OperationContext* opCtx,
     }
 }
 
-std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,
+std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationContext* opCtx,
+                                                                  StringSet requestedFields,
                                                                   bool needWholeDocument) {
     // This function is analogous to OpDebug::append. The main difference is that append() does
     // the work of building BSON right away, while appendStaged() stages the work to be done
@@ -990,8 +991,8 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
             b.append(field, zeroPaddedHex(*args.op.planCacheKey));
         }
     });
-    addIfNeeded("queryShapeHash", [](auto field, auto args, auto& b) {
-        if (auto hash = args.curop.getQueryShapeHash()) {
+    addIfNeeded("queryShapeHash", [&](auto field, auto args, auto& b) {
+        if (auto&& hash = args.op.getQueryShapeHash()) {
             b.append(field, hash->toHexString());
         }
     });
@@ -1303,6 +1304,27 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setFromPlanCache(additiveMetrics.fromPlanCache.value_or(false));
 
     return metrics;
+}
+
+boost::optional<query_shape::QueryShapeHash> OpDebug::getQueryShapeHash() const {
+    // Access to OpDebug is already synchronized, therefore no extra lock is taken here.
+    return _queryShapeHash;
+}
+
+/**
+ * Convenience method that sets 'queryShapeHash' if 'queryShapeHash' has not been previously
+ * set. Currently QueryShapeHash for a given command may be computed twice (due to view
+ * resolution). By preventing new QueryShapeHash overwrites we ensure that original
+ * QueryShapeHash is recorded in CurOp::OpDebug.
+ */
+void OpDebug::setQueryShapeHashIfNotPresent(
+    OperationContext* opCtx, const boost::optional<query_shape::QueryShapeHash>& hash) {
+    // Field 'queryShapeHash' is computed by the command handler but may be accessed by
+    // $currentOp thread and therefore needs to be synchronized.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    if (!_queryShapeHash) {
+        _queryShapeHash = hash;
+    }
 }
 
 BSONArray OpDebug::getResolvedViewsInfo() const {
