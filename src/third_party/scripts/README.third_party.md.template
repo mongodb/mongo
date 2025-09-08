@@ -19,17 +19,17 @@ not authored by MongoDB, and has a license which requires reproduction,
 a notice will be included in
 `THIRD-PARTY-NOTICES`.
 
-{{ component_chart }}
+$component_chart
 
-{{ component_links }}
+$component_links
 
 ## WiredTiger Vendored Test Libraries
 
-The following Python libraries are transitively included by WiredTiger,
+The following libraries are transitively included by WiredTiger,
 and are used by that component for testing. They don't appear in
 released binary artifacts.
 
-{{ wiredtiger_chart }}
+$wiredtiger_chart
 
 ## Dynamically Linked Libraries
 

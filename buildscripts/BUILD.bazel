@@ -256,6 +256,10 @@ py_binary(
             "jsonschema",
             group = "build-metrics",
         ),
+        dependency(
+            "license-expression",
+            group = "lint",
+        ),
     ],
 )
 
