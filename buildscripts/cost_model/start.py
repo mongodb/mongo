@@ -231,6 +231,25 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
     )
 
 
+async def execute_sorts(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    # Using collections of varying sizes instead of limits, as the limit + sort combination
+    # would trigger the optimized top-N sorting algorithm, which requires separate calibration.
+    collections = [c for c in collections if c.name.startswith("sort")]
+
+    requests = [
+        # A standard sort applies the simple sort algorithm.
+        Query({"sort": {"payload": 1}}, note="SORT_SIMPLE"),
+        # Including the recordId explicitly forces the use of the default sort algorithm.
+        Query(
+            {"projection": {"$recordId": {"$meta": "recordId"}}, "sort": {"payload": 1}},
+            note="SORT_DEFAULT",
+        ),
+    ]
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests
+    )
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -250,6 +269,7 @@ async def main():
             execute_collection_scans,
             execute_limits,
             execute_skips,
+            execute_sorts,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)

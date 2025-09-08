@@ -65,20 +65,18 @@ def calibrate_node(
 ):
     node_name = node_config.name if node_config.name else node_config.type
     qsn_node_df = qsn_df[
-        (qsn_df.node_type == node_config.type)
-        & (
-            qsn_df.note.isna()
-            | (qsn_df.note == node_name)
-        )
+        (qsn_df.node_type == node_config.type) & (qsn_df.note.isna() | (qsn_df.note == node_name))
     ]
     if node_config.filter_function is not None:
         qsn_node_df = node_config.filter_function(qsn_node_df)
     y = qsn_node_df["execution_time"]
     X_vars = (
-        qsn_node_df["n_processed"]
+        pd.DataFrame({"Number of documents": qsn_node_df["n_processed"]})
         if node_config.variables_override is None
         else node_config.variables_override(qsn_node_df)
     )
+    n_vars = X_vars.shape[1]
+    labels = X_vars.columns.tolist()
     X = sm.add_constant(X_vars)
 
     def fit(X, y):
@@ -89,8 +87,7 @@ def calibrate_node(
     model = estimate(fit, X.to_numpy(), y.to_numpy(), config.test_size, config.trace)
     # plot regression and save to file
     if model.predict:
-        # We currently assume that if a node overrides the variables, there are two independent variables.
-        if node_config.variables_override:
+        if n_vars == 2:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection="3d")
             X1 = X_vars.iloc[:, 0]
@@ -111,29 +108,32 @@ def calibrate_node(
             )
 
             ax.set(
-                xlabel=X_vars.columns.tolist()[0],
-                ylabel=X_vars.columns.tolist()[1],
+                xlabel=labels[0],
+                ylabel=labels[1],
                 zlabel="Execution time (ns)",
-                title=f"Regression for {node_config.type}",
+                title=f"Regression for {node_name}",
             )
             ax.legend()
-
-        else:
+        elif n_vars == 1:
             fig, ax = plt.subplots()
-            ax.scatter(qsn_node_df["n_processed"], y, label="Executions")
+            ax.scatter(X_vars, y, label="Executions")
             ax.plot(
-                qsn_node_df["n_processed"],
+                X_vars,
                 model.predict(X),
                 linewidth=3,
                 color="tab:orange",
                 label="Linear Regression",
             )
             ax.set(
-                xlabel="Number of documents",
+                xlabel=labels[0],
                 ylabel="Execution time (ns)",
-                title=f"Regression for {node_config.type}",
+                title=f"Regression for {node_name}",
             )
 
             ax.legend()
-        fig.savefig(f"{node_name}.png")
+        else:
+            raise ValueError(f"Currently only support 1 or 2 input variables, got {n_vars}")
+
+        if fig:
+            fig.savefig(f"{node_name}.png")
     return model
