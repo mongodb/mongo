@@ -118,7 +118,6 @@ TEST_F(ScanStageTest, scanStage) {
                                                     boost::none /* indexIdentSlot */,
                                                     boost::none /* indexKeySlot */,
                                                     boost::none /* indexKeyPatternSlot */,
-                                                    boost::none /* oplogTsSlot */,
                                                     std::vector<std::string>{} /* scanFieldNames */,
                                                     scanFieldSlots,
                                                     boost::none /* seekRecordIdSlot */,
@@ -131,8 +130,7 @@ TEST_F(ScanStageTest, scanStage) {
                                                     false /* useRandomCursor */,
                                                     false /* participateInTrialRunTracking */,
                                                     false /* includeScanStartRecordId */,
-                                                    false /* includeScanEndRecordId */,
-                                                    false /* tolerateKeyNotFound */);
+                                                    false /* includeScanEndRecordId */);
 
         return std::make_pair(scanSlot, std::move(scanStage));
     };

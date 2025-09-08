@@ -29,13 +29,12 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -64,11 +63,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/shared_buffer_fragment.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #include <algorithm>
 
@@ -322,16 +318,14 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     indexInfoSlots.snapshotIdSlot = snapshotIdSlot;
 
     // Create a limit-1/scan subtree to perform the seek.
-    auto [scanStage, resultSlot, recordIdSlot, fieldSlots] =
-        b.makeScan(collToFetch->uuid(),
-                   collToFetch->ns().dbName(),
-                   true /* forward */,
-                   seekRecordIdSlot,
-                   false, /* tolerateKeyNotFound */
-                   fields,
-                   {} /* scanBounds */,
-                   std::move(indexInfoSlots),
-                   std::move(callbacks));
+    auto [scanStage, resultSlot, recordIdSlot, fieldSlots] = b.makeScan(collToFetch->uuid(),
+                                                                        collToFetch->ns().dbName(),
+                                                                        true /* forward */,
+                                                                        seekRecordIdSlot,
+                                                                        fields,
+                                                                        {} /* scanBounds */,
+                                                                        std::move(indexInfoSlots),
+                                                                        std::move(callbacks));
 
     auto seekStage = b.makeLimit(std::move(scanStage), b.makeInt64Constant(1));
 

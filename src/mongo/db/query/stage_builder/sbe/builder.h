@@ -535,15 +535,6 @@ public:
         boost::optional<FieldSet> trackedFieldSet;
         boost::optional<FieldEffects> resultInfoEffects;
 
-        // When we're in the middle of building a special union sub-tree implementing a tailable
-        // cursor collection scan, this flag will be set to true. Otherwise this flag will be false.
-        bool isBuildingUnionForTailableCollScan{false};
-
-        // When we're in the middle of building a special union sub-tree implementing a tailable
-        // cursor collection scan, this flag indicates whether we're currently building an anchor or
-        // resume branch. At all other times, this flag will be false.
-        bool isTailableCollScanResumeBranch{false};
-
         // When we are processing a stage that can work on top of block values, this flag instruct
         // the child stage not to insert a BlockToRow stage to convert the block values into scalar
         // values.
@@ -776,24 +767,6 @@ public:
 
         _data->slotNameSet.emplace(PlanStageSlots::kResult);
 
-        return *this;
-    }
-
-    bool getIsBuildingUnionForTailableCollScan() const {
-        return _data->isBuildingUnionForTailableCollScan;
-    }
-
-    PlanStageReqs& setIsBuildingUnionForTailableCollScan(bool b) {
-        _data->isBuildingUnionForTailableCollScan = b;
-        return *this;
-    }
-
-    bool getIsTailableCollScanResumeBranch() const {
-        return _data->isTailableCollScanResumeBranch;
-    }
-
-    PlanStageReqs& setIsTailableCollScanResumeBranch(bool b) {
-        _data->isTailableCollScanResumeBranch = b;
         return *this;
     }
 
@@ -1066,9 +1039,6 @@ private:
 
     std::pair<SbStage, PlanStageSlots> buildAndSorted(const QuerySolutionNode* root,
                                                       const PlanStageReqs& reqs);
-
-    std::pair<SbStage, PlanStageSlots> makeUnionForTailableCollScan(const QuerySolutionNode* root,
-                                                                    const PlanStageReqs& reqs);
 
     std::pair<SbStage, PlanStageSlots> buildShardFilter(const QuerySolutionNode* root,
                                                         const PlanStageReqs& reqs);

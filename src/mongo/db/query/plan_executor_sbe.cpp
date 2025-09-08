@@ -113,13 +113,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
-        _oplogTs = env->getAccessor(env->getSlot("oplogTs"_sd));
-    }
-
-    if (_rootData.staticData->shouldUseTailableScan) {
-        _resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
-    }
     _minRecordIdSlot = env->getSlotIfExists("minRecordId"_sd);
     _maxRecordIdSlot = env->getSlotIfExists("maxRecordId"_sd);
 
@@ -409,53 +402,10 @@ template PlanExecutor::ExecState PlanExecutorSBE::getNextImpl<Document>(Document
                                                                         RecordId* dlOut);
 
 Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
-    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
-        tassert(5567201,
-                "The '_oplogTs' accessor should be populated when "
-                "'shouldTrackLatestOplogTimestamp' is true",
-                _oplogTs);
-
-        auto [tag, val] = _oplogTs->getViewOfValue();
-        if (tag != sbe::value::TypeTags::Nothing) {
-            const auto msgTag = tag;
-            uassert(4822868,
-                    str::stream() << "Collection scan was asked to track latest operation time, "
-                                     "but found a result without a valid 'ts' field: "
-                                  << msgTag,
-                    tag == sbe::value::TypeTags::Timestamp);
-            return Timestamp{sbe::value::bitcastTo<uint64_t>(val)};
-        }
-    }
     return {};
 }
 
 BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
-    if (_rootData.staticData->shouldTrackResumeToken) {
-        invariant(_resultRecordId);
-
-        auto [tag, val] = _resultRecordId->getViewOfValue();
-        if (tag != sbe::value::TypeTags::Nothing) {
-            const auto msgTag = tag;
-            uassert(4822869,
-                    str::stream() << "Collection scan was asked to track resume token, "
-                                     "but found a result without a valid RecordId: "
-                                  << msgTag,
-                    tag == sbe::value::TypeTags::RecordId);
-            BSONObjBuilder builder;
-            sbe::value::getRecordIdView(val)->serializeToken("$recordId", &builder);
-            auto initialSyncId =
-                repl::ReplicationCoordinator::get(_opCtx)->getInitialSyncId(_opCtx);
-            if (initialSyncId) {
-                initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
-            }
-            return builder.obj();
-        }
-    }
-
-    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
-        return ResumeTokenOplogTimestamp{getLatestOplogTimestamp()}.toBSON();
-    }
-
     return {};
 }
 

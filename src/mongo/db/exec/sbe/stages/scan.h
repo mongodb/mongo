@@ -97,7 +97,6 @@ public:
                    boost::optional<value::SlotId> inIndexIdentSlot,
                    boost::optional<value::SlotId> inIndexKeySlot,
                    boost::optional<value::SlotId> inIndexKeyPatternSlot,
-                   boost::optional<value::SlotId> inOplogTsSlot,
                    std::vector<std::string> inScanFieldNames,
                    value::SlotVector inScanFieldSlots,
                    boost::optional<value::SlotId> inSeekRecordIdSlot,
@@ -105,8 +104,7 @@ public:
                    boost::optional<value::SlotId> inMaxRecordIdSlot,
                    bool inForward,
                    ScanCallbacks inScanCallbacks,
-                   bool inUseRandomCursor,
-                   bool inTolerateKeyNotFound)
+                   bool inUseRandomCursor)
         : collUuid(inCollUuid),
           dbName(dbName),
           recordSlot(inRecordSlot),
@@ -115,7 +113,6 @@ public:
           indexIdentSlot(inIndexIdentSlot),
           indexKeySlot(inIndexKeySlot),
           indexKeyPatternSlot(inIndexKeyPatternSlot),
-          oplogTsSlot(inOplogTsSlot),
           scanFieldNames(inScanFieldNames),
           scanFieldSlots(inScanFieldSlots),
           seekRecordIdSlot(inSeekRecordIdSlot),
@@ -123,8 +120,7 @@ public:
           maxRecordIdSlot(inMaxRecordIdSlot),
           forward(inForward),
           scanCallbacks(inScanCallbacks),
-          useRandomCursor(inUseRandomCursor),
-          tolerateKeyNotFound(inTolerateKeyNotFound) {
+          useRandomCursor(inUseRandomCursor) {
         invariant(scanFieldNames.size() == scanFieldSlots.size());
     }
 
@@ -141,7 +137,6 @@ public:
     const boost::optional<value::SlotId> indexIdentSlot;
     const boost::optional<value::SlotId> indexKeySlot;
     const boost::optional<value::SlotId> indexKeyPatternSlot;
-    const boost::optional<value::SlotId> oplogTsSlot;
 
     // 'scanFieldNames' - names of the fields being scanned from the doc
     // 'scanFieldSlots' - slot IDs for the fields being scanned from the doc
@@ -159,18 +154,10 @@ public:
 
     // Used to return a random sample of the collection.
     const bool useRandomCursor;
-
-    // If false, resuming will raise KeyNotFound if RecordId doesn't exist. If true, seeks to next
-    // valid RecordId.
-    const bool tolerateKeyNotFound;
 };  // class ScanStageState
 
 /**
  * Retrieves documents from the collection with the given 'collUuid' using the storage API.
- *
- * Iff resuming a prior scan, this stage is given a 'seekRecordIdSlot' from which to read a
- * 'RecordId'. We seek to this 'RecordId' before resuming the scan. 'stageType' is set to "seek"
- * instead of "scan" for this case only.
  *
  * If the 'recordSlot' is provided, then each of the records returned from the scan is placed into
  * an output slot with this slot id. Similarly, if 'recordIdSlot' is provided, then this slot is
@@ -192,19 +179,15 @@ public:
  * storage snapshot from which it was obtained. This information is made available to the seek stage
  * via 'snapshotIdSlot', 'indexIdentSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
  *
- * For oplog scans, 'oplogTsSlot' will be populated with a copy of the "ts" field (which is the
- * oplog clustering key) from the doc if it is a clustered scan (for use by the EOF filter above the
- * scan) or the caller asked for the latest oplog "ts" value.
- *
  * Debug string representations:
  *
  *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
  *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
- *       slot_n = fieldName_n] collUuid forward needOplogSlotForTs
+ *       slot_n = fieldName_n] collUuid forward
  *
  *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
  *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
- *       slot_n = fieldName_n] collUuid forward needOplogSlotForTs
+ *       slot_n = fieldName_n] collUuid forward
  */
 class ScanStage final : public PlanStage {
 public:
@@ -219,7 +202,6 @@ public:
               boost::optional<value::SlotId> indexIdentSlot,
               boost::optional<value::SlotId> indexKeySlot,
               boost::optional<value::SlotId> indexKeyPatternSlot,
-              boost::optional<value::SlotId> oplogTsSlot,
               std::vector<std::string> scanFieldNames,
               value::SlotVector scanFieldSlots,
               boost::optional<value::SlotId> seekRecordIdSlot,
@@ -233,8 +215,8 @@ public:
               bool useRandomCursor = false,
               bool participateInTrialRunTracking = true,
               bool includeScanStartRecordId = true,
-              bool includeScanEndRecordId = true,
-              bool tolerateKeyNotFound = false);
+              bool includeScanEndRecordId = true);
+
 
     /**
      * Constructor for clone(). Copies '_state' shared_ptr.
@@ -309,15 +291,6 @@ private:
     value::SlotAccessor* _indexIdentAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
-
-    // For oplog scans only, holds a copy of the "ts" field of the record (which is the oplog
-    // clustering key) for use by the end-bound EOF filter above the scan, if applicable.
-    RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
-
-    // For oplog scans only, holds a cached pointer to the accessor for the "ts" field in the
-    // current document to get this accessor quickly rather than having to look it up in the
-    // '_scanFieldAccessors' hashtable each time.
-    value::SlotAccessor* _tsFieldAccessor{nullptr};
 
     // These members hold info about the target fields being scanned from the record.
     //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _state->scanFieldNames
