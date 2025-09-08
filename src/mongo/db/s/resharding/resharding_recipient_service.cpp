@@ -945,7 +945,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
-    const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kBuildingIndex;
+    const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kCloning;
 
     if (!_dataReplication) {
         invariant(_cloneTimestamp);
@@ -978,7 +978,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
         _dataReplication = std::move(dataReplication);
     }
 
-    if (cloningDone) {
+    if (_recipientCtx.getState() >= RecipientStateEnum::kApplying) {
         _dataReplication->startOplogApplication();
     }
 }
