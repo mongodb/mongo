@@ -2149,6 +2149,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/sasl_commands',
         '$BUILD_DIR/mongo/db/auth/saslauth',
         '$BUILD_DIR/mongo/db/commands/authentication_commands',
+        '$BUILD_DIR/mongo/db/connection_health_metrics_parameter',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
         'hello_command',
     ],
 )

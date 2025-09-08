@@ -46,6 +46,7 @@ namespace mongo {
 void handleHelloAuth(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      const HelloCommand& cmd,
+                     bool isInitialHandshake,
                      BSONObjBuilder* result);
 
 }  // namespace mongo

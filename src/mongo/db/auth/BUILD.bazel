@@ -81,6 +81,7 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:saslauth",
         "//src/mongo/db/stats:counters",
+        "//src/mongo/rpc:client_metadata",
     ],
 )
 
