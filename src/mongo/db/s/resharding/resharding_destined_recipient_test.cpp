@@ -227,7 +227,9 @@ protected:
         DatabaseVersion dbVersion{UUID::gen(), Timestamp(1, 1)};
     };
 
-    ReshardingEnv setupReshardingEnv(OperationContext* opCtx, bool refreshTempNss) {
+    ReshardingEnv setupReshardingEnv(OperationContext* opCtx,
+                                     bool refreshTempNss,
+                                     bool runInTransaction = false) {
         DBDirectClient client(opCtx);
         ASSERT(client.createCollection(NamespaceString::kSessionTransactionsTableNamespace));
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
@@ -265,6 +267,10 @@ protected:
                             BSON(kShardKey << 1));
         coll.setAllowMigrations(false);
 
+        // When running in transaction, the db version must carry a PlacementConflictTime.
+        if (runInTransaction) {
+            env.dbVersion.setPlacementConflictTime(LogicalTime(Timestamp{0, 0}));
+        }
         getConfigServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
             DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
 
@@ -413,7 +419,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
 
 TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTransaction) {
     auto opCtx = operationContext();
-    auto env = setupReshardingEnv(opCtx, true);
+    auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(
@@ -497,7 +503,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
     DBDirectClient client(opCtx);
     client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
 
-    auto env = setupReshardingEnv(opCtx, true);
+    auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
@@ -543,7 +549,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     DBDirectClient client(opCtx);
     client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10));
 
-    auto env = setupReshardingEnv(opCtx, true);
+    auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(
         opCtx, kNss, env.version /* shardVersion */, env.dbVersion /* databaseVersion */);
@@ -570,7 +576,7 @@ TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
     DBDirectClient client(opCtx);
     client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
 
-    auto env = setupReshardingEnv(opCtx, true);
+    auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     ASSERT_THROWS(runInTransaction(opCtx,
@@ -590,7 +596,7 @@ TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
     DBDirectClient client(opCtx);
     client.insert(kNss, BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
 
-    auto env = setupReshardingEnv(opCtx, true);
+    auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
