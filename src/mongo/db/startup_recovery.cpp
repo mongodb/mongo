@@ -489,8 +489,8 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
 // Returns the timestamp at which pre-images should be truncated for recovery.
 Timestamp getPreImageTruncateTimestampForRecovery(OperationContext* opCtx) {
     const auto currentTime = change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
-    auto originalExpirationDate = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
-        opCtx, boost::none, currentTime);
+    auto originalExpirationDate =
+        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx, currentTime);
     boost::optional<Date_t> operationTimeExpirationDate = boost::none;
     if (originalExpirationDate) {
         // Pre-image expiration is based on either 'operationTime', or '_id.ts'. However, after

@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/internal_plans.h"
@@ -61,33 +60,20 @@
 namespace mongo {
 namespace {
 // Returns true if the pre-image with highestRecordId and highestWallTime is expired.
-bool isExpired(OperationContext* opCtx,
-               const boost::optional<TenantId>& tenantId,
-               const RecordId& highestRecordId,
-               Date_t highestWallTime) {
+bool isExpired(OperationContext* opCtx, const RecordId& highestRecordId, Date_t highestWallTime) {
     auto currentTimeForTimeBasedExpiration =
         change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
 
     auto opTimeExpirationDate = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
-        opCtx, tenantId, currentTimeForTimeBasedExpiration);
+        opCtx, currentTimeForTimeBasedExpiration);
 
-    if (tenantId) {
-        // In a serverless environment, the 'expireAfterSeconds' is set per tenant and pre-images
-        // always expire according to their 'operationTime'.
-        invariant(opTimeExpirationDate);
-
-        // The oldest marker is expired if:
-        //   'wallTime' of the oldest marker <= current node time - 'expireAfterSeconds'.
-        return highestWallTime <= *opTimeExpirationDate;
-    }
-
-    // In a non-serverless environment, a marker is expired if either:
+    // A marker is expired if either:
     //     (1) 'highestWallTime' of the (partial) marker <= current node time -
     //     'expireAfterSeconds' OR
     //     (2) Timestamp of the 'highestRecordId' in the oldest marker <
     //     Timestamp of earliest oplog entry
 
-    // The 'expireAfterSeconds' may or may not be set in a non-serverless environment.
+    // The 'expireAfterSeconds' may or may not be set.
     bool expiredByTimeBasedExpiration =
         opTimeExpirationDate ? highestWallTime <= opTimeExpirationDate : false;
 
@@ -123,10 +109,7 @@ boost::optional<std::tuple<RecordId, Date_t, int>> getLastRecordInfo(
 }  // namespace
 
 PreImagesTruncateMarkersPerNsUUID::PreImagesTruncateMarkersPerNsUUID(
-    boost::optional<TenantId> tenantId,
-    const UUID& nsUUID,
-    InitialSetOfMarkers initialSetOfMarkers,
-    int64_t minBytesPerMarker)
+    const UUID& nsUUID, InitialSetOfMarkers initialSetOfMarkers, int64_t minBytesPerMarker)
     : CollectionTruncateMarkersWithPartialExpiration(std::move(initialSetOfMarkers.markers),
                                                      initialSetOfMarkers.highestRecordId,
                                                      initialSetOfMarkers.highestWallTime,
@@ -135,7 +118,6 @@ PreImagesTruncateMarkersPerNsUUID::PreImagesTruncateMarkersPerNsUUID(
                                                      minBytesPerMarker,
                                                      initialSetOfMarkers.timeTaken,
                                                      initialSetOfMarkers.creationMethod),
-      _tenantId(std::move(tenantId)),
       _nsUUID(nsUUID) {}
 
 void PreImagesTruncateMarkersPerNsUUID::refreshHighestTrackedRecord(
@@ -305,7 +287,7 @@ bool PreImagesTruncateMarkersPerNsUUID::_hasExcessMarkers(OperationContext* opCt
     }
 
     const Marker& oldestMarker = markers.front();
-    return isExpired(opCtx, _tenantId, oldestMarker.lastRecord, oldestMarker.wallTime);
+    return isExpired(opCtx, oldestMarker.lastRecord, oldestMarker.wallTime);
 }
 
 bool PreImagesTruncateMarkersPerNsUUID::_hasPartialMarkerExpired(
@@ -317,6 +299,6 @@ bool PreImagesTruncateMarkersPerNsUUID::_hasPartialMarkerExpired(
         // 'highestSeenRecordId'. Account for newly constructed markers that have yet to be updated.
         return false;
     }
-    return isExpired(opCtx, _tenantId, highestSeenRecordId, highestSeenWallTime);
+    return isExpired(opCtx, highestSeenRecordId, highestSeenWallTime);
 }
 }  // namespace mongo

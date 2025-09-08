@@ -33,7 +33,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
 #include "mongo/db/client.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/service_context.h"

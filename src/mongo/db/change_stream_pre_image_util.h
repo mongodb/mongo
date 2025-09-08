@@ -33,7 +33,6 @@
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/time_support.h"
@@ -46,23 +45,14 @@ namespace change_stream_pre_image_util {
 /**
  * If 'expireAfterSeconds' is defined for pre-images, returns its value. Otherwise, returns
  * boost::none.
- *
- * 'expireAfterSeconds' is always defined in a multi-tenant environment, however, not necessarily in
- * a single-tenant environment. If 'tenantId' is provided, fetches the cluster-wide parameter for
- * that tenant. Otherwise, fetches the parameter for single-tenant environments.
  */
-boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx,
-                                               boost::optional<TenantId> tenantId = boost::none);
+boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx);
 
 /**
  * If 'expireAfterSeconds' is defined for pre-images, returns the 'date' at which all pre-images
  * with 'operationTime' <= 'date' are expired. Otherwise, returns boost::none.
- *
- * 'expireAfterSeconds' is always defined in a multi-tenant environment, however, not necessarily in
- * a single-tenant environment.
  */
 boost::optional<Date_t> getPreImageOpTimeExpirationDate(OperationContext* opCtx,
-                                                        boost::optional<TenantId> tenantId,
                                                         Date_t currentTime);
 
 /**

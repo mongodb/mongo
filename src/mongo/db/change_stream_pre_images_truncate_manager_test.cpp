@@ -64,10 +64,6 @@ protected:
     const UUID kNsUUID1 = UUID::gen();
     const UUID kNsUUID2 = UUID::gen();
 
-    const TenantId kTenantIdA = TenantId(OID::gen());
-    const TenantId kTenantIdB = TenantId(OID::gen());
-    const boost::optional<TenantId> kNullTenantId{};
-
     void setUp() override {
         CatalogTestFixture::setUp();
         ChangeStreamOptionsManager::create(getServiceContext());
@@ -126,10 +122,8 @@ protected:
         wuow.commit();
     }
 
-    std::shared_ptr<PreImagesTenantMarkers> getInitializedTruncateMarkers(
-        boost::optional<TenantId> tenantId) {
-        return _truncateManager._getInitializedMarkersForPreImagesCollection(operationContext(),
-                                                                             tenantId);
+    std::shared_ptr<PreImagesTenantMarkers> getInitializedTruncateMarkers() {
+        return _truncateManager._getInitializedMarkersForPreImagesCollection(operationContext());
     }
 
     int64_t getNumRecordsInMarkers(std::shared_ptr<PreImagesTenantMarkers> tenantMarkers) {
@@ -161,19 +155,14 @@ protected:
     // Validates that the truncate markers capture the metadata for the pre-images collection
     // accurately.
     void validateMarkerMetadataMatchesCollection(
-        boost::optional<TenantId> tenantId,
         const CollectionAcquisition& preImagesCollection,
         std::shared_ptr<PreImagesTenantMarkers> tenantMarkers) {
         ASSERT(preImagesCollection.exists());
 
         // Also validate that the _truncateManager contains the markers we are validated.
-        ASSERT(_truncateManager._tenantMap.find(tenantId));
+        ASSERT(_truncateManager._tenantMap.find(boost::none));
 
-        // Truncate markers store the UUID, nss, and tenantId corresponding the tenant's pre-images
-        // collection they were created with.
         ASSERT_EQ(tenantMarkers->_preImagesCollectionUUID, preImagesCollection.uuid());
-        ASSERT_EQ(tenantMarkers->_preImagesCollectionNss, preImagesCollection.nss());
-        ASSERT_EQ(tenantMarkers->_tenantId, tenantId);
 
         const auto& preImagesCollPtr = preImagesCollection.getCollectionPtr();
         const auto opCtx = operationContext();
@@ -222,7 +211,6 @@ protected:
                                 "Truncate markers created for pre-images with nsUUID were not "
                                 "initialised in increasing order of highest wall time and RecordId",
                                 "nsUUID"_attr = nsUUID,
-                                "tenant"_attr = tenantMarkers->_tenantId,
                                 "highestSeenWallTime"_attr = highestSeenWallTime,
                                 "highestSeenRecordId"_attr = highestSeenRecordId,
                                 "markerRecordId"_attr = currentRid,
@@ -254,13 +242,13 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID) {
 
     insertPreImages(kNsUUID0, /*numPreImages*/ 3000, /*docPaddingBytes*/ 1);
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
@@ -279,13 +267,13 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID1Doc) {
 
     insertPreImages(kNsUUID0, /*numPreImages*/ 1, /*docPaddingBytes*/ 1);
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
@@ -302,13 +290,13 @@ TEST_F(PreImagesTruncateManagerTest, EmptyCollection) {
 
     createPreImagesCollection();
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 }
 
 TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
@@ -321,13 +309,13 @@ TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
     insertPreImages(kNsUUID0, /*numPreImages*/ 10, /*docPaddingSize*/ 100);
     insertPreImages(kNsUUID1, /*numPreImages*/ 1990, /*docPaddingSize*/ 1);
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
@@ -348,13 +336,13 @@ TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUID) {
 
     insertPreImages(kNsUUID0, /*numPreImages*/ 4000, /*docPaddingBytes*/ 1);
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
@@ -378,12 +366,12 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDs) {
     insertPreImages(kNsUUID0, /*numPreImages*/ 1000, /*docPaddingSize*/ 100);
     insertPreImages(kNsUUID1, /*numPreImages*/ 1000, /*docPaddingSize*/ 1);
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
@@ -405,13 +393,13 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFew) {
     insertPreImages(kNsUUID0, /*numPreImages*/ 1999, /*docPaddingSize*/ 100);
     insertPreImages(kNsUUID1, /*numPreImages*/ 1, /*docPaddingSize*/ 1);
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
@@ -440,13 +428,13 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
         insertPreImages(nsUUID, /*numPreImages*/ 555, /*docPaddingSize*/ 100);
     }
 
-    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    auto tenantMarkers = getInitializedTruncateMarkers();
     ASSERT(tenantMarkers);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
-    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+    validateMarkerMetadataMatchesCollection(preImagesCollection, tenantMarkers);
 
     validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 

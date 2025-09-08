@@ -32,12 +32,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -49,11 +46,10 @@
 #include <boost/optional/optional.hpp>
 
 /**
- * There is up to one 'config.system.preimages' collection per tenant. This pre-images
- * collection contains pre-images for every collection 'nsUUID' with pre-images enabled on the
- * tenant. The pre-images collection is ordered by collection 'nsUUID', so that pre-images belonging
- * to a given collection are grouped together. Additionally, pre-images for a given collection
- * 'nsUUID' are stored in timestamp order, which makes range truncation possible.
+ * The pre-images collection contains pre-images for every collection 'nsUUID' with pre-images
+ * enabled. The pre-images collection is ordered by collection 'nsUUID', so that pre-images
+ * belonging to a given collection are grouped together. Additionally, pre-images for a given
+ * collection 'nsUUID' are stored in timestamp order, which makes range truncation possible.
  *
  * Implementation of truncate markers for pre-images associated with a single collection 'nsUUID'
  * within a pre-images collection.
@@ -73,8 +69,7 @@ public:
         MarkersCreationMethod creationMethod{MarkersCreationMethod::EmptyCollection};
     };
 
-    PreImagesTruncateMarkersPerNsUUID(boost::optional<TenantId> tenantId,
-                                      const UUID& nsUUID,
+    PreImagesTruncateMarkersPerNsUUID(const UUID& nsUUID,
                                       InitialSetOfMarkers initialSetOfMarkers,
                                       int64_t minBytesPerMarker);
 
@@ -143,11 +138,6 @@ private:
     bool _hasPartialMarkerExpired(OperationContext* opCtx,
                                   const RecordId& highestSeenRecordId,
                                   const Date_t& highestSeenWallTime) const override;
-
-    /**
-     * When initialized, indicates this is a serverless environment.
-     */
-    boost::optional<TenantId> _tenantId;
 
     UUID _nsUUID;
 };

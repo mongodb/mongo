@@ -99,7 +99,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersEmptyCollection) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
     int64_t minBytesPerMarker = 4;
     const auto actualInitialMarkers =
         PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
@@ -115,7 +115,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersNoFullMarkers1PreI
 
     insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     // Large 'minBytesPerMarker' to test 0 markers created.
     int64_t minBytesPerMarker = 10000;
@@ -138,7 +138,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarker1PreImag
 
     insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     // Small 'minBytesPerMarker' to test full marker creation.
     int64_t minBytesPerMarker = 3;
@@ -166,7 +166,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarkerNoLeftov
     insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
     const auto preImageBytesTotal = bytes(kPreImage1) + bytes(kPreImage2);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     int64_t minBytesPerMarker = preImageBytesTotal - 2;
     const auto actualInitialMarkers =
@@ -194,7 +194,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarkerLeftover
     const auto bytesPreImage1And2 = bytes(kPreImage1) + bytes(kPreImage2);
     const auto minBytesPerMarker = bytesPreImage1And2 - 2;
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     const auto actualInitialMarkers =
         PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
@@ -230,7 +230,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersManyFullMarkers) {
     // pre-image generates a marker.
     const auto minBytesPerMarker = bytesPerPreImage * targetPreImagesPerMarker - 2;
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
     const auto actualInitialMarkers =
         PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
             opCtx, preImagesRAII, kNsUUID, minBytesPerMarker);
@@ -266,7 +266,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIncludeMinAndMax) 
     insertDirectlyToPreImagesCollection(opCtx, kPreImageMin);
     insertDirectlyToPreImagesCollection(opCtx, kPreImageMax);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     // Small 'minBytesPerMarker' to test the minimum pre-image for 'kNsUUID' is accounted for via
     // scanning.
@@ -301,7 +301,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
 
     // Test that initial markers are isolated for 'kNsUUID'.
     {
-        const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
         int64_t minBytesPerMarker = 1;
         const auto actualInitialMarkers =
             PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
@@ -320,7 +320,7 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
 
     // Test that initial markers are isolated for 'kNsUUIDOther'.
     {
-        const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
         int64_t minBytesPerMarker = 1;
         const auto actualInitialMarkers =
             PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
@@ -494,11 +494,11 @@ public:
                                               int64_t minBytesPerMarker,
                                               const ChangeStreamPreImage& preImage) {
         const auto nsUUID = preImage.getId().getNsUUID();
-        auto nsUUIDTruncateMarkers = makeEmptyTruncateMarkers(kTenantId, nsUUID, minBytesPerMarker);
+        auto nsUUIDTruncateMarkers = makeEmptyTruncateMarkers(nsUUID, minBytesPerMarker);
         assertNoHighestTrackedRecord(nsUUIDTruncateMarkers);
 
         {
-            const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+            const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
             nsUUIDTruncateMarkers.refreshHighestTrackedRecord(opCtx, preImagesCollection);
         }
         assertTracksSinglePreImage(opCtx, preImage, nsUUIDTruncateMarkers);
@@ -510,12 +510,12 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, InitiallyEmptyBasic) {
     createPreImagesCollection(opCtx);
 
     const auto minBytesPerMarker = 1;
-    auto nsUUIDTruncateMarkers = makeEmptyTruncateMarkers(kTenantId, kNsUUID, minBytesPerMarker);
+    auto nsUUIDTruncateMarkers = makeEmptyTruncateMarkers(kNsUUID, minBytesPerMarker);
     assertNoHighestTrackedRecord(nsUUIDTruncateMarkers);
 
     {
         // Refreshing on an empty pre-images collection does not alter the truncate markers.
-        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         nsUUIDTruncateMarkers.refreshHighestTrackedRecord(opCtx, preImagesCollection);
         assertNoHighestTrackedRecord(nsUUIDTruncateMarkers);
     }
@@ -527,7 +527,7 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, InitiallyEmptyBasic) {
     {
         // Pre-images are present for 'kNsUUIDOther', but shouldn't effect truncate markers for
         // 'kNsUUID'.
-        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         nsUUIDTruncateMarkers.refreshHighestTrackedRecord(opCtx, preImagesCollection);
         assertNoHighestTrackedRecord(nsUUIDTruncateMarkers);
     }
@@ -535,7 +535,7 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, InitiallyEmptyBasic) {
     insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
 
     {
-        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         nsUUIDTruncateMarkers.refreshHighestTrackedRecord(opCtx, preImagesCollection);
         assertTracksSinglePreImage(opCtx, kPreImage1, nsUUIDTruncateMarkers);
     }
@@ -606,13 +606,13 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshTracksNewInsert) {
                                 bytes(kPreImage1) /* leftoverRecordsBytes */,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     PreImagesTruncateMarkersPerNsUUID nsUUIDTruncateMarkers{
-        kTenantId, kNsUUID, initialSetOfMarkers, minBytesPerMarker};
+        kNsUUID, initialSetOfMarkers, minBytesPerMarker};
     assertTracksSinglePreImage(opCtx, kPreImage1, nsUUIDTruncateMarkers);
 
     {
         insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
 
-        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         nsUUIDTruncateMarkers.refreshHighestTrackedRecord(opCtx, preImagesCollection);
         ASSERT_TRUE(activelyTrackingPreImage(nsUUIDTruncateMarkers, kPreImage2));
     }
@@ -633,23 +633,22 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshAfterRollbackOfTrac
                                 bytes(kPreImage1) /* leftoverRecordsBytes */,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     PreImagesTruncateMarkersPerNsUUID nsUUIDTruncateMarkers{
-        kTenantId, kNsUUID, initialSetOfMarkers, minBytesPerMarker};
+        kNsUUID, initialSetOfMarkers, minBytesPerMarker};
     assertTracksSinglePreImage(opCtx, kPreImage1, nsUUIDTruncateMarkers);
 
     {
         // The absence of 'kPreImage1' in the pre-images collection simulates a pre-image visible
         // during the construction of the nsUUID truncate markers, but rolled back prior to their
         // refresh.
-        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         nsUUIDTruncateMarkers.refreshHighestTrackedRecord(opCtx, preImagesCollection);
         assertTracksSinglePreImage(opCtx, kPreImage1, nsUUIDTruncateMarkers);
     }
 }
 
-// Tests the 'expiry' conditions of pre-image truncate markers in a single tenant
-// environment. Leverages 'StorageInterfaceMock' for fine grain controlled over the perceived
-// earliest oplog entry timestamp and current wall time - both of which are used to determine
-// pre-image expiration.
+// Tests the 'expiry' conditions of pre-image truncate markers. Leverages 'StorageInterfaceMock' for
+// fine grain controlled over the perceived earliest oplog entry timestamp and current wall time -
+// both of which are used to determine pre-image expiration.
 class PreImageTruncateMarkerExpiryTestFixture : public ServiceContextMongoDTest,
                                                 public ChangeStreamPreImageTestConstants {
 public:
@@ -700,7 +699,7 @@ public:
         auto changeStreamOptions = populateChangeStreamPreImageOptions(expireAfterSecondsOrOff);
         setChangeStreamOptionsToManager(opCtx(), *changeStreamOptions.get());
         boost::optional<Seconds> expireAfterSeconds =
-            change_stream_pre_image_util::getExpireAfterSeconds(opCtx(), kTenantId);
+            change_stream_pre_image_util::getExpireAfterSeconds(opCtx());
         if (expireAfterSeconds) {
             // Set back the clock to before the pre-image wall time, to guarantee it is not yet
             // expired.
@@ -789,7 +788,7 @@ public:
         createPreImagesCollection(opCtx());
 
         const auto minBytesPerMarker = 1;
-        auto truncateMarkers = makeEmptyTruncateMarkers(kTenantId, kNsUUID, minBytesPerMarker);
+        auto truncateMarkers = makeEmptyTruncateMarkers(kNsUUID, minBytesPerMarker);
         assertEmptyTruncateMarkers(truncateMarkers);
 
         // The pre-image is inserted into the underlying collection without updating the truncate
@@ -798,7 +797,7 @@ public:
         assertEmptyTruncateMarkers(truncateMarkers);
 
         {
-            const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx(), kTenantId);
+            const auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx());
             truncateMarkers.refreshHighestTrackedRecord(opCtx(), preImagesCollection);
         }
 
@@ -825,7 +824,7 @@ public:
         // A 'minBytesPerMarker' smaller than 'kPreImage1' so the insertion of 'kPreImage1'
         // generates a full marker.
         const auto minBytesPerMarker = 1;
-        auto truncateMarkers = makeEmptyTruncateMarkers(kTenantId, kNsUUID, minBytesPerMarker);
+        auto truncateMarkers = makeEmptyTruncateMarkers(kNsUUID, minBytesPerMarker);
         assertEmptyTruncateMarkers(truncateMarkers);
 
         forceNotExpired(kPreImage1, expireAfterSeconds);
@@ -853,7 +852,7 @@ public:
         // A 'minBytesPerMarker' greater than 'kPreImage1's size to ensure inserting 'kPreImage1'
         // doesn't generate a full marker automatically.
         const auto minBytesPerMarker = bytes(kPreImage1) * 4;
-        auto truncateMarkers = makeEmptyTruncateMarkers(kTenantId, kNsUUID, minBytesPerMarker);
+        auto truncateMarkers = makeEmptyTruncateMarkers(kNsUUID, minBytesPerMarker);
         assertEmptyTruncateMarkers(truncateMarkers);
 
         forceNotExpired(kPreImage1, expireAfterSeconds);
@@ -891,7 +890,7 @@ public:
             CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
         PreImagesTruncateMarkersPerNsUUID truncateMarkers(
-            kTenantId, kNsUUID, std::move(initialMarkers), minBytesPerMarker);
+            kNsUUID, std::move(initialMarkers), minBytesPerMarker);
 
         ASSERT_FALSE(truncateMarkers.isEmpty());
 

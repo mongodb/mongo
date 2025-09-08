@@ -31,44 +31,23 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/exec/classic/batched_delete_stage.h"
-#include "mongo/db/exec/classic/delete_stage.h"
-#include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/local_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/local_catalog/clustered_collection_util.h"
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/create_collection.h"
-#include "mongo/db/local_catalog/ddl/drop_gen.h"
-#include "mongo/db/local_catalog/drop_collection.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/record_id_bound.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/version_context.h"
-#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -78,17 +57,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/uuid.h"
-
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -192,7 +160,7 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
         });
 
     auto bytesInserted = insertStatement.doc.objsize();
-    _truncateManager.updateMarkersOnInsert(opCtx, boost::none, preImage, bytesInserted);
+    _truncateManager.updateMarkersOnInsert(opCtx, preImage, bytesInserted);
 }
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
@@ -232,8 +200,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
 
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTruncate(
     OperationContext* opCtx) {
-    // TODO SERVER-108851: Remove multitenancy support.
-    const auto truncateStats = _truncateManager.truncateExpiredPreImages(opCtx, boost::none);
+    const auto truncateStats = _truncateManager.truncateExpiredPreImages(opCtx);
 
     _purgingJobStats.maxTimestampEligibleForTruncate.store(
         truncateStats.maxTimestampEligibleForTruncate);

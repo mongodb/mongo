@@ -33,7 +33,6 @@
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/uuid.h"
 
@@ -76,7 +75,6 @@ stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash> collectP
  */
 void populateByScanning(
     OperationContext* opCtx,
-    boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection,
     int32_t minBytesPerMarker,
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap);
@@ -97,7 +95,6 @@ void populateByScanning(
  */
 void populateBySampling(
     OperationContext* opCtx,
-    boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection,
     int64_t numRecords,
     int64_t dataSize,
@@ -140,7 +137,6 @@ public:
      * truncate markers.
      */
     static PreImagesTenantMarkers createMarkers(OperationContext* opCtx,
-                                                boost::optional<TenantId> tenantId,
                                                 const CollectionAcquisition& preImagesCollection);
 
     /**
@@ -171,39 +167,19 @@ public:
         return _preImagesCollectionUUID;
     }
 
-    boost::optional<TenantId> getTenantId() {
-        return _tenantId;
-    }
-
 private:
     friend class PreImagesTruncateManagerTest;
 
-    PreImagesTenantMarkers(boost::optional<TenantId> tenantId, const UUID& preImagesCollectionUUID)
-        : _tenantId{tenantId},
-          _preImagesCollectionUUID{preImagesCollectionUUID},
-          _preImagesCollectionNss{NamespaceString::kChangeStreamPreImagesNamespace} {
-        // TODO SERVER-109191: Remove tenantId as a parameter and the _preImagesCollectionNss
-        // member.
-        invariant(tenantId == boost::none);
-    }
+    PreImagesTenantMarkers(const UUID& preImagesCollectionUUID)
+        : _preImagesCollectionUUID{preImagesCollectionUUID} {}
 
-    boost::optional<TenantId> _tenantId;
-
-    /**
-     * UUID of the tenant's pre-images collection.
-     */
     UUID _preImagesCollectionUUID;
 
     /**
-     * Namespace of the tenant's pre-images collection.
-     */
-    NamespaceString _preImagesCollectionNss;
-
-    /**
-     * The tenant's pre-images collection spans pre-images generated across all the tenant's
-     * pre-image enabled collections. The pre-images collection is sorted so that all pre-images
-     * from the same 'nsUUID' are stored consecutively. There is a separate set of truncate markers
-     * for each 'nsUUID'.
+     * The pre-images collection spans pre-images generated across all pre-image enabled
+     * collections. The pre-images collection is sorted so that all pre-images from the same
+     * 'nsUUID' are stored consecutively. There is a separate set of truncate markers for each
+     * 'nsUUID'.
      *
      * Maps pre-images of a given 'nsUUID' to their truncate markers.
      */

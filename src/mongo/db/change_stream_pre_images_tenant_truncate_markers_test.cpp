@@ -48,7 +48,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleEmptyCollection) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, boost::none);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
     const auto lastRecordsMap =
         pre_image_marker_initialization_internal::sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
     ASSERT_EQ(0, lastRecordsMap.size());
@@ -64,7 +64,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleLastRecordSingleNsUUID) {
     insertDirectlyToPreImagesCollection(opCtx, kPreImage3);
     insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
     const auto lastRecordsMap =
         pre_image_marker_initialization_internal::sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
     ASSERT_EQ(1, lastRecordsMap.size());
@@ -86,7 +86,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleLastRecordMultipleNsUUIDs) {
     insertDirectlyToPreImagesCollection(opCtx, kPreImageOtherMin);
     insertDirectlyToPreImagesCollection(opCtx, kPreImageOther);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
     const auto lastRecordsMap =
         pre_image_marker_initialization_internal::sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
     ASSERT_EQ(2, lastRecordsMap.size());
@@ -110,7 +110,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesFromEmptyCollection) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     std::vector<uint64_t> targetSampleOptions{0, 1, 2, 100};
     for (const auto& targetNumSamples : targetSampleOptions) {
@@ -148,7 +148,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
         // Test Case: 1 pre-image for 'kNsUUID' in the pre-images collection with 0 samples
         // requested yields 1 sample.
         insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
         const auto samples = pre_image_marker_initialization_internal::collectPreImageSamples(
             opCtx, preImagesRAII, 0);
         assert1SampleForNsUUID(kNsUUID, kPreImage1, samples);
@@ -158,7 +158,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
         // Test Case: 2 pre-images for 'kNsUUID' in the pre-images collection with 0 samples
         // requested yields 1 sample.
         insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
         const auto samples = pre_image_marker_initialization_internal::collectPreImageSamples(
             opCtx, preImagesRAII, 0);
         assert1SampleForNsUUID(kNsUUID, kPreImage2, samples);
@@ -168,7 +168,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordP
         // Test Case: 2 pre-images for 'kNsUUID', 1 for 'kNsOtherUUID' in the pre-images collection
         // with 0 samples requested yields 1 sample per nsUUID.
         insertDirectlyToPreImagesCollection(opCtx, kPreImageOther);
-        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
         const auto samples = pre_image_marker_initialization_internal::collectPreImageSamples(
             opCtx, preImagesRAII, 0);
         assert1SampleForNsUUID(kNsUUID, kPreImage2, samples);
@@ -189,7 +189,7 @@ TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
     const auto preImage = makePreImage(kNsUUID, baseTimestamp, baseDate);
     insertDirectlyToPreImagesCollection(opCtx, preImage);
 
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
 
     std::vector<int64_t> targetSampleOptions{1, 10};
     for (const auto& targetNumSamples : targetSampleOptions) {
@@ -211,9 +211,9 @@ TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
     {
         // Populate by scanning an empty collection.
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         pre_image_marker_initialization_internal::populateByScanning(
-            opCtx, kTenantId, preImagesCollection, minBytesPerMarker, mapByScan);
+            opCtx, preImagesCollection, minBytesPerMarker, mapByScan);
         const auto mapSnapshot = mapByScan.getUnderlyingSnapshot();
         ASSERT_EQ(0, mapSnapshot->size());
     }
@@ -222,10 +222,9 @@ TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
         // Populate by sampling an empty collection where the initial 'totalRecords' and
         // 'totalBytes' estimates are accurate.
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         pre_image_marker_initialization_internal::populateBySampling(
             opCtx,
-            kTenantId,
             preImagesCollection,
             0 /* totalRecords */,
             0 /* totalBytes */,
@@ -241,10 +240,9 @@ TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
         // 'totalBytes' estimates aren't accurate. The size tracked in-memory can be inaccurate
         // after unclean shutdowns.
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         pre_image_marker_initialization_internal::populateBySampling(
             opCtx,
-            kTenantId,
             preImagesCollection,
             100 /* totalRecords */,
             200 /* totalBytes */,
@@ -283,31 +281,26 @@ TEST_F(PreImageMarkerInitializationTest, PopulateMapWithSinglePreImage) {
     {
         // Populate by scanning, pre-image covered by full marker.
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         pre_image_marker_initialization_internal::populateByScanning(
-            opCtx, kTenantId, preImagesCollection, 1 /* minBytesPerMarker */, mapByScan);
+            opCtx, preImagesCollection, 1 /* minBytesPerMarker */, mapByScan);
         assertPreImageIsTracked(kNsUUID, mapByScan, kPreImage1);
     }
 
     {
         // Populate by scanning, pre-image not covered in marker.
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapByScan;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         pre_image_marker_initialization_internal::populateByScanning(
-            opCtx,
-            kTenantId,
-            preImagesCollection,
-            bytes(kPreImage1) + 100 /* minBytesPerMarker */,
-            mapByScan);
+            opCtx, preImagesCollection, bytes(kPreImage1) + 100 /* minBytesPerMarker */, mapByScan);
         assertPreImageIsTracked(kNsUUID, mapByScan, kPreImage1);
     }
 
     {
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx, kTenantId);
+        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
         pre_image_marker_initialization_internal::populateBySampling(
             opCtx,
-            kTenantId,
             preImagesCollection,
             1 /* totalRecords */,
             bytes(kPreImage1) /* totalBytes */,

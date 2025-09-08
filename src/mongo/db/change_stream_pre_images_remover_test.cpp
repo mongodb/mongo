@@ -104,8 +104,8 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest,
     setChangeStreamOptionsToManager(opCtx.get(), *changeStreamOptions.get());
 
     auto currentTime = Date_t::now();
-    auto receivedExpireAfterSeconds = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
-        opCtx.get(), boost::none /** tenantId **/, currentTime);
+    auto receivedExpireAfterSeconds =
+        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx.get(), currentTime);
     ASSERT(receivedExpireAfterSeconds);
     ASSERT_EQ(*receivedExpireAfterSeconds, currentTime - Seconds(expireAfterSeconds));
 }
@@ -114,8 +114,8 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageOpTimeExpirationDate
     auto opCtx = cc().makeOperationContext();
 
     auto currentTime = Date_t::now();
-    auto receivedExpireAfterSeconds = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
-        opCtx.get(), boost::none /** tenantId **/, currentTime);
+    auto receivedExpireAfterSeconds =
+        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx.get(), currentTime);
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 
@@ -126,8 +126,8 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageOpTimeExpirationDate
     setChangeStreamOptionsToManager(opCtx.get(), *changeStreamOptions.get());
 
     auto currentTime = Date_t::now();
-    auto receivedExpireAfterSeconds = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
-        opCtx.get(), boost::none /** tenantId **/, currentTime);
+    auto receivedExpireAfterSeconds =
+        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx.get(), currentTime);
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 }  // namespace

@@ -34,9 +34,9 @@
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
 
@@ -47,22 +47,24 @@ namespace {
 
 // Acquires the pre-images collection given 'nsOrUUID'. When provided a UUID, throws
 // NamespaceNotFound if the collection is dropped.
-auto acquirePreImagesCollectionForRead(OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) {
+auto acquirePreImagesCollectionForRead(OperationContext* opCtx, const UUID& uuid) {
     return acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(std::move(nssOrUUID),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kRead),
+        CollectionAcquisitionRequest(
+            NamespaceStringOrUUID{NamespaceString::kChangeStreamPreImagesNamespace.dbName(), uuid},
+            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+            repl::ReadConcernArgs::get(opCtx),
+            AcquisitionPrerequisites::kRead),
         MODE_IS);
 }
-auto acquirePreImagesCollectionForWrite(OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) {
+auto acquirePreImagesCollectionForWrite(OperationContext* opCtx, const UUID& uuid) {
     return acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(std::move(nssOrUUID),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kUnreplicatedWrite),
+        CollectionAcquisitionRequest(
+            NamespaceStringOrUUID{NamespaceString::kChangeStreamPreImagesNamespace.dbName(), uuid},
+            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+            repl::ReadConcernArgs::get(opCtx),
+            AcquisitionPrerequisites::kUnreplicatedWrite),
         MODE_IX);
 }
 
@@ -311,7 +313,6 @@ stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash> collectP
 
 void populateByScanning(
     OperationContext* opCtx,
-    const boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection,
     int32_t minBytesPerMarker,
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
@@ -320,14 +321,12 @@ void populateByScanning(
         auto initialSetOfMarkers = PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
             opCtx, preImagesCollection, nsUUID, minBytesPerMarker);
 
-        markersMap.getOrEmplace(
-            nsUUID, tenantId, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
+        markersMap.getOrEmplace(nsUUID, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
     }
 }
 
 void populateBySampling(
     OperationContext* opCtx,
-    const boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection,
     int64_t numRecords,
     int64_t dataSize,
@@ -341,11 +340,9 @@ void populateBySampling(
               "Reverting to scanning for initial pre-images truncate markers. The tracked number "
               "of records and bytes in the pre-images collection are not compatible with sampling",
               "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
-              "tenantId"_attr = tenantId,
               "numRecords"_attr = numRecords,
               "dataSize"_attr = dataSize);
-        return populateByScanning(
-            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+        return populateByScanning(opCtx, preImagesCollection, minBytesPerMarker, markersMap);
     }
     double avgRecordSize = double(dataSize) / double(numRecords);
     double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
@@ -356,11 +353,9 @@ void populateBySampling(
         LOGV2(8198000,
               "Reverting to scanning for initial pre-images truncate markers. The number of "
               "samples needed is 0",
-              "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
-              "tenantId"_attr = tenantId);
+              "preImagesCollectionUUID"_attr = preImagesCollection.uuid());
 
-        return populateByScanning(
-            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+        return populateByScanning(opCtx, preImagesCollection, minBytesPerMarker, markersMap);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -379,10 +374,8 @@ void populateBySampling(
               "samples collected does not match the desired number of samples",
               "samplesTaken"_attr = totalSamples,
               "samplesDesired"_attr = numSamples,
-              "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
-              "tenantId"_attr = tenantId);
-        return populateByScanning(
-            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+              "preImagesCollectionUUID"_attr = preImagesCollection.uuid());
+        return populateByScanning(opCtx, preImagesCollection, minBytesPerMarker, markersMap);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
@@ -410,8 +403,7 @@ void populateBySampling(
 
         updateMarkersMapAggregates(initialSetOfMarkers, recordsInMarkersMap, bytesInMarkersMap);
 
-        markersMap.getOrEmplace(
-            nsUUID, tenantId, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
+        markersMap.getOrEmplace(nsUUID, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
@@ -434,7 +426,6 @@ void populateBySampling(
 // guaranteed to be covered.
 void populateMarkersMap(
     OperationContext* opCtx,
-    boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection,
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
 
@@ -454,13 +445,11 @@ void populateMarkersMap(
                    CollectionTruncateMarkers::toString(initialCreationMethod),
                "dataSize"_attr = dataSize,
                "numRecords"_attr = numRecords,
-               "preImagesCollectionUUID"_attr = preImagesCollection.uuid(),
-               "tenantId"_attr = tenantId);
+               "preImagesCollectionUUID"_attr = preImagesCollection.uuid());
 
     if (initialCreationMethod == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
         pre_image_marker_initialization_internal::populateBySampling(
             opCtx,
-            tenantId,
             preImagesCollection,
             numRecords,
             dataSize,
@@ -471,19 +460,17 @@ void populateMarkersMap(
         // Even if the collection is expected to be empty, try scanning since a table scan provides
         // more accurate results.
         pre_image_marker_initialization_internal::populateByScanning(
-            opCtx, tenantId, preImagesCollection, minBytesPerMarker, markersMap);
+            opCtx, preImagesCollection, minBytesPerMarker, markersMap);
     }
 }
 }  // namespace pre_image_marker_initialization_internal
 
 PreImagesTenantMarkers PreImagesTenantMarkers::createMarkers(
-    OperationContext* opCtx,
-    boost::optional<TenantId> tenantId,
-    const CollectionAcquisition& preImagesCollection) {
+    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection) {
     invariant(preImagesCollection.exists());
-    PreImagesTenantMarkers preImagesTenantMarkers(tenantId, preImagesCollection.uuid());
+    PreImagesTenantMarkers preImagesTenantMarkers(preImagesCollection.uuid());
     pre_image_marker_initialization_internal::populateMarkersMap(
-        opCtx, tenantId, preImagesCollection, preImagesTenantMarkers._markersMap);
+        opCtx, preImagesCollection, preImagesTenantMarkers._markersMap);
     return preImagesTenantMarkers;
 }
 
@@ -492,31 +479,30 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
 
     // Use writeConflictRetry since acquiring the collection can yield a WriteConflictException if
     // it races with concurrent catalog changes.
-    writeConflictRetry(
-        opCtx,
-        "Refreshing the pre image truncate markers in a new snapshot",
-        _preImagesCollectionNss,
-        [&] {
-            // writeConflictRetry automatically abandon's the snapshot before retrying.
-            //
-            const auto preImagesCollection = acquirePreImagesCollectionForRead(
-                opCtx,
-                NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
+    writeConflictRetry(opCtx,
+                       "Refreshing the pre image truncate markers in a new snapshot",
+                       NamespaceString::kChangeStreamPreImagesNamespace,
+                       [&] {
+                           // writeConflictRetry automatically abandon's the snapshot before
+                           // retrying.
+                           //
+                           const auto preImagesCollection =
+                               acquirePreImagesCollectionForRead(opCtx, _preImagesCollectionUUID);
 
-            const auto nsUUIDs =
-                change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
-            for (const auto& nsUUID : nsUUIDs) {
-                // Account for records inserted into an 'nsUUID' not tracked during the initial
-                // construction of the markers.
-                auto nsUUIDMarkers = _markersMap.getOrEmplace(
-                    nsUUID,
-                    _tenantId,
-                    nsUUID,
-                    PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{},
-                    gPreImagesCollectionTruncateMarkersMinBytes);
-                nsUUIDMarkers->refreshHighestTrackedRecord(opCtx, preImagesCollection);
-            }
-        });
+                           const auto nsUUIDs =
+                               change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
+                           for (const auto& nsUUID : nsUUIDs) {
+                               // Account for records inserted into an 'nsUUID' not tracked during
+                               // the initial construction of the markers.
+                               auto nsUUIDMarkers = _markersMap.getOrEmplace(
+                                   nsUUID,
+                                   nsUUID,
+                                   PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{},
+                                   gPreImagesCollectionTruncateMarkersMinBytes);
+                               nsUUIDMarkers->refreshHighestTrackedRecord(opCtx,
+                                                                          preImagesCollection);
+                           }
+                       });
 }
 
 PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
@@ -542,8 +528,8 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     //      operations to invalidate our collection instance. This is only a risk when
     //      'abandonSnapshot()' is called, which can invalidate the acquired collection instance,
     //      like after a WriteConflictException.
-    const auto preImagesCollection = acquirePreImagesCollectionForWrite(
-        opCtx, NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
+    const auto preImagesCollection =
+        acquirePreImagesCollectionForWrite(opCtx, _preImagesCollectionUUID);
     const auto& preImagesColl = preImagesCollection.getCollectionPtr();
 
     PreImagesTruncateStats stats;
@@ -638,7 +624,6 @@ void PreImagesTenantMarkers::updateOnInsert(const RecordId& recordId,
     if (!nsUUIDMarkers) {
         nsUUIDMarkers =
             _markersMap.getOrEmplace(nsUUID,
-                                     _tenantId,
                                      nsUUID,
                                      PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{},
                                      gPreImagesCollectionTruncateMarkersMinBytes);

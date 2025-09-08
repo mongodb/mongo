@@ -30,16 +30,10 @@
 #pragma once
 
 #include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
-#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
-#include "mongo/db/local_catalog/collection.h"
-#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrent_shared_values_map.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <memory>
@@ -49,26 +43,14 @@
 
 namespace mongo {
 /**
- * Manages the truncation of expired pre-images for pre-images collection(s) across all tenants.
- * There is up to one "system.config.preimages" pre-images collection per tenant.
- *
- * In a single-tenant environment, there is only one "system.config.preimages" pre-images
- * collection. In which case, the corresponding truncate markers are mapped to TenantId
- * 'boost::none'.
+ * Manages the truncation of expired pre-images for the pre-images collection.
  */
 class PreImagesTruncateManager {
 public:
     /*
-     * Truncates expired pre-images spanning the tenant's pre-images collection.
+     * Truncates expired pre-images spanning the pre-images collection.
      */
-    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx,
-                                                    boost::optional<TenantId> tenantId);
-
-    /**
-     * Exclusively used when the config.preimages collection associated with 'tenantId' is dropped.
-     * All markers will be dropped immediately.
-     */
-    void dropAllMarkersForTenant(boost::optional<TenantId> tenantId);
+    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx);
 
     /**
      * Updates truncate markers to account for a newly inserted 'preImage' into the tenant's
@@ -76,7 +58,6 @@ public:
      * pre-images collection, this is a no-op.
      */
     void updateMarkersOnInsert(OperationContext* opCtx,
-                               boost::optional<TenantId> tenantId,
                                const ChangeStreamPreImage& preImage,
                                int64_t bytesInserted);
 
@@ -84,23 +65,23 @@ private:
     friend class PreImagesTruncateManagerTest;
 
     /**
-     * Tries to retrieve truncate markers for the tenant - or initialize the truncate markers if
-     * they don't yet exist.
+     * Tries to retrieve truncate markers for the pre-images collection - or initialize the truncate
+     * markers if they don't yet exist.
      *
-     * Returns a shared_ptr to truncate markers for the tenant's pre-images collection. If truncate
-     * markers don't exist (either the collection doesn't exist or the collection was dropped during
-     * the initialization process), returns nullptr.
+     * Returns a shared_ptr to truncate markers for the pre-images collection. Returns a nullptr if
+     * the pre-images collection doesn't exist yet.
      */
     std::shared_ptr<PreImagesTenantMarkers> _getInitializedMarkersForPreImagesCollection(
-        OperationContext* opCtx, boost::optional<TenantId> tenantId);
+        OperationContext* opCtx);
 
     /**
-     * Returns a shared pointer to 'PreImagesTenantMarkers' installed in the '_tenantMap', provided
-     * the truncate markers were successfully installed. Otherwise, returns a null pointer.
+     * Returns a shared pointer to 'PreImagesTenantMarkers', provided the truncate markers were
+     * successfully installed. Otherwise, returns a null pointer.
      */
-    std::shared_ptr<PreImagesTenantMarkers> _createAndInstallMarkers(
-        OperationContext* opCtx, boost::optional<TenantId> tenantId);
+    std::shared_ptr<PreImagesTenantMarkers> _createAndInstallMarkers(OperationContext* opCtx);
 
+    // TODO SERVER-109269: Remove map. Until then, only one entry should ever exist, for tenantId
+    // boost::none.
     ConcurrentSharedValuesMap<boost::optional<TenantId>, PreImagesTenantMarkers> _tenantMap;
 };
 }  // namespace mongo

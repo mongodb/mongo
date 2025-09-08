@@ -42,8 +42,6 @@ namespace change_stream_pre_image_test_helper {
  * Pre-defined pre-images and UUIDs for testing pre-image components.
  */
 struct ChangeStreamPreImageTestConstants {
-    const boost::optional<TenantId> kTenantId{};
-
     /**
      * 'kNsUUID' constants.
      */
@@ -118,8 +116,7 @@ PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers makeInitialSetOfMarkers(
     int64_t partialMarkerBytes,
     CollectionTruncateMarkers::MarkersCreationMethod creationMethod);
 
-PreImagesTruncateMarkersPerNsUUID makeEmptyTruncateMarkers(boost::optional<TenantId> tenantId,
-                                                           const UUID& nsUUID,
+PreImagesTruncateMarkersPerNsUUID makeEmptyTruncateMarkers(const UUID& nsUUID,
                                                            int64_t minBytesPerMarker);
 
 /**
@@ -164,7 +161,6 @@ int64_t bytes(const ChangeStreamPreImage& preImage);
 /**
  * Readability convenience method - obtains locks to read the pre-image collection.
  */
-CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx,
-                                                        boost::optional<TenantId> tenantId);
+CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx);
 }  // namespace change_stream_pre_image_test_helper
 }  // namespace mongo

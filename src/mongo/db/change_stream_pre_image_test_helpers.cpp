@@ -151,13 +151,9 @@ PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers makeInitialSetOfMarkers(
             creationMethod};
 }
 
-PreImagesTruncateMarkersPerNsUUID makeEmptyTruncateMarkers(boost::optional<TenantId> tenantId,
-                                                           const UUID& nsUUID,
+PreImagesTruncateMarkersPerNsUUID makeEmptyTruncateMarkers(const UUID& nsUUID,
                                                            int64_t minBytesPerMarker) {
-    return {tenantId,
-            nsUUID,
-            PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{},
-            minBytesPerMarker};
+    return {nsUUID, PreImagesTruncateMarkersPerNsUUID::InitialSetOfMarkers{}, minBytesPerMarker};
 }
 
 void updateMarkers(const ChangeStreamPreImage& preImage,
@@ -204,10 +200,7 @@ int64_t bytes(const ChangeStreamPreImage& preImage) {
     return preImage.toBSON().objsize();
 }
 
-CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx,
-                                                        boost::optional<TenantId> tenantId) {
-    // TODO SERVER-109191: Remove tenantId parameter.
-    invariant(tenantId == boost::none);
+CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx) {
     return acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
