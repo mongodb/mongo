@@ -344,3 +344,8 @@ py_binary(
         ),
     ],
 )
+
+py_binary(
+    name = "archive_artifacts",
+    srcs = ["archive_artifacts.py"],
+)

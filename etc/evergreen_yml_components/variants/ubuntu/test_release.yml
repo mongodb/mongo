@@ -99,10 +99,10 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2404-large
+          - ubuntu2404-xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2204-large
+          - ubuntu2404-xlarge
       - name: test_packages
         distros:
           - ubuntu2404-large
@@ -568,10 +568,10 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2404-large
+          - ubuntu2404-xlarge
       - name: run_unit_tests_TG
         distros:
-          - ubuntu2404-large
+          - ubuntu2404-xlarge
       - name: test_packages
         distros:
           - ubuntu2404-large
@@ -622,7 +622,7 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-xlarge
       - name: run_unit_tests_TG
         distros:
           - ubuntu2404-arm64-xlarge
@@ -668,7 +668,7 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - ubuntu2404-arm64-large
+          - ubuntu2404-arm64-xlarge
       - name: run_unit_tests_TG
         distros:
           - ubuntu2404-arm64-xlarge

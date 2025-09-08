@@ -54,14 +54,23 @@ else
     INVOCATION_WITH_REDACTION="${target} ${args}"
 fi
 
+# The --config flag needs to stay consistent between invocations to avoid evicting the previous results.
+# Strip out anything that isn't a --config flag that could interfere with the run command.
+ALL_FLAGS=""
+if [[ -f .bazel_build_flags ]]; then
+    ALL_FLAGS=$(<.bazel_build_flags)
+fi
+CONFIG_FLAGS=$(echo "${ALL_FLAGS}" | tr ' ' '\n' | grep -- '--config' | tr '\n' ' ')
+
+LOCAL_ARG="${CONFIG_FLAGS} ${LOCAL_ARG}"
+
 # Print command being run to file that can be uploaded
-echo "python buildscripts/install_bazel.py" >bazel-invocation.txt
-echo "bazel run --verbose_failures ${bazel_compile_flags} ${task_compile_flags} ${LOCAL_ARG} ${INVOCATION_WITH_REDACTION}" >>bazel-invocation.txt
+echo "bazel run --verbose_failures ${LOCAL_ARG} ${INVOCATION_WITH_REDACTION}" >>bazel-invocation.txt
 
 # Run bazel command, retrying up to five times
 MAX_ATTEMPTS=5
 for ((i = 1; i <= $MAX_ATTEMPTS; i++)); do
-    eval $env $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${target} ${args} >>bazel_output.log 2>&1 && RET=0 && break || RET=$? && sleep 10
+    eval $env $BAZEL_BINARY run --verbose_failures ${LOCAL_ARG} ${target} ${args} >>bazel_output.log 2>&1 && RET=0 && break || RET=$? && sleep 10
     if [ $i -lt $MAX_ATTEMPTS ]; then echo "Bazel failed to execute, retrying ($(($i + 1)) of $MAX_ATTEMPTS attempts)... " >>bazel_output.log 2>&1; fi
     $BAZEL_BINARY shutdown
 done
