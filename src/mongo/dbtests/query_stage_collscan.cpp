@@ -735,14 +735,14 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanStartAtDeletedRecord) {
     for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &rid));) {
         // Assert that we get the RecordId following the previous one (starting with the one after
         // 'startAt').
-        ASSERT_EQUALS(recordIds[offset + count + 1], rid);
+        ASSERT_EQUALS(recordIds[offset + count], rid);
 
         // Assert that the document content is as expected.
-        ASSERT_EQUALS(count + offset + 1, obj["foo"].numberInt());
+        ASSERT_EQUALS(count + offset, obj["foo"].numberInt());
         ++count;
     }
     ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
-    ASSERT_EQUALS(numObj() - offset - 1, count);
+    ASSERT_EQUALS(numObj() - offset, count);
 }
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {

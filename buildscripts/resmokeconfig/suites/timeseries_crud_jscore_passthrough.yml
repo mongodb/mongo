@@ -253,6 +253,7 @@ selector:
   # TODO(SERVER-85322): Try to include this test(s).
   - jstests/core/resume_query.js
   - jstests/core/resume_query_from_non_existent_record.js
+  - jstests/core/query/start_at_blocked_in_sbe.js
   # TODO(SERVER-82059): Try to include this test(s).
   - jstests/core/ts1.js
   # Cursor manipulation incompatible with count 'applySkipLimit' option.

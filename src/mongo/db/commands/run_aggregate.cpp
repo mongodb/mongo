@@ -1435,7 +1435,7 @@ Status _runAggregate(OperationContext* opCtx,
                 uuid = collections.getMainCollection()->uuid();
             }
         }
-        if (request.getResumeAfter()) {
+        if (request.getResumeAfter() || request.getStartAt()) {
             uassert(ErrorCodes::InvalidPipelineOperator,
                     "$_resumeAfter is not supported on view",
                     !ctx->getView());

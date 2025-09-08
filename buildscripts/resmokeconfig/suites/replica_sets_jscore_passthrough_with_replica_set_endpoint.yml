@@ -53,6 +53,7 @@ selector:
     - jstests/core/resume_query_from_non_existent_record.js
     - jstests/core/resume_query.js
     - jstests/core/timeseries/timeseries_resume_after.js
+    - jstests/core/query/start_at_blocked_in_sbe.js
     # The tests below expect some commands to run directly against the shard.
     # This test runs the internal _shardsvrInsertGlobalIndexKey command in a transaction.
     - jstests/core/txns/global_index.js
