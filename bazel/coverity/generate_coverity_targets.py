@@ -31,34 +31,11 @@ proc = subprocess.run(
 )
 
 print(proc.stderr)
-print(proc.stdout)
 
 targets = set()
-for line in proc.stdout.splitlines():
-    if line.startswith("  Target: "):
-        targets.add(line.split()[-1])
+with open('coverity_targets.list', 'w') as f: 
+    for line in proc.stdout.splitlines():
+        if line.startswith("  Target: "):
+            f.write(line.split()[-1] + "\n")
 
 
-enterprise_coverity_dir = os.path.join("src", "mongo", "db", "modules", "enterprise", "coverity")
-os.makedirs(enterprise_coverity_dir, exist_ok=True)
-with open(os.path.join(enterprise_coverity_dir, "BUILD.bazel"), "w") as buildfile:
-    buildfile.write("""\
-load("@rules_coverity//coverity:defs.bzl", "cov_gen_script")
-cov_gen_script(
-    name="enterprise_coverity_build",
-    testonly=True,
-    tags=["coverity"],
-    deps=[
-""")
-    for target in targets:
-        buildfile.write(
-            """\
-        "%s",
-"""
-            % target
-        )
-
-    buildfile.write("""\
-    ],
-)
-""")
