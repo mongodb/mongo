@@ -149,7 +149,7 @@ buildvariants:
       has_packages: false
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
-        --remote_execution_priority=3
+        --remote_execution_priority=1
         --jobs=1600
         --build_atlas=True
         --config=opt_profiled
@@ -263,6 +263,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --linkstatic=False
+        --remote_execution_priority=2
       clang_tidy_toolchain: v5
       compile_variant: *commit-queue
     depends_on: []
@@ -434,7 +435,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --remote_execution_priority=3
+        --remote_execution_priority=1
       evergreen_remote_exec: on
       skip_debug_link: true
     run_on:
@@ -454,7 +455,7 @@ buildvariants:
         --define=MONGO_DISTMOD=amazon2023
         --release=True
         --build_atlas=True
-        --remote_execution_priority=3
+        --remote_execution_priority=1
       evergreen_remote_exec: on
       skip_debug_link: true
     run_on:
@@ -474,7 +475,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --remote_execution_priority=3
+        --remote_execution_priority=1
       evergreen_remote_exec: on
       skip_debug_link: true
     run_on:

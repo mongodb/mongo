@@ -89,11 +89,12 @@ variables:
   - &linux_debug_community_compile_expansions
     <<: *generic_linux_compile_expansions
     bazel_compile_flags: >-
+      --remote_execution_priority=3
       --dbg=True
       --opt=on
       --build_otel=True
       --build_enterprise=False
-      --jobs=800
+      --jobs=1600
     unittest_library_compile_flags: >-
       --linkstatic=False
     unittest_compile_flags: >-
@@ -256,6 +257,7 @@ buildvariants:
         --opt=on
         --fission=no
         --jobs=800
+        --remote_execution_priority=3
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on
@@ -526,8 +528,16 @@ buildvariants:
       evergreen_remote_exec: on
       test_flags: >-
         --excludeWithAnyTags=tsan_incompatible
+      bazel_compile_flags: >-
+        --config=dbg_tsan
+        --opt=on
+        --fission=no
+        --jobs=1600
+        --remote_execution_priority=3
     tasks:
       - name: compile_test_parallel_core_stream_TG
+        distros:
+          - rhel8.8-xlarge
       - name: run_unit_tests_8_way_split_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_jstestshell_TG
