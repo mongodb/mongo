@@ -558,6 +558,10 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
+    auto hangKillCursorFp =
+        globalFailPointRegistry().find("hangReshardingChangeStreamsMonitorBeforeKillingCursors");
+    auto timesEntered = hangKillCursorFp->setMode(FailPoint::alwaysOn);
+
     // Start a monitor.
     auto monitor0 = std::make_shared<TestReshardingChangeStreamsMonitorNoKill>(
         reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);
@@ -583,11 +587,17 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
         monitor1->startMonitoring(executor1, cleanupExecutor1, cancelSource1.token(), factory1);
 
     insertRecipientFinalEventNoopOplogEntry(tempNss);
+
+    // Delay monitor1 cleanup until monitor0 sees the final event so monitor0's cursor is idle.
+    hangKillCursorFp->waitForTimesEntered(timesEntered + 1);
+    monitor0->awaitFinalChangeEvent().get();
+    hangKillCursorFp->setMode(FailPoint::off);
+
     monitor1->awaitFinalChangeEvent().get();
     monitor1->awaitCleanup().get();
     awaitCompletion1.get();
 
-    // Verify that the cursor from the previous try got killed.
+    // Verify that monitor1 killed monitor0's cursor during cleanup.
     ASSERT_FALSE(hasOpenCursor(tempNss, monitor0->makeAggregateComment(reshardingUUID)));
 }
 

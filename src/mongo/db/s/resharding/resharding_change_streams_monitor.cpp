@@ -48,6 +48,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failReshardingChangeStreamsMonitorAfterProcessingBatch);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch);
+MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeKillingCursors);
 
 const StringData kAggregateCommentFieldName = "reshardingChangeStreamsMonitor"_sd;
 const StringData kCommonUUIDFieldName = "commonUUID"_sd;
@@ -395,6 +396,8 @@ ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
 }
 
 Status ReshardingChangeStreamsMonitor::killCursors(OperationContext* opCtx) {
+    hangReshardingChangeStreamsMonitorBeforeKillingCursors.pauseWhileSet();
+
     auto aggComment = makeAggregateComment(_reshardingUUID);
     auto cursorIds = lookUpCursorIds(opCtx, _monitorNss, aggComment);
 
