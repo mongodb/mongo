@@ -1236,6 +1236,19 @@ tasks:
           content_type: application/tar
           display_name: gcc_pgo
           optional: true
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/profile_data_pr.py"
+            - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_${revision}_${build_arch}_clang_thinlto_pgo_bolt_${version}.fdata"
+            - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_${revision}_${build_arch}_clang_thinlto_pgo_${version}.profdata"
+            - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_${revision}_${build_arch}_gcc_lto_pgo_${version}.tgz"
+            - "${branch_name}"
+            - "SERVER-110427-${revision}"
+            - "${MONGO_PR_BOT_APP_ID}"
+            - "${MONGO_PR_BOT_PRIVATE_KEY}"
 
 ################################################
 #                 Task Groups                  #

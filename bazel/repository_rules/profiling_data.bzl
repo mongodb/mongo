@@ -1,3 +1,5 @@
+# This file gets automatically updated by profile_data_pr.py. Do not change the path to this file or variables in this file
+# without updating that script.
 DEFAULT_CLANG_PGO_DATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_26f259ce2429fd9febf88b208e6650b5a27efcf2_aarch64_clang_thinlto_pgo_8.3.0-alpha0-1001-g26f259c-patch-68ba3c5c82fb6d0007fb4033.profdata"
 DEFAULT_CLANG_PGO_DATA_CHECKSUM = "f06298f465629db1edef5ac022eefd34d2c3f49623d1ec4cc74173bcf74067c6"
 
