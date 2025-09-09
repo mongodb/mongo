@@ -27,7 +27,22 @@ if [ -n "${build_timeout_seconds}" ]; then
     TIMEOUT_CMD="timeout ${build_timeout_seconds}"
 fi
 
-ci_flags="--//bazel/resmoke:in_evergreen --test_output=all --noincompatible_enable_cc_toolchain_resolution --repo_env=no_c++_toolchain=1"
+ci_flags="\
+--//bazel/resmoke:in_evergreen \
+--test_output=all \
+--noincompatible_enable_cc_toolchain_resolution \
+--repo_env=no_c++_toolchain=1"
+
+# Absolute paths to AWS credential/configs are used here, allowing the test
+# action to escape the local sandboxing of bazel. This is done rather than
+# set the credentials in the environment themselves so that they will not get
+# added to the bazel invocation sent to EngFlow. This is incompatible
+# with remote execution since these are files only on the Evergreen host.
+ci_flags+=" \
+--test_env AWS_PROFILE=${aws_profile_remote} \
+--test_env AWS_CONFIG_FILE=$(realpath ~/.aws/config) \
+--test_env AWS_SHARED_CREDENTIALS_FILE=$(realpath ~/.aws/credentials) \
+--test_env BOTO_CONFIG=$(realpath ~/.boto)"
 
 if [ ${should_shuffle} = true ]; then
     ci_flags+=" --test_arg=--shuffle"
@@ -108,6 +123,9 @@ find bazel-testlogs/ -type f -path "*TestLogs/*" -print0 |
         mkdir -p $(dirname $target)
         ln -sf $source $target
     done
+
+# Combine archive.json from potentially multiple tests/shards.
+find bazel-testlogs/ -name archive.json -exec cat {} + | jq -s 'add' >"archive.json"
 
 # Combine reports from potentially multiple tests/shards.
 find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json
