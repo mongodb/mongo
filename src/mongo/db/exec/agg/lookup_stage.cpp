@@ -186,8 +186,8 @@ bool LookUpStage::usedDisk() const {
     return _sharedState->execPipeline && _sharedState->execPipeline->usedDisk();
 }
 
-Document LookUpStage::getExplainOutput() const {
-    auto doc = MutableDocument(Stage::getExplainOutput());
+Document LookUpStage::getExplainOutput(const SerializationOptions& opts) const {
+    auto doc = MutableDocument(Stage::getExplainOutput(opts));
 
     const PlanSummaryStats& stats = _stats.planSummaryStats;
     doc["totalDocsExamined"] = Value(static_cast<long long>(stats.totalDocsExamined));

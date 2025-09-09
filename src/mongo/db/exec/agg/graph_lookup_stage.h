@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/spilling/spillable_deque.h"
 #include "mongo/db/pipeline/spilling/spillable_map.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <memory>
 #include <vector>
@@ -90,7 +91,8 @@ public:
         spill(0);
     }
 
-    Document getExplainOutput() const final;
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
     static constexpr StringData kFrontierValueField = "f"_sd;

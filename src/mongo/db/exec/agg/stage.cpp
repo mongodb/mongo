@@ -45,7 +45,7 @@ Stage::Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>
     }
 }
 
-Document Stage::getExplainOutput() const {
+Document Stage::getExplainOutput(const SerializationOptions&) const {
     MutableDocument doc;
     doc.addField("nReturned", Value(static_cast<long long>(_commonStats.advanced)));
 

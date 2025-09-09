@@ -125,7 +125,7 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
     std::vector<Value> execArray;
     execArray.reserve(_stages.size());
     for (auto&& stage : _stages) {
-        execArray.emplace_back(stage->getExplainOutput());
+        execArray.emplace_back(stage->getExplainOutput(opts));
     }
 
     return execArray;

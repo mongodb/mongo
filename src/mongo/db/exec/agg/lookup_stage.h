@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/sequential_document_cache.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <cstddef>
 #include <memory>
@@ -89,7 +90,8 @@ public:
         return &_stats;
     }
 
-    Document getExplainOutput() const final;
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a

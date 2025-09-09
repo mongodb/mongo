@@ -38,6 +38,7 @@
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -60,7 +61,6 @@ public:
               const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
               const std::shared_ptr<SortExecutor<Document>>& sortExecutor,
               const std::shared_ptr<DocumentSourceSort::TimeSorterInterface>& timeSorter,
-              const std::shared_ptr<SimpleMemoryUsageTracker>& memoryTracker,
               const std::shared_ptr<SortKeyGenerator>& timeSorterPartitionKeyGen,
               bool outputSortKeyMetadata);
 
@@ -103,12 +103,15 @@ public:
     }
 
     bool isBoundedSortStage() const {
-        return _timeSorter ? true : false;
+        return bool(_timeSorter);
     }
 
     const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
-        return *_memoryTracker;
+        return _memoryTracker;
     }
+
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
     GetNextResult doGetNext() final;
@@ -163,7 +166,7 @@ private:
 
     std::shared_ptr<SortExecutor<Document>> _sortExecutor;
     std::shared_ptr<DocumentSourceSort::TimeSorterInterface> _timeSorter;
-    std::shared_ptr<SimpleMemoryUsageTracker> _memoryTracker;
+    SimpleMemoryUsageTracker _memoryTracker;
 
     std::shared_ptr<SortKeyGenerator> _timeSorterPartitionKeyGen;
     boost::optional<SortKeyGenerator> _sortKeyGen;

@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 
@@ -73,10 +72,9 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
       _searchIdLookupMetrics(searchIdLookupMetrics),
       _viewPipeline(std::move(viewPipeline)) {}
 
-Document InternalSearchIdLookUpStage::getExplainOutput() const {
+Document InternalSearchIdLookUpStage::getExplainOutput(const SerializationOptions& opts) const {
     const PlanSummaryStats& stats = _stats.planSummaryStats;
-    auto opts = SerializationOptions{.verbosity = ExplainOptions::Verbosity::kExecStats};
-    MutableDocument output(Stage::getExplainOutput());
+    MutableDocument output(Stage::getExplainOutput(opts));
     // Create sub-document with the stage name. The QO side of the explain output has a similar
     // sub-document, and they are going to be merged together by the owner of the pipelines.
     MutableDocument doc;

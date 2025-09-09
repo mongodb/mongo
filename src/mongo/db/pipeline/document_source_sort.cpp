@@ -36,7 +36,6 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -134,20 +133,14 @@ const DocumentSourceSort::SortStageOptions DocumentSourceSort::kDefaultOptions =
 
 DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        const SortPattern& sortOrder,
-                                       DocumentSourceSort::SortStageOptions options)
+                                       SortStageOptions options)
     : DocumentSource(kStageName, pExpCtx),
       _sortExecutor(std::make_shared<SortExecutor<Document>>(
           sortOrder,
           options.limit,
-          options.maxMemoryUsageBytes.value_or(
-              loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes)),
+          loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes),
           pExpCtx->getTempDir(),
           pExpCtx->getAllowDiskUse())),
-      _memoryTracker(std::make_shared<SimpleMemoryUsageTracker>(
-          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-              *pExpCtx,
-              options.maxMemoryUsageBytes.value_or(
-                  loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes))))),
       _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
             "$sort stage must have at least one sort key",
@@ -204,10 +197,6 @@ void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(stats.spilledKeyValuePairs()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
-        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            mutDoc["peakTrackedMemBytes"] = opts.serializeLiteral(
-                static_cast<long long>(_memoryTracker->peakTrackedMemoryBytes()));
-        }
     }
 
     array.push_back(Value{mutDoc.freeze()});
@@ -259,10 +248,6 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
-        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            mutDoc["peakTrackedMemBytes"] = opts.serializeLiteral(
-                static_cast<long long>(_memoryTracker->peakTrackedMemoryBytes()));
-        }
     }
     array.push_back(Value(mutDoc.freeze()));
 }
@@ -439,8 +424,6 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
         ds->_timeSorterPartitionKeyGen =
             std::make_shared<SortKeyGenerator>(std::move(partitionKey), expCtx->getCollator());
     }
-
-    ds->_timeSorterStats = ds->_sortExecutor->stats();
 
     return ds;
 }

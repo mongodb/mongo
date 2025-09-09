@@ -36,6 +36,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <memory>
 
@@ -58,7 +59,8 @@ public:
         return &_stats;
     }
 
-    Document getExplainOutput() const override;
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const override;
 
 private:
     GetNextResult doGetNext() final;

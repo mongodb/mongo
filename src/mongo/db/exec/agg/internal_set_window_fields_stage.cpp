@@ -177,13 +177,13 @@ void InternalSetWindowFieldsStage::doDispose() {
     _stats.spillingStats = _iterator.getSpillingStats();
 }
 
-Document InternalSetWindowFieldsStage::getExplainOutput() const {
-    MutableDocument out(Stage::getExplainOutput());
+Document InternalSetWindowFieldsStage::getExplainOutput(const SerializationOptions& opts) const {
+    MutableDocument out(Stage::getExplainOutput(opts));
     MutableDocument md;
 
     for (auto&& [fieldName, function] : _executableOutputs) {
-        md[fieldName] =
-            Value(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes(fieldName)));
+        md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteral(
+            static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes(fieldName)));
     }
 
     out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
@@ -191,15 +191,18 @@ Document InternalSetWindowFieldsStage::getExplainOutput() const {
     // TODO SERVER-88298 Remove maxTotalMemoryUsageBytes when we enable feature flag as
     // peakTrackedMemBytes reports the same value.
     out["maxTotalMemoryUsageBytes"] =
-        Value(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
-    out["usedDisk"] = Value(_iterator.usedDisk());
-    out["spills"] = Value(static_cast<long long>(_stats.spillingStats.getSpills()));
-    out["spilledDataStorageSize"] =
-        Value(static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
-    out["spilledBytes"] = Value(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
-    out["spilledRecords"] = Value(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
+        opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
+    out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
+    out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
+    out["spilledDataStorageSize"] = opts.serializeLiteral(
+        static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
+    out["spilledBytes"] =
+        opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
+    out["spilledRecords"] =
+        opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-        out["peakTrackedMemBytes"] = Value(static_cast<long long>(_stats.peakTrackedMemBytes));
+        out["peakTrackedMemBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.peakTrackedMemBytes));
     }
 
     return out.freeze();

@@ -30,6 +30,7 @@
 #include "mongo/db/exec/agg/sort_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -43,7 +44,6 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceSortToStageFn(
                                                 sortDS->getExpCtx(),
                                                 sortDS->_sortExecutor,
                                                 sortDS->_timeSorter,
-                                                sortDS->_memoryTracker,
                                                 sortDS->_timeSorterPartitionKeyGen,
                                                 sortDS->_outputSortKeyMetadata);
 }
@@ -61,22 +61,36 @@ SortStage::SortStage(StringData stageName,
                      const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                      const std::shared_ptr<SortExecutor<Document>>& sortExecutor,
                      const std::shared_ptr<DocumentSourceSort::TimeSorterInterface>& timeSorter,
-                     const std::shared_ptr<SimpleMemoryUsageTracker>& memoryTracker,
                      const std::shared_ptr<SortKeyGenerator>& timeSorterPartitionKeyGen,
                      bool outputSortKeyMetadata)
     : Stage(stageName, pExpCtx),
       _sortExecutor(sortExecutor),
       _timeSorter(timeSorter),
-      _memoryTracker(memoryTracker),
+      _memoryTracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *pExpCtx, sortExecutor->getMaxMemoryBytes())},
       _timeSorterPartitionKeyGen(timeSorterPartitionKeyGen),
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
       // by a metadata field.
       _sortKeyGen({sortExecutor->sortPattern(), pExpCtx->getCollator()}),
-      _outputSortKeyMetadata(outputSortKeyMetadata) {};
+      _outputSortKeyMetadata(outputSortKeyMetadata) {
+    if (_timeSorter) {
+        _timeSorterStats = _sortExecutor->stats();
+    }
+};
 
 bool SortStage::usedDisk() const {
     return isBoundedSortStage() ? _timeSorter->stats().spilledRanges() > 0
                                 : _sortExecutor->wasDiskUsed();
+}
+
+Document SortStage::getExplainOutput(const SerializationOptions& opts) const {
+    // TODO SERVER-108419: Move all execution stats.
+    MutableDocument mutDoc(Stage::getExplainOutput(opts));
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+        mutDoc["peakTrackedMemBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
+    }
+    return mutDoc.freeze();
 }
 
 GetNextResult SortStage::doGetNext() {
@@ -115,7 +129,7 @@ GetNextResult SortStage::doGetNext() {
                     auto [time, doc] = extractTime(timeSorterGetNext());
                     _timeSorter->add({time}, doc);
                     auto currMemUsage = _timeSorter->stats().memUsage();
-                    _memoryTracker->add(currMemUsage - prevMemUsage);
+                    _memoryTracker.add(currMemUsage - prevMemUsage);
                     prevMemUsage = currMemUsage;
                     continue;
                 }
@@ -135,7 +149,7 @@ GetNextResult SortStage::doGetNext() {
         prevMemUsage = _timeSorter->stats().memUsage();
         Document nextDocument = _timeSorter->next().second;
         auto currMemUsage = _timeSorter->stats().memUsage();
-        _memoryTracker->add(currMemUsage - prevMemUsage);
+        _memoryTracker.add(currMemUsage - prevMemUsage);
         return nextDocument;
     }
 
@@ -151,7 +165,7 @@ GetNextResult SortStage::doGetNext() {
     }
 
     if (!_sortExecutor->hasNext()) {
-        _memoryTracker->set(0);
+        _memoryTracker.set(0);
         return GetNextResult::makeEOF();
     }
 
@@ -166,13 +180,13 @@ void SortStage::doForceSpill() {
         auto prevSorterSize = _sortExecutor->stats().memoryUsageBytes;
         _sortExecutor->forceSpill();
         auto currSorterSize = _sortExecutor->stats().memoryUsageBytes;
-        _memoryTracker->add(currSorterSize - prevSorterSize);
+        _memoryTracker.add(currSorterSize - prevSorterSize);
     }
     if (_timeSorter) {
         auto prevSorterSize = _timeSorter->stats().memUsage();
         _timeSorter->forceSpill();
         auto currSorterSize = _timeSorter->stats().memUsage();
-        _memoryTracker->add(currSorterSize - prevSorterSize);
+        _memoryTracker.add(currSorterSize - prevSorterSize);
     }
 }
 
@@ -262,7 +276,7 @@ GetNextResult SortStage::populate() {
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         loadDocument(nextInput.releaseDocument());
         auto currMemUsage = _sortExecutor->stats().memoryUsageBytes;
-        _memoryTracker->add(currMemUsage - prevMemUsage);
+        _memoryTracker.add(currMemUsage - prevMemUsage);
         prevMemUsage = currMemUsage;
     }
     if (nextInput.isEOF()) {

@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/granularity_rounder.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter.h"
 
 #include <memory>
@@ -61,7 +62,8 @@ public:
                        : _stats.spillingStats.getSpills() > 0;
     }
 
-    Document getExplainOutput() const final;
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const MemoryUsageTracker* getMemoryTracker_forTest() const {
         return &_memoryTracker;

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo::exec::agg {
 
@@ -59,7 +60,8 @@ public:
         return &_stats;
     }
 
-    Document getExplainOutput() const final;
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
     void initialize();

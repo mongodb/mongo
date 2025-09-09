@@ -591,13 +591,11 @@ std::tuple<boost::intrusive_ptr<exec::agg::MockStage>,
            intrusive_ptr<exec::agg::SortStage>>
 initSpillingTest(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const unittest::TempDir& tempDir,
-                 size_t maxMemoryUsageBytes,
                  size_t largeStrSize) {
     // Allow the $sort stage to spill to disk.
     expCtx->setTempDir(tempDir.path());
     expCtx->setAllowDiskUse(true);
-    auto sort = DocumentSourceSort::create(
-        expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
+    auto sort = DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx});
 
     string largeStr(largeStrSize, 'x');
     auto mock =
@@ -635,7 +633,6 @@ std::tuple<boost::intrusive_ptr<exec::agg::MockStage>,
            intrusive_ptr<exec::agg::SortStage>>
 initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
                                const unittest::TempDir& tempDir,
-                               size_t maxMemoryUsageBytes,
                                size_t largeStrSize) {
     // Allow the $sort stage to spill to disk.
     expCtx->setTempDir(tempDir.path());
@@ -665,7 +662,9 @@ initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 1000000, 1000000);
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", 1000000};
+    auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 1000000);
 
     // There were 2 pauses, so we should expect 2 paused results before any results can be
     // returned.
@@ -687,7 +686,9 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturningFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 1000000, 10);
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", 1000000};
+    auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 10);
 
     ASSERT_TRUE(sortStage->getNext().isPaused());
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -708,7 +709,9 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturni
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturningFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 1000000, 10);
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", 1000000};
+    auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 10);
 
     ASSERT_TRUE(sortStage->getNext().isPaused());
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -743,8 +746,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturnin
 TEST_F(DocumentSourceSortExecutionTest,
        ShouldBeAbleToForceSpillOnBoundedSortBeforeReturningFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort, sortStage] =
-        initSpillingTestForBoundedSort(getExpCtx(), tempDir, 1000000, 16777215);
+    auto [mock, sort, sortStage] = initSpillingTestForBoundedSort(getExpCtx(), tempDir, 16777215);
 
     sortStage->forceSpill();
     auto next = sortStage->getNext();
@@ -768,8 +770,7 @@ TEST_F(DocumentSourceSortExecutionTest,
 TEST_F(DocumentSourceSortExecutionTest,
        ShouldBeAbleToForceSpillOnBoundedSortAfterReturningFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort, sortStage] =
-        initSpillingTestForBoundedSort(getExpCtx(), tempDir, 1000000, 10);
+    auto [mock, sort, sortStage] = initSpillingTestForBoundedSort(getExpCtx(), tempDir, 10);
 
     auto next = sortStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -920,9 +921,10 @@ TEST_F(DocumentSourceSortExecutionTest,
     auto expCtx = getExpCtx();
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", int(maxMemoryUsageBytes)};
 
-    auto sort = DocumentSourceSort::create(
-        expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
+    auto sort = DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx});
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
@@ -940,9 +942,10 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     auto expCtx = getExpCtx();
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", int(maxMemoryUsageBytes)};
 
-    auto sort = DocumentSourceSort::create(
-        expCtx, {BSON("_id" << -1), expCtx}, {.maxMemoryUsageBytes = maxMemoryUsageBytes});
+    auto sort = DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx});
 
     string largeStr(maxMemoryUsageBytes / 5, 'x');
     auto mock =
@@ -1130,6 +1133,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
                                                                true);
     createSort(BSON("a" << 1));
+    createSortStage();
     auto boundedSort = DocumentSourceSort::createBoundedSort(
         sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
 
@@ -1182,10 +1186,16 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
             "spills": "?number",
             "spilledBytes": "?number",
             "spilledRecords": "?number",
-            "spilledDataStorageSize": "?number",
-            "peakTrackedMemBytes": "?number"
+            "spilledDataStorageSize": "?number"
         })",
         redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({
+            nReturned: 0,
+            peakTrackedMemBytes: 0
+        })",
+        _sortStage->getExplainOutput().toBson());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1204,10 +1214,17 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
             "spills": "?number",
             "spilledBytes": "?number",
             "spilledRecords": "?number",
-            "spilledDataStorageSize": "?number",
-            "peakTrackedMemBytes": "?number"
+            "spilledDataStorageSize": "?number"
         })",
         redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
+
+    auto boundedSortStage = exec::agg::buildStage(boundedSort);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({
+            nReturned: 0,
+            peakTrackedMemBytes: 0
+        })",
+        boundedSortStage->getExplainOutput().toBson());
 }
 
 void assertProducesSortKeyMetadata(auto expCtx, auto sort) {

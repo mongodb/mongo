@@ -37,10 +37,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_executor.h"
 #include "mongo/db/index/sort_key_generator.h"
-#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression.h"
@@ -53,7 +51,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter.h"
-#include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -85,7 +82,6 @@ public:
 
     struct SortStageOptions {
         uint64_t limit = 0;
-        boost::optional<uint64_t> maxMemoryUsageBytes = boost::none;
         bool outputSortKeyMetadata = false;
     };
 
@@ -242,15 +238,11 @@ public:
     boost::optional<long long> getLimit() const;
 
     bool isBoundedSortStage() const {
-        return _timeSorter ? true : false;
+        return bool(_timeSorter);
     }
 
     bool hasLimit() const {
         return _sortExecutor->hasLimit();
-    }
-
-    const SpecificStats* getSpecificStats() const {
-        return isBoundedSortStage() ? &_timeSorterStats : &_sortExecutor->stats();
     }
 
 protected:
@@ -279,12 +271,8 @@ private:
 
     std::shared_ptr<SortExecutor<Document>> _sortExecutor;
     std::shared_ptr<TimeSorterInterface> _timeSorter;
-    std::shared_ptr<SimpleMemoryUsageTracker> _memoryTracker;
     // TODO: SERVER-105521 This member can be moved instead of shared.
     std::shared_ptr<SortKeyGenerator> _timeSorterPartitionKeyGen;
-
-    // Used only if _timeSorter is present.
-    SortStats _timeSorterStats;
 
     // Whether to include metadata including the sort key in the output documents from this stage.
     bool _outputSortKeyMetadata = false;

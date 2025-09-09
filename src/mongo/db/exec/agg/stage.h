@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -249,7 +250,8 @@ public:
         return false;
     }
 
-    virtual Document getExplainOutput() const;
+    virtual Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const;
 
 protected:
     /**

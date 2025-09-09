@@ -430,18 +430,21 @@ void BucketAutoStage::doForceSpill() {
     }
 }
 
-Document BucketAutoStage::getExplainOutput() const {
-    MutableDocument out(Stage::getExplainOutput());
-    out["usedDisk"] = Value(_stats.spillingStats.getSpills() > 0);
-    out["spills"] = Value(static_cast<long long>(_stats.spillingStats.getSpills()));
-    out["spilledDataStorageSize"] =
-        Value(static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
-    out["spilledBytes"] = Value(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
-    out["spilledRecords"] = Value(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
+Document BucketAutoStage::getExplainOutput(const SerializationOptions& opts) const {
+    MutableDocument out(Stage::getExplainOutput(opts));
+    out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
+    out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
+    out["spilledDataStorageSize"] = opts.serializeLiteral(
+        static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
+    out["spilledBytes"] =
+        opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
+    out["spilledRecords"] =
+        opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
         out["peakTrackedMemBytes"] =
-            Value(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
+            opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
     }
+
 
     return out.freeze();
 }

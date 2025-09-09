@@ -151,12 +151,7 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
  */
 boost::intrusive_ptr<DocumentSourceSort> createNewSortWithMemoryUsage(
     const DocumentSourceSort& sort, const SortPattern& pattern, uint64_t limit) {
-    boost::optional<uint64_t> maxMemoryUsageBytes;
-    if (auto sortStatsPtr = dynamic_cast<const SortStats*>(sort.getSpecificStats())) {
-        maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
-    }
-    return DocumentSourceSort::create(
-        sort.getExpCtx(), pattern, {.limit = limit, .maxMemoryUsageBytes = maxMemoryUsageBytes});
+    return DocumentSourceSort::create(sort.getExpCtx(), pattern, {.limit = limit});
 }
 
 /**
