@@ -7,10 +7,7 @@ import pathlib
 import subprocess
 from datetime import datetime
 
-from retry import retry
 
-
-@retry(tries=3)
 def log_subprocess_run(*args, **kwargs):
     arg_list_or_string = kwargs["args"] if "args" in kwargs else args[0]
     print(" ".join(arg_list_or_string) if type(arg_list_or_string) == list else arg_list_or_string)

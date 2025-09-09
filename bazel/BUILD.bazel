@@ -33,8 +33,3 @@ py_binary(
         ),
     ],
 )
-
-filegroup(
-    name = "test_wrapper",
-    srcs = ["test_wrapper.sh"],
-)
