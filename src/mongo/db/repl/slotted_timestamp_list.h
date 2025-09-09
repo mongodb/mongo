@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <vector>

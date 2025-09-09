@@ -39,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
@@ -46,7 +47,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 // Common fail points for logOp() and logInsertOps().
 extern FailPoint addDestinedRecipient;
@@ -106,4 +107,4 @@ DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern, BSONObj const
 extern const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
     shardingWriteRouterOpStateAccumulatorDecoration;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

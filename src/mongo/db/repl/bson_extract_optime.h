@@ -31,8 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
 
@@ -53,4 +54,4 @@ class OpTime;
  */
 Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

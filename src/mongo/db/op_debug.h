@@ -43,6 +43,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <set>
@@ -52,7 +53,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class CurOp;
 
@@ -537,4 +538,4 @@ private:
     // The hash of query_shape::QueryShapeHash.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

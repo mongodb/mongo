@@ -64,7 +64,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_OPEN mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class DocumentKey;
 struct IndexBuildInfo;
@@ -170,7 +170,7 @@ struct IndexCollModInfo {
  * to perform the operation being observed are still held. These rules should apply for all observer
  * methods unless otherwise specified.
  */
-class OpObserver {
+class MONGO_MOD_OPEN OpObserver {
 public:
     using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
 
@@ -778,4 +778,4 @@ private:
     Times& _times;
 };
 
-}  // namespace MONGO_MOD_OPEN mongo
+}  // namespace MONGO_MOD_PUB mongo

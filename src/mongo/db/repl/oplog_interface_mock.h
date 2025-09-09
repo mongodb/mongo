@@ -43,7 +43,7 @@
 #include <string>
 #include <utility>
 
-namespace MONGO_MOD_OPEN mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 class TransactionHistoryIteratorBase;
 
 namespace repl {
@@ -73,4 +73,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_OPEN mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

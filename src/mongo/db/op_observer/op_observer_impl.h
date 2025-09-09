@@ -46,6 +46,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -57,7 +58,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 class ReplOperation;
@@ -289,4 +290,4 @@ private:
     std::unique_ptr<OperationLogger> _operationLogger;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

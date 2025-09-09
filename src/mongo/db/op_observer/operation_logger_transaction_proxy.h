@@ -39,13 +39,14 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
 #include <memory>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Accumulates replicated operations for multi-document transactions and batched WUOW writes.
@@ -81,4 +82,4 @@ private:
     std::unique_ptr<OperationLogger> _targetOperationLogger;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

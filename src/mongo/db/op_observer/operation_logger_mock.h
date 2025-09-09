@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/db/op_observer/operation_logger.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class OperationLoggerMock : public OperationLogger {
+class MONGO_MOD_NEEDS_REPLACEMENT OperationLoggerMock : public OperationLogger {
     OperationLoggerMock(const OperationLoggerMock&) = delete;
     OperationLoggerMock& operator=(const OperationLoggerMock&) = delete;
 

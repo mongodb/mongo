@@ -30,6 +30,7 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub_for_technical_reasons
 
 imports:
     - "mongo/db/basic_types.idl"

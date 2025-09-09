@@ -39,12 +39,13 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class OperationLoggerImpl : public OperationLogger {
     OperationLoggerImpl(const OperationLoggerImpl&) = delete;
@@ -72,4 +73,4 @@ public:
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

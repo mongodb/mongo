@@ -66,7 +66,7 @@ extern FailPoint stopReplProducer;
 
 };
 
-namespace MONGO_MOD_OPEN repl {
+namespace MONGO_MOD_PARENT_PRIVATE repl {
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable,
@@ -527,5 +527,5 @@ public:
 
 typedef OplogFetcherFactoryImpl<OplogFetcher> CreateOplogFetcherFn;
 
-}  // namespace MONGO_MOD_OPEN repl
+}  // namespace MONGO_MOD_PARENT_PRIVATE repl
 }  // namespace mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -44,7 +45,7 @@ class BSONObj;
 class OperationContext;
 class Timestamp;
 
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * A mock ReplicationConsistencyMarkers implementation that stores everything in memory.
@@ -97,5 +98,5 @@ private:
     BSONObj _initialSyncId;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

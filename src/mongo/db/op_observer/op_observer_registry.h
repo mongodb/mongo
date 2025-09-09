@@ -46,6 +46,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -60,7 +61,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 struct IndexBuildInfo;
 
@@ -655,4 +656,4 @@ private:
     std::vector<OpObserver*> _onDeleteUserObservers;    // not config nor system
                                                       // Will impact writes to all user collections.
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

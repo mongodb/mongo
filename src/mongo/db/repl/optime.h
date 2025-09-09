@@ -44,7 +44,9 @@
 #include <tuple>
 #include <utility>
 
-namespace mongo::repl {
+namespace mongo {
+
+namespace MONGO_MOD_PUB repl {
 
 /**
  * OpTime encompasses a Timestamp (which itself is composed of two 32-bit integers, which can
@@ -219,4 +221,7 @@ struct MONGO_MOD_PUB TimestampAndWallTime {
     Timestamp timestamp;
     Date_t wallTime;
 };
-}  // namespace mongo::repl
+
+}  // namespace MONGO_MOD_PUB repl
+
+}  // namespace mongo

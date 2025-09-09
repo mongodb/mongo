@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * No-op implementation of OpObserver interface.
@@ -39,7 +40,7 @@ namespace mongo {
  * Suitable base class of OpObserver implementations that do not need to implement most of the
  * OpObserver interface.
  */
-class OpObserverNoop : public OpObserver {
+class MONGO_MOD_OPEN OpObserverNoop : public OpObserver {
 public:
     NamespaceFilters getNamespaceFilters() const override {
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};
@@ -276,4 +277,4 @@ public:
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {}
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
