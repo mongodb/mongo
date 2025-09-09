@@ -29,5 +29,5 @@ podman run \
   --env-file=signing-envfile \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
-  ${garasign_gpg_image} \
+  ${garasign_gpg_image_ecr} \
   /bin/bash -c "$(cat ./gpg_signing_commands.sh)"
