@@ -44,7 +44,6 @@ race:__handle_close
 race:__sweep_remove_handles
 race:__stash_discard
 race:__evict_lru_walk
-race:__log_file_server
 race:__tree_walk_internal
 race:__evict_queue_empty
 race:__evict_get_ref

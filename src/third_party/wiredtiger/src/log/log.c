@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 #include "log_private.h"
 
-static int __log_newfile(WT_SESSION_IMPL *, bool, bool *);
+static int __log_newfile(WT_SESSION_IMPL *, bool, bool *, bool *);
 static int __log_openfile(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_FH **);
 static int __log_truncate(WT_SESSION_IMPL *, WT_LSN *, bool, bool);
 static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *, uint32_t);
@@ -614,7 +614,7 @@ __wt_log_reset(WT_SESSION_IMPL *session, uint32_t lognum)
     log->fileid = lognum;
 
     /* Send in true to update connection creation LSNs. */
-    WTI_WITH_SLOT_LOCK(session, log, ret = __log_newfile(session, true, NULL));
+    WTI_WITH_SLOT_LOCK(session, log, ret = __log_newfile(session, true, NULL, NULL));
     WT_ERR(__wti_log_slot_init(session, false));
 err:
     WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
@@ -1124,7 +1124,7 @@ err:
  *     Create the next log file and write the file header record into it.
  */
 static int
-__log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
+__log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created, bool *closed)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -1138,6 +1138,9 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
     conn = S2C(session);
     log_mgr = &conn->log_mgr;
     log = log_mgr->log;
+
+    if (closed != NULL)
+        *closed = false;
 
     /*
      * Set aside the log file handle to be closed later. Other threads may still be using it to
@@ -1167,12 +1170,13 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      * Note, the file server worker thread requires the LSN be set once the close file handle is
      * set, force that ordering.
      */
-    if (log->log_fh == NULL)
-        log->log_close_fh = NULL;
-    else {
+    if (log->log_fh != NULL) {
         WT_ASSIGN_LSN(&log->log_close_lsn, &log->alloc_lsn);
         /* Paired with an acquire read in the log file server path. */
         WT_RELEASE_WRITE_WITH_BARRIER(log->log_close_fh, log->log_fh);
+
+        if (closed != NULL)
+            *closed = true;
     }
     log->fileid++;
 
@@ -1344,7 +1348,7 @@ __wti_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WTI_LOGSLOT *slot)
 {
     WT_CONNECTION_IMPL *conn;
     WTI_LOG *log;
-    bool created_log;
+    bool created_log, log_to_close;
 
     conn = S2C(session);
     log = conn->log_mgr.log;
@@ -1365,10 +1369,10 @@ __wti_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WTI_LOGSLOT *slot)
      * risk of an error due to no space.
      */
     if (F_ISSET(log, WTI_LOG_FORCE_NEWFILE) || !__log_size_fit(session, &log->alloc_lsn, recsize)) {
-        WT_RET(__log_newfile(session, false, &created_log));
-        F_CLR(log, WTI_LOG_FORCE_NEWFILE);
-        if (log->log_close_fh != NULL)
+        WT_RET(__log_newfile(session, false, &created_log, &log_to_close));
+        if (log_to_close)
             F_SET_ATOMIC_16(slot, WTI_SLOT_CLOSEFH);
+        F_CLR(log, WTI_LOG_FORCE_NEWFILE);
     }
 
     /*
@@ -1704,7 +1708,7 @@ again:
      * ends.
      */
     if (!F_ISSET(conn, WT_CONN_READONLY)) {
-        WTI_WITH_SLOT_LOCK(session, log, ret = __log_newfile(session, true, NULL));
+        WTI_WITH_SLOT_LOCK(session, log, ret = __log_newfile(session, true, NULL, NULL));
         WT_ERR(ret);
     }
 

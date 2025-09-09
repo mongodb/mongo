@@ -2317,12 +2317,12 @@ __wti_cache_eviction_controls_config(WT_SESSION_IMPL *session, const char *cfg[]
     WT_RET(
       __wt_config_gets(session, cfg, "cache_eviction_controls.incremental_app_eviction", &cval));
     if (cval.val != 0)
-        F_SET(&conn->cache_eviction_controls, WT_CACHE_EVICT_INCREMENTAL_APP);
+        F_SET_ATOMIC_32(&(conn->cache->cache_eviction_controls), WT_CACHE_EVICT_INCREMENTAL_APP);
 
     WT_RET(__wt_config_gets(
       session, cfg, "cache_eviction_controls.scrub_evict_under_target_limit", &cval));
     if (cval.val != 0)
-        F_SET(&conn->cache_eviction_controls, WT_CACHE_EVICT_SCRUB_UNDER_TARGET);
+        F_SET_ATOMIC_32(&(conn->cache->cache_eviction_controls), WT_CACHE_EVICT_SCRUB_UNDER_TARGET);
 
     return (0);
 }

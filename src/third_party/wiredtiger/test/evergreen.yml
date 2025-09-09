@@ -3718,6 +3718,20 @@ tasks:
             g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++17 -Wall -Werror -DAVOID_CPP20_SEMAPHORE
             ./memory_model_test -n 100000000
 
+  - name: tsan-playground-test
+    exec_timeout_secs: 86400
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            ../tools/tsan_playground/collect_warnings.sh
+
   - name: data-validation-stress-test-checkpoint
     tags: ["data-validation-stress-test"]
     depends_on:
@@ -6108,6 +6122,7 @@ buildvariants:
     - name: unit-test-tsan
       distros: ubuntu2004-large
     - name: generate-tsan-metric
+    - name: tsan-playground-test
 
 # FIXME-WT-13256
 # This variant runs all possible tasks under TSan but instructs TSan to not report any issues it

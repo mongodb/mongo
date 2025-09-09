@@ -656,8 +656,25 @@ __log_file_server(void *arg)
                  * make sure the compiler does not reorder the following two statements.
                  */
                 WT_ASSIGN_LSN(&close_end_lsn, &log->log_close_lsn);
+
+                /*
+                 * Based on the code investigation, there is no reason to use a FULL_BARRIER here.
+                 * We send a message that `log_close_lsn` is read by setting `log_close_fh` to NULL,
+                 * making it available to `__log_newfile` to assign a new one. Therefore, release
+                 * semantics should be sufficient.
+                 *
+                 * For now, this is placed under the TSAN_BUILD macro only, since weakening barriers
+                 * requires extra care.
+                 *
+                 * FIXME-WT-15337: Consider using a release write in production.
+                 */
+#if defined(TSAN_BUILD)
+                WT_RELEASE_WRITE(log->log_close_fh, NULL);
+#else
                 WT_FULL_BARRIER();
-                log->log_close_fh = NULL;
+                __wt_atomic_store_pointer(&log->log_close_fh, NULL);
+#endif
+
                 /*
                  * Set the close_end_lsn to the LSN immediately after ours. That is, the beginning
                  * of the next log file. We need to know the LSN file number of our own close in

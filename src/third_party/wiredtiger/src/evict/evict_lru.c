@@ -805,7 +805,8 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
     if (__wt_conn_is_disagg(session) && bytes_inuse < (uint64_t)(trigger * bytes_max) / 100)
         LF_SET(WT_EVICT_CACHE_SCRUB);
     else if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200) {
-        if (F_ISSET(&conn->cache_eviction_controls, WT_CACHE_EVICT_SCRUB_UNDER_TARGET)) {
+        if (F_ISSET_ATOMIC_32(
+              &(conn->cache->cache_eviction_controls), WT_CACHE_EVICT_SCRUB_UNDER_TARGET)) {
             LF_SET(WT_EVICT_CACHE_SCRUB);
         } else if (bytes_dirty < (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200 &&
           bytes_updates < (uint64_t)((updates_target + updates_trigger) * bytes_max) / 200) {
