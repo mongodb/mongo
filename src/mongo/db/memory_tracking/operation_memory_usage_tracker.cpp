@@ -52,7 +52,7 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
     if (!opTracker) {
         auto uniqueTracker = std::make_unique<OperationMemoryUsageTracker>(opCtx);
         opTracker = uniqueTracker.get();
-        opTracker->setDoExtraBookkeeping(
+        opTracker->setWriteToCurOp(
             [opTracker](int64_t inUseTrackedMemoryBytes, int64_t peakTrackedMemBytes) {
                 if (opTracker->_opCtx) {
                     CurOp::get(opTracker->_opCtx)
@@ -86,6 +86,19 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
     }
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
     return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
+}
+
+SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
+    const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        expCtx.isIncompatibleWithMemoryTracking()) {
+        return SimpleMemoryUsageTracker{maxMemoryUsageBytes, 0 /* chunkSize */};
+    }
+
+    OperationContext* opCtx = expCtx.getOperationContext();
+    OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
+    return SimpleMemoryUsageTracker{
+        opTracker, maxMemoryUsageBytes, internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed()};
 }
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(

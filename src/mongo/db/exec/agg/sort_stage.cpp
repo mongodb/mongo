@@ -66,7 +66,7 @@ SortStage::SortStage(StringData stageName,
     : Stage(stageName, pExpCtx),
       _sortExecutor(sortExecutor),
       _timeSorter(timeSorter),
-      _memoryTracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+      _memoryTracker{OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
           *pExpCtx, sortExecutor->getMaxMemoryBytes())},
       _timeSorterPartitionKeyGen(timeSorterPartitionKeyGen),
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort

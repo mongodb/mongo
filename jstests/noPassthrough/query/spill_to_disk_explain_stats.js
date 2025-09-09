@@ -22,7 +22,7 @@ assert.commandWorked(setParameter(db, "internalQueryMaxBlockingSortMemoryUsageBy
 assert.commandWorked(setParameter(db, "internalDocumentSourceGroupMaxMemoryBytes", 1));
 assert.commandWorked(setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1));
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", isSbeEnabled ? 129 : 392));
+assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", isSbeEnabled ? 129 : 424));
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
 // Spilling memory threshold for $lookup and $lookup-$unwind

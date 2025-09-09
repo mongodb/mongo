@@ -28,6 +28,11 @@ const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
 
+// The tests expect that memory metrics appear right after memory is used. Decrease the threshold
+// for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
+// limit.
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+
 const bigStr = Array(1025).toString(); // 1KB of ','
 const lowMaxMemoryLimit = 5000;
 const nDocs = 50;
@@ -50,7 +55,8 @@ if (checkSbeFullyEnabled(db)) {
         {
             name: "SBE Sort",
             pipelineFn: (pipeline) => {
-                // Add $_internalInhibitOptimization to prevent $sort pushdown so the pipeline uses SBE.
+                // Add $_internalInhibitOptimization to prevent $sort pushdown so the pipeline uses
+                // SBE.
                 pipeline.unshift({$_internalInhibitOptimization: {}});
             },
             stageName: "sort", // SBE sort stage appears without the dollar sign

@@ -75,6 +75,14 @@ public:
         OperationContext* opCtx, int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
     /**
+     * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
+     * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.
+     */
+    static SimpleMemoryUsageTracker createChunkedSimpleMemoryUsageTrackerForStage(
+        const ExpressionContext& expCtx,
+        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+
+    /**
      * When constructing a stage containing a MemoryUsageTracker, use this method to ensure that we
      * aggregate operation-wide memory stats.
      */

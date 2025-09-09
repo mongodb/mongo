@@ -523,6 +523,18 @@ server_parameters:
     #
     # Query execution
     #
+    internalQueryMaxWriteToCurOpMemoryUsageBytes:
+        description: >-
+            Maximum amount of memory bytes tracked by a stage's memory tracker before writing to CurOp."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxWriteToCurOpMemoryUsageBytes"
+        cpp_vartype: AtomicWord<int>
+        default:
+            expr: 1024 * 1024
+        validator:
+            gte: 0
+        redact: false
+
     internalQueryExecYieldIterations:
         description: 'Yield after this many "should yield?" checks.'
         set_at: [startup, runtime]

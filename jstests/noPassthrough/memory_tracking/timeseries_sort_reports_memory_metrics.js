@@ -26,6 +26,11 @@ const timeseriesCollName = jsTestName() + "_timeseries";
 const coll = db.getCollection(timeseriesCollName);
 db[timeseriesCollName].drop();
 
+// The tests expect that memory metrics appear right after memory is used. Decrease the threshold
+// for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
+// limit.
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+
 assert.commandWorked(
     db.createCollection(timeseriesCollName, {
         timeseries: {timeField: "time", metaField: "metadata", granularity: "seconds"},

@@ -45,7 +45,6 @@
 #include <boost/noncopyable.hpp>
 
 namespace mongo {
-
 /**
  * Memory usage tracker for use cases where we don't need per-function memory tracking.
  */
@@ -57,11 +56,15 @@ public:
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker&&) = default;
     SimpleMemoryUsageTracker& operator=(SimpleMemoryUsageTracker&&) = default;
 
-    SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base, int64_t maxAllowedMemoryUsageBytes)
-        : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes) {}
+    SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
+                             int64_t maxAllowedMemoryUsageBytes,
+                             int64_t chunkSize = 0)
+        : _base(base),
+          _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes),
+          _chunkSize(chunkSize) {}
 
-    explicit SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes)
-        : SimpleMemoryUsageTracker(nullptr, maxAllowedMemoryUsageBytes) {}
+    explicit SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes, int64_t chunkSize = 0)
+        : SimpleMemoryUsageTracker(nullptr, maxAllowedMemoryUsageBytes, chunkSize) {}
 
     SimpleMemoryUsageTracker() : SimpleMemoryUsageTracker(std::numeric_limits<int64_t>::max()) {}
 
@@ -74,12 +77,32 @@ public:
         if (_inUseTrackedMemoryBytes > _peakTrackedMemoryBytes) {
             _peakTrackedMemoryBytes = _inUseTrackedMemoryBytes;
         }
-        if (_base) {
-            _base->add(diff);
-        }
 
-        if (_doExtraBookkeeping) {
-            _doExtraBookkeeping(_inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
+        // When chunking is enabled, we report memory usage in discrete chunks (0, chunkSize,
+        // 2*chunkSize, ...) rather than exact values. This reduces update frequency and
+        // provides predictable lower-bound semantics where CurOp's reported value <= actual
+        // usage < reported value + chunkSize.
+        //
+        // This is to avoid performance regressions, but will also result having slightly less
+        // accurate statistics in CurOp.
+        int64_t inUseTrackedMemoryBytes = _inUseTrackedMemoryBytes;
+
+        if (_base) {
+            if (_chunkSize) {
+                int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
+
+                if (newLowerBound != _lastReportedLowerBound) {
+                    int64_t chunkedDelta = newLowerBound - _lastReportedLowerBound;
+
+                    _base->add(chunkedDelta);
+                    _lastReportedLowerBound = newLowerBound;
+                    inUseTrackedMemoryBytes = newLowerBound;
+                }
+            } else {
+                _base->add(diff);
+            }
+        } else if (_writeToCurOp) {
+            _writeToCurOp(inUseTrackedMemoryBytes, _peakTrackedMemoryBytes);
         }
     }
 
@@ -110,8 +133,8 @@ public:
      */
     SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const {
         SimpleMemoryUsageTracker memTracker =
-            SimpleMemoryUsageTracker{_base, maxAllowedMemoryUsageBytes()};
-        memTracker.setDoExtraBookkeeping(_doExtraBookkeeping);
+            SimpleMemoryUsageTracker{_base, maxAllowedMemoryUsageBytes(), _chunkSize};
+        memTracker.setWriteToCurOp(_writeToCurOp);
         return memTracker;
     }
 
@@ -122,8 +145,8 @@ protected:
      * Provide an extra function that is called whenever add() is invoked. Let it be set via this
      * method instead in the constructor to allow subclasses to capture "this."
      */
-    void setDoExtraBookkeeping(std::function<void(int64_t, int64_t)> doExtraBookkeeping) {
-        _doExtraBookkeeping = std::move(doExtraBookkeeping);
+    void setWriteToCurOp(std::function<void(int64_t, int64_t)> writeToCurOp) {
+        _writeToCurOp = std::move(writeToCurOp);
     }
 
 private:
@@ -140,7 +163,14 @@ private:
     // be invoked with _inUseTrackedMemoryBytes and _peakTrackedMemoryBytes. This mechanism exists
     // to avoid making add() virtual, since it has been shown to have an effect on performance in
     // some cases.
-    std::function<void(int64_t, int64_t)> _doExtraBookkeeping;
+    std::function<void(int64_t, int64_t)> _writeToCurOp;
+
+    // If set, memory usage updates will only be written to CurOp if the usage surpasses this
+    // size. Writing to CurOp involves lock contention, so in performance-sensitive situations,
+    // we should set a non-zero size. If 0, no chunking is performed.
+    int64_t _chunkSize;
+    // Last lower-bound chunk reported to CurOp.
+    int64_t _lastReportedLowerBound = 0;
 };
 
 /**

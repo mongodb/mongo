@@ -51,7 +51,8 @@ SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
       _ws(ws),
       _sortKeyGen(sortPattern, expCtx->getCollator()),
       _addSortKeyMetadata(addSortKeyMetadata),
-      _memoryTracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)} {
+      _memoryTracker{OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
+          *expCtx, std::numeric_limits<int64_t>::max())} {
     _children.emplace_back(std::move(child));
 }
 
