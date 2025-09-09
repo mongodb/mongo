@@ -368,3 +368,8 @@ commands:
                 cpp_name: isHybridSearch
                 type: optionalBool
                 stability: internal
+            forcedPlanSolutionHash:
+                description: "Solution hash to force a execution with a given plan."
+                type: safeInt64
+                optional: true
+                stability: internal

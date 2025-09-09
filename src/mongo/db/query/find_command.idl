@@ -258,3 +258,8 @@ commands:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool
                 stability: internal
+            forcedPlanSolutionHash:
+                description: "Solution hash to force execution with a given plan."
+                type: safeInt64
+                optional: true
+                stability: internal
