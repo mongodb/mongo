@@ -2606,7 +2606,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/rss/OWNERS.yml
-/src/mongo/db/rss/**/* @10gen/server-replication @10gen/server-storage-execution @svc-auto-approve-bot
+/src/mongo/db/rss/**/* @10gen/server-rss @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
