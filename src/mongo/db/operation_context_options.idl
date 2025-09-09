@@ -37,8 +37,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gOverdueInterruptCheckIntervalMillis
-        # TODO SERVER-105986 This value will need to be tuned.
-        default: 100
+        default: 30
         validator:
             gte: 10
         redact: false
@@ -49,7 +48,6 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<double>
         cpp_varname: gOverdueInterruptCheckSamplingRate
-        # TODO SERVER-105986 This value will need to be tuned.
         default: 0.001
         validator:
             gte: 0

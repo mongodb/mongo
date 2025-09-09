@@ -105,12 +105,19 @@ function assertOverdueOpsSlowlogAndCurop(operationMetrics, count) {
     );
 }
 
+function setOverdueThreshold(db, thresholdMs) {
+    assert.commandFailedWithCode(
+        db.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: 9}),
+        ErrorCodes.BadValue,
+    );
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: thresholdMs}));
+}
+
 function testDelinquencyOnRouter(routerDb) {
     // Before running the operation, reduce our threshold so that an operation that hangs for
     // 200ms should get marked overdue.
-    assert.commandWorked(
-        routerDb.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}),
-    );
+    setOverdueThreshold(routerDb, delinquentIntervalMs);
 
     // Collect the number of overdue operations before running the op that we force to be
     // overdue.
@@ -141,9 +148,7 @@ function testDelinquencyOnRouter(routerDb) {
 function testDelinquencyOnShard(routerDb, shardDb) {
     // Before running the operation, reduce our threshold so that an operation that hangs for
     // 200ms should get marked overdue.
-    assert.commandWorked(
-        shardDb.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}),
-    );
+    setOverdueThreshold(shardDb, delinquentIntervalMs);
 
     // Collect the number of overdue operations before running the op that we force to be
     // overdue.
@@ -375,7 +380,7 @@ const startupParameters = {
     delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
     internalQueryStatsRateLimit: -1,
 
-    overdueInterruptCheckIntervalMillis: delinquentIntervalMs,
+    overdueInterruptCheckIntervalMillis: delinquentIntervalMs * 100,
     overdueInterruptCheckSamplingRate: 1.0, // For this test we sample 100% of the time.
 };
 

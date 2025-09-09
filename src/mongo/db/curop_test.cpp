@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -647,13 +648,17 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
         curOp->reportState(&bob, SerializationContext{});
         BSONObj state = bob.obj();
 
+        const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+
         ASSERT_TRUE(state.hasField("numInterruptChecks")) << state.toString();
         ASSERT_EQ(state["numInterruptChecks"].Number(), 1);
 
         ASSERT_TRUE(state.hasField("delinquencyInfo"));
         ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptChecks"].Number(), 1);
-        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptTotalMillis"].Number(), 100);
-        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(), 100);
+        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptTotalMillis"].Number(),
+                  200 - interval.count());
+        ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
+                  200 - interval.count());
     }
 }
 
