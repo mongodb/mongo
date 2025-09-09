@@ -8,6 +8,7 @@
  * ]
  */
 
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const assertStats = (db, assertFn) => {
@@ -204,9 +205,13 @@ assert.eq(
         .itcount(),
 );
 assertStats(db, (stats) => {
-    // Includes _id index built for system.views.
-    assertCountIncrease(lastStats, stats, 2);
-    assertFeatureCountIncrease(lastStats, stats, "id", 1);
+    let idIndexIncrement = 0;
+    if (!areViewlessTimeseriesEnabled(db)) {
+        // Includes _id index built for system.views.
+        idIndexIncrement = 1;
+    }
+    assertCountIncrease(lastStats, stats, 1 + idIndexIncrement);
+    assertFeatureCountIncrease(lastStats, stats, "id", idIndexIncrement);
     assertFeatureCountIncrease(lastStats, stats, "single", 1);
     assertFeatureCountIncrease(lastStats, stats, "2dsphere_bucket", 1);
 
