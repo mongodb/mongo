@@ -79,7 +79,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-latest-large
+    - amazon2-latest-c6i-32xlarge
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -166,7 +166,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.3-large
+    - amazon2023.3-xlarge
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -209,7 +209,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.3-large
+    - amazon2023.3-xlarge
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -331,7 +331,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2023.3-arm64-large
+    - amazon2023.3-arm64-xxxlarge
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
@@ -410,10 +410,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-xlarge
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-xlarge
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
