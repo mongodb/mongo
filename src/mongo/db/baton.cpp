@@ -62,6 +62,7 @@ public:
     explicit SubBaton(BatonHandle baton) : _baton(std::move(baton)) {}
 
     ~SubBaton() override {
+        stdx::lock_guard lk(_mutex);
         invariant(_isDead);
     }
 
@@ -93,13 +94,19 @@ public:
     }
 
     void run(ClockSource* clkSource) noexcept override {
-        invariant(!_isDead);
+        {
+            stdx::lock_guard lk(_mutex);
+            invariant(!_isDead);
+        }
 
         _baton->run(clkSource);
     }
 
     TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept override {
-        invariant(!_isDead);
+        {
+            stdx::lock_guard lk(_mutex);
+            invariant(!_isDead);
+        }
 
         return _baton->run_until(clkSource, deadline);
     }
