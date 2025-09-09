@@ -37,8 +37,6 @@ buildvariants:
       # These are carefully and explicitly curated. Do not add more tests/tasks without consulting with DevProd.
       # unittests
       - name: bazel_coverage
-        distros:
-          - amazon2023.3-arm64-xlarge
       # jstests
       - name: jsCore
       - name: fle2
