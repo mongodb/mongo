@@ -87,14 +87,16 @@ public:
 
     static ResolvedView fromBSON(const BSONObj& commandResponseObj);
 
-    void handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const;
+    /**
+     * Applies timeseries-specific rewrites to the resolved pipeline.
+     */
+    void applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const;
 
     /**
-     * Convert an aggregation command on a view to the equivalent command against the view's
-     * underlying collection.
+     * Rewrites an index hint over a time-series view to be a hint over the underlying buckets
+     * collection. If the hint cannot or does not need to be rewritten, returns boost::none.
      */
-    AggregateCommandRequest asExpandedViewAggregation(
-        const VersionContext& vCtx, const AggregateCommandRequest& aggRequest) const;
+    boost::optional<BSONObj> rewriteIndexHintForTimeseries(const BSONObj& originalHint) const;
 
     const NamespaceString& getNamespace() const {
         return _namespace;
@@ -144,6 +146,16 @@ private:
     boost::optional<bool> _timeseriesMayContainMixedData;
     boost::optional<bool> _timeseriesUsesExtendedRange;
     boost::optional<bool> _timeseriesfixedBuckets;
+};
+
+class PipelineResolver {
+public:
+    /**
+     * Constructs a new aggregation request which targets the base collection of 'resolvedView'
+     * and applies the view pipeline to the original aggregation request pipeline.
+     */
+    static AggregateCommandRequest buildRequestWithResolvedPipeline(
+        const ResolvedView& resolvedView, const AggregateCommandRequest& request);
 };
 
 }  // namespace mongo

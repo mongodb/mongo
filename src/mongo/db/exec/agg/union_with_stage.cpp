@@ -109,8 +109,8 @@ std::unique_ptr<mongo::Pipeline> buildPipelineFromViewDefinition(
     opts.optimize = !resolvedNs.pipeline.empty();
     opts.validator = validatorCallback;
 
-    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNs.ns, resolvedNs.uuid, boost::none);
+    auto subExpCtx =
+        makeCopyForSubPipelineFromExpressionContext(expCtx, resolvedNs.ns, resolvedNs.uuid);
 
     return mongo::Pipeline::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);

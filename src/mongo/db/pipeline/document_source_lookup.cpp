@@ -227,7 +227,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     _sharedState->resolvedPipeline = resolvedNamespace.pipeline;
 
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNamespace.ns, resolvedNamespace.uuid, boost::none, _fromNs);
+        expCtx, resolvedNamespace.ns, resolvedNamespace.uuid, _fromNs);
     _fromExpCtx->setInLookup(true);
 }
 

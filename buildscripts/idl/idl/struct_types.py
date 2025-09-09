@@ -243,7 +243,7 @@ class StructTypeInfoBase(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def gen_getter_method(self, indented_writer):
+    def gen_methods(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         """Generate the additional methods for a class."""
         pass
@@ -389,7 +389,7 @@ class _StructTypeInfo(StructTypeInfoBase):
         # type: () -> Optional[MethodInfo]
         return None
 
-    def gen_getter_method(self, indented_writer):
+    def gen_methods(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         pass
 
@@ -557,7 +557,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
             "void",
         )
 
-    def gen_getter_method(self, indented_writer):
+    def gen_methods(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         raise NotImplementedError
 
@@ -639,8 +639,9 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
             "void",
         )
 
-    def gen_getter_method(self, indented_writer):
+    def gen_methods(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
+        indented_writer.write_line("void setNamespace(NamespaceString nss) { _nss = std::move(nss); }")
         indented_writer.write_line("const NamespaceString& getNamespace() const { return _nss; }")
         if self._struct.non_const_getter:
             indented_writer.write_line("NamespaceString& getNamespace() { return _nss; }")
@@ -744,7 +745,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
             "void",
         )
 
-    def gen_getter_method(self, indented_writer):
+    def gen_methods(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line(
             "const NamespaceStringOrUUID& getNamespaceOrUUID() const { return _nssOrUUID; }"

@@ -930,7 +930,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             self.gen_getter(command, command.command_field)
         else:
             struct_type_info = struct_types.get_struct_info(command)
-            struct_type_info.gen_getter_method(self._writer)
+            struct_type_info.gen_methods(self._writer)
 
         self._writer.write_empty_line()
 

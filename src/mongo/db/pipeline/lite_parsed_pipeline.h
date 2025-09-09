@@ -65,15 +65,16 @@ public:
      * validation happens later, during Pipeline construction.
      */
     LiteParsedPipeline(const AggregateCommandRequest& request,
-                       const bool isRunningAgainstViewForHybridSearch = false)
+                       const bool isRunningAgainstView_ForHybridSearch = false)
         : LiteParsedPipeline(
-              request.getNamespace(), request.getPipeline(), isRunningAgainstViewForHybridSearch) {}
+              request.getNamespace(), request.getPipeline(), isRunningAgainstView_ForHybridSearch) {
+    }
 
     LiteParsedPipeline(const NamespaceString& nss,
                        const std::vector<BSONObj>& pipelineStages,
-                       const bool isRunningAgainstViewForHybridSearch = false,
+                       const bool isRunningAgainstView_ForHybridSearch = false,
                        const LiteParserOptions& options = LiteParserOptions{})
-        : _isRunningAgainstViewForHybridSearch(isRunningAgainstViewForHybridSearch) {
+        : _isRunningAgainstView_ForHybridSearch(isRunningAgainstView_ForHybridSearch) {
         _stageSpecs.reserve(pipelineStages.size());
         for (auto&& rawStage : pipelineStages) {
             _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage, options));
@@ -284,8 +285,8 @@ public:
     void checkStagesAllowedInViewDefinition() const;
 
     // TODO SERVER-101722: Remove this once the validation is changed.
-    bool isRunningAgainstViewForHybridSearch() const {
-        return _isRunningAgainstViewForHybridSearch;
+    bool isRunningAgainstView_ForHybridSearch() const {
+        return _isRunningAgainstView_ForHybridSearch;
     }
 
 private:
@@ -296,7 +297,7 @@ private:
     // This variable specifies whether the pipeline is running on a view's namespace. This is
     // currently needed for $rankFusion/$scoreFusion positional validation.
     // TODO SERVER-101722: Remove this once the validation is changed.
-    bool _isRunningAgainstViewForHybridSearch = false;
+    bool _isRunningAgainstView_ForHybridSearch = false;
 
     Deferred<bool (*)(const decltype(_stageSpecs)&)> _hasChangeStream{[](const auto& stageSpecs) {
         return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {

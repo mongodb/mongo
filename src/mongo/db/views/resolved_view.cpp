@@ -173,7 +173,7 @@ void ResolvedView::serializeToBSON(StringData fieldName, BSONObjBuilder* builder
     serialize(builder);
 }
 
-void ResolvedView::handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
+void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
     // Stages that are constrained to be the first stage of the pipeline ($collStats, $indexStats)
     // require special handling since $_internalUnpackBucket is the first stage.
     if (resolvedPipeline->size() >= 2 &&
@@ -234,76 +234,79 @@ void ResolvedView::handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeli
     }
 }
 
-AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
-    const VersionContext& vCtx, const AggregateCommandRequest& request) const {
+boost::optional<BSONObj> ResolvedView::rewriteIndexHintForTimeseries(
+    const BSONObj& originalHint) const {
+    if (!timeseries()) {
+        return boost::none;
+    }
+
+    // Only convert if we are given an index spec, not an index name or a $natural hint.
+    if (!timeseries::isHintIndexKey(originalHint)) {
+        return boost::none;
+    }
+
+    auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*_timeseriesOptions,
+                                                                               originalHint);
+    if (converted.isOK()) {
+        return converted.getValue();
+    }
+
+    return boost::none;
+}
+
+
+AggregateCommandRequest PipelineResolver::buildRequestWithResolvedPipeline(
+    const ResolvedView& resolvedView, const AggregateCommandRequest& originalRequest) {
+    // Start with a copy of the original request and modify fields as needed. We assume that most
+    // fields should be unchanged from the original request; any fields that need to be changed will
+    // be modified below.
+    // TODO SERVER-110454: Avoid copying the original pipeline when possible.
+    AggregateCommandRequest expandedRequest = originalRequest;
+    expandedRequest.setNamespace(resolvedView.getNamespace());
+
+    // If both 'explain' and 'cursor' are set, we give precedence to 'explain' and drop 'cursor'.
+    if (originalRequest.getExplain()) {
+        expandedRequest.setCursor(SimpleCursorOptions());
+    }
+
     std::vector<BSONObj> resolvedPipeline;
+    auto& viewPipeline = resolvedView.getPipeline();
     // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
     // For this reason, we do not expand the aggregation request to include the view pipeline.
-    if (search_helper_bson_obj::isMongotPipeline(request.getPipeline())) {
-        resolvedPipeline.reserve(request.getPipeline().size());
-        resolvedPipeline.insert(
-            resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
+    if (search_helper_bson_obj::isMongotPipeline(originalRequest.getPipeline())) {
+        resolvedPipeline.reserve(originalRequest.getPipeline().size());
+        resolvedPipeline.insert(resolvedPipeline.end(),
+                                originalRequest.getPipeline().begin(),
+                                originalRequest.getPipeline().end());
     } else {
         // The new pipeline consists of two parts: first, 'pipeline' in this ResolvedView; then, the
         // pipeline in 'request'.
-        resolvedPipeline.reserve(_pipeline.size() + request.getPipeline().size());
-        resolvedPipeline.insert(resolvedPipeline.end(), _pipeline.begin(), _pipeline.end());
-        resolvedPipeline.insert(
-            resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
+        resolvedPipeline.reserve(viewPipeline.size() + originalRequest.getPipeline().size());
+        resolvedPipeline.insert(resolvedPipeline.end(), viewPipeline.begin(), viewPipeline.end());
+        resolvedPipeline.insert(resolvedPipeline.end(),
+                                originalRequest.getPipeline().begin(),
+                                originalRequest.getPipeline().end());
     }
 
     if (resolvedPipeline.size() >= 1 &&
         resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal]) {
-        handleTimeseriesRewrites(&resolvedPipeline);
+        resolvedView.applyTimeseriesRewrites(&resolvedPipeline);
     }
-
-    AggregateCommandRequest expandedRequest{
-        _namespace, std::move(resolvedPipeline), request.getSerializationContext()};
-
-    if (request.getExplain()) {
-        expandedRequest.setExplain(request.getExplain());
-    } else {
-        expandedRequest.setCursor(request.getCursor());
-    }
+    expandedRequest.setPipeline(std::move(resolvedPipeline));
 
     // If we have an index hint on a time-series view, we may need to rewrite the index spec to
     // match the index on the underlying buckets collection.
-    if (request.getHint() && _timeseriesOptions) {
-        BSONObj original = *request.getHint();
-        BSONObj rewritten = original;
-        // Only convert if we are given an index spec, not an index name or a $natural hint.
-        if (timeseries::isHintIndexKey(original)) {
-            auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                *_timeseriesOptions, original);
-            if (converted.isOK()) {
-                rewritten = converted.getValue();
-            }
+    if (originalRequest.getHint() && resolvedView.timeseries()) {
+        auto newHint = resolvedView.rewriteIndexHintForTimeseries(*originalRequest.getHint());
+        if (newHint.has_value()) {
+            expandedRequest.setHint(*newHint);
         }
-        expandedRequest.setHint(rewritten);
-    } else {
-        expandedRequest.setHint(request.getHint());
     }
-
-    // If query settings were present in the original request, they should be present in the
-    // 'expandedRequest'.
-    if (request.getQuerySettings()) {
-        expandedRequest.setQuerySettings(request.getQuerySettings());
-    }
-
-    expandedRequest.setMaxTimeMS(request.getMaxTimeMS());
-    expandedRequest.setReadConcern(request.getReadConcern());
-    expandedRequest.setUnwrappedReadPref(request.getUnwrappedReadPref());
-    expandedRequest.setBypassDocumentValidation(request.getBypassDocumentValidation());
-    expandedRequest.setAllowDiskUse(request.getAllowDiskUse());
-    expandedRequest.setIsMapReduceCommand(request.getIsMapReduceCommand());
-    expandedRequest.setLet(request.getLet());
-    expandedRequest.setIncludeQueryStatsMetrics(request.getIncludeQueryStatsMetrics());
-    expandedRequest.setComment(request.getComment());
 
     // Operations on a view must always use the default collation of the view. We must have already
     // checked that if the user's request specifies a collation, it matches the collation of the
     // view.
-    expandedRequest.setCollation(_defaultCollation);
+    expandedRequest.setCollation(resolvedView.getDefaultCollation());
 
     return expandedRequest;
 }

@@ -312,8 +312,11 @@ public:
                             CountCommandRequest::parse(originalCmdObj, IDLParserContext("count"));
                         auto aggRequestOnView =
                             query_request_conversion::asAggregateCommandRequest(countRequest);
-                        auto resolvedAggRequest = ex->asExpandedViewAggregation(
-                            VersionContext::getDecoration(opCtx), aggRequestOnView);
+
+                        const ResolvedView& resolvedView = *ex.extraInfo<ResolvedView>();
+                        auto resolvedAggRequest =
+                            PipelineResolver::buildRequestWithResolvedPipeline(resolvedView,
+                                                                               aggRequestOnView);
 
                         BSONObj aggResult = CommandHelpers::runCommandDirectly(
                             opCtx,

@@ -96,7 +96,7 @@ std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
     opts.validator = validatorCallback;
 
     auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNs.ns, resolvedNs.uuid, boost::none, userNss);
+        expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
 
     return Pipeline::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);

@@ -90,7 +90,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
     // case of a change stream on a whole database so we need to make a copy of the
     // ExpressionContext with the new namespace.
-    auto foreignExpCtx = makeCopyFromExpressionContext(expCtx, nss, collectionUUID, boost::none);
+    auto foreignExpCtx = makeCopyFromExpressionContext(expCtx, nss, collectionUUID);
     std::unique_ptr<Pipeline> pipeline;
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {

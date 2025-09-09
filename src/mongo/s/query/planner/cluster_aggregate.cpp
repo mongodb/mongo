@@ -1146,11 +1146,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     }
 
     auto resolvedAggRequest =
-        resolvedView.asExpandedViewAggregation(VersionContext::getDecoration(opCtx), request);
-
-    if (request.getIsHybridSearch()) {
-        resolvedAggRequest.setIsHybridSearch(true);
-    }
+        PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, request);
 
     result->resetToEmpty();
 

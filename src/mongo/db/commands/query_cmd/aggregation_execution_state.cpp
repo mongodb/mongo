@@ -630,9 +630,10 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
           _opCtx,
           _originalAggReqDerivatives->request.getNamespace(),
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
-      _resolvedViewRequest(_resolvedView.asExpandedViewAggregation(
-          VersionContext::getDecoration(_opCtx), _originalAggReqDerivatives->request)),
-      _resolvedViewLiteParsedPipeline(_resolvedViewRequest, true) {
+      _resolvedViewRequest_DO_NOT_USE_DIRECTLY(PipelineResolver::buildRequestWithResolvedPipeline(
+          _resolvedView, _originalAggReqDerivatives->request)),
+      _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(_resolvedViewRequest_DO_NOT_USE_DIRECTLY,
+                                                          true) {
     bool isExplain = _originalAggReqDerivatives->request.getExplain().get_value_or(false);
     uassert(std::move(_resolvedView),
             "Explain of a resolved view must be executed by mongos",
@@ -640,9 +641,8 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
 
     // Parse the resolved view into a new AggregationRequestDerivatives object.
     _aggReqDerivatives = std::make_unique<AggregateRequestDerivatives>(
-        _resolvedViewRequest, _resolvedViewLiteParsedPipeline, [this]() {
-            return _resolvedViewRequest.toBSON();
-        });
+        _resolvedViewRequest_DO_NOT_USE_DIRECTLY,
+        _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY);
 
     setExecutionNss(_resolvedView.getNamespace());
 }
@@ -674,7 +674,7 @@ StatusWith<std::unique_ptr<ResolvedViewAggExState>> ResolvedViewAggExState::crea
         std::move(aggExState), aggCatalogState, viewDefinition);
 }
 
-std::unique_ptr<Pipeline> ResolvedViewAggExState::handleViewHelper(
+std::unique_ptr<Pipeline> ResolvedViewAggExState::applyViewToPipeline(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline> pipeline,
     boost::optional<UUID> uuid) const {
@@ -700,7 +700,7 @@ std::unique_ptr<Pipeline> ResolvedViewAggExState::handleViewHelper(
 }
 
 ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingInfo& cri) {
-    const NamespaceString& underlyingNss = _resolvedView.getNamespace();
+    const NamespaceString& underlyingNss = getExecutionNss();
 
     const auto optPlacementConflictTimestamp = [&]() {
         auto originalShardVersion =

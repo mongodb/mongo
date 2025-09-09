@@ -167,6 +167,5 @@ boost::intrusive_ptr<ExpressionContext> makeCopyForSubPipelineFromExpressionCont
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString nss,
     boost::optional<UUID> uuid = boost::none,
-    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none,
     boost::optional<NamespaceString> userNs = boost::none);
 }  // namespace mongo

@@ -69,7 +69,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmpty
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommandRequest requestOnView{viewNss, emptyPipeline};
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnView);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnView);
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
@@ -81,23 +81,13 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
     const ResolvedView resolvedView{backingNss, viewPipeline, kSimpleCollation};
     AggregateCommandRequest requestOnView{viewNss, std::vector<BSONObj>{BSON("limit" << 3)}};
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnView);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnView);
 
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline"
                          << BSON_ARRAY(BSON("skip" << 7) << BSON("limit" << 3)) << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
     ASSERT_BSONOBJ_EQ(result.toBSON(), expected);
-}
-
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {
-    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest{viewNss, std::vector<mongo::BSONObj>()};
-    aggRequest.setExplain(true);
-
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT(result.getExplain());
-    ASSERT(*result.getExplain() == true);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExplain) {
@@ -108,68 +98,155 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExpla
     aggRequest.setCursor(cursor);
     aggRequest.setExplain(true);
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
     ASSERT(result.getExplain());
-    ASSERT(*result.getExplain() == true);
+    ASSERT(*result.getExplain());
     ASSERT_EQ(
         result.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
         aggregation_request_helper::kDefaultBatchSize);
 }
 
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesBypassDocumentValidation) {
+TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndNoExplainPreservesCursor) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-    aggRequest.setBypassDocumentValidation(true);
+    AggregateCommandRequest aggRequest{viewNss, std::vector<mongo::BSONObj>()};
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(10);
+    aggRequest.setCursor(cursor);
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_TRUE(result.getBypassDocumentValidation().value_or(false));
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+    ASSERT_FALSE(result.getExplain());
+    ASSERT_EQ(
+        result.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+        10);
 }
 
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesAllowDiskUse) {
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesUnsetFields) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-    aggRequest.setAllowDiskUse(true);
+    auto aggRequest = AggregateCommandRequest(viewNss, std::vector<mongo::BSONObj>());
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_TRUE(result.getAllowDiskUse());
-}
-
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesHint) {
-    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-    aggRequest.setHint(BSON("a" << 1));
-
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_BSONOBJ_EQ(result.getHint().value_or(BSONObj()), BSON("a" << 1));
-}
-
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadPreference) {
-    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-    aggRequest.setUnwrappedReadPref(BSON("$readPreference" << "nearest"));
-
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_BSONOBJ_EQ(result.getUnwrappedReadPref().value_or(BSONObj()),
-                      BSON("$readPreference" << "nearest"));
-}
-
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadConcern) {
-    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-    aggRequest.setReadConcern(repl::ReadConcernArgs::kLinearizable);
-
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_BSONOBJ_EQ(result.getReadConcern().value_or(repl::ReadConcernArgs()).toBSONInner(),
-                      BSON("level" << "linearizable"));
-}
-
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesMaxTimeMS) {
-    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
+    // Set only a few fields on the request.
+    aggRequest.setExplain(true);
+    aggRequest.setLet(BSON("myVar" << 5));
+    aggRequest.setNeedsMerge(true);
+    aggRequest.setStmtId(123);
     aggRequest.setMaxTimeMS(100u);
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_EQ(result.getMaxTimeMS().value_or(0), 100u);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+
+    // Verify that the namespace, pipeline, and collation were updated correctly.
+    ASSERT_EQ(result.getNamespace(), backingNss);
+    ASSERT_TRUE(result.getPipeline().empty());
+    ASSERT(result.getCollation()->isEmpty());
+
+    // Verify that the other set fields were preserved.
+    ASSERT_TRUE(result.getExplain() && *result.getExplain());
+    ASSERT_BSONOBJ_EQ(result.getLet().value(), BSON("myVar" << 5));
+    ASSERT_TRUE(result.getNeedsMerge().value_or(false));
+    ASSERT_EQ(result.getStmtId().value(), 123);
+    ASSERT_EQ(result.getMaxTimeMS().value(), 100u);
+
+    // Verify that all unset optional fields remain unset.
+    ASSERT_FALSE(result.getAllowDiskUse().has_value());
+    ASSERT_FALSE(result.getBypassDocumentValidation().has_value());
+    ASSERT_FALSE(result.getHint().has_value());
+    ASSERT_FALSE(result.getQuerySettings().has_value());
+    ASSERT_FALSE(result.getFromMongos().has_value());
+    ASSERT_FALSE(result.getNeedsSortedMerge().has_value());
+    ASSERT_FALSE(result.getFromRouter().has_value());
+    ASSERT_FALSE(result.getRequestReshardingResumeToken().has_value());
+    ASSERT_FALSE(result.getIsMapReduceCommand().has_value());
+    ASSERT_FALSE(result.getCollectionUUID().has_value());
+    ASSERT_FALSE(result.getPassthroughToShard().has_value());
+    ASSERT_FALSE(result.getEncryptionInformation().has_value());
+    ASSERT_FALSE(result.getSampleId().has_value());
+    ASSERT_FALSE(result.getIsClusterQueryWithoutShardKeyCmd().has_value());
+    ASSERT_FALSE(result.getRequestResumeToken().has_value());
+    ASSERT_FALSE(result.getResumeAfter().has_value());
+    ASSERT_FALSE(result.getStartAt().has_value());
+    ASSERT_FALSE(result.getIncludeQueryStatsMetrics().has_value());
+    ASSERT_FALSE(result.getIsHybridSearch().has_value());
+    ASSERT_FALSE(result.getReadConcern().has_value());
+    ASSERT_FALSE(result.getUnwrappedReadPref().has_value());
+}
+
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
+    auto aggRequest = AggregateCommandRequest(viewNss, std::vector<mongo::BSONObj>());
+
+    // Set all fields on the request.
+    aggRequest.setExplain(true);
+    aggRequest.setAllowDiskUse(true);
+    aggRequest.setBypassDocumentValidation(true);
+    aggRequest.setCollation(BSON("locale" << "en_US"));
+    aggRequest.setHint(BSON("a" << 1));
+    aggRequest.setQuerySettings(
+        query_settings::QuerySettings::parse(BSON("queryFramework" << "classic")));
+    aggRequest.setLet(BSON("myVar" << 5));
+    aggRequest.setNeedsMerge(true);
+    aggRequest.setNeedsSortedMerge(true);
+    aggRequest.setFromMongos(true);
+    aggRequest.setFromRouter(true);
+    aggRequest.setRequestReshardingResumeToken(true);
+    aggRequest.setExchange(ExchangeSpec::parse(BSON("policy" << "roundrobin"
+                                                             << "consumers" << 3)));
+    aggRequest.setIsMapReduceCommand(true);
+    aggRequest.setCollectionUUID(UUID::gen());
+    aggRequest.setPassthroughToShard(
+        PassthroughToShardOptions::parse(BSON("shard" << "shard0000")));
+    aggRequest.setEncryptionInformation(
+        EncryptionInformation::parse(BSON("type" << 1 << "schema" << BSON("foo" << "bar"))));
+    aggRequest.setSampleId(UUID::gen());
+    aggRequest.setStmtId(123);
+    aggRequest.setIsClusterQueryWithoutShardKeyCmd(true);
+    aggRequest.setRequestResumeToken(true);
+    aggRequest.setResumeAfter(BSON("rid" << 12345));
+    aggRequest.setStartAt(BSON("rid" << 67890));
+    aggRequest.setIncludeQueryStatsMetrics(true);
+    aggRequest.setIsHybridSearch(true);
+    aggRequest.setMaxTimeMS(100u);
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kLinearizable);
+    aggRequest.setUnwrappedReadPref(BSON("$readPreference" << BSON("mode" << "secondary")));
+
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+
+    // Verify that the namespace, pipeline, and collation were updated correctly.
+    ASSERT_EQ(result.getNamespace(), backingNss);
+    ASSERT_TRUE(result.getPipeline().empty());
+    ASSERT(result.getCollation()->isEmpty());
+
+    // Verify that all other fields were preserved.
+    ASSERT_TRUE(result.getExplain() && *result.getExplain());
+    ASSERT_TRUE(result.getAllowDiskUse());
+    ASSERT_TRUE(result.getBypassDocumentValidation() && *result.getBypassDocumentValidation());
+    ASSERT_BSONOBJ_EQ(result.getHint().value(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(result.getQuerySettings()->toBSON(), BSON("queryFramework" << "classic"));
+    ASSERT_BSONOBJ_EQ(result.getLet().value(), BSON("myVar" << 5));
+    ASSERT_TRUE(result.getNeedsMerge().value_or(false));
+    ASSERT_TRUE(result.getNeedsSortedMerge().value_or(false));
+    ASSERT_TRUE(result.getFromMongos().value_or(false));
+    ASSERT_TRUE(result.getFromRouter().value_or(false));
+    ASSERT_TRUE(result.getRequestReshardingResumeToken().value_or(false));
+    ASSERT_BSONOBJ_EQ(result.getExchange()->toBSON(),
+                      BSON("policy" << "roundrobin"
+                                    << "consumers" << 3 << "orderPreserving" << false
+                                    << "bufferSize" << 16777216 << "key" << BSONObj()));
+    ASSERT_TRUE(result.getIsMapReduceCommand().value_or(false));
+    ASSERT_EQ(result.getCollectionUUID(), aggRequest.getCollectionUUID());
+    ASSERT_BSONOBJ_EQ(result.getPassthroughToShard()->toBSON(), BSON("shard" << "shard0000"));
+    ASSERT_BSONOBJ_EQ(result.getEncryptionInformation()->toBSON(),
+                      BSON("type" << 1 << "schema" << BSON("foo" << "bar")));
+    ASSERT_EQ(result.getSampleId(), aggRequest.getSampleId());
+    ASSERT_EQ(result.getStmtId().value(), 123);
+    ASSERT_TRUE(result.getIsClusterQueryWithoutShardKeyCmd().value_or(false));
+    ASSERT_TRUE(result.getRequestResumeToken().value_or(false));
+    ASSERT_BSONOBJ_EQ(result.getResumeAfter().value(), BSON("rid" << 12345));
+    ASSERT_BSONOBJ_EQ(result.getStartAt().value(), BSON("rid" << 67890));
+    ASSERT_TRUE(result.getIncludeQueryStatsMetrics());
+    ASSERT_TRUE(result.getIsHybridSearch().value_or(false));
+    ASSERT_EQ(result.getMaxTimeMS().value(), 100u);
+    ASSERT_BSONOBJ_EQ(result.getReadConcern()->toBSONInner(), BSON("level" << "linearizable"));
+    ASSERT_BSONOBJ_EQ(result.getUnwrappedReadPref().value(),
+                      BSON("$readPreference" << BSON("mode" << "secondary")));
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesDefaultCollationOfView) {
@@ -177,7 +254,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesDefaultCollationOfView) {
     ASSERT_BSONOBJ_EQ(resolvedView.getDefaultCollation(), BSON("locale" << "fr_CA"));
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
 
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
     ASSERT_BSONOBJ_EQ(result.getCollation().value_or(BSONObj()), BSON("locale" << "fr_CA"));
 }
 
@@ -187,7 +264,7 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
     AggregateCommandRequest requestOnViewDefault{viewNss, emptyPipeline};
 
     auto resultDefault =
-        resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnViewDefault);
+        PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnViewDefault);
     ASSERT_TRUE(resultDefault.getSerializationContext() ==
                 SerializationContext::stateCommandRequest());
 
@@ -196,26 +273,13 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
     AggregateCommandRequest requestOnViewCommand{viewNss, emptyPipeline, scCommand};
 
     auto resultCommand =
-        resolvedView.asExpandedViewAggregation(kNoVersionContext, requestOnViewCommand);
+        PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnViewCommand);
     ASSERT_EQ(resultCommand.getSerializationContext().getSource(),
               SerializationContext::Source::Command);
     ASSERT_EQ(resultCommand.getSerializationContext().getCallerType(),
               SerializationContext::CallerType::Request);
     ASSERT_EQ(resultCommand.getSerializationContext().getPrefix(),
               SerializationContext::Prefix::IncludePrefix);
-}
-
-TEST(ResolvedViewTest, ExpandingAggRequestPreservesIncludeQueryStatsMetrics) {
-    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
-    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
-
-    aggRequest.setIncludeQueryStatsMetrics(false);
-    auto result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_FALSE(result.getIncludeQueryStatsMetrics());
-
-    aggRequest.setIncludeQueryStatsMetrics(true);
-    result = resolvedView.asExpandedViewAggregation(kNoVersionContext, aggRequest);
-    ASSERT_TRUE(result.getIncludeQueryStatsMetrics());
 }
 
 TEST(ResolvedViewTest, FromBSONFailsIfMissingResolvedView) {

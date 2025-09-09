@@ -130,7 +130,7 @@ public:
      * Returns the namespace of the original request the class was constructed with. For AggExState,
      * this is just the namespace on the request.
      */
-    virtual const NamespaceString& getOriginalNss() const {
+    const NamespaceString& getOriginalNss() const {
         return getOriginalRequest().getNamespace();
     }
 
@@ -180,7 +180,7 @@ public:
      * view (notably the oplog)
      */
     void setExecutionNss(NamespaceString nss) {
-        _executionNss = nss;
+        _executionNss = std::move(nss);
     }
 
     /* Checking member functions (returns bool / status describing the aggregation state) */
@@ -200,7 +200,7 @@ public:
      * the pipeline dispatched will be the desugared representation). If the hybrid search request
      * came straight from the user, we'll identify via the lite-parsed pipeline.
      */
-    virtual bool isHybridSearchPipeline() const {
+    bool isHybridSearchPipeline() const {
         // Use the original request as we want this assert to work during/after view resolution.
         return _aggReqDerivatives->request.getIsHybridSearch() ||
             _aggReqDerivatives->liteParsedPipeline.hasHybridSearchStage();
@@ -265,7 +265,7 @@ public:
      * Returns the total aggregation pipeline for a view. If called on the base class, returns the
      * normal pipeline (no op).
      */
-    virtual std::unique_ptr<Pipeline> handleViewHelper(
+    virtual std::unique_ptr<Pipeline> applyViewToPipeline(
         boost::intrusive_ptr<ExpressionContext> expCtx,
         std::unique_ptr<Pipeline> pipeline,
         boost::optional<UUID> uuid) const {
@@ -300,11 +300,12 @@ protected:
               liteParsedPipeline(liteParsedPipeline),
               cmdObj(DeferredCmd(cmdObj)) {}
 
-        // Constructor for when the BSONObj's construction is to be deferred
+        // Constructor for when the BSONObj's construction is to be deferred.
         AggregateRequestDerivatives(AggregateCommandRequest& request,
-                                    const LiteParsedPipeline& liteParsedPipeline,
-                                    std::function<BSONObj()> BSONObjFn)
-            : request(request), liteParsedPipeline(liteParsedPipeline), cmdObj(BSONObjFn) {}
+                                    const LiteParsedPipeline& liteParsedPipeline)
+            : request(request),
+              liteParsedPipeline(liteParsedPipeline),
+              cmdObj([&request]() { return request.toBSON(); }) {}
     };
 
     // The AggregateRequestDerivatives variables is wrapped in a unique_ptr because it needs to be
@@ -388,9 +389,9 @@ public:
         return _resolvedView;
     }
 
-    std::unique_ptr<Pipeline> handleViewHelper(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                               std::unique_ptr<Pipeline> pipeline,
-                                               boost::optional<UUID> uuid) const override;
+    std::unique_ptr<Pipeline> applyViewToPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                  std::unique_ptr<Pipeline> pipeline,
+                                                  boost::optional<UUID> uuid) const override;
 
     ScopedSetShardRole setShardRole(const CollectionRoutingInfo& cri);
 
@@ -401,30 +402,8 @@ public:
         return _originalAggReqDerivatives->request;
     }
 
-    /**
-     * Returns the original namespace the class was constructed with.
-     */
-    const NamespaceString& getOriginalNss() const override {
-        return _originalAggReqDerivatives->request.getNamespace();
-    }
-
     boost::optional<NamespaceString> getViewNss() const override {
         return boost::make_optional(getOriginalNss());
-    }
-
-    /**
-     * True if aggregation represents a $rankFusion/$scoreFusion pipeline.
-     *
-     * If the $rankFusion/$scoreFusion request came from the router, that will get annotated on the
-     * request from the router (which is necessary to distinguish it as $rankFusion/$scoreFusion
-     * since the pipeline dispatched will be the desugared representation). If the
-     * $rankFusion/$scoreFusion request came straight from the user, we'll identify via the
-     * lite-parsed pipeline.
-     */
-    bool isHybridSearchPipeline() const override {
-        // Use the original request as we want this assert to work during/after view resolution.
-        return _originalAggReqDerivatives->request.getIsHybridSearch() ||
-            _originalAggReqDerivatives->liteParsedPipeline.hasHybridSearchStage();
     }
 
 private:
@@ -437,8 +416,17 @@ private:
 
     ResolvedView _resolvedView;
 
-    AggregateCommandRequest _resolvedViewRequest;
-    const LiteParsedPipeline _resolvedViewLiteParsedPipeline;
+    // After construction of the ResolvedViewAggExState, we return to the start of runAggregate()
+    // Both of these fields below will now be the underlying resolved _aggReqDerivatives for
+    // aggregation as we return to the start of runAggregate() with the newly resolved full
+    // pipeline. Since the AggExState base class only stores references inside
+    // AggregateRequestDerivatives, we need to store them here, but usages should almost always go
+    // through _aggReqDerivatives instead.
+    //
+    // TODO SERVER-93536 Remove this member variable once AggregateRequestDerivatives stores
+    // the request by value instead of reference.
+    AggregateCommandRequest _resolvedViewRequest_DO_NOT_USE_DIRECTLY;
+    const LiteParsedPipeline _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY;
 };
 
 /**

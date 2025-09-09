@@ -147,7 +147,7 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
         uassert(10170100,
                 "$rankFusion/$scoreFusion can only be the first stage of an aggregation pipeline.",
                 !((stage_it != _stageSpecs.begin()) && stage->isHybridSearchStage() &&
-                  !isRunningAgainstViewForHybridSearch()));
+                  !isRunningAgainstView_ForHybridSearch()));
 
         const auto& stageName = (*stage_it)->getParseTimeName();
         const auto& stageInfo = LiteParsedDocumentSource::getInfo(stageName);

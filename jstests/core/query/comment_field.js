@@ -30,6 +30,12 @@ coll.drop();
 
 assert.commandWorked(coll.insert({x: 1, _id: 1}));
 assert.commandWorked(coll.insert({x: 1, _id: 2}));
+assert.commandWorked(coll.insert({x: 0, _id: 3}));
+
+const viewPipeline = [{$match: {x: 1}}];
+const viewName = "view";
+assert.commandWorked(testDB.createView(viewName, coll.getName(), viewPipeline));
+const view = testDB[viewName];
 
 function setPostCommandFailpoint({mode, options}) {
     assert.commandWorked(
@@ -103,10 +109,17 @@ runCommentParamTest({
     command: {aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 1}},
 });
 
-// Verify the 'comment' field on the aggreage command is propagated to the subsequent getMore
+// Verify that the comment attached to an aggregate command on a view appears in both currentOp and the
+// profiler.
+runCommentParamTest({
+    coll: view,
+    command: {aggregate: viewName, pipeline: [], cursor: {batchSize: 1}},
+});
+
+// Verify the 'comment' field on the aggregate command is propagated to the subsequent getMore
 // command.
 const comment = [{name: "agg_comment"}];
-const res = testDB.runCommand({aggregate: coll.getName(), pipeline: [], comment: comment, cursor: {batchSize: 1}});
+let res = testDB.runCommand({aggregate: coll.getName(), pipeline: [], comment: comment, cursor: {batchSize: 1}});
 runCommentParamTest({
     coll: coll,
     command: {getMore: res.cursor.id, collection: coll.getName(), batchSize: 1},
@@ -116,6 +129,15 @@ runCommentParamTest({
 // Verify the 'comment' field on the getMore command takes precedence over the 'comment' field on
 // the originating command.
 runCommentParamTest({coll: coll, command: {getMore: res.cursor.id, collection: coll.getName(), batchSize: 1}});
+
+// Verify the 'comment' field on the aggregate command on a view is propagated to the subsequent
+// getMore command.
+res = testDB.runCommand({aggregate: viewName, pipeline: [], comment: comment, cursor: {batchSize: 1}});
+runCommentParamTest({
+    coll: view,
+    command: {getMore: res.cursor.id, collection: viewName, batchSize: 1},
+    commentObj: comment,
+});
 
 // Verify that comment field gets populated on the profiler for aggregate with explain:true.
 runCommentParamTest({
