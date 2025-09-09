@@ -47,6 +47,7 @@
 #include "mongo/db/global_catalog/known_collections.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
@@ -201,15 +202,20 @@ public:
             {
                 // The "local.system.collections_to_restore" collection needs to exist prior to
                 // running this command.
-                CollectionPtr restoreColl = CollectionPtr::CollectionPtr_UNSAFE(
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                        opCtx, NamespaceString::kConfigsvrRestoreNamespace));
+                const auto coll =
+                    acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest(
+                                          NamespaceString::kConfigsvrRestoreNamespace,
+                                          PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                          repl::ReadConcernArgs::get(opCtx),
+                                          AcquisitionPrerequisites::kRead),
+                                      MODE_IS);
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()
                             << "Collection "
                             << NamespaceString::kConfigsvrRestoreNamespace.toStringForErrorMsg()
                             << " is missing",
-                        restoreColl);
+                        coll.exists());
             }
 
             DBDirectClient client(opCtx);
@@ -238,9 +244,16 @@ public:
 
 
                 LOGV2(6261300, "1st Phase - Restoring collection entries", logAttrs(nss));
-                CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
-                if (!coll) {
+
+                const auto coll =
+                    acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest(
+                                          nss,
+                                          PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                          repl::ReadConcernArgs::get(opCtx),
+                                          AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
+                if (!coll.exists()) {
                     LOGV2(6261301, "Collection not found, skipping", logAttrs(nss));
                     continue;
                 }
@@ -299,7 +312,7 @@ public:
                                 "Found document",
                                 "doc"_attr = doc,
                                 "shouldRestore"_attr = shouldRestore,
-                                logAttrs(coll->ns().dbName()),
+                                logAttrs(nss.dbName()),
                                 "docNss"_attr = docNss);
 
                     if (shouldRestore == ShouldRestoreDocument::kYes ||
@@ -311,10 +324,10 @@ public:
                     LOGV2_DEBUG(6938702,
                                 1,
                                 "Deleting collection that was not restored",
-                                logAttrs(coll->ns().dbName()),
-                                "uuid"_attr = coll->uuid(),
+                                logAttrs(nss.dbName()),
+                                "uuid"_attr = coll.uuid(),
                                 "_id"_attr = doc.getField("_id"));
-                    NamespaceStringOrUUID nssOrUUID(coll->ns().dbName(), coll->uuid());
+                    NamespaceStringOrUUID nssOrUUID(nss.dbName(), coll.uuid());
                     uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                         opCtx, nssOrUUID, doc.getField("_id")));
                 }
@@ -332,9 +345,16 @@ public:
                 // given database was restored.
                 for (const NamespaceString& nss : databasesEntries) {
                     LOGV2(6261303, "2nd Phase - Restoring database entries", logAttrs(nss));
-                    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-                        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
-                    if (!coll) {
+
+                    const auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(
+                            nss,
+                            PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                            repl::ReadConcernArgs::get(opCtx),
+                            AcquisitionPrerequisites::kWrite),
+                        MODE_IX);
+                    if (!coll.exists()) {
                         LOGV2(6261304, "Collection not found, skipping", logAttrs(nss));
                         return;
                     }
@@ -364,7 +384,7 @@ public:
                                     "Found document",
                                     "doc"_attr = doc,
                                     "shouldRestore"_attr = shouldRestore,
-                                    logAttrs(coll->ns().dbName()),
+                                    logAttrs(nss.dbName()),
                                     "dbNss"_attr = dbNss);
 
                         if (shouldRestore) {
@@ -376,10 +396,10 @@ public:
                         LOGV2_DEBUG(6938703,
                                     1,
                                     "Deleting database that was not restored",
-                                    logAttrs(coll->ns().dbName()),
-                                    "uuid"_attr = coll->uuid(),
+                                    logAttrs(nss.dbName()),
+                                    "uuid"_attr = coll.uuid(),
                                     "_id"_attr = doc.getField("_id"));
-                        NamespaceStringOrUUID nssOrUUID(coll->ns().dbName(), coll->uuid());
+                        NamespaceStringOrUUID nssOrUUID(nss.dbName(), coll.uuid());
                         uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                             opCtx, nssOrUUID, doc.getField("_id")));
                     }
