@@ -1,10 +1,14 @@
 #!/bin/env bash
 set -eux
 
+# get the datetime for the current commit SHA
+cd ${WORK_DIR}/src
+commit_datetime=$(git show -s --format=%cd --date=iso-strict ${GITHUB_COMMIT})
+echo "Date and time of commit: $commit_datetime"
+
+# generate the SAST report
 cd ${MODULE_PATH}/scripts
 echo "Running SAST report generation script..."
-commit_datetime=$(git log -1 --format=%cd --date=iso-strict)
-echo "Date and time of commit: $commit_datetime"
 virtualenv -p python3.12 .venv
 source .venv/bin/activate
 pip install -r sast_reporting/requirements.txt

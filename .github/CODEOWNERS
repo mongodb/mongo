@@ -347,6 +347,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/packager_crypt_py_run.sh @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/perf-submission.sh @10gen/devprod-performance-analysis @svc-auto-approve-bot
 /evergreen/streams* @10gen/streams-engine @svc-auto-approve-bot
+/evergreen/generate_sast_report.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
+/evergreen/write_sast_report_env_file.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/OWNERS.yml
 /jstests/README.md @10gen/devprod-correctness @svc-auto-approve-bot

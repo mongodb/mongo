@@ -33,6 +33,7 @@ tasks:
           env:
             WORK_DIR: ${workdir}
             MODULE_PATH: ${workdir}/devprodCoveritySrc/devprod_coverity
+            GITHUB_COMMIT: ${github_commit}
             TRIGGERED_BY_GIT_TAG: ${triggered_by_git_tag}
             MONGODB_VERSION: ${version}
             MONGODB_RELEASE_BRANCH: ${branch_name}
