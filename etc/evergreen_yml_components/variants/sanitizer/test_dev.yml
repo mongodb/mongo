@@ -329,8 +329,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{maxRoundsWithoutProgressParameter: 20}"
-        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000, maxRoundsWithoutProgressParameter: 20}"
     tasks:
       - name: jsCore_in_parts_gen
       - name: jsCore_txns
@@ -653,7 +652,7 @@ buildvariants:
       # fcv_upgrade_downgrade tests, when concurrent FCV upgrade/downgrades can keep batch write
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
-        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine, internalQueryEnableAggressiveSpillsInGroup: true, maxRoundsWithoutProgressParameter: 20}"
+        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine, internalQueryEnableAggressiveSpillsInGroup: true}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
         --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan

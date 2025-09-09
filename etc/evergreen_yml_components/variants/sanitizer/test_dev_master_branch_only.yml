@@ -473,7 +473,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, maxRoundsWithoutProgressParameter: 20}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks: &rhel8-debug-aubsan-task-list
@@ -536,7 +536,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
         --excludeWithAnyTags=incompatible_aubsan
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, maxRoundsWithoutProgressParameter: 20}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks: *rhel8-debug-aubsan-task-list
@@ -580,7 +580,7 @@ buildvariants:
       # fcv_upgrade_downgrade tests, when concurrent FCV upgrade/downgrades can keep batch write
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000, maxRoundsWithoutProgressParameter: 20}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests
@@ -628,7 +628,7 @@ buildvariants:
       # fcv_upgrade_downgrade tests, when concurrent FCV upgrade/downgrades can keep batch write
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000, maxRoundsWithoutProgressParameter: 20}"
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags

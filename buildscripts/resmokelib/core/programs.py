@@ -217,6 +217,9 @@ def mongos_program(
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0"
     )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "maxRoundsWithoutProgressParameter", bin_version, "8.2.0"
+    )
 
     if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
         mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
