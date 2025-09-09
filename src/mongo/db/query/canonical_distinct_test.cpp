@@ -69,7 +69,7 @@ public:
         expCtx = ExpressionContextBuilder{}
                      .opCtx(opCtx)
                      .ns(testns)
-                     .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                     .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                      .build();
     }
 

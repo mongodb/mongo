@@ -138,7 +138,7 @@ auto makeExpressionContext(OperationContext* opCtx,
             .collUUID(uuid)
             .explain(verbosity)
             .runtimeConstants(runtimeConstants)
-            .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+            .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
             .build();
     return expCtx;
 }

@@ -97,7 +97,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::serializationContext(
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::tmpDir(std::string tmpDir) {
+ExpressionContextBuilder& ExpressionContextBuilder::tmpDir(boost::filesystem::path tmpDir) {
     params.tmpDir = std::move(tmpDir);
     return *this;
 }

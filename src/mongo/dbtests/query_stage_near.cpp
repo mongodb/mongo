@@ -284,7 +284,7 @@ TEST_F(QueryStageNearTest, Spilling) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagExtendedAutoSpilling", true};
     RAIIServerParameterControllerForTest maxMemoryBytes{"internalNearStageMaxMemoryBytes", 128};
 
-    _expCtx->setTempDir(storageGlobalParams.dbpath + "/_tmp");
+    _expCtx->setTempDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp");
     _expCtx->setAllowDiskUse(true);
 
     WorkingSet workingSet;

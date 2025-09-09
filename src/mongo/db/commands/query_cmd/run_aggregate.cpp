@@ -606,7 +606,7 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
                          .mongoProcessInterface(MongoProcessInterface::create(opCtx))
                          .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
                          .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
-                         .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                         .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                          .collationMatchesDefault(expCtx->getCollationMatchesDefault())
                          .canBeRejected(query_settings::canPipelineBeRejected(
                              aggExState.getRequest().getPipeline()))

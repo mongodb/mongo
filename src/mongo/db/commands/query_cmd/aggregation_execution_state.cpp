@@ -792,7 +792,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .originalNs(_aggExState.getOriginalNss())
                       .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
-                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                       .collationMatchesDefault(collationMatchesDefault)
                       .canBeRejected(canPipelineBeRejected)
                       .explain(_aggExState.getVerbosity())

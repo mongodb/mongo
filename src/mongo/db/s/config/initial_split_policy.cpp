@@ -930,7 +930,7 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .allowDiskUse(true)
                       .bypassDocumentValidation(true)
-                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                       .build();
     return Pipeline::makePipeline(aggRequest, expCtx, boost::none /* shardCursorsSortSpec */, opts);
 }

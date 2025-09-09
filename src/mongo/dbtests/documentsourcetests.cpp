@@ -115,7 +115,7 @@ public:
         : client(_opCtx.get()),
           _ctx(new ExpressionContextForTest(
               _opCtx.get(), AggregateCommandRequest(nss, std::vector<mongo::BSONObj>()))) {
-        _ctx->setTempDir(storageGlobalParams.dbpath + "/_tmp");
+        _ctx->setTempDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp");
     }
 
     ~DocumentSourceCursorTest() override {

@@ -101,7 +101,7 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
                   .runtimeConstants(_request->getLegacyRuntimeConstants())
                   .letParameters(_request->getLetParameters())
                   .isUpsert(request->isUpsert())
-                  .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                  .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                   .build()),
       _driver(_expCtx),
       _modification(

@@ -78,6 +78,7 @@
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
+#include <boost/filesystem/path.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -641,11 +642,13 @@ public:
         return _params.forPerShardCursor;
     }
 
-    const std::string& getTempDir() const {
-        return _params.tmpDir;
+    std::string getTempDir() const {
+        // TODO SERVER-109634: Return boost::filesystem::path directly when it is supported by
+        // SortOptions.
+        return _params.tmpDir.string();
     }
 
-    void setTempDir(std::string tempDir) {
+    void setTempDir(boost::filesystem::path tempDir) {
         _params.tmpDir = std::move(tempDir);
     }
 
@@ -1060,7 +1063,7 @@ protected:
         // view's effective pipeline.
         boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none;
         // Defaults to empty to prevent external sorting in mongos.
-        std::string tmpDir;
+        boost::filesystem::path tmpDir;
         // Tracks whether the collator to use for the aggregation matches the default collation of
         // the collection or view.
         ExpressionContextCollationMatchesDefault collationMatchesDefault =

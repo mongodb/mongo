@@ -384,7 +384,7 @@ void runClusterAggregate(OperationContext* opCtx,
                       .allowDiskUse(aggRequest.getAllowDiskUse())
                       .bypassDocumentValidation(true)
                       .collUUID(collUuid)
-                      .tmpDir(storageGlobalParams.dbpath + "/_tmp")
+                      .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                       .build();
 
     auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);

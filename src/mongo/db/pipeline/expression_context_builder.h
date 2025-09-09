@@ -57,7 +57,7 @@ public:
     ExpressionContextBuilder& explain(boost::optional<ExplainOptions::Verbosity>);
     ExpressionContextBuilder& runtimeConstants(boost::optional<LegacyRuntimeConstants>);
     ExpressionContextBuilder& letParameters(boost::optional<BSONObj>);
-    ExpressionContextBuilder& tmpDir(std::string);
+    ExpressionContextBuilder& tmpDir(boost::filesystem::path);
     ExpressionContextBuilder& mayDbProfile(bool);
     ExpressionContextBuilder& fromRouter(bool);
     ExpressionContextBuilder& mergeType(MergeType);
