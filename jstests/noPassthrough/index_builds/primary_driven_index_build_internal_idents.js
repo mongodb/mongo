@@ -46,43 +46,24 @@ const sideWritesIdent = "internal-sideWrites-" + indexIdent;
 const skippedRecordsTrackerIdent = "internal-skippedRecordsTracker-" + indexIdent;
 const constraintViolationsIdent = "internal-constraintViolations-" + indexIdent;
 
-assert(
-    checkLog.checkContainsWithCountJson(
-        primary,
-        20384,
-        {
-            "indexBuildInfo": {
-                "indexIdent": indexIdent,
-                "sorterIdent": sorterIdent,
-                "sideWritesIdent": sideWritesIdent,
-                "skippedRecordsTrackerIdent": skippedRecordsTrackerIdent,
-                "constraintViolationsTrackerIdent": constraintViolationsIdent,
-            },
-        },
-        /*expectedCount=*/ 1,
-        /*severity=*/ null,
-        /*isRelaxed=*/ true,
-    ),
-    "Could not find log with expected temporary table idents for " + indexIdent,
-);
+checkLog.containsRelaxedJson(primary, 20384, {
+    "indexBuildInfo": {
+        "indexIdent": indexIdent,
+        "sorterIdent": sorterIdent,
+        "sideWritesIdent": sideWritesIdent,
+        "skippedRecordsTrackerIdent": skippedRecordsTrackerIdent,
+        "constraintViolationsTrackerIdent": constraintViolationsIdent,
+    },
+});
 
-assert(
-    checkLog.checkContainsWithCountJson(
-        secondary,
-        20384,
-        {
-            "indexBuildInfo": {
-                "indexIdent": indexIdent,
-                "sorterIdent": sorterIdent,
-                "sideWritesIdent": sideWritesIdent,
-                "skippedRecordsTrackerIdent": skippedRecordsTrackerIdent,
-                "constraintViolationsTrackerIdent": constraintViolationsIdent,
-            },
-        },
-        /*expectedCount=*/ 1,
-        /*severity=*/ null,
-        /*isRelaxed=*/ true,
-    ),
-);
+checkLog.containsRelaxedJson(secondary, 20384, {
+    "indexBuildInfo": {
+        "indexIdent": indexIdent,
+        "sorterIdent": sorterIdent,
+        "sideWritesIdent": sideWritesIdent,
+        "skippedRecordsTrackerIdent": skippedRecordsTrackerIdent,
+        "constraintViolationsTrackerIdent": constraintViolationsIdent,
+    },
+});
 
 rst.stopSet();
