@@ -171,3 +171,6 @@ filters:
   - "replica_sets_transition_to_csrs_jscore_passthrough.yml":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "streams*":
+    approvers:
+      - 10gen/streams-engine

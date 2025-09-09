@@ -8,6 +8,8 @@ selector:
       # When splitting into multiple suites, each suite will need
       # its own broker
       - streams_kafka
+      # This suite requires sidecar containers.
+      - streams_aspio
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:
     # Exclude list of jstests file names.

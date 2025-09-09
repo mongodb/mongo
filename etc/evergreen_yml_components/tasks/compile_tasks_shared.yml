@@ -217,6 +217,8 @@ tasks:
             "src/src/mongo/db/modules/atlas/jstests/**"
             "src/src/mongo/db/modules/enterprise/docs/**"
             "src/src/mongo/db/modules/enterprise/jstests/**"
+            "src/src/mongo/db/modules/enterprise/src/streams/build/*"
+            "src/src/mongo/db/modules/enterprise/src/streams/aspio/**"
             "src/src/mongo/db/modules/subscription/jstests/**"
             "src/src/mongo/db/query/benchmark/data_generator/**"
             "src/src/mongo/db/query/query_tester/tests/**"
