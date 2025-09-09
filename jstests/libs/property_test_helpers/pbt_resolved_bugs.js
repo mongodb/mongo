@@ -58,8 +58,7 @@ export const partialIndexCounterexamples = [
     // I'm not sure why examples have to be placed in an array, the documentation doesn't say. I've
     // verified it works though.
     [partialIndexExample102825],
-    // TODO SERVER-106023 uncomment this example workload.
-    // [partialIndexExample2]
+    [partialIndexExample2],
 ];
 
 // Repro from SERVER-106983.
