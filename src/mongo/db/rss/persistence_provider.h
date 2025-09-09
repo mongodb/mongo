@@ -122,9 +122,9 @@ public:
     virtual bool supportsTableLogging() const = 0;
 
     /**
-     * If true, the provider supports multi-document transactions.
+     * If true, the provider supports cross-shard transactions.
      */
-    virtual bool supportsMultiDocumentTransactions() const = 0;
+    virtual bool supportsCrossShardTransactions() const = 0;
 };
 
 }  // namespace rss

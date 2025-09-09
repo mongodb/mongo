@@ -94,7 +94,7 @@ bool AttachedPersistenceProvider::supportsTableLogging() const {
     return true;
 }
 
-bool AttachedPersistenceProvider::supportsMultiDocumentTransactions() const {
+bool AttachedPersistenceProvider::supportsCrossShardTransactions() const {
     return true;
 }
 

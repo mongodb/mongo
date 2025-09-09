@@ -97,9 +97,9 @@ public:
     bool supportsTableLogging() const override;
 
     /**
-     * We can support multi-document transactions.
+     * We can support cross-shard transactions.
      */
-    bool supportsMultiDocumentTransactions() const override;
+    bool supportsCrossShardTransactions() const override;
 };
 
 }  // namespace mongo::rss

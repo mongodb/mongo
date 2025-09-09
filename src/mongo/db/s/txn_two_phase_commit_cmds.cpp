@@ -48,6 +48,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -139,6 +140,13 @@ public:
             uassert(ErrorCodes::CommandFailed,
                     "prepareTransaction must be run within a transaction",
                     txnParticipant);
+
+            auto& rss = rss::ReplicatedStorageService::get(opCtx);
+            if (!rss.getPersistenceProvider().supportsCrossShardTransactions()) {
+                uasserted(ErrorCodes::NotImplemented,
+                          str::stream() << rss.getPersistenceProvider().name()
+                                        << "does not support cross-shard transactions");
+            }
 
             TxnNumberAndRetryCounter txnNumberAndRetryCounter{*opCtx->getTxnNumber(),
                                                               *opCtx->getTxnRetryCounter()};

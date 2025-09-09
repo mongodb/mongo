@@ -1066,13 +1066,6 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     TransactionActions action) {
-    auto& rss = rss::ReplicatedStorageService::get(opCtx);
-    if (!rss.getPersistenceProvider().supportsMultiDocumentTransactions() && autocommit) {
-        uasserted(ErrorCodes::NotImplemented,
-                  str::stream() << rss.getPersistenceProvider().name()
-                                << "does not support multi-document transactions");
-    }
-
     opCtx->setActiveTransactionParticipant();
 
     if (_isInternalSessionForRetryableWrite()) {
@@ -2507,10 +2500,12 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
 void TransactionParticipant::Participant::_abortActiveTransaction(
     OperationContext* opCtx, TransactionState::StateSet expectedStates) {
     invariant(!o().txnResourceStash);
-
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
     auto* splitPrepareManager =
         repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
-    bool haveSplitPreparedTxns = opCtx->writesAreReplicated() &&
+    // TODO (SLS-2079): Determine how to handle split prepared transactions.
+    bool haveSplitPreparedTxns = rss.getPersistenceProvider().supportsCrossShardTransactions() &&
+        opCtx->writesAreReplicated() &&
         splitPrepareManager->isSessionSplit(_sessionId(),
                                             o().activeTxnNumberAndRetryCounter.getTxnNumber());
 
