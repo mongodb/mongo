@@ -283,11 +283,11 @@ public:
      * send a `killCursors`. If the aggregation results are exhausted, there will be no additional
      * calls to `callback`.
      */
-    virtual Status runAggregation(
+    Status runAggregation(
         OperationContext* opCtx,
         const AggregateCommandRequest& aggRequest,
         std::function<bool(const std::vector<BSONObj>& batch,
-                           const boost::optional<BSONObj>& postBatchResumeToken)> callback) = 0;
+                           const boost::optional<BSONObj>& postBatchResumeToken)> callback);
 
     /**
      * Runs a write command against a shard. This is separate from runCommand, because write
@@ -372,14 +372,14 @@ private:
                                                     Milliseconds maxTimeMSOverride,
                                                     const BSONObj& cmdObj) = 0;
 
-    virtual StatusWith<QueryResponse> _runExhaustiveCursorCommand(
+    virtual RetryStrategy::Result<QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) = 0;
 
-    virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
+    virtual RetryStrategy::Result<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,
@@ -388,6 +388,12 @@ private:
         const BSONObj& sort,
         boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none) = 0;
+
+    virtual RetryStrategy::Result<std::monostate> _runAggregation(
+        OperationContext* opCtx,
+        const AggregateCommandRequest& aggRequest,
+        std::function<bool(const std::vector<BSONObj>& batch,
+                           const boost::optional<BSONObj>& postBatchResumeToken)> callback) = 0;
 
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).

@@ -32,7 +32,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_test_fixture.h"
@@ -94,6 +96,8 @@ protected:
     void tearDown() override;
 
     Status status;
+    boost::optional<HostAndPort> target;
+    std::vector<std::string> errorLabels;
     CursorId cursorId;
     NamespaceString nss;
     Fetcher::Documents documents;
@@ -105,7 +109,7 @@ protected:
     Fetcher::CallbackFn callbackHook;
 
 private:
-    void _callback(const StatusWith<Fetcher::QueryResponse>& result,
+    void _callback(const Fetcher::QueryResponseStatus& result,
                    Fetcher::NextAction* nextAction,
                    BSONObjBuilder* getMoreBob);
 };
@@ -183,7 +187,7 @@ void FetcherTest::finishProcessingNetworkResponse(ReadyQueueState readyQueueStat
     ASSERT_EQUALS(fetcherStateAfterProcessing == FetcherState::kActive, fetcher->isActive());
 }
 
-void FetcherTest::_callback(const StatusWith<Fetcher::QueryResponse>& result,
+void FetcherTest::_callback(const Fetcher::QueryResponseStatus& result,
                             Fetcher::NextAction* nextActionFromFetcher,
                             BSONObjBuilder* getMoreBob) {
     status = result.getStatus();
@@ -194,7 +198,13 @@ void FetcherTest::_callback(const StatusWith<Fetcher::QueryResponse>& result,
         documents = batchData.documents;
         elapsedMillis = duration_cast<Milliseconds>(batchData.elapsed);
         first = batchData.first;
+        errorLabels.clear();
+    } else {
+        auto labels = result.getErrorLabels();
+        errorLabels.assign(labels.begin(), labels.end());
     }
+
+    target = result.getOrigin();
 
     if (callbackHook) {
         callbackHook(result, nextActionFromFetcher, getMoreBob);
@@ -205,13 +215,13 @@ void FetcherTest::_callback(const StatusWith<Fetcher::QueryResponse>& result,
     }
 }
 
-void unreachableCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
+void unreachableCallback(const Fetcher::QueryResponseStatus& fetchResult,
                          Fetcher::NextAction* nextAction,
                          BSONObjBuilder* getMoreBob) {
     FAIL("should not reach here");
 }
 
-void doNothingCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
+void doNothingCallback(const Fetcher::QueryResponseStatus& fetchResult,
                        Fetcher::NextAction* nextAction,
                        BSONObjBuilder* getMoreBob) {}
 
@@ -586,6 +596,23 @@ TEST_F(FetcherTest, FindCommandFailed2) {
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
     ASSERT_EQUALS("bad hint", status.reason());
+}
+
+TEST_F(FetcherTest, FindCommandFailed3) {
+    auto responseErrorLabels =
+        std::array{ErrorLabel::kSystemOverloadedError, ErrorLabel::kRetryableError};
+    BSONArrayBuilder labelArray;
+    for (const auto& label : responseErrorLabels) {
+        labelArray << label;
+    }
+
+    ASSERT_OK(fetcher->schedule());
+    processNetworkResponse(BSON("ok" << 0 << kErrorLabelsFieldName << labelArray.arr() << "code"
+                                     << int(ErrorCodes::AdmissionQueueOverflow)),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_EQUALS(source, target);
+    ASSERT(std::ranges::equal(responseErrorLabels, errorLabels));
 }
 
 TEST_F(FetcherTest, CursorFieldMissing) {

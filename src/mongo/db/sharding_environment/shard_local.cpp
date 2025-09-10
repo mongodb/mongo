@@ -31,6 +31,7 @@
 #include "mongo/db/sharding_environment/shard_local.h"
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -81,7 +82,7 @@ StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opC
     return _rsLocalClient.runCommandOnce(opCtx, dbName, cmdObj);
 }
 
-StatusWith<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
+RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const DatabaseName& dbName,
@@ -90,7 +91,7 @@ StatusWith<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
     MONGO_UNREACHABLE;
 }
 
-StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
+RetryStrategy::Result<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
@@ -110,12 +111,19 @@ void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-Status ShardLocal::runAggregation(
+RetryStrategy::Result<std::monostate> ShardLocal::_runAggregation(
     OperationContext* opCtx,
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
-    return _rsLocalClient.runAggregation(opCtx, aggRequest, callback);
+    // TODO: SERVER-104141 return the result of runAggregation directly.
+    auto status = _rsLocalClient.runAggregation(opCtx, aggRequest, callback);
+
+    if (status.isOK()) {
+        return std::monostate{};
+    }
+
+    return status;
 }
 
 BatchedCommandResponse ShardLocal::runBatchWriteCommand(OperationContext* opCtx,

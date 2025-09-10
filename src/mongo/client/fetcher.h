@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
@@ -90,7 +91,7 @@ public:
         bool first = false;
     };
 
-    using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
+    using QueryResponseStatus = RetryStrategy::Result<QueryResponse>;
 
     /**
      * Represents next steps of fetcher.
@@ -105,7 +106,7 @@ public:
     /**
      * Type of a fetcher callback function.
      */
-    typedef std::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
+    typedef std::function<void(const QueryResponseStatus&, NextAction*, BSONObjBuilder*)>
         CallbackFn;
 
     /**

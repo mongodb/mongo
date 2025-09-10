@@ -44,6 +44,8 @@
 #include <string>
 #include <variant>
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 struct TargetingMetadata {
@@ -120,7 +122,7 @@ public:
          *
          * Not marked constexpr because HostAndPort is not constexpr compatible.
          */
-        Result(T data, HostAndPort origin)
+        Result(T data, boost::optional<HostAndPort> origin)
             : _status{Status::OK()},
               _valueOrError{std::in_place_type<T>, std::move(data)},
               _origin{std::move(origin)} {}
@@ -174,6 +176,14 @@ public:
               _origin{std::exchange(result._origin, {})} {}
 
         /**
+         * Converting constructor from status for error cases.
+         */
+        explicit(false) constexpr Result(Status s)
+            : _status{std::move(s)}, _valueOrError{std::in_place_type<ErrorLabels>, ErrorLabels{}} {
+            dassert(!_status.isOK());
+        }
+
+        /**
          * Constructor for the error case.
          */
         constexpr Result(Status s, std::vector<std::string> errorLabels)
@@ -188,7 +198,7 @@ public:
          * This constructor is not constexpr only because HostAndPort cannot be used in constexpr
          * context.
          */
-        Result(Status s, std::vector<std::string> errorLabels, HostAndPort origin)
+        Result(Status s, std::vector<std::string> errorLabels, boost::optional<HostAndPort> origin)
             : _status{std::move(s)},
               _valueOrError{std::in_place_type<ErrorLabels>, std::move(errorLabels)},
               _origin{std::move(origin)} {
@@ -224,8 +234,11 @@ public:
         }
 
         constexpr std::span<const std::string> getErrorLabels() const {
-            dassert(!isOK());
-            return std::get<ErrorLabels>(_valueOrError);
+            if (!isOK()) {
+                return std::get<ErrorLabels>(_valueOrError);
+            }
+
+            return {};
         }
 
         constexpr const boost::optional<HostAndPort>& getOrigin() const {

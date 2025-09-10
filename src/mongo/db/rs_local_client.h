@@ -77,14 +77,15 @@ public:
      * Warning: This method exhausts the cursor and pulls all data into memory.
      * Do not use other than for very small (i.e., admin or metadata) collections.
      */
-    StatusWith<Shard::QueryResponse> queryOnce(OperationContext* opCtx,
-                                               const ReadPreferenceSetting& readPref,
-                                               const repl::ReadConcernLevel& readConcernLevel,
-                                               const NamespaceString& nss,
-                                               const BSONObj& query,
-                                               const BSONObj& sort,
-                                               boost::optional<long long> limit,
-                                               const boost::optional<BSONObj>& hint = boost::none);
+    RetryStrategy::Result<Shard::QueryResponse> queryOnce(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcernLevel,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit,
+        const boost::optional<BSONObj>& hint = boost::none);
 
     Status runAggregation(
         OperationContext* opCtx,

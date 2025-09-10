@@ -87,12 +87,6 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) override;
 
-    Status runAggregation(OperationContext* opCtx,
-                          const AggregateCommandRequest& aggRequest,
-                          std::function<bool(const std::vector<BSONObj>& batch,
-                                             const boost::optional<BSONObj>& postBatchResumeToken)>
-                              callback) override;
-
     BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
                                                 Milliseconds maxTimeMS,
                                                 const BatchedCommandRequest& batchRequest,
@@ -106,14 +100,14 @@ private:
                                                    Milliseconds maxTimeMSOverrideUnused,
                                                    const BSONObj& cmdObj) final;
 
-    StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
+    RetryStrategy::Result<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) final;
 
-    StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
+    RetryStrategy::Result<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,
@@ -122,6 +116,12 @@ private:
         const BSONObj& sort,
         boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none) final;
+
+    RetryStrategy::Result<std::monostate> _runAggregation(
+        OperationContext* opCtx,
+        const AggregateCommandRequest& aggRequest,
+        std::function<bool(const std::vector<BSONObj>& batch,
+                           const boost::optional<BSONObj>& postBatchResumeToken)> callback) final;
 
     RSLocalClient _rsLocalClient;
 };

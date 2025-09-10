@@ -111,7 +111,7 @@ StatusWith<Shard::CommandResponse> RSLocalClient::runCommandOnce(OperationContex
     }
 }
 
-StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
+RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
@@ -197,9 +197,9 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest), readPref);
 
         if (!cursor) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to establish a cursor for reading "
-                                  << nss.toStringForErrorMsg() << " from local storage"};
+            return Status{ErrorCodes::OperationFailed,
+                          str::stream() << "Failed to establish a cursor for reading "
+                                        << nss.toStringForErrorMsg() << " from local storage"};
         }
 
         std::vector<BSONObj> documentVector;

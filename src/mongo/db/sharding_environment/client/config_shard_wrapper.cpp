@@ -73,12 +73,12 @@ void ConfigShardWrapper::runFireAndForgetCommand(OperationContext* opCtx,
     _configShard->runFireAndForgetCommand(opCtx, readPrefWithConfigTime, dbName, cmdObj);
 }
 
-Status ConfigShardWrapper::runAggregation(
+RetryStrategy::Result<std::monostate> ConfigShardWrapper::_runAggregation(
     OperationContext* opCtx,
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
-    return _configShard->runAggregation(opCtx, aggRequest, std::move(callback));
+    return _configShard->_runAggregation(opCtx, aggRequest, std::move(callback));
 }
 
 BatchedCommandResponse ConfigShardWrapper::runBatchWriteCommand(
@@ -103,7 +103,7 @@ StatusWith<Shard::CommandResponse> ConfigShardWrapper::_runCommand(
         opCtx, readPrefWithConfigTime, dbName, maxTimeMSOverrideUnused, cmdObj);
 }
 
-StatusWith<Shard::QueryResponse> ConfigShardWrapper::_runExhaustiveCursorCommand(
+RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const DatabaseName& dbName,
@@ -113,7 +113,7 @@ StatusWith<Shard::QueryResponse> ConfigShardWrapper::_runExhaustiveCursorCommand
         opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
 }
 
-StatusWith<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindOnConfig(
+RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,

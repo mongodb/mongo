@@ -35,6 +35,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
+#include <algorithm>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -84,6 +85,23 @@ std::string RemoteCommandResponse::toString() const {
 
 bool RemoteCommandResponse::isOK() const {
     return status.isOK();
+}
+
+std::vector<std::string> RemoteCommandResponse::getErrorLabels() const {
+    if (BSONElement errorLabelsElement = data["errorLabels"]; !errorLabelsElement.eoo()) {
+        auto errorLabelsArray = errorLabelsElement.Array();
+
+        std::vector<std::string> errorLabels{};
+        errorLabels.resize(errorLabelsArray.size());
+
+        std::ranges::transform(errorLabelsArray, errorLabels.begin(), [](const BSONElement& data) {
+            return data.String();
+        });
+
+        return errorLabels;
+    }
+
+    return {};
 }
 
 bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/optime.h"
@@ -89,11 +90,12 @@ public:
                                  const BSONObj& cmdObj) override {
         lastReadPref = readPref;
     }
-    Status runAggregation(OperationContext* opCtx,
-                          const AggregateCommandRequest& aggRequest,
-                          std::function<bool(const std::vector<BSONObj>& batch,
-                                             const boost::optional<BSONObj>& postBatchResumeToken)>
-                              callback) override {
+    RetryStrategy::Result<std::monostate> _runAggregation(
+        OperationContext* opCtx,
+        const AggregateCommandRequest& aggRequest,
+        std::function<bool(const std::vector<BSONObj>& batch,
+                           const boost::optional<BSONObj>& postBatchResumeToken)> callback)
+        override {
         return Status::OK();
     }
 
@@ -120,7 +122,7 @@ private:
         return Shard::CommandResponse{boost::none, BSON("ok" << 1), Status::OK(), Status::OK()};
     }
 
-    StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
+    RetryStrategy::Result<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const DatabaseName& dbName,
@@ -130,7 +132,7 @@ private:
         return Shard::QueryResponse{std::vector<BSONObj>{}, repl::OpTime::max()};
     }
 
-    StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
+    RetryStrategy::Result<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,

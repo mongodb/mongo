@@ -306,6 +306,14 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     MONGO_UNREACHABLE;
 }
 
+Status Shard::runAggregation(
+    OperationContext* opCtx,
+    const AggregateCommandRequest& aggRequest,
+    std::function<bool(const std::vector<BSONObj>& batch,
+                       const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
+    return _runAggregation(opCtx, aggRequest, callback).getStatus();
+}
+
 BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
                                                        const BSONObj& serialisedBatchRequest,
                                                        const DatabaseName& dbName,

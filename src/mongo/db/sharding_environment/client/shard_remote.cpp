@@ -206,7 +206,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
                                   std::move(writeConcernStatus));
 }
 
-StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
+RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const DatabaseName& dbName,
@@ -223,12 +223,20 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     Status status =
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
 
-    auto fetcherCallback = [&status, &response](const Fetcher::QueryResponseStatus& dataStatus,
-                                                Fetcher::NextAction* nextAction,
-                                                BSONObjBuilder* getMoreBob) {
+    // TODO: SERVER-104141 Use host and port and error labels from status
+    std::vector<std::string> errorLabels;
+    boost::optional<HostAndPort> hostAndPort;
+
+    auto fetcherCallback = [&status, &errorLabels, &hostAndPort, &response](
+                               const Fetcher::QueryResponseStatus& dataStatus,
+                               Fetcher::NextAction* nextAction,
+                               BSONObjBuilder* getMoreBob) {
+        hostAndPort = dataStatus.getOrigin();
         // Throw out any accumulated results on error
         if (!dataStatus.isOK()) {
             status = dataStatus.getStatus();
+            auto labelsFromStatus = dataStatus.getErrorLabels();
+            errorLabels.assign(labelsFromStatus.begin(), labelsFromStatus.end());
             response.docs.clear();
             return;
         }
@@ -301,10 +309,10 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
         if (ErrorCodes::isExceededTimeLimitError(status.code())) {
             LOGV2(22740, "Operation timed out", "error"_attr = status);
         }
-        return status;
+        return RetryStrategy::Result<QueryResponse>{status, std::move(errorLabels), hostAndPort};
     }
 
-    return response;
+    return RetryStrategy::Result{response, hostAndPort};
 }
 
 Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
@@ -318,7 +326,7 @@ Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
                     Shard::getConfiguredTimeoutForOperationOnNamespace(nss));
 }
 
-StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
+RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
@@ -386,7 +394,7 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
         .ignore();
 }
 
-Status ShardRemote::runAggregation(
+RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
     OperationContext* opCtx,
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
@@ -411,12 +419,21 @@ Status ShardRemote::runAggregation(
 
     Status status =
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-    auto fetcherCallback = [&status, callback](const Fetcher::QueryResponseStatus& dataStatus,
-                                               Fetcher::NextAction* nextAction,
-                                               BSONObjBuilder* getMoreBob) {
+
+    // TODO: SERVER-104141 Use host and port and error labels from status
+    boost::optional<HostAndPort> hostAndPort;
+    std::vector<std::string> errorLabels;
+
+    auto fetcherCallback = [&status, &hostAndPort, &errorLabels, callback](
+                               const Fetcher::QueryResponseStatus& dataStatus,
+                               Fetcher::NextAction* nextAction,
+                               BSONObjBuilder* getMoreBob) {
+        hostAndPort = dataStatus.getOrigin();
         // Throw out any accumulated results on error
         if (!dataStatus.isOK()) {
             status = dataStatus.getStatus();
+            auto labels = dataStatus.getErrorLabels();
+            errorLabels.assign(labels.begin(), labels.end());
             return;
         }
 
@@ -487,7 +504,11 @@ Status ShardRemote::runAggregation(
 
     updateReplSetMonitor(host, status);
 
-    return status;
+    if (!status.isOK()) {
+        return RetryStrategy::Result<std::monostate>{status, std::move(errorLabels), hostAndPort};
+    }
+
+    return RetryStrategy::Result{std::monostate{}, hostAndPort};
 }
 
 

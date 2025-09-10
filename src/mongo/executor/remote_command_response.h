@@ -75,6 +75,7 @@ struct RemoteCommandResponse {
                           bool moreToCome = false);
 
     std::string toString() const;
+    std::vector<std::string> getErrorLabels() const;
 
     bool operator==(const RemoteCommandResponse& rhs) const;
     bool operator!=(const RemoteCommandResponse& rhs) const;
