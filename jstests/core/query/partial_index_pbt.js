@@ -17,6 +17,7 @@
  * does_not_support_causal_consistency,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
+ * multiversion_incompatible,
  * ]
  */
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
