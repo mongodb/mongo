@@ -99,6 +99,7 @@ class ParametersBuilderClassic:
                 "stage",
                 "execution_time",
                 "n_processed",
+                "n_input_stages",
                 "seeks",
                 "note",
                 "keys_length_in_bytes",

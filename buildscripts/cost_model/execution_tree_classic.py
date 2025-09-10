@@ -42,6 +42,7 @@ class Node:
     execution_time_nanoseconds: int
     n_returned: int
     n_processed: int
+    n_input_stages: int
     seeks: Optional[int]
     children: list[Node]
 
@@ -54,7 +55,7 @@ class Node:
     def print(self, level=0):
         """Pretty print the execution tree"""
         print(
-            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}'
+            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}, nInputStages: {self.n_input_stages}'
         )
         for child in self.children:
             child.print(level + 1)
@@ -76,7 +77,6 @@ def process_stage(stage: dict[str, Any]) -> Node:
         "AND_HASH": process_intersection,
         "AND_SORTED": process_intersection,
         "OR": process_or,
-        "MERGE_SORT": process_mergesort,
         "SORT_MERGE": process_mergesort,
         "SORT": process_sort,
         "LIMIT": process_passthrough,
@@ -134,7 +134,13 @@ def process_intersection(stage: dict[str, Any]) -> Node:
 
 def process_mergesort(stage: dict[str, Any]) -> Node:
     children = [process_stage(child) for child in stage["inputStages"]]
-    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=children)
+    # The number of processed documents is not just `stage["nReturned"]`, because that does
+    # not include the potential duplicate documents which may had to be processed and dropped.
+    return Node(
+        **get_common_fields(stage),
+        n_processed=sum(child.n_returned for child in children),
+        children=children,
+    )
 
 
 def process_skip(stage: dict[str, Any]) -> Node:
@@ -151,5 +157,8 @@ def get_common_fields(json_stage: dict[str, Any]) -> dict[str, Any]:
         "stage": json_stage["stage"],
         "execution_time_nanoseconds": json_stage["executionTimeNanos"],
         "n_returned": json_stage["nReturned"],
+        "n_input_stages": 1
+        if "inputStage" in json_stage
+        else len(json_stage.get("inputStages", [])),
         "seeks": json_stage.get("seeks"),
     }

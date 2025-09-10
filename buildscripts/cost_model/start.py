@@ -250,6 +250,27 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
     )
 
 
+async def execute_merge_sorts(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collections = [c for c in collections if c.name.startswith("merge_sort")]
+    fields = collections[0].fields
+
+    requests = []
+    for num_merge_inputs in range(2, len(fields)):
+        requests.append(
+            Query(
+                find_cmd={
+                    "filter": {"$or": [{f.name: 1} for f in fields[:num_merge_inputs]]},
+                    "sort": {"sort_field": 1},
+                },
+                note="SORT_MERGE",
+            )
+        )
+
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests
+    )
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -270,6 +291,7 @@ async def main():
             execute_limits,
             execute_skips,
             execute_sorts,
+            execute_merge_sorts,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)

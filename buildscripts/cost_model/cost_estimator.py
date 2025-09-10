@@ -45,6 +45,7 @@ class ExecutionStats:
     execution_time: int
     n_returned: int
     n_processed: int
+    n_input_stages: int
     seeks: Optional[int]
 
 
