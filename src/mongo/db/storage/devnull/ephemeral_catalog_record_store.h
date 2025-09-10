@@ -172,13 +172,13 @@ public:
     }
 
     void updateStatsAfterRepair(long long numRecords, long long dataSize) override {
-        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->mutex);
         invariant(_data->records.size() == size_t(numRecords));
         _data->dataSize = dataSize;
     }
 
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
-        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->mutex);
         return RecordId(_data->nextId - 1);
     }
 
@@ -245,11 +245,13 @@ private:
 
     // This is the "persistent" data.
     struct Data {
-        explicit Data(bool isOplog) : dataSize(0), recordsMutex(), nextId(1), isOplog(isOplog) {}
+        explicit Data(bool isOplog) : mutex(), dataSize(0), nextId(1), isOplog(isOplog) {}
 
+        // Protects 'dataSize' and 'records'.
+        stdx::recursive_mutex mutex;
         int64_t dataSize;
-        stdx::recursive_mutex recordsMutex;
         Records records;
+
         int64_t nextId;
         const bool isOplog;
     };
