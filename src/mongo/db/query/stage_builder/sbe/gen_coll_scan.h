@@ -59,6 +59,7 @@ class PlanStageSlots;
 std::pair<SbStage, PlanStageSlots> generateCollScan(StageBuilderState& state,
                                                     const CollectionPtr& collection,
                                                     const CollectionScanNode* csn,
-                                                    std::vector<std::string> scanFieldNames);
+                                                    std::vector<std::string> scanFieldNames,
+                                                    bool isResumingTailableScan);
 
 }  // namespace mongo::stage_builder

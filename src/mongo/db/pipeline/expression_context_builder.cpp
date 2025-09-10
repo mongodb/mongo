@@ -404,7 +404,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     runtimeConstants(request.getLegacyRuntimeConstants());
     letParameters(request.getLet());
     serializationContext(request.getSerializationContext());
-    tailableMode(query_request_helper::getTailableMode(request));
 
     if (!request.getCollation().isEmpty()) {
         auto requestCollator =

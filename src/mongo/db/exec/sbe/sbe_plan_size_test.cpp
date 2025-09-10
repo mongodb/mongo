@@ -278,6 +278,7 @@ TEST_F(PlanSizeTest, Scan) {
                                        generateSlotId() /* indexIdSlot */,
                                        generateSlotId() /* indexKeySlot */,
                                        generateSlotId() /* indexKeyPatternSlot */,
+                                       boost::none /* oplogTsSlot */,
                                        std::vector<std::string>{"field"} /* scanFieldNames */,
                                        mockSV() /* scanFieldSlots */,
                                        generateSlotId() /* seekRecordIdSlot */,

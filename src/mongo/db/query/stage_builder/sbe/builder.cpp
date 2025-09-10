@@ -919,10 +919,12 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
 
     if (node) {
         auto csn = static_cast<const CollectionScanNode*>(node);
-        tassert(9884965, "Tailable scans not supported", !csn->tailable);
-        tassert(9884966, "Resumable scans not supported", !csn->requestResumeToken);
+
         bool doClusteredCollectionScanSbe = csn->doClusteredCollectionScanSbe();
 
+        _data->shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
+        _data->shouldTrackResumeToken = csn->requestResumeToken;
+        _data->shouldUseTailableScan = csn->tailable;
         _data->direction = csn->direction;
         _data->doClusteredCollectionScanSbe = doClusteredCollectionScanSbe;
 
@@ -940,7 +942,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
 }
 
 std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
-    const bool needsRecordIdSlot = _cq.getForceGenerateRecordId();
+    const bool needsRecordIdSlot = _data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
+        _cq.getForceGenerateRecordId();
 
     // We always produce a 'resultSlot'.
     PlanStageReqs reqs;
@@ -976,7 +979,8 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     // needed.
     invariant(outputs.hasResultObj());
 
-    const bool needsRecordIdSlot = _cq.getForceGenerateRecordId();
+    const bool needsRecordIdSlot = _data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
+        _cq.getForceGenerateRecordId();
     if (needsRecordIdSlot) {
         invariant(outputs.has(kRecordId));
     }
@@ -995,14 +999,13 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCollScan(
     tassert(6023400, "buildCollScan() does not support kSortKey", !reqs.hasSortKeys());
 
     auto csn = static_cast<const CollectionScanNode*>(root);
-
-    tassert(9884975, "Tailable scans not supported", !csn->tailable);
-    tassert(9884976, "Resumable scans not supported", !csn->requestResumeToken);
-
     auto fields = reqs.getFields();
 
-    auto [stage, outputs] =
-        generateCollScan(_state, getCurrentCollection(reqs), csn, std::move(fields));
+    auto [stage, outputs] = generateCollScan(_state,
+                                             getCurrentCollection(reqs),
+                                             csn,
+                                             std::move(fields),
+                                             reqs.getIsTailableCollScanResumeBranch());
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
@@ -1390,10 +1393,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildLimit(const Query
         }
     }();
 
-    stage = b.makeLimitSkip(std::move(stage),
-                            buildLimitSkipAmountExpression(
-                                ln->canBeParameterized, ln->limit, _data->limitSkipSlots.limit),
-                            std::move(skip));
+    if (!reqs.getIsTailableCollScanResumeBranch()) {
+        stage = b.makeLimitSkip(std::move(stage),
+                                buildLimitSkipAmountExpression(
+                                    ln->canBeParameterized, ln->limit, _data->limitSkipSlots.limit),
+                                std::move(skip));
+    }
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -1405,10 +1410,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSkip(const QueryS
     const auto sn = static_cast<const SkipNode*>(root);
     auto [stage, outputs] = build(sn->children[0].get(), reqs);
 
-    stage = b.makeLimitSkip(std::move(stage),
-                            SbExpr{},
-                            buildLimitSkipAmountExpression(
-                                sn->canBeParameterized, sn->skip, _data->limitSkipSlots.skip));
+    if (!reqs.getIsTailableCollScanResumeBranch()) {
+        stage = b.makeLimitSkip(std::move(stage),
+                                SbExpr{},
+                                buildLimitSkipAmountExpression(
+                                    sn->canBeParameterized, sn->skip, _data->limitSkipSlots.skip));
+    }
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -3466,6 +3473,75 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
     return {std::move(stage), std::move(outputs)};
 }
 
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::makeUnionForTailableCollScan(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    using namespace std::literals;
+    tassert(
+        6023415, "makeUnionForTailableCollScan() does not support kSortKey", !reqs.hasSortKeys());
+
+    SbBuilder b(_state, root->nodeId());
+
+    // Register a SlotId in the global environment which would contain a recordId to resume a
+    // tailable collection scan from. A PlanStage executor will track the last seen recordId and
+    // will reset a SlotAccessor for the resumeRecordIdSlot with this recordId.
+    auto resumeRecordIdSlot = SbSlot{_env->registerSlot(
+        "resumeRecordId"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator)};
+
+    // For tailable collection scan we need to build a special union sub-tree consisting of two
+    // branches:
+    //   1) An anchor branch implementing an initial collection scan before the first EOF is hit.
+    //   2) A resume branch implementing all consecutive collection scans from a recordId which was
+    //      seen last.
+    //
+    // The 'makeStage' parameter is used to build a PlanStage tree which is served as a root stage
+    // for each of the union branches. The same mechanism is used to build each union branch, and
+    // the special logic which needs to be triggered depending on which branch we build is
+    // controlled by setting the isTailableCollScanResumeBranch flag in PlanStageReqs.
+    auto makeUnionBranch = [&](bool isTailableCollScanResumeBranch) {
+        auto childReqs = reqs;
+        childReqs.setIsTailableCollScanResumeBranch(isTailableCollScanResumeBranch);
+        return build(root, childReqs);
+    };
+
+    std::vector<std::pair<SbStage, PlanStageSlots>> stagesAndSlots;
+
+    // Build the anchor branch and resume branch of the union.
+    stagesAndSlots.emplace_back(makeUnionBranch(false));
+    stagesAndSlots.emplace_back(makeUnionBranch(true));
+
+    // Add a constant filter on top of the anchor branch, so that it would only execute on an
+    // initial collection scan, that is, when resumeRecordId is not available yet.
+    auto& [anchorBranch, _] = stagesAndSlots[0];
+    anchorBranch = b.makeConstFilter(std::move(anchorBranch),
+                                     b.makeNot(b.makeFunction("exists"_sd, resumeRecordIdSlot)));
+
+    // Add a constant filter on top of the resume branch, so that it would only execute when we
+    // resume a collection scan from the resumeRecordId.
+    auto& [resumeBranch, __] = stagesAndSlots[1];
+    resumeBranch = b.makeConstFilter(
+        b.makeLimitSkip(std::move(resumeBranch), SbExpr{}, b.makeInt64Constant(1)),
+        b.makeFunction("exists"_sd, resumeRecordIdSlot));
+
+    std::vector<const FieldSet*> postimageAllowedFieldSets;
+    postimageAllowedFieldSets.reserve(2);
+    postimageAllowedFieldSets.push_back(&getPostimageAllowedFields(root));
+    postimageAllowedFieldSets.push_back(&getPostimageAllowedFields(root));
+
+    // Define a lambda for creating a UnionStage.
+    auto makeUnionStage = [&](sbe::PlanStage::Vector inputStages,
+                              const std::vector<SbSlotVector>& inputSlots) {
+        return b.makeUnion(std::move(inputStages), inputSlots);
+    };
+
+    // Call makeMergedPlanStageSlots(), passing in the 'makeUnionStage' lambda.
+    return PlanStageSlots::makeMergedPlanStageSlots(_state,
+                                                    root->nodeId(),
+                                                    reqs,
+                                                    std::move(stagesAndSlots),
+                                                    makeUnionStage,
+                                                    postimageAllowedFieldSets);
+}
+
 std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildShardFilterCovered(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
@@ -5050,6 +5126,26 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
             kStageBuilders.find(root->getType()) != kStageBuilders.end());
 
     auto stageType = root->getType();
+
+    // If this plan is for a tailable cursor scan, and we're not already in the process of building
+    // a special union sub-tree implementing such scans, then start building a union sub-tree. Note
+    // that LIMIT or SKIP stage is used as a splitting point of the two union branches, if present,
+    // because we need to apply limit (or skip) only in the initial scan (in the anchor branch), and
+    // the resume branch should not have it.
+    switch (stageType) {
+        case STAGE_COLLSCAN:
+        case STAGE_LIMIT:
+        case STAGE_SKIP:
+            if (_cq.getFindCommandRequest().getTailable() &&
+                !reqsIn.getIsBuildingUnionForTailableCollScan()) {
+                auto reqs = reqsIn;
+                reqs.setIsBuildingUnionForTailableCollScan(true);
+                return makeUnionForTailableCollScan(root, reqs);
+            }
+            [[fallthrough]];
+        default:
+            break;
+    }
 
     // If 'root->fetched()' is true and 'reqsIn' has a kPrefetchedResult req, then we drop the
     // kPrefetchedResult req (as well as the kIndexKey, kIndexKeyPattern, kIndexIdent, and

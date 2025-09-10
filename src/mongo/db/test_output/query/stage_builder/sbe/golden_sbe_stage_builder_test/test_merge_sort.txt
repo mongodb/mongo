@@ -7,7 +7,7 @@
             [1] ixseek KS(2B0201) KS(2B04FE) s4 s1 s5 s3 [s2 = 0] @"UUID" @"a_1" true 
         right 
             [2] limit 1ll 
-            [2] seek s1 s8 s9 s5 s3 s4 s6 none none [] @"UUID" true 
+            [2] seek s1 s8 s9 s5 s3 s4 s6 none none [] @"UUID" true false 
     , 
     [s11] [s17, s15, s11] [4] nlj inner [s11, s15] [s10, s14, s12, s13, s6] 
         left 
@@ -15,5 +15,5 @@
             [3] ixseek KS(2B0401) KS(2B06FE) s13 s10 s14 s12 [s11 = 0] @"UUID" @"a_1" true 
         right 
             [4] limit 1ll 
-            [4] seek s10 s16 s17 s14 s12 s13 s6 none none [] @"UUID" true 
+            [4] seek s10 s16 s17 s14 s12 s13 s6 none none [] @"UUID" true false 
 ] 

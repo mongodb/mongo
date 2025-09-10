@@ -16,7 +16,7 @@ $$RESULT=s16 env: { s1 = Nothing (searchLimit), s2 = Nothing (searchSortSpec), s
                 [1] ixseek ks(1ll, 0, s10, 1ll) ks(1ll, 0, s10, 2ll) s13 s11 s14 s12 [] @"UUID" @"_id_" true 
             right 
                 [1] limit 1ll 
-                [1] seek s11 s16 s17 s14 s12 s13 s15 none none [] @"UUID" true 
+                [1] seek s11 s16 s17 s14 s12 s13 s15 none none [] @"UUID" true false 
 
 Search NonStoredSource Test
 $$RESULT=s3 env: { s1 = 1 (searchLimit), s2 = Nothing (searchSortSpec), s4 = {"count" : 2} (SEARCH_META) }
