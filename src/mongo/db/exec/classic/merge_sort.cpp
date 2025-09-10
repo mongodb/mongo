@@ -57,7 +57,7 @@ MergeSortStage::MergeSortStage(ExpressionContext* expCtx,
       _pattern(params.pattern),
       _dedup(params.dedup),
       _recordIdDeduplicator(expCtx),
-      // TODO SERVER-99279 Add internalMergeSortMaxMemoryBytes when it exists.
+      // TODO SERVER-97746 Add internalMergeSortMaxMemoryBytes when it exists.
       _merging(StageWithValueComparison(ws, params.pattern, params.collator)),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
 }
