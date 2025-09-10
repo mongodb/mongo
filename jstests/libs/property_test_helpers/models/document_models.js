@@ -14,7 +14,7 @@
  * arrays.
  * See property_test_helpers/README.md for more detail on the design.
  */
-import {dateArb, getScalarArb, intArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {dateArb, fieldArb, getScalarArb, intArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -64,4 +64,30 @@ export function getDatasetModel({maxNumDocs = 250, docModel} = {}) {
             return Object.assign({}, oldDoc, {_id: _ids[ix]});
         });
     });
+}
+
+/**
+ * Similar to getDocModel(), but generates more deeply nested data, and does not allow arrays.
+ *
+ * 'keyArb' is the arbitrary used to generate object keys. 'allowUnicode' and 'allowNullBytes' are
+ * used as input to the "base" value generator. It's not a strict guarantee that objects produced
+ * will have nesting depth at most 'approxMaxDepth' (hence "approx"); see note below.
+ */
+export function getNestedDocModelNoArray({keyArb, approxMaxDepth, maxObjectKeys, allowUnicode, allowNullBytes} = {}) {
+    if (!keyArb) {
+        // Re-use the standard field arbitrary if keyArb is not provided. Note that some of these
+        // keys could be dotted, so in reality we may end up with an object slightly more nested
+        // than 'approxMaxDepth'.
+        keyArb = fieldArb;
+    }
+    const scalarArb = getScalarArb({allowUnicode, allowNullBytes});
+    if (!maxObjectKeys) {
+        maxObjectKeys = 5;
+    }
+
+    return fc.letrec((tie) => ({
+        // A value in an object can be our leaf arbitrary, or it can be a nested object.
+        value: fc.oneof({maxDepth: approxMaxDepth}, scalarArb, tie("object")),
+        object: fc.dictionary(keyArb, tie("value"), {maxKeys: maxObjectKeys}),
+    })).object;
 }

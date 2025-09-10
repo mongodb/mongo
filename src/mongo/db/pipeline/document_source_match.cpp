@@ -45,6 +45,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -531,7 +532,24 @@ DocumentSourceMatch::splitMatchByModifiedFields(
     const boost::intrusive_ptr<DocumentSourceMatch>& match,
     const DocumentSource::GetModPathsReturn& modifiedPathsRet) {
     // Attempt to move some or all of this $match before this stage.
-    OrderedPathSet modifiedPaths;
+    OrderedPathSet modifiedPaths = modifiedPathsRet.paths;
+    auto renames = modifiedPathsRet.renames;
+
+    // A "complex rename" is a rename-like operation which involves a dotted path, such as
+    // "a":"$b.c". If "b" is an array, then this is not a rename but a reshaping operation.
+    // Therefore, the typical behavior of getModifiedPaths() is to report "a" as a modified path and
+    // "a" -> "b.c" as a complex rename.
+    //
+    // When match swapping is permitted for complex renames we must reclassify "a":"$b.c" as a
+    // regular rename. This is done by removing "a" from the set of modified paths and adding "a" ->
+    // "b.c" to the renames map.
+    if (internalQueryPermitMatchSwappingForComplexRenames.load()) {
+        for (auto&& complexRename : modifiedPathsRet.complexRenames) {
+            renames[complexRename.first] = complexRename.second;
+            modifiedPaths.erase(complexRename.first);
+        }
+    }
+
     switch (modifiedPathsRet.type) {
         case DocumentSource::GetModPathsReturn::Type::kNotSupported:
             // We don't know what paths this stage might modify, so refrain from swapping.
@@ -540,14 +558,13 @@ DocumentSourceMatch::splitMatchByModifiedFields(
             // This stage modifies all paths, so cannot be swapped with a $match at all.
             return {nullptr, match};
         case DocumentSource::GetModPathsReturn::Type::kFiniteSet:
-            modifiedPaths = modifiedPathsRet.paths;
             break;
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             DepsTracker depsTracker;
             match->getDependencies(&depsTracker);
 
-            auto preservedPaths = modifiedPathsRet.paths;
-            for (auto&& rename : modifiedPathsRet.renames) {
+            auto preservedPaths = modifiedPaths;
+            for (auto&& rename : renames) {
                 preservedPaths.insert(rename.first);
             }
             modifiedPaths =
@@ -555,7 +572,7 @@ DocumentSourceMatch::splitMatchByModifiedFields(
                     .modified;
         }
     }
-    return std::move(*match).splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
+    return std::move(*match).splitSourceBy(modifiedPaths, renames);
 }
 
 intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
