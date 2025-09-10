@@ -270,7 +270,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
         poolData.target = maxConns;
     }
 
-    poolData.isAbleToShutdown = stats.health.isExpired;
+    poolData.isAbleToShutdown = (stats.health == ConnectionPool::HostHealth::kExpired);
 
     // If the pool isn't in a groupData, we can return now
     auto groupData = poolData.groupData.lock();

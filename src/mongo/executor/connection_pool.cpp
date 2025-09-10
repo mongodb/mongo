@@ -174,7 +174,7 @@ std::string ConnectionPool::HostState::toString() const {
         pending,
         active,
         leased,
-        health.isExpired);
+        health == HostHealth::kExpired);
 }
 
 /**
@@ -205,7 +205,7 @@ public:
             data.target = maxConns;
         }
 
-        return {{data.host}, stats.health.isExpired};
+        return {{data.host}, stats.health == HostHealth::kExpired};
     }
     void removeHost(PoolId id) override {
         stdx::lock_guard lk(_mutex);
@@ -611,7 +611,7 @@ private:
     // Indicates connections associated with this HostAndPort should be kept open.
     bool _keepOpen = true;
 
-    HostHealth _health;
+    HostHealth _health = HostHealth::kHealthy;
 
     std::uint64_t _nextRequestId{0};
 
@@ -1142,7 +1142,7 @@ void ConnectionPool::SpecificPool::finishRefresh(
     _refreshed++;
 
     // If we're in shutdown, we don't need refreshed connections
-    if (_health.isShutdown) {
+    if (_health == HostHealth::kShutdown) {
         return;
     }
 
@@ -1197,7 +1197,7 @@ void ConnectionPool::SpecificPool::returnConnection(
     auto conn = takeFromPool(lk, isLeased ? _leasedPool : _checkedOutPool, connPtr);
     invariant(conn);
 
-    if (_health.isShutdown) {
+    if (_health == HostHealth::kShutdown) {
         // If we're in shutdown, then we don't care
         return;
     }
@@ -1301,7 +1301,7 @@ void ConnectionPool::SpecificPool::addToReady(WithLock, OwnedConnection conn) {
             return;
 
         // If we're in shutdown, we don't need to refresh connections
-        if (_health.isShutdown)
+        if (_health == HostHealth::kShutdown)
             return;
 
         _checkedOutPool[connPtr] = std::move(conn);
@@ -1314,10 +1314,11 @@ void ConnectionPool::SpecificPool::addToReady(WithLock, OwnedConnection conn) {
 }
 
 bool ConnectionPool::SpecificPool::initiateShutdown(WithLock lk) {
-    auto wasShutdown = std::exchange(_health.isShutdown, true);
-    if (wasShutdown) {
+    if (_health == HostHealth::kShutdown) {
+        // Shutdown was already initiated.
         return false;
     }
+    _health = HostHealth::kShutdown;
 
     LOGV2_DEBUG(22571, 2, "Delisting connection pool", "hostAndPort"_attr = _hostAndPort);
 
@@ -1369,7 +1370,7 @@ void ConnectionPool::SpecificPool::processFailure(
     _readyPool.clear();
 
     // Migrate processing connections to the dropped pool, unless we're shutting down.
-    if (!_health.isShutdown) {
+    if (_health != HostHealth::kShutdown) {
         for (auto&& x : _processingPool) {
             // If we're just dropping the pool, we can reuse them later
             _droppedProcessingPool[x.first] = std::move(x.second);
@@ -1378,7 +1379,9 @@ void ConnectionPool::SpecificPool::processFailure(
     _processingPool.clear();
 
     // Mark ourselves as failed so we don't immediately respawn
-    _health.isFailed = true;
+    if (_health != HostHealth::kShutdown) {
+        _health = HostHealth::kFailed;
+    }
 
     if (_requests.empty()) {
         return;
@@ -1470,12 +1473,12 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::setGetCon
 
 // spawn enough connections to satisfy open requests and minpool, while honoring maxpool
 void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
-    if (_health.isShutdown) {
+    if (_health == HostHealth::kShutdown) {
         // Dead pools spawn no conns
         return;
     }
 
-    if (_health.isFailed) {
+    if (_health == HostHealth::kFailed) {
         LOGV2_DEBUG(22574,
                     kDiagnosticLogLevel,
                     "Pool has failed recently, postponing any attempts to spawn connections",
@@ -1563,13 +1566,22 @@ ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::take
 void ConnectionPool::SpecificPool::updateHealth() {
     const auto now = _parent->_factory->now();
 
-    // We're expired if we have no sign of connection use and are past our expiry
-    _health.isExpired = _requests.empty() && _checkedOutPool.empty() && _leasedPool.empty() &&
-        (_hostExpiration <= now);
+    // Don't update the host health if we are on shutdown.
+    if (_health == HostHealth::kShutdown) {
+        return;
+    }
 
-    // We're failed until we get new requests or our timer triggers
-    if (_health.isFailed) {
-        _health.isFailed = _requests.empty();
+    // We're failed until we get new requests or our timer triggers.
+    if (_health == HostHealth::kFailed && !_requests.empty()) {
+        _health = HostHealth::kHealthy;
+    }
+
+    // We're expired if we have no sign of connection use and are past our expiry.
+    if (_requests.empty() && _checkedOutPool.empty() && _leasedPool.empty() &&
+        (_hostExpiration <= now)) {
+        _health = HostHealth::kExpired;
+    } else if (_health == HostHealth::kExpired) {
+        _health = HostHealth::kHealthy;
     }
 }
 
@@ -1618,7 +1630,9 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     auto deferredStateUpdateFunc = guardCallback([this](auto& lk) {
         auto now = _parent->_factory->now();
 
-        _health.isFailed = false;
+        if (_health == HostHealth::kFailed) {
+            _health = HostHealth::kHealthy;
+        }
 
         std::vector<Promise<ConnectionHandle>> toError;
         while (_requests.size() > 0 && _requests.begin()->first <= now) {
@@ -1639,7 +1653,7 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
 
 void ConnectionPool::SpecificPool::updateController(
     stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk) {
-    if (_health.isShutdown) {
+    if (_health == HostHealth::kShutdown) {
         return;
     }
 
@@ -1671,7 +1685,7 @@ void ConnectionPool::SpecificPool::updateController(
             }
 
             auto& pool = it->second;
-            if (!pool->_health.isExpired) {
+            if (pool->_health != HostHealth::kExpired) {
                 // Just because a HostGroup "canShutdown" doesn't mean that a SpecificPool should
                 // shutdown. For example, it is always inappropriate to shutdown a SpecificPool with
                 // connections in use or requests outstanding unless its parent ConnectionPool is
@@ -1684,7 +1698,7 @@ void ConnectionPool::SpecificPool::updateController(
             }
 
             // At the moment, controllers will never mark for shutdown a pool with active
-            // connections or pending requests. isExpired is never true if these invariants are
+            // connections or pending requests. _health is never kExpired if these invariants are
             // false. That's not to say that it's a terrible idea, but if this happens then we
             // should review what it means to be expired.
 
@@ -1720,7 +1734,7 @@ void ConnectionPool::SpecificPool::updateController(
 
 // Updates our state and manages the request timer
 void ConnectionPool::SpecificPool::updateState(WithLock) {
-    if (_health.isShutdown) {
+    if (_health == HostHealth::kShutdown) {
         // If we're in shutdown, there is nothing to update. Our clients are all gone.
         LOGV2_DEBUG(22579, kDiagnosticLogLevel, "Pool is dead", "hostAndPort"_attr = _hostAndPort);
         return;

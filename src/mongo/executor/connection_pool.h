@@ -197,38 +197,36 @@ public:
     };
 
     /**
-     * A set of flags describing the health of a host pool
+     * A set of states describing the health of a host pool:
      */
-    struct HostHealth {
+    enum class HostHealth {
         /**
-         * The pool is expired and can be shutdown by updateController
-         *
-         * This flag is set to true when there have been no connection requests or in use
-         * connections for ControllerInterface::hostTimeout().
-         *
-         * This flag is set to false whenever a connection is requested.
+         * The pool is healthy and will spawn new connections to reach the specified target.
          */
-        bool isExpired = false;
-
+        kHealthy,
         /**
-         *  The pool has processed a failure and will not spawn new connections until requested
+         * The pool is expired and can be shutdown by updateController.
+         * It is set when there have been no connection requests or in use connections for
+         * ControllerInterface::hostTimeout().
          *
-         *  This flag is set to true by processFailure(), and thus also triggerShutdown().
-         *
-         *  This flag is set to false whenever a connection is requested.
-         *
-         *  As a further note, this prevents us from spamming a failed host with connection
-         *  attempts. If an external user believes a host should be available, they can request
-         *  again.
+         * The host health will go back to `kHealthy` as soon as a connection is requested.
          */
-        bool isFailed = false;
-
+        kExpired,
+        /**
+         * The pool has processed a failure and will not spawn new connections until requested.
+         * It is set by processFailure() unless a shutdown has been triggered.
+         *
+         * As a further note, this prevents us from spamming a failed host with connection attempts.
+         * If an external user believes a host should be available, they can request again.
+         *
+         * The host health will go back to `kHealthy` as soon as a connection is requested.
+         */
+        kFailed,
         /**
          * The pool is shutdown and will never be called by the ConnectionPool again.
-         *
-         * This flag is set to true by triggerShutdown() or updateController(). It is never unset.
+         * It is set by triggerShutdown() or updateController(). It is never unset.
          */
-        bool isShutdown = false;
+        kShutdown,
     };
 
     /**
@@ -237,7 +235,7 @@ public:
      * This should only be constructed by the SpecificPool.
      */
     struct HostState {
-        HostHealth health;
+        HostHealth health = HostHealth::kHealthy;
         size_t requests = 0;
         size_t pending = 0;
         size_t ready = 0;

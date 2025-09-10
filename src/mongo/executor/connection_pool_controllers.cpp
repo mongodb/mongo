@@ -67,7 +67,7 @@ DynamicLimitController::HostGroupState DynamicLimitController::updateHost(PoolId
     auto& data = getOrInvariant(_poolData, id);
     data.target =
         std::clamp(stats.requests + stats.active + stats.leased, _minLoader(), _maxLoader());
-    return {{data.host}, stats.health.isExpired};
+    return {{data.host}, stats.health == ConnectionPool::HostHealth::kExpired};
 }
 
 void DynamicLimitController::removeHost(PoolId id) {
