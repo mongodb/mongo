@@ -19,39 +19,48 @@ through which the host can load an extension, make function calls into an extens
 how the extension can expect to interface with the host. The Public API will be versioned, vendored
 and distributed to extension developers. It is written in C to ensure we maintain a stable ABI.
 
-## Host API
+## Host Logic and Host Adapter
 
 While the Public API defines the building blocks for communicating and interacting between the host
 and the extension, its C interface makes it difficult and unsafe for the host code (i.e C++) to
 interact with it directly.
 
-The Host API is an adapter layer responsible for creating a safe interface for the C++ host code to
+The Host Adapter layer is responsible for creating a safe interface for the C++ host code to
 interact with the extension using the C Public API. The host does not need to be aware of any of the
-C types that are introduced in the Public API. Instead, the Host API provides C++ classes and
+C types that are introduced in the Public API. Instead, the Host Adapter provides C++ classes and
 functions which abstract away the complexity and memory ownership concerns of interfacing with the
 C API.
 
-The Host API can be found under the `mongo/db/extension/host` directory.
-
 In general, every abstraction in the Public API has a respective C++ interface implemented in the
-Host API which the host is expected to use. This allows us to encapsulate and control where
+Host Adapter which the host is expected to use. This allows us to encapsulate and control where
 conversions across the API boundary between C and C++ take place, leading to more maintainable code
-and minimizing the risk of programmer errors in the host code. The Host API code lives within the
-C++ namespace mongo::extension::host.
+and minimizing the risk of programmer errors in the host code. The Host Adapter code lives within the
+C++ namespace `mongo::extension::host_adapter` and can be found under the
+`mongo/db/extension/host_adapter` directory.
 
-## SDK API
+The core host logic lives in `mongo/db/extension/host` within the C++ namespace
+`mongo::extension::host` and relies on the host adapters to communicate across the API boundary.
+In other words, logic in `mongo::extension::host` should only refer to data structures in
+`mongo::extension::host_adapter` and should _not_ refer to any data structures from the Public API
+directly.
 
-The SDK API is an adapter layer that is responsible for creating a safe interface for an extension
+**NOTE:** The exception to the `host`/`host_adapter` division is the adapter logic that wraps host services
+(like the HostPortal). Since that logic has many other server dependencies, the host services
+adapter logic lives with the `host` logic.
+
+## C++ SDK
+
+The C++ SDK is an adapter layer that is responsible for creating a safe interface for an extension
 developer to build an extension in their language of choice, and have it interact with the C Public
 API.
 
 The Extensions API initiative will only support Rust extensions in production. The Search team will
 own the Rust SDK. However, the Query team develops and maintains a C++ SDK for the purpose of
-writing internal unit and integration tests. The C++ SDK API can be found under
+writing internal unit and integration tests. The C++ SDK can be found under
 `mongo/db/extensions/sdk` directory.
 
 In general, every abstraction in the Public API has a respective C++ interface implemented in the
-C++ SDK API which extension developers are expected to use to build their extension. This includes
+C++ SDK which extension developers are expected to use to build their extension. This includes
 things like convenience methods, relevant base classes, etc. This allows us to encapsulate and
 control where conversions across the API boundary between C and C++ take place, leading to more
 maintainable code and minimizing the risk of programmer errors in extension code.

@@ -295,7 +295,8 @@ TEST_F(DocumentSourceExtensionTest, liteParsedDesugarTest) {
 }
 
 TEST_F(DocumentSourceExtensionTest, noOpStaticDescriptorTest) {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(&_noOpStaticDescriptor);
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
+        &_noOpStaticDescriptor);
     ASSERT_EQUALS(handle.getName(), NoOpAggregationStageDescriptor::kStageName);
     ASSERT_EQUALS(handle.getType(), ::MongoExtensionAggregationStageType::kNoOp);
 }
@@ -343,14 +344,14 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
 }
 
 TEST_F(DocumentSourceExtensionTest, DesugarStaticDescriptorTest) {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
         &_matchLimitDesugarStaticDescriptor);
     ASSERT_EQUALS(handle.getName(), DesugarAsMatchAndLimitDescriptor::kStageName);
     ASSERT_EQUALS(handle.getType(), ::MongoExtensionAggregationStageType::kDesugar);
 }
 
 TEST_F(DocumentSourceExtensionTest, MatchLimitDesugarExpansionSucceedsTest) {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
         &_matchLimitDesugarStaticDescriptor);
 
     auto vec = handle.getExpandedPipelineVec();
@@ -361,7 +362,7 @@ TEST_F(DocumentSourceExtensionTest, MatchLimitDesugarExpansionSucceedsTest) {
 }
 
 TEST_F(DocumentSourceExtensionTest, EmptyDesugarExpansionSucceedsTest) {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
         &_emptyDesugarStaticDescriptor);
 
     auto vec = handle.getExpandedPipelineVec();
@@ -369,19 +370,20 @@ TEST_F(DocumentSourceExtensionTest, EmptyDesugarExpansionSucceedsTest) {
 }
 
 DEATH_TEST_F(DocumentSourceExtensionTest, NoExpandOverrideDesugarExpansionFails, "11038200") {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
         &_badNoExpandOverrideDesugarStaticDescriptor);
     [[maybe_unused]] auto result = handle.getExpandedPipelineVec();
 }
 
 TEST_F(DocumentSourceExtensionTest, BadArrayElementsDesugarExpansionFails) {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
         &_badArrayEltsDesugarStaticDescriptor);
     ASSERT_THROWS_CODE(handle.getExpandedPipelineVec(), DBException, ErrorCodes::TypeMismatch);
 }
 
 DEATH_TEST_F(DocumentSourceExtensionTest, NonDesugarExtensionExpansionFails, "11038201") {
-    extension::host::ExtensionAggregationStageDescriptorHandle handle(&_noOpStaticDescriptor);
+    extension::host_adapter::ExtensionAggregationStageDescriptorHandle handle(
+        &_noOpStaticDescriptor);
     [[maybe_unused]] auto result = handle.getExpandedPipelineVec();
 }
 }  // namespace

@@ -30,7 +30,7 @@
 
 #include "mongo/db/extension/sdk/extension_status.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_adapter {
 /**
  * ExtensionStatusHandle is an owned handle wrapper around a
  * MongoExtensionStatus. Typically this is a handle around a MongoExtensionStatus allocated by the
@@ -72,7 +72,6 @@ using HostStatus = sdk::ExtensionStatus;
 
 /**
  * HostStatusOK is an ExtensionStatus without errors.
- *
  */
 using HostStatusOK = sdk::ExtensionStatusOK;
-}  // namespace mongo::extension::host
+}  // namespace mongo::extension::host_adapter

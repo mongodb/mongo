@@ -1,4 +1,6 @@
-# Host API
+# Extension Host
+
+This directory holds all extension logic that hooks extensions into the rest of the server.
 
 ## DocumentSourceExtension
 

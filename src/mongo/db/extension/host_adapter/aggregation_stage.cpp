@@ -26,33 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
-#include "mongo/base/string_data.h"
-#include "mongo/db/extension/host/handle.h"
-#include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/extension/host_adapter/aggregation_stage.h"
 
+#include "mongo/db/extension/sdk/byte_buf.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 
-namespace mongo::extension::host {
-/**
- * ExtensionByteBufHandle is an owned handle wrapper around a
- * MongoExtensionByteBuf.
- */
-class ExtensionByteBufHandle : public OwnedHandle<::MongoExtensionByteBuf> {
-public:
-    ExtensionByteBufHandle(::MongoExtensionByteBuf* byteBufPtr)
-        : OwnedHandle<::MongoExtensionByteBuf>(byteBufPtr) {}
+namespace mongo::extension::host_adapter {
+std::vector<BSONObj> ExtensionAggregationStageDescriptorHandle::getExpandedPipelineVec() const {
+    ::MongoExtensionByteBuf* buf;
+    const auto& vtbl = vtable();
+    auto* ptr = get();
+    sdk::enterC([&]() { return vtbl.expand(ptr, &buf); });
 
-    /**
-     * Get a read-only view of the contents of MongoExtensionByteBuf.
-     */
-    StringData getView() const {
-        if (!isValid()) {
-            return StringData();
-        }
-
-        auto stringView = sdk::byteViewAsStringView(vtable().get_view(get()));
-        return StringData{stringView.data(), stringView.size()};
+    if (!buf) {
+        return std::vector<BSONObj>{};
     }
-};
-}  // namespace mongo::extension::host
+
+    sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
+    auto ownedBob = sdk::bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+
+    BSONArray arr(ownedBob);
+    auto wrappedPipeline = BSON("pipeline" << arr);
+    return parsePipelineFromBSON(wrappedPipeline.firstElement());
+}
+
+ExtensionLogicalAggregationStageHandle ExtensionAggregationStageDescriptorHandle::parse(
+    BSONObj stageBson) const {
+    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
+    const auto& vtbl = vtable();
+    auto* ptr = get();
+    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
+    sdk::enterC([&]() { return vtbl.parse(ptr, sdk::objAsByteView(stageBson), &logicalStagePtr); });
+    return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
+}
+}  // namespace mongo::extension::host_adapter

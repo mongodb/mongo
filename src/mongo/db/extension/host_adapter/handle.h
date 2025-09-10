@@ -27,41 +27,32 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/db/extension/host/handle.h"
-#include "mongo/db/extension/host/host_portal.h"
-#include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/sdk/handle.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_adapter {
+/**
+ * OwnedHandle is a move-only wrapper around a raw pointer allocated by the extension, whose
+ * ownership has been transferred to the host. OwnedHandle acts as a wrapper that
+ * abstracts the vtable and underlying pointer, and makes sure to destroy the associated pointer
+ * when it goes out of scope.
+ *
+ * Note, for the time being, we are building and linking the C++ SDK into the host API to minimize
+ * code duplication. Once we are ready to decouple the C++ SDK from the server, we will need to
+ * provide a copy of the implementation of these classes within the host API.
+ */
+template <typename T>
+using OwnedHandle = sdk::OwnedHandle<T>;
 
 /**
- * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
- * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
- * is never transferred to the host.
+ * UnownedHandle is a wrapper around a raw pointer allocated by the extension, whose
+ * ownership has not been transferred to the host. UnownedHandle acts as a wrapper that
+ * abstracts the vtable and underlying pointer, but does not destroy the pointer when it goes out of
+ * scope.
+ *
+ * Note, for the time being, we are building and linking the C++ SDK into the host API to minimize
+ * code duplication. Once we are ready to decouple the C++ SDK from the server, we will need to
+ * provide a copy of the implementation of these classes within the host API.
  */
-class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
-
-public:
-    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
-        _assertValidVTable();
-    }
-
-    void initialize(const HostPortal& portal) const {
-        sdk::enterC([&] {
-            assertValid();
-            return vtable().initialize(get(), &portal);
-        });
-    }
-
-    ::MongoExtensionAPIVersion getVersion() const {
-        assertValid();
-        return get()->version;
-    }
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
-    };
-};
-
-}  // namespace mongo::extension::host
+template <typename T>
+using UnownedHandle = sdk::UnownedHandle<T>;
+}  // namespace mongo::extension::host_adapter

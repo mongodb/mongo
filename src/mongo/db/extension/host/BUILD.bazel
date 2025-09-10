@@ -4,32 +4,25 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "document_source_extension_test.cpp",
+    "host_portal.h",
 ])
 
 mongo_cc_library(
-    name = "api",
+    name = "extension_host",
     srcs = [
         "document_source_extension.cpp",
         "extension_stage.cpp",
         "host_portal.cpp",
     ],
     hdrs = [
-        "aggregation_stage.h",
-        "byte_buf.h",
         "document_source_extension.h",
-        "extension_handle.h",
         "extension_stage.h",
-        "extension_status.h",
-        "handle.h",
         "host_portal.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//src/mongo/db/extension/public:api",
-        # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.
-        # Eventually, we may decouple the C++ SDK from the server and remove this dependency.
-        "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo:base",
+        "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
         "//src/mongo/db/pipeline",
     ],
 )
@@ -41,10 +34,9 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo:core_headers_library",
-        "//src/mongo/db/extension/host:api",
-        "//src/mongo/db/extension/public:api",
-        "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/extension/host:extension_host",
         "//src/mongo/db/query:query_knobs",
+        "//src/third_party/yaml-cpp:yaml",
     ],
 )
 

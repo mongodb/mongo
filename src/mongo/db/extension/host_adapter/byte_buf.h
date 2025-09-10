@@ -27,32 +27,32 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/db/extension/sdk/handle.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/extension/host/handle.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/byte_buf_utils.h"
 
-namespace mongo::extension::host {
-/**
- * OwnedHandle is a move-only wrapper around a raw pointer allocated by the extension, whose
- * ownership has been transferred to the host. OwnedHandle acts as a wrapper that
- * abstracts the vtable and underlying pointer, and makes sure to destroy the associated pointer
- * when it goes out of scope.
- *
- * Note, for the time being, we are building and linking the C++ SDK into the host API to minimize
- * code duplication. Once we are ready to decouple the C++ SDK from the server, we will need to
- * provide a copy of the implementation of these classes within the host API.
- */
-template <typename T>
-using OwnedHandle = sdk::OwnedHandle<T>;
 
+namespace mongo::extension::host_adapter {
 /**
- * UnownedHandle is a wrapper around a raw pointer allocated by the extension, whose
- * ownership has not been transferred to the host. UnownedHandle acts as a wrapper that
- * abstracts the vtable and underlying pointer, but does not destroy the pointer when it goes out of
- * scope.
- *
- * Note, for the time being, we are building and linking the C++ SDK into the host API to minimize
- * code duplication. Once we are ready to decouple the C++ SDK from the server, we will need to
- * provide a copy of the implementation of these classes within the host API.
+ * ExtensionByteBufHandle is an owned handle wrapper around a
+ * MongoExtensionByteBuf.
  */
-template <typename T>
-using UnownedHandle = sdk::UnownedHandle<T>;
-}  // namespace mongo::extension::host
+class ExtensionByteBufHandle : public OwnedHandle<::MongoExtensionByteBuf> {
+public:
+    ExtensionByteBufHandle(::MongoExtensionByteBuf* byteBufPtr)
+        : OwnedHandle<::MongoExtensionByteBuf>(byteBufPtr) {}
+
+    /**
+     * Get a read-only view of the contents of MongoExtensionByteBuf.
+     */
+    StringData getView() const {
+        if (!isValid()) {
+            return StringData();
+        }
+
+        auto stringView = sdk::byteViewAsStringView(vtable().get_view(get()));
+        return StringData{stringView.data(), stringView.size()};
+    }
+};
+}  // namespace mongo::extension::host_adapter

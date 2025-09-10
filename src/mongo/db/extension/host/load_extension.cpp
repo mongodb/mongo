@@ -29,7 +29,7 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
-#include "mongo/db/extension/host/extension_handle.h"
+#include "mongo/db/extension/host_adapter/extension_handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -81,7 +81,8 @@ void assertVersionCompatibility(const ::MongoExtensionAPIVersionVector* hostVers
             foundCompatibleMinor);
 }
 
-ExtensionHandle getMongoExtension(SharedLibrary& extensionLib, const std::string& extensionPath) {
+host_adapter::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
+                                                const std::string& extensionPath) {
     StatusWith<get_mongo_extension_t> swGetExtensionFunction =
         extensionLib.getFunctionAs<get_mongo_extension_t>(GET_MONGODB_EXTENSION_SYMBOL);
     uassert(10615501,
@@ -99,7 +100,7 @@ ExtensionHandle getMongoExtension(SharedLibrary& extensionLib, const std::string
                           << "': get_mongodb_extension failed to set an extension",
             extension != nullptr);
 
-    return ExtensionHandle{extension};
+    return host_adapter::ExtensionHandle{extension};
 }
 }  // namespace
 
@@ -154,7 +155,7 @@ void ExtensionLoader::load(const std::string& extensionPath) {
     loadedExtensions.emplace(extensionPath, std::move(swExtensionLib.getValue()));
     auto& extensionLib = loadedExtensions[extensionPath];
 
-    ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
+    host_adapter::ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
     // Validate that the major and minor versions from the extension implementation are compatible
     // with the host API version.
     assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extHandle.getVersion());

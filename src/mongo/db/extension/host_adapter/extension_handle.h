@@ -26,25 +26,42 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 #include "mongo/db/extension/host/host_portal.h"
-
-#include "mongo/db/extension/host/document_source_extension.h"
-#include "mongo/db/extension/host_adapter/aggregation_stage.h"
+#include "mongo/db/extension/host_adapter/handle.h"
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
-namespace mongo::extension::host {
+namespace mongo::extension::host_adapter {
 
-void registerStageDescriptor(const ::MongoExtensionAggregationStageDescriptor* descriptor) {
-    tassert(
-        10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
-    DocumentSourceExtension::registerStage(
-        host_adapter::ExtensionAggregationStageDescriptorHandle(descriptor));
-}
+/**
+ * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
+ * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
+ * is never transferred to the host.
+ */
+class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
 
+public:
+    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
+        _assertValidVTable();
+    }
 
-::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(
-    const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept {
-    return sdk::enterCXX([&]() { return registerStageDescriptor(stageDesc); });
-}
+    void initialize(const extension::host::HostPortal& portal) const {
+        sdk::enterC([&] {
+            assertValid();
+            return vtable().initialize(get(), &portal);
+        });
+    }
 
-}  // namespace mongo::extension::host
+    ::MongoExtensionAPIVersion getVersion() const {
+        assertValid();
+        return get()->version;
+    }
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
+    };
+};
+
+}  // namespace mongo::extension::host_adapter

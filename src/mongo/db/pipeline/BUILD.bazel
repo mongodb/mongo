@@ -1642,7 +1642,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
-        "//src/mongo/db/extension/host:api",
+        "//src/mongo/db/extension/host:extension_host",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
