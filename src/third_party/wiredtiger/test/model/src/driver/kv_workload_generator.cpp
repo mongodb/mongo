@@ -562,6 +562,9 @@ kv_workload_generator::run()
         /* FIXME-WT-15041 Handling abandoned checkpoints is not yet supported. */
         _spec.crash = 0;
         _spec.checkpoint_crash = 0;
+
+        /* FIXME-WT-14998 Truncate is not yet supported. */
+        _spec.truncate = 0;
     }
 
     /* Create tables. */

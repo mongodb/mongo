@@ -75,6 +75,8 @@ __wt_wiredtiger_error(int error)
         return (
           "WT_CONFLICT_LIVE_RESTORE: Conflict performing operation due to an in-progress live "
           "restore");
+    case WT_CONFLICT_DISAGG:
+        return ("WT_CONFLICT_DISAGG: Conflict with disaggregated storage");
     }
 
     /* Windows strerror doesn't support ENOTSUP. */

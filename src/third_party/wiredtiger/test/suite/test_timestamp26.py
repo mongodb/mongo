@@ -30,9 +30,10 @@
 #   Timestamps: assert commit settings
 #
 
-import wiredtiger, wttest
+import wiredtiger, wttest, errno
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
+from helper_disagg import DisaggConfigMixin
 
 # Test write_timestamp_usage never setting.
 class test_timestamp26_wtu_never(wttest.WiredTigerTestCase):
@@ -436,7 +437,7 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         self.ignoreStderrPatternIfExists("__wt_verbose_dump_txn_one")
 
 # Test that timestamps are ignored in logged files.
-class test_timestamp26_log_ts(wttest.WiredTigerTestCase):
+class test_timestamp26_log_ts(wttest.WiredTigerTestCase, DisaggConfigMixin):
     # Turn on logging to cause timestamps to be ignored.
     conn_config = 'log=(enabled=true)'
 
@@ -459,11 +460,17 @@ class test_timestamp26_log_ts(wttest.WiredTigerTestCase):
 
         # Open the object, configuring write_timestamp usage.
         uri = 'table:ts'
-        config = ',write_timestamp_usage='
+        config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        config += ',write_timestamp_usage='
         config += 'always' if self.always else 'never'
-        self.session.create(uri,
-            'key_format={},value_format={}'.format(self.key_format, self.value_format) + config)
 
+        # Disagg is not compatible with write timestamp never.
+        if not self.always and DisaggConfigMixin.is_disagg_scenario(self):
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.create(uri, config), "")
+            return
+
+        self.session.create(uri, config)
         c = self.session.open_cursor(uri)
 
         # Commit with a timestamp.

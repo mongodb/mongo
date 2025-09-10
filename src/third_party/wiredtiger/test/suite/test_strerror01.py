@@ -50,6 +50,7 @@ class test_strerror(wttest.WiredTigerTestCase, suite_subprocess):
         (wiredtiger.WT_CONFLICT_TABLE_LOCK, "WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock"),
         (wiredtiger.WT_CONFLICT_CHECKPOINT_LOCK, "WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock"),
         (wiredtiger.WT_CONFLICT_LIVE_RESTORE, "WT_CONFLICT_LIVE_RESTORE: Conflict performing operation due to an in-progress live restore"),
+        (wiredtiger.WT_CONFLICT_DISAGG, "WT_CONFLICT_DISAGG: Conflict with disaggregated storage"),
     ]
 
     def check_error_code(self, error, expected):

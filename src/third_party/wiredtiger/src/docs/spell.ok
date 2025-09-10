@@ -41,6 +41,7 @@ DCMAKE
 DENABLE
 DHANDLE
 DHAVE
+DISAGG
 DNON
 DONTNEED
 DSPINLOCK
@@ -323,6 +324,7 @@ dhandle's
 dhandles
 dir
 dirstore
+disaggregated
 disjunction
 disjunctions
 distclean

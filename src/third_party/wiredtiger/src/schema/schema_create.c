@@ -1456,6 +1456,14 @@ __schema_create_config_check(
           "unsupported type configuration: %.*s: type must be file for tiered storage",
           (int)cval.len, cval.str);
 
+    /* In disaggregated storage we should write everything with a timestamp. */
+    bool write_ts_never =
+      __wt_config_getones(session, config, "write_timestamp_usage", &cval) == 0 &&
+      WT_CONFIG_LIT_MATCH("never", cval);
+    if (__wt_conn_is_disagg(session) && write_ts_never)
+        WT_RET_SUB(session, EINVAL, WT_CONFLICT_DISAGG,
+          "write_timestamp_usage cannot be set to never when disaggregated storage is enabled");
+
     return (0);
 }
 

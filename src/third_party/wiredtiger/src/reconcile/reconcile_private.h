@@ -450,8 +450,8 @@ typedef struct {
         (r)->ref->page->modify->mod_multi_entries == 1))
 
 /* Called after building the disk image. */
-#define WT_BUILD_DELTA_LEAF(session, r)                                           \
-    WT_DELTA_LEAF_ENABLED((session)) && (r)->multi_next == 1 && !r->ovfl_items && \
+#define WT_BUILD_DELTA_LEAF(session, r)                         \
+    WT_DELTA_LEAF_ENABLED((session)) && (r)->multi_next == 1 && \
       WT_REC_RESULT_SINGLE_PAGE((session), (r))
 
 /*

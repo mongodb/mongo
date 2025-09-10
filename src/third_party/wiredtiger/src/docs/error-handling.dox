@@ -154,6 +154,10 @@ record with modifies. This is not supported.
 This sub-level error indicates that there is a conflict performing the operation because of a
 running live restore in the system.
 
+@par \c WT_CONFLICT_DISAGG
+This sub-level error indicates that an operation or configuration conflicts with disaggregated
+storage.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

@@ -120,7 +120,7 @@ main(int argc, char *argv[])
             g.checkpoint_name = __wt_optarg;
             break;
         case 'C': /* wiredtiger_open config */
-            strcpy(config_open, __wt_optarg);
+            strncpy(config_open, __wt_optarg, sizeof(config_open) - 1);
             break;
         case 'd': /* disaggregated storage options */
             if (enable_disagg(__wt_optarg) != 0) {

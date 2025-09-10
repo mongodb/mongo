@@ -45,6 +45,7 @@ TEST_CASE("Test generation of sub-level error codes when strerror is called",
           {WT_CONFLICT_LIVE_RESTORE,
             "WT_CONFLICT_LIVE_RESTORE: Conflict performing operation due to an in-progress live "
             "restore"},
+          {WT_CONFLICT_DISAGG, "WT_CONFLICT_DISAGG: Conflict with disaggregated storage"},
         };
 
         for (auto const [code, expected] : errors)

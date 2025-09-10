@@ -192,6 +192,10 @@ sub_errors = [
         "Conflict performing operation due to an in-progress live restore", '''
         This sub-level error indicates that there is a conflict performing the operation
         because of a running live restore in the system.'''),
+    Error('WT_CONFLICT_DISAGG', -32014,
+        "Conflict with disaggregated storage", '''
+        This sub-level error indicates that an operation or configuration conflicts with
+        disaggregated storage.'''),     
 ]
 
 # Update the #defines in the wiredtiger.h.in file.

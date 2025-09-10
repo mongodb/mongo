@@ -4320,6 +4320,12 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * operation because of a running live restore in the system.
  */
 #define	WT_CONFLICT_LIVE_RESTORE	(-32013)
+/*!
+ * Conflict with disaggregated storage.
+ * This sub-level error indicates that an operation or configuration conflicts
+ * with disaggregated storage.
+ */
+#define	WT_CONFLICT_DISAGG	(-32014)
 /*
  * Sub-level error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

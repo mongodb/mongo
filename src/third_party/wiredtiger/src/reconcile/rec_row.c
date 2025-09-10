@@ -256,10 +256,19 @@ __rec_row_merge(
     val = &r->v;
 
     /* FIXME-WT-14880: build delta for split pages. */
-    if (*build_delta && mod->mod_multi_entries > 1 && ref_changes > 0) {
-        *build_delta = false;
-        r->delta.size = 0;
-    }
+    if (mod->mod_multi_entries > 1) {
+        /*
+         * We need to remember what has been written for this ref in this internal page
+         * reconciliation to be able to build the internal page delta in the future. We have to
+         * remember it on the ref otherwise the information is lost if the child page is evicted.
+         */
+        F_SET(ref, WT_REF_FLAG_REC_MULTIPLE);
+        if (*build_delta && ref_changes > 0) {
+            *build_delta = false;
+            r->delta.size = 0;
+        }
+    } else
+        F_CLR(ref, WT_REF_FLAG_REC_MULTIPLE);
 
     /* For each entry in the split array... */
     for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
@@ -382,8 +391,16 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
-        /* FIXME-WT-14880: build delta for split pages. */
-        if (build_delta && r->multi_next > 0) {
+        /*
+         * FIXME-WT-14880: build delta for split pages.
+         *
+         * Stop building the delta if the page has ever been split.
+         *
+         * We write the child as multiple keys in the previous reconciliation. In this case, we
+         * cannot delete the keys written in the previous reconciliation if we build a delta. Stop
+         * building a delta.
+         */
+        if (build_delta && (r->multi_next > 0 || F_ISSET(ref, WT_REF_FLAG_REC_MULTIPLE))) {
             build_delta = false;
             r->delta.size = 0;
         }
@@ -443,6 +460,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
              */
             if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
                 __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
+
+            F_CLR(ref, WT_REF_FLAG_REC_MULTIPLE);
             /*
              * Ignored child.
              */
@@ -474,6 +493,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
                     __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
 
+                F_CLR(ref, WT_REF_FLAG_REC_MULTIPLE);
                 WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
@@ -561,6 +581,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         WT_TIME_AGGREGATE_COPY(&ta, source_ta);
         if (page_del != NULL)
             WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
+
+        F_CLR(ref, WT_REF_FLAG_REC_MULTIPLE);
         WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */

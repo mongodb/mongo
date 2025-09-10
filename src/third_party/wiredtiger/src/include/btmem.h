@@ -1217,9 +1217,10 @@ struct __wt_ref {
  * depending on it to be "!leaf" instead.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_REF_FLAG_INTERNAL 0x1u /* Page is an internal page */
-#define WT_REF_FLAG_LEAF 0x2u     /* Page is a leaf page */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+#define WT_REF_FLAG_INTERNAL 0x1u     /* Page is an internal page */
+#define WT_REF_FLAG_LEAF 0x2u         /* Page is a leaf page */
+#define WT_REF_FLAG_REC_MULTIPLE 0x4u /* Page has been split in reconciliation */
+                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

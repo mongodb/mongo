@@ -37,7 +37,7 @@
 #include <sstream>
 #include <vector>
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
 #include <libgen.h>
 #endif
@@ -364,7 +364,7 @@ decode_utf8(const std::string &str)
 std::string
 directory_path(const std::string &path)
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     char *buf;
 
     buf = strdup(path.c_str());
@@ -386,7 +386,7 @@ directory_path(const std::string &path)
 std::string
 executable_path()
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     char buf[PATH_MAX];
     int ret = readlink("/proc/self/exe", buf, sizeof(buf));
     if (ret != 0)
@@ -404,7 +404,7 @@ executable_path()
 std::string
 model_library_path()
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     Dl_info info;
     if (dladdr((const void *)model_library_path, &info) == 0)
         throw std::runtime_error("Cannot find the location of the model library");
@@ -465,9 +465,17 @@ std::string
 wt_build_dir_path()
 {
     std::string path = model_library_path();
+#if defined(__linux__)
+    const std::string library_name = "libwiredtiger.so";
+#elif defined(__APPLE__)
+    const std::string library_name = "libwiredtiger.dylib";
+#else
+    throw std::runtime_error("Not implemented for this platform");
+#endif
+
     for (path = directory_path(path); path != "." && path != "/"; path = directory_path(path)) {
-        std::string s = join(path, "libwiredtiger.so", "/");
-        if (access(s.c_str(), 0) == 0)
+        std::string s = join(path, library_name, "/");
+        if (access(s.c_str(), F_OK) == 0)
             return path;
     }
 

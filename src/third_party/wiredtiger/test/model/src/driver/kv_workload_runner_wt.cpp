@@ -37,7 +37,7 @@
 #include "model/driver/kv_workload_runner_wt.h"
 #include "model/util.h"
 
-#ifdef __unix__
+#if defined(__unix__) || defined(__APPLE__)
 #include <dirent.h>
 #endif
 
@@ -747,7 +747,7 @@ kv_workload_runner_wt::remove_local_files()
     if (_connection != nullptr)
         throw model_exception("WiredTiger is open");
 
-#ifndef __unix__
+#if !defined(__unix__) && !defined(__APPLE__)
     throw model_exception("Removing local files is not implemented on this platform");
 #else
 
