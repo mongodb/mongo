@@ -69,7 +69,7 @@ DiskSpaceMonitor* DiskSpaceMonitor::get(ServiceContext* svcCtx) {
 void DiskSpaceMonitor::_start(ServiceContext* svcCtx) {
     LOGV2(7333401, "Starting the DiskSpaceMonitor");
     invariant(!_job, "DiskSpaceMonitor is already started");
-    _dbpath = storageGlobalParams.dbpath;
+    _dbpath = boost::filesystem::path{storageGlobalParams.dbpath};
     _job = svcCtx->getPeriodicRunner()->makeJob(
         PeriodicRunner::PeriodicJob{"DiskSpaceMonitor",
                                     [this](Client* client) { _run(client); },

@@ -31,11 +31,14 @@
 
 #include "mongo/base/status.h"
 
+#include <boost/filesystem.hpp>
+
 namespace mongo {
 
 /*
  * Checks the available disk space to ensure there is a minimum amount required for spilling
  */
-Status ensureSufficientDiskSpaceForSpilling(const std::string& path, int64_t minRequired);
+Status ensureSufficientDiskSpaceForSpilling(const boost::filesystem::path& path,
+                                            int64_t minRequired);
 
 }  // namespace mongo

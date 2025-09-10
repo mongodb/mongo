@@ -49,10 +49,9 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(simulateAvailableDiskSpace);
 }
 
-int64_t getAvailableDiskSpaceBytes(const std::string& path) {
-    boost::filesystem::path fsPath(path);
+int64_t getAvailableDiskSpaceBytes(const boost::filesystem::path& path) {
     boost::system::error_code ec;
-    boost::filesystem::space_info spaceInfo = boost::filesystem::space(fsPath, ec);
+    boost::filesystem::space_info spaceInfo = boost::filesystem::space(path, ec);
     if (ec) {
         LOGV2(7333403,
               "Failed to query filesystem disk stats",
@@ -64,7 +63,7 @@ int64_t getAvailableDiskSpaceBytes(const std::string& path) {
     return static_cast<int64_t>(spaceInfo.available);
 }
 
-int64_t getAvailableDiskSpaceBytesInDbPath(const std::string& dbpath) {
+int64_t getAvailableDiskSpaceBytesInDbPath(const boost::filesystem::path& dbpath) {
     if (auto fp = simulateAvailableDiskSpace.scoped(); fp.isActive()) {
         return static_cast<int64_t>(fp.getData()["bytes"].numberLong());
     }

@@ -96,7 +96,7 @@ private:
     PeriodicJobAnchor _job;
 
     // Copy of the dbpath which is always safe to access.
-    std::string _dbpath;
+    boost::filesystem::path _dbpath;
     // This mutex protects _actions and the entire run loop of the disk space monitor.
     // The mutex also enables us to increment the _actionId for each new action added to _actions.
     stdx::mutex _mutex;

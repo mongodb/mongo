@@ -30,13 +30,14 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
+
+#include <boost/filesystem.hpp>
 
 namespace mongo {
 
 // This takes the dbpath as an input because storageGlobalParams.dbpath isn't always safe
 // to access; it is up to the caller to ensure that the correct path is passed and it is
 // safe to access.
-int64_t getAvailableDiskSpaceBytesInDbPath(const std::string& dbpath);
+int64_t getAvailableDiskSpaceBytesInDbPath(const boost::filesystem::path& dbpath);
 
 }  // namespace mongo

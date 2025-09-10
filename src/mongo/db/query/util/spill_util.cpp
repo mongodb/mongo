@@ -35,7 +35,8 @@
 
 namespace mongo {
 
-Status ensureSufficientDiskSpaceForSpilling(const std::string& dbpath, int64_t minRequired) {
+Status ensureSufficientDiskSpaceForSpilling(const boost::filesystem::path& dbpath,
+                                            int64_t minRequired) {
     int64_t available = getAvailableDiskSpaceBytesInDbPath(dbpath);
     if (available < minRequired) {
         return Status(ErrorCodes::OutOfDiskSpace,
