@@ -499,6 +499,8 @@ buildvariants:
     tasks:
       - name: compile_test_parallel_core_stream_TG
       - name: run_unit_tests_TG
+        distros:
+          - rhel8.8-xlarge
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG

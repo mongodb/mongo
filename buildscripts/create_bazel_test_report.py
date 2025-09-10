@@ -38,7 +38,9 @@ def main(testlog_dir: str):
     for test_xml in glob(f"{testlog_dir}/**/test.xml", recursive=True):
         testsuite = ET.parse(test_xml).getroot().find("testsuite")
         testcase = testsuite.find("testcase")
-        test_file = testcase.attrib["name"]
+
+        # Replace part of the name added by the remote test wrapper script
+        test_file = testcase.attrib["name"].replace("_remote_exec", "")
 
         if testcase.find("error") is not None:
             status = "fail"

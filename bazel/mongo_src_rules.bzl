@@ -852,6 +852,22 @@ def _mongo_cc_binary_and_test(
             exec_properties = exec_properties,
         )
 
+        native.sh_test(
+            name = name + "_remote_exec",
+            srcs = [
+                "//bazel:test_wrapper",
+            ],
+            tags = original_tags + ["remote_exec_test"],
+            args = [
+                "$(location " + name + ")",
+            ],
+            data = args["data"] + [name],
+            env = args["env"],
+            target_compatible_with = target_compatible_with,
+            visibility = visibility,
+            exec_properties = exec_properties,
+        )
+
 def mongo_cc_binary(
         name,
         srcs = [],
