@@ -43,7 +43,6 @@ public:
     static constexpr StringData kCursorFieldName = "cursor"_sd;
     static constexpr StringData kFirstBatchFieldName = "firstBatch"_sd;
 
-    static void validateListSearchIndexesSpec(const DocumentSourceListSearchIndexesSpec* spec);
     /**
      * A 'LiteParsed' representation of the $listSearchIndexes stage.
      */

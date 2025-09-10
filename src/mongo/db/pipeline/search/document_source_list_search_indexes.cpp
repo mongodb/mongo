@@ -44,13 +44,6 @@ REGISTER_DOCUMENT_SOURCE(listSearchIndexes,
                          AllowedWithApiStrict::kNeverInVersion1)
 ALLOCATE_DOCUMENT_SOURCE_ID(listSearchIndexes, DocumentSourceListSearchIndexes::id)
 
-void DocumentSourceListSearchIndexes::validateListSearchIndexesSpec(
-    const DocumentSourceListSearchIndexesSpec* spec) {
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot set both 'name' and 'id' for $listSearchIndexes.",
-            !(spec->getId() && spec->getName()));
-};
-
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSearchIndexes::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     // We must validate if atlas is configured. However, we might just be parsing or validating the
