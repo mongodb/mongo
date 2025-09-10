@@ -147,6 +147,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
+        findShardsOnConfigTimeoutMS: 30000 # giving legroom as this suite is doing initial sync
     shard_options:
       all_nodes_electable: True
       mongod_options:
