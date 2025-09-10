@@ -17,7 +17,7 @@ function runTest(conn, failPointConn, shardColl) {
     const coll = testDB.getCollection("t");
 
     const timeFieldName = "time";
-    const metaFieldName = "meta";
+    const metaFieldName = "m";
 
     coll.drop();
     assert.commandWorked(

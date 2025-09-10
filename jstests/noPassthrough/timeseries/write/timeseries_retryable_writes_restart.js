@@ -9,6 +9,9 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
+const timeFieldName = "time";
+const metaFieldName = "m";
+
 function testRetryableRestart(ordered) {
     const replTest = new ReplSetTest({nodes: 1});
     replTest.startSet();
@@ -19,17 +22,19 @@ function testRetryableRestart(ordered) {
     const testDB = primary.startSession({retryWrites: true}).getDatabase("test");
     const coll = testDB[jsTestName()];
 
-    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     function setupRetryableWritesForCollection(collName) {
         jsTestLog("Setting up the test collection");
         assert.commandWorked(
             coll.insert(
                 [
-                    {time: ISODate(), x: 0, meta: 0},
-                    {time: ISODate(), x: 1, meta: 0},
-                    {time: ISODate(), x: 0, meta: 1},
-                    {time: ISODate(), x: 1, meta: 1},
+                    {[timeFieldName]: ISODate(), x: 0, [metaFieldName]: 0},
+                    {[timeFieldName]: ISODate(), x: 1, [metaFieldName]: 0},
+                    {[timeFieldName]: ISODate(), x: 0, [metaFieldName]: 1},
+                    {[timeFieldName]: ISODate(), x: 1, [metaFieldName]: 1},
                 ],
                 {writeConcern: {w: "majority"}},
             ),
@@ -45,15 +50,15 @@ function testRetryableRestart(ordered) {
                 insert: collName,
                 documents: [
                     // Batched inserts resulting in "inserts".
-                    {x: 0, time: ISODate(), tag: insertTag, meta: 2},
-                    {x: 1, time: ISODate(), tag: insertTag, meta: 2},
-                    {x: 0, time: ISODate(), tag: insertTag, meta: 3},
-                    {x: 1, time: ISODate(), tag: insertTag, meta: 3},
+                    {x: 0, [timeFieldName]: ISODate(), tag: insertTag, [metaFieldName]: 2},
+                    {x: 1, [timeFieldName]: ISODate(), tag: insertTag, [metaFieldName]: 2},
+                    {x: 0, [timeFieldName]: ISODate(), tag: insertTag, [metaFieldName]: 3},
+                    {x: 1, [timeFieldName]: ISODate(), tag: insertTag, [metaFieldName]: 3},
                     // Batched inserts resulting in "updates".
-                    {x: 2, time: ISODate(), tag: updateTag, meta: 0},
-                    {x: 3, time: ISODate(), tag: updateTag, meta: 0},
-                    {x: 2, time: ISODate(), tag: updateTag, meta: 1},
-                    {x: 3, time: ISODate(), tag: updateTag, meta: 1},
+                    {x: 2, [timeFieldName]: ISODate(), tag: updateTag, [metaFieldName]: 0},
+                    {x: 3, [timeFieldName]: ISODate(), tag: updateTag, [metaFieldName]: 0},
+                    {x: 2, [timeFieldName]: ISODate(), tag: updateTag, [metaFieldName]: 1},
+                    {x: 3, [timeFieldName]: ISODate(), tag: updateTag, [metaFieldName]: 1},
                 ],
                 txnNumber: NumberLong(0),
                 lsid: {id: UUID()},

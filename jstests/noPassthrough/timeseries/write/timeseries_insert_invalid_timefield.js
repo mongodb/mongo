@@ -11,7 +11,7 @@ const coll = testDB.getCollection("t");
 coll.drop();
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
@@ -22,13 +22,13 @@ const goodDocs = [
     {
         _id: 0,
         time: ISODate("2020-11-26T00:00:00.000Z"),
-        meta: "A",
+        [metaFieldName]: "A",
         data: true,
     },
     {
         _id: 1,
         time: ISODate("2020-11-27T00:00:00.000Z"),
-        meta: "A",
+        [metaFieldName]: "A",
         data: true,
     },
 ];
@@ -37,11 +37,11 @@ assert.eq(1, coll.count());
 assert.docEq([goodDocs[0]], coll.find().toArray());
 
 // now make sure we reject if timeField is missing or isn't a valid BSON datetime
-let mixedDocs = [{meta: "B", data: true}, goodDocs[1], {time: "invalid", meta: "B", data: false}];
+let mixedDocs = [{[metaFieldName]: "B", data: true}, goodDocs[1], {time: "invalid", [metaFieldName]: "B", data: false}];
 assert.commandFailedWithCode(coll.insert(mixedDocs, {ordered: false}), ErrorCodes.BadValue);
 assert.eq(coll.count(), 2);
 assert.docEq(goodDocs, coll.find().toArray());
-assert.eq(null, coll.findOne({meta: mixedDocs[0].meta}));
-assert.eq(null, coll.findOne({meta: mixedDocs[2].meta}));
+assert.eq(null, coll.findOne({[metaFieldName]: mixedDocs[0].m}));
+assert.eq(null, coll.findOne({[metaFieldName]: mixedDocs[2].m}));
 
 MongoRunner.stopMongod(conn);

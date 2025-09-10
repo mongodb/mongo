@@ -31,7 +31,7 @@ const collName = jsTestName();
 const ts = db[collName];
 ts.drop();
 
-assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
 
 // The tests expect that memory metrics appear right after memory is used. Decrease the threshold
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
@@ -69,7 +69,7 @@ for (let i = 0; i < numTimes; i++) {
             time: new Date(startTime + i * 1000),
             price: randRange(minPrice, maxPrice),
             amount: randRange(minAmount, maxAmount),
-            meta: {"symbol": symbol},
+            m: {"symbol": symbol},
         });
     }
 }
@@ -84,7 +84,7 @@ const pipeline = [
     {
         $group: {
             _id: {
-                symbol: "$meta.symbol",
+                symbol: "$m.symbol",
                 minute: {
                     $subtract: [
                         {$dateTrunc: {date: "$time", unit: "minute"}},
@@ -126,7 +126,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
         {
             $group: {
                 _id: {
-                    symbol: "$meta.symbol",
+                    symbol: "$m.symbol",
                     minute: {
                         $subtract: [
                             {$dateTrunc: {date: "$time", unit: "minute"}},

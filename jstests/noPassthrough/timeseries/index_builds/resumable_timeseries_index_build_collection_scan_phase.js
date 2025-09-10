@@ -24,7 +24,7 @@ const coll = db[jsTestName()];
 coll.drop();
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
 );
@@ -42,7 +42,7 @@ for (let i = 0; i < 3; i++) {
             _id: i,
             measurement: "measurement",
             time: ISODate(),
-            meta: i,
+            [metaFieldName]: i,
         }),
     );
 }

@@ -20,7 +20,7 @@ TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
 
     const timeFieldName = "time";
-    const metaFieldName = "meta";
+    const metaFieldName = "m";
 
     coll.drop();
     assert.commandWorked(

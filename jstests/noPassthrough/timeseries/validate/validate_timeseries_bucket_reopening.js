@@ -19,7 +19,7 @@ assert.commandWorked(db.dropDatabase());
 
 const collNamePrefix = db[jsTestName() + "_"];
 const timeFieldName = "time";
-const metaFieldName1 = "meta";
+const metaFieldName1 = "m";
 const metaFieldName2 = "tag";
 const valueFieldName = "value";
 let testCaseId = 0;

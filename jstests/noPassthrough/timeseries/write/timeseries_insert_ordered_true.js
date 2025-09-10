@@ -10,7 +10,7 @@ const testDB = conn.getDB(jsTestName());
 const coll = testDB.getCollection("t");
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 coll.drop();
 assert.commandWorked(

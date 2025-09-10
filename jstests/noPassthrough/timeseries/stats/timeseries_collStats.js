@@ -26,7 +26,7 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection("t");
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 const expectedStats = {
     bucketsNs: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),

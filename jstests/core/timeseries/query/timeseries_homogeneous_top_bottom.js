@@ -21,7 +21,7 @@ TimeseriesTest.run((insert) => {
     // collection.
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: "time", metaField: "m"},
         }),
     );
 
@@ -41,7 +41,7 @@ TimeseriesTest.run((insert) => {
             tsDocs.push({
                 _id: id,
                 time: new Date(datePrefix + currentDate + id), // Use id to ensure uniqueness of each time stamp
-                meta: metaIdx,
+                m: metaIdx,
                 x: NumberLong(200 * metaIdx * metaOffsetSign + doc * docOffsetSign),
                 y: 1000 * metaIdx * metaOffsetSign + doc * docOffsetSign,
                 z: NumberLong(id++),
@@ -57,7 +57,7 @@ TimeseriesTest.run((insert) => {
                 tsDocs.push({
                     _id: id,
                     time: new Date(datePrefix + currentDate + id), // Use id to ensure uniqueness of each time stamp
-                    meta: metaIdx,
+                    m: metaIdx,
                     x: NumberLong(200 * metaIdx * metaOffsetSign + doc * docOffsetSign),
                     y: dbl,
                     z: NumberInt(id++),

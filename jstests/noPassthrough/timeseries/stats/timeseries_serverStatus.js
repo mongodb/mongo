@@ -12,7 +12,7 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection("t");
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),

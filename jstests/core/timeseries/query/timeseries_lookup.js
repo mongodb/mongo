@@ -21,7 +21,7 @@ TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());
     const timeFieldName = "time";
-    const tagFieldName = "tag";
+    const tagFieldName = "tags";
     const collOptions = [null, {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}];
     const numHosts = 10;
     const numDocs = 200;
@@ -46,8 +46,8 @@ TimeseriesTest.run((insert) => {
             assert.commandWorked(
                 insert(collA, {
                     measurement: "cpu",
-                    time: ISODate(),
-                    tags: host.tags,
+                    [timeFieldName]: ISODate(),
+                    [tagFieldName]: host.tags,
                 }),
             );
         }
@@ -58,13 +58,13 @@ TimeseriesTest.run((insert) => {
             assert.commandWorked(
                 insert(collB, {
                     measurement: "cpu",
-                    time: ISODate(),
-                    tags: host.tags,
+                    [timeFieldName]: ISODate(),
+                    [tagFieldName]: host.tags,
                 }),
             );
             // Here we extract the hostId from "host.tags.hostname". It is expected that the
             // "host.tags.hostname" is in the form of 'host_<hostNum>'.
-            entryCountPerHost[parseInt(host.tags.hostname.substring(5, host.tags.hostname.length))]++;
+            entryCountPerHost[parseInt(host[tagFieldName].hostname.substring(5, host[tagFieldName].hostname.length))]++;
         }
 
         // Equality Match
@@ -73,15 +73,15 @@ TimeseriesTest.run((insert) => {
                 {
                     $lookup: {
                         from: collB.getName(),
-                        localField: "tags.hostname",
-                        foreignField: "tags.hostname",
+                        localField: `${tagFieldName}.hostname`,
+                        foreignField: `${tagFieldName}.hostname`,
                         as: "matchedB",
                     },
                 },
                 {
                     $project: {
                         _id: 0,
-                        host: "$tags.hostname",
+                        host: `$${tagFieldName}.hostname`,
                         matchedB: {
                             $size: "$matchedB",
                         },
@@ -103,10 +103,10 @@ TimeseriesTest.run((insert) => {
                 {
                     $lookup: {
                         from: collB.getName(),
-                        let: {"outer_hostname": "$tags.hostname"},
+                        let: {"outer_hostname": `$${tagFieldName}.hostname`},
                         pipeline: [
                             // $match will be pushed before unpack bucket stage
-                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0].tags.hostname]}}},
+                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname]}}},
                         ],
                         as: "matchedB",
                     },
@@ -114,7 +114,7 @@ TimeseriesTest.run((insert) => {
                 {
                     $project: {
                         _id: 0,
-                        host: "$tags.hostname",
+                        host: `$${tagFieldName}.hostname`,
                         matchedB: {
                             $size: "$matchedB",
                         },
@@ -137,9 +137,9 @@ TimeseriesTest.run((insert) => {
                 {
                     $lookup: {
                         from: collB.getName(),
-                        let: {"outer_hostname": "$tags.hostname"},
+                        let: {"outer_hostname": `$${tagFieldName}.hostname`},
                         pipeline: [
-                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0].tags.hostname]}}},
+                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname]}}},
                             {$set: {foo: {$const: 123}}}, // uncorrelated
                         ],
                         as: "matchedB",
@@ -148,7 +148,7 @@ TimeseriesTest.run((insert) => {
                 {
                     $project: {
                         _id: 0,
-                        host: "$tags.hostname",
+                        host: `$${tagFieldName}.hostname`,
                         matchedB: {
                             $size: "$matchedB",
                         },
@@ -171,9 +171,9 @@ TimeseriesTest.run((insert) => {
                 {
                     $lookup: {
                         from: collB.getName(),
-                        let: {"outer_hostname": "$tags.hostname"},
+                        let: {"outer_hostname": `$${tagFieldName}.hostname`},
                         pipeline: [
-                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0].tags.hostname]}}},
+                            {$match: {$expr: {$eq: ["$$outer_hostname", hosts[0][tagFieldName].hostname]}}},
                             {$set: {foo: "$$outer_hostname"}}, // correlated
                         ],
                         as: "matchedB",
@@ -182,7 +182,7 @@ TimeseriesTest.run((insert) => {
                 {
                     $project: {
                         _id: 0,
-                        host: "$tags.hostname",
+                        host: `$${tagFieldName}.hostname`,
                         matchedB: {
                             $size: "$matchedB",
                         },
@@ -204,13 +204,13 @@ TimeseriesTest.run((insert) => {
                     $lookup: {
                         from: collB.getName(),
                         let: {
-                            hostId: {$toInt: {$substr: ["$tags.hostname", 5, -1]}},
+                            hostId: {$toInt: {$substr: [`$${tagFieldName}.hostname`, 5, -1]}},
                         },
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
-                                        $lte: [{$toInt: {$substr: ["$tags.hostname", 5, -1]}}, "$$hostId"],
+                                        $lte: [{$toInt: {$substr: [`$${tagFieldName}.hostname`, 5, -1]}}, "$$hostId"],
                                     },
                                 },
                             },
@@ -221,7 +221,7 @@ TimeseriesTest.run((insert) => {
                 {
                     $project: {
                         _id: 0,
-                        host: "$tags.hostname",
+                        host: `$${tagFieldName}.hostname`,
                         matchedB: {
                             $size: "$matchedB",
                         },
@@ -275,6 +275,9 @@ TimeseriesTest.run((insert) => {
     // (src/mongo/db/pipeline/document_source_sequential_document_cache.h) regardless of the order
     // of the $match stages.
 
+    const timeFieldName = "time";
+    const metaFieldName = "m";
+
     // TODO SERVER-84279: these tests may be duplicating some the above, but it is unclear due to
     // the complexity which should be cleared up with this ticket.
     const testDB = db.getSiblingDB(jsTestName());
@@ -282,10 +285,10 @@ TimeseriesTest.run((insert) => {
         {_id: 0, key: 1},
         {_id: 1, key: 2},
     ]);
-    testDB.createCollection("foreign", {timeseries: {timeField: "time", metaField: "meta"}});
+    testDB.createCollection("foreign", {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
     testDB.foreign.insertMany([
-        {time: new Date(), _id: 0, meta: 1, val1: 42, val2: 100},
-        {time: new Date(), _id: 2, meta: 2, val1: 17, val2: 100},
+        {[timeFieldName]: new Date(), _id: 0, [metaFieldName]: 1, val1: 42, val2: 100},
+        {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 17, val2: 100},
     ]);
 
     // The $sequentialCache (document_source_sequential_document_cache.h) decides whether or not it
@@ -302,8 +305,8 @@ TimeseriesTest.run((insert) => {
                 let: {lkey: "$key"},
                 pipeline: [
                     {$match: {$expr: {$lt: ["$val1", "$val2"]}}},
-                    {$match: {$expr: {$eq: ["$meta", "$$lkey"]}}},
-                    {$project: {lkey: "$$lkey", fkey: "$meta", val: "$val1", _id: 0}},
+                    {$match: {$expr: {$eq: [`$${metaFieldName}`, "$$lkey"]}}},
+                    {$project: {lkey: "$$lkey", fkey: `$${metaFieldName}`, val: "$val1", _id: 0}},
                 ],
                 as: "joined",
             },
@@ -325,9 +328,9 @@ TimeseriesTest.run((insert) => {
                 from: "foreign",
                 let: {lkey: "$key"},
                 pipeline: [
-                    {$match: {$expr: {$eq: ["$meta", "$$lkey"]}}},
+                    {$match: {$expr: {$eq: [`$${metaFieldName}`, "$$lkey"]}}},
                     {$match: {$expr: {$lt: ["$val1", "$val2"]}}},
-                    {$project: {lkey: "$$lkey", fkey: "$meta", val: "$val1", _id: 0}},
+                    {$project: {lkey: "$$lkey", fkey: `$${metaFieldName}`, val: "$val1", _id: 0}},
                 ],
                 as: "joined",
             },
@@ -349,9 +352,9 @@ TimeseriesTest.run((insert) => {
                 from: "foreign",
                 let: {lkey: "$key"},
                 pipeline: [
-                    {$match: {$expr: {$lt: ["$meta", "$val1"]}}},
+                    {$match: {$expr: {$lt: [`$${metaFieldName}`, "$val1"]}}},
                     {$match: {$expr: {$lt: ["$val1", "$val2"]}}},
-                    {$project: {meta: "$meta", val: "$val1", _id: 0}},
+                    {$project: {meta: `$${metaFieldName}`, val: "$val1", _id: 0}},
                 ],
                 as: "joined",
             },

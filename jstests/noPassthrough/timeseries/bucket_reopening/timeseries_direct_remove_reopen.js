@@ -13,7 +13,7 @@ assert.commandWorked(testDB.dropDatabase());
 
 const collName = "test";
 
-const metaFieldName = "meta";
+const metaFieldName = "m";
 const timeFieldName = "time";
 const times = [ISODate("2021-01-01T01:00:00Z"), ISODate("2021-01-01T01:10:00Z")];
 let docs = [

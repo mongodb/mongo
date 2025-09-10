@@ -35,7 +35,7 @@ const sortMemoryLimitKnob = "internalQueryMaxBlockingSortMemoryUsageBytes";
 
 db.dropDatabase();
 const coll = db[jsTestName()];
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
 const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 
 const start = new Date();
@@ -47,7 +47,7 @@ for (let i = 0; i < kMetaCount; ++i) {
     const batch = [];
     let batchTime = +start + i;
     for (let j = 0; j < kDocCount; ++j) {
-        batch.push({time: new Date(batchTime), meta: i, padding: string1KB});
+        batch.push({time: new Date(batchTime), m: i, padding: string1KB});
         batchTime += bucketMaxSpanSeconds / 10;
     }
     assert.commandWorked(coll.insertMany(batch));

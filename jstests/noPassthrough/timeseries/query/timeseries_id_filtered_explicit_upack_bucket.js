@@ -11,7 +11,7 @@ const testDB = conn.getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 const tsColl = testDB.getCollection("tsColl");
-assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "start", metaField: "meta"}}));
+assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "start", metaField: "m"}}));
 
 const bulk = tsColl.initializeUnorderedBulkOp();
 const aMinuteInMs = 60 * 1000;
@@ -22,7 +22,7 @@ for (let i = 0; i < nBuckets; i++) {
         bulk.insert({
             start: new Date(seedDate.valueOf() + seqNumber * aMinuteInMs),
             end: new Date(seedDate.valueOf() + (seqNumber + 1) * aMinuteInMs),
-            meta: "bucket_" + i,
+            m: "bucket_" + i,
             value: seqNumber,
         });
     }
@@ -60,7 +60,7 @@ let getFilteredMeasurements = () =>
         .aggregate(
             [
                 {$match: {_id: {$in: ids}}},
-                {$_unpackBucket: {timeField: "start", metaField: "meta"}},
+                {$_unpackBucket: {timeField: "start", metaField: "m"}},
                 {$sort: {value: 1}},
                 {$project: {_id: 0}},
             ],
@@ -78,7 +78,7 @@ let assertMeasurementsInBuckets = (lo, hi, measurements) => {
                 {
                     start: new Date(seedDate.valueOf() + seqNumber * aMinuteInMs),
                     end: new Date(seedDate.valueOf() + (seqNumber + 1) * aMinuteInMs),
-                    meta: "bucket_" + i,
+                    m: "bucket_" + i,
                     value: seqNumber,
                 },
                 measurements[k],

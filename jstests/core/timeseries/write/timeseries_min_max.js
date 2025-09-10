@@ -20,7 +20,7 @@ TimeseriesTest.run((insert) => {
     const collNamePrefix = jsTestName() + "_";
 
     const timeFieldName = "time";
-    const metaFieldName = "meta";
+    const metaFieldName = "m";
 
     let collCount = 0;
     let coll;
@@ -76,7 +76,7 @@ TimeseriesTest.run((insert) => {
     clearColl();
 
     // The metadata field is not considered.
-    runTest({meta: 1}, {}, {});
+    runTest({m: 1}, {}, {});
     clearColl();
 
     // Objects and arrays are updated element-wise.

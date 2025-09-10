@@ -36,12 +36,12 @@ const numDocsPerBucket = 4;
 
 function setUpCollectionForTest() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
 
     let docs = [];
     for (const bucket of buckets) {
         for (let i = 0; i < numDocsPerBucket; ++i) {
-            docs.push({"time": dateTime, "meta": bucket, str: i % 2 == 0 ? "even" : "odd"});
+            docs.push({"time": dateTime, "m": bucket, str: i % 2 == 0 ? "even" : "odd"});
         }
     }
     assert.commandWorked(coll.insert(docs));

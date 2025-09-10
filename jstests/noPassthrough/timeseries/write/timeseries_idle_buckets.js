@@ -20,7 +20,7 @@ assert.commandWorked(db.dropDatabase());
 const coll = db[jsTestName()];
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 const valueFieldName = "value";
 
 coll.drop();

@@ -42,7 +42,7 @@ assert(!coll.isCapped());
     const timeseriesCollName = "timeseriesColl";
 
     assert.commandWorked(
-        testDb.runCommand({create: timeseriesCollName, timeseries: {timeField: "time", metaField: "meta"}}),
+        testDb.runCommand({create: timeseriesCollName, timeseries: {timeField: "time", metaField: "m"}}),
     );
 
     const timeseriesColl = testDb.getCollection(timeseriesCollName);

@@ -24,14 +24,14 @@ if (checkSbeStatus(db) !== kSbeRestricted) {
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {
-        timeseries: {timeField: "time", metaField: "meta"},
+        timeseries: {timeField: "time", metaField: "m"},
     }),
 );
 
 // Just after midnight on Saturday, April 8, 2023 in GMT, expressed as milliseconds since the epoch.
 const datePrefix = 1680912440;
 for (let i = 0; i < 50; ++i) {
-    assert.commandWorked(coll.insert({_id: i, time: new Date(datePrefix + i * 10), meta: "foobar", x: i, y: i * 2}));
+    assert.commandWorked(coll.insert({_id: i, time: new Date(datePrefix + i * 10), m: "foobar", x: i, y: i * 2}));
 }
 assert.gt(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), 0);
 
@@ -120,7 +120,7 @@ const originalPipeline = [
     {
         $match: {
             time: {$gt: new Date(datePrefix), $lt: new Date(datePrefix + 500)},
-            meta: "foobar",
+            m: "foobar",
             x: {$eq: 20},
         },
     },
@@ -144,7 +144,7 @@ const cacheEntry = testLoweredPipeline({
                     $gt: new Date(datePrefix),
                     $lt: new Date(datePrefix + 400 /* Different from above. */),
                 },
-                meta: "foobar",
+                m: "foobar",
                 x: {$eq: 20},
             },
         },
@@ -156,7 +156,7 @@ const cacheEntry = testLoweredPipeline({
         {
             $match: {
                 time: {$gt: new Date(datePrefix), $lt: new Date(datePrefix + 500)},
-                meta: "foobar",
+                m: "foobar",
                 x: {$eq: 21 /* Different from above */},
             },
         },
@@ -174,7 +174,7 @@ const cacheEntry = testLoweredPipeline({
         {
             $match: {
                 time: {$gt: new Date(datePrefix), $lt: new Date(datePrefix + 500)},
-                meta: "foobar",
+                m: "foobar",
                 x: 20,
                 y: {$gt: 0},
             },

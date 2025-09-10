@@ -17,10 +17,10 @@ import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "tag"}}));
 
 // Trivial, small data set with one document and one bucket.
-assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
+assert.commandWorked(coll.insert({time: new Date(), tag: 1, a: 42, b: 17}));
 
 // Test that bucket-level filters are applied on a collscan plan.
 (function testBucketLevelFiltersOnCollScanPlan() {
@@ -64,9 +64,9 @@ assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
 // Test that bucket-level filters are applied at the FETCH stage.
 (function testBucketLevelFiltersOnIxScanFetchPlan() {
     const pipeline = [
-        // 'a' is never greater than 100, but there is a bucket with meta value meta=1. The match
-        // on 'meta' should allow this to use the default {meta:1,time:1} index.
-        {$match: {meta: 1, a: {$gt: 100}}},
+        // 'a' is never greater than 100, but there is a bucket with meta value tag=1. The match
+        // on the 'metaField' should allow this to use the default {meta:1,time:1} index.
+        {$match: {tag: 1, a: {$gt: 100}}},
 
         // For simplicity, just count all the results.
         {$count: "ct"},

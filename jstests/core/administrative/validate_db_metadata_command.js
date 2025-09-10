@@ -132,7 +132,7 @@ assert.commandWorked(testDB.runCommand({drop: validatorCollName}));
 //
 (function maybeValidateWithTimeseriesCollection() {
     const coll = "timeseriesCollectionMetaDataValidation";
-    assert.commandWorked(testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "tag"}}));
     validate({dbName: testDB.getName(), apiStrict: true});
 })();
 

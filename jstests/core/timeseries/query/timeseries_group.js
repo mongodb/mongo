@@ -35,7 +35,7 @@ TimeseriesTest.run((insert) => {
     let collNotTs = db[jsTestName() + "_not_ts"];
 
     const timeFieldName = "time";
-    const metaFieldName = "meta";
+    const metaFieldName = "m";
 
     coll.drop();
     collNotTs.drop();

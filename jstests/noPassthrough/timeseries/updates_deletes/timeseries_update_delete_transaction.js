@@ -12,7 +12,7 @@ rst.startSet();
 rst.initiate();
 const testDB = rst.getPrimary().getDB(jsTestName());
 
-const metaFieldName = "meta";
+const metaFieldName = "m";
 const timeFieldName = "time";
 const collectionName = "t";
 

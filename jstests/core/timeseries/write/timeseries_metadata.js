@@ -19,7 +19,7 @@ TimeseriesTest.run((insert) => {
     const collNamePrefix = jsTestName() + "_";
 
     const timeFieldName = "time";
-    const metaFieldName = "meta";
+    const metaFieldName = "m";
 
     let collCount = 0;
 
@@ -110,92 +110,92 @@ TimeseriesTest.run((insert) => {
 
     runTest(
         [
-            {_id: 0, time: t[0], meta: "a", x: 0},
-            {_id: 1, time: t[1], meta: "a", x: 10},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: "a", x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: "a", x: 10},
         ],
         [
-            {_id: 2, time: t[2], meta: "b", x: 20},
-            {_id: 3, time: t[3], meta: "b", x: 30},
-        ],
-    );
-
-    runTest(
-        [
-            {_id: 0, time: t[0], meta: null, x: 0},
-            {_id: 1, time: t[1], meta: null, x: 10},
-        ],
-        [
-            {_id: 2, time: t[2], x: 20},
-            {_id: 3, time: t[3], x: 30},
+            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: "b", x: 20},
+            {_id: 3, [timeFieldName]: t[3], [metaFieldName]: "b", x: 30},
         ],
     );
 
     runTest(
         [
-            {_id: 0, time: t[0], meta: null, x: 0},
-            {_id: 1, time: t[1], meta: null, x: 10},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: null, x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: null, x: 10},
         ],
         [
-            {_id: 2, time: t[2], meta: 123, x: 20},
-            {_id: 3, time: t[3], meta: 123, x: 30},
+            {_id: 2, [timeFieldName]: t[2], x: 20},
+            {_id: 3, [timeFieldName]: t[3], x: 30},
+        ],
+    );
+
+    runTest(
+        [
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: null, x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: null, x: 10},
+        ],
+        [
+            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: 123, x: 20},
+            {_id: 3, [timeFieldName]: t[3], [metaFieldName]: 123, x: 30},
         ],
     );
 
     runTest(
         // Metadata field contains an array.
         [
-            {_id: 0, time: t[0], meta: [1, 2, 3], x: 0},
-            {_id: 1, time: t[1], meta: [1, 2, 3], x: 10},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: [1, 2, 3], x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: [1, 2, 3], x: 10},
         ],
         [
-            {_id: 2, time: t[2], x: 20},
-            {_id: 3, time: t[3], x: 30},
+            {_id: 2, [timeFieldName]: t[2], x: 20},
+            {_id: 3, [timeFieldName]: t[3], x: 30},
         ],
     );
 
     runTest(
         // Metadata field contains an object. Its ordering does not affect which bucket is used.
         [
-            {_id: 0, time: t[0], meta: {a: 1, b: 1}, x: 0},
-            {_id: 1, time: t[1], meta: {a: 1, b: 1}, x: 10},
-            {_id: 2, time: t[2], meta: {b: 1, a: 1}, x: 20},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: {a: 1, b: 1}, x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: {a: 1, b: 1}, x: 10},
+            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: {b: 1, a: 1}, x: 20},
         ],
-        [{_id: 3, time: t[3], meta: {a: 1}, x: 30}],
+        [{_id: 3, [timeFieldName]: t[3], [metaFieldName]: {a: 1}, x: 30}],
     );
 
     runTest(
         // Metadata field contains an array within an object.
         [
-            {_id: 0, time: t[0], meta: {a: [{b: 1, c: 0}]}, x: 0},
-            {_id: 1, time: t[1], meta: {a: [{c: 0, b: 1}]}, x: 10},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: {a: [{b: 1, c: 0}]}, x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: {a: [{c: 0, b: 1}]}, x: 10},
         ],
         [
-            {_id: 2, time: t[2], meta: {a: [{b: 2, c: 0}]}, x: 20},
-            {_id: 3, time: t[3], meta: {a: [{c: 0, b: 2}]}, x: 30},
+            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: {a: [{b: 2, c: 0}]}, x: 20},
+            {_id: 3, [timeFieldName]: t[3], [metaFieldName]: {a: [{c: 0, b: 2}]}, x: 30},
         ],
     );
 
     runTest(
         // Metadata field contains a nested array.
         [
-            {_id: 0, time: t[0], meta: {a: [{b: 1, c: 0}, [{e: 1, f: 0}]]}, x: 0},
-            {_id: 1, time: t[1], meta: {a: [{c: 0, b: 1}, [{f: 0, e: 1}]]}, x: 10},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: {a: [{b: 1, c: 0}, [{e: 1, f: 0}]]}, x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: {a: [{c: 0, b: 1}, [{f: 0, e: 1}]]}, x: 10},
         ],
         [
-            {_id: 2, time: t[2], meta: {a: [[{e: 1, f: 0}], {b: 1, c: 0}]}, x: 20},
-            {_id: 3, time: t[3], meta: {a: [[{f: 0, e: 1}], {c: 0, b: 1}]}, x: 30},
+            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: {a: [[{e: 1, f: 0}], {b: 1, c: 0}]}, x: 20},
+            {_id: 3, [timeFieldName]: t[3], [metaFieldName]: {a: [[{f: 0, e: 1}], {c: 0, b: 1}]}, x: 30},
         ],
     );
 
     runTest(
         // Metadata field contains an array.
         [
-            {_id: 0, time: t[0], meta: {a: [1, 2, 3]}, x: 0},
-            {_id: 1, time: t[1], meta: {a: [1, 2, 3]}, x: 10},
+            {_id: 0, [timeFieldName]: t[0], [metaFieldName]: {a: [1, 2, 3]}, x: 0},
+            {_id: 1, [timeFieldName]: t[1], [metaFieldName]: {a: [1, 2, 3]}, x: 10},
         ],
         [
-            {_id: 2, time: t[2], meta: {a: [2, 1, 3]}, x: 20},
-            {_id: 3, time: t[3], meta: {a: [2, 1, 3]}, x: 30},
+            {_id: 2, [timeFieldName]: t[2], [metaFieldName]: {a: [2, 1, 3]}, x: 20},
+            {_id: 3, [timeFieldName]: t[3], [metaFieldName]: {a: [2, 1, 3]}, x: 30},
         ],
     );
 });

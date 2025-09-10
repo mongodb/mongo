@@ -18,7 +18,7 @@ ts.drop();
 const coll = db[jsTestName() + "_regular_collection"];
 coll.drop();
 
-assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "m"}}));
 
 const numTimes = 100;
 const numSymbols = 10;
@@ -51,7 +51,7 @@ for (let i = 0; i < numTimes; i++) {
             time: new Date(startTime + i * 1000),
             price: randRange(minPrice, maxPrice),
             amount: randRange(minAmount, maxAmount),
-            meta: {"symbol": symbol},
+            m: {"symbol": symbol},
         });
     }
 }
@@ -110,7 +110,7 @@ runTest(
         {
             $group: {
                 _id: {
-                    symbol: "$meta.symbol",
+                    symbol: "$m.symbol",
                     minute: {
                         $subtract: [
                             {$dateTrunc: {date: "$time", unit: "minute"}},

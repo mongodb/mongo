@@ -22,20 +22,25 @@ if (!sbeEnabled) {
     quit();
 }
 
+const timeFieldName = "time";
+const metaFieldName = "m";
+
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 // Bucket 1: a and b are both scalars.
-assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
-assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 43, b: 18}));
-assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 44, b: 19}));
+assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: 42, b: 17}));
+assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: 43, b: 18}));
+assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: 44, b: 19}));
 
 // Bucket 2: a is an array, b is scalar.
-assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: [1, 2, 3], b: 17}));
+assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: [1, 2, 3], b: 17}));
 
 // Bucket 3: a.b is an array.
-assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: {b: [1, 2, 3]}, b: 17}));
+assert.commandWorked(coll.insert({[timeFieldName]: new Date(), [metaFieldName]: 1, a: {b: [1, 2, 3]}, b: 17}));
 
 (function testBucketLevelFiltersOnCollScanPlan() {
     const pipeline = [{$match: {a: {$gt: 0}}}, {$project: {_id: 0, a: 1, b: 1}}];

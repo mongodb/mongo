@@ -20,7 +20,7 @@ const minWiredTigerCacheSize = minWiredTigerCacheSizeGB * 1024 * 1024 * 1024; //
 const measurementValueLength = 1 * 1024 * 1024; //    1 MB
 const defaultBucketMinCount = 10;
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 const replSet = new ReplSetTest({
     nodes: 1,

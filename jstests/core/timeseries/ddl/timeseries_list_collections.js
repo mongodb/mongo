@@ -15,7 +15,7 @@ import {
 const testDB = db.getSiblingDB(jsTestName());
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 const collNamePrefix = jsTestName() + "_";
 let collCount = 0;

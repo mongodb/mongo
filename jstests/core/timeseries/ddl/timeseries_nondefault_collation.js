@@ -47,27 +47,30 @@ const insensitive = {
     strength: 1,
 };
 
+const timeFieldName = "time";
+const metaFieldName = "tag";
+
 // Test find on meta field
 (function testFind_MetaField() {
     coll.drop();
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             collation: numericOrdering,
         }),
     );
 
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "1", value: 42}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "10", value: 42}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "5", value: 42}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "1", value: 42}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "10", value: 42}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "5", value: 42}));
 
     // Use the collection's collation with numeric ordering.
-    let res1 = coll.find({meta: {$gt: "4"}});
+    let res1 = coll.find({[metaFieldName]: {$gt: "4"}});
     assert.eq(2, res1.itcount(), res1.toArray()); // should match "5" and "10"
 
     // Use explicit collation with lexicographic ordering.
-    let res2 = coll.find({meta: {$gt: "4"}}).collation(insensitive);
+    let res2 = coll.find({[metaFieldName]: {$gt: "4"}}).collation(insensitive);
     assert.eq(1, res2.itcount(), res2.toArray()); // should match only "5"
 })();
 
@@ -78,16 +81,16 @@ const insensitive = {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             collation: numericOrdering,
         }),
     );
 
     // The 'numericOrdering' on the collection means that the max of the bucket with the three docs
     // below is "10" (while the lexicographic max is "5").
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "1"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "10"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "5"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, value: "1"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, value: "10"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, value: "5"}));
 
     // A query with default collation would use the bucket's min/max and find the matches. We are
     // not checking the unpacking optimizations here as it's not a concern of collation per se.
@@ -103,12 +106,14 @@ const insensitive = {
 (function testFind_OnlyQueryHasCollation() {
     coll.drop();
 
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     // This should generate a bucket with control.min.value = 'C' and control.max.value = 'c'.
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "C"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "b"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "c"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, value: "C"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, value: "b"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, value: "c"}));
 
     // A query with default collation would use the bucket's min/max and find the two matches.
     const resWithNoCollation = coll.find({value: {$lt: "c"}});
@@ -129,22 +134,22 @@ const insensitive = {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             collation: numericOrdering,
         }),
     );
 
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "1", val: 1}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "5", val: 1}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "1", val: 1}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "5", val: 1}));
 
     // Using collection's collation with numeric ordering.
-    let res1 = coll.aggregate([{$bucket: {groupBy: "$meta", boundaries: ["1", "10", "50"]}}]).toArray();
+    let res1 = coll.aggregate([{$bucket: {groupBy: `$${metaFieldName}`, boundaries: ["1", "10", "50"]}}]).toArray();
     assert.eq(1, res1.length);
     assert.eq({_id: "1", count: 2}, res1[0]);
 
     // Using explicit collation with lexicographic ordering.
     let res2 = coll
-        .aggregate([{$bucket: {groupBy: "$meta", boundaries: ["1", "10", "50"]}}], {collation: insensitive})
+        .aggregate([{$bucket: {groupBy: `$${metaFieldName}`, boundaries: ["1", "10", "50"]}}], {collation: insensitive})
         .toArray();
     assert.eq(2, res2.length);
     assert.eq({_id: "1", count: 1}, res2[0]); // "1" goes here
@@ -156,18 +161,18 @@ const insensitive = {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             collation: insensitive,
         }),
     );
 
     // Cause two different buckets with various case/diacritics in each for the measurement 'name'.
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "a", name: "A"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "a", name: "a"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "a", name: "á"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "b", name: "A"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "b", name: "a"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "b", name: "ä"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "a", name: "A"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "a", name: "a"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "a", name: "á"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "b", name: "A"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "b", name: "a"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "b", name: "ä"}));
 
     // Test with the collection's collation, which is case and diacritic insensitive.
     assert.eq(1, coll.aggregate([{$sortByCount: "$name"}]).itcount());
@@ -185,15 +190,15 @@ const insensitive = {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             collation: numericOrdering,
         }),
     );
 
     // These two docs will be placed in the same bucket, and the max for the bucket will be computed
     // using collection's collation, that is, it should be "10".
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, val: "10"}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, val: "5"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, val: "10"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42, val: "5"}));
 
     // Let's check our understanding of what happens with the bucketing as otherwise the tests below
     // won't be testing what we think they are.
@@ -202,11 +207,13 @@ const insensitive = {
     assert.eq("10", buckets[0].control.max.val, "Computed max control for 'val' measurement");
 
     // Use the collection's collation with numeric ordering.
-    let res1 = coll.aggregate([{$group: {_id: "$meta", v: {$max: "$val"}}}]).toArray();
+    let res1 = coll.aggregate([{$group: {_id: `$${metaFieldName}`, v: {$max: "$val"}}}]).toArray();
     assert.eq("10", res1[0].v, "max val in numeric ordering per the collection's collation");
 
     // Use the collection's collation with lexicographic ordering.
-    let res2 = coll.aggregate([{$group: {_id: "$meta", v: {$max: "$val"}}}], {collation: insensitive}).toArray();
+    let res2 = coll
+        .aggregate([{$group: {_id: `$${metaFieldName}`, v: {$max: "$val"}}}], {collation: insensitive})
+        .toArray();
     assert.eq("5", res2[0].v, "max val in lexicographic ordering per the query collation");
 })();
 
@@ -215,36 +222,42 @@ const insensitive = {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {
-            timeseries: {timeField: "time", metaField: "meta"},
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             collation: diacriticSensitive,
         }),
     );
 
     // Create index with a different collation.
-    assert.commandWorked(coll.createIndex({meta: 1}, {collation: insensitive}));
+    assert.commandWorked(coll.createIndex({[metaFieldName]: 1}, {collation: insensitive}));
 
     // We only check that the correct plan is chosen so the contents of the collection don't matter
     // as long as it's not empty.
-    assert.commandWorked(coll.insert({time: ISODate(), meta: 42}));
-    assert.commandWorked(coll.insert({time: ISODate(), meta: "the answer"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: 42}));
+    assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: "the answer"}));
 
     // Queries that don't specify explicit collation should use the collection's default collation.
     // We can have an index scan because the default timeseries index uses the default collation.
     // However, the default collation isn't compatible with the index with a different collation,
     // so the non-default index should not be used.
-    let query = assert.commandWorked(coll.find({meta: "str"}).explain());
+    let query = assert.commandWorked(coll.find({[metaFieldName]: "str"}).explain());
     assert(aggPlanHasStage(query, "IXSCAN"), query);
 
     // Queries with an explicit collation which isn't compatible with the index, should NOT do
     // index scan.
-    query = coll.find({meta: "str"}).collation(caseSensitive).explain();
+    query = coll
+        .find({[metaFieldName]: "str"})
+        .collation(caseSensitive)
+        .explain();
     assert(!aggPlanHasStage(query, "IXSCAN"), query);
 
     // Queries with the same collation as in the index, should do index scan.
-    query = coll.find({meta: "str"}).collation(insensitive).explain();
+    query = coll
+        .find({[metaFieldName]: "str"})
+        .collation(insensitive)
+        .explain();
     assert(aggPlanHasStage(query, "IXSCAN"), query);
 
     // Numeric queries that don't rely on collation should do index scan.
-    query = coll.find({meta: 1}).explain();
+    query = coll.find({[metaFieldName]: 1}).explain();
     assert(aggPlanHasStage(query, "IXSCAN"), query);
 })();

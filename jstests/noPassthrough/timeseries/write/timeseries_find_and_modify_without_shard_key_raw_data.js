@@ -33,7 +33,7 @@ const assertExplain = function (coll, commandResult) {
         "Expected not to find TS_MODIFY stage " + tojson(commandResult);
 };
 
-const metaFieldName = "meta";
+const metaFieldName = "m";
 const timeFieldName = "time";
 const dbName = "test";
 
@@ -56,16 +56,14 @@ coll.insertMany([
     {[timeFieldName]: ISODate(), [metaFieldName]: 4, data: 4},
 ]);
 
-assert.commandWorked(
-    db.adminCommand({split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: {[metaFieldName]: 2}}),
-);
+assert.commandWorked(db.adminCommand({split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: {meta: 2}}));
 
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);
 assert.commandWorked(
     db.adminCommand({
         moveChunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-        find: {[metaFieldName]: 1},
+        find: {meta: 1},
         to: otherShard.shardName,
     }),
 );
@@ -76,7 +74,7 @@ assertExplain(
         .explain()
         .findAndModify({
             query: {"control.count": 1},
-            update: {$set: {meta: "3"}},
+            update: {$set: {[metaFieldName]: "3"}},
             ...getRawOperationSpec(db),
         }),
 );

@@ -29,7 +29,7 @@ const scalarColl = scalarDb[jsTestName()];
 const bpColl = bpDb[jsTestName()];
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 scalarColl.drop();
 bpColl.drop();

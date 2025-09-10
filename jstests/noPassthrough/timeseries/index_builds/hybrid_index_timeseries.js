@@ -14,7 +14,7 @@ const testDB = conn.getDB(dbName);
 const tsColl = testDB[collName];
 
 const timeField = "time";
-const metaField = "meta";
+const metaField = "m";
 
 const runTest = (config) => {
     // Populate the collection.

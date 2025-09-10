@@ -17,7 +17,7 @@ const testDB = primary.getDB("test");
 const coll = testDB[jsTestName()];
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),

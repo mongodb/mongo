@@ -21,7 +21,7 @@ const testDB = conn.getDB(jsTestName());
 const coll = testDB.getCollection("t");
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 const runTest = (ordered) => {
     coll.drop();

@@ -13,7 +13,7 @@ import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 const timeField = "time";
-const metaField = "meta";
+const metaField = "m";
 const measureField = "a";
 
 // The docs and queries are designed so that some buckets match the query entirely, some buckets
@@ -412,7 +412,13 @@ runTest({
     ],
     eventFilter: {$or: [{[timeField]: {$lte: aTime}}, {[metaField]: {$gt: bMeta}}]},
     wholeBucketFilter: {
-        $or: [{[maxTimeField]: {$lte: aTime}}, {[metaField]: {$gt: bMeta}}],
+        $or: [
+            {[maxTimeField]: {$lte: aTime}},
+            {
+                // The 'wholeBucketFilter' is on the buckets collection and should use "meta".
+                meta: {$gt: bMeta},
+            },
+        ],
     },
     expectedDocs: [
         {[timeField]: ISODate("2022-01-01T00:00:01"), [measureField]: 1, [metaField]: 0},
@@ -489,7 +495,7 @@ runTest({
     ],
     eventFilter: {
         $and: [
-            {"meta": {$_internalExprGt: 1}},
+            {[metaField]: {$_internalExprGt: 1}},
             {
                 $expr: {
                     $and: [{$lt: [`$${measureField}`, `$${metaField}`]}, {$gt: [`$${metaField}`, {$const: 1}]}],

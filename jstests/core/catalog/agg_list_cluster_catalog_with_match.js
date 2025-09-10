@@ -28,9 +28,7 @@ function setupUserCollections(dbTest) {
     assert.commandWorked(dbTest.createCollection("coll1"));
     assert.commandWorked(dbTest.createCollection("coll2"));
     assert.commandWorked(dbTest.createCollection("view", {viewOn: "coll1", pipeline: []}));
-    assert.commandWorked(
-        dbTest.createCollection("timeseries", {timeseries: {metaField: "meta", timeField: "timestamp"}}),
-    );
+    assert.commandWorked(dbTest.createCollection("timeseries", {timeseries: {metaField: "m", timeField: "timestamp"}}));
 }
 
 function arrayContainsValueOnField(listClusterArrayResponse, field, value) {

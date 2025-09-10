@@ -26,7 +26,7 @@ const coll = function (num) {
 };
 
 const timeFieldName = "time";
-const metaFieldName = "meta";
+const metaFieldName = "m";
 
 const createColl = function (num) {
     assert.commandWorked(

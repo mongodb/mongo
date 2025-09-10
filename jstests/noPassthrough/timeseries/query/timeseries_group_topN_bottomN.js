@@ -23,7 +23,7 @@ bpColl.drop();
 // collection.
 assert.commandWorked(
     bpDb.createCollection(bpColl.getName(), {
-        timeseries: {timeField: "time", metaField: "meta"},
+        timeseries: {timeField: "time", metaField: "m"},
     }),
 );
 
@@ -49,7 +49,7 @@ for (let metaIdx = 0; metaIdx < 10; ++metaIdx) {
         tsDocs.push({
             _id: id++,
             time: new Date(datePrefix + currentDate),
-            meta: metaDoc,
+            m: metaDoc,
             w: bsonVals[id % numBsonVals],
             x: bsonVals[(1 + 5 * id) % numBsonVals],
             y: bsonVals[(3 + 11 * id) % numBsonVals],
@@ -86,10 +86,10 @@ const complexGroups = [
     {w: "$w", x: "$x", y: "$y", z: "$z"},
     {time: "$time"},
     {time: "$time", w: "$w"},
-    {meta: "$meta"},
-    {meta: "$meta", x: "$x"},
-    {time: "$time", meta: "$meta", y: "$y"},
-    {time: "$time", meta: "$meta", y: "$y", z: "$z"},
+    {m: "$meta"},
+    {m: "$meta", x: "$x"},
+    {time: "$time", m: "$meta", y: "$y"},
+    {time: "$time", m: "$meta", y: "$y", z: "$z"},
 ];
 
 // Values to use for the "n" argument of $topN and $bottomN. This can only be a positive
@@ -168,7 +168,7 @@ groupStages.push({
 });
 groupStages.push({
     $group: {
-        _id: {meta: "$meta", time: "$time"},
+        _id: {m: "$meta", time: "$time"},
         acc1: {$topN: {n: 11, sortBy: {w: 1, x: -1, _id: 1}, output: ["$_id"]}},
         acc2: {$bottomN: {n: 13, sortBy: {w: 1, x: -1, _id: 1}, output: ["$_id"]}},
         acc3: {$topN: {n: 17, sortBy: {w: 1, x: 1, y: 1, _id: 1}, output: ["$_id"]}},

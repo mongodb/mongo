@@ -14,13 +14,16 @@ import {
 const testDB = db.getSiblingDB(jsTestName());
 let collCount = 0;
 
+const timeFieldName = "time";
+const metaFieldName = "m";
+
 const bucketMaxSpanSecondsError = ErrorCodes.InvalidOptions;
 
 const testOptions = function ({
     errorCode,
     createOptions = {},
     timeseriesOptions = {
-        timeField: "time",
+        timeField: timeFieldName,
     },
     optionsAffectStorage = true,
     fixture = {
@@ -116,17 +119,17 @@ const testCompatibleCreateOptions = function (createOptions, optionsAffectStorag
     });
 };
 
-testValidTimeseriesOptions({timeField: "time"});
-testValidTimeseriesOptions({timeField: "time", metaField: "meta"});
-testValidTimeseriesOptions({timeField: "time", granularity: "minutes"});
-testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "minutes"});
+testValidTimeseriesOptions({timeField: timeFieldName});
+testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName});
+testValidTimeseriesOptions({timeField: timeFieldName, granularity: "minutes"});
+testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName, granularity: "minutes"});
 
 // Granularity can include a corresponding bucketMaxSpanSeconds value, but not a
 // bucketRoundingSeconds value (even if the value corresponds to the granularity).
 testInvalidTimeseriesOptions(
     {
-        timeField: "time",
-        metaField: "meta",
+        timeField: timeFieldName,
+        metaField: metaFieldName,
         granularity: "seconds",
         bucketMaxSpanSeconds: 60 * 60,
         bucketRoundingSeconds: 60,
@@ -137,48 +140,48 @@ testInvalidTimeseriesOptions(
 // Granularity may be provided with bucketMaxSpanSeconds as long as it corresponds to the
 // granularity.
 testValidTimeseriesOptions({
-    timeField: "time",
-    metaField: "meta",
+    timeField: timeFieldName,
+    metaField: metaFieldName,
     granularity: "seconds",
     bucketMaxSpanSeconds: 60 * 60,
 });
 testValidTimeseriesOptions({
-    timeField: "time",
-    metaField: "meta",
+    timeField: timeFieldName,
+    metaField: metaFieldName,
     granularity: "minutes",
     bucketMaxSpanSeconds: 60 * 60 * 24,
 });
 testValidTimeseriesOptions({
-    timeField: "time",
-    metaField: "meta",
+    timeField: timeFieldName,
+    metaField: metaFieldName,
     granularity: "hours",
     bucketMaxSpanSeconds: 60 * 60 * 24 * 30,
 });
 
-testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "minutes"});
-testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "hours"});
+testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName, granularity: "minutes"});
+testValidTimeseriesOptions({timeField: timeFieldName, metaField: metaFieldName, granularity: "hours"});
 
 testInvalidTimeseriesOptions("", ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
-testInvalidTimeseriesOptions({timeField: "time", metaField: 100}, ErrorCodes.TypeMismatch);
+testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: 100}, ErrorCodes.TypeMismatch);
 
-testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, ErrorCodes.IDLUnknownField);
+testInvalidTimeseriesOptions({timeField: timeFieldName, invalidOption: {}}, ErrorCodes.IDLUnknownField);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
-testInvalidTimeseriesOptions({timeField: "time", metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
-testInvalidTimeseriesOptions({timeField: "time", metaField: "time"}, ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: timeFieldName}, ErrorCodes.InvalidOptions);
 
 testInvalidTimeseriesOptions(
-    {timeField: "time", metaField: "meta", bucketMaxSpanSeconds: 10},
+    {timeField: timeFieldName, metaField: metaFieldName, bucketMaxSpanSeconds: 10},
     bucketMaxSpanSecondsError,
 );
 testInvalidTimeseriesOptions(
-    {timeField: "time", metaField: "meta", granularity: "minutes", bucketMaxSpanSeconds: 3600},
+    {timeField: timeFieldName, metaField: metaFieldName, granularity: "minutes", bucketMaxSpanSeconds: 3600},
     bucketMaxSpanSecondsError,
 );
 
 // Fails to create a time-series collection with null-embedded timeField or metaField.
 testInvalidTimeseriesOptions({timeField: "\0time"}, ErrorCodes.BadValue);
-testInvalidTimeseriesOptions({timeField: "time", metaField: "t\0ag"}, ErrorCodes.BadValue);
+testInvalidTimeseriesOptions({timeField: timeFieldName, metaField: "t\0ag"}, ErrorCodes.BadValue);
 
 testCompatibleCreateOptions({expireAfterSeconds: NumberLong(100)});
 testCompatibleCreateOptions({storageEngine: {}}, false);

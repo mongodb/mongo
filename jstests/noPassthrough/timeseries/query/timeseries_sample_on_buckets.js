@@ -10,11 +10,11 @@ const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 // Prepares a timeseries collection.
-assert.commandWorked(testDB.createCollection("t", {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(testDB.createCollection("t", {timeseries: {timeField: "time", metaField: "m"}}));
 assert.commandWorked(
     testDB.t.insert([
-        {time: ISODate(), meta: 1, a: 1},
-        {time: ISODate(), meta: 1, a: 2},
+        {time: ISODate(), m: 1, a: 1},
+        {time: ISODate(), m: 1, a: 2},
     ]),
 );
 
