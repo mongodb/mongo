@@ -1262,7 +1262,8 @@ SbExpr buildFinalizeTopBottomNImpl(const AccumOp& acc,
                            inputVar,
                            std::move(sortSpec));
         if (single) {
-            finalExpr = b.makeFunction("getElement", std::move(finalExpr), b.makeInt32Constant(0));
+            finalExpr = b.makeFillEmptyNull(
+                b.makeFunction("getElement", std::move(finalExpr), b.makeInt32Constant(0)));
         }
         return finalExpr;
     }
