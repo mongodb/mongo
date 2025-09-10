@@ -572,7 +572,7 @@ server_parameters:
         redact: false
 
     internalQueryFacetMaxOutputDocSizeBytes:
-        description: "The number of bytes to buffer at once during a $facet stage."
+        description: "The maximum size of the result that will be returned from a document's $facet stage."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFacetMaxOutputDocSizeBytes"
         cpp_vartype: AtomicWord<long long>
