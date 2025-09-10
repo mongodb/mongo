@@ -926,6 +926,26 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "truncate_range_oplog_entry_gen",
+    src = "truncate_range_oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:record_id_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "truncate_range_oplog_entry_idl",
+    srcs = [
+        ":truncate_range_oplog_entry_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 mongo_cc_library(
     name = "oplog",
     srcs = [
@@ -948,6 +968,7 @@ mongo_cc_library(
         ":repl_server_parameters",
         ":repl_settings",
         ":timestamp_block",
+        ":truncate_range_oplog_entry_idl",
         "//src/mongo/db:change_stream_change_collection_manager",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:change_stream_serverless_helpers",
@@ -1105,13 +1126,17 @@ mongo_cc_library(
         "oplog_buffer.h",
     ],
     deps = [
+        ":oplog",
         ":oplog_entry",
         ":repl_coordinator_interface",
         ":repl_server_parameters",
+        ":truncate_range_oplog_entry_idl",
+        "//src/mongo/db:change_stream_pre_image_util",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role_api_stor_ex",
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/util:log_and_backoff",
         "//src/mongo/util:processinfo",
@@ -1937,6 +1962,7 @@ mongo_cc_library(
     }),
     deps = [
         ":oplog_entry",
+        "//src/mongo/db:change_stream_pre_image_util",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/op_observer:op_observer_impl",

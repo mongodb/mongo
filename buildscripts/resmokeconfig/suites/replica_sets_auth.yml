@@ -27,6 +27,8 @@ selector:
     - jstests/replsets/transactions_committed_with_tickets_exhausted.js
     # This test disables test commands which is incompatible with this suite.
     - jstests/replsets/test_only_repl_commands.js
+    # This test applies an internal unregistered 'truncateRange' command.
+    - jstests/replsets/replicated_truncate.js
 
 executor:
   config:

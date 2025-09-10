@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/client.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -186,7 +188,8 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
             }
         }
 
-        BatchAction action = _getBatchActionForEntry(entry, batchStats);
+        BatchAction action =
+            _getBatchActionForEntry(ops.empty() ? entry : ops.front(), entry, batchStats);
         switch (action) {
             case BatchAction::kContinueBatch:
                 break;
@@ -262,9 +265,25 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
  *    operation and thus can be safely batched with other CRUD operations in most cases, unless
  *    it refers to the end of a large transaction (> 16MB) or a transaction that contains DDL
  *    commands, which have to be processed individually (see SERVER-45565).
+ * 3) Ranged truncates on certain collections can be batched due to the their special property,
+ *    assuming that we only truncate up to a known RecordId, not an arbitrarily large non existing
+ *    RecordId. With this assumption, batching is possible for the special collections below:
+ *    a. For the change stream pre-images collection, inserts are implicitly replicated. If we are
+ *       truncating up to a timestamp that is already applied, we can be sure no more inserts could
+ *       fall into the range, and therefore we can safely apply the truncate in the current batch.
+ *       Otherwise, we need to start a new batch, but do not have to apply it individually, because
+ *       we should only be truncating up to a known timestamp, which is lower than the current
+ *       entry's timestamp and any entry after it.
+ *    b. For the oplog collection, since the applier buffer only receives entries already written by
+ *       OplogWriter, assuming we are truncating up to a known timestamp below the current entry's
+ *       timestamp, we can apply the truncate in the current batch since the range will not receive
+ *       more writes.
+ *    c. For all other collections, since they are required to be clustered, we cannot guarantee the
+ *       RecordIds are inserted in an ascending order. Therefore, the truncate has to be processed
+ *       individually.
  */
 OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
-    const OplogEntry& entry, const BatchStats& batchStats) {
+    const OplogEntry& firstEntryInBatch, const OplogEntry& entry, const BatchStats& batchStats) {
     // Used by non-commit and non-abort entries to cut the batch if it already contains any
     // commit or abort entries.
     auto continueOrStartNewBatch = [&] {
@@ -297,6 +316,26 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
             return batchStats.commitOrAbortOps == 0
                 ? OplogApplierBatcher::BatchAction::kStartNewBatch
                 : OplogApplierBatcher::BatchAction::kContinueBatch;
+        }
+    }
+
+    if (entry.getCommandType() == OplogEntry::CommandType::kTruncateRange) {
+        const auto& cmd = entry.getObject();
+        const auto& ns = OplogApplication::extractNsFromCmd(entry.getNss().dbName(), cmd);
+        if (ns.isChangeStreamPreImagesCollection()) {
+            auto truncateRangeEntry = TruncateRangeOplogEntry::parse(cmd);
+            const auto& maxRecordId = truncateRangeEntry.getMaxRecordId();
+            auto maxTruncateTimestamp =
+                change_stream_pre_image_util::getPreImageTimestamp(maxRecordId);
+            // Entries in the current batch can be applied concurrently as the truncate. Make sure
+            // applying the current batch does not insert preimages into the truncate range.
+            return maxTruncateTimestamp >= firstEntryInBatch.getTimestamp()
+                ? OplogApplierBatcher::BatchAction::kStartNewBatch
+                : continueOrStartNewBatch();
+        } else if (ns.isOplog()) {
+            return continueOrStartNewBatch();
+        } else {
+            return OplogApplierBatcher::BatchAction::kProcessIndividually;
         }
     }
 

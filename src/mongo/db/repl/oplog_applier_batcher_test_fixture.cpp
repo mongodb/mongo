@@ -36,10 +36,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/unittest/unittest.h"
@@ -510,6 +513,54 @@ OplogEntry makeLargeRetryableWriteOplogEntries(int t,
     return unittest::assertGet(OplogEntry::parse(durableEntry.toBSON().addField(
         BSON(OplogEntry::kMultiOpTypeFieldName << MultiOplogEntryType::kApplyOpsAppliedSeparately)
             .firstElement())));
+}
+
+/**
+ * Generates a truncateRange oplog entry
+ */
+OplogEntry makeTruncateRangeEntry(int t, const NamespaceString& nss, const RecordId& maxRecordId) {
+    TruncateRangeOplogEntry oField(std::string(nss.coll()), RecordId(), maxRecordId, 0, 0);
+    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                              OpTypeEnum::kCommand,        // op type
+                              nss.getCommandNS(),          // namespace
+                              boost::none,                 // uuid
+                              boost::none,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
+                              OplogEntry::kOplogVersion,   // version
+                              oField.toBSON(),             // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t() + Seconds(t),       // wall clock time
+                              {},                          // statement ids
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
+}
+
+/**
+ * Generates a truncateRange oplog entry that truncates the pre-images collection
+ */
+OplogEntry makeTruncateRangeOnPreImagesEntry(int t, int maxTruncateTimestamp) {
+    ChangeStreamPreImageId preImageId(UUID::gen(), Timestamp(maxTruncateTimestamp, 1), 0);
+    return makeTruncateRangeEntry(t,
+                                  NamespaceString::kChangeStreamPreImagesNamespace,
+                                  change_stream_pre_image_util::toRecordId(preImageId));
+}
+
+/**
+ * Generates a truncateRange oplog entry that truncates the oplog collection
+ */
+OplogEntry makeTruncateRangeOnOplogEntry(int t, int maxTruncateTimestamp) {
+    return makeTruncateRangeEntry(
+        t,
+        NamespaceString::kRsOplogNamespace,
+        record_id_helpers::keyForOptime(Timestamp(maxTruncateTimestamp, 1), KeyFormat::String)
+            .getValue());
 }
 
 /**

@@ -35,6 +35,7 @@
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -61,6 +62,16 @@ bool shouldReplicateLocalCatalogIdentifers(const rss::PersistenceProvider& provi
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return fcvSnapshot.isVersionInitialized() &&
         feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(vCtx, fcvSnapshot);
+}
+
+bool shouldReplicateRangeTruncates(const rss::PersistenceProvider& provider,
+                                   const VersionContext& vCtx) {
+    if (provider.shouldUseReplicatedTruncates()) {
+        return true;
+    }
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions.isEnabled(vCtx, fcvSnapshot);
 }
 
 bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx) {

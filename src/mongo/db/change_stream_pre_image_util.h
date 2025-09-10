@@ -73,18 +73,6 @@ RecordIdBound getAbsoluteMinPreImageRecordIdBoundForNs(const UUID& nsUUID);
 RecordIdBound getAbsoluteMaxPreImageRecordIdBoundForNs(const UUID& nsUUID);
 
 /**
- * Truncates a pre-images collection from 'minRecordId' to 'maxRecordId' inclusive. 'bytesDeleted'
- * and 'docsDeleted' are estimates of the bytes and documents that will be truncated within the
- * provided range.
- */
-void truncateRange(OperationContext* opCtx,
-                   const CollectionPtr& preImagesColl,
-                   const RecordId& minRecordId,
-                   const RecordId& maxRecordId,
-                   int64_t bytesDeleted,
-                   int64_t docsDeleted);
-
-/**
  * Truncates all pre-images with '_id.ts' <= 'expirationTimestampApproximation'.
  */
 void truncatePreImagesByTimestampExpirationApproximation(

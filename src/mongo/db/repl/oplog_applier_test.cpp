@@ -465,7 +465,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations
 }
 
 TEST_F(OplogApplierTest,
-       GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp1) {
+       GetNextApplierBatchChecksBatchLimitsUsingEmbeddedCountInUnpreparedCommitTransactionOp1) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(
         makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
@@ -490,7 +490,7 @@ TEST_F(OplogApplierTest,
 }
 
 TEST_F(OplogApplierTest,
-       GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp2) {
+       GetNextApplierBatchChecksBatchLimitsUsingEmbeddedCountInUnpreparedCommitTransactionOp2) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(
         makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
@@ -519,7 +519,7 @@ TEST_F(OplogApplierTest,
 }
 
 TEST_F(OplogApplierTest,
-       GetNextApplierBatchChecksBatchLimitsUsingEmbededCountInUnpreparedCommitTransactionOp3) {
+       GetNextApplierBatchChecksBatchLimitsUsingEmbeddedCountInUnpreparedCommitTransactionOp3) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(
         makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
@@ -584,6 +584,89 @@ TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
     batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[4], batch[0]);
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithTruncateRangeOnPreImagesCollection) {
+    std::vector<OplogEntry> srcOps;
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+    int oplogTs = 4;
+
+    // First entry in batch is timestamped (5, 1)
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+    // Truncate preImages to (4, 1).
+    // Should continue in current batch since maxTruncateTimestamp < firstEntryTimestamp
+    srcOps.push_back(makeTruncateRangeOnPreImagesEntry(++oplogTs, 4));
+
+    // Truncate preImages to (5, 1)
+    // Should start a new batch since maxTruncateTimestamp == firstEntryTimestamp
+    // New batch's first entry is timestamped (7, 1)
+    srcOps.push_back(makeTruncateRangeOnPreImagesEntry(++oplogTs, 5));
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+
+    // Truncate preImages to (8, 1)
+    // Should start a new batch since maxTruncateTimestamp > firstEntryTimestamp
+    srcOps.push_back(makeTruncateRangeOnPreImagesEntry(++oplogTs, 8));
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+    ASSERT_EQUALS(srcOps[1], batch[1]);
+
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[2], batch[0]);
+    ASSERT_EQUALS(srcOps[3], batch[1]);
+
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[4], batch[0]);
+    ASSERT_EQUALS(srcOps[5], batch[1]);
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithTruncateRangeOnOplog) {
+    std::vector<OplogEntry> srcOps;
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+    int oplogTs = 0;
+
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+    srcOps.push_back(makeTruncateRangeOnOplogEntry(++oplogTs, 0));
+    srcOps.push_back(makeTruncateRangeOnOplogEntry(++oplogTs, 1));
+    srcOps.push_back(makeTruncateRangeOnOplogEntry(++oplogTs, 2));
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+
+    // Oplog truncation is always batched
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(5U, batch.size()) << toString(batch);
+    for (int i = 0; i < 5; i++) {
+        ASSERT_EQUALS(srcOps[i], batch[i]);
+    }
+}
+
+TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithTruncateRangeOnNormalColls) {
+    std::vector<OplogEntry> srcOps;
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+    int oplogTs = 0;
+
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+    srcOps.push_back(makeTruncateRangeEntry(++oplogTs, nss, RecordId()));
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+
+    // Truncation on normal collections is always processed individually
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[1], batch[0]);
+
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[2], batch[0]);
 }
 
 class OplogApplierDelayTest : public OplogApplierTest {

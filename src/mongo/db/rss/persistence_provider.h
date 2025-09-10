@@ -64,7 +64,7 @@ public:
     virtual boost::optional<Timestamp> getSentinelDataTimestamp() const = 0;
 
     /**
-     * Additional configuration that shoudld be added to the WiredTiger config string for the
+     * Additional configuration that should be added to the WiredTiger config string for the
      * 'wiredtiger_open' call. The 'flattenLeafPageDelta' is expected to be the corresponding
      * WiredTigerConfig member value.
      */
@@ -83,6 +83,11 @@ public:
     virtual bool shouldUseReplicatedRecordIds() const = 0;
 
     /**
+     * If true, expired documents should be removed using replicated truncates.
+     */
+    virtual bool shouldUseReplicatedTruncates() const = 0;
+
+    /**
      * If true, writes to the oplog should be used as the unit of progress for flow control
      * sampling.
      */
@@ -94,7 +99,7 @@ public:
     virtual bool shouldStepDownForShutdown() const = 0;
 
     /**
-     * If true, data may not be availabile immediately after starting the storage engine, so systems
+     * If true, data may not be available immediately after starting the storage engine, so systems
      * like the catalog should not be initialized immediately.
      */
     virtual bool shouldDelayDataAccessDuringStartup() const = 0;

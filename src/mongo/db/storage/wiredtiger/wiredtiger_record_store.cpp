@@ -1026,6 +1026,8 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
                                              const RecordId& maxRecordId,
                                              int64_t hintDataSizeDiff,
                                              int64_t hintNumRecordsDiff) {
+    invariant(ru.inUnitOfWork());
+
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     wtRangeTruncate(wtRu, minRecordId, maxRecordId);
     _changeNumRecordsAndDataSize(wtRu, hintNumRecordsDiff, hintDataSizeDiff);

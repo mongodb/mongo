@@ -100,6 +100,7 @@ enums:
             kImportCollection: "importCollection"
             kCreateDatabaseMetadata: "createDatabaseMetadata"
             kDropDatabaseMetadata: "dropDatabaseMetadata"
+            kTruncateRange: "truncateRange"
 
 types:
     zeroOneManyStmtId:

@@ -105,6 +105,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -1205,6 +1206,40 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
+    {"truncateRange",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+          const auto& entry = *op;
+          const auto& cmd = entry.getObject();
+          const auto& ns = OplogApplication::extractNsFromCmd(entry.getNss().dbName(), cmd);
+
+          const auto truncateRangeEntry = TruncateRangeOplogEntry::parse(cmd);
+          writeConflictRetryWithLimit(opCtx, "applyOps_truncateRange", ns, [&] {
+              const auto coll =
+                  acquireCollection(opCtx,
+                                    CollectionAcquisitionRequest(
+                                        ns,
+                                        PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                        repl::ReadConcernArgs::get(opCtx),
+                                        AcquisitionPrerequisites::kWrite),
+                                    MODE_IX);
+              uassert(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Failed to truncate due to missing collection: "
+                                    << ns.toStringForErrorMsg(),
+                      coll.exists());
+
+              WriteUnitOfWork wuow(opCtx);
+              collection_internal::truncateRange(opCtx,
+                                                 coll.getCollectionPtr(),
+                                                 truncateRangeEntry.getMinRecordId(),
+                                                 truncateRangeEntry.getMaxRecordId(),
+                                                 truncateRangeEntry.getBytesDeleted(),
+                                                 truncateRangeEntry.getDocsDeleted());
+              wuow.commit();
+          });
+          return Status::OK();
+      },
+      {ErrorCodes::NamespaceNotFound}}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write

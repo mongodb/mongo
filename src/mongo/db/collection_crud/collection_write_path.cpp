@@ -951,5 +951,45 @@ void deleteDocument(OperationContext* opCtx,
     }
 }
 
+repl::OpTime truncateRange(OperationContext* opCtx,
+                           const CollectionPtr& collection,
+                           const RecordId& minRecordId,
+                           const RecordId& maxRecordId,
+                           int64_t bytesDeleted,
+                           int64_t docsDeleted) {
+    const auto& nss = collection->ns();
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot perform ranged truncate without holding an IX lock on the collection",
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX) ||
+                (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()));
+
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot perform ranged truncate in collections other than clustered collections as "
+            "RecordIds must be equal across nodes",
+            collection->isClustered());
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot perform ranged truncate in collections with preimages enabled",
+            !collection->isChangeStreamPreAndPostImagesEnabled());
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot perform ranged truncate on collections that have an index",
+            collection->getTotalIndexCount() == 0);
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot perform ranged truncate on null range upper bound",
+            !maxRecordId.isNull());
+
+    repl::OpTime opTime;
+    auto status =
+        collection->getRecordStore()->rangeTruncate(opCtx,
+                                                    *shard_role_details::getRecoveryUnit(opCtx),
+                                                    minRecordId,
+                                                    maxRecordId,
+                                                    -bytesDeleted,
+                                                    -docsDeleted);
+    uassertStatusOK(status);
+
+    opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
+        opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
+    return opTime;
+}
 }  // namespace collection_internal
 }  // namespace mongo

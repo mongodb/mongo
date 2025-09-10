@@ -190,5 +190,28 @@ void deleteDocument(OperationContext* opCtx,
                     CheckRecordId checkRecordId = CheckRecordId::Off,
                     RetryableWrite retryableWrite = RetryableWrite::kNo);
 
+/**
+ * Truncates a clustered collection from 'minRecordId' to 'maxRecordId' inclusive. 'bytesDeleted'
+ * and 'docsDeleted' are estimates of the bytes and documents that will be truncated within the
+ * provided range.
+ *
+ * Typically used on Primary to truncate a range in a collection and replicate the truncate
+ * operation to Secondaries through the oplog. To make oplog application safe and efficient, callers
+ * should only truncate up to a known RecordId, not an arbitrarily large non existing
+ * RecordId.
+ *
+ * Also supports unreplicated truncates to maintain backwards compatibility on platforms where
+ * `shouldReplicateRangeTruncates()` returns false. Requires explicitly disabling replication
+ * using an UnreplicatedWritesBlock RAII object in scope before calling `truncateRange()`.
+ *
+ * Returns the optime of the oplog entry created for the truncate operation.
+ * Returns a null optime if oplog was not modified.
+ */
+repl::OpTime truncateRange(OperationContext* opCtx,
+                           const CollectionPtr& collection,
+                           const RecordId& minRecordId,
+                           const RecordId& maxRecordId,
+                           int64_t bytesDeleted,
+                           int64_t docsDeleted);
 }  // namespace collection_internal
 }  // namespace mongo

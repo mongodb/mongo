@@ -43,6 +43,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
 #include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/database.h"
@@ -1359,6 +1360,234 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
     ASSERT_EQ(recordId, record->id);
 
     ASSERT(!cursor->next());
+}
+
+TEST_F(CatalogTestFixture, TruncateRangeFailOnNonClusteredCollection) {
+    OperationContext* opCtx = operationContext();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    CollectionOptions options;
+    RecordId minRecordId("a");
+    RecordId maxRecordId("b");
+
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    // Should fail since collection is not clustered.
+    ASSERT_THROWS_CODE(
+        collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1),
+        DBException,
+        ErrorCodes::IllegalOperation);
+}
+
+TEST_F(CatalogTestFixture, TruncateRangeOnClusteredCollection) {
+    OperationContext* opCtx = operationContext();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    RecordId minRecordId("a");
+    RecordId maxRecordId("b");
+
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
+    // Acquire exclusive access for index creation later.
+    AutoGetCollection autoColl(opCtx, nss, MODE_X);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    // Should not throw on a clustered collection with no indexes.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1);
+        wuow.commit();
+    }
+
+    // Should fail if truncate on null range upper bound.
+    ASSERT_THROWS_CODE(
+        collection_internal::truncateRange(opCtx, coll, minRecordId, RecordId(), 1, 1),
+        DBException,
+        ErrorCodes::IllegalOperation);
+
+    // Should fail if collection has indexes.
+    {
+        auto indexName = "myindex"_sd;
+        WriteUnitOfWork wuow(opCtx);
+        CollectionWriter writer{opCtx, autoColl};
+        auto writableColl = writer.getWritableCollection(opCtx);
+        ASSERT_OK(writableColl->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, writableColl, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
+        wuow.commit();
+
+        ASSERT_THROWS_CODE(
+            collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1),
+            DBException,
+            ErrorCodes::IllegalOperation);
+    }
+}
+
+TEST_F(CatalogTestFixture, TruncateRangeOnPreimagesEnabledCollection) {
+    OperationContext* opCtx = operationContext();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
+    RecordId minRecordId("a");
+    RecordId maxRecordId("b");
+
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    // Should fail since change stream preimages is enabled.
+    ASSERT_THROWS_CODE(
+        collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1),
+        DBException,
+        ErrorCodes::IllegalOperation);
+}
+
+class TruncateRangeTest : public CollectionTest {
+protected:
+    // Create two-letter string format RecordIds: "ba", "bb", "bc", ...
+    std::vector<RecordId> createSortedRecordIds() {
+        std::vector<RecordId> recordIds;
+        int inserted = 0;
+        for (char x = 'b'; x <= 'z'; ++x) {
+            for (char y = 'a'; y <= 'z'; ++y) {
+                std::string key;
+                key += x;
+                key += y;
+                recordIds.emplace_back(key);
+                if (++inserted == numToInsert) {
+                    return recordIds;
+                }
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    void setUp() override {
+        CollectionTest::setUp();
+        sortedRecordIds = createSortedRecordIds();
+    }
+
+    void testTruncateRange(const RecordId& beginId, const RecordId& endId) {
+        ASSERT_LTE(beginId, endId);
+        OperationContext* opCtx = operationContext();
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("test.t" + std::to_string(collSuffix++));
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+
+        ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        const CollectionPtr& coll = autoColl.getCollection();
+        auto rs = coll->getRecordStore();
+
+        std::vector<RecordId> recordIds = sortedRecordIds;
+        ASSERT_EQ(recordIds.size(), numToInsert);
+
+        std::string data = "data";
+        std::vector<Record> records;
+        for (auto&& id : recordIds) {
+            records.push_back({id, {data.data(), static_cast<int>(data.size())}});
+        }
+
+        {
+            WriteUnitOfWork wuow(opCtx);
+            ASSERT_OK(rs->insertRecords(opCtx,
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        &records,
+                                        std::vector<Timestamp>(numToInsert, Timestamp())));
+            wuow.commit();
+        }
+
+        // Truncate the recordIds vector
+        auto lower = std::lower_bound(recordIds.begin(), recordIds.end(), beginId);
+        auto upper = std::upper_bound(recordIds.begin(), recordIds.end(), endId);
+        recordIds.erase(lower, upper);
+        auto numRecordsDeleted = numToInsert - recordIds.size();
+
+        {
+            // Truncate the collection
+            WriteUnitOfWork wuow(opCtx);
+            collection_internal::truncateRange(
+                opCtx, coll, beginId, endId, data.size() * numRecordsDeleted, numRecordsDeleted);
+            wuow.commit();
+        }
+
+        // Read the remaining records in the collection
+        std::vector<RecordId> remainingRecordIds;
+        auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        while (auto record = cursor->next()) {
+            remainingRecordIds.push_back(record->id);
+        }
+
+        ASSERT_EQ(recordIds, remainingRecordIds);
+    }
+
+    int collSuffix = 0;
+    int numToInsert = 100;
+    std::vector<RecordId> sortedRecordIds;
+};
+
+TEST_F(TruncateRangeTest, TruncateRangeShouldDeleteRecords) {
+    // Prepare some RecordIds before and after the inserted records
+    std::vector<RecordId> recordIds = sortedRecordIds;
+    RecordId beforeBeginning{"aa"};
+    RecordId afterEnd1{"za"};
+    RecordId afterEnd2{"zb"};
+    recordIds.insert(recordIds.begin(), beforeBeginning);
+    recordIds.push_back(afterEnd1);
+    recordIds.push_back(afterEnd2);
+    ASSERT_EQ(recordIds.size(), numToInsert + 3);
+    ASSERT(std::is_sorted(recordIds.begin(), recordIds.end()));
+
+    enum BeginIdChoices { BeforeBeginning = 0, AtBeginning, Middle, AtEnd, AfterEnd };
+    enum EndIdChoices { EqualToBeginId = 1, OneAfterBeginId /* , AtEnd, AfterEnd */ };
+
+    for (int i = BeforeBeginning; i <= AfterEnd; i++) {
+        for (int j = EqualToBeginId; j <= AfterEnd; j++) {
+            auto getBeginIdIndex = [&]() -> int {
+                switch (i) {
+                    case BeforeBeginning:
+                        return 0;
+                    case AtBeginning:
+                        return 1;
+                    case Middle:
+                        return numToInsert / 2;
+                    case AtEnd:
+                        return numToInsert;
+                    case AfterEnd:
+                        return numToInsert + 1;
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            };
+            int beginIdIndex = getBeginIdIndex();
+            auto getEndIdIndex = [&]() -> int {
+                switch (j) {
+                    case EqualToBeginId:
+                        return beginIdIndex;
+                    case OneAfterBeginId:
+                        return beginIdIndex + 1;
+                    case AtEnd:
+                        return numToInsert;
+                    case AfterEnd:
+                        return numToInsert + 2;
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            };
+            int endIdIndex = getEndIdIndex();
+            if (endIdIndex < beginIdIndex) {
+                // Not allowed by WiredTiger but possible when i == AfterEnd
+                continue;
+            }
+            if (endIdIndex == beginIdIndex && j != EqualToBeginId) {
+                // Already tested by j == EqualToBeginId
+                continue;
+            }
+            testTruncateRange(recordIds[beginIdIndex], recordIds[endIdIndex]);
+        }
+    }
 }
 
 }  // namespace

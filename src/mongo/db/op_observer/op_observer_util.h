@@ -60,6 +60,11 @@ bool shouldReplicateLocalCatalogIdentifers(const rss::PersistenceProvider&,
                                            const VersionContext& vCtx);
 
 /**
+ * Returns true when ranged truncates should be replicated through the oplog.
+ */
+bool shouldReplicateRangeTruncates(const rss::PersistenceProvider&, const VersionContext& vCtx);
+
+/**
  * Returns true if gFeatureFlagPrimaryDrivenIndexBuilds is enabled.
  */
 bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx);

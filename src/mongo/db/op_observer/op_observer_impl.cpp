@@ -66,6 +66,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -2235,4 +2236,32 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
     ReadWriteConcernDefaults::get(opCtx).invalidate();
 }
 
+void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
+                                     const CollectionPtr& coll,
+                                     const RecordId& minRecordId,
+                                     const RecordId& maxRecordId,
+                                     int64_t bytesDeleted,
+                                     int64_t docsDeleted,
+                                     repl::OpTime& opTime) {
+    // Don't write oplog entry on secondaries.
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    uassert(ErrorCodes::IllegalOperation,
+            "Replicated ranged truncate not enabled",
+            shouldReplicateRangeTruncates(
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
+                VersionContext::getDecoration(opCtx)));
+
+    TruncateRangeOplogEntry objectEntry(
+        std::string(coll->ns().coll()), minRecordId, maxRecordId, bytesDeleted, docsDeleted);
+
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(coll->ns().getCommandNS());
+    oplogEntry.setUuid(coll->uuid());
+    oplogEntry.setObject(objectEntry.toBSON());
+    opTime = logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
+}
 }  // namespace mongo

@@ -148,7 +148,9 @@ private:
      * Returns how we should batch an oplog entry: grouping with the current batch, starting a new
      * new batch, or processing it individually in its own batch.
      */
-    BatchAction _getBatchActionForEntry(const OplogEntry& entry, const BatchStats& batchStats);
+    BatchAction _getBatchActionForEntry(const OplogEntry& firstEntryInBatch,
+                                        const OplogEntry& entry,
+                                        const BatchStats& batchStats);
 
     /**
      * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any

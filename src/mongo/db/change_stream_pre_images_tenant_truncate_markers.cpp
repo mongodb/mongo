@@ -31,6 +31,7 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/operation_context.h"
@@ -116,12 +117,15 @@ void truncateExpiredMarkersForNsUUID(
             auto bytesDeleted = marker->bytes;
             auto docsDeleted = marker->records;
 
-            change_stream_pre_image_util::truncateRange(opCtx,
-                                                        preImagesColl,
-                                                        minRecordIdForNs,
-                                                        marker->lastRecord,
-                                                        bytesDeleted,
-                                                        docsDeleted);
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            WriteUnitOfWork wuow(opCtx);
+            collection_internal::truncateRange(opCtx,
+                                               preImagesColl,
+                                               minRecordIdForNs,
+                                               marker->lastRecord,
+                                               bytesDeleted,
+                                               docsDeleted);
+            wuow.commit();
 
             if (marker->wallTime > maxWallTimeForNsTruncateOutput) {
                 maxWallTimeForNsTruncateOutput = marker->wallTime;
@@ -603,9 +607,11 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
                     .recordId();
 
             writeConflictRetry(opCtx, "final truncate", preImagesColl->ns(), [&] {
-                // Call creates it's own writeUnitOfWork.
-                change_stream_pre_image_util::truncateRange(
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                WriteUnitOfWork wuow(opCtx);
+                collection_internal::truncateRange(
                     opCtx, preImagesColl, minRecordId, maxRecordId, 0, 0);
+                wuow.commit();
             });
 
             _markersMap.erase(nsUUID);

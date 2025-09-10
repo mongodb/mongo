@@ -80,7 +80,7 @@ public:
     OpObserverRegistry();
     ~OpObserverRegistry() override;
 
-    // This implementaton is unused, but needs to be implemented to conform to the OpObserver
+    // This implementation is unused, but needs to be implemented to conform to the OpObserver
     // interface.
     NamespaceFilters getNamespaceFilters() const override {
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};
@@ -623,6 +623,20 @@ public:
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {
         for (auto& o : _observers)
             o->onDropDatabaseMetadata(opCtx, op);
+    }
+
+    void onTruncateRange(OperationContext* opCtx,
+                         const CollectionPtr& coll,
+                         const RecordId& minRecordId,
+                         const RecordId& maxRecordId,
+                         int64_t bytesDeleted,
+                         int64_t docsDeleted,
+                         repl::OpTime& opTime) override {
+        ReservedTimes times{opCtx};
+        for (auto& observer : this->_observers) {
+            observer->onTruncateRange(
+                opCtx, coll, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
+        }
     }
 
 private:

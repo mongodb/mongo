@@ -275,6 +275,14 @@ public:
     void onCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {}
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {}
+
+    void onTruncateRange(OperationContext* opCtx,
+                         const CollectionPtr& coll,
+                         const RecordId& minRecordId,
+                         const RecordId& maxRecordId,
+                         int64_t bytesDeleted,
+                         int64_t docsDeleted,
+                         repl::OpTime& opTime) override {}
 };
 
 }  // namespace MONGO_MOD_PUB mongo

@@ -42,6 +42,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
@@ -84,6 +85,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session.h"
@@ -291,6 +293,9 @@ protected:
                 if (uuid) {
                     opts.uuid = uuid;
                 }
+                if (nss == clusteredNss) {
+                    opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+                }
                 invariant(db->createCollection(opCtx, nss, opts));
             }
             wunit.commit();
@@ -479,6 +484,8 @@ protected:
     const NamespaceString nss3 =
         NamespaceString::createNamespaceString_forTest(boost::none, "testDB3", "testColl3");
     const UUID uuid3{UUID::gen()};
+    const NamespaceString clusteredNss = NamespaceString::createNamespaceString_forTest(
+        TenantId(OID::gen()), "testDB", "clusteredColl");
 
     const TenantId kTenantId = TenantId(OID::gen());
     const NamespaceString kNssUnderTenantId = NamespaceString::createNamespaceString_forTest(
@@ -839,7 +846,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     ASSERT_EQUALS(cause, getStatusFromCommandResult(o.getObjectField("cause")));
 }
 
-TEST_F(OpObserverTest, checkisTimeseriesOnReplLogUpdate) {
+TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogUpdate) {
     RAIIServerParameterControllerForTest viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
@@ -1111,7 +1118,7 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), dropOpTime);
 }
 
-TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
+TEST_F(OpObserverTest, OnDropCollectionIncludesTenantId) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -1523,6 +1530,73 @@ TEST_F(OpObserverTest, EntriesIncludeVersionContextDecoration) {
     auto oplogEntry = getSingleOplogEntry(opCtx.get());
     auto vCtxBSON = oplogEntry.getObjectField(repl::OplogEntryBase::kVersionContextFieldName);
     ASSERT_BSONOBJ_EQ(vCtxBSON, expectedVCtx.toBSON());
+}
+
+TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    auto opCtx = opCtxWrapper.get();
+    reset(opCtx, clusteredNss);
+
+    AutoGetCollection autoColl(opCtx, clusteredNss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    opObserverRegistry()->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+
+    {
+        // Tests that truncateRange() does not throw in unreplicated mode
+        repl::UnreplicatedWritesBlock uwb(opCtx);
+        WriteUnitOfWork wuow(opCtx);
+        // featureFlagUseReplicatedTruncatesForDeletions is ignored
+        {
+            RAIIServerParameterControllerForTest featureFlagScope{
+                "featureFlagUseReplicatedTruncatesForDeletions", true};
+            collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1);
+        }
+        {
+            RAIIServerParameterControllerForTest featureFlagScope{
+                "featureFlagUseReplicatedTruncatesForDeletions", false};
+            collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1);
+        }
+        wuow.commit();
+        // No oplog entry generated.
+        getNOplogEntries(opCtx, 0);
+    }
+
+    {
+        // Tests that with feature flag disabled, the OpObserver would throw
+        RAIIServerParameterControllerForTest featureFlagScope{
+            "featureFlagUseReplicatedTruncatesForDeletions", false};
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_THROWS_CODE(
+            collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1),
+            DBException,
+            ErrorCodes::IllegalOperation);
+        wuow.commit();
+        // No oplog entry generated.
+        getNOplogEntries(opCtx, 0);
+    }
+
+    {
+        RAIIServerParameterControllerForTest featureFlagScope{
+            "featureFlagUseReplicatedTruncatesForDeletions", true};
+        WriteUnitOfWork wuow(opCtx);
+        collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1);
+        wuow.commit();
+    }
+
+    const auto oplogEntryBSON = getSingleOplogEntry(opCtx);
+    const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
+
+    ASSERT(oplogEntry.isCommand());
+    ASSERT_EQ(oplogEntry.getNss().db_forTest(), clusteredNss.db_forTest());
+    ASSERT_EQ(oplogEntry.getNss().coll(), "$cmd");
+    ASSERT_EQ(oplogEntry.getUuid(), coll->uuid());
+
+    const auto& o = oplogEntry.getObject();
+    TruncateRangeOplogEntry objectEntry(
+        std::string(coll->ns().coll()), RecordId("a"), RecordId("b"), 1, 1);
+    ASSERT_BSONOBJ_EQ(o, objectEntry.toBSON());
 }
 
 /**

@@ -732,6 +732,18 @@ public:
      */
     virtual void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
 
+    /**
+     * Called when 'truncateRange' is called on a collection.
+     * Out parameter 'opTime' is updated to the optime of the oplog entry logged.
+     */
+    virtual void onTruncateRange(OperationContext* opCtx,
+                                 const CollectionPtr& coll,
+                                 const RecordId& minRecordId,
+                                 const RecordId& maxRecordId,
+                                 int64_t bytesDeleted,
+                                 int64_t docsDeleted,
+                                 repl::OpTime& opTime) = 0;
+
     struct Times;
 
 protected:

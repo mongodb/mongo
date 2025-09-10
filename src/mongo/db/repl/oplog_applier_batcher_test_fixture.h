@@ -123,6 +123,12 @@ std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
                                                               bool prepared,
                                                               int count);
 
+OplogEntry makeTruncateRangeEntry(int t, const NamespaceString& nss, const RecordId& maxRecordId);
+
+OplogEntry makeTruncateRangeOnPreImagesEntry(int t, int maxTruncateTimestamp);
+
+OplogEntry makeTruncateRangeOnOplogEntry(int t, int maxTruncateTimestamp);
+
 std::string toString(const std::vector<OplogEntry>& ops);
 }  // namespace repl
 }  // namespace mongo
