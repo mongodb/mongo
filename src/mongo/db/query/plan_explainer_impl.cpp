@@ -970,12 +970,9 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
         return {std::move(stats), boost::none};
     }();
 
-    const auto candidateSolutionHash = _solution ? _solution->hash() : 0;
-    bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == candidateSolutionHash);
+
+    bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == _solution->hash());
     BSONObjBuilder bob;
-    if (internalQueryAllowForcedPlanByHash.load() && _solution) {
-        bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
-    }
     statsToBSON(_planStageQsnMap,
                 _cbrResult.estimates,
                 *stats,
@@ -1008,13 +1005,9 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
         for (; i < mpsStats->children.size(); ++i) {
             if (i != *bestPlanIdx) {
                 const auto& candidate = mps->getCandidate(i);
-                const auto candidateSolutionHash = candidate.solution->hash();
-                bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
+                bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
 
                 BSONObjBuilder bob;
-                if (internalQueryAllowForcedPlanByHash.load()) {
-                    bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
-                }
                 auto stats = _root->getStats();
                 statsToBSON(_planStageQsnMap,
                             _cbrResult.estimates,

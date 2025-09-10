@@ -178,9 +178,6 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
         if (aggRequest->getStartAt()) {
             findCommand->setStartAt(*aggRequest->getStartAt());
         }
-        if (aggRequest->getForcedPlanSolutionHash()) {
-            findCommand->setForcedPlanSolutionHash(aggRequest->getForcedPlanSolutionHash());
-        }
     }
 
     // The collation on the ExpressionContext has been resolved to either the user-specified

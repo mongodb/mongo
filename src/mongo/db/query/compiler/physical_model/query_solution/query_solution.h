@@ -469,11 +469,7 @@ public:
 
     template <typename H>
     friend H AbslHashValue(H h, const QuerySolution& qs) {
-        auto initial = H::combine(std::move(h), qs.taggedMatchExpressionHash);
-        if (qs._root) {
-            return H::combine(std::move(initial), *qs._root);
-        }
-        return initial;
+        return H::combine(std::move(h), qs.taggedMatchExpressionHash, *qs._root);
     }
 
     size_t hash() const {

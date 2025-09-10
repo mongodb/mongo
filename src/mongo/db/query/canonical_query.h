@@ -376,13 +376,6 @@ public:
         return _forSubPlanner;
     }
 
-    /**
-     * Return the solution hash for the forced plan.
-     */
-    boost::optional<int64_t> getForcedPlanSolutionHash() const {
-        return _findCommand->getForcedPlanSolutionHash();
-    }
-
 private:
     void initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<ParsedFindCommand> parsedFind,

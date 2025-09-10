@@ -1116,11 +1116,6 @@ private:
                 query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
                     !findCommand->getQuerySettings().has_value());
 
-        uassert(ErrorCodes::FailedToParse,
-                "Use of forcedPlanSolutionHash not permitted.",
-                !findCommand->getForcedPlanSolutionHash() ||
-                    internalQueryAllowForcedPlanByHash.load());
-
         return findCommand;
     }
 };
