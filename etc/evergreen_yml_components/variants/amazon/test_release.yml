@@ -191,7 +191,7 @@ buildvariants:
           - amazon2-arm64-latest-xlarge
       - name: test_packages
         distros:
-          - ubuntu2204-large
+          - ubuntu2204-arm64-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
