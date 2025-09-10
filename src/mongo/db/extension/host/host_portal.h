@@ -30,20 +30,31 @@
 
 #include "mongo/db/extension/public/api.h"
 
+#include <string>
+
 namespace mongo::extension::host {
 
 void registerStageDescriptor(const ::MongoExtensionAggregationStageDescriptor* descriptor);
 
 class HostPortal final : public ::MongoExtensionHostPortal {
 public:
-    HostPortal(::MongoExtensionAPIVersion apiVersion, int maxWireVersion)
-        : ::MongoExtensionHostPortal(&VTABLE, apiVersion, maxWireVersion) {}
+    HostPortal(::MongoExtensionAPIVersion apiVersion,
+               int maxWireVersion,
+               std::string extensionOptions)
+        : ::MongoExtensionHostPortal{&VTABLE, apiVersion, maxWireVersion},
+          _extensionOpts(std::move(extensionOptions)) {}
 
 private:
     static ::MongoExtensionStatus* _extRegisterStageDescriptor(
         const MongoExtensionAggregationStageDescriptor* stageDesc) noexcept;
 
-    static constexpr ::MongoExtensionHostPortalVTable VTABLE{&_extRegisterStageDescriptor};
+    static ::MongoExtensionByteView _extGetOptions(
+        const ::MongoExtensionHostPortal* portal) noexcept;
+
+    static constexpr ::MongoExtensionHostPortalVTable VTABLE{&_extRegisterStageDescriptor,
+                                                             &_extGetOptions};
+
+    const std::string _extensionOpts;
 };
 
 }  // namespace mongo::extension::host

@@ -24,5 +24,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",
+        "//src/third_party/yaml-cpp:yaml",
     ],
 )

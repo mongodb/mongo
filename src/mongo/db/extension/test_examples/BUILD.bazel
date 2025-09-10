@@ -33,6 +33,18 @@ mongo_cc_extension_shared_library(
     srcs = ["vector_search.cpp"],
 )
 
+# Extensions under test_examples/extension_options/
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_mongo_extension",
+        srcs = ["extension_options/" + extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "test_options",
+        "parse_options",
+    ]
+]
+
 # Extensions under test_examples/loading/
 [
     mongo_cc_extension_shared_library(

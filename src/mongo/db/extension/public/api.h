@@ -238,6 +238,9 @@ typedef struct MongoExtensionHostPortal {
 typedef struct MongoExtensionHostPortalVTable {
     MongoExtensionStatus* (*registerStageDescriptor)(
         const MongoExtensionAggregationStageDescriptor* descriptor);
+    // Returns a MongoExtensionByteView containing the raw extension options associated with this
+    // extension.
+    MongoExtensionByteView (*getExtensionOptions)(const MongoExtensionHostPortal* portal);
 } MongoExtensionHostPortalVTable;
 
 /**

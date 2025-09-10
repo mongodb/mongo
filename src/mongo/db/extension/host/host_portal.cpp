@@ -47,4 +47,9 @@ void registerStageDescriptor(const ::MongoExtensionAggregationStageDescriptor* d
     return sdk::enterCXX([&]() { return registerStageDescriptor(stageDesc); });
 }
 
+::MongoExtensionByteView HostPortal::_extGetOptions(
+    const ::MongoExtensionHostPortal* portal) noexcept {
+    return sdk::stringViewAsByteView(static_cast<const HostPortal*>(portal)->_extensionOpts);
+}
+
 }  // namespace mongo::extension::host

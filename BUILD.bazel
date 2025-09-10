@@ -445,6 +445,9 @@ extensions_with_config(
         # TODO SERVER-109108: Remove this entry when the bar extension is no longer needed.
         "//src/mongo/db/extension/test_examples:bar_mongo_extension",
         "//src/mongo/db/extension/test_examples:foo_mongo_extension",
+        # TODO SERVER-110326: Add these tests when possible.
+        # "//src/mongo/db/extension/test_examples:test_options_mongo_extension",
+        # "//src/mongo/db/extension/test_examples:parse_options_mongo_extension",
 
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
         # "_mongo_extension" suffix.

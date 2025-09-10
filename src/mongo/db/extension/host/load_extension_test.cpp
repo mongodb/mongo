@@ -50,10 +50,8 @@ static std::filesystem::path getExtensionPath(const std::string& extensionName) 
 }
 
 static ExtensionConfig makeEmptyExtensionConfig(const std::string& extensionName) {
-    ExtensionConfig config;
-    config.sharedLibraryPath = getExtensionPath(extensionName).string();
-    config.extOptions = YAML::Node(YAML::NodeType::Map);
-    return config;
+    return ExtensionConfig{.sharedLibraryPath = getExtensionPath(extensionName).string(),
+                           .extOptions = YAML::Node(YAML::NodeType::Map)};
 }
 
 class LoadExtensionsTest : public unittest::Test {
@@ -272,5 +270,55 @@ TEST(LoadExtensionTest, LoadHighestCompatibleVersionSucceeds) {
     ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
     pipeline = {BSON("$extensionV4" << BSONObj())};
     ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+}
+
+TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
+    {
+        const auto extOptions = YAML::Load("optionA: true\n");
+        const ExtensionConfig config = {
+            .sharedLibraryPath = getExtensionPath("libtest_options_mongo_extension.so").string(),
+            .extOptions = extOptions};
+        ASSERT_DOES_NOT_THROW(ExtensionLoader::load(config));
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+        std::vector<BSONObj> pipeline = {BSON("$optionA" << BSONObj())};
+        auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+        ASSERT_TRUE(parsedPipeline != nullptr);
+        ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+
+        auto stage =
+            dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+        ASSERT_TRUE(stage != nullptr);
+        ASSERT_EQUALS(std::string(stage->getSourceName()), "$optionA");
+
+        // Assert that $optionB is unavailable.
+        pipeline = {BSON("$optionB" << BSONObj())};
+        ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 16436);
+    }
+}
+
+TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
+    {
+        const auto extOptions = YAML::Load("checkMax: true\nmax: 10");
+        const ExtensionConfig config = {
+            .sharedLibraryPath = getExtensionPath("libparse_options_mongo_extension.so").string(),
+            .extOptions = extOptions};
+        ASSERT_DOES_NOT_THROW(ExtensionLoader::load(config));
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+        std::vector<BSONObj> pipeline = {BSON("$checkNum" << BSON("num" << 9))};
+        auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+        ASSERT_TRUE(parsedPipeline != nullptr);
+        ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+
+        auto stage =
+            dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+        ASSERT_TRUE(stage != nullptr);
+        ASSERT_EQUALS(std::string(stage->getSourceName()), "$checkNum");
+
+        // Assert that parsing fails when the provided num is greater than max 10.
+        pipeline = {BSON("$checkNum" << BSON("num" << 11))};
+        ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10999106);
+    }
 }
 }  // namespace mongo::extension::host

@@ -32,6 +32,8 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
+#include <yaml-cpp/yaml.h>
+
 namespace mongo::extension::sdk {
 
 /**
@@ -62,11 +64,19 @@ public:
         return get()->hostMongoDBMaxWireVersion;
     }
 
+    YAML::Node getExtensionOptions() const {
+        assertValid();
+        return YAML::Load(std::string(byteViewAsStringView(vtable().getExtensionOptions(get()))));
+    }
+
 private:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(10926401,
                 "Extension 'registerStageDescriptor' is null",
                 vtable.registerStageDescriptor != nullptr);
+        tassert(10999108,
+                "Extension 'getExtensionOptions' is null",
+                vtable.getExtensionOptions != nullptr);
     };
 };
 
