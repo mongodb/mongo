@@ -129,8 +129,15 @@ reshardingTest.withReshardingInBackground(
             jsTestLog("Completed operations");
         },
         afterReshardingFn: () => {
-            jsTestLog("Join possible ongoing collMod command and dropIndexes commands");
+            // The ShardingDDLCoordinator will automatically retry any retriable DDLs, and
+            // ExceededTimeLimit is considered retriable. If a DDL fails with this code, it will be
+            // queued to rerun once the resharding releases the locks. We need to join any
+            // in-progress retries and accept IndexNotFound for dropIndexes since the index may have
+            // already been dropped by the retry.
+
+            jsTestLog("Join possible ongoing collMod and dropIndexes commands");
             assert.commandWorked(coll.runCommand("collMod"));
+
             // TODO SERVER-107420: Remove IndexNotFound from acceptable dropIndexes errors once 9.0
             // becomes LTS
             assert.commandWorkedOrFailedWithCode(
