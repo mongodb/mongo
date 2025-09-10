@@ -76,7 +76,6 @@
 #endif
 
 #if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND
-#define UNW_LOCAL_ONLY
 #include <elf.h>
 #include <libunwind.h>
 #include <link.h>

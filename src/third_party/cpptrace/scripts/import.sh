@@ -10,7 +10,6 @@ NAME=cpptrace
 VERSION="1.0.3"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/cpptrace
-PATCH_DIR=$DEST_DIR/patches
 if [[ -d $DEST_DIR/dist ]]; then
     echo "You must remove '$DEST_DIR/dist' before running $0" >&2
     exit 1
@@ -27,5 +26,3 @@ find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf benchmarking ci cmake docs res test tools
 find . -maxdepth 1 -type f -not -regex ".*\(CHANGELOG.md\|CONTRIBUTING.md\|LICENSE\|README.md\|SECURITY.md\)$" -delete
 popd
-
-git apply $PATCH_DIR/*.patch

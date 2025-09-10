@@ -1,7 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
-package(default_visibility = ["//visibility:public"])
-
 # Used to restrict compilation flags to only be added when compiling arm64 on clang.
 config_setting(
     name = "clang_arm64",
@@ -13,6 +11,24 @@ config_setting(
     },
 )
 
+# libunwind must be consumed with UNW_LOCAL_ONLY defined, but cannot be built that way.
+# Define unwind as a wrapper target around unwind_impl to handle this since there is
+# nothing like the opposite of local_defines to achieve this.
+mongo_cc_library(
+    name = "unwind",
+    defines = ["UNW_LOCAL_ONLY"],
+    skip_global_deps = [
+        # This is a globally injected dependency.
+        # Skip depending on all globally injected dependencies to avoid circular dependencies.
+        "allocator",
+        "libunwind",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":unwind_impl",
+    ],
+)
+
 # Update procedure (mostly out of date):
 # Run "scripts/host_config.sh". This creates a `make_output.json` file.
 # Find the "unwind" library. Combine its `srcs` file list with the sources
@@ -20,7 +36,7 @@ config_setting(
 #
 # Ensure that compilation flags are captured in this Bazel file.
 mongo_cc_library(
-    name = "unwind",
+    name = "unwind_impl",
     srcs = [
         "dist/src/dl-iterate-phdr.c",
         "dist/src/dwarf/Lexpr.c",
@@ -139,10 +155,18 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    hdrs = glob([
-        "**/*.h",
-        "**/*.c",
-    ]),
+    hdrs = select({
+        "@platforms//cpu:aarch64": glob(["platform/linux_aarch64/install/include/**"]),
+        "@platforms//cpu:x86_64": glob(["platform/linux_x86_64/install/include/**"]),
+        "@platforms//cpu:ppc": glob(["platform/linux_ppc64le/install/include/**"]),
+        "@platforms//cpu:s390x": glob(["platform/linux_s390x/install/include/**"]),
+        "//conditions:default": glob([]),
+    }),
+    # Some .c files include other .c files so make them available,
+    # but only when compiling the library, not dependents.
+    # Also listing private headers here to ensure they are not available
+    # when compiling dependents.
+    additional_compiler_inputs = glob(["**/*.h"]) + ["dist/src/elfxx.c"] + glob(["**/G*.c"]),
     copts = [
         "-Isrc/third_party/unwind/dist/src",
         "-Isrc/third_party/unwind/dist/include",

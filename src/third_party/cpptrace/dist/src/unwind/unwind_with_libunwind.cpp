@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <vector>
 
-#define UNW_LOCAL_ONLY
 #include <libunwind.h>
 
 CPPTRACE_BEGIN_NAMESPACE

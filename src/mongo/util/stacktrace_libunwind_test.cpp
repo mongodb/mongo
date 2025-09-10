@@ -28,6 +28,12 @@
  */
 
 
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/stacktrace_libunwind_test_functions.h"
+#include "mongo/util/stacktrace_test_helpers.h"
+
 #include <cstdlib>
 #include <functional>
 #include <sstream>
@@ -35,20 +41,12 @@
 #include <vector>
 
 #include <cxxabi.h>
+#include <libunwind.h>  // IWYU pragma: keep
 
 #include <fmt/format.h>
 #include <fmt/printf.h>  // IWYU pragma: keep
 
 // IWYU pragma: no_include "libunwind-x86_64.h"
-
-#define UNW_LOCAL_ONLY
-#include "mongo/base/string_data.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/stacktrace_libunwind_test_functions.h"
-#include "mongo/util/stacktrace_test_helpers.h"
-
-#include <libunwind.h>  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

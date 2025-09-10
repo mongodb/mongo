@@ -42,7 +42,6 @@
 #include "mongo/util/stacktrace.h"
 
 #if defined(MONGO_CONFIG_USE_LIBUNWIND)
-#define UNW_LOCAL_ONLY
 #include <libunwind.h>  // IWYU pragma: keep
 #endif
 
