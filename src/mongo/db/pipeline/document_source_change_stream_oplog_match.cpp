@@ -39,11 +39,11 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 #include <algorithm>
-#include <iterator>
-#include <list>
 #include <memory>
 
 #include <boost/move/utility_core.hpp>
@@ -104,6 +104,13 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     if (expCtx->getChangeStreamSpec()->getShowExpandedEvents() &&
         expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
         eventFilter->add(buildViewDefinitionEventFilter(expCtx, userMatch, backingBsonObjs));
+    }
+
+    // For sharded clusters, add an oplog filter for control events for v2 change stream readers.
+    if (expCtx->getInRouter() &&
+        expCtx->getChangeStreamSpec()->getVersion() == ChangeStreamReaderVersionEnum::kV2) {
+        eventFilter->add(MatchExpressionParser::parseAndNormalize(
+            backingBsonObjs.emplace_back(buildControlEventsFilterForDataShard(expCtx)), expCtx));
     }
 
     // Build the final $match filter to be applied to the oplog.

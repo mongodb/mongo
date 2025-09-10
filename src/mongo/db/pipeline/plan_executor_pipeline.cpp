@@ -35,9 +35,9 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/pipeline/change_stream_topology_change_info.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -59,16 +59,6 @@ namespace mongo {
 namespace {
 auto& changeStreamsLargeEventsFailedCounter =
     *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
-
-// Tests if we are currently running in a router or in a replica set context.
-bool isRouterOrReplicaSet(ExpressionContext* expCtx) {
-    if (expCtx->getInRouter()) {
-        return true;
-    }
-    auto* replCoord = repl::ReplicationCoordinator::get(expCtx->getOperationContext());
-    return replCoord && replCoord->getSettings().isReplSet();
-}
-
 }  // namespace
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -141,9 +131,10 @@ boost::optional<Document> PlanExecutorPipeline::_getNext() {
         // No change stream control events should ever escape an aggregation pipeline on the router
         // or the replica set.
         tassert(10358906,
-                "No control events should escape this aggregation pipeline",
+                "No control events should escape this aggregation pipeline on a router or "
+                "non-sharded replica set",
                 !nextDoc->metadata().isChangeStreamControlEvent() ||
-                    !isRouterOrReplicaSet(_expCtx.get()));
+                    !change_stream::isRouterOrNonShardedReplicaSet(_expCtx));
     } else {
         _pipelineIsEof = true;
     }

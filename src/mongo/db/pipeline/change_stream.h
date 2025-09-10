@@ -59,7 +59,7 @@ class ChangeStream {
 public:
     ChangeStream(ChangeStreamReadMode mode,
                  ChangeStreamType type,
-                 boost::optional<NamespaceString> nss);
+                 const boost::optional<NamespaceString>& nss);
 
     /**
      * Returns the robustness level of the change stream instance.

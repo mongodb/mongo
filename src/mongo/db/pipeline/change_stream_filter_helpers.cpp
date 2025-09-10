@@ -36,7 +36,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/change_stream_reader_builder.h"
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -271,21 +273,27 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
                                                     SerializationContext::stateDefault())
                   << "$or" << invalidatingCommands.arr()));
     return MatchExpressionParser::parseAndNormalize(invalidatingFilter, expCtx);
-}  // namespace change_stream_filter
+}
+
+void appendBaseTransactionFilter(BSONObjBuilder& applyOpsBuilder) {
+    applyOpsBuilder.append("op", "c");
+    applyOpsBuilder.append("o.prepare", BSON("$ne" << true));
+    applyOpsBuilder.append("o.partialTxn", BSON("$ne" << true));
+}
 
 std::unique_ptr<MatchExpression> buildTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
+
     BSONObjBuilder applyOpsBuilder;
+    appendBaseTransactionFilter(applyOpsBuilder);
+
+    // "o.applyOps" stores the list of operations, so it must be an array.
+    applyOpsBuilder.append("o.applyOps", BSON("$type" << "array"));
 
     BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
 
-    // "o.applyOps" stores the list of operations, so it must be an array.
-    applyOpsBuilder.append("op", "c");
-    applyOpsBuilder.append("o.applyOps", BSON("$type" << "array"));
-    applyOpsBuilder.append("o.prepare", BSON("$ne" << true));
-    applyOpsBuilder.append("o.partialTxn", BSON("$ne" << true));
     {
         // Include this 'applyOps' if it has an operation with a matching namespace _or_ if it has a
         // 'prevOpTime' link to another 'applyOps' command, indicating a multi-entry transaction.
@@ -335,10 +343,51 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
         auto transactionFilterWithUserMatch = std::make_unique<AndMatchExpression>();
         transactionFilterWithUserMatch->add(std::move(transactionFilter));
         transactionFilterWithUserMatch->add(std::move(rewrittenMatch));
-        return transactionFilterWithUserMatch;
+        transactionFilter = std::move(transactionFilterWithUserMatch);
+    }
+
+    // For sharded clusters, additionally match control events for v2 change stream readers. The
+    // user's match filter is not used here and must not have impact on which control events are
+    // emitted.
+    const BSONObj controlEventsFilter = [&]() {
+        if (expCtx->getInRouter() &&
+            expCtx->getChangeStreamSpec()->getVersion() == ChangeStreamReaderVersionEnum::kV2) {
+            return buildControlEventsFilterForDataShard(expCtx);
+        }
+
+        return BSONObj();
+    }();
+
+    if (!controlEventsFilter.isEmpty()) {
+        BSONObjBuilder bob;
+        appendBaseTransactionFilter(bob);
+
+        // "o.applyOps" stores the list of operations, so it must be an array.
+        bob.append("o.applyOps", BSON("$type" << "array" << "$elemMatch" << controlEventsFilter));
+
+        auto transactionFilterWithControlEventsFilter = std::make_unique<OrMatchExpression>();
+        transactionFilterWithControlEventsFilter->add(std::move(transactionFilter));
+        transactionFilterWithControlEventsFilter->add(MatchExpressionParser::parseAndNormalize(
+            backingBsonObjs.emplace_back(bob.obj()), expCtx));
+        transactionFilter = std::move(transactionFilterWithControlEventsFilter);
     }
 
     return transactionFilter;
+}
+
+BSONObj buildControlEventsFilterForDataShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(10743901,
+            "expecting v2 change stream reader version to be set",
+            expCtx->getChangeStreamSpec()->getVersion() == ChangeStreamReaderVersionEnum::kV2);
+
+    ChangeStreamReaderBuilder* readerBuilder =
+        ChangeStreamReaderBuilder::get(expCtx->getOperationContext()->getServiceContext());
+
+    tassert(10743902, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
+
+    return readerBuilder->buildControlEventFilterForDataShard(
+        expCtx->getOperationContext(), ChangeStream::buildFromExpressionContext(expCtx));
 }
 
 std::unique_ptr<MatchExpression> buildInternalOpFilter(

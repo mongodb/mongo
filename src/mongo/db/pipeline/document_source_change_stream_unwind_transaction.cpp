@@ -86,7 +86,7 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     // The transaction unwind filter is the same as the operation filter applied to the oplog. This
     // includes a namespace filter, which ensures that it will discard all documents that would be
     // filtered out by the default 'ns' filter this stage gets initialized with.
-    auto unwindFilter =
+    std::unique_ptr<ListOfMatchExpression> unwindFilter =
         std::make_unique<AndMatchExpression>(buildOperationFilter(expCtx, nullptr, bsonObj));
 
     // To correctly handle filtering out entries of direct write operations on orphaned documents,
@@ -104,6 +104,20 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
             expCtx, userMatch, bsonObj, {}, kUnwindExcludedFields)) {
         unwindFilter->add(std::move(rewrittenMatch));
     }
+
+    // For sharded clusters, additionally match control events for v2 change stream readers. The
+    // user's match filter is not used here and must not have impact on which control events are
+    // emitted.
+    if (expCtx->getInRouter() &&
+        expCtx->getChangeStreamSpec()->getVersion() == ChangeStreamReaderVersionEnum::kV2) {
+        if (BSONObj controlEventsFilter = buildControlEventsFilterForDataShard(expCtx);
+            !controlEventsFilter.isEmpty()) {
+            unwindFilter = std::make_unique<OrMatchExpression>(std::move(unwindFilter), nullptr);
+            unwindFilter->add(MatchExpressionParser::parseAndNormalize(
+                bsonObj.emplace_back(controlEventsFilter), expCtx));
+        }
+    }
+
     return optimizeMatchExpression(std::move(unwindFilter));
 }
 }  // namespace change_stream_filter
@@ -111,7 +125,7 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
 DocumentSourceChangeStreamUnwindTransaction::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    std::vector<BSONObj> bsonObj = std::vector<BSONObj>{};
+    std::vector<BSONObj> bsonObj;
     std::unique_ptr<MatchExpression> matchExpr =
         change_stream_filter::buildUnwindTransactionFilter(expCtx, nullptr, bsonObj);
     return new DocumentSourceChangeStreamUnwindTransaction(matchExpr->serialize(), expCtx);

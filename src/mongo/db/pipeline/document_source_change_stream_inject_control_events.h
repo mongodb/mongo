@@ -89,6 +89,13 @@ public:
          * Convert the internal C++ actions type into a BSONObj.
          */
         static BSONObj serializeToBSON(const ActionsMap& actions);
+
+        /**
+         * Build the action map for a data shard from the current change stream specification.
+         */
+        static ActionsMap buildMapForDataShard(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const DocumentSourceChangeStreamSpec& spec);
     };
 
     const char* getSourceName() const override;
@@ -123,10 +130,18 @@ public:
         const DocumentSourceChangeStreamSpec& spec,
         const BSONObj& actions = {});
 
+    static boost::intrusive_ptr<DocumentSourceChangeStreamInjectControlEvents> createForDataShard(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
+
     static const Id& id;
 
     Id getId() const override {
         return id;
+    }
+
+    const ActionsMap& getActionsMap_forTest() const {
+        return _actions;
     }
 
 private:

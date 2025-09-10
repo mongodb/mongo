@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/change_streams/all_databases_change_stream_shard_targeter_impl.h"
 #include "mongo/s/change_streams/collection_change_stream_shard_targeter_impl.h"
 #include "mongo/s/change_streams/control_events.h"

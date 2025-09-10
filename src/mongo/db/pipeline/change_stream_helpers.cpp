@@ -31,13 +31,35 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
-namespace change_stream {
+namespace mongo::change_stream {
+
+bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (expCtx->getInRouter()) {
+        return true;
+    }
+    if (expCtx->getForPerShardCursor()) {
+        // Sharded cluster mongod.
+        return false;
+    }
+
+    if (const auto* shardingState = ShardingState::get(expCtx->getOperationContext());
+        shardingState) {
+        auto role = shardingState->pollClusterRole();
+        const bool isReplSet = !role.has_value();
+        return isReplSet;
+    } else {
+        // Sharding state is not initialized. This is the case in unit tests and also on standalone
+        // mongods. But on standalone mongods we do not support change streams, so we will never get
+        // here on standalone mongods.
+        return false;
+    }
+}
 
 ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec) {
@@ -93,5 +115,4 @@ repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     return oplogEntry;
 }
 
-}  // namespace change_stream
-}  // namespace mongo
+}  // namespace mongo::change_stream

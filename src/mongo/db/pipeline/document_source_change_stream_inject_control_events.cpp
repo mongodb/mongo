@@ -32,8 +32,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_reader_builder.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/s/change_streams/control_events.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -109,6 +112,29 @@ BSONObj DocumentSourceChangeStreamInjectControlEvents::ActionsHelper::serializeT
     return bob.obj();
 }
 
+DocumentSourceChangeStreamInjectControlEvents::ActionsMap
+DocumentSourceChangeStreamInjectControlEvents::ActionsHelper::buildMapForDataShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec& spec) {
+    ChangeStreamReaderBuilder* readerBuilder =
+        ChangeStreamReaderBuilder::get(expCtx->getOperationContext()->getServiceContext());
+
+    tassert(10743900, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
+
+    BSONObjBuilder controlEventsBuilder;
+    for (const auto& eventType : readerBuilder->getControlEventTypesOnDataShard(
+             expCtx->getOperationContext(), ChangeStream::buildFromExpressionContext(expCtx))) {
+        if (eventType == MoveChunkControlEvent::opType && spec.getShowSystemEvents()) {
+            controlEventsBuilder.append(eventType, kActionNameInjectControlEvent);
+        } else {
+            controlEventsBuilder.append(
+                eventType,
+                DocumentSourceChangeStreamInjectControlEvents::kActionNameTransformToControlEvent);
+        }
+    }
+    return parseFromBSON(controlEventsBuilder.obj());
+}
+
 DocumentSourceChangeStreamInjectControlEvents::DocumentSourceChangeStreamInjectControlEvents(
     const intrusive_ptr<ExpressionContext>& expCtx,
     DocumentSourceChangeStreamInjectControlEvents::ActionsMap actions)
@@ -123,6 +149,14 @@ DocumentSourceChangeStreamInjectControlEvents::create(
     return new DocumentSourceChangeStreamInjectControlEvents(expCtx,
                                                              ActionsHelper::parseFromBSON(actions));
 }
+
+intrusive_ptr<DocumentSourceChangeStreamInjectControlEvents>
+DocumentSourceChangeStreamInjectControlEvents::createForDataShard(
+    const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
+    return new DocumentSourceChangeStreamInjectControlEvents(
+        expCtx, ActionsHelper::buildMapForDataShard(expCtx, spec));
+}
+
 
 intrusive_ptr<DocumentSourceChangeStreamInjectControlEvents>
 DocumentSourceChangeStreamInjectControlEvents::createFromBson(

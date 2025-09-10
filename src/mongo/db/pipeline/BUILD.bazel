@@ -144,6 +144,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:top.h",
     ],
     hdrs = [
+        "change_stream.h",
         "change_stream_constants.h",
         "change_stream_helpers.h",
         "change_stream_read_mode.h",
@@ -192,6 +193,7 @@ mongo_cc_library(
     ],
     deps = [
         "document_sources_idl",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:oplog_entry",
     ],
 )
@@ -1288,6 +1290,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/update:update_driver",
+        "//src/mongo/s/change_streams:change_streams_control_events",
         "//src/mongo/s/query/exec:router_exec_stage",
     ],
 )

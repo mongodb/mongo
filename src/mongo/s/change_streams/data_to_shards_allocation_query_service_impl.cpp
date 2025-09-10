@@ -30,6 +30,9 @@
 #include "mongo/s/change_streams/data_to_shards_allocation_query_service_impl.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
+#include "mongo/s/change_streams/data_to_shards_allocation_query_service_impl.h"
+#include "mongo/s/change_streams/historical_placement_fetcher_impl.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -46,5 +49,22 @@ AllocationToShardsStatus DataToShardsAllocationQueryServiceImpl::getAllocationTo
     }
 
     MONGO_UNREACHABLE_TASSERT(10718905);
-}  // namespace mongo
+}
+
+namespace {
+
+ServiceContext::ConstructorActionRegisterer dataToShardsAllocationQueryServiceRegisterer(
+    "DataToShardsAllocationQueryServiceRegisterer",
+    {},
+    [](ServiceContext* serviceContext) {
+        invariant(serviceContext);
+
+        auto fetcher = std::make_unique<HistoricalPlacementFetcherImpl>();
+        DataToShardsAllocationQueryService::set(
+            serviceContext,
+            std::make_unique<DataToShardsAllocationQueryServiceImpl>(std::move(fetcher)));
+    },
+    {});
+}  // namespace
+
 }  // namespace mongo

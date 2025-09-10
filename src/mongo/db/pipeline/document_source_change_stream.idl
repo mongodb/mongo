@@ -228,6 +228,8 @@ structs:
                 type: ChangeStreamReaderVersion
                 description: Selects the change stream reader version.
                 optional: true
+                # This field is for internal purposes only and not supposed to be set by end users.
+                # The change stream reader version is not serialized as part of the query shape.
                 query_shape: parameter
 
             ignoreRemovedShards:
@@ -251,6 +253,8 @@ structs:
                     supported events as a field name inside their "o2" field value.
                     All of these oplog entries must have the "uuid" field set as well.
                 optional: true
+                # This field is for internal purposes only and not supposed to be set by end users.
+                # The field is not serialized as part of the query shape
                 query_shape: literal
 
     DocumentSourceChangeStreamOplogMatchSpec:

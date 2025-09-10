@@ -69,6 +69,9 @@ class DocumentSourceChangeStreamUnwindTransaction final
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
 
+    DocumentSourceChangeStreamUnwindTransaction(
+        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     static boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -93,6 +96,10 @@ public:
         return DocumentSourceChangeStreamUnwindTransaction::kStageName.data();
     }
 
+    MatchExpression* getMatchExpression() const {
+        return _expression.get();
+    }
+
     static const Id& id;
 
     Id getId() const override {
@@ -106,9 +113,6 @@ private:
 
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
-
-    DocumentSourceChangeStreamUnwindTransaction(
-        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Resets the transaction entry filter saved in the '_filter' and '_expression' fields.

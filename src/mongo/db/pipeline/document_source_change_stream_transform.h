@@ -99,6 +99,10 @@ public:
         return id;
     }
 
+    const ChangeStreamEventTransformation::SupportedEvents& getSupportedEvents_forTest() const {
+        return _transformer->getSupportedEvents_forTest();
+    }
+
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamTransformToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);

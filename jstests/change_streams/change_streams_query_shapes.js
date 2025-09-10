@@ -143,28 +143,29 @@ checkQueryShapeAndHash(
     "8BFCDD5DA40E82A947514CD30503795B72B3B61DD2F5455133F1D7120F9394B2",
 );
 
-// The following tests rely on fields that were added to the $changeStreams stage in v8.2, so we
-// only execute them if the FCV version is high enough.
+// The following tests rely on fields that were added to the $changeStreams stage in v8.2, and for
+// which query shape hash computation was changed in v8.3, so we only execute them if the FCV
+// version is high enough.
 const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.2") >= 0) {
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.3") >= 0) {
     // Check shape and hash when setting the change stream reader version.
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {version: "v1"}}], $db: db.getName()},
-        "EC5DB9EA352364BD4061C6CBC605C887347ED0B30B9CE8D5B3BFFB6BE5F81AF5",
+        "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
     );
 
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {version: "v2"}}], $db: db.getName()},
-        "CA169C644BFED846C3782FF04DB2AA18CA0EBC141AF71654D77B245AD9C5B1F0",
+        "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
     );
 
     // Check shape and hash when setting the 'supportedEvents' field.
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {supportedEvents: ["foo"]}}], $db: db.getName()},
-        "B953C7FD7733C29EEEFB27EC963A2C9D123AB94311959A9B2749DD745BCBC838",
+        "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
     );
 
     // Check shape and hash for a change stream pipeline using the 'ignoreRemovedShards' flag.

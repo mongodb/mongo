@@ -38,7 +38,12 @@ namespace mongo {
 
 HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     OperationContext* opCtx, const boost::optional<NamespaceString>& nss, Timestamp atClusterTime) {
-    ConfigsvrGetHistoricalPlacement request(nss.value_or(NamespaceString::kEmpty), atClusterTime);
+    // The config server request must always have a namespace string, even if it is the empty
+    // string.
+    const auto targetWholeCluster = !nss.has_value() || nss->isEmpty();
+    ConfigsvrGetHistoricalPlacement request(
+        targetWholeCluster ? nss.value() : NamespaceString::kEmpty, atClusterTime);
+    request.setTargetWholeCluster(targetWholeCluster);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto remoteResponse = uassertStatusOK(

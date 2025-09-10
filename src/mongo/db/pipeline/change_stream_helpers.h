@@ -37,9 +37,13 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace mongo::change_stream {
 
-namespace change_stream {
+/**
+ * Tests if we are currently running on a router or in a non-sharded replica set context.
+ */
+bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 /**
  * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,
  * returns the equivalent high-watermark token. This method should only ever be called on a spec
@@ -75,6 +79,4 @@ static const std::set<StringData> kClassicOperationTypes =
                          DocumentSourceChangeStream::kReshardBlockingWritesOpType,
                          DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
                          DocumentSourceChangeStream::kNewShardDetectedOpType};
-
-}  // namespace change_stream
-}  // namespace mongo
+}  // namespace mongo::change_stream

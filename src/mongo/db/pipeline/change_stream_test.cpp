@@ -94,6 +94,20 @@ TEST(ChangeStreamTest, DatabaseLevelChangeStream) {
     ASSERT_TRUE(actualNss->isDbOnly());
 }
 
+TEST(ChangeStreamTest, DatabaseLevelChangeStreamOnCollectionLessAggregateNS) {
+    boost::optional<NamespaceString> nss =
+        NamespaceString::createNamespaceString_forTest("testDB.$cmd.aggregate");
+
+    ChangeStream changeStream(ChangeStreamReadMode::kStrict, ChangeStreamType::kDatabase, nss);
+
+    ASSERT_EQ(ChangeStreamType::kDatabase, changeStream.getChangeStreamType());
+
+    auto actualNss = changeStream.getNamespace();
+    ASSERT_TRUE(actualNss.has_value());
+    ASSERT_EQ(NamespaceString::createNamespaceString_forTest("testDB"), *actualNss);
+    ASSERT_TRUE(actualNss->isDbOnly());
+}
+
 DEATH_TEST_REGEX(ChangeStreamTest,
                  DatabaseLevelChangeStreamWithoutNamespace,
                  "Tripwire assertion.*10656201") {
@@ -125,6 +139,27 @@ TEST(ChangeStreamTest, AllDatabasesChangeStream) {
     ASSERT_FALSE(changeStream.getNamespace().has_value());
 }
 
+TEST(ChangeStreamTest, AllDatabasesChangeStreamOnAdminDB) {
+    boost::optional<NamespaceString> nss = NamespaceString::createNamespaceString_forTest("admin");
+
+    ChangeStream changeStream(ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, nss);
+
+    ASSERT_EQ(ChangeStreamType::kAllDatabases, changeStream.getChangeStreamType());
+
+    ASSERT_FALSE(changeStream.getNamespace().has_value());
+}
+
+DEATH_TEST_REGEX(ChangeStreamTest,
+                 AllDatabasesChangeStreamWithNamespace,
+                 "Tripwire assertion.*10656200") {
+    // Not allowed to create an all databases change stream with an NSS.
+    ASSERT_THROWS_CODE(ChangeStream(ChangeStreamReadMode::kStrict,
+                                    ChangeStreamType::kAllDatabases,
+                                    NamespaceString::createNamespaceString_forTest("testDB")),
+                       AssertionException,
+                       10656200);
+}
+
 TEST(ChangeStreamTest, ChangeStreamGetTypeCollection) {
     auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
     ASSERT_EQ(ChangeStreamType::kCollection, ChangeStream::getChangeStreamType(nss));
@@ -141,17 +176,6 @@ TEST(ChangeStreamTest, ChangeStreamGetTypeAllDatabases) {
     auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
     ASSERT_TRUE(nss.isAdminDB());
     ASSERT_EQ(ChangeStreamType::kAllDatabases, ChangeStream::getChangeStreamType(nss));
-}
-
-DEATH_TEST_REGEX(ChangeStreamTest,
-                 AllDatabasesChangeStreamWithNamespace,
-                 "Tripwire assertion.*10656200") {
-    // Not allowed to create an all databases change stream with an NSS.
-    ASSERT_THROWS_CODE(ChangeStream(ChangeStreamReadMode::kStrict,
-                                    ChangeStreamType::kAllDatabases,
-                                    NamespaceString::createNamespaceString_forTest("testDB")),
-                       AssertionException,
-                       10656200);
 }
 
 }  // namespace mongo

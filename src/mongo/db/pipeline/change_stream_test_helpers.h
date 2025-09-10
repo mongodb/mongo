@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -45,8 +44,6 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
-#include <string>
-#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

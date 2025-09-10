@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <deque>
@@ -55,6 +56,10 @@ public:
         return _responses.empty();
     }
 
+    void allowAnyClusterTime() {
+        _allowAnyClusterTime = true;
+    }
+
     /**
      * Check that the provided cluster time is equal to next buffered response's cluster time, and
      * then hand out the buffered status for it.
@@ -64,14 +69,19 @@ public:
         uassert(10612400, "queue should not be empty", !empty());
         auto response = _responses.front();
         uassert(10612401,
-                "cluster time should be equal to expected cluster time",
-                clusterTime == response.first);
+                str::stream() << "cluster time should be equal to expected cluster time. expected: "
+                              << response.first.toStringPretty()
+                              << ", actual: " << clusterTime.toStringPretty(),
+                _allowAnyClusterTime || clusterTime == response.first);
         _responses.pop_front();
         return response.second;
     }
 
 private:
     std::deque<Response> _responses;
+
+    // If set to true, allows any cluster time for the 'getAllocationToShardsStatus' calls.
+    bool _allowAnyClusterTime = false;
 };
 
 }  // namespace mongo

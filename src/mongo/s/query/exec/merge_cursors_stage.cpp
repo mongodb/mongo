@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "src/mongo/s/query/exec/merge_cursors_stage.h"
+#include "mongo/s/query/exec/merge_cursors_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-
-#include "src/mongo/s/query/exec/document_source_merge_cursors.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/query/exec/document_source_merge_cursors.h"
 
 namespace mongo::exec::agg {
 
@@ -88,7 +88,13 @@ GetNextResult MergeCursorsStage::doGetNext() {
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
     }
-    return Document::fromBsonWithMetaData(*next.getResult());
+    Document doc = Document::fromBsonWithMetaData(*next.getResult());
+    if (MONGO_unlikely(doc.metadata().isChangeStreamControlEvent())) {
+        // Special handling needed for control events here to avoid an assertion failure in the
+        // 'GetNextResult' constructor.
+        return GetNextResult::makeAdvancedControlDocument(std::move(doc));
+    }
+    return GetNextResult(std::move(doc));
 }
 
 void MergeCursorsStage::doDispose() {

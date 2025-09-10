@@ -34,19 +34,20 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 namespace mongo {
+
+namespace {
+// The following fields will be removed for query shape serialization.
+const StringDataSet kFieldsToRemoveForQueryShapeSerialization = {"version", "supportedEvents"};
+}  // namespace
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamTransform,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
@@ -69,32 +70,13 @@ DocumentSourceChangeStreamTransform::createFromBson(
     auto spec =
         DocumentSourceChangeStreamSpec::parse(rawSpec.Obj(), IDLParserContext("$changeStream"));
 
-    // Set the change stream spec on the expression context.
-    expCtx->setChangeStreamSpec(spec);
-
-    auto canUseSupportedEvents = [&]() {
-        if (expCtx->getInRouter()) {
-            // 'supportedEvents' are not supposed to be used on a router.
-            return false;
-        }
-
-        const auto* shardingState = ShardingState::get(expCtx->getOperationContext());
-        if (!shardingState) {
-            // Sharding state is not initialized. This is the case in unit tests and also on
-            // standalone mongods. But on standalone mongods we do not support change streams, so we
-            // will never get here.
-            return true;
-        }
-
-        // Also 'supportedEvents' cannot be used in a non-shard replica set.
-        auto role = shardingState->pollClusterRole();
-        const bool isReplSet = !role.has_value();
-        return !isReplSet;
-    };
     uassert(10498501,
             "Expecting 'supportedEvents' to be set only on a shard mongod, not on router or "
             "replica set member",
-            canUseSupportedEvents());
+            !spec.getSupportedEvents() || !change_stream::isRouterOrNonShardedReplicaSet(expCtx));
+
+    // Set the change stream spec on the expression context.
+    expCtx->setChangeStreamSpec(spec);
 
     return new DocumentSourceChangeStreamTransform(expCtx, std::move(spec));
 }
@@ -134,10 +116,22 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
 }
 
 Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions& opts) const {
+    BSONObj serializedOptions = [&]() -> BSONObj {
+        BSONObj serialized = _changeStreamSpec.toBSON(opts);
+
+        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+            // Explicitly remove specific fields from the '$changeStream' stage serialization for
+            // query shapes that should not have any influence on the query shape hash computation.
+            serialized = serialized.removeFields(kFieldsToRemoveForQueryShapeSerialization);
+        }
+
+        return serialized;
+    }();
+
     if (opts.isSerializingForExplain()) {
-        return Value(Document{{DocumentSourceChangeStream::kStageName,
-                               Document{{"stage"_sd, "internalTransform"_sd},
-                                        {"options"_sd, _changeStreamSpec.toBSON(opts)}}}});
+        return Value(Document{
+            {DocumentSourceChangeStream::kStageName,
+             Document{{"stage"_sd, "internalTransform"_sd}, {"options"_sd, serializedOptions}}}});
     }
 
     // Internal change stream stages are not serialized for query stats. Query stats uses this stage
@@ -146,7 +140,7 @@ Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions&
     auto stageName = (opts.isSerializingForQueryStats())
         ? DocumentSourceChangeStream::kStageName
         : DocumentSourceChangeStreamTransform::kStageName;
-    return Value(Document{{stageName, _changeStreamSpec.toBSON(opts)}});
+    return Value(Document{{stageName, serializedOptions}});
 }
 
 DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {

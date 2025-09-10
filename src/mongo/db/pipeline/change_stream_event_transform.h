@@ -49,6 +49,8 @@ namespace mongo {
  */
 class ChangeStreamEventTransformation {
 public:
+    using SupportedEvents = StringDataSet;
+
     ChangeStreamEventTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const DocumentSourceChangeStreamSpec& spec);
 
@@ -89,13 +91,15 @@ protected:
  */
 class ChangeStreamDefaultEventTransformation final : public ChangeStreamEventTransformation {
 public:
-    using SupportedEvents = StringDataSet;
-
     ChangeStreamDefaultEventTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec);
 
     Document applyTransformation(const Document& fromDoc) const override;
     std::set<std::string> getFieldNameDependencies() const override;
+
+    const ChangeStreamEventTransformation::SupportedEvents& getSupportedEvents_forTest() const {
+        return _supportedEvents;
+    }
 
 private:
     /**
@@ -110,14 +114,14 @@ private:
      * Build the '_supportedEvents' container from the 'supportedEvents' change stream parameter.
      * Can throw exceptions if 'supportedEvents' contains invalid values.
      */
-    SupportedEvents buildSupportedEvents() const;
+    ChangeStreamEventTransformation::SupportedEvents buildSupportedEvents() const;
 
     /**
      * Additional supported events that this transformer can handle. These events can be created off
      * of "noop" oplog entries which have any of the supported events as a field name inside their
      * 'o2' field value.
      */
-    SupportedEvents _supportedEvents;
+    ChangeStreamEventTransformation::SupportedEvents _supportedEvents;
 };
 
 /**
@@ -153,6 +157,10 @@ public:
         auto accessedFields = _defaultEventBuilder->getFieldNameDependencies();
         accessedFields.merge(_viewNsEventBuilder->getFieldNameDependencies());
         return accessedFields;
+    }
+
+    const ChangeStreamEventTransformation::SupportedEvents& getSupportedEvents_forTest() const {
+        return _defaultEventBuilder->getSupportedEvents_forTest();
     }
 
 private:

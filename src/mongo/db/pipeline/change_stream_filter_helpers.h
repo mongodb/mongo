@@ -133,6 +133,11 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     std::vector<BSONObj>& backingBsonObjs);
 
 /**
+ * Produce a filter matching control events on a data shard for v2 change stream readers.
+ */
+BSONObj buildControlEventsFilterForDataShard(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
  * Produce a filter matching any operations for internal change stream use. These events must not be
  * filtered out by the change stream's oplog scan, even if they are not ultimately returned to the
  * user.

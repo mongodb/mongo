@@ -46,6 +46,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -59,6 +60,7 @@
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -237,9 +239,9 @@ ChangeStreamDefaultEventTransformation::ChangeStreamDefaultEventTransformation(
     _supportedEvents = buildSupportedEvents();
 }
 
-ChangeStreamDefaultEventTransformation::SupportedEvents
+ChangeStreamEventTransformation::SupportedEvents
 ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
-    SupportedEvents result;
+    ChangeStreamEventTransformation::SupportedEvents result;
 
     // Check if field 'supportedEvents' is present, and handle it if so.
     if (auto supportedEvents = _changeStreamSpec.getSupportedEvents()) {
@@ -251,9 +253,13 @@ ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
         }
     }
 
-
     // Add built-in sharding events to list of noop events we need to handle.
     result.insert(kBuiltInNoopEvents.begin(), kBuiltInNoopEvents.end());
+
+    LOGV2_DEBUG(10743903,
+                3,
+                "default change stream transformation supports the following dynamic events",
+                "supportedEvents"_attr = result);
 
     return result;
 }
@@ -291,19 +297,26 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
     NamespaceString nss = createNamespaceStringFromOplogEntry(tenantId, ns.getStringData());
     Value id = input.getNestedField("o._id");
+
     // Non-replace updates have the _id in field "o2".
     StringData operationType;
     Value fullDocument;
     Value updateDescription;
     Value documentKey;
+
     // Used to populate the 'operationDescription' output field and also to build the resumeToken
     // for some events. Note that any change to the 'operationDescription' for existing events can
     // break changestream resumability between different mongod versions and should thus be avoided!
     Value operationDescription;
     Value stateBeforeChange;
+
     // Optional value containing the namespace type for changestream create events. This will be
     // emitted as 'nsType' field.
     Value nsType;
+
+    // By default, all events returned from here should populate their UUID field. This requirement
+    // can be overriden for specific event types below.
+    bool requireUUID = true;
 
     MutableDocument doc;
 
@@ -477,7 +490,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
             // Check for dynamic events that were specified via the 'supportedEvents' change stream
             // parameter.
-            // This also checks for some hard-code sharding-related events.
+            // This also checks for some hard-coded sharding-related events.
             if (auto result = handleSupportedEvent(o2Field)) {
                 // Apply returned event name and operationDescription.
                 operationType = result->first;
@@ -494,6 +507,9 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 if (operationType == DocumentSourceChangeStream::kEndOfTransactionOpType) {
                     addTransactionIdFieldsIfPresent(o2Field, doc);
                 }
+
+                // Configured events do not require the UUID field to be present.
+                requireUUID = false;
                 break;
             }
 
@@ -505,13 +521,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         }
     }
 
-    // UUID should always be present except for a known set of types.
-    // All of the extra event types specified in the 'supportedEvents' change stream parameter
-    // require the UUID field to be set in their oplog entry. Otherwise the following tassert will
-    // trigger.
+    // UUID should always be present except for a known set of operation types.
     tassert(7826901,
-            "Saw a CRUD op without a UUID",
-            !uuid.missing() || kOpsWithoutUUID.contains(operationType));
+            str::stream() << "Saw a '" << operationType << "' op without a UUID",
+            !requireUUID || !uuid.missing() || kOpsWithoutUUID.contains(operationType));
 
     // Extract the 'txnOpIndex' field. This will be missing unless we are unwinding a transaction.
     auto txnOpIndex = input[DocumentSourceChangeStream::kTxnOpIndexField];

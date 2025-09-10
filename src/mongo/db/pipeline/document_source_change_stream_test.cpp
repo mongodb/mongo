@@ -44,8 +44,12 @@
 #include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/db/pipeline/change_stream_reader_builder_mock.h"
 #include "mongo/db/pipeline/change_stream_stage_test_fixture.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
@@ -72,8 +76,10 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #include <array>
@@ -106,6 +112,65 @@ using DSChangeStream = DocumentSourceChangeStream;
 
 // Deterministic values used for testing
 const UUID testConstUuid = UUID::parse("6948DF80-14BD-4E04-8842-7668D9C001F5").getValue();
+
+// RAII scopeguard for creating a 'ChangeStreamReaderBuilder' mock instance.
+struct ScopedChangeStreamReaderBuilderMock {
+    ScopedChangeStreamReaderBuilderMock(const ScopedChangeStreamReaderBuilderMock&) = delete;
+    ScopedChangeStreamReaderBuilderMock& operator=(const ScopedChangeStreamReaderBuilderMock&) =
+        delete;
+
+    explicit ScopedChangeStreamReaderBuilderMock(
+        std::unique_ptr<ChangeStreamReaderBuilder> readerBuilder) {
+        ChangeStreamReaderBuilder::set(getGlobalServiceContext(), std::move(readerBuilder));
+    }
+
+    ~ScopedChangeStreamReaderBuilderMock() {
+        ChangeStreamReaderBuilder::set(getGlobalServiceContext(), nullptr);
+    }
+};
+
+// RAII scopeguard for creating a 'DataToShardsAllocationQueryService' mock instance.
+struct ScopedDataToShardsAllocationQueryServiceMock {
+    ScopedDataToShardsAllocationQueryServiceMock(
+        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
+    ScopedDataToShardsAllocationQueryServiceMock& operator=(
+        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
+
+    ScopedDataToShardsAllocationQueryServiceMock(std::nullptr_t) {
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
+    }
+
+    ScopedDataToShardsAllocationQueryServiceMock() {
+        std::vector<DataToShardsAllocationQueryServiceMock::Response> responses;
+
+        // The actual cluster time used here does not matter, as we are using
+        // 'allowAnyClusterTime()' later.
+        responses.emplace_back(Timestamp(42, 0), AllocationToShardsStatus::kOk);
+
+        auto queryService = std::make_unique<DataToShardsAllocationQueryServiceMock>();
+        queryService->allowAnyClusterTime();
+        queryService->bufferResponses(std::move(responses));
+
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(),
+                                                    std::move(queryService));
+    }
+
+    ~ScopedDataToShardsAllocationQueryServiceMock() {
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
+    }
+};
+
+// Extract a stage from the pipeline by type. Returns nullptr if the pipeline does not contain a
+// stage of that type.
+template <typename Stage>
+const Stage* getStageFromPipeline(const Pipeline* pipeline) {
+    for (const auto& stage : pipeline->getSources()) {
+        if (stage->getId() == Stage::id) {
+            return dynamic_cast<const Stage*>(stage.get());
+        }
+    }
+    return nullptr;
+}
 
 void assertCommitTimestamp(bool showCommitTimestamp, const Document& doc) {
     if (showCommitTimestamp) {
@@ -434,6 +499,15 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesWholeCluster) {
 }
 
 TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
     // Versions "v1", "v2" are supported.
     std::array<boost::optional<StringData>, 3> versions = {boost::none, "v1"_sd, "v2"_sd};
 
@@ -459,20 +533,25 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
                 ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
                 if (version.has_value()) {
-                    ASSERT_EQ(version,
+                    ASSERT_EQ(*version,
                               serialization[0]
                                   .getDocument()
                                   .getField(DocumentSourceChangeStreamTransform::kStageName)
                                   .getDocument()
                                   .getField("version"_sd)
                                   .getStringData());
+                    ASSERT_EQ(ChangeStreamReaderVersion_parse(*version),
+                              getExpCtx()->getChangeStreamSpec()->getVersion());
                 } else {
-                    ASSERT_TRUE(serialization[0]
-                                    .getDocument()
-                                    .getField(DocumentSourceChangeStreamTransform::kStageName)
-                                    .getDocument()
-                                    .getField("version"_sd)
-                                    .missing());
+                    ASSERT_EQ("v1",
+                              serialization[0]
+                                  .getDocument()
+                                  .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                  .getDocument()
+                                  .getField("version"_sd)
+                                  .getStringData());
+                    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1,
+                              getExpCtx()->getChangeStreamSpec()->getVersion());
                 }
                 found = true;
             }
@@ -487,6 +566,8 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithoutAnyVersion) {
 
     auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_FALSE(pipeline.empty());
+
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
 }
 
 TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
@@ -498,6 +579,642 @@ TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
                            AssertionException,
                            ErrorCodes::BadValue);
     }
+}
+
+// Tests that change stream reader version v1 is selected when the change stream is not opened on a
+// router, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenNotOnRouter) {
+    getExpCtx()->setInRouter(false);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Tests that change stream reader version v1 is selected when the feature flag for SPM-1941 is not
+// enabled, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenFeatureFlagIsDisabled) {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", false);
+
+    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Tests that change stream reader version v1 is selected when an all-database change stream is
+// opened, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForAllDatabasesChangeStream) {
+    getExpCtx()->setInRouter(true);
+
+    // Opening a change stream on the "admin" namespace triggers opening an all-databases change
+    // stream.
+    getExpCtx()->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate"));
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    const BSONObj spec =
+        BSON("$changeStream" << BSON("version" << "v2" << "allChangesForCluster" << true));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Tests that change stream reader version v1 is selected when a database-level change stream is
+// opened, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForDatabaseLevelChangeStream) {
+    getExpCtx()->setInRouter(true);
+
+    getExpCtx()->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("testDB.$cmd.aggregate"));
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Test that creating a v2 change stream reader pipeline will fail if no valid
+// 'ChangeStreamReaderBuilder' instance is set in the global ServiceContext.
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   CreatingChangeStreamFailsWithV2VersionWithoutReaderBuilderInstance,
+                   "Tripwire assertion.*10743904") {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    // Intentionally set the global 'ChangeStreamReaderBuilder' instance to a nullptr.
+    ScopedChangeStreamReaderBuilderMock readerBuilder(nullptr);
+
+    auto spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10743904);
+}
+
+// Test that creating a v2 change stream reader pipeline will fail if no valid
+// 'DataToShardsAllocationQueryService' instance is set in the global ServiceContext.
+DEATH_TEST_REGEX_F(
+    ChangeStreamStageTest,
+    CreatingChangeStreamFailsWithV2VersionWithoutDataToShardsAllocationQueryServiceInstance,
+    "Tripwire assertion.*10743906") {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    // Intentionally set the global 'DataToShardsAllocationQueryService' instance to a nullptr.
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(nullptr);
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    auto spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10743906);
+}
+
+// Test that 'supportedEvents' are registered in the change stream transform stage for v2 change
+// stream readers.
+TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const ChangeStreamEventTransformation::SupportedEvents expectedEvents = {
+        "moveChunk"_sd, "namespacePlacementChanged"_sd, "movePrimary"_sd};
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{expectedEvents.begin(), expectedEvents.end()};
+            }));
+
+    const StringDataSet noopEvents = {DocumentSourceChangeStream::kShardCollectionOpType,
+                                      DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType,
+                                      DocumentSourceChangeStream::kRefineCollectionShardKeyOpType,
+                                      DocumentSourceChangeStream::kReshardCollectionOpType,
+                                      DocumentSourceChangeStream::kNewShardDetectedOpType,
+                                      DocumentSourceChangeStream::kReshardBeginOpType,
+                                      DocumentSourceChangeStream::kReshardBlockingWritesOpType,
+                                      DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
+                                      DocumentSourceChangeStream::kEndOfTransactionOpType};
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    auto transformStage = getStageFromPipeline<DocumentSourceChangeStreamTransform>(pipeline.get());
+    ASSERT_NE(nullptr, transformStage);
+
+    const auto& actualEvents = transformStage->getSupportedEvents_forTest();
+    ASSERT_GTE(actualEvents.size(), expectedEvents.size());
+
+    for (auto& eventName : actualEvents) {
+        ASSERT_TRUE(noopEvents.contains(eventName) || expectedEvents.contains(eventName))
+            << "unknown event " << eventName;
+    }
+}
+
+// Test that the match expression for the supportedEvents is registered in the change stream oplog
+// match stage for v2 change stream readers.
+TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterForSupportedEvents) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const ChangeStreamEventTransformation::SupportedEvents expectedEvents = {
+        "moveChunk"_sd, "namespacePlacementChanged"_sd, "movePrimary"_sd};
+
+    // Build oplog match expression for supported events.
+    BSONObj filter = [&]() {
+        BSONArrayBuilder bab;
+        for (auto& eventName : expectedEvents) {
+            bab.append(BSON("o2." + eventName << BSON("$exists" << true)));
+        }
+        bab.done();
+        return BSON(
+            "$and" << BSON_ARRAY(BSON("op" << BSON("$eq" << "n")) << BSON("$or" << bab.arr())));
+    }();
+    const auto filterMatchExpression =
+        MatchExpressionParser::parseAndNormalize(filter, getExpCtx());
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) { return filter; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{expectedEvents.begin(), expectedEvents.end()};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    auto oplogMatchStage =
+        getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
+    ASSERT_NE(nullptr, oplogMatchStage);
+
+    // Check that the overall oplog match expression contains the expected match expression as a
+    // subpart. We use the stringified versions of the match expressions for testing here, which is
+    // not great but should be good enough for testing purposes.
+    ASSERT_TRUE(str::contains(oplogMatchStage->getMatchExpression()->serialize().toString(),
+                              filterMatchExpression->serialize().toString()));
+}
+
+// Test that the control events filter for data shards is correctly registered in the change stream
+// unwind transaction stage for v2 change stream readers.
+TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForDataShard) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    // Build control events filter.
+    BSONObj filter = BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
+
+    const auto filterMatchExpression =
+        MatchExpressionParser::parseAndNormalize(filter, getExpCtx());
+    ASSERT_EQ(MatchExpression::MatchType::OR, filterMatchExpression->matchType());
+
+    // Set up a set of match expressions we want to find later.
+    stdx::unordered_set<std::string> branchesToFind;
+    for (auto& child :
+         static_cast<const OrMatchExpression*>(filterMatchExpression.get())->getChildren()) {
+        branchesToFind.insert(child->serialize().toString());
+    }
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) { return filter; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    auto unwindTransactionStage =
+        getStageFromPipeline<DocumentSourceChangeStreamUnwindTransaction>(pipeline.get());
+    ASSERT_NE(nullptr, unwindTransactionStage);
+
+    // The overall match expression must be a logical OR.
+    auto matchExpression = unwindTransactionStage->getMatchExpression();
+    ASSERT_EQ(MatchExpression::MatchType::OR, matchExpression->matchType());
+
+    // Assert that one of the logical OR's branches is equal to the control events filter above.
+    auto orMatchExpression = static_cast<const OrMatchExpression*>(matchExpression);
+    for (auto& child : orMatchExpression->getChildren()) {
+        branchesToFind.erase(child->serialize().toString());
+    }
+
+    // All sub-branches of the control events filter's logical OR should have been found.
+    ASSERT_EQ(stdx::unordered_set<std::string>{}, branchesToFind);
+}
+
+// Test that the calling 'buildControlEventsFilterForDataShard' fails for change stream reader
+// versions unequal to v2.
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   BuildControlEventsFilterForDataShardFailsWhenCallingForNonV2ChangeStreamReaders,
+                   "Tripwire assertion.*10743901") {
+    // Set version v1 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    ASSERT_THROWS_CODE(change_stream_filter::buildControlEventsFilterForDataShard(getExpCtx()),
+                       AssertionException,
+                       10743901);
+}
+
+// Test that the control events filter for a data shard in v2 change stream readers is as expected.
+TEST_F(ChangeStreamStageTest,
+       BuildControlEventsFilterForDataShardReturnsCorrectFilterForV2ChangeStream) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    BSONObj expectedFilter =
+        BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return expectedFilter;
+            }));
+
+    // Set version v2 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    BSONObj actualFilter = change_stream_filter::buildControlEventsFilterForDataShard(getExpCtx());
+    ASSERT_BSONOBJ_EQ(expectedFilter, actualFilter);
+}
+
+// Test that the transaction filter for v1 change streams is as expected.
+TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
+    // Set version v1 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    std::vector<BSONObj> backingBsonObjs;
+    auto actualFilter =
+        change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+
+    std::string expected = R"(
+{
+    "$or": [
+        {
+            "$and": [
+                {
+                    "$or": [
+                        {
+                            "o.applyOps": {
+                                "$elemMatch": {
+                                    "$and": [
+                                        {
+                                            "$or": [
+                                                {
+                                                    "o.create": {
+                                                        "$regex": "^change_stream$"
+                                                    }
+                                                },
+                                                {
+                                                    "o.createIndexes": {
+                                                        "$regex": "^change_stream$"
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "ns": {
+                                                "$regex": "^unittests\\.\\$cmd$"
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "o.applyOps.ns": {
+                                "$regex": "^unittests\\.change_stream$"
+                            }
+                        },
+                        {
+                            "prevOpTime": {
+                                "$not": {
+                                    "$eq": {
+                                        "ts": {"$timestamp":{"t":0,"i":0}},
+                                        "t": -1
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                },
+                {
+                    "o.partialTxn": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.prepare": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.applyOps": {
+                        "$type": [
+                            4
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "o.commitTransaction": {
+                        "$eq": 1
+                    }
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "op": {
+                        "$eq": "n"
+                    }
+                },
+                {
+                    "o2.endOfTransaction": {
+                        "$regex": "^unittests\\.change_stream$"
+                    }
+                }
+            ]
+        }
+    ]
+}
+    )";
+
+    ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+}
+
+// Test that the transaction filter for v2 change streams is as expected, including the filter for
+// the control events.
+TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
+    getExpCtx()->setInRouter(true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    BSONObj expectedFilter =
+        BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return expectedFilter;
+            }));
+
+    // Set version v2 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    std::vector<BSONObj> backingBsonObjs;
+    auto actualFilter =
+        change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+
+    std::string expected = R"(
+{
+    "$or": [
+        {
+            "$or": [
+                {
+                    "$and": [
+                        {
+                            "$or": [
+                                {
+                                    "o.applyOps": {
+                                        "$elemMatch": {
+                                            "$and": [
+                                                {
+                                                    "$or": [
+                                                        {
+                                                            "o.create": {
+                                                                "$regex": "^change_stream$"
+                                                            }
+                                                        },
+                                                        {
+                                                            "o.createIndexes": {
+                                                                "$regex": "^change_stream$"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "ns": {
+                                                        "$regex": "^unittests\\.\\$cmd$"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "o.applyOps.ns": {
+                                        "$regex": "^unittests\\.change_stream$"
+                                    }
+                                },
+                                {
+                                    "prevOpTime": {
+                                        "$not": {
+                                            "$eq": {
+                                                "ts": {"$timestamp":{"t":0,"i":0}},
+                                                "t": -1
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "op": {
+                                "$eq": "c"
+                            }
+                        },
+                        {
+                            "o.partialTxn": {
+                                "$not": {
+                                    "$eq": true
+                                }
+                            }
+                        },
+                        {
+                            "o.prepare": {
+                                "$not": {
+                                    "$eq": true
+                                }
+                            }
+                        },
+                        {
+                            "o.applyOps": {
+                                "$type": [
+                                    4
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "$and": [
+                        {
+                            "o.commitTransaction": {
+                                "$eq": 1
+                            }
+                        },
+                        {
+                            "op": {
+                                "$eq": "c"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "$and": [
+                        {
+                            "op": {
+                                "$eq": "n"
+                            }
+                        },
+                        {
+                            "o2.endOfTransaction": {
+                                "$regex": "^unittests\\.change_stream$"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "o.applyOps": {
+                        "$elemMatch": {
+                            "$or": [
+                                {
+                                    "$and": [
+                                        {
+                                            "a": {
+                                                "$eq": 1
+                                            }
+                                        },
+                                        {
+                                            "b": {
+                                                "$eq": 2
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "foo": {
+                                        "$eq": "bar"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                },
+                {
+                    "o.partialTxn": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.prepare": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.applyOps": {
+                        "$type": [
+                            4
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
+    )";
+
+    ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
 }
 
 // Test different values for 'ignoreRemovedShards' when creating a change stream.
@@ -2498,6 +3215,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
 
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSupportedEvents) {
     auto expCtx = getExpCtx();
+    expCtx->setForPerShardCursor(true);
 
     for (const auto& supportedEvents :
          {BSONArray(),
@@ -2534,6 +3252,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSuppo
 
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseInvalidSupportedEvents) {
     auto expCtx = getExpCtx();
+    expCtx->setForPerShardCursor(true);
 
     for (const auto& supportedEvents : {
              BSON_ARRAY("singleEvent" << "singleEvent"),
@@ -2575,6 +3294,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformCannotSetSuppor
 }
 
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingleSupportedEvent) {
+    getExpCtx()->setForPerShardCursor(true);
+
     BSONObj spec =
         BSON(DocumentSourceChangeStreamTransform::kStageName
              << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
@@ -2617,6 +3338,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
 }
 
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultipleSupportedEvents) {
+    getExpCtx()->setForPerShardCursor(true);
+
     BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
                         << BSON("resumeAfter"
                                 << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
@@ -2695,6 +3418,8 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
 
 TEST_F(ChangeStreamStageTest,
        DocumentSourceChangeStreamTransformTransformMultipleSupportedEventsExpandedEvents) {
+    getExpCtx()->setForPerShardCursor(true);
+
     BSONObj spec =
         BSON(DocumentSourceChangeStreamTransform::kStageName
              << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
@@ -2779,6 +3504,8 @@ TEST_F(ChangeStreamStageTest,
 DEATH_TEST_REGEX_F(ChangeStreamStageTest,
                    DocumentSourceChangeStreamTransformTransformUnknownSupportedEvent,
                    "Tripwire assertion.*5052201") {
+    getExpCtx()->setForPerShardCursor(true);
+
     BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
                         << BSON("resumeAfter"
                                 << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
@@ -2805,6 +3532,11 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamSpec spec;
+
+    // Need to set version number here, because if missing, the change stream reader version will be
+    // injected by the pipeline building later and then serialized. This would create a difference
+    // between the serializations.
+    spec.setVersion(ChangeStreamReaderVersionEnum::kV1);
     spec.setStartAtOperationTime(kDefaultTs);
     auto originalSpec = BSON("" << spec.toBSON());
 
@@ -2880,6 +3612,7 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
 
 TEST_F(ChangeStreamStageTest, DSCSTransformStageWithResumeTokenSerialize) {
     auto expCtx = getExpCtx();
+    expCtx->setForPerShardCursor(true);
 
     DocumentSourceChangeStreamSpec spec;
     spec.setResumeAfter(ResumeToken::parse(
@@ -3168,6 +3901,76 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
 
     next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isEOF());
+}
+
+// Test the control events for a v2 change stream reader.
+TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{
+                    "moveChunk", "namespacePlacementChanged", "movePrimary"};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    auto injectControlEvents =
+        getStageFromPipeline<DocumentSourceChangeStreamInjectControlEvents>(pipeline.get());
+    ASSERT_NE(nullptr, injectControlEvents);
+
+    const auto& actionsMap = injectControlEvents->getActionsMap_forTest();
+    ASSERT_EQ(actionsMap.at("moveChunk"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_FALSE(actionsMap.contains("foo"));
+}
+
+// Test the control events for a v2 change stream reader.
+TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShardShowSystemEvents) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{
+                    "moveChunk", "namespacePlacementChanged", "movePrimary"};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showSystemEvents" << true << "version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    auto injectControlEvents =
+        getStageFromPipeline<DocumentSourceChangeStreamInjectControlEvents>(pipeline.get());
+    ASSERT_NE(nullptr, injectControlEvents);
+
+    const auto& actionsMap = injectControlEvents->getActionsMap_forTest();
+    ASSERT_EQ(actionsMap.at("moveChunk"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kInjectControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_FALSE(actionsMap.contains("foo"));
 }
 
 TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
@@ -4155,6 +4958,57 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
 }
 
 //
+// Tests the stages in a basic change stream without any additional pipeline steps.
+//
+TEST_F(ChangeStreamStageTest, BasicChangeStreamStagesOrder) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        change_stream_test_helper::kShowExpandedEventsSpec,
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic v2 change stream without any additional pipeline steps.
+//
+TEST_F(ChangeStreamStageTest, BasicChangeStreamV2StagesOrder) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
 // Tests that the single '$match' gets promoted before the
 // '$_internalChangeStreamHandleTopologyChange'.
 //
@@ -4180,6 +5034,38 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
 }
 
 //
+// Tests that the single '$match' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleMatch) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$match: {operationType: 'insert'}}"),
+    };
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
 // Tests that multiple '$match' gets merged and promoted before the
 // '$_internalChangeStreamHandleTopologyChange'.
 //
@@ -4201,6 +5087,39 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
                            "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange"});
+}
+
+
+//
+// Tests that multiple '$match' gets merged and promoted before the
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$match: {operationType: 'insert'}}"),
+        fromjson("{$match: {operationType: 'delete'}}")};
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
 }
 
 //
@@ -4234,6 +5153,44 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
 }
 
 //
+// Tests that multiple '$match' gets merged and promoted before the
+// '$_internalChangeStreamCheckTopologyChange' in a v2 change stream when resume token is present.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON(
+                 "version"
+                 << "v2" << "resumeAfter"
+                 << makeResumeToken(
+                        kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                 << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$match" << BSON("operationType" << "insert")),
+        BSON("$match" << BSON("operationType" << "insert"))};
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChangeV2",
+                           "$_internalChangeStreamEnsureResumeTokenPresent"});
+}
+
+//
 // Tests that the single '$project' gets promoted before the
 // '$_internalChangeStreamHandleTopologyChange'.
 //
@@ -4254,6 +5211,37 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
                            "$_internalChangeStreamCheckTopologyChange",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that the single '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleProject) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$project: {operationType: 1}}")};
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$project",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
 }
 
 //
@@ -4279,6 +5267,39 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
                            "$project",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that multiple '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChangeV2'.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleProject) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$project: {operationType: 1}}"),
+        fromjson("{$project: {fullDocument: 1}}")};
+
+    auto pipeline = buildTestPipeline(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$project",
+                           "$project",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
 }
 
 //

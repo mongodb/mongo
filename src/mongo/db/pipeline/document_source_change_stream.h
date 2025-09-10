@@ -42,6 +42,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -389,9 +390,24 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
+    // Determines the change stream reader version (v1 or v2) from the user's change stream request
+    // ('spec') parameter. The v2 reader version will only be selected if the feature flag for
+    // precise change stream shard-targeting ('featureFlagChangeStreamPreciseShardTargeting') is
+    // enabled. In addition, the change stream must have been opened on a collection, and the user
+    // must have explicitly selected the v2 version in the request. For all other combinations, the
+    // v1 change stream reader version will be selected.
+    static ChangeStreamReaderVersionEnum _determineChangeStreamReaderVersion(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Timestamp atClusterTime,
+        const DocumentSourceChangeStreamSpec& spec,
+        const ChangeStream& changeStream);
+
     // Constructs and returns a series of stages representing the full change stream pipeline.
     static std::list<boost::intrusive_ptr<DocumentSource>> _buildPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec,
+        const ResumeTokenData& resumeToken,
+        bool useV2ChangeStreamReader);
 
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is

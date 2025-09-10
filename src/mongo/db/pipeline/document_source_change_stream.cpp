@@ -31,9 +31,10 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 #include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
@@ -50,7 +52,9 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 
 #include <string>
@@ -59,6 +63,8 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -298,18 +304,122 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
         spec.setStartAfter(boost::none);
     }
 
+    // Obtain the resume token from the spec. This will be used when building the pipeline.
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+
+    const auto& nss = expCtx->getNamespaceString();
+
+    ChangeStream changeStream(
+        fromIgnoreRemovedShardsParameter(static_cast<bool>(spec.getIgnoreRemovedShards())),
+        ChangeStream::getChangeStreamType(nss),
+        nss);
+
+    ChangeStreamReaderVersionEnum changeStreamVersion =
+        _determineChangeStreamReaderVersion(expCtx, resumeToken.clusterTime, spec, changeStream);
+
+    // Override global change stream reader version with the version just determined.
+    spec.setVersion(changeStreamVersion);
+
+    const bool useV2ChangeStreamReader = changeStreamVersion == ChangeStreamReaderVersionEnum::kV2;
+
+    if (useV2ChangeStreamReader) {
+        OperationContext* opCtx = expCtx->getOperationContext();
+        ChangeStreamReaderBuilder* readerBuilder =
+            ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
+        tassert(10743908, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
+
+        // Set supported control events for the 'DocumentSourceChangeStreamTransform' stage. That
+        // stage will pick up the supported events from the change stream definition in the
+        // ExpressionContext later.
+        auto controlEventTypes =
+            readerBuilder->getControlEventTypesOnDataShard(opCtx, changeStream);
+
+        std::vector<std::string> supportedEvents(controlEventTypes.begin(),
+                                                 controlEventTypes.end());
+        spec.setSupportedEvents(std::move(supportedEvents));
+    }
+
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->setChangeStreamSpec(spec);
 
-    return _buildPipeline(expCtx, spec);
+
+    return _buildPipeline(expCtx, spec, resumeToken, useV2ChangeStreamReader);
+}
+
+ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStreamReaderVersion(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Timestamp atClusterTime,
+    const DocumentSourceChangeStreamSpec& spec,
+    const ChangeStream& changeStream) try {
+
+    if (!expCtx->getInRouter()) {
+        // If we are not on a router, we always set reader version v1.
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
+
+    OperationContext* opCtx = expCtx->getOperationContext();
+
+    // Check feature flag 'featureFlagChangeStreamPreciseShardTargeting' that is required to enable
+    // v2 change stream readers.
+    if (!feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // Feature flag is disabled. Default to v1.
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
+
+    // Check If the user explicitly requested a specific change stream reader version.
+    const auto& version = spec.getVersion();
+
+    // If no change stream reader version was explicitly selected, or if it was set explicitly to
+    // v1, change stream reader version v1 will be used.
+    if (!version.has_value() || *version == ChangeStreamReaderVersionEnum::kV1) {
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
+
+    // The user has explicitly selected the v2 change stream reader version.
+
+    // v2 change stream readers are currently only supported for collection-level change streams.
+    if (changeStream.getChangeStreamType() != ChangeStreamType::kCollection) {
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
+
+    ChangeStreamReaderBuilder* readerBuilder =
+        ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
+
+    tassert(10743904, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
+
+    DataToShardsAllocationQueryService* dataToShardsAllocationQueryService =
+        DataToShardsAllocationQueryService::get(opCtx);
+
+    tassert(10743906,
+            "expecting DataToShardsAllocationQueryService to be available",
+            dataToShardsAllocationQueryService);
+
+    if (dataToShardsAllocationQueryService->getAllocationToShardsStatus(opCtx, atClusterTime) ==
+        AllocationToShardsStatus::kNotAvailable) {
+        // No shard placement information is available. Use v1 change stream reader.
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
+
+    // All requirements for using a v2 change stream reader are satisfied.
+    return ChangeStreamReaderVersionEnum::kV2;
+} catch (const DBException& ex) {
+    // Log any error that we have caught while determining the change stream reader version.
+    LOGV2_DEBUG(10743907,
+                3,
+                "caught exception while determining change stream reader version",
+                "error"_attr = ex.toStatus());
+    throw;
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_buildPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec& spec,
+    const ResumeTokenData& resumeToken,
+    bool useV2ChangeStreamReader) {
+    // Build the actual change stream pipeline.
     std::list<boost::intrusive_ptr<DocumentSource>> stages;
-
-    // Obtain the resume token from the spec. This will be used when building the pipeline.
-    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
 
     // Unfold the $changeStream into its constituent stages and add them to the pipeline.
     stages.push_back(DocumentSourceChangeStreamOplogMatch::create(expCtx, spec));
@@ -332,8 +442,18 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     // change event is detected, this stage forwards the event directly to the executor via an
     // exception (bypassing the rest of the pipeline). Router must see all topology change events,
     // so it's important that this stage occurs before any filtering is performed.
-    if (expCtx->getInRouter()) {
+    if (expCtx->getInRouter() && !useV2ChangeStreamReader) {
+        // Only add this stage for V1 change stream readers. V2 change stream readers handle all
+        // topology changes via the HandleTopologyChangeV2 stage.
         stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
+    }
+
+    if (expCtx->getInRouter() && useV2ChangeStreamReader) {
+        // For V2 change stream readers in sharded clusters, add the DSCSInjectControlEvents stage
+        // on the shards. The control events filter will always be for a data-shard when we are
+        // here, as the control events stage for a config server is built elsewhere.
+        stages.push_back(
+            DocumentSourceChangeStreamInjectControlEvents::createForDataShard(expCtx, spec));
     }
 
     // If 'fullDocumentBeforeChange' is not set to 'off', add the DSCSAddPreImage stage into the
@@ -350,11 +470,19 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamAddPostImage::create(expCtx, spec));
     }
 
-    // If the pipeline is built on router, then the DSCSHandleTopologyChange stage acts as the
-    // split point for the pipline. All stages before this stages will run on shards and all
-    // stages after and inclusive of this stage will run on the router.
+    // If the pipeline is built on router, inject a DSCSHandleTopologyChange stage for v1 change
+    // stream readers or a DSC"HandleTopologyChangeV2 stage for v2 change stream readers. The
+    // DSCSHandleTopologyChange(V2) stage acts as the split point for the pipeline. All stages
+    // before this stage will run on shards and all stages after and inclusive of this stage will
+    // run on the router.
     if (expCtx->getInRouter()) {
-        stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
+        if (useV2ChangeStreamReader) {
+            // V2 change stream reader, using the HandleTopologyChangeV2 stage.
+            stages.push_back(DocumentSourceChangeStreamHandleTopologyChangeV2::create(expCtx));
+        } else {
+            // V1 change stream reader, using the HandleTopologyChange stage.
+            stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
+        }
     }
 
     // If the resume point is an event, we must include a DSCSEnsureResumeTokenPresent stage.

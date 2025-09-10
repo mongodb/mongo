@@ -34,24 +34,40 @@
 
 namespace mongo {
 
+namespace {
+boost::optional<NamespaceString> convertedNss(ChangeStreamType type,
+                                              const boost::optional<NamespaceString>& nss) {
+    if (type == ChangeStreamType::kAllDatabases) {
+        // Cluster-wide change streams have to be opened on the "admin" database.
+        // Convert this to a Namespace without a value.
+        tassert(10656200,
+                "NSS for all-databases change stream must be empty",
+                !nss.has_value() || nss->isAdminDB());
+        return {};
+    }
+
+    tassert(10656201,
+            "NSS for collection- or database-level change stream must not be empty",
+            nss.has_value());
+
+    if (type == ChangeStreamType::kDatabase && nss->isCollectionlessAggregateNS()) {
+        // Convert 'dbName.$cmd.aggregate' namespace to just 'dbName'.
+        return NamespaceString(nss->dbName());
+    }
+
+    tassert(10656202,
+            "NSS for collection- or database-level change stream must have the right granularity",
+            (type == ChangeStreamType::kDatabase) == nss->isDbOnly());
+
+    // Return original namespace as is.
+    return nss;
+}
+
+}  // namespace
 ChangeStream::ChangeStream(ChangeStreamReadMode mode,
                            ChangeStreamType type,
-                           boost::optional<NamespaceString> nss)
-    : _mode(mode), _type(type), _nss(std::move(nss)) {
-
-    if (_type == ChangeStreamType::kAllDatabases) {
-        tassert(10656200, "NSS for all-databases change stream must be empty", !_nss.has_value());
-    } else {
-        tassert(10656201,
-                "NSS for collection- or database-level change stream must not be empty",
-                _nss.has_value());
-
-        tassert(
-            10656202,
-            "NSS for collection- or database-level change stream must have the right granularity",
-            (_type == ChangeStreamType::kDatabase) == _nss->isDbOnly());
-    }
-}
+                           const boost::optional<NamespaceString>& nss)
+    : _mode(mode), _type(type), _nss(convertedNss(type, nss)) {}
 
 ChangeStreamReadMode ChangeStream::getReadMode() const {
     return _mode;
@@ -74,6 +90,10 @@ ChangeStreamType ChangeStream::getChangeStreamType(const NamespaceString& nss) {
 
 ChangeStream ChangeStream::buildFromExpressionContext(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(10743905,
+            "expecting changeStreamSpec to be present in ExpressionContext",
+            expCtx->getChangeStreamSpec().has_value());
+
     const auto& nss = expCtx->getNamespaceString();
 
     return ChangeStream(fromIgnoreRemovedShardsParameter(static_cast<bool>(
