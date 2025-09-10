@@ -70,3 +70,28 @@ structs:
         fields:
             ecoc: ECOCStats
             esc: ECStats
+
+    FLEIndexTypeStats:
+        description: "Counters for each FLE2 index type, including unindexed"
+        fields:
+            unindexed:
+                type: exactInt64
+                default: 0
+            equality:
+                type: exactInt64
+                default: 0
+            range:
+                type: exactInt64
+                default: 0
+            substringPreview:
+                type: exactInt64
+                default: 0
+            suffixPreview:
+                type: exactInt64
+                default: 0
+            prefixPreview:
+                type: exactInt64
+                default: 0
+            rangePreview:
+                type: exactInt64
+                default: 0

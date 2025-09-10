@@ -3830,13 +3830,14 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
         return;
     }
 
-    auto checkOneQueryType = [](StringData path, const QueryTypeConfig& qtc) {
+    auto checkOneQueryType = [](const EncryptedField& field, const QueryTypeConfig& qtc) {
         if (qtc.getQueryType() != QueryTypeEnum::SubstringPreview) {
-            return;
+            return false;
         }
         int32_t ub = qtc.getStrMaxQueryLength().get();
         int32_t lb = qtc.getStrMinQueryLength().get();
         int32_t max = qtc.getStrMaxLength().get();
+        auto path = field.getPath();
         uassert(10453200,
                 fmt::format("strMinQueryLength ({}) must be >= {} for substringPreview query "
                             "type of field {}. {}",
@@ -3861,22 +3862,10 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
                             path,
                             bypassMsg),
                 max <= kSubstringPreviewMaxLengthMax);
+        return false;
     };
 
-    for (const auto& field : ef.getFields()) {
-        if (!field.getQueries()) {
-            continue;
-        }
-
-        visit(
-            OverloadedVisitor{[&](QueryTypeConfig qtc) { checkOneQueryType(field.getPath(), qtc); },
-                              [&](std::vector<QueryTypeConfig> queries) {
-                                  for (auto& qtc : queries) {
-                                      checkOneQueryType(field.getPath(), qtc);
-                                  }
-                              }},
-            field.getQueries().get());
-    }
+    visitQueryTypeConfigs(ef, checkOneQueryType);
 }
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
@@ -4059,29 +4048,17 @@ ConstDataRange binDataToCDR(BSONElement element) {
 }
 
 bool hasQueryTypeMatching(const EncryptedField& field, const QueryTypeMatchFn& matcher) {
-    if (!field.getQueries()) {
-        return false;
-    }
-    return visit(OverloadedVisitor{
-                     [&](QueryTypeConfig query) { return matcher(query.getQueryType()); },
-                     [&](std::vector<QueryTypeConfig> queries) {
-                         return std::any_of(
-                             queries.cbegin(), queries.cend(), [&](const QueryTypeConfig& qtc) {
-                                 return matcher(qtc.getQueryType());
-                             });
-                     }},
-                 field.getQueries().get());
+    return visitQueryTypeConfigs(field,
+                                 [&matcher](const EncryptedField&, const QueryTypeConfig& qtc) {
+                                     return matcher(qtc.getQueryType());
+                                 });
 }
+
 bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMatchFn& matcher) {
-    for (const auto& field : config.getFields()) {
-        if (field.getQueries().has_value()) {
-            bool hasQuery = hasQueryTypeMatching(field, matcher);
-            if (hasQuery) {
-                return hasQuery;
-            }
-        }
-    }
-    return false;
+    return visitQueryTypeConfigs(config,
+                                 [&matcher](const EncryptedField&, const QueryTypeConfig& qtc) {
+                                     return matcher(qtc.getQueryType());
+                                 });
 }
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {

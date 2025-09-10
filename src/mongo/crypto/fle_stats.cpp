@@ -29,20 +29,54 @@
 
 #include "mongo/crypto/fle_stats.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_options_gen.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/testing_options_gen.h"
-
-#include <memory>
 
 namespace mongo {
 
 namespace {
 // We only track fle stats on the shard.
 auto& fleStatusSection =
-    *ServerStatusSectionBuilder<FLEStatusSection>("fle").bind(globalSystemTickSource()).forShard();
+    *ServerStatusSectionBuilder<FLEStatusSection>("fle").forShard().bind(globalSystemTickSource());
+
+FLEIndexTypeStats countIndexTypeUsages(const EncryptedFieldConfig& efc) {
+    FLEIndexTypeStats counters;
+    visitQueryTypeConfigs(
+        efc,
+        [&counters](const EncryptedField& field, const QueryTypeConfig& qtc) {
+            switch (qtc.getQueryType()) {
+                case QueryTypeEnum::Equality:
+                    counters.setEquality(counters.getEquality() + 1);
+                    break;
+                case QueryTypeEnum::Range:
+                    counters.setRange(counters.getRange() + 1);
+                    break;
+                case QueryTypeEnum::RangePreviewDeprecated:
+                    counters.setRangePreview(counters.getRangePreview() + 1);
+                    break;
+                case QueryTypeEnum::SubstringPreview:
+                    counters.setSubstringPreview(counters.getSubstringPreview() + 1);
+                    break;
+                case QueryTypeEnum::SuffixPreview:
+                    counters.setSuffixPreview(counters.getSuffixPreview() + 1);
+                    break;
+                case QueryTypeEnum::PrefixPreview:
+                    counters.setPrefixPreview(counters.getPrefixPreview() + 1);
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            };
+            return false;
+        },
+        [&counters](const EncryptedField&) {
+            counters.setUnindexed(counters.getUnindexed() + 1);
+            return false;
+        });
+    return counters;
+}
 
 }  // namespace
 
@@ -91,12 +125,74 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
         sub << "totalMillis" << emuBinaryTotalMillis.loadRelaxed();
     }
 
+    {
+        FLEIndexTypeStats temp;
+        {
+            stdx::lock_guard<stdx::mutex> lock(_indexTypeMutex);
+            temp = _indexTypeStats;
+        }
+        auto sub = BSONObjBuilder(builder.subobjStart("indexTypeStats"));
+        temp.serialize(&sub);
+    }
+
     return builder.obj();
 }
 
 
 FLEStatusSection::EmuBinaryTracker FLEStatusSection::makeEmuBinaryTracker() {
     return EmuBinaryTracker(this, gTestingDiagnosticsEnabledAtStartup);
+}
+
+void FLEStatusSection::updateIndexTypeStats(const EncryptedFieldConfig& efc, bool subtract) {
+    const std::int64_t delta = (subtract ? -1 : 1);
+    FLEIndexTypeStats deltas;
+    visitQueryTypeConfigs(
+        efc,
+        [&deltas, delta](const EncryptedField& field, const QueryTypeConfig& qtc) {
+            switch (qtc.getQueryType()) {
+                case QueryTypeEnum::Equality:
+                    deltas.setEquality(delta);
+                    break;
+                case QueryTypeEnum::Range:
+                    deltas.setRange(delta);
+                    break;
+                case QueryTypeEnum::RangePreviewDeprecated:
+                    deltas.setRangePreview(delta);
+                    break;
+                case QueryTypeEnum::SubstringPreview:
+                    deltas.setSubstringPreview(delta);
+                    break;
+                case QueryTypeEnum::SuffixPreview:
+                    deltas.setSuffixPreview(delta);
+                    break;
+                case QueryTypeEnum::PrefixPreview:
+                    deltas.setPrefixPreview(delta);
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            };
+            return false;
+        },
+        [&deltas, delta](const EncryptedField&) {
+            deltas.setUnindexed(delta);
+            return false;
+        });
+
+    stdx::lock_guard<stdx::mutex> lock(_indexTypeMutex);
+    FLEStatsUtil::accumulateStats(_indexTypeStats, deltas);
+}
+
+void FLEStatusSection::updateIndexTypeStatsOnRegisterCollection(const EncryptedFieldConfig& efc) {
+    updateIndexTypeStats(efc, false);
+}
+
+void FLEStatusSection::updateIndexTypeStatsOnDeregisterCollection(const EncryptedFieldConfig& efc) {
+    updateIndexTypeStats(efc, true);
+}
+
+void FLEStatusSection::clearIndexTypeStats() {
+    stdx::lock_guard<stdx::mutex> lock(_indexTypeMutex);
+    _indexTypeStats = {};
 }
 
 }  // namespace mongo
