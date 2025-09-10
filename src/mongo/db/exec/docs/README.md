@@ -37,7 +37,7 @@ Queries are intended to yield at least every 10 ms by default. Yielding is confi
 - performYieldWithAcquisitions() → yieldTransactionResourcesFromOperationContext() → getLocker(opCtx)->saveLockStateAndUnlock() – yields by releasing the locks
 - performYieldWithAcquisitions() → restoreTransactionResourcesToOperationContext() → getLocker(opCtx)->restoreLockState() – “unyields” by reacquiring the locks
 
-**PlanExecutorPipeline** does not yield directly. Only the parts of the pipeline that are executed by a PlanExecutorImpl or PlanExecutorSBE under the PlanExecutorPipeline may yield (see the Executors section). This means that DocumentSourceStages other than DocumentSourceCursor, which can own a sub-executor, do not themselves yield, however, due to the batching behavior at the interface between the $match execution and the rest of the pipeline, these other DocumentSource stages are normally not holding any locks when they execute, so yielding is normally not needed.
+**PlanExecutorPipeline** does not yield directly. Only the parts of the pipeline that are executed by a PlanExecutorImpl or PlanExecutorSBE under the PlanExecutorPipeline may yield (see the Executors section). This means that pipeline stages other than CursorStage, which can own a sub-executor, do not themselves yield, however, due to the batching behavior at the interface between the $match execution and the rest of the pipeline, these other stages are normally not holding any locks when they execute, so yielding is normally not needed.
 
 ### Checking for Interrupts
 
@@ -51,9 +51,9 @@ Interrupts signal that the query should be killed immediately. Queries are inten
 2. PlanExecutorPipeline::getNextDocument()
 3. PlanExecutorPipeline::\_getNext()
 4. PlanExecutorPipeline::\_tryGetNext()
-5. Pipeline::getNext() (from PlanExecutorPipeline::\_pipeline)
-6. DocumentSource::getNext() (from Pipeline::\_sources)
-7. ExpressionContext::checkForInterrupt() (from DocumentSource::pExpCtx)
+5. exec::agg::Pipeline::getNext() (from PlanExecutorPipeline::\_execPipeline)
+6. exec::agg::Stage::getNext() (from exec::agg::Pipeline::\_sources)
+7. ExpressionContext::checkForInterrupt() (from exec::agg::Stage::pExpCtx)
 8. ExpressionContext::checkForInterruptSlow()
 9. OperationContext::checkForInterrupt() (from ExpressionContext::opCtx)
    (Aintcha glad I found that whole chain for ya?😀)
