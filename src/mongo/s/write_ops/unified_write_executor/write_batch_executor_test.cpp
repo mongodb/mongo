@@ -52,6 +52,10 @@ public:
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
 
+    const UUID uuid0 = UUID::gen();
+    const UUID uuid1 = UUID::gen();
+    const UUID uuid2 = UUID::gen();
+
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(HostAndPort("config", 12345));
@@ -80,11 +84,13 @@ public:
 
     NamespaceInfoEntry getNamespaceInfoEntry(const NamespaceString& nss,
                                              boost::optional<ShardVersion> shardVersion,
-                                             boost::optional<DatabaseVersion> databaseVersion) {
+                                             boost::optional<DatabaseVersion> databaseVersion,
+                                             boost::optional<UUID> collectionUUID) {
 
         NamespaceInfoEntry entry(nss);
         entry.setShardVersion(shardVersion);
         entry.setDatabaseVersion(databaseVersion);
+        entry.setCollectionUUID(collectionUUID);
         return entry;
     }
 
@@ -184,7 +190,14 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
          BulkWriteUpdateOp(
              2, BSON("a" << 1), write_ops::UpdateModification(BSON("$set" << BSON("b" << 1)))),
          BulkWriteDeleteOp(1, BSON("a" << 2))},
-        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+        {
+            getNamespaceInfoEntry(
+                nss0, boost::none /* shardVersion */, boost::none /* databaseVersion */, uuid0),
+            getNamespaceInfoEntry(
+                nss1, boost::none /* shardVersion */, boost::none /* databaseVersion */, uuid1),
+            getNamespaceInfoEntry(
+                nss2, boost::none /* shardVersion */, boost::none /* databaseVersion */, uuid2),
+        });
     WriteCommandRef cmdRef(bulkRequest);
 
     auto batch = SimpleWriteBatch{{
@@ -237,8 +250,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
                 BSON("delete" << 0 << "filter" << BSON("a" << 2) << "multi" << false),
             },
             {
-                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
-                getNamespaceInfoEntry(nss2, nss2ShardVersion1, boost::none),
+                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion, uuid1),
+                getNamespaceInfoEntry(nss2, nss2ShardVersion1, boost::none, uuid2),
             },
             lsid,
             txnNumber,
@@ -254,7 +267,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
                               << BSON("$set" << BSON("b" << 1)) << "upsert" << false),
             },
             {
-                getNamespaceInfoEntry(nss2, nss2ShardVersion2, boost::none),
+                getNamespaceInfoEntry(nss2, nss2ShardVersion2, boost::none, uuid2),
             },
             lsid,
             txnNumber,
@@ -323,7 +336,10 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
                                    BSON("insert" << 0 << "document" << BSON("a" << 0)),
                                },
                                {
-                                   getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
+                                   getNamespaceInfoEntry(nss1,
+                                                         boost::none /* shardVersion */,
+                                                         nss1DbVersion,
+                                                         boost::none /* collectionUUID */),
                                },
                                lsid,
                                txnNumber,
@@ -395,7 +411,10 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
                               << hintBSON),
             },
             {
-                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
+                getNamespaceInfoEntry(nss1,
+                                      boost::none /* shardVersion */,
+                                      nss1DbVersion,
+                                      boost::none /* collectionUUID */),
             },
             lsid,
             txnNumber,
@@ -455,7 +474,10 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
                 BSON("delete" << 0 << "filter" << BSON("a" << 2) << "multi" << false),
             },
             {
-                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
+                getNamespaceInfoEntry(nss1,
+                                      boost::none /* shardVersion */,
+                                      nss1DbVersion,
+                                      boost::none /* collectionUUID */),
             },
             lsid,
             txnNumber,

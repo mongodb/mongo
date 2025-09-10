@@ -22,9 +22,6 @@ selector:
     # The WTWriteConflictException failpoint is not supported on mongos.
 
     # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-108068 Support passing expected collection uuid in UWE.
-    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid_sharded.js
-    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid.js
 
     # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
     - jstests/concurrency/fsm_workloads/timeseries/**/*.js

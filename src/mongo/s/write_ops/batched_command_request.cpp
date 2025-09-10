@@ -109,6 +109,10 @@ const NamespaceString& BatchedCommandRequest::getNS() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getNamespace(); });
 }
 
+const boost::optional<UUID>& BatchedCommandRequest::getCollectionUUID() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getCollectionUUID(); });
+}
+
 bool BatchedCommandRequest::hasEncryptionInformation() const {
     return _visit(
         [](auto&& op) -> decltype(auto) { return op.getEncryptionInformation().has_value(); });

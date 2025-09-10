@@ -37,8 +37,6 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
 
     # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-108068 Support passing expected collection uuid in UWE
-    - jstests/core/query/parsing/collection_uuid_write_commands.js
 
     # TODO: SERVER-104535 support cursor with bulk write.
     - jstests/core/txns/bulk_write_getMore.js

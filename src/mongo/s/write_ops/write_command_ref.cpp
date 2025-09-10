@@ -218,6 +218,10 @@ const NamespaceString& BatchWriteCommandRefImpl::getNss(int index) const {
     return getRequest().getNS();
 }
 
+const boost::optional<UUID>& BatchWriteCommandRefImpl::getCollectionUUID(int index) const {
+    return getRequest().getCollectionUUID();
+}
+
 BatchedCommandRequest::BatchType BatchWriteCommandRefImpl::getOpType(int index) const {
     return getRequest().getBatchType();
 }
@@ -348,6 +352,11 @@ bool BulkWriteCommandRefImpl::getMulti(int index) const {
 const NamespaceString& BulkWriteCommandRefImpl::getNss(int index) const {
     auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
     return getRequest().getNsInfo()[nsInfoIdx].getNs();
+}
+
+const boost::optional<UUID>& BulkWriteCommandRefImpl::getCollectionUUID(int index) const {
+    auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
+    return getRequest().getNsInfo()[nsInfoIdx].getCollectionUUID();
 }
 
 BatchedCommandRequest::BatchType BulkWriteCommandRefImpl::getOpType(int index) const {

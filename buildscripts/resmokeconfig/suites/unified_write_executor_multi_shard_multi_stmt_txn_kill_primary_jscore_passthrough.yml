@@ -237,8 +237,6 @@ selector:
     - jstests/core/query/bulk/bulk_write_non_retryable_cursor.js
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
     - jstests/core/query/bulk/bulk_write.js
-    # TODO: SERVER-108068 correctly handle collection uuid mismatch errors.
-    - jstests/core/query/parsing/collection_uuid_write_commands.js
 
   exclude_with_any_tags:
     ##

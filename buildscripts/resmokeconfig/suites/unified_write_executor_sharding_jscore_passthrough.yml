@@ -44,8 +44,6 @@ selector:
     - jstests/core/query/queryable_encryption/query_settings_fle.js
     # TODO: SERVER-104535 support cursor with bulk write.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
-    # TODO: SERVER-108068 Support passing expected collection uuid in UWE.
-    - jstests/core/query/parsing/collection_uuid_write_commands.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

@@ -283,6 +283,11 @@ public:
     const NamespaceString& getNss(int index) const;
 
     /**
+     * Returns the collection UUID targeted by the specified write op.
+     */
+    const boost::optional<UUID>& getCollectionUUID(int index) const;
+
+    /**
      * Returns the type (insert, update, delete) of the specified write op.
      */
     BatchedCommandRequest::BatchType getOpType(int index) const;
@@ -547,6 +552,11 @@ public:
      * Returns the collection namespace targeted by the specified write op.
      */
     const NamespaceString& getNss(int index) const;
+
+    /**
+     * Returns the collection UUID targeted by the specified write op.
+     */
+    const boost::optional<UUID>& getCollectionUUID(int index) const;
 
     /**
      * Returns the type (insert, update, delete) of the specified write op.
@@ -960,6 +970,9 @@ public:
     }
     decltype(auto) getNss() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getNss(_index); });
+    }
+    decltype(auto) getCollectionUUID() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getCollectionUUID(_index); });
     }
     decltype(auto) getUpsert() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getUpsert(_index); });

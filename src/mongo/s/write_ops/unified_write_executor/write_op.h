@@ -65,6 +65,10 @@ public:
         return _ref.getNss();
     }
 
+    const boost::optional<UUID>& getCollectionUUID() const {
+        return _ref.getCollectionUUID();
+    }
+
     WriteType getType() const {
         return WriteType(_ref.getOpType());
     }

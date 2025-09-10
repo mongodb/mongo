@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/global_catalog/router_role_api/collection_uuid_mismatch.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -335,8 +336,14 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
             auto [it, _] = _results.emplace(op.getId(), item);
             it->second.setIdx(op.getId());
 
-            const auto status = item.getStatus();
+            auto status = item.getStatus();
             if (!status.isOK()) {
+                // Attempts to populate the actualCollection field of a CollectionUUIDMismatch error
+                // if not already present.
+                if (status.code() == ErrorCodes::CollectionUUIDMismatch) {
+                    status = populateCollectionUUIDMismatch(opCtx, status);
+                }
+
                 _nErrors++;
                 // If we are in a transaction, we stop processing and return the first error.
                 if (static_cast<bool>(TransactionRouter::get(opCtx))) {

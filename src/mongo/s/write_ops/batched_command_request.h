@@ -99,6 +99,8 @@ public:
 
     const NamespaceString& getNS() const;
 
+    const boost::optional<UUID>& getCollectionUUID() const;
+
     bool getOrdered() const;
 
     bool getBypassDocumentValidation() const;
