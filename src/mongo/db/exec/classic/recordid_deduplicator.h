@@ -84,7 +84,6 @@ public:
      */
     void spill(SpillingStats& stats, uint64_t maximumMemoryUsageBytes = 0);
 
-
     /**
      * Removes the recordId from in-memory structures. This might not actually remove recordId from
      * the deduplicator, if the record is spilled to disk.

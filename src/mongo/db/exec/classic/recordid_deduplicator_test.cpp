@@ -55,6 +55,14 @@ void assertInsertExisting(RecordIdDeduplicator& recordIdDeduplicator, RecordId r
     ASSERT_TRUE(recordIdDeduplicator.contains(recordId)) << "RecordId " << recordId;
 }
 
+void assertDidNotSpill(const RecordIdDeduplicator& recordIdDeduplicator,
+                       const SpillingStats& stats) {
+    ASSERT_FALSE(recordIdDeduplicator.hasSpilled());
+    ASSERT_EQ(0, stats.getSpills()) << "Spills is " << stats.getSpills();
+    ASSERT_EQ(0, stats.getSpilledBytes()) << "Spilled bytes is " << stats.getSpilledBytes();
+    ASSERT_EQ(0, stats.getSpilledRecords()) << "Spilled records is " << stats.getSpilledRecords();
+}
+
 class RecordIdDeduplicatorTest : public SpillingTestFixture {
 public:
     SpillingStats spillingStats;
@@ -90,9 +98,9 @@ TEST_F(RecordIdDeduplicatorTest, spillNoDiskUsageTest) {
 
     assertInsertNew(recordIdDeduplicator, longRecordId);
     assertInsertNew(recordIdDeduplicator, stringRecordId);
-    ASSERT_THROWS_CODE(recordIdDeduplicator.spill(spillingStats),
-                       DBException,
-                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+
+    recordIdDeduplicator.spill(spillingStats);
+    assertDidNotSpill(recordIdDeduplicator, spillingStats);
 }
 
 TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
@@ -104,21 +112,13 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
     RecordId longRecordId(12345678);
     RecordId nullRecordId;
 
-    uint64_t expectedSpills = 1;
-    uint64_t expectedSpilledBytes = stringRecordId.memUsage() + longRecordId.memUsage();
-    uint64_t expectedSpilledRecords = 2;  // The record with id null is not spilled.
-
     assertInsertNew(recordIdDeduplicator, nullRecordId);
     assertInsertNew(recordIdDeduplicator, longRecordId);
     assertInsertNew(recordIdDeduplicator, stringRecordId);
 
     recordIdDeduplicator.spill(spillingStats);
 
-    // At this point it should have spilled.
-    ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
-    ASSERT_EQ(expectedSpills, spillingStats.getSpills());
-    ASSERT_EQ(expectedSpilledBytes, spillingStats.getSpilledBytes());
-    ASSERT_EQ(expectedSpilledRecords, spillingStats.getSpilledRecords());
+    assertDidNotSpill(recordIdDeduplicator, spillingStats);
 
     // Insert the same records.
     assertInsertExisting(recordIdDeduplicator, stringRecordId);
@@ -133,10 +133,7 @@ TEST_F(RecordIdDeduplicatorTest, basicHashSpillTest) {
     assertInsertExisting(recordIdDeduplicator, longRecordId2);
 
     // The spills should not have changed.
-    ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
-    ASSERT_EQ(expectedSpills, spillingStats.getSpills());
-    ASSERT_EQ(expectedSpilledBytes, spillingStats.getSpilledBytes());
-    ASSERT_EQ(expectedSpilledRecords, spillingStats.getSpilledRecords());
+    assertDidNotSpill(recordIdDeduplicator, spillingStats);
 }
 
 TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
@@ -149,10 +146,6 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
 
     assertInsertNew(recordIdDeduplicator, stringRecordId);
     assertInsertNew(recordIdDeduplicator, nullRecordId);
-
-    uint64_t expectedSpills = 1;
-    uint64_t expectedSpilledBytes = stringRecordId.memUsage();
-    uint64_t expectedSpilledRecords = 1;  // The record with id null is not spilled.
 
     // Create some recordIds.
     std::vector<int64_t> recordIds;
@@ -170,17 +163,11 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     for (const auto& ridInt : recordIds) {
         RecordId rid{ridInt};
         assertInsertNew(recordIdDeduplicator, rid);
-        expectedSpilledBytes += rid.memUsage();
-        ++expectedSpilledRecords;
     }
 
     recordIdDeduplicator.spill(spillingStats);
 
-    // At this point it should have spilled.
-    ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
-    ASSERT_EQ(expectedSpills, spillingStats.getSpills());
-    ASSERT_EQ(expectedSpilledBytes, spillingStats.getSpilledBytes());
-    ASSERT_EQ(expectedSpilledRecords, spillingStats.getSpilledRecords());
+    assertDidNotSpill(recordIdDeduplicator, spillingStats);
 
     // Insert the same records.
     assertInsertExisting(recordIdDeduplicator, stringRecordId);
@@ -225,18 +212,13 @@ TEST_F(RecordIdDeduplicatorTest, freeMemoryRemovesOnlyInMemoryElements) {
 
     SpillingStats stats;
     recordIdDeduplicator.spill(stats);
-    ASSERT_TRUE(recordIdDeduplicator.hasSpilled());
+    assertDidNotSpill(recordIdDeduplicator, spillingStats);
 
+    // Since RecordIdDeduplicator does not spill all records are in memory and are released when
+    // freeMemory is called.
     for (const auto& recordId : recordIds) {
         recordIdDeduplicator.freeMemory(recordId);
-        if (!recordId.isNull()) {
-            // Because we have spilled, old recordIds are not in memory, so they are not affected by
-            // freeMemory call.
-            assertInsertExisting(recordIdDeduplicator, recordId);
-        } else {
-            // Null record is one bool, so it is never spilled.
-            assertInsertNew(recordIdDeduplicator, recordId);
-        }
+        assertInsertNew(recordIdDeduplicator, recordId);
     }
 
     RecordId newRecordId{static_cast<int64_t>(2)};
@@ -303,6 +285,7 @@ TEST_F(RecordIdDeduplicatorCatalogTest, canSpillWithAcquiredCollection) {
 
     SpillingStats stats;
     recordIdDeduplicator.spill(stats);
+    assertDidNotSpill(recordIdDeduplicator, stats);
 
     assertInsertExisting(recordIdDeduplicator, nullRecordId);
     assertInsertExisting(recordIdDeduplicator, longRecordId);
