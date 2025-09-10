@@ -139,8 +139,6 @@ public:
 
     SharedSemiFuture<void> awaitCriticalSectionPromoted();
 
-    SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
-
     /**
      * To be used by the _shardsvrReshardingDonorStartChangeStreamsMonitor command sent by the
      * coordinator. Notifies the donor to start the change streams monitor, and then waits for the
@@ -358,8 +356,6 @@ private:
     SharedPromise<void> _allRecipientsDoneCloning;
 
     SharedPromise<void> _allRecipientsDoneApplying;
-
-    SharedPromise<void> _finalOplogEntriesWritten;
 
     SharedPromise<void> _inBlockingWritesOrError;
 

@@ -963,34 +963,24 @@ void ReshardingDonorService::DonorStateMachine::
                     });
             }
 
-            {
-                stdx::lock_guard<stdx::mutex> lg(_mutex);
-                LOGV2_DEBUG(5279504,
-                            0,
-                            "Committed oplog entries to temporarily block writes for resharding",
-                            logAttrs(_metadata.getSourceNss()),
-                            "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                            "numRecipients"_attr = _recipientShardIds.size(),
-                            "duration"_attr = duration_cast<Milliseconds>(latency.elapsed()));
-                ensureFulfilledPromise(lg, _finalOplogEntriesWritten);
-            }
+            LOGV2_DEBUG(5279504,
+                        0,
+                        "Committed oplog entries to temporarily block writes for resharding",
+                        logAttrs(_metadata.getSourceNss()),
+                        "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                        "numRecipients"_attr = _recipientShardIds.size(),
+                        "duration"_attr = duration_cast<Milliseconds>(latency.elapsed()));
         } catch (const DBException& e) {
             const auto& status = e.toStatus();
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
             LOGV2_ERROR(5279508,
                         "Exception while writing resharding final oplog entries",
                         "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                         "error"_attr = status);
-            ensureFulfilledPromise(lg, _finalOplogEntriesWritten, status);
             uassertStatusOK(status);
         }
     }
 
     _transitionState(DonorStateEnum::kBlockingWrites, factory);
-}
-
-SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplogEntriesWritten() {
-    return _finalOplogEntriesWritten.getFuture();
 }
 
 void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTransitionToDone(
