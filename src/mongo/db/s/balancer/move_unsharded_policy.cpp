@@ -292,7 +292,8 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::ConflictingOperationInProgress:
                 case ErrorCodes::DuplicateKey:
                 case ErrorCodes::FailedToSatisfyReadPreference:
-                // TODO SERVER-90851 Investigate IllegalOperation error
+                // IllegalOperation may happen if moving inconsistent legacy timeseries collections
+                // (SERVER-90862) or temporary resharding collections (SERVER-90851, SERVER-110570).
                 case ErrorCodes::IllegalOperation:
                 case ErrorCodes::LockBusy:
                 case ErrorCodes::NamespaceNotFound:

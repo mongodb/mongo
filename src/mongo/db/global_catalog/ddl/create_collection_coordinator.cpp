@@ -288,8 +288,7 @@ bool viewlessTimeseriesEnabled(OperationContext* opCtx) {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
-void assertTimeseriesOptionsConsistency(const Collection* coll,
-                                        const bool viewlessTimeseriesEnabled) {
+void assertTimeseriesLocalCatalogConsistency(OperationContext* opCtx, const Collection* coll) {
     tassert(9934501,
             fmt::format("Encountered invalid state for target collection '{}'. ",
                         coll->ns().toStringForErrorMsg()) +
@@ -306,8 +305,25 @@ void assertTimeseriesOptionsConsistency(const Collection* coll,
                 "associated time-series options. Please consider options to correct this, "
                 "including renaming the collection or dropping the collection after inspecting "
                 "and/or backing up its contents.",
-            viewlessTimeseriesEnabled || coll->ns().isTimeseriesBucketsCollection() ||
+            viewlessTimeseriesEnabled(opCtx) || coll->ns().isTimeseriesBucketsCollection() ||
                 !coll->getTimeseriesOptions().has_value());
+
+    // Refuse to track if both 'coll' and 'system.buckets.coll' are regular collections in the local
+    // catalog. This prevents the inconsistency from propagating to the global catalog.
+    auto isBuckets = coll->ns().isTimeseriesBucketsCollection();
+    const auto& viewNs = isBuckets ? coll->ns().getTimeseriesViewNamespace() : coll->ns();
+    const auto& bucketsNs = isBuckets ? coll->ns() : coll->ns().makeTimeseriesBucketsNamespace();
+    const auto& otherNs = isBuckets ? viewNs : bucketsNs;
+    // TODO(SERVER-90862): Change to a tassert once this state can not exist in the local catalog
+    uassert(
+        ErrorCodes::IllegalOperation,
+        fmt::format("Found both normal collection '{}' and a timeseries buckets collection '{}' "
+                    "registered using the same collection name. Please consider options to correct "
+                    "this, including renaming the collection or dropping the collection after "
+                    "inspecting and/or backing up its contents.",
+                    viewNs.toStringForErrorMsg(),
+                    bucketsNs.toStringForErrorMsg()),
+        !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, otherNs));
 }
 
 // NOTES on the 'collation' optional parameter contained by the shardCollection() request:
@@ -670,8 +686,7 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
             "expected the target collection to exist",
             targetColl.has_value() && targetColl->exists());
 
-    assertTimeseriesOptionsConsistency(targetColl->getCollectionPtr().get(),
-                                       viewlessTimeseriesEnabled(opCtx));
+    assertTimeseriesLocalCatalogConsistency(opCtx, targetColl->getCollectionPtr().get());
 
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
         // No need to check for collection options when registering an existing collection
