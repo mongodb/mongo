@@ -2318,14 +2318,18 @@ tasks:
           suite: disagg_storage
           use_large_distro: "true"
 
-  - <<: *task_template
-    name: disagg_repl_jscore_passthrough
+  - <<: *gen_task_template
+    name: disagg_repl_jscore_passthrough_gen
     tags:
       [
         "assigned_to_jira_team_server_disagg",
         "default",
+        "large",
+        "clustered_collections",
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_repl_jscore_passthrough
+          use_large_distro: "true"
