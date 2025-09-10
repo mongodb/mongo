@@ -35,7 +35,14 @@
 
 #include <string>
 
+#include <yaml-cpp/yaml.h>
+
 namespace mongo::extension::host {
+
+struct ExtensionConfig {
+    std::string sharedLibraryPath;
+    YAML::Node extOptions;
+};
 
 static ::MongoExtensionAPIVersion supportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
 
@@ -52,16 +59,25 @@ bool loadExtensions(const std::vector<std::string>& extensionPaths);
 class ExtensionLoader {
 public:
     /**
+     * Loads the corresponding configuration file for the given extension and returns it as an
+     * ExtensionConfig.
+     */
+    static ExtensionConfig loadExtensionConfig(const std::string& extensionPath);
+    /**
      * Given a path to an extension shared library, loads the extension, checks for API version
      * compatibility, and calls the extension initialization function.
      */
-    static void load(const std::string& extensionPath);
+    static void load(const ExtensionConfig& config);
 
 private:
     // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
     // and track what extensions have been loaded. Initialized during process initialization and
     // const thereafter. These are intentionally "leaked" on shutdown.
     static stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> loadedExtensions;
+
+    // Expected YAML config file field names.
+    static inline constexpr char kSharedLibraryPath[] = "sharedLibraryPath";
+    static inline constexpr char kExtensionOptions[] = "extensionOptions";
 };
 
 }  // namespace mongo::extension::host
