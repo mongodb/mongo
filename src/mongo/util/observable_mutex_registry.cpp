@@ -29,44 +29,152 @@
 
 #include "mongo/util/observable_mutex_registry.h"
 
-#include "mongo/util/scoped_unlock.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {
+MutexStats operator+(const MutexStats& lhs, const ObservableMutexRegistry::StatsRecord& rhs) {
+    return {lhs + rhs.data};
+}
+
+namespace {
+class ObservableMutexServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return false;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& config) const override {
+        bool listAll = false;
+        if (config.isABSONObj()) {
+            auto obj = config.Obj();
+            listAll = obj.hasField("listAll") ? obj.getIntField("listAll") : false;
+        }
+
+        return ObservableMutexRegistry::get().report(listAll);
+    }
+};
+
+auto& observableMutexSection =
+    *ServerStatusSectionBuilder<ObservableMutexServerStatusSection>("lockContentionMetrics")
+         .forShard()
+         .forRouter();
+
+void serialize(BSONObjBuilder& bob, const MutexAcquisitionStats& stats) {
+    bob.append(ObservableMutexRegistry::kTotalAcquisitionsFieldName,
+               static_cast<long long>(stats.total));
+    bob.append(ObservableMutexRegistry::kTotalContentionsFieldName,
+               static_cast<long long>(stats.contentions));
+    bob.append(ObservableMutexRegistry::kTotalWaitCyclesFieldName,
+               static_cast<long long>(stats.waitCycles));
+}
+
+void serialize(BSONObjBuilder& bob, const MutexStats& stats) {
+    {
+        BSONObjBuilder sub(bob.subobjStart(ObservableMutexRegistry::kExclusiveFieldName));
+        serialize(sub, stats.exclusiveAcquisitions);
+    }
+    {
+        BSONObjBuilder sub(bob.subobjStart(ObservableMutexRegistry::kSharedFieldName));
+        serialize(sub, stats.sharedAcquisitions);
+    }
+}
+
+void serialize(BSONArrayBuilder& builder, const ObservableMutexRegistry::StatsRecord& entry) {
+    BSONObjBuilder subObjBuilder;
+    invariant(entry.mutexId && entry.registered);
+    subObjBuilder.append(ObservableMutexRegistry::kIdFieldName, entry.mutexId.get());
+    subObjBuilder.appendDate(ObservableMutexRegistry::kRegisteredFieldName, entry.registered.get());
+    serialize(subObjBuilder, entry.data);
+
+    builder.append(subObjBuilder.obj());
+}
+
+BSONObj serializeStats(StringMap<std::vector<ObservableMutexRegistry::StatsRecord>>& statsMap,
+                       bool listAll) {
+    BSONObjBuilder bob;
+    for (const auto& [tag, stats] : statsMap) {
+        BSONObjBuilder tagSubObj(bob.subobjStart(tag));
+        const auto sum = std::accumulate(stats.begin(), stats.end(), MutexStats{});
+        serialize(tagSubObj, sum);
+
+        if (MONGO_unlikely(listAll)) {
+            BSONArrayBuilder mutexSubArray(
+                tagSubObj.subarrayStart(ObservableMutexRegistry::kMutexFieldName));
+            for (const auto& entry : stats) {
+                if (!entry.mutexId || !entry.registered) {
+                    // The listAll output should ignore stats from invalidated mutexes.
+                    continue;
+                }
+                serialize(mutexSubArray, entry);
+            }
+        }
+    }
+    return bob.obj();
+}
+}  // namespace
 
 ObservableMutexRegistry& ObservableMutexRegistry::get() {
     static StaticImmortal<ObservableMutexRegistry> obj;
     return *obj;
 }
 
-void ObservableMutexRegistry::iterate(CollectionCallback cb) {
-    std::vector<StringData> tags;
-    stdx::unique_lock lk(_mutex);
-    tags.reserve(_mutexEntries.size());
-    for (const auto& [tag, _] : _mutexEntries) {
-        tags.emplace_back(tag);
-    }
-
-    for (const auto& tag : tags) {
-        auto& entries = _mutexEntries[tag];
-        std::list<MutexEntry> entriesSnapshot(entries);
-
-        // Garbage collect invalid entries.
-        entries.remove_if([&](auto& entry) { return MONGO_unlikely(!entry.token->isValid()); });
-
-        ScopedUnlock scopedUnlock(lk);
-        for (const auto& entry : entriesSnapshot) {
-            cb(tag, entry.registrationTime, *entry.token);
-        }
-    }
+BSONObj ObservableMutexRegistry::report(bool listAll) {
+    auto stats = _collectStats();
+    return serializeStats(stats, listAll);
 }
 
 size_t ObservableMutexRegistry::getNumRegistered_forTest() const {
-    stdx::lock_guard lk(_mutex);
+    stdx::lock_guard lk(_registrationMutex);
     size_t size = 0;
     for (const auto& [_, entries] : _mutexEntries) {
         size += entries.size();
     }
     return size;
+}
+
+StringMap<std::vector<ObservableMutexRegistry::StatsRecord>>
+ObservableMutexRegistry::_collectStats() {
+    stdx::lock_guard lk(_collectionMutex);
+    decltype(_mutexEntries) mutexEntriesSnapshot;
+    {
+        stdx::lock_guard lk(_registrationMutex);
+        mutexEntriesSnapshot = _mutexEntries;
+    }
+
+    StringMap<std::vector<StatsRecord>> statsMap;
+    for (auto& [tag, value] : mutexEntriesSnapshot) {
+        for (auto& entry : value) {
+            const auto stats = entry.token->getStats();
+            if (MONGO_unlikely(!entry.token->isValid())) {
+                // Token is invalid, so store its last known stats.
+                _removedTokensSnapshots[tag] += stats;
+
+                stdx::lock_guard lk(_registrationMutex);
+                // Remove the invalidated mutex from the registry. O(N) removal is acceptable since
+                // we don't expect many invalidated mutexes.
+                _mutexEntries[tag].remove_if([&](const auto& elem) { return elem.id == entry.id; });
+                continue;
+            }
+            statsMap[tag].push_back(StatsRecord{stats, entry.id, entry.registrationTime});
+        }
+    }
+
+    _includeRemovedSnapshots(lk, statsMap);
+    return statsMap;
+}
+
+void ObservableMutexRegistry::_includeRemovedSnapshots(
+    WithLock, StringMap<std::vector<StatsRecord>>& statsMap) {
+    for (const auto& [tag, stats] : _removedTokensSnapshots) {
+        // The mutexId and registered field within entry are left blank to indicate that these stats
+        // came from an invalidated mutex.
+        StatsRecord entry{stats};
+        statsMap[tag].push_back(entry);
+    }
 }
 }  // namespace mongo

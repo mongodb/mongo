@@ -45,15 +45,10 @@ namespace mongo {
 
 namespace {
 
-using observable_mutex_details::AcquisitionStats;
-using observable_mutex_details::ImplementsLockShared;
-using observable_mutex_details::LockStats;
-using observable_mutex_details::ObservationToken;
-
 class ObservationTokenTest : public unittest::Test {
 public:
     ObservationTokenTest()
-        : obsToken(ObservationToken([this](LockStats& stats) {
+        : obsToken(ObservationToken([this](MutexStats& stats) {
               auto append = [](auto& agg, auto& sample) {
                   agg.total += sample.total;
                   agg.contentions += sample.contentions;
@@ -63,16 +58,16 @@ public:
               append(stats.sharedAcquisitions, _tokenStats.sharedAcquisitions);
           })) {};
 
-    void setTokenStats(LockStats& newStats) {
+    void setTokenStats(MutexStats& newStats) {
         _tokenStats = newStats;
     }
 
-    const LockStats kZeroStats = {{0, 0, 0}, {0, 0, 0}};
+    const MutexStats kZeroStats = {{0, 0, 0}, {0, 0, 0}};
 
-    void verifyAcqStats(const AcquisitionStats<uint64_t>& current,
-                        const AcquisitionStats<uint64_t>& expected) const {
+    void verifyAcqStats(const MutexAcquisitionStats& current,
+                        const MutexAcquisitionStats& expected) const {
 
-        auto transformAcqStats = [](const AcquisitionStats<uint64_t>& stats) {
+        auto transformAcqStats = [](const MutexAcquisitionStats& stats) {
             return std::tie(stats.total, stats.contentions, stats.waitCycles);
         };
 
@@ -81,7 +76,7 @@ public:
         ASSERT_EQ(actualV, expectedV);
     }
 
-    void verifyLockStats(const LockStats& current, const LockStats& expected) const {
+    void verifyMutexStats(const MutexStats& current, const MutexStats& expected) const {
         verifyAcqStats(current.exclusiveAcquisitions, expected.exclusiveAcquisitions);
         verifyAcqStats(current.sharedAcquisitions, expected.sharedAcquisitions);
     }
@@ -90,7 +85,7 @@ public:
 
 private:
     // The following mimics the metrics collected by an observable mutex.
-    LockStats _tokenStats;
+    MutexStats _tokenStats;
 };
 
 class InvalidObservationTokenTest : public ObservationTokenTest {
@@ -106,18 +101,17 @@ TEST_F(ObservationTokenTest, Validity) {
 }
 
 TEST_F(ObservationTokenTest, ValidInitStats) {
-    verifyLockStats(*obsToken.getStats(), kZeroStats);
+    verifyMutexStats(obsToken.getStats(), kZeroStats);
 }
 
 TEST_F(ObservationTokenTest, ValidGetStats) {
     // Mimic a process updating the token's stats.
-    LockStats newStats = {{1, 1, 1}, {1, 1, 1}};
+    MutexStats newStats = {{1, 1, 1}, {1, 1, 1}};
     setTokenStats(newStats);
 
     // Check that retrieving the token's stats shows updated stats.
     auto fetchedTokenStats = obsToken.getStats();
-    ASSERT_TRUE(fetchedTokenStats);
-    verifyLockStats(*fetchedTokenStats, newStats);
+    verifyMutexStats(fetchedTokenStats, newStats);
 }
 
 TEST_F(InvalidObservationTokenTest, Invalidity) {
@@ -125,24 +119,23 @@ TEST_F(InvalidObservationTokenTest, Invalidity) {
 }
 
 TEST_F(InvalidObservationTokenTest, InvalidInitStats) {
-    ASSERT_FALSE(obsToken.getStats());
+    verifyMutexStats(obsToken.getStats(), {{0, 0, 0}, {0, 0, 0}});
 }
 
 TEST_F(ObservationTokenTest, ValidThenInvalid) {
     // Mimic a process updating the token's stats.
-    LockStats firstUpdate = {{1, 1, 1}, {1, 1, 1}};
+    MutexStats firstUpdate = {{1, 1, 1}, {1, 1, 1}};
     setTokenStats(firstUpdate);
 
     // Check that retrieving the token's stats shows updated stats.
     auto fetchedTokenStats = obsToken.getStats();
-    ASSERT_TRUE(fetchedTokenStats);
-    verifyLockStats(*fetchedTokenStats, firstUpdate);
+    verifyMutexStats(fetchedTokenStats, firstUpdate);
 
     // Invalidate the token.
     obsToken.invalidate();
 
-    // Check that retrieving the token's stats returns an optional.
-    ASSERT_FALSE(obsToken.getStats());
+    // Check that stats are still accessible after invalidation.
+    verifyMutexStats(fetchedTokenStats, firstUpdate);
 }
 
 class ObservableMutexTest : public ObservationTokenTest {
@@ -174,10 +167,10 @@ public:
     };
 
     template <typename MutexType>
-    void waitForChange(MutexType& m, const LockStats& oldStats) {
+    void waitForChange(MutexType& m, const MutexStats& oldStats) {
         size_t kNumChecks = 50;
         while (kNumChecks--) {
-            auto currentValue = *m.token()->getStats();
+            auto currentValue = m.token()->getStats();
             if (!(currentValue.exclusiveAcquisitions.contentions ==
                   oldStats.exclusiveAcquisitions.contentions) ||
                 !(currentValue.sharedAcquisitions.contentions ==
@@ -193,10 +186,9 @@ public:
     void statsTest(MutexType& m, Locker locker) {
         boost::optional<unittest::JoinThread> waiter;
         stdx::lock_guard lk(m);
-        LockStats expected = LockStats{{1, 0, 0}, {0, 0, 0}};
+        MutexStats expected = MutexStats{{1, 0, 0}, {0, 0, 0}};
         auto fetchedTokenStats = m.token()->getStats();
-        ASSERT_TRUE(fetchedTokenStats);
-        verifyLockStats(*fetchedTokenStats, expected);
+        verifyMutexStats(fetchedTokenStats, expected);
         waiter.emplace([&] {
             locker.lock(m);
             locker.unlock(m);
@@ -240,24 +232,18 @@ public:
         _m.unlock();
     }
 
-    void lock_shared()
-    requires ImplementsLockShared<MutexType>
-    {
+    void lock_shared() {
         if (!_m.try_lock_shared()) {
             auto reason = "Simulated lock failure for test";
             uasserted(ErrorCodes::LockFailed, reason);
         }
     }
 
-    bool try_lock_shared()
-    requires ImplementsLockShared<MutexType>
-    {
+    bool try_lock_shared() {
         return _m.try_lock_shared();
     }
 
-    void unlock_shared()
-    requires ImplementsLockShared<MutexType>
-    {
+    void unlock_shared() {
         _m.unlock_shared();
     }
 
@@ -271,51 +257,46 @@ using ThrowingObservableSharedMutex = ObservableMutex<ThrowingMutex<std::shared_
 TEST_F(ObservableMutexTest, MetricsAreInitializedToZero) {
     ObservableSharedMutex m;
     auto maybeStats = m.token()->getStats();
-    ASSERT_TRUE(maybeStats);
-    verifyLockStats(*maybeStats, kZeroStats);
+    verifyMutexStats(maybeStats, kZeroStats);
 }
 
 TEST_F(ObservableMutexTest, AcquisitionMetricsNotUpdatedWhenAcquisitionThrows) {
     ThrowingObservableMutex m;
     throwTest(m, ExclusiveLocker{});
-    LockStats expected = LockStats{{1, 0, 0}, {0, 0, 0}};
+    MutexStats expected = MutexStats{{1, 0, 0}, {0, 0, 0}};
     auto fetchedTokenStats = m.token()->getStats();
-    ASSERT_TRUE(fetchedTokenStats);
-    verifyLockStats(*fetchedTokenStats, expected);
+    verifyMutexStats(fetchedTokenStats, expected);
 }
 
 TEST_F(ObservableMutexTest, AcquisitionMetricsNotUpdatedWhenSharedAcquisitionThrows) {
     ThrowingObservableSharedMutex m;
     throwTest(m, SharedLocker{});
-    LockStats expected = LockStats{{1, 0, 0}, {0, 0, 0}};
+    MutexStats expected = MutexStats{{1, 0, 0}, {0, 0, 0}};
     auto fetchedTokenStats = m.token()->getStats();
-    ASSERT_TRUE(fetchedTokenStats);
-    verifyLockStats(*fetchedTokenStats, expected);
+    verifyMutexStats(fetchedTokenStats, expected);
 }
 
 #ifndef _WIN32
 TEST_F(ObservableMutexTest, AcquisitionMetricsCorrectlyUpdated) {
     ObservableExclusiveMutex m;
     statsTest(m, ExclusiveLocker{});
-    AcquisitionStats expected = AcquisitionStats<uint64_t>{0, 0, 0};
+    MutexAcquisitionStats expected = MutexAcquisitionStats{0, 0, 0};
     auto fetchedTokenStats = m.token()->getStats();
-    ASSERT_TRUE(fetchedTokenStats);
-    ASSERT_EQ((*fetchedTokenStats).exclusiveAcquisitions.total, 2);
-    ASSERT_EQ((*fetchedTokenStats).exclusiveAcquisitions.contentions, 1);
-    ASSERT_GREATER_THAN((*fetchedTokenStats).exclusiveAcquisitions.waitCycles, 0);
-    verifyAcqStats((*fetchedTokenStats).sharedAcquisitions, expected);
+    ASSERT_EQ((fetchedTokenStats).exclusiveAcquisitions.total, 2);
+    ASSERT_EQ((fetchedTokenStats).exclusiveAcquisitions.contentions, 1);
+    ASSERT_GREATER_THAN((fetchedTokenStats).exclusiveAcquisitions.waitCycles, 0);
+    verifyAcqStats((fetchedTokenStats).sharedAcquisitions, expected);
 }
 
 TEST_F(ObservableMutexTest, SharedAcquisitionMetricsCorrectlyUpdated) {
     ObservableSharedMutex m;
     statsTest(m, SharedLocker{});
-    AcquisitionStats expected = AcquisitionStats<uint64_t>{1, 0, 0};
+    MutexAcquisitionStats expected = MutexAcquisitionStats{1, 0, 0};
     auto fetchedTokenStats = m.token()->getStats();
-    ASSERT_TRUE(fetchedTokenStats);
-    verifyAcqStats((*fetchedTokenStats).exclusiveAcquisitions, expected);
-    ASSERT_EQ((*fetchedTokenStats).sharedAcquisitions.total, 1);
-    ASSERT_EQ((*fetchedTokenStats).sharedAcquisitions.contentions, 1);
-    ASSERT_GREATER_THAN((*fetchedTokenStats).sharedAcquisitions.waitCycles, 0);
+    verifyAcqStats((fetchedTokenStats).exclusiveAcquisitions, expected);
+    ASSERT_EQ((fetchedTokenStats).sharedAcquisitions.total, 1);
+    ASSERT_EQ((fetchedTokenStats).sharedAcquisitions.contentions, 1);
+    ASSERT_GREATER_THAN((fetchedTokenStats).sharedAcquisitions.waitCycles, 0);
 }
 #endif
 

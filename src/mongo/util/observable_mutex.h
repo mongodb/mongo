@@ -44,6 +44,8 @@
 namespace mongo {
 
 namespace observable_mutex_details {
+template <typename MutexType>
+concept ImplementsLockShared = requires(MutexType m) { m.lock_shared(); };
 
 /**
  * AcquisitionStats are the building blocks to keeping track of different sorts of acquisition
@@ -54,11 +56,54 @@ struct AcquisitionStats {
     CounterType total{0};        // Tracks the total number of acquisitions.
     CounterType contentions{0};  // Tracks the number of acquisitions that had to wait.
     CounterType waitCycles{0};   // Tracks the total wait time for contended acquisitions.
+
+    AcquisitionStats& operator+=(const AcquisitionStats rhs) {
+        this->total += rhs.total;
+        this->contentions += rhs.contentions;
+        this->waitCycles += rhs.waitCycles;
+        return *this;
+    }
+
+    AcquisitionStats operator+(const AcquisitionStats rhs) const {
+        return {this->total + rhs.total,
+                this->contentions + rhs.contentions,
+                this->waitCycles + rhs.waitCycles};
+    }
 };
 
-struct LockStats {
-    AcquisitionStats<uint64_t> exclusiveAcquisitions{0, 0, 0};
-    AcquisitionStats<uint64_t> sharedAcquisitions{0, 0, 0};
+struct Timer {
+    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
+#if defined(__linux__) && defined(__x86_64__)
+        unsigned int lo, hi;
+        asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+        return ((uint64_t)hi << 32) | lo;
+#elif defined(__linux__) && defined(__aarch64__)
+        uint64_t tsc;
+        asm volatile("mrs %0, cntvct_el0" : "=r"(tsc));
+        return tsc;
+#else
+        return std::clock();
+#endif
+    }
+};
+}  // namespace observable_mutex_details
+
+using MutexAcquisitionStats = observable_mutex_details::AcquisitionStats<uint64_t>;
+
+struct MutexStats {
+    MutexAcquisitionStats exclusiveAcquisitions{0, 0, 0};
+    MutexAcquisitionStats sharedAcquisitions{0, 0, 0};
+
+    MutexStats& operator+=(const MutexStats rhs) {
+        this->exclusiveAcquisitions += rhs.exclusiveAcquisitions;
+        this->sharedAcquisitions += rhs.sharedAcquisitions;
+        return *this;
+    }
+
+    MutexStats operator+(const MutexStats rhs) const {
+        return {this->exclusiveAcquisitions + rhs.exclusiveAcquisitions,
+                this->sharedAcquisitions + rhs.sharedAcquisitions};
+    }
 };
 
 /**
@@ -70,12 +115,19 @@ struct LockStats {
  */
 class ObservationToken {
 public:
-    using AppendStatsCallback = std::function<void(LockStats&)>;
+    using AppendStatsCallback = std::function<void(MutexStats&)>;
 
     explicit ObservationToken(AppendStatsCallback callback) : _callback(std::move(callback)) {}
 
+    /**
+     * Updates _lastKnownStats using _callback and marks the token as invalid.
+     */
     void invalidate() {
         stdx::lock_guard lk(_mutex);
+        if (!_isValid) {
+            return;
+        }
+        _callback(_lastKnownStats);
         _isValid = false;
     }
 
@@ -88,50 +140,20 @@ public:
         return isValid();
     }
 
-    boost::optional<LockStats> getStats() const {
+    MutexStats getStats() {
         stdx::lock_guard lk(_mutex);
-        if (!_isValid) {
-            return boost::none;
+        if (_isValid) {
+            _callback(_lastKnownStats);
         }
-        LockStats stats;
-        _callback(stats);
-        return stats;
+        return _lastKnownStats;
     }
 
 private:
     AppendStatsCallback _callback;
     mutable stdx::mutex _mutex;
+    MutexStats _lastKnownStats;
     bool _isValid = true;
 };
-
-template <typename MutexType>
-concept ImplementsLockShared = requires(MutexType m) { m.lock_shared(); };
-
-#if defined(__linux__) && defined(__x86_64__)
-struct Timer {
-    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
-        unsigned int lo, hi;
-        asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-        return ((uint64_t)hi << 32) | lo;
-    }
-};
-#elif defined(__linux__) && defined(__aarch64__)
-struct Timer {
-    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
-        uint64_t tsc;
-        asm volatile("mrs %0, cntvct_el0" : "=r"(tsc));
-        return tsc;
-    }
-};
-#else
-struct Timer {
-    MONGO_COMPILER_ALWAYS_INLINE auto getTime() const {
-        return std::clock();
-    }
-};
-#endif
-
-}  // namespace observable_mutex_details
 
 /**
  * The wrapper for mutex objects, ObservableMutex, collects contention metrics for the wrapped mutex
@@ -147,16 +169,15 @@ template <typename MutexType>
 class ObservableMutex {
 public:
     ObservableMutex()
-        : _token(std::make_shared<ObservationToken>(
-              [this](observable_mutex_details::LockStats& stats) {
-                  auto append = [](auto& agg, const auto& sample) {
-                      agg.total += sample.total.loadRelaxed();
-                      agg.contentions += sample.contentions.loadRelaxed();
-                      agg.waitCycles += sample.waitCycles.loadRelaxed();
-                  };
-                  append(stats.exclusiveAcquisitions, _exclusiveAcquisitions);
-                  append(stats.sharedAcquisitions, _sharedAcquisitions);
-              })) {}
+        : _token(std::make_shared<ObservationToken>([this](MutexStats& stats) {
+              auto assign = [](auto& target, const auto& source) {
+                  target.total = source.total.loadRelaxed();
+                  target.contentions = source.contentions.loadRelaxed();
+                  target.waitCycles = source.waitCycles.loadRelaxed();
+              };
+              assign(stats.exclusiveAcquisitions, _exclusiveAcquisitions);
+              assign(stats.sharedAcquisitions, _sharedAcquisitions);
+          })) {}
 
     ~ObservableMutex() {
         _token->invalidate();
@@ -192,8 +213,19 @@ public:
         _mutex.unlock_shared();
     }
 
+    void setExclusiveAcquisitions_forTest(MutexAcquisitionStats stat) {
+        _exclusiveAcquisitions.contentions.store(stat.contentions);
+        _exclusiveAcquisitions.total.store(stat.total);
+        _exclusiveAcquisitions.waitCycles.store(stat.waitCycles);
+    }
+
+    void setSharedAcquisitions_forTest(MutexAcquisitionStats stat) {
+        _sharedAcquisitions.contentions.store(stat.contentions);
+        _sharedAcquisitions.total.store(stat.total);
+        _sharedAcquisitions.waitCycles.store(stat.waitCycles);
+    }
+
 private:
-    using ObservationToken = observable_mutex_details::ObservationToken;
     using AtomicAcquisitionStats = observable_mutex_details::AcquisitionStats<Atomic<uint64_t>>;
 
     MONGO_COMPILER_NOINLINE void _onContendedAcquisition(AtomicAcquisitionStats& stats,

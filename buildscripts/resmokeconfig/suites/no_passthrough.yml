@@ -19,6 +19,8 @@ selector:
     - jstests/concurrency/*.js
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
+    # TODO(SERVER-106634): Remove
+    - jstests/noPassthrough/network/lock_contention_metrics_server_status.js
   exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.

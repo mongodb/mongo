@@ -51,6 +51,21 @@ variables:
     # - name: generate_buildid_to_debug_symbols_mapping
     #   variant: linux-x86-dynamic-compile
 
+  # TODO(SERVER-106634): Remove mutex_observation compile variants
+  - &linux_x86_dynamic_compile_with_mutex_observation_variant_name linux-x86-dynamic-compile-observable-mutex
+
+  - &linux_x86_dynamic_compile_with_mutex_observation_variant_dependency
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux_x86_dynamic_compile_with_mutex_observation_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: linux-x86-dynamic-compile
+
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
@@ -65,6 +80,15 @@ variables:
     large_distro_name: rhel8.8-medium
     core_analyzer_distro_name: rhel8.8-xlarge
     compile_variant: *linux_x86_dynamic_compile_variant_name
+
+  # TODO(SERVER-106634): Remove mutex_observation compile variants
+  - &linux_x86_with_mutex_observation_generic_expansions
+    multiversion_platform: rhel8
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    large_distro_name: rhel8.8-medium
+    core_analyzer_distro_name: rhel8.8-xlarge
+    compile_variant: *linux_x86_dynamic_compile_with_mutex_observation_variant_name
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -91,6 +115,35 @@ buildvariants:
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
       compile_variant: *linux-x86-dynamic-compile
+      build_mongot: true
+      download_mongot_release: true
+    tasks:
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+        distros:
+          - rhel8.8-xlarge
+
+  - <<: *linux-x86-dynamic-compile-params
+    name: &linux-x86-dynamic-compile-observable-mutex linux-x86-dynamic-compile-observable-mutex
+    display_name: "* Linux x86 Enterprise Shared Library With Mutex Observation"
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
+    expansions:
+      <<: *linux-x86-dynamic-enterprise-compile-expansions
+      compile_variant: *linux-x86-dynamic-compile-observable-mutex
+      bazel_compile_flags: >-
+        --mutex_observation=True
       build_mongot: true
       download_mongot_release: true
     tasks:
@@ -357,7 +410,7 @@ buildvariants:
       - name: sharding_pqs_index_filters_gen
 
   # TODO SERVER-106634 Delete this variant once the feature is compiled in by default
-  - <<: *linux_x86_dynamic_compile_variant_dependency
+  - <<: *linux_x86_dynamic_compile_with_mutex_observation_variant_dependency
     name: mutex-observation
     display_name: "~ Build With Mutex Observation"
     tags: ["mutex_observation"]
@@ -365,14 +418,13 @@ buildvariants:
     run_on:
       - rhel8.8-medium
     expansions:
-      <<: *linux_x86_generic_expansions
+      <<: *linux_x86_with_mutex_observation_generic_expansions
       bazel_compile_flags: >-
-        --mutex_observation=true
         --define=MONGO_DISTMOD=rhel88
         --linkstatic=False
     depends_on:
       - name: archive_dist_test
-        variant: *linux_x86_dynamic_compile_variant_name
+        variant: *linux_x86_dynamic_compile_with_mutex_observation_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
@@ -385,6 +437,7 @@ buildvariants:
       - name: sharding_gen
       - name: replica_sets_gen
       - name: noPassthrough_gen
+      - name: no_passthrough_network_with_mutex_observability
       - name: run_unit_tests_TG
         distros:
           - rhel8.8-xlarge

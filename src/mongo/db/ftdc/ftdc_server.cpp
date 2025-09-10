@@ -282,6 +282,7 @@ public:
         // mirrored by this process in FTDC collections.
         // "oplog" is included to append the earliest and latest optimes, which allow calculation of
         // the oplog window.
+        // "lockContentionMetrics" is included to collect metrics on mutexes
 
         BSONObjBuilder commandBuilder;
         commandBuilder.append(kCommand, 1);
@@ -289,6 +290,7 @@ public:
         commandBuilder.append("timing", false);
         commandBuilder.append("defaultRWConcern", false);
         commandBuilder.append(MirrorMaestro::kServerStatusSectionName, true);
+        commandBuilder.append("lockContentionMetrics", BSON("listAll" << 0));
 
         // Avoid requesting metrics that aren't available during a shutdown.
         if (_serverShuttingDown) {

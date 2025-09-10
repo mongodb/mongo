@@ -1081,10 +1081,12 @@ mongo_cc_library(
     name = "observable_mutex_registry",
     srcs = [
         "observable_mutex_registry.cpp",
-        "scoped_unlock.h",
     ],
     hdrs = ["observable_mutex_registry.h"],
-    deps = ["//src/mongo:base"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
 )
 
 mongo_cc_unit_test(
