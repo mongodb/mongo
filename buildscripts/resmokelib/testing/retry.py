@@ -20,6 +20,7 @@ retryable_codes = [
     89,  # NetworkTimeout
     9001,  # SocketException
     262,  # ExceededTimeLimit
+    202,  # NetworkInterfaceExceededTimeLimit
 ]
 
 # The names for the error codes above.
@@ -37,6 +38,7 @@ retryable_code_names = [
     "NetworkTimeout",
     "SocketException",
     "ExceededTimeLimit",
+    "NetworkInterfaceExceededTimeLimit",
 ]
 
 
