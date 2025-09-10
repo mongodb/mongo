@@ -208,11 +208,6 @@ public:
                                                   boost::optional<Timestamp> afterClusterTime,
                                                   bool expandSimpleCollation = false);
 
-
-    bool isParallelFetchingSupported() {
-        return _parallelFetchersSupported;
-    }
-
     /**
      * Gets the collection uuid and options from fromShardId. If given a chunk manager, will fetch
      * the collection options using the database version protocol.
@@ -335,8 +330,6 @@ private:
 
     // State that is shared among all inserter threads.
     std::shared_ptr<MigrationCloningProgressSharedState> _migrationCloningProgress;
-
-    bool _parallelFetchersSupported;
 
     LogicalSessionId _lsid;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
