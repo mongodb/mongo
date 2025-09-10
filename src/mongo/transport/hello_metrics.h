@@ -44,6 +44,8 @@ namespace transport {
 class SessionManager;
 }  // namespace transport
 
+class HelloMetrics;
+
 /**
  * A decoration on the Session object used to track exhaust metrics. We are
  * tracking metrics for "hello" and "isMaster/ismaster" separately while we
@@ -52,6 +54,11 @@ class SessionManager;
  */
 class InExhaustHello {
 public:
+    enum class Command {
+        kHello,
+        kIsMaster,
+    };
+
     InExhaustHello() = default;
 
     InExhaustHello(const InExhaustHello&) = delete;
@@ -60,12 +67,16 @@ public:
     InExhaustHello& operator=(InExhaustHello&&) = delete;
 
     static InExhaustHello* get(transport::Session* session);
-    void setInExhaust(bool inExhaust, StringData commandName);
+    void setInExhaust(Command command);
+    void resetInExhaust();
     bool getInExhaustIsMaster() const;
     bool getInExhaustHello() const;
     ~InExhaustHello();
 
 private:
+    void transitionOutOfInExhaustHello(HelloMetrics*);
+    void transitionOutOfInExhaustIsMaster(HelloMetrics*);
+
     bool _inExhaustIsMaster = false;
     bool _inExhaustHello = false;
 

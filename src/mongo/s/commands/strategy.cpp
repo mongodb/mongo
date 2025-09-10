@@ -496,7 +496,7 @@ void ParseAndRunCommand::_parseCommand() {
     const auto session = client->session();
     if (session) {
         if (!opCtx->isExhaust() || !_isHello.value()) {
-            InExhaustHello::get(session.get())->setInExhaust(false, _commandName);
+            InExhaustHello::get(session.get())->resetInExhaust();
         }
     }
 

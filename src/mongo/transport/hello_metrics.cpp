@@ -186,33 +186,42 @@ bool InExhaustHello::getInExhaustHello() const {
     return _inExhaustHello;
 }
 
-void InExhaustHello::setInExhaust(bool inExhaust, StringData commandName) {
-    const bool isHello = (commandName == "hello"_sd);
+void InExhaustHello::transitionOutOfInExhaustHello(HelloMetrics* helloMetrics) {
+    if (!_inExhaustHello)
+        return;
+    helloMetrics->decrementNumExhaustHello();
+    _inExhaustHello = false;
+}
+
+void InExhaustHello::transitionOutOfInExhaustIsMaster(HelloMetrics* helloMetrics) {
+    if (!_inExhaustIsMaster)
+        return;
+    helloMetrics->decrementNumExhaustIsMaster();
+    _inExhaustIsMaster = false;
+}
+
+void InExhaustHello::setInExhaust(Command command) {
     auto* helloMetrics = getHelloMetrics(this);
-
-    // Transition out of exhaust hello if setting inExhaust to false or if
-    // the isMaster command is used.
-    if (_inExhaustHello && (!inExhaust || !isHello)) {
-        helloMetrics->decrementNumExhaustHello();
-        _inExhaustHello = false;
-    }
-
-    // Transition out of exhaust isMaster if setting inExhaust to false or if
-    // the hello command is used.
-    if (_inExhaustIsMaster && (!inExhaust || isHello)) {
-        helloMetrics->decrementNumExhaustIsMaster();
-        _inExhaustIsMaster = false;
-    }
-
-    if (inExhaust) {
-        if (isHello && !_inExhaustHello) {
+    if (command == Command::kHello) {
+        transitionOutOfInExhaustIsMaster(helloMetrics);
+        if (!_inExhaustHello) {
             helloMetrics->incrementNumExhaustHello();
-            _inExhaustHello = inExhaust;
-        } else if (!isHello && !_inExhaustIsMaster) {
+            _inExhaustHello = true;
+        }
+    } else {
+        invariant(command == Command::kIsMaster);
+        transitionOutOfInExhaustHello(helloMetrics);
+        if (!_inExhaustIsMaster) {
             helloMetrics->incrementNumExhaustIsMaster();
-            _inExhaustIsMaster = inExhaust;
+            _inExhaustIsMaster = true;
         }
     }
+}
+
+void InExhaustHello::resetInExhaust() {
+    auto* helloMetrics = getHelloMetrics(this);
+    transitionOutOfInExhaustHello(helloMetrics);
+    transitionOutOfInExhaustIsMaster(helloMetrics);
 }
 
 }  // namespace mongo

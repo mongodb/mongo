@@ -616,7 +616,7 @@ private:
         const auto session = _execContext.getOpCtx()->getClient()->session();
         if (session) {
             if (!opCtx->isExhaust() || !isHello()) {
-                InExhaustHello::get(session.get())->setInExhaust(false, command->getName());
+                InExhaustHello::get(session.get())->resetInExhaust();
             }
         }
     }

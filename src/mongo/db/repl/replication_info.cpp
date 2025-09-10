@@ -607,8 +607,7 @@ public:
                     maxAwaitTimeMS);
             invariant(clientTopologyVersion);
 
-            InExhaustHello::get(opCtx->getClient()->session().get())
-                ->setInExhaust(true /* inExhaust */, getName());
+            InExhaustHello::get(opCtx->getClient()->session().get())->setInExhaust(commandType());
 
             if (clientTopologyVersion->getProcessId() == currentTopologyVersion.getProcessId() &&
                 clientTopologyVersion->getCounter() == currentTopologyVersion.getCounter()) {
@@ -656,6 +655,10 @@ protected:
 
     virtual bool useLegacyResponseFields() const {
         return false;
+    }
+
+    virtual InExhaustHello::Command commandType() const {
+        return InExhaustHello::Command::kHello;
     }
 
 private:
@@ -714,6 +717,10 @@ protected:
     // instead of "ismaster" and "secondaryDelaySecs" response field instead of "slaveDelay".
     bool useLegacyResponseFields() const final {
         return true;
+    }
+
+    InExhaustHello::Command commandType() const final {
+        return InExhaustHello::Command::kIsMaster;
     }
 };
 MONGO_REGISTER_COMMAND(CmdIsMaster).forShard();
