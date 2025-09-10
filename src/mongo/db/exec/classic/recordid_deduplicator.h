@@ -93,7 +93,8 @@ public:
     void freeMemory(const RecordId& recordId);
 
     uint64_t getApproximateSize() const {
-        return _hashset.size() + _roaring.getApproximateSize();
+        size_t emptySlotsSpace = (_hashset.capacity() - _hashset.size()) * sizeof(RecordId);
+        return emptySlotsSpace + _hashSetMemUsage + _roaring.getApproximateSize();
     }
 
 private:
@@ -107,5 +108,7 @@ private:
 
     std::unique_ptr<SpillTable> _diskStorageString;
     std::unique_ptr<SpillTable> _diskStorageLong;
+
+    uint64_t _hashSetMemUsage = 0;
 };
 }  // namespace mongo
