@@ -626,7 +626,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
         ASSERT_EQUALS(nss, collNss);
     };
 
-    const auto entry = makeCreateCollectionOplogEntry(nextOpTime(), nss);
+    const auto entry = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nss);
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
     ASSERT_TRUE(applyCmdCalled);
@@ -703,8 +703,10 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
     ASSERT_TRUE(collectionExists(_opCtx.get(), nssTenant1));
     ASSERT_FALSE(collectionExists(_opCtx.get(), nssTenant2));
 
-    const auto entry1 = makeCreateCollectionOplogEntry(nextOpTime(), nssTenant1, options);
-    const auto entry2 = makeCreateCollectionOplogEntry(nextOpTime(), nssTenant2, UUID::gen());
+    const auto entry1 =
+        makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssTenant1, options);
+    const auto entry2 =
+        makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssTenant2, UUID::gen());
 
     // This fails silently so we won't see any indication of a collision, but we can also assert
     // that the opObserver event above won't be called in the event of a collision.
@@ -1124,7 +1126,8 @@ TEST_F(IdempotencyTest, CollModCommandMultitenant) {
 
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_OK(runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), nss, kUuid)));
+    ASSERT_OK(
+        runOpInitialSync(makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nss, kUuid)));
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
@@ -1165,7 +1168,8 @@ TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
 
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_OK(runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), nssTenant1, kUuid)));
+    ASSERT_OK(runOpInitialSync(
+        makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssTenant1, kUuid)));
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
@@ -1295,7 +1299,7 @@ TEST_F(OplogApplierImplTest,
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncUsesApplyOplogEntryOrGroupedInsertsToApplyOperation) {
     NamespaceString nss = makeNamespace("local");
-    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+    auto op = makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss);
 
     std::vector<ApplierOperation> ops = {ApplierOperation{&op}};
     WorkerMultikeyPathInfo pathInfo;
@@ -3601,7 +3605,8 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInf
     NamespaceString nss = makeNamespace("test");
 
     {
-        auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
+        auto op = makeCreateCollectionOplogEntry(
+            _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
         testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
     {
@@ -3625,7 +3630,8 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
     NamespaceString nss = makeNamespace("test");
 
     {
-        auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
+        auto op = makeCreateCollectionOplogEntry(
+            _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
         testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
@@ -3667,7 +3673,8 @@ TEST_F(OplogApplierImplTest,
     NamespaceString nss = makeNamespace("test");
 
     {
-        auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
+        auto op = makeCreateCollectionOplogEntry(
+            _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
         testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
@@ -3695,8 +3702,8 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
     NamespaceString nss = makeNamespace("foo");
-    auto op =
-        makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, CollectionOptions{});
+    auto op = makeCreateCollectionOplogEntry(
+        _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, CollectionOptions{});
 
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
@@ -3831,8 +3838,10 @@ TEST_F(OplogApplierImplTest,
     };
     NamespaceString nss1 = makeNamespace("test", "_1");
     NamespaceString nss2 = makeNamespace("test", "_2");
-    auto createOp1 = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss1);
-    auto createOp2 = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss2);
+    auto createOp1 =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(seconds++), 0), 1LL}, nss1);
+    auto createOp2 =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(seconds++), 0), 1LL}, nss2);
     auto insertOp1a = makeOp(nss1);
     auto insertOp1b = makeOp(nss1);
     auto insertOp2a = makeOp(nss2);
@@ -3872,7 +3881,8 @@ TEST_F(OplogApplierImplTest,
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
     NamespaceString nss = makeNamespace("test", "_1");
-    auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
+    auto createOp =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Generate operations to apply:
     // {create}, {insert_1}, {insert_2}, .. {insert_(limit)}, {insert_(limit+1)}
@@ -3924,7 +3934,8 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncLimitsBatchSizeWhenGroupingInsertOperations) {
     int seconds = 1;
     NamespaceString nss = makeNamespace("test");
-    auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
+    auto createOp =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Create a sequence of insert ops that are too large to fit in one group.
     int maxBatchSize = write_ops::insertVectorMaxBytes;
@@ -3974,7 +3985,8 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncAppliesOpIndividuallyWhenOpIndividuallyExceedsBatchSize) {
     int seconds = 1;
     NamespaceString nss = makeNamespace("test");
-    auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
+    auto createOp =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     int maxBatchSize = write_ops::insertVectorMaxBytes;
     // Create an insert op that exceeds the maximum batch size by itself.
@@ -4054,7 +4066,8 @@ TEST_F(OplogApplierImplTest,
         return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
     NamespaceString nss = makeNamespace("test", "_1");
-    auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
+    auto createOp =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Generate operations to apply:
     // {create}, {insert_1}, {insert_2}, .. {insert_(limit)}, {insert_(limit+1)}
@@ -4134,7 +4147,7 @@ TEST_F(OplogApplierImplTest,
     auto doc1 = BSON("_id" << 1);
     auto doc2 = BSON("_id" << 2);
     auto doc3 = BSON("_id" << 3);
-    auto op0 = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+    auto op0 = makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss);
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc1);
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, badNss, doc2);
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
@@ -4165,7 +4178,8 @@ TEST_F(OplogApplierImplTest,
     auto doc1 = BSON("_id" << 1);
     auto keyPattern = BSON("a" << 1);
     auto doc3 = BSON("_id" << 3);
-    auto op0 = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
+    auto op0 =
+        makeCreateCollectionOplogEntry(_opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc1);
     auto op2 = makeCreateIndexOplogEntry(
         {Timestamp(Seconds(3), 0), 1LL}, badNss, "a_1", keyPattern, kUuid);
@@ -4394,12 +4408,14 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
     auto runOpsAndValidate = [this, uuid]() {
         auto options1 = CollectionOptions{
             .uuid = uuid, .validator = fromjson("{'phone' : {'$type' : 'string' } }")};
-        auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options1);
+        auto createColl1 =
+            makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), _nss, options1);
         auto dropColl = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()));
 
         auto options2 = CollectionOptions{
             .uuid = uuid, .validator = fromjson("{'phone' : {'$type' : 'number' } }")};
-        auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options2);
+        auto createColl2 =
+            makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), _nss, options2);
 
         auto ops = {createColl1, dropColl, createColl2};
         ASSERT_OK(runOpsInitialSync(ops));
@@ -4435,7 +4451,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
                                         << IndexConstants::kIdIndexName << "v" << 2),
 
             .collation = collationOpts};
-        auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options);
+        auto createColl = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), _nss, options);
         auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
         auto updateOp1 = update("foo",
                                 update_oplog_entry::makeDeltaOplogEntry(
@@ -4471,7 +4487,8 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(runOpInitialSync(createCollection()));
     // Create "system.views" collection
     auto viewNss = NamespaceString::makeSystemDotViewsNamespace(_nss.dbName());
-    ASSERT_OK(runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options)));
+    ASSERT_OK(runOpInitialSync(
+        makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), viewNss, options)));
 
     auto viewDoc = BSON(
         "_id"

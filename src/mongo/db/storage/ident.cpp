@@ -85,23 +85,36 @@ constexpr std::array<StringData, 256> escapeTable = {
     ".240"_sd, ".241"_sd, ".242"_sd, ".243"_sd, ".244"_sd, ".245"_sd, ".246"_sd, ".247"_sd,
     ".248"_sd, ".249"_sd, ".250"_sd, ".251"_sd, ".252"_sd, ".253"_sd, ".254"_sd, ".255"_sd};
 
-std::string generateNewIdent(const DatabaseName& dbName,
-                             StringData identType,
-                             bool directoryPerDB,
-                             bool directoryForIndexes) {
+StringBuilder buildIdentPrefix(const DatabaseName& dbName,
+                               StringData identType,
+                               bool directoryPerDB,
+                               bool directoryForIndexes) {
     StringBuilder buf;
     if (directoryPerDB) {
         buf << ident::createDBNamePathComponent(dbName) << '/';
     }
     buf << identType;
     buf << (directoryForIndexes ? '/' : '-');
+    return buf;
+}
+
+std::string generateNewIdent(const DatabaseName& dbName,
+                             StringData identType,
+                             const boost::optional<StringData>& optIdentUniqueTag,
+                             bool directoryPerDB,
+                             bool directoryForIndexes) {
+    auto buf = buildIdentPrefix(dbName, identType, directoryPerDB, directoryForIndexes);
     // The suffix of an ident serves as a unique identifier.
     //
     // (v8.2+) Suffix new idents with a unique UUID.
     //
     // Idents created before v8.2 are suffixed with a <counter> + <random number> combination.
     // Future versions of the server must support both formats.
-    buf << UUID::gen();
+    if (optIdentUniqueTag) {
+        buf << *optIdentUniqueTag;
+    } else {
+        buf << UUID::gen();
+    }
     return buf.str();
 }
 
@@ -121,12 +134,6 @@ struct ParsedIdent {
     StringData uniqueTag;
 };
 
-bool validateTag(StringData uniqueTag) {
-    // The tag is pretty free-form, but must not contain any characters which would be special when
-    // interpreted as a path
-    return !uniqueTag.empty() && uniqueTag.find_first_of("./\\:") == uniqueTag.npos;
-}
-
 boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
                                            StringData identType,
                                            StringData uniqueTag) {
@@ -134,7 +141,7 @@ boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
     auto parsedIdentType = getIdentType(identType);
     if (!parsedIdentType)
         return boost::none;
-    if (!validateTag(uniqueTag))
+    if (!ident::validateTag(uniqueTag))
         return boost::none;
 
     // If the dbName is present it must be non-empty, must not change when escaped with
@@ -205,13 +212,13 @@ boost::optional<ParsedIdent> parseIdent(StringData str) {
     // and thus it's a collection in the db named "index".
     if (auto identType = getIdentType(tok2->head)) {
         // Format 3: "$dbName/$identType-$uniqueTag"
-        if (!validateTag(tok2->tail))
+        if (!ident::validateTag(tok2->tail))
             return boost::none;
         return ParsedIdent{*identType, tok2->tail};
     }
     if (auto identType = getIdentType(tok1->head)) {
         // Format 2: "$identType/$uniqueTag"
-        if (!validateTag(tok1->tail))
+        if (!ident::validateTag(tok1->tail))
             return boost::none;
         return ParsedIdent{*identType, tok1->tail};
     }
@@ -223,14 +230,18 @@ namespace ident {
 
 std::string generateNewCollectionIdent(const DatabaseName& dbName,
                                        bool directoryPerDB,
-                                       bool directoryForIndexes) {
-    return generateNewIdent(dbName, kCollectionIdentStem, directoryPerDB, directoryForIndexes);
+                                       bool directoryForIndexes,
+                                       const boost::optional<StringData>& optIdentUniqueTag) {
+    return generateNewIdent(
+        dbName, kCollectionIdentStem, optIdentUniqueTag, directoryPerDB, directoryForIndexes);
 }
 
 std::string generateNewIndexIdent(const DatabaseName& dbName,
                                   bool directoryPerDB,
-                                  bool directoryForIndexes) {
-    return generateNewIdent(dbName, kIndexIdentStem, directoryPerDB, directoryForIndexes);
+                                  bool directoryForIndexes,
+                                  const boost::optional<StringData>& optIdentUniqueTag) {
+    return generateNewIdent(
+        dbName, kIndexIdentStem, optIdentUniqueTag, directoryPerDB, directoryForIndexes);
 }
 
 std::string generateNewInternalIdent(StringData identStem) {
@@ -239,6 +250,26 @@ std::string generateNewInternalIdent(StringData identStem) {
 
 std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent) {
     return fmt::format("{}-{}-{}", kInternalIdentStem, identStem, indexIdent);
+}
+
+StringData getCollectionIdentUniqueTag(StringData ident,
+                                       const DatabaseName& dbName,
+                                       bool directoryPerDB,
+                                       bool directoryForIndexes) {
+    auto identPrefix =
+        buildIdentPrefix(dbName, kCollectionIdentStem, directoryPerDB, directoryForIndexes);
+    invariant(ident.starts_with(identPrefix.stringData()));
+    return ident.substr(identPrefix.len());
+}
+
+StringData getIndexIdentUniqueTag(StringData ident,
+                                  const DatabaseName& dbName,
+                                  bool directoryPerDB,
+                                  bool directoryForIndexes) {
+    auto identPrefix =
+        buildIdentPrefix(dbName, kIndexIdentStem, directoryPerDB, directoryForIndexes);
+    invariant(ident.starts_with(identPrefix.stringData()));
+    return ident.substr(identPrefix.len());
 }
 
 bool isCollectionOrIndexIdent(StringData ident) {
@@ -258,6 +289,10 @@ bool isCollectionIdent(StringData ident) {
     // they are not eligible for orphan recovery through repair.
     auto parsed = parseIdent(ident);
     return parsed && parsed->identType == IdentType::collection;
+}
+
+bool validateTag(StringData uniqueTag) {
+    return !uniqueTag.empty() && uniqueTag.find_first_of("./\\:") == uniqueTag.npos;
 }
 
 bool isValidIdent(StringData ident) {

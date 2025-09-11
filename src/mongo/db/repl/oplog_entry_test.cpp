@@ -179,16 +179,20 @@ TEST_F(OplogEntryTest, CreateWithCatalogIdentifier) {
     // Oplog entries generated with 'featureFlagReplicateLocalCatalogIdentifiers' enabled include
     // catalog identifier information in the 'o2' field.
     RecordId catalogId = RecordId(1);
-    std::string ident = "collection_ident";
-    std::string idIndexIdent = "id_index_ident";
+    std::string identUniqueTag = "collection_ident";
+    std::string idIndexIdentUniqueTag = "id_index_ident";
     bool directoryPerDB = true;
     bool directoryForIndexes = true;
-    const auto oplogEntryObject2Doc = MutableOplogEntry::makeCreateCollObject2(
-        catalogId, ident, idIndexIdent, directoryPerDB, directoryForIndexes);
+    const auto oplogEntryObject2Doc =
+        MutableOplogEntry::makeCreateCollObject2(catalogId,
+                                                 identUniqueTag,
+                                                 StringData(idIndexIdentUniqueTag),
+                                                 directoryPerDB,
+                                                 directoryForIndexes);
     ASSERT_BSONOBJ_EQ(oplogEntryObject2Doc,
-                      BSON("catalogId" << 1 << "ident" << ident << "idIndexIdent" << idIndexIdent
-                                       << "directoryPerDB" << true << "directoryForIndexes"
-                                       << true));
+                      BSON("catalogId" << 1 << "ident" << identUniqueTag << "idIndexIdent"
+                                       << idIndexIdentUniqueTag << "directoryPerDB" << true
+                                       << "directoryForIndexes" << true));
 
     const auto entry = makeCommandOplogEntry(
         entryOpTime, nss, oplogEntryObjectDoc, oplogEntryObject2Doc, opts.uuid);
@@ -212,12 +216,15 @@ TEST_F(OplogEntryTest, CreateO2RoundTrip) {
     // original form when supplied with catalog identifiers.
 
     RecordId catalogId = RecordId(1);
-    std::string ident = "collection_ident";
-    std::string idIndexIdent = "id_index_ident";
+    std::string identUniqueTag = "collection_ident";
+    std::string idIndexIdentUniqueTag = "id_index_ident";
     bool directoryPerDB = true;
     bool directoryForIndexes = true;
-    const auto rawO2 = MutableOplogEntry::makeCreateCollObject2(
-        catalogId, ident, idIndexIdent, directoryPerDB, directoryForIndexes);
+    const auto rawO2 = MutableOplogEntry::makeCreateCollObject2(catalogId,
+                                                                identUniqueTag,
+                                                                StringData(idIndexIdentUniqueTag),
+                                                                directoryPerDB,
+                                                                directoryForIndexes);
 
     // Test parsing of 'o2' BSON.
     const auto parsedO2 = CreateOplogEntryO2::parse(rawO2, IDLParserContext("createOplogEntryO2"));
@@ -228,9 +235,9 @@ TEST_F(OplogEntryTest, CreateO2RoundTrip) {
     const auto& parsedDirectoryForIndexes = parsedO2.getDirectoryForIndexes();
 
     ASSERT_EQ(catalogId, parsedCatalogId);
-    ASSERT_EQ(ident, parsedIdent);
+    ASSERT_EQ(identUniqueTag, parsedIdent);
     ASSERT(parsedIdIndexIdent);
-    ASSERT_EQ(idIndexIdent, *parsedIdIndexIdent);
+    ASSERT_EQ(idIndexIdentUniqueTag, *parsedIdIndexIdent);
     ASSERT(parsedDirectoryPerDB);
     ASSERT(parsedDirectoryForIndexes);
 
@@ -243,11 +250,12 @@ TEST_F(OplogEntryTest, CreateIndexesO2RoundTrip) {
     // Tests the 'o2' object for a createIndexes oplog entry can be parsed and serialized back to
     // its original form when supplied with catalog identifiers.
 
-    std::string indexIdent = "index_ident";
+    std::string indexIdentUniqueTag = "index_ident";
     bool directoryPerDB = true;
     bool directoryForIndexes = true;
-    const auto rawO2 = BSON("indexIdent" << indexIdent << "directoryPerDB" << directoryPerDB
-                                         << "directoryForIndexes" << directoryForIndexes);
+    const auto rawO2 =
+        BSON("indexIdent" << indexIdentUniqueTag << "directoryPerDB" << directoryPerDB
+                          << "directoryForIndexes" << directoryForIndexes);
     // Test parsing of 'o2' BSON.
     const auto parsedO2 =
         CreateIndexesOplogEntryO2::parse(rawO2, IDLParserContext("createIndexesOplogEntryO2"));
@@ -255,7 +263,7 @@ TEST_F(OplogEntryTest, CreateIndexesO2RoundTrip) {
     const auto& parsedDirectoryPerDB = parsedO2.getDirectoryPerDB();
     const auto& parsedDirectoryForIndexes = parsedO2.getDirectoryForIndexes();
 
-    ASSERT_EQ(indexIdent, parsedIndexIdent);
+    ASSERT_EQ(indexIdentUniqueTag, parsedIndexIdent);
     ASSERT(parsedDirectoryPerDB);
     ASSERT(parsedDirectoryForIndexes);
 
@@ -268,11 +276,11 @@ TEST_F(OplogEntryTest, StartIndexBuildO2RoundTrip) {
     // Tests the 'o2' object for a startIndexBuild oplog entry can be parsed and serialized back to
     // its original form when supplied with catalog identifiers.
 
-    std::string indexIdent = "index_ident";
+    std::string indexIdentUniqueTag = "index_ident";
     bool directoryPerDB = true;
     bool directoryForIndexes = true;
     const auto rawO2 =
-        BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdent)) << "directoryPerDB"
+        BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdentUniqueTag)) << "directoryPerDB"
                        << directoryPerDB << "directoryForIndexes" << directoryForIndexes);
     // Test parsing of 'o2' BSON.
     const auto parsedO2 =
@@ -282,7 +290,7 @@ TEST_F(OplogEntryTest, StartIndexBuildO2RoundTrip) {
     const auto& parsedDirectoryForIndexes = parsedO2.getDirectoryForIndexes();
 
     ASSERT_EQ(parsedIndexes.size(), 1);
-    ASSERT_EQ(parsedIndexes[0].getIndexIdent(), indexIdent);
+    ASSERT_EQ(parsedIndexes[0].getIndexIdent(), indexIdentUniqueTag);
     ASSERT(parsedDirectoryPerDB);
     ASSERT(parsedDirectoryForIndexes);
 
@@ -944,8 +952,13 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(parsed.indexes.size(), 2);
         ASSERT_EQ(toIndexNames(parsed.indexes), indexNames);
         ASSERT_BSONOBJ_VECTOR_EQ(toIndexSpecs(parsed.indexes), indexSpecs);
-        ASSERT_EQ(parsed.indexes[0].indexIdent, o2Indexes[0].getField("indexIdent").str());
-        ASSERT_EQ(parsed.indexes[1].indexIdent, o2Indexes[1].getField("indexIdent").str());
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        const auto& indexIdentUniqueTag0 =
+            storageEngine->getIndexIdentUniqueTag(parsed.indexes[0].indexIdent, nss.dbName());
+        const auto& indexIdentUniqueTag1 =
+            storageEngine->getIndexIdentUniqueTag(parsed.indexes[1].indexIdent, nss.dbName());
+        ASSERT_EQ(indexIdentUniqueTag0, o2Indexes[0].getField("indexIdent").str());
+        ASSERT_EQ(indexIdentUniqueTag1, o2Indexes[1].getField("indexIdent").str());
         ASSERT_FALSE(parsed.cause);
     }
 

@@ -147,6 +147,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
     if (auto o2 = entry.getObject2(); o2 && parseO2) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto parsedO2 = repl::StartIndexBuildOplogEntryO2::parse(
             *o2, IDLParserContext("startIndexBuildOplogEntryO2"));
         auto indexes = parsedO2.getIndexes();
@@ -160,11 +161,14 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
         }
 
         for (size_t i = 0; i < indexes.size(); ++i) {
-            auto indexIdent = indexes[i].getIndexIdent();
-            if (!ident::isValidIdent(indexIdent)) {
+            auto indexIdentUniqueTag = indexes[i].getIndexIdent();
+            if (!ident::validateTag(indexIdentUniqueTag)) {
                 return {ErrorCodes::BadValue,
-                        fmt::format("'indexIdent' '{}' is not a valid ident", indexIdent)};
+                        fmt::format("'indexIdent' '{}' is not valid", indexIdentUniqueTag)};
             }
+
+            const auto& indexIdent =
+                storageEngine->generateNewIndexIdent(entry.getNss().dbName(), indexIdentUniqueTag);
             indexesVec[i].indexIdent = std::string{indexIdent};
         }
     }

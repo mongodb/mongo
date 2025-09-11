@@ -212,7 +212,7 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
 }
 
 OplogEntry IdempotencyTest::createCollection(UUID uuid) {
-    return makeCreateCollectionOplogEntry(nextOpTime(), _nss, uuid);
+    return makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), _nss, uuid);
 }
 
 OplogEntry IdempotencyTest::insert(const BSONObj& obj) {

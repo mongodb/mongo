@@ -78,13 +78,17 @@ constexpr inline StringData kMbdCatalog = "_mdb_catalog"_sd;
  * The 'generateNew<Collection|Index>Ident()' methods produce a new, unique ident for a
  * 'collection|index' table. Default method for generating user-data table idents.
  */
-std::string generateNewCollectionIdent(const DatabaseName& dbName,
-                                       bool directoryPerDB,
-                                       bool directoryForIndexes);
+std::string generateNewCollectionIdent(
+    const DatabaseName& dbName,
+    bool directoryPerDB,
+    bool directoryForIndexes,
+    const boost::optional<StringData>& optIdentUniqueTag = boost::none);
 
-std::string generateNewIndexIdent(const DatabaseName& dbName,
-                                  bool directoryPerDB,
-                                  bool directoryForIndexes);
+std::string generateNewIndexIdent(
+    const DatabaseName& dbName,
+    bool directoryPerDB,
+    bool directoryForIndexes,
+    const boost::optional<StringData>& optIdentUniqueTag = boost::none);
 
 /**
  * Marking an ident as internal implies the underlying data is subject to different handling by the
@@ -101,6 +105,24 @@ std::string generateNewInternalIdent(StringData identStem = ""_sd);
 std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent);
 
 /**
+ * Assumes 'ident' is a well-formed ident for a collection, returns the unique identifier component
+ * of the ident.
+ */
+StringData getCollectionIdentUniqueTag(StringData ident,
+                                       const DatabaseName& dbName,
+                                       bool directoryPerDB,
+                                       bool directoryForIndexes);
+
+/**
+ * Assumes 'ident' is a well-formed ident for an index, returns the unique identifier component
+ * of the ident.
+ */
+StringData getIndexIdentUniqueTag(StringData ident,
+                                  const DatabaseName& dbName,
+                                  bool directoryPerDB,
+                                  bool directoryForIndexes);
+
+/**
  * Returns true if the ident specifies a basic "collection" or "index" table type.
  */
 bool isCollectionOrIndexIdent(StringData ident);
@@ -111,6 +133,12 @@ bool isCollectionOrIndexIdent(StringData ident);
 bool isInternalIdent(StringData ident, StringData identStem = ""_sd);
 
 bool isCollectionIdent(StringData ident);
+
+/**
+ * Validates that the tag does not contain any characters which would be special when interpreted as
+ * a path.
+ */
+bool validateTag(StringData uniqueTag);
 
 /**
  * Returns false if the string is definitely not a well-formed ident or would be unsafe to interpret

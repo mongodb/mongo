@@ -2924,8 +2924,14 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         {
             FailPointEnableBlock fpb("hangAfterStartingIndexBuild");
 
+            auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
             auto start = repl::makeStartIndexBuildOplogEntry(
-                startBuildOpTime, nss, collUUID, indexBuildUUID, indexBuildInfo);
+                startBuildOpTime,
+                nss,
+                collUUID,
+                indexBuildUUID,
+                indexBuildInfo,
+                storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName()));
             const bool dataIsConsistent = true;
             ASSERT_OK(
                 repl::applyOplogEntryOrGroupedInserts(_opCtx,

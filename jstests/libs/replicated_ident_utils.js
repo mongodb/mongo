@@ -78,7 +78,7 @@ export function assertCreateOplogEntriesContainIdents(node) {
         );
         assert(
             o2.hasOwnProperty("idIndexIdent"),
-            `Expected to find 'iddIndexIdent' property in 'o2' field of ${tojson(
+            `Expected to find 'idIndexIdent' property in 'o2' field of ${tojson(
                 op,
             )}. Dumping all create oplog entries ${tojson(createOps)}`,
         );

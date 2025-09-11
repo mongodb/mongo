@@ -851,8 +851,17 @@ public:
      */
     virtual std::string getFilesystemPathForDb(const DatabaseName& dbName) const = 0;
 
-    virtual std::string generateNewCollectionIdent(const DatabaseName& dbName) const = 0;
-    virtual std::string generateNewIndexIdent(const DatabaseName& dbName) const = 0;
+    virtual std::string generateNewCollectionIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const = 0;
+    virtual std::string generateNewIndexIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const = 0;
+
+    virtual StringData getCollectionIdentUniqueTag(StringData ident,
+                                                   const DatabaseName& dbName) const = 0;
+    virtual StringData getIndexIdentUniqueTag(StringData ident,
+                                              const DatabaseName& dbName) const = 0;
 
     /**
      * Generates a unique ident for an internal table that can be used to create a temporary

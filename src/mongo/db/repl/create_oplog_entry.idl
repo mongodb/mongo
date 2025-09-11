@@ -42,10 +42,10 @@ structs:
                 description: "The recordId mapping to the _mdb_catalog for the collection"
                 type: RecordId
             ident:
-                description: "The ident where the collection's main data table is stored."
+                description: "The unique tag of the ident where the collection's main data table is stored."
                 type: string
             idIndexIdent:
-                description: "The ident where the collection's _id index is stored. Present if the _id index is generated as a part of collection creation"
+                description: "The unique tag of the ident where the collection's _id index is stored. Present if the _id index is generated as a part of collection creation"
                 type: string
                 optional: true
             directoryPerDB:
@@ -59,7 +59,7 @@ structs:
         strict: false
         fields:
             indexIdent:
-                description: "The ident where the index's table is stored."
+                description: "The unique tag of the ident where the index's table is stored."
                 type: string
             directoryPerDB:
                 description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
@@ -72,7 +72,7 @@ structs:
         strict: false
         fields:
             indexIdent:
-                description: "The ident where the table of the index being built is stored."
+                description: "The unique tag of the ident where the table of the index being built is stored."
                 type: string
     StartIndexBuildOplogEntryO2:
         description: "In a 'startIndexBuild' oplog entry, defines the fields expected in the 'o2' subobject."

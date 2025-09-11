@@ -259,8 +259,16 @@ public:
         return _dropPendingIdentReaper.getNumIdents();
     }
 
-    std::string generateNewCollectionIdent(const DatabaseName& dbName) const override;
-    std::string generateNewIndexIdent(const DatabaseName& dbName) const override;
+    std::string generateNewCollectionIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag) const override;
+    std::string generateNewIndexIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag) const override;
+
+    StringData getCollectionIdentUniqueTag(StringData ident,
+                                           const DatabaseName& dbName) const override;
+    StringData getIndexIdentUniqueTag(StringData ident, const DatabaseName& dbName) const override;
 
     bool storesFilesInDbPath() const override {
         return !_options.directoryForIndexes && !_options.directoryPerDB;

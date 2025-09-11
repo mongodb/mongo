@@ -351,10 +351,12 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     }
     oplogEntry.setObject(builder.obj());
     if (replicateLocalCatalogIdentifiers) {
-        oplogEntry.setObject2(BSON("indexIdent" << indexBuildInfo.indexIdent << "directoryPerDB"
-                                                << indexBuildInfo.directoryPerDB
-                                                << "directoryForIndexes"
-                                                << indexBuildInfo.directoryForIndexes));
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto indexIdentUniqueTag =
+            storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
+        oplogEntry.setObject2(BSON(
+            "indexIdent" << indexIdentUniqueTag << "directoryPerDB" << indexBuildInfo.directoryPerDB
+                         << "directoryForIndexes" << indexBuildInfo.directoryForIndexes));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
@@ -391,6 +393,8 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
         return;
     }
 
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
 
@@ -404,7 +408,9 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
 
     BSONArrayBuilder o2IndexesArr;
     for (const auto& indexBuildInfo : indexes) {
-        o2IndexesArr.append(BSON("indexIdent" << indexBuildInfo.indexIdent));
+        auto indexIdentUniqueTag =
+            storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
+        o2IndexesArr.append(BSON("indexIdent" << indexIdentUniqueTag));
     }
 
     MutableOplogEntry oplogEntry;
@@ -1330,10 +1336,18 @@ void OpObserverImpl::onCreateCollection(
         invariant(createCollCatalogIdentifier.has_value(),
                   "Missing catalog identifier required to log replicated "
                   "collection");
+
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
+            createCollCatalogIdentifier->ident, collectionName.dbName());
+        auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
+            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+                  *createCollCatalogIdentifier->idIndexIdent, collectionName.dbName()))
+            : boost::none;
         const auto o2 = repl::MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
-            createCollCatalogIdentifier->ident,
-            createCollCatalogIdentifier->idIndexIdent,
+            identUniqueTag,
+            idIndexIdentUniqueTag,
             createCollCatalogIdentifier->directoryPerDB,
             createCollCatalogIdentifier->directoryForIndexes);
         oplogEntry.setObject2(o2);

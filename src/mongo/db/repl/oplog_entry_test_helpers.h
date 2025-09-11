@@ -125,7 +125,8 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
                                          const UUID& uuid,
                                          const UUID& indexBuildUUID,
-                                         const IndexBuildInfo& indexBuildInfo);
+                                         const IndexBuildInfo& indexBuildInfo,
+                                         StringData indexIdent);
 
 /**
  * Creates a two-phase index build commit oplog entry with a given optime, namespace, and index

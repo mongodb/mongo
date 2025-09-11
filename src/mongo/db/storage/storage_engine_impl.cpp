@@ -480,14 +480,28 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName
     }
 }
 
-std::string StorageEngineImpl::generateNewCollectionIdent(const DatabaseName& dbName) const {
+std::string StorageEngineImpl::generateNewCollectionIdent(
+    const DatabaseName& dbName, const boost::optional<StringData>& optIdentUniqueTag) const {
     return ident::generateNewCollectionIdent(
-        dbName, _options.directoryPerDB, _options.directoryForIndexes);
+        dbName, _options.directoryPerDB, _options.directoryForIndexes, optIdentUniqueTag);
 }
 
-std::string StorageEngineImpl::generateNewIndexIdent(const DatabaseName& dbName) const {
+std::string StorageEngineImpl::generateNewIndexIdent(
+    const DatabaseName& dbName, const boost::optional<StringData>& optIdentUniqueTag) const {
     return ident::generateNewIndexIdent(
-        dbName, _options.directoryPerDB, _options.directoryForIndexes);
+        dbName, _options.directoryPerDB, _options.directoryForIndexes, optIdentUniqueTag);
+}
+
+StringData StorageEngineImpl::getCollectionIdentUniqueTag(StringData ident,
+                                                          const DatabaseName& dbName) const {
+    return ident::getCollectionIdentUniqueTag(
+        ident, dbName, _options.directoryPerDB, _options.directoryForIndexes);
+}
+
+StringData StorageEngineImpl::getIndexIdentUniqueTag(StringData ident,
+                                                     const DatabaseName& dbName) const {
+    return ident::getIndexIdentUniqueTag(
+        ident, dbName, _options.directoryPerDB, _options.directoryForIndexes);
 }
 
 void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) {

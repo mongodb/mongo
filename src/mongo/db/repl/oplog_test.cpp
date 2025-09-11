@@ -425,12 +425,13 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
     auto opCtx = cc().makeOperationContext();
 
     const std::string ident = "index-test-ident";
+    const std::string identUniqueTag = "test-ident";
     {
         Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
         createIndexForApplyOps(opCtx.get(),
                                BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
                                         << "a_1"),
-                               BSON("indexIdent" << ident << "directoryPerDB" << false
+                               BSON("indexIdent" << identUniqueTag << "directoryPerDB" << false
                                                  << "directoryForIndexes" << false),
                                _nss,
                                OplogApplication::Mode::kSecondary);

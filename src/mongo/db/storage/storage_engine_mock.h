@@ -193,10 +193,21 @@ public:
         return false;
     }
 
-    std::string generateNewCollectionIdent(const DatabaseName& dbName) const final {
+    std::string generateNewCollectionIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const final {
         return "";
     }
-    std::string generateNewIndexIdent(const DatabaseName& dbName) const final {
+    std::string generateNewIndexIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const final {
+        return "";
+    }
+    StringData getCollectionIdentUniqueTag(StringData ident,
+                                           const DatabaseName& dbName) const final {
+        return "";
+    };
+    StringData getIndexIdentUniqueTag(StringData ident, const DatabaseName& dbName) const final {
         return "";
     }
     bool storesFilesInDbPath() const final {

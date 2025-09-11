@@ -224,28 +224,35 @@ boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
         return boost::none;
     }
 
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto parsedO2 = repl::CreateOplogEntryO2::parse(*o2, IDLParserContext("createOplogEntryO2"));
     const auto& catalogId = parsedO2.getCatalogId();
-    auto ident = parsedO2.getIdent();
-    auto idIndexIdent = parsedO2.getIdIndexIdent();
+    auto replicatedIdent = parsedO2.getIdent();
+    auto replicatedIdIndexIdent = parsedO2.getIdIndexIdent();
     auto directoryPerDB = parsedO2.getDirectoryPerDB();
     auto directoryForIndexes = parsedO2.getDirectoryForIndexes();
 
-    uassert(ErrorCodes::InvalidOptions,
-            fmt::format("'ident' field must contain a valid ident but got '{}'", ident),
-            ident::isValidIdent(ident));
-
     uassert(
         ErrorCodes::InvalidOptions,
-        fmt::format("'idIndexIdent' field must contain a valid ident but got '{}'", *idIndexIdent),
-        !idIndexIdent || ident::isValidIdent(*idIndexIdent));
+        fmt::format("'ident' field must contain a valid ident tag but got '{}'", replicatedIdent),
+        ident::validateTag(replicatedIdent));
+    uassert(ErrorCodes::InvalidOptions,
+            fmt::format("'idIndexIdent' field must contain a valid ident tag but got '{}'",
+                        *replicatedIdIndexIdent),
+            !replicatedIdIndexIdent || ident::validateTag(*replicatedIdIndexIdent));
 
-    return CreateCollCatalogIdentifier{
-        .catalogId = catalogId,
-        .ident = std::string{ident},
-        .idIndexIdent = idIndexIdent ? boost::optional<std::string>(*idIndexIdent) : boost::none,
-        .directoryPerDB = directoryPerDB,
-        .directoryForIndexes = directoryForIndexes};
+    const auto& ident =
+        storageEngine->generateNewCollectionIdent(oplogEntry.getNss().dbName(), replicatedIdent);
+    const auto& idIndexIdent = replicatedIdIndexIdent
+        ? boost::optional<std::string>(storageEngine->generateNewIndexIdent(
+              oplogEntry.getNss().dbName(), replicatedIdIndexIdent))
+        : boost::none;
+
+    return CreateCollCatalogIdentifier{.catalogId = catalogId,
+                                       .ident = ident,
+                                       .idIndexIdent = idIndexIdent,
+                                       .directoryPerDB = directoryPerDB,
+                                       .directoryForIndexes = directoryForIndexes};
 }
 }  // namespace
 
@@ -383,12 +390,15 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
         auto parsedIndexMetadata = repl::CreateIndexesOplogEntryO2::parse(
             *indexMetadata, IDLParserContext("createIndexesOplogEntryO2"));
-        auto indexIdent = parsedIndexMetadata.getIndexIdent();
-
+        auto replicatedIndexIdent = parsedIndexMetadata.getIndexIdent();
         uassert(ErrorCodes::BadValue,
-                "Failed to create index because indexIdent field in metadata o2 was invalid: " +
+                "Failed to create index because 'indexIdent' field in metadata o2 was "
+                "invalid: " +
                     indexMetadata->toString(),
-                ident::isValidIdent(indexIdent));
+                ident::validateTag(replicatedIndexIdent));
+
+        auto indexIdent =
+            storageEngine->generateNewIndexIdent(indexNss.dbName(), replicatedIndexIdent);
         IndexBuildInfo indexBuildInfo(indexSpec, std::string{indexIdent});
         indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(opCtx));
         return indexBuildInfo;

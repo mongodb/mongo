@@ -208,20 +208,21 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
                                          const UUID& uuid,
                                          const UUID& indexBuildUUID,
-                                         const IndexBuildInfo& indexBuildInfo) {
+                                         const IndexBuildInfo& indexBuildInfo,
+                                         StringData indexIdent) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
     oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
-    return makeCommandOplogEntry(
-        opTime,
-        nss,
-        oplogEntryBuilder.obj(),
-        BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexBuildInfo.indexIdent))
-                       << "directoryPerDB" << indexBuildInfo.directoryPerDB << "directoryForIndexes"
-                       << indexBuildInfo.directoryForIndexes),
-        uuid);
+    return makeCommandOplogEntry(opTime,
+                                 nss,
+                                 oplogEntryBuilder.obj(),
+                                 BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdent))
+                                                << "directoryPerDB" << indexBuildInfo.directoryPerDB
+                                                << "directoryForIndexes"
+                                                << indexBuildInfo.directoryForIndexes),
+                                 uuid);
 }
 
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,

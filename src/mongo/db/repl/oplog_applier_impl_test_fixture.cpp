@@ -528,6 +528,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optiona
 }
 
 OplogEntry makeCreateCollectionOplogEntry(
+    OperationContext* opCtx,
     const OpTime& opTime,
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
@@ -537,19 +538,27 @@ OplogEntry makeCreateCollectionOplogEntry(
 
     BSONObj o2;
     if (createCollCatalogIdentifier.has_value()) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
+            createCollCatalogIdentifier->ident, nss.dbName());
+        auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
+            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+                  *createCollCatalogIdentifier->idIndexIdent, nss.dbName()))
+            : boost::none;
         o2 = MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
-            createCollCatalogIdentifier->ident,
-            createCollCatalogIdentifier->idIndexIdent,
+            identUniqueTag,
+            idIndexIdentUniqueTag,
             createCollCatalogIdentifier->directoryPerDB,
             createCollCatalogIdentifier->directoryForIndexes);
     }
     return makeCommandOplogEntry(opTime, nss, object, o2, collectionOptions.uuid);
 }
-OplogEntry makeCreateCollectionOplogEntry(const OpTime& opTime,
+OplogEntry makeCreateCollectionOplogEntry(OperationContext* opCtx,
+                                          const OpTime& opTime,
                                           const NamespaceString& nss,
                                           const UUID& uuid) {
-    return makeCreateCollectionOplogEntry(opTime, nss, CollectionOptions{.uuid = uuid});
+    return makeCreateCollectionOplogEntry(opCtx, opTime, nss, CollectionOptions{.uuid = uuid});
 }
 
 CollectionOptions createOplogCollectionOptions() {

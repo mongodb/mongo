@@ -510,7 +510,8 @@ class OpObserverOnCreateCollectionTest : public OpObserverTest {
 protected:
     // Validates that local catalog identifier information is replicated in the 'o2' field of an
     // 'create' oplog entry iff the server supports replicating local catalog identifiers.
-    void validateReplicatedCatalogIdentifier(const OplogEntry& oplogEntry,
+    void validateReplicatedCatalogIdentifier(OperationContext* opCtx,
+                                             const OplogEntry& oplogEntry,
                                              const CreateCollCatalogIdentifier& catalogIdentifier,
                                              bool catalogReplicationEnabled) {
         ASSERT_EQ(repl::CommandTypeEnum::kCreate, oplogEntry.getCommandType());
@@ -522,24 +523,31 @@ protected:
             return;
         }
 
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         ASSERT_EQ(catalogIdentifier.catalogId,
                   RecordId::deserializeToken(o2->getField("catalogId")));
-        ASSERT_EQ(catalogIdentifier.ident, o2->getStringField("ident"));
+        auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
+            catalogIdentifier.ident, oplogEntry.getNss().dbName());
+        ASSERT_EQ(identUniqueTag, o2->getStringField("ident"));
 
         bool expectIdIndexIdent = catalogIdentifier.idIndexIdent.has_value();
         ASSERT_EQ(expectIdIndexIdent, o2->hasField("idIndexIdent"));
         if (expectIdIndexIdent) {
-            ASSERT_EQ(*catalogIdentifier.idIndexIdent, o2->getStringField("idIndexIdent"));
+            auto idIndexIdentUniqueTag = storageEngine->getIndexIdentUniqueTag(
+                *catalogIdentifier.idIndexIdent, oplogEntry.getNss().dbName());
+            ASSERT_EQ(idIndexIdentUniqueTag, o2->getStringField("idIndexIdent"));
         }
     }
 
-    CreateCollCatalogIdentifier newCatalogIdentifier(const DatabaseName& dbName,
+    CreateCollCatalogIdentifier newCatalogIdentifier(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
                                                      bool includeIdIndexIdent) {
         CreateCollCatalogIdentifier catalogIdentifier;
         catalogIdentifier.catalogId = RecordId(100);
-        catalogIdentifier.ident = ident::generateNewCollectionIdent(dbName, true, true);
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        catalogIdentifier.ident = storageEngine->generateNewCollectionIdent(dbName);
         if (includeIdIndexIdent) {
-            catalogIdentifier.idIndexIdent = ident::generateNewIndexIdent(dbName, true, true);
+            catalogIdentifier.idIndexIdent = storageEngine->generateNewIndexIdent(dbName);
         }
         return catalogIdentifier;
     }
@@ -550,13 +558,15 @@ protected:
         RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
 
-        // Simulate catalog information for a normal collection with a standard '_id_' index.
-        ASSERT_TRUE(nss.isReplicated());
-        auto catalogIdentifier = newCatalogIdentifier(nss.dbName(), true /* includeIdIndexIdent */);
-        CollectionOptions options{.uuid = uuid};
-
         auto opCtxWrapper = cc().makeOperationContext();
         auto opCtx = opCtxWrapper.get();
+
+        // Simulate catalog information for a normal collection with a standard '_id_' index.
+        ASSERT_TRUE(nss.isReplicated());
+        auto catalogIdentifier =
+            newCatalogIdentifier(opCtx, nss.dbName(), true /* includeIdIndexIdent */);
+        CollectionOptions options{.uuid = uuid};
+
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
         {
             // Generate the create oplog entry.
@@ -577,7 +587,7 @@ protected:
         const auto oplogEntryBSON = getSingleOplogEntry(opCtx);
         const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
         validateReplicatedCatalogIdentifier(
-            oplogEntry, catalogIdentifier, catalogReplicationEnabled);
+            opCtx, oplogEntry, catalogIdentifier, catalogReplicationEnabled);
         bool isTimeseries = oplogEntryBSON.getBoolField("isTimeseries");
         ASSERT_EQ(viewless, isTimeseries);
     }
@@ -586,6 +596,9 @@ protected:
         RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
 
+        auto opCtxWrapper = cc().makeOperationContext();
+        auto opCtx = opCtxWrapper.get();
+
         CollectionOptions clusteredCollectionOptions{
             .uuid = uuid, .clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()};
 
@@ -593,11 +606,9 @@ protected:
         // an explicit '_id_' index table.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(nss.dbName(), false /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), false /* includeIdIndexIdent */);
         ASSERT_FALSE(catalogIdentifier.idIndexIdent.has_value());
 
-        auto opCtxWrapper = cc().makeOperationContext();
-        auto opCtx = opCtxWrapper.get();
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
         {
             // Generate the create oplog entry.
@@ -616,7 +627,7 @@ protected:
         const auto oplogEntryBSON = getSingleOplogEntry(opCtx);
         const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
         validateReplicatedCatalogIdentifier(
-            oplogEntry, catalogIdentifier, catalogReplicationEnabled);
+            opCtx, oplogEntry, catalogIdentifier, catalogReplicationEnabled);
     }
 
     // Tests that the presences or absence of a 'CreateCollCatalogIdentifier' passed into
@@ -645,8 +656,8 @@ protected:
 
         boost::optional<CreateCollCatalogIdentifier> catalogIdentifier;
         if (isPersistedInLocalCatalog) {
-            catalogIdentifier =
-                newCatalogIdentifier(localNSS.dbName(), false /* includeIdIndexIdent */);
+            catalogIdentifier = newCatalogIdentifier(
+                opCtx.get(), localNSS.dbName(), false /* includeIdIndexIdent */);
         }
 
         {
@@ -5449,9 +5460,9 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
     ASSERT_FALSE(disabledEntry.getObject2());
     auto enabledO2 = enabledEntry.getObject2();
     ASSERT(enabledO2);
-    ASSERT_BSONOBJ_EQ(*enabledO2,
-                      BSON("indexIdent" << "index-1" << "directoryPerDB" << false
-                                        << "directoryForIndexes" << false));
+    ASSERT_BSONOBJ_EQ(
+        *enabledO2,
+        BSON("indexIdent" << "1" << "directoryPerDB" << false << "directoryForIndexes" << false));
 }
 
 TEST_F(OpObserverTest, OnCreateIndexTimeseriesFlag) {
@@ -5497,11 +5508,17 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto indexIdentUniqueTag0 =
+        storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
+    auto indexIdentUniqueTag1 =
+        storageEngine->getIndexIdentUniqueTag(indexes[1].indexIdent, nss.dbName());
+
     ASSERT_BSONOBJ_EQ(*entry1.getObject2(),
-                      BSON("indexIdent" << indexes[0].indexIdent << "directoryPerDB" << false
+                      BSON("indexIdent" << indexIdentUniqueTag0 << "directoryPerDB" << false
                                         << "directoryForIndexes" << false));
     ASSERT_BSONOBJ_EQ(*entry2.getObject2(),
-                      BSON("indexIdent" << indexes[1].indexIdent << "directoryPerDB" << false
+                      BSON("indexIdent" << indexIdentUniqueTag1 << "directoryPerDB" << false
                                         << "directoryForIndexes" << false));
 }
 
@@ -5543,7 +5560,10 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto indexesElemVec = indexesElem.Array();
     ASSERT_EQ(indexesElemVec.size(), 1);
     auto indexElemObj = indexesElemVec[0].Obj();
-    ASSERT_EQ(indexElemObj.getField("indexIdent").str(), indexes[0].indexIdent);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto indexIdentUniqueTag =
+        storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
+    ASSERT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
     ASSERT_FALSE(entry2.getObject2());
 }
 

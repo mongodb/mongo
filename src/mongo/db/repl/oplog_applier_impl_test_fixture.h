@@ -363,12 +363,14 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optiona
  * Generates a 'create' oplog entry for a new collection.
  */
 OplogEntry makeCreateCollectionOplogEntry(
+    OperationContext* opCtx,
     const OpTime& opTime,
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
     const BSONObj& idIndex = BSONObj(),
     boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier = boost::none);
-OplogEntry makeCreateCollectionOplogEntry(const OpTime& opTime,
+OplogEntry makeCreateCollectionOplogEntry(OperationContext* opCtx,
+                                          const OpTime& opTime,
                                           const NamespaceString& nss,
                                           const UUID& uuid = UUID::gen());
 

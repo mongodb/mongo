@@ -127,10 +127,17 @@ void AuthOpObserver::onCreateCollection(
         shouldReplicateLocalCatalogIdentifers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
             VersionContext::getDecoration(opCtx))) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
+            createCollCatalogIdentifier->ident, collectionName.dbName());
+        auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
+            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+                  *createCollCatalogIdentifier->idIndexIdent, collectionName.dbName()))
+            : boost::none;
         o2 = repl::MutableOplogEntry::makeCreateCollObject2(
             createCollCatalogIdentifier->catalogId,
-            createCollCatalogIdentifier->ident,
-            createCollCatalogIdentifier->idIndexIdent,
+            identUniqueTag,
+            idIndexIdentUniqueTag,
             createCollCatalogIdentifier->directoryPerDB,
             createCollCatalogIdentifier->directoryForIndexes);
     }
