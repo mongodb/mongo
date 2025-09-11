@@ -970,9 +970,12 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
         return {std::move(stats), boost::none};
     }();
 
-
-    bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == _solution->hash());
+    const auto candidateSolutionHash = _solution ? _solution->hash() : 0;
+    bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == candidateSolutionHash);
     BSONObjBuilder bob;
+    if (internalQueryAllowForcedPlanByHash.load() && _solution) {
+        bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
+    }
     statsToBSON(_planStageQsnMap,
                 _cbrResult.estimates,
                 *stats,
@@ -1005,9 +1008,13 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
         for (; i < mpsStats->children.size(); ++i) {
             if (i != *bestPlanIdx) {
                 const auto& candidate = mps->getCandidate(i);
-                bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
+                const auto candidateSolutionHash = candidate.solution->hash();
+                bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
 
                 BSONObjBuilder bob;
+                if (internalQueryAllowForcedPlanByHash.load()) {
+                    bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
+                }
                 auto stats = _root->getStats();
                 statsToBSON(_planStageQsnMap,
                             _cbrResult.estimates,
@@ -1033,11 +1040,21 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     }
 
     // For each rejected plan via CBR, explain it, and look up the corresponding cost and CE.
-    for (auto&& rejectedPlan : _cbrRejectedPlanStages) {
+    tassert(10872501,
+            "CBR PlanStage and QuerySolution vectors must have equal length.",
+            _cbrRejectedPlanStages.size() == _cbrResult.rejectedPlans.size());
+    for (size_t i = 0; i < _cbrRejectedPlanStages.size(); ++i) {
+        auto&& rejectedPlan = _cbrRejectedPlanStages[i];
+        auto&& rejectedSoln = _cbrResult.rejectedPlans[i];
+        const auto candidateSolutionHash = rejectedSoln->hash();
+        bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
         BSONObjBuilder bob;
+        if (internalQueryAllowForcedPlanByHash.load()) {
+            bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
+        }
         auto stats = rejectedPlan->getStats();
         statsToBSON(
-            _planStageQsnMap, _cbrResult.estimates, *stats, verbosity, i, &bob, &bob, false);
+            _planStageQsnMap, _cbrResult.estimates, *stats, verbosity, i, &bob, &bob, isCached);
         ++i;
         res.push_back({bob.obj(), boost::none /*summary*/});
     }

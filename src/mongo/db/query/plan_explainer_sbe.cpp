@@ -343,6 +343,7 @@ void statsToBSON(const QuerySolutionNode* node,
     }
     childrenBob.doneFast();
 }
+
 void statsToBSONHelper(const sbe::PlanStageStats* stats,
                        BSONObjBuilder* bob,
                        const BSONObjBuilder* topLevelBob,
@@ -462,6 +463,9 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         auto summary = sbe::collectExecutionStatsSummary(stats);
         if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
             summary.score = solution->score;
+            if (internalQueryAllowForcedPlanByHash.load()) {
+                bob.append("solutionHashUnstable", (long long)solution->hash());
+            }
         }
         statsToBSON(&stats, &bob, &bob);
         // At the 'kQueryPlanner' verbosity level we use the QSN-derived format for the given plan,
@@ -475,6 +479,9 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 
     if (solution != nullptr) {
         statsToBSON(solution->root(), &bob, &bob);
+        if (internalQueryAllowForcedPlanByHash.load()) {
+            bob.append("solutionHashUnstable", (long long)solution->hash());
+        }
     }
 
     BSONObjBuilder plan;

@@ -1557,7 +1557,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     bool clusteredCollection = params.clusteredInfo.has_value();
 
-
     if (collScanRequired && mustUseIndexedPlan) {
         return Status(ErrorCodes::NoQueryExecutionPlans, "No query solutions");
     }
@@ -1619,6 +1618,26 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                               "No DISTINCT_SCAN plans available");
             }
         }
+    }
+
+    // We must wait until the set of candidates in the "out" vector is
+    // complete before choosing a forced plan.
+    if (auto solutionHash = query.getForcedPlanSolutionHash()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Use of forcedPlanSolutionHash not permitted.",
+                internalQueryAllowForcedPlanByHash.load());
+
+        for (auto&& soln : out) {
+            if ((int64_t)soln->hash() == *solutionHash) {
+                LOGV2_DEBUG(10872500,
+                            5,
+                            "Forced plan by solution hash",
+                            "solution"_attr = redact(soln->toString()));
+                return singleSolution(std::move(soln));
+            }
+        }
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "Forced plan solution hash not present in candidate plan set.");
     }
 
     return {std::move(out)};

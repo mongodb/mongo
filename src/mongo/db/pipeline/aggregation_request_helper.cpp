@@ -147,6 +147,10 @@ void validate(const AggregateCommandRequest& aggregate,
                           << nss.toStringForErrorMsg(),
             !aggregate.getRequestReshardingResumeToken().value_or(false) || nss.isOplog());
 
+    uassert(ErrorCodes::FailedToParse,
+            "Use of forcedPlanSolutionHash not permitted.",
+            !aggregate.getForcedPlanSolutionHash() || internalQueryAllowForcedPlanByHash.load());
+
     bool hasRequestResumeToken = aggregate.getRequestResumeToken().value_or(false);
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName

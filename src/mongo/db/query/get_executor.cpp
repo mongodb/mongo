@@ -454,6 +454,13 @@ public:
                         2,
                         "Running query as sub-queries",
                         "query"_attr = redact(_queryStringForDebugLog));
+
+            // Forced plan solution hash doesn't make sense to be accessed in QueryPlanner::plan()
+            // during subplanning. It would need to be applicable to all branches.
+            uassert(ErrorCodes::IllegalOperation,
+                    "Use of forcedPlanSolutionHash not permitted for rooted $or queries.",
+                    !_cq->getForcedPlanSolutionHash());
+
             return buildSubPlan();
         }
 

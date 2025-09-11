@@ -1651,6 +1651,15 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+
+    internalQueryAllowForcedPlanByHash:
+        description: >-
+            Using the forcedPlanSolution argument to find/aggregate commands, force selection of a given plan by solution hash.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryAllowForcedPlanByHash
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
