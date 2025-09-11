@@ -169,11 +169,8 @@ list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
                   "One cannot specify the bounds as 'partition' without specifying a non-empty "
                   "array of partitionByFields. You may have meant to specify 'full' bounds.");
 
-    return create(std::move(expCtx),
-                  std::move(partitions),
-                  std::move(field),
-                  std::move(rangeStatement),
-                  isInternal);
+    return create(
+        expCtx, std::move(partitions), std::move(field), std::move(rangeStatement), isInternal);
 }
 
 list<intrusive_ptr<DocumentSource>> createFromBson(BSONElement elem,
@@ -218,8 +215,8 @@ list<intrusive_ptr<DocumentSource>> create(const intrusive_ptr<ExpressionContext
     }
 
     // Constructing resulting stages.
-    results.push_back(
-        make_intrusive<DocumentSourceInternalDensify>(expCtx, field, partitions, rangeStatement));
+    results.push_back(make_intrusive<DocumentSourceInternalDensify>(
+        expCtx, std::move(field), std::move(partitions), std::move(rangeStatement)));
 
     return results;
 }

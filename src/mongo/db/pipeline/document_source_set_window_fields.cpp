@@ -123,8 +123,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
 
-    return create(
-        std::move(expCtx), std::move(partitionBy), std::move(sortBy), std::move(outputFields));
+    return create(expCtx, std::move(partitionBy), std::move(sortBy), std::move(outputFields));
 }
 
 WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,

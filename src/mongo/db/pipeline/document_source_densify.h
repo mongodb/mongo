@@ -302,9 +302,9 @@ public:
     static constexpr StringData kRangeFieldName = "range"_sd;
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                  const FieldPath& field,
-                                  const std::list<FieldPath>& partitions,
-                                  const RangeStatement& range)
+                                  FieldPath field,
+                                  std::list<FieldPath> partitions,
+                                  RangeStatement range)
         : DocumentSource(kStageName, pExpCtx),
           _memTracker(internalDocumentSourceDensifyMaxMemoryBytes.load()),
           _field(std::move(field)),

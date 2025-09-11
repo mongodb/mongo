@@ -67,9 +67,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::cre
 
 DocumentSourceInternalApplyOplogUpdate::DocumentSourceInternalApplyOplogUpdate(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& oplogUpdate)
-    : DocumentSource(kStageName, pExpCtx),
-      _oplogUpdate(std::move(oplogUpdate)),
-      _updateDriver(pExpCtx) {
+    : DocumentSource(kStageName, pExpCtx), _oplogUpdate(oplogUpdate), _updateDriver(pExpCtx) {
     // Parse the raw oplog update description.
     const auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(
         _oplogUpdate, {true /* mustCheckExistenceForInsertOperations */});

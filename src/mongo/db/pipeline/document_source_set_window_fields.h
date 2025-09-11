@@ -112,7 +112,7 @@ public:
     DocumentSourceInternalSetWindowFields(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
-        const boost::optional<SortPattern>& sortBy,
+        boost::optional<SortPattern> sortBy,
         std::vector<WindowFunctionStatement> outputFields,
         int64_t maxMemoryBytes)
         : DocumentSource(kStageName, expCtx),
