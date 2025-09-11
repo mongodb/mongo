@@ -701,12 +701,15 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
         # optional types, and non-primitive types.
         if field.chained_struct_field:
-            member_name = _get_field_member_name(field.chained_struct_field)
+            chained_struct_getter = _get_field_member_getter_name(field.chained_struct_field)
             self._writer.write_line(
-                f"{const_type}{param_type} {method_name}() const {{ return {member_name}.{method_name}(); }}"
+                f"{const_type}{param_type} {method_name}() const {{ return {chained_struct_getter}().{method_name}(); }}"
             )
 
         elif field.type.is_struct:
+            if field.nested_chained_parent:
+                body = f"return {_get_field_member_getter_name(field.nested_chained_parent)}().{_get_field_member_getter_name(field)}();"
+
             # Support mutable accessors
             self._writer.write_line(f"const {param_type} {method_name}() const {{ {body} }}")
 
@@ -750,11 +753,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # Generate the setter for instances of the "getter/setter type", which may not be the same
         # as the storage type.
         if field.chained_struct_field:
-            body = "{}.{}(std::move(value));".format(
-                _get_field_member_name(field.chained_struct_field), memfn
-            )
+            body = f"{_get_field_member_getter_name(field.chained_struct_field)}().{memfn}(std::move(value));"
         else:
-            body = cpp_type_info.get_setter_body(_get_field_member_name(field), validator)
+            if field.nested_chained_parent:
+                body = f"{_get_field_member_getter_name(field.nested_chained_parent)}().{memfn}(std::move(value));"
+            else:
+                body = cpp_type_info.get_setter_body(_get_field_member_name(field), validator)
         set_has = _gen_mark_present(field.cpp_name) if is_serial else ""
 
         with self._block(f"void {memfn}({setter_type} value) {{", "}"):
@@ -1427,7 +1431,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     # Write member variables
                     for field in struct.fields:
-                        if not field.ignore and not field.chained_struct_field:
+                        if not field.ignore and not field.chained_struct_field and not field.nested_chained_parent:
                             if not (field.type and field.type.internal_only):
                                 self.gen_member(field)
 
@@ -1888,15 +1892,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         def validate_and_assign_or_uassert(field, expression):
             # type: (ast.Field, str) -> None
             """Perform field value validation post-assignment."""
-            field_name = _get_field_member_name(field)
             if field.validator is None:
-                self._writer.write_line("%s = %s;" % (field_name, expression))
+                self._writer.write_line("%s = %s;" % (_get_field_member_name(field), expression))
                 return
 
             with self._block("{", "}"):
                 self._writer.write_line("auto value = %s;" % (expression))
                 self._writer.write_line("%s(value);" % (_get_field_member_validator_name(field)))
-                self._writer.write_line("%s = std::move(value);" % (field_name))
+                self._writer.write_line("%s = std::move(value);" % (_get_field_member_name(field)))
 
         if field.chained:
             # Do not generate a predicate check since we always call these deserializers.
@@ -1912,7 +1915,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 expression = "%s(%s)" % (method_name, bson_object)
 
             self._gen_usage_check(field, bson_element, field_usage_check)
-            validate_and_assign_or_uassert(field, expression)
+
+            if not field.nested_chained_parent:
+                validate_and_assign_or_uassert(field, expression)
 
         else:
             predicate = None
@@ -1937,9 +1942,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                     # No need for explicit validation as setter will throw for us.
                     self._writer.write_line(
-                        "%s.%s(%s);"
+                        "%s().%s(%s);"
                         % (
-                            _get_field_member_name(field.chained_struct_field),
+                            _get_field_member_getter_name(field.chained_struct_field),
                             _get_field_member_setter_name(field),
                             object_value,
                         )
@@ -2148,7 +2153,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         required_constructor = struct_type_info.get_required_constructor_method()
         if len(required_constructor.args) != len(constructor.args):
-            # print(struct.name + ": "+  str(required_constructor.args))
             self._gen_constructor(struct, required_constructor, False)
 
     def gen_field_list_entry_lookup_methods_struct(self, struct):
@@ -2906,6 +2910,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 continue
 
             if field.chained_struct_field:
+                continue
+            
+            if field.nested_chained_parent:
                 continue
 
             # The $db injected field should only be inject when serializing to OpMsgRequest. In the

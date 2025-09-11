@@ -464,6 +464,61 @@ structs:
 
     ##################################################################################################
     #
+    # Test structs with tested chaining
+    #
+    ##################################################################################################
+    NestedChainedBase:
+        description: "Base struct for testing nested chains"
+        fields:
+            base_field: int
+
+    NestedChainedBottom:
+        description: "Bottom struct for nested chaining"
+        chained_structs:
+            NestedChainedBase: NestedChainedBase
+        fields:
+            bottom_field: int
+
+    NestedChainedMiddle:
+        description: "Middle struct for nested chaining"
+        chained_structs:
+            NestedChainedBottom: NestedChainedBottom
+        fields:
+            middle_field: string
+
+    NestedChainedTop:
+        description: "Top struct for nested chaining"
+        chained_structs:
+            NestedChainedMiddle: NestedChainedMiddle
+        fields:
+            top_field: bool
+
+    NestedChainedNoInlineBase:
+        description: "Base struct for testing nested chains without inline"
+        strict: false
+        fields:
+            base_field: int
+
+    NestedChainedNoInlineBottom:
+        description: "Top struct for nested chaining without inline"
+        inline_chained_structs: false
+        strict: false
+        chained_structs:
+            NestedChainedNoInlineBase: NestedChainedNoInlineBase
+        fields:
+            bottom_field: string
+
+    NestedChainedNoInlineTop:
+        description: "Top struct for nested chaining without inline"
+        strict: false
+        inline_chained_structs: false
+        chained_structs:
+            NestedChainedNoInlineBottom: NestedChainedNoInlineBottom
+        fields:
+            top_field: bool
+
+    ##################################################################################################
+    #
     # Test fields with default values
     #
     ##################################################################################################

@@ -5357,6 +5357,53 @@ TEST(IDLTrie, TestPrefixes) {
     ASSERT_TRUE(TestTrieArgs::hasField("swimmed"));
 }
 
+TEST(IDLNestedChaining, Parse) {
+    auto testDoc = BSON("base_field" << 42 << "bottom_field" << 40 << "middle_field" << "hello"
+                                     << "top_field" << true);
+    auto topStruct = NestedChainedTop::parse(testDoc);
+
+    ASSERT_EQUALS(topStruct.getBase_field(), 42);
+    ASSERT_EQUALS(topStruct.getBottom_field(), 40);
+    ASSERT_EQUALS(topStruct.getMiddle_field(), "hello");
+    ASSERT_EQUALS(topStruct.getTop_field(), true);
+
+    // Test various methods generated from `inlined_chained_structs: true`.
+    ASSERT_EQUALS(topStruct.getNestedChainedMiddle().getNestedChainedBase().getBase_field(), 42);
+    ASSERT_EQUALS(topStruct.getNestedChainedBottom().getBottom_field(), 40);
+
+    BSONObj serialized = topStruct.toBSON();
+    ASSERT_BSONOBJ_EQ(serialized, testDoc);
+}
+
+TEST(IDLNestedChaining, Initialize) {
+    auto testDoc = BSON("base_field" << 42 << "bottom_field" << 40 << "middle_field" << "hello"
+                                     << "top_field" << true);
+
+    NestedChainedTop newStruct;
+    newStruct.getNestedChainedMiddle()
+        .getNestedChainedBottom()
+        .getNestedChainedBase()
+        .setBase_field(42);
+    newStruct.setBottom_field(40);
+    newStruct.getNestedChainedMiddle().setMiddle_field("hello");
+    newStruct.setTop_field(true);
+
+    BSONObj newSerialized = newStruct.toBSON();
+    ASSERT_BSONOBJ_EQ(newSerialized, testDoc);
+}
+
+TEST(IDLNestedChaining, NoInline) {
+    auto testDoc = BSON("base_field" << 42 << "bottom_field" << "hello" << "top_field" << true);
+    auto topStruct = NestedChainedNoInlineTop::parse(testDoc);
+
+    ASSERT_EQUALS(topStruct.getNestedChainedNoInlineBottom().getBottom_field(), "hello");
+    ASSERT_EQUALS(topStruct.getNestedChainedNoInlineBase().getBase_field(), 42);
+    ASSERT_EQUALS(topStruct.getTop_field(), true);
+
+    BSONObj serialized = topStruct.toBSON();
+    ASSERT_BSONOBJ_EQ(serialized, testDoc);
+}
+
 template <typename StructType, typename ParseValueType>
 void testBasicTypeSerialization(StringData fieldName, ParseValueType value) {
     // Positive: parse correct type.

@@ -1269,9 +1269,8 @@ def _bind_field(ctxt, parsed_spec, field):
         ctxt.add_must_be_query_shape_component(ast_field, ast_field.type.name, ast_field.name)
     return ast_field
 
-
-def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
-    # type: (errors.ParserContext, syntax.IDLSpec, ast.Struct, syntax.ChainedStruct) -> None
+def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct, nested_chained_parent=None):
+    # type: (errors.ParserContext, syntax.IDLSpec, ast.Struct, syntax.ChainedStruct, ast.Field) -> None
     """Bind the specified chained struct."""
     syntax_symbol = parsed_spec.symbols.resolve_type_from_name(
         ctxt, ast_struct, chained_struct.name, chained_struct.name
@@ -1292,10 +1291,6 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
             ast_struct, ast_struct.name, chained_struct.name
         )
 
-    if struct.chained_structs:
-        ctxt.add_chained_nested_struct_no_nested_error(
-            ast_struct, ast_struct.name, chained_struct.name
-        )
 
     # Configure a field for the chained struct.
     ast_chained_field = ast.Field(ast_struct.file_name, ast_struct.line, ast_struct.column)
@@ -1304,6 +1299,13 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     ast_chained_field.cpp_name = chained_struct.cpp_name
     ast_chained_field.description = struct.description
     ast_chained_field.chained = True
+
+    if struct.chained_structs:
+        for nested_chained_struct in struct.chained_structs or []:
+            _bind_chained_struct(ctxt, parsed_spec, ast_struct, nested_chained_struct, ast_chained_field)
+
+    if nested_chained_parent:
+        ast_chained_field.nested_chained_parent = nested_chained_parent
 
     if not _is_duplicate_field(ctxt, chained_struct.name, ast_struct.fields, ast_chained_field):
         ast_struct.fields.append(ast_chained_field)

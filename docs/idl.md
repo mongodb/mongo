@@ -716,6 +716,9 @@ the struct including them. This means that instead of users have to call
 `obj.getChainedStruct.getCommonField()`, they can call `obj.getCommonField()` instead. Field storage
 is not affected as this option is only syntactic sugar.
 
+There can be multiple levels of chained structs. Be wary of circular chaining when choosing to use
+multi level chained structs.
+
 ### Struct Reference
 
 - `description` - string - A comment to add to the generated C++

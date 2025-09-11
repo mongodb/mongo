@@ -71,7 +71,6 @@ ERROR_ID_BAD_BINDATA_DEFAULT = "ID0026"
 ERROR_ID_CHAINED_DUPLICATE_FIELD = "ID0029"
 ERROR_ID_CHAINED_STRUCT_NOT_FOUND = "ID0031"
 ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT = "ID0032"
-ERROR_ID_CHAINED_NO_NESTED_CHAINED = "ID0033"
 ERROR_ID_BAD_EMPTY_ENUM = "ID0034"
 ERROR_ID_NO_ARRAY_ENUM = "ID0035"
 ERROR_ID_ENUM_BAD_TYPE = "ID0036"
@@ -664,19 +663,6 @@ class ParserContext(object):
                 + " contained by struct '%s'. Specify 'strict: false' for this struct."
             )
             % (nested_struct_name, struct_name),
-        )
-
-    def add_chained_nested_struct_no_nested_error(self, location, struct_name, chained_name):
-        # type: (common.SourceLocation, str, str) -> None
-        """Add an error about struct's chaining being a struct with nested chaining."""
-        self._add_error(
-            location,
-            ERROR_ID_CHAINED_NO_NESTED_CHAINED,
-            (
-                "Struct '%s' is not allowed to nest struct '%s' since it has chained"
-                + " structs and/or types."
-            )
-            % (struct_name, chained_name),
         )
 
     def add_empty_enum_error(self, node, name):

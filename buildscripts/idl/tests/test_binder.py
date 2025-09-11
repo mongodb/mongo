@@ -1572,6 +1572,30 @@ class TestBinder(testcase.IDLTestcase):
             )
         )
 
+        # Chained struct with nested chained struct
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_structs:
+                    chained: alias
+
+            foobar:
+                description: foo
+                strict: false
+                chained_structs:
+                    bar1: alias
+                fields:
+                    f1: string
+
+        """),
+            )
+        )
+
     def test_chained_struct_negative(self):
         # type: () -> None
         """Negative parser chaining test cases."""
@@ -1699,31 +1723,6 @@ class TestBinder(testcase.IDLTestcase):
         """),
             ),
             idl.errors.ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT,
-        )
-
-        # Chained struct with nested chained struct
-        self.assert_bind_fail(
-            test_preamble
-            + indent_text(
-                1,
-                textwrap.dedent("""
-            bar1:
-                description: foo
-                strict: false
-                chained_structs:
-                    chained: alias
-
-            foobar:
-                description: foo
-                strict: false
-                chained_structs:
-                    bar1: alias
-                fields:
-                    f1: string
-
-        """),
-            ),
-            idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED,
         )
 
     def test_enum_positive(self):

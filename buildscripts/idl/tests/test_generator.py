@@ -1012,8 +1012,95 @@ class TestGenerator(testcase.IDLTestcase):
             header,
             [
                 "mongo::VariantStruct _variantStruct;",
-                "const std::variant<std::string, std::int32_t, bool>& getField1() const { return _variantStruct.getField1(); }",
+                "const std::variant<std::string, std::int32_t, bool>& getField1() const { return getVariantStruct().getField1(); }",
             ],
+        )
+
+    def test_nested_chained_structs(self) -> None:
+        """Test that nested chained structs generate the right setters and getters."""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            structs:
+                NestedChainedBase:
+                    description: "Base struct for testing nested chains"
+                    fields:
+                        base_field: int
+                NestedChainedBottom:
+                    description: "Bottom struct for nested chaining"
+                    chained_structs:
+                        NestedChainedBase: NestedChainedBase
+                    fields:
+                        bottom_field: int
+                NestedChainedMiddle:
+                    description: "Middle struct for nested chaining"
+                    chained_structs:
+                        NestedChainedBottom: NestedChainedBottom
+                    fields:
+                        middle_field: string
+                NestedChainedTop:
+                    description: "Top struct for nested chaining"
+                    chained_structs:
+                        NestedChainedMiddle: NestedChainedMiddle
+                    fields:
+                        top_field: bool
+            """
+            )
+        )
+        self.assertStringsInFile(header, [
+            "mongo::NestedChainedBase& getNestedChainedBase() { return getNestedChainedBottom().getNestedChainedBase();",
+            "void setNestedChainedBase(mongo::NestedChainedBase value) {\n        getNestedChainedBottom().setNestedChainedBase(std::move(value));",
+            "void setBase_field(std::int32_t value) {\n        getNestedChainedBase().setBase_field(std::move(value));",
+            "mongo::NestedChainedBottom& getNestedChainedBottom() { return getNestedChainedMiddle().getNestedChainedBottom();",
+            "void setNestedChainedBottom(mongo::NestedChainedBottom value) {\n        getNestedChainedMiddle().setNestedChainedBottom(std::move(value));",
+            ])
+        self.assertStringsInFile(source, ["getNestedChainedBase().setBase_field(element._numberInt());",
+            "getNestedChainedBottom().setBottom_field(element._numberInt());",
+            "getNestedChainedMiddle().setMiddle_field(element.str());",
+            "_top_field = element.boolean();",
+            ])
+
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            structs:
+                NestedChainedNoInlineBase:
+                    description: "Base struct for testing nested chains without inline"
+                    strict: false
+                    fields:
+                        base_field: int
+                NestedChainedNoInlineBottom:
+                    description: "Top struct for nested chaining without inline"
+                    inline_chained_structs: false
+                    strict: false
+                    chained_structs:
+                        NestedChainedNoInlineBase: NestedChainedNoInlineBase
+                    fields:
+                        bottom_field: string
+                NestedChainedNoInlineTop:
+                    description: "Top struct for nested chaining without inline"
+                    strict: false
+                    inline_chained_structs: false
+                    chained_structs:
+                        NestedChainedNoInlineBottom: NestedChainedNoInlineBottom
+                    fields:
+                        top_field: bool
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            [
+                "mongo::NestedChainedNoInlineBase& getNestedChainedNoInlineBase() { return getNestedChainedNoInlineBottom().getNestedChainedNoInlineBase();",
+                "void setNestedChainedNoInlineBase(mongo::NestedChainedNoInlineBase value) {\n        getNestedChainedNoInlineBottom().setNestedChainedNoInlineBase(std::move(value));",
+                "mongo::NestedChainedNoInlineBottom& getNestedChainedNoInlineBottom() { return _nestedChainedNoInlineBottom;",
+            ],
+        )
+
+        # Inline setters/getters not generated.
+        self.assertStringNotInFile(
+            header,
+            "void setBase_field(std::int32_t value) {\n        getNestedChainedNoInlineBase().setBase_field(std::move(value));",
         )
 
     def test_callback_validators(self) -> None:
