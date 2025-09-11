@@ -116,6 +116,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "pinned_connection_task_executor_registry",
+    srcs = [
+        "pinned_connection_task_executor_registry.cpp",
+    ],
+    hdrs = [
+        "pinned_connection_task_executor_registry.h",
+    ],
+    deps = [
+        ":task_executor_interface",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "pinned_connection_task_executor",
     srcs = [
         "pinned_connection_task_executor.cpp",
@@ -259,6 +272,7 @@ mongo_cc_library(
     ],
     deps = [
         ":pinned_connection_task_executor_factory",
+        ":pinned_connection_task_executor_registry",
         ":task_executor_interface",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:plan_yield_policy",  # TODO(SERVER-93876): Remove.

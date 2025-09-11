@@ -36,6 +36,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/pinned_connection_task_executor_factory.h"
+#include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -68,6 +69,12 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
     if (_options.pinConnection) {
         _executor = makePinnedConnectionTaskExecutor(executor);
         _underlyingExecutor = std::move(executor);
+        // Hold a (PCTE, underlying executor) pair so shutdown can drain the PCTE before
+        // 'underlying' is destroyed.
+        if (rcr.opCtx) {
+            _pcteToken = std::make_unique<PinnedExecutorRegistryToken>(
+                rcr.opCtx->getServiceContext(), _executor, _underlyingExecutor);
+        }
     } else {
         _executor = std::move(executor);
     }
@@ -175,6 +182,7 @@ TaskExecutorCursor::~TaskExecutorCursor() {
                     // underlying if this is the last TaskExecutorCursor using that pinned executor.
                 });
             };
+            _pcteToken.reset();
         }
         auto swCallback = _executor->scheduleRemoteCommand(
             _createRequest(nullptr, KillCursorsCommandRequest(_ns, {_cursorId}).toBSON()),
