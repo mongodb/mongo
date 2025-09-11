@@ -31,6 +31,9 @@ from wiredtiger import stat
 
 # Test that cache eviction controls can be reconfigured dynamically
 # and that WT_CACHE_EVICT_SCRUB_UNDER_TARGET behaves correctly.
+
+# FIXME-WT-14684
+@wttest.skip_for_hook("disagg", "Fails with PALM mapsize limit reached")
 class test_cache_evict_config02(wttest.WiredTigerTestCase):
     conn_config = "cache_size=5MB,statistics=(all),cache_eviction_controls=[scrub_evict_under_target_limit=false]"
     uri = "table:eviction02"

@@ -38,7 +38,7 @@ from wtthread import checkpoint_thread
 # This simulates the scenario seen in WT-14376, where the eviction subsystem opened the history
 # store file before metadata recovery had completed.
 class test_hs33(wttest.WiredTigerTestCase, suite_subprocess):
-    conn_config = 'statistics=(all)'
+    conn_config = 'statistics=(all),log=(enabled=true)'
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -130,6 +130,6 @@ class test_hs33(wttest.WiredTigerTestCase, suite_subprocess):
         # should not occur. Files should only be opened after metadata recovery to ensure the
         # correct checkpoint is loaded.
         self.close_conn()
-        self.conn_config = 'cache_size=1MB,eviction_dirty_trigger=2,eviction_dirty_target=1,statistics=(all)'
+        self.conn_config = 'cache_size=1MB,eviction_dirty_trigger=2,eviction_dirty_target=1,statistics=(all),log=(enabled)'
         conn = self.setUpConnectionOpen("RESTART")
         self.session = self.setUpSessionOpen(conn)

@@ -55,7 +55,7 @@ from helper_disagg import DisaggConfigMixin, gen_disagg_storages, disagg_ignore_
 # These are the hook functions that are run when particular APIs are called.
 
 # Add the local storage extension whenever we call wiredtiger_open
-def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
+def wiredtiger_open_replace(orig_wiredtiger_open, homedir, curconfig):
 
     disagg_storages = gen_disagg_storages()
     testcase = WiredTigerTestCase.currentTestCase()
@@ -77,7 +77,7 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     # We might attempt to let the wiredtiger_open complete without alteration,
     # however, we alter several other API methods that would do weird things with
     # a different disagg_storage configuration. So better to skip the test entirely.
-    if 'disaggregated=' in conn_config:
+    if 'disaggregated=' in curconfig:
         skip_test("cannot run disagg hook on a test that already uses disagg storage")
 
     # Similarly if this test is already set up to run disagg vs non-disagg scenario, let's
@@ -85,15 +85,14 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     if hasattr(testcase, 'disagg_conn_config'):
         skip_test("cannot run disagg hook on a test that already includes DisaggConfigMixin")
 
-    if 'in_memory=true' in conn_config:
+    if 'in_memory=true' in curconfig:
         skip_test("cannot run disagg hook on a test that is in-memory")
 
-    if 'compatibility=' in conn_config:
+    if 'compatibility=' in curconfig:
         skip_test("cannot run disagg hook on a test that requires compatibility in the config string")
 
-    if 'tiered_storage=' in conn_config:
+    if 'tiered_storage=' in curconfig:
         skip_test("cannot run disagg hook on a test that uses tiered_storage in the config string")
-
 
     extension_libs = WiredTigerTestCase.findExtension('page_log', page_log_name)
     if len(extension_libs) == 0:
@@ -125,12 +124,12 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     # Build the extension strings, we'll need to merge it with any extensions
     # already in the configuration.
     ext_string = 'extensions=['
-    start = conn_config.find(ext_string)
+    start = curconfig.find(ext_string)
     if start >= 0:
-        end = conn_config.find(']', start)
+        end = curconfig.find(']', start)
         if end < 0:
-            raise Exception('hook_disagg: bad extensions in config \"%s\"' % conn_config)
-        ext_string = conn_config[start: end]
+            raise Exception('hook_disagg: bad extensions in config \"%s\"' % curconfig)
+        ext_string = curconfig[start: end]
 
     if page_log_config == None:
         ext_lib = '\"%s\"' % extension_libs[0]
@@ -139,11 +138,12 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
 
     disagg_config += ',' + ext_string + ',%s]' % ext_lib
 
-    config = conn_config + disagg_config
+    config = curconfig + disagg_config
 
     WiredTigerTestCase.verbose(None, 3, f'    Calling wiredtiger_open({homedir}, {config})')
 
     result = orig_wiredtiger_open(homedir, config)
+
     # Disaggregated storage generates some extra verbose output which must be ignored.
     disagg_ignore_expected_output(testcase)
 
@@ -235,16 +235,6 @@ def session_create_replace(orig_session_create, session_self, uri, config):
     # there's nothing we can do to "fix" it.  Currently "index:foo" is hardwired to
     # link up with "table:foo", and there is not a "table:foo", only a "layered:foo".
     WiredTigerTestCase.verbose(None, 1, f'    Creating "{uri}" with config = "{config}"')
-
-    # Check if log table is enabled at connection level. If it is, by default session will create a log table unless explicitly disabled in session config.
-    # Skip test if it is enabled
-    # FIXME-WT-15221 Should throw an error when this is set in disagg"
-    conn_config = testcase.conn_config
-    if hasattr(conn_config, '__call__'):
-        conn_config = testcase.conn_config()
-    log_enabled = re.search(r'log=\(enabled(?:=true|,|\))', conn_config) is not None
-    if log_enabled and 'log=(enabled=false' not in config:
-        skip_test("Log tables are not supported in disagg.")
 
     if uri.startswith("index:"):
         # URI is index:base_name:index_name
