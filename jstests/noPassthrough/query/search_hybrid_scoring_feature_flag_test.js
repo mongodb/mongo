@@ -20,7 +20,11 @@ import {assertCreateCollection, assertDropCollection} from "jstests/libs/collect
 
     // Pipeline to run $rankFusion should fail without feature flag turned on.
     assert.commandFailedWithCode(
-        testDB.runCommand({aggregate: 1, pipeline: [{$rankFusion: {}}], cursor: {}}),
+        testDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}}}],
+            cursor: {},
+        }),
         ErrorCodes.QueryFeatureNotAllowed,
     );
 

@@ -73,6 +73,21 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "rank_fusion_util",
+    srcs = [
+        "rank_fusion_util.cpp",
+    ],
+    hdrs = [
+        "rank_fusion_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/db/query:query_knobs",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "query_util_test",
     srcs = [

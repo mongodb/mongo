@@ -991,8 +991,8 @@ public:
     }
 
     bool isBasicRankFusionEnabled() const {
-        return _featureFlagRankFusionBasic.get(
-            VersionContext::getDecoration(getOperationContext()));
+        return bypassRankFusionFCVGate ||
+            _featureFlagRankFusionBasic.get(VersionContext::getDecoration(getOperationContext()));
     }
 
     bool shouldParserAllowStreams() const {
