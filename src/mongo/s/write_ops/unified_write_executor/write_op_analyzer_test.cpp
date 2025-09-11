@@ -134,13 +134,13 @@ TEST_F(WriteOpAnalyzerTestImpl, SingleInserts) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -164,14 +164,14 @@ TEST_F(WriteOpAnalyzerTestImpl, MultiNSSingleInserts) {
 
     WriteOp op1(request, 0);
     ASSERT_EQ(nss, op1.getNss());
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
     ASSERT_EQ(nss2, op2.getNss());
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -197,18 +197,45 @@ TEST_F(WriteOpAnalyzerTestImpl, EqUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     rtx->onRequestSentForNss(nss);
+}
+
+TEST_F(WriteOpAnalyzerTestImpl, EqUpdateWithAnalysisError) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    // Create write command containing a multi:true replacement update. This kind of update is not
+    // supported by MongoDB. It should trigger an InvalidOptions error during analysis.
+    BulkWriteCommandRequest request(
+        {
+            [&]() {
+                auto op = BulkWriteUpdateOp(
+                    0,
+                    BSON("x" << -1 << "_id" << -1),
+                    write_ops::UpdateModification(BSON("_id" << -1 << "x" << -1)));
+                op.setMulti(true);
+                return op;
+            }(),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto swAnalysis = analyzer.analyze(operationContext(), *rtx, op1);
+
+    ASSERT_FALSE(swAnalysis.isOK());
+    ASSERT_EQ(swAnalysis.getStatus().code(), ErrorCodes::InvalidOptions);
 }
 
 TEST_F(WriteOpAnalyzerTestImpl, RangeUpdateOnes) {
@@ -228,12 +255,12 @@ TEST_F(WriteOpAnalyzerTestImpl, RangeUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
 
@@ -267,12 +294,12 @@ TEST_F(WriteOpAnalyzerTestImpl, RangeUpdateManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
@@ -296,13 +323,13 @@ TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -337,13 +364,13 @@ TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeUpdateManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -364,13 +391,13 @@ TEST_F(WriteOpAnalyzerTestImpl, EqDeletes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -392,12 +419,12 @@ TEST_F(WriteOpAnalyzerTestImpl, RangeDeleteOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
 
@@ -427,12 +454,12 @@ TEST_F(WriteOpAnalyzerTestImpl, RangeDeleteManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
@@ -452,13 +479,13 @@ TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeDeleteOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -489,13 +516,13 @@ TEST_F(WriteOpAnalyzerTestImpl, SingleShardRangeDeleteManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -533,7 +560,7 @@ TEST_F(WriteOpAnalyzerTestImpl, UnshardedUntracked) {
     for (size_t i = 0; i < request.getOps().size(); i++) {
         LOGV2(10346501, "request index", "i"_attr = i);
         WriteOp op(request, i);
-        auto analysis = analyzer.analyze(operationContext(), *rtx, op);
+        auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op));
         ASSERT_EQ(1, analysis.shardsAffected.size());
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }
@@ -572,7 +599,7 @@ TEST_F(WriteOpAnalyzerTestImpl, Unsplittable) {
     for (size_t i = 0; i < request.getOps().size(); i++) {
         LOGV2(10346502, "request index", "i"_attr = i);
         WriteOp op(request, i);
-        auto analysis = analyzer.analyze(operationContext(), *rtx, op);
+        auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op));
         ASSERT_EQ(1, analysis.shardsAffected.size());
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }

@@ -60,19 +60,23 @@ public:
      * Peek the current active write op without advancing the internal pointer. Repeated calls
      * return the same write op. When no active write op is left, return empty.
      */
-    virtual boost::optional<WriteOp> peekNext();
+    boost::optional<WriteOp> peekNext();
 
     /**
      * Mark the current write op as inactive and advance the internal pointer to the next active
      * write op.
      */
-    virtual void advance();
+    void advance();
 
     /**
      * Mark a write op as active. The internal pointer will be updated to the active write op with
      * the lowest id.
      */
-    virtual void markOpReprocess(const WriteOp& op);
+    void markOpReprocess(const WriteOp& op);
+
+    void stopProducingOps() {
+        _stopProducingOps = true;
+    }
 
 protected:
     void populateActiveIndices(size_t numOps) {
@@ -83,6 +87,7 @@ protected:
 
     const WriteCommandRef _cmdRef;
     absl::btree_set<size_t> _activeIndices;
+    bool _stopProducingOps{false};
 };
 
 }  // namespace unified_write_executor

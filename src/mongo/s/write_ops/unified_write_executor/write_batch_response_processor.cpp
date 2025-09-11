@@ -82,6 +82,12 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     return result;
 }
 
+Result WriteBatchResponseProcessor::_onWriteBatchResponse(OperationContext* opCtx,
+                                                          RoutingContext& routingCtx,
+                                                          const EmptyBatchResponse& response) {
+    return Result{};
+}
+
 Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx,
     RoutingContext& routingCtx,

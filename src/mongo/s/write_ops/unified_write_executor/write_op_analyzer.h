@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/router_role_api/routing_context.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
@@ -57,9 +58,9 @@ public:
      * Analyzes the given write op to determine which shards it would affect, and if it could be
      * combined into a batch with other writes.
      */
-    virtual Analysis analyze(OperationContext* opCtx,
-                             const RoutingContext& routingCtx,
-                             const WriteOp& op) = 0;
+    virtual StatusWith<Analysis> analyze(OperationContext* opCtx,
+                                         RoutingContext& routingCtx,
+                                         const WriteOp& op) = 0;
 };
 
 class WriteOpAnalyzerImpl : public WriteOpAnalyzer {
@@ -70,9 +71,9 @@ public:
      * Analyzes the given write op to determine which shards it would affect, and if it could be
      * combined into a batch with other writes.
      */
-    Analysis analyze(OperationContext* opCtx,
-                     const RoutingContext& routingCtx,
-                     const WriteOp& op) override;
+    StatusWith<Analysis> analyze(OperationContext* opCtx,
+                                 RoutingContext& routingCtx,
+                                 const WriteOp& op) override;
 
 private:
     Stats& _stats;

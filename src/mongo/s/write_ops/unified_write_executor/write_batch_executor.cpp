@@ -136,6 +136,12 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
+                                                const EmptyBatch& batch) {
+    return EmptyBatchResponse{};
+}
+
+WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
                                                 const SimpleWriteBatch& batch) {
     std::vector<AsyncRequestsSender::Request> requestsToSend;
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {

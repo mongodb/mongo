@@ -47,6 +47,8 @@ struct ShardResponse {
     std::vector<WriteOp> ops;
 };
 
+struct EmptyBatchResponse {};
+
 using SimpleWriteBatchResponse = std::map<ShardId, ShardResponse>;
 
 struct NonTargetedWriteBatchResponse {
@@ -55,7 +57,8 @@ struct NonTargetedWriteBatchResponse {
     WriteOp op;
 };
 
-using WriteBatchResponse = std::variant<SimpleWriteBatchResponse, NonTargetedWriteBatchResponse>;
+using WriteBatchResponse =
+    std::variant<EmptyBatchResponse, SimpleWriteBatchResponse, NonTargetedWriteBatchResponse>;
 
 class WriteBatchExecutor {
 public:
@@ -72,6 +75,10 @@ public:
                                const WriteBatch& batch);
 
 private:
+    WriteBatchResponse _execute(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const EmptyBatch& batch);
+
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
                                 const SimpleWriteBatch& batch);

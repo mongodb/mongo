@@ -37,6 +37,20 @@
 namespace mongo {
 namespace unified_write_executor {
 
+struct EmptyBatch {
+    std::vector<WriteOp> getWriteOps() const {
+        return std::vector<WriteOp>{};
+    }
+
+    std::set<NamespaceString> getInvolvedNamespaces() const {
+        return std::set<NamespaceString>{};
+    }
+
+    bool executorUsesSeparateRoutingContext() const {
+        return false;
+    }
+};
+
 struct SimpleWriteBatch {
     // Given that a write command can target multiple collections,
     // we store one shard version per namespace to support batching ops which target the same shard,
@@ -45,7 +59,24 @@ struct SimpleWriteBatch {
         std::map<NamespaceString, ShardEndpoint> versionByNss;
         std::vector<WriteOp> ops;
     };
+
     std::map<ShardId, ShardRequest> requestByShardId;
+
+    std::vector<WriteOp> getWriteOps() const {
+        std::vector<WriteOp> result;
+        absl::flat_hash_set<WriteOpId> dedup;
+
+        for (const auto& [_, req] : requestByShardId) {
+            for (const auto& op : req.ops) {
+                if (dedup.insert(op.getId()).second) {
+                    result.emplace_back(op);
+                }
+            }
+        }
+
+        return result;
+    }
+
     std::set<NamespaceString> getInvolvedNamespaces() const {
         std::set<NamespaceString> result;
         for (const auto& [_, req] : requestByShardId) {
@@ -56,15 +87,41 @@ struct SimpleWriteBatch {
         return result;
     }
 };
+
 struct NonTargetedWriteBatch {
     WriteOp op;
+
+    std::vector<WriteOp> getWriteOps() const {
+        std::vector<WriteOp> result;
+        result.emplace_back(op);
+        return result;
+    }
+
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return {op.getNss()};
     }
 };
+
 struct WriteBatch {
-    std::variant<SimpleWriteBatch, NonTargetedWriteBatch> data;
-    std::set<NamespaceString> getInvolvedNamespaces() {
+    std::variant<EmptyBatch, SimpleWriteBatch, NonTargetedWriteBatch> data;
+
+    explicit operator bool() const {
+        return !isEmptyBatch();
+    }
+
+    bool operator!() const {
+        return isEmptyBatch();
+    }
+
+    bool isEmptyBatch() const {
+        return holds_alternative<EmptyBatch>(data);
+    }
+
+    std::vector<WriteOp> getWriteOps() const {
+        return std::visit([](const auto& inner) { return inner.getWriteOps(); }, data);
+    }
+
+    std::set<NamespaceString> getInvolvedNamespaces() const {
         return std::visit([](const auto& inner) { return inner.getInvolvedNamespaces(); }, data);
     }
 };
@@ -75,6 +132,14 @@ struct WriteBatch {
  */
 class WriteOpBatcher {
 public:
+    enum ErrorHandlerAction : uint8_t {
+        kReturnError = 0,
+        kConsumeErrorAndResume,
+        kConsumeErrorAndReturnEmptyBatch,
+    };
+
+    using ErrorHandlerFn = std::function<ErrorHandlerAction(const WriteOp&, const Status&, bool)>;
+
     WriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : _producer(producer), _analyzer(analyzer) {}
 
@@ -85,22 +150,37 @@ public:
      * results, the batches may be of different write types. If there are no more write ops to be
      * batched up, this function returns none.
      */
-    virtual boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                                     const RoutingContext& routingCtx) = 0;
+    virtual StatusWith<WriteBatch> getNextBatch(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
+                                                const ErrorHandlerFn& eh = nullptr) = 0;
+
+    /**
+     * Mark a write op to be reprocessed, which will in turn be reanalyzed and rebatched.
+     */
+    void markOpReprocess(const WriteOp& op) {
+        _producer.markOpReprocess(op);
+    }
 
     /**
      * Mark a list of write ops to be reprocessed, which will in turn be reanalyzed and rebatched.
      */
-    void markOpReprocess(const std::vector<WriteOp> ops) {
+    void markOpReprocess(const std::vector<WriteOp>& ops) {
         for (const auto& op : ops) {
             _producer.markOpReprocess(op);
         }
     }
 
     /**
+     * Takes a 'batch' that needs to be reprocessed. This method will do whatever is needed to
+     * cancel the batch, and it will mark the batch's ops to be reprocessed (so they can later
+     * be reanalyzed and rebatched).
+     */
+    void markBatchReprocess(WriteBatch batch);
+
+    /**
      * Returns true if there are no more ops left to batch.
      */
-    virtual bool isDone() {
+    bool isDone() {
         return _producer.peekNext() == boost::none;
     }
 
@@ -120,16 +200,11 @@ public:
     OrderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : WriteOpBatcher(producer, analyzer) {}
 
-    boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                             const RoutingContext& routingCtx) override;
+    StatusWith<WriteBatch> getNextBatch(OperationContext* opCtx,
+                                        RoutingContext& routingCtx,
+                                        const ErrorHandlerFn& eh = nullptr) override;
 
     void markUnrecoverableError() override;
-    bool isDone() override {
-        return WriteOpBatcher::isDone() || unrecoverableError;
-    }
-
-private:
-    bool unrecoverableError{false};
 };
 
 class UnorderedWriteOpBatcher : public WriteOpBatcher {
@@ -137,10 +212,11 @@ public:
     UnorderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : WriteOpBatcher(producer, analyzer) {}
 
-    boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                             const RoutingContext& routingCtx) override;
+    StatusWith<WriteBatch> getNextBatch(OperationContext* opCtx,
+                                        RoutingContext& routingCtx,
+                                        const ErrorHandlerFn& eh = nullptr) override;
 
-    void markUnrecoverableError() override {};
+    void markUnrecoverableError() override {}
 };
 
 }  // namespace unified_write_executor

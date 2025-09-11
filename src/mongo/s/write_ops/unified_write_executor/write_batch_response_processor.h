@@ -117,6 +117,9 @@ public:
 private:
     Result _onWriteBatchResponse(OperationContext* opCtx,
                                  RoutingContext& routingCtx,
+                                 const EmptyBatchResponse& response);
+    Result _onWriteBatchResponse(OperationContext* opCtx,
+                                 RoutingContext& routingCtx,
                                  const SimpleWriteBatchResponse& response);
     Result _onWriteBatchResponse(OperationContext* opCtx,
                                  RoutingContext& routingCtx,

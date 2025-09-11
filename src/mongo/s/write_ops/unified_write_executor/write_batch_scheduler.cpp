@@ -46,23 +46,21 @@ void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceS
             std::vector<NamespaceString>{nssSet.begin(), nssSet.end()},
             [&,
              this](RoutingContext& routingCtx) -> WriteBatchResponseProcessor::CollectionsToCreate {
-                auto batchOfRequests = _batcher.getNextBatch(opCtx, routingCtx);
-                tassert(10411402,
-                        "batcher has no batches left but 'isDone()' returned false",
-                        batchOfRequests.has_value());
+                // TODO SERVER-108965 Handle targeting errors in the UWE.
 
+                // Call getNextBatch(). If a target error occurs, throw an exception.
+                auto batchOfRequests = uassertStatusOK(_batcher.getNextBatch(opCtx, routingCtx));
 
                 // Dismiss validation for any namespaces that don't have write ops in this
                 // round.
-                auto involvedNamespaces = batchOfRequests->getInvolvedNamespaces();
+                auto involvedNamespaces = batchOfRequests.getInvolvedNamespaces();
                 for (const auto& nss : nssSet) {
                     if (!involvedNamespaces.contains(nss)) {
                         routingCtx.release(nss);
                     }
                 }
 
-
-                auto batchOfResponses = _executor.execute(opCtx, routingCtx, *batchOfRequests);
+                auto batchOfResponses = _executor.execute(opCtx, routingCtx, batchOfRequests);
                 auto result = _processor.onWriteBatchResponse(opCtx, routingCtx, batchOfResponses);
                 if (result.errorType == WriteBatchResponseProcessor::ErrorType::kStopProcessing) {
                     shouldAbort = true;

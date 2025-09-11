@@ -31,12 +31,14 @@
 
 #include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 namespace unified_write_executor {
 
-Analysis WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
-                                      const RoutingContext& routingCtx,
-                                      const WriteOp& op) {
+StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
+                                                  RoutingContext& routingCtx,
+                                                  const WriteOp& op) try {
     const auto& cri = routingCtx.getCollectionRoutingInfo(op.getNss());
     // TODO SERVER-103782 Don't use CRITargeter.
     CollectionRoutingInfoTargeter targeter(op.getNss(), cri);
@@ -73,12 +75,18 @@ Analysis WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
-        return {BatchType::kNonTargetedWrite, std::move(tr.endpoints)};
+        return Analysis{BatchType::kNonTargetedWrite, std::move(tr.endpoints)};
     } else if (tr.endpoints.size() == 1) {
-        return {BatchType::kSingleShard, std::move(tr.endpoints)};
+        return Analysis{BatchType::kSingleShard, std::move(tr.endpoints)};
     } else {
-        return {BatchType::kMultiShard, std::move(tr.endpoints)};
+        return Analysis{BatchType::kMultiShard, std::move(tr.endpoints)};
     }
+} catch (const DBException& ex) {
+    auto status = ex.toStatus();
+
+    LOGV2_DEBUG(10896516, 4, "Encountered targeting error", "error"_attr = redact(status));
+
+    return status;
 }
 
 }  // namespace unified_write_executor
