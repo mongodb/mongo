@@ -163,6 +163,12 @@ void validateForTimeseries(const DocumentSourceContainer* sources) {
                 str::stream() << stage->getSourceName()
                               << " is unsupported for timeseries collections",
                 stage->constraints().canRunOnTimeseries);
+        // $text indexes are unsupported on timeseries collections because timeseries collections
+        // are clustered by _id.
+        DocumentSourceMatch* matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get());
+        uassert(10830400,
+                "$text is unsupported for timeseries collections",
+                !matchStage || !matchStage->isTextQuery());
     }
 }
 

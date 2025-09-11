@@ -1,11 +1,10 @@
 /**
- * Test that $geoNear, $near, $nearSphere, and $text are not allowed against timeseries collections
+ * Test that $geoNear, $near, $nearSphere, $where, and $text are not allowed against timeseries collections
  * and such queries fail cleanly.
  *
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 
@@ -68,5 +67,20 @@ assert.commandFailedWithCode(tsColl.createIndex({"tags.descr": "text"}), ErrorCo
 // Since a Text index can't be created, a $text query should fail due to a missing index.
 assert.commandFailedWithCode(
     assert.throws(() => tsColl.find({$text: {$search: "1"}}).itcount()),
-    ErrorCodes.IndexNotFound,
+    [ErrorCodes.IndexNotFound, 10830400],
+);
+// TODO SERVER-108560 remove '17313' error code when 9.0 becomes last LTS, and we only have viewless timeseries.
+assert.commandFailedWithCode(
+    assert.throws(() => tsColl.aggregate([{$match: {$text: {$search: "1"}}}]).itcount()),
+    [ErrorCodes.IndexNotFound, 17313, 10830400],
+);
+
+// $where cannot be used inside a $match stage and therefore is unsupported on timeseries collections.
+assert.commandFailedWithCode(
+    assert.throws(() => tsColl.aggregate([{$match: {$where: "return true"}}]).itcount()),
+    [ErrorCodes.BadValue, 6108304],
+);
+assert.commandFailedWithCode(
+    assert.throws(() => tsColl.find({$where: "return true"}).itcount()),
+    [ErrorCodes.BadValue, 6108304],
 );
