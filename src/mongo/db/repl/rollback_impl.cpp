@@ -1369,13 +1369,6 @@ Timestamp RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
     // Recover to the stable timestamp while holding the global exclusive lock. This may throw,
     // which the caller must handle.
     Lock::GlobalWrite globalWrite(opCtx);
-
-    // Reset the drop pending reaper state prior to recovering to the stable timestamp, which
-    // re-opens the catalog and can add drop pending idents. This prevents collisions with idents
-    // already registered with the reaper.
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    storageEngine->clearDropPendingState(opCtx);
-
     return _storageInterface->recoverToStableTimestamp(opCtx);
 }
 

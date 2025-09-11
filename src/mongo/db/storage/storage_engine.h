@@ -41,6 +41,7 @@
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
 
+#include <compare>
 #include <initializer_list>
 #include <memory>
 #include <string>
@@ -588,24 +589,9 @@ public:
     virtual bool supportsReadConcernSnapshot() const = 0;
 
     /**
-     * Returns a set of drop pending idents inside the storage engine.
-     */
-    virtual std::set<std::string> getDropPendingIdents() const = 0;
-
-    /**
      * Returns the number of drop pending idents inside the storage engine.
      */
     virtual size_t getNumDropPendingIdents() const = 0;
-
-    /**
-     * Removes the drop-pending state for indexes / collections with a timestamped drop time.
-     * Effectively aborts the second phase of a two phase table drop for eligible idents.
-     *
-     * This function is primarily used for rollback after recovering to a stable timestamp - and
-     * clears drop-pending entries in case drops were rolled back. Because of this, only timestamped
-     * drops are affected as non-timestamped drops cannot be rolled back.
-     */
-    virtual void clearDropPendingState(OperationContext* opCtx) = 0;
 
     /**
      * If the given ident has been registered with the reaper, attempts to immediately drop it,
@@ -616,21 +602,67 @@ public:
      */
     virtual Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) = 0;
 
+    /**
+     * Attempts to immediately drop the given ident. If the ident is still in use and cannot be
+     * dropped now, adds it to the reaper to be dropped later.
+     */
+    virtual void dropIdent(RecoveryUnit& ru, StringData ident) = 0;
+
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
+
+    /**
+     * Drops can be either timestamped or untimestamped. A timestamped drop is delayed until the
+     * oldest timestamp has advanced past the drop timestamp, while an untimestamped drop happens as
+     * soon as a checkpoint has been taken. Untimestamped drops are performed by constructing a
+     * DropTime with a CheckpointIteration representing the most recent checkpoint.
+     */
+    struct DropTime : public std::variant<Timestamp, CheckpointIteration> {
+        using Base = std::variant<Timestamp, CheckpointIteration>;
+        using Base::Base;
+
+        BSONObj toBSON() const {
+            return std::visit(OverloadedVisitor{[](Timestamp ts) { return ts.toBSON(); },
+                                                [](CheckpointIteration iter) {
+                                                    return BSON("checkpointIteration"
+                                                                << std::to_string(uint64_t{iter}));
+                                                }},
+                              *this);
+        }
+
+        // CheckpointIterations are considered less than all Timestamps
+        auto operator<=>(const DropTime& other) const {
+            return std::visit(
+                OverloadedVisitor{
+                    [](Timestamp a, Timestamp b) { return a.asULL() <=> b.asULL(); },
+                    [](CheckpointIteration a, CheckpointIteration b) { return a <=> b; },
+                    [](Timestamp, CheckpointIteration) { return std::strong_ordering::greater; },
+                    [](CheckpointIteration, Timestamp) { return std::strong_ordering::less; },
+                },
+                *this,
+                other);
+        }
+
+        bool operator==(const DropTime&) const = default;
+    };
 
     /**
      * Adds 'ident' to a list of indexes/collections whose data will be dropped when:
      * - the 'dropTime' is sufficiently old to ensure no future data accesses
      * - and no holders of 'ident' remain (the index/collection is no longer in active use)
-     *
-     * 'dropTime' can be either a CheckpointIteration or a Timestamp. In the case of a Timestamp the
-     * ident will be dropped when we can guarantee that no other operation can access the ident.
-     * CheckpointIteration should be chosen when performing untimestamped drops as they
-     * will make the ident wait for a catalog checkpoint before proceeding with the ident drop.
      */
-    virtual void addDropPendingIdent(const std::variant<Timestamp, CheckpointIteration>& dropTime,
+    virtual void addDropPendingIdent(const DropTime& dropTime,
                                      std::shared_ptr<Ident> ident,
                                      DropIdentCallback&& onDrop = nullptr) = 0;
+
+    /**
+     * Drops the data for the given ident which is not present in the catalog, but whose exact drop
+     * time is unknown. If stableTimestamp is null this is equivalent to dropIdent(). If it is
+     * non-null and the ident is already pending drop the drop time may be updated, and otherwise it
+     * will be added to the drop-pending list.
+     */
+    virtual void dropUnknownIdent(RecoveryUnit& ru,
+                                  const Timestamp& stableTimestamp,
+                                  StringData ident) = 0;
 
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
@@ -900,7 +932,6 @@ public:
     virtual const KVEngine* getSpillEngine() const = 0;
     virtual MDBCatalog* getMDBCatalog() = 0;
     virtual const MDBCatalog* getMDBCatalog() const = 0;
-    virtual std::set<std::string> getDropPendingIdents() = 0;
 
     /**
      * A service that would like to pin the oldest timestamp registers its request here. If the

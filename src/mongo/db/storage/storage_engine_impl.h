@@ -185,8 +185,6 @@ public:
 
     bool supportsReadConcernSnapshot() const final;
 
-    void clearDropPendingState(OperationContext* opCtx) final;
-
     Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) final;
 
     SnapshotManager* getSnapshotManager() const final;
@@ -209,14 +207,13 @@ public:
         return _spillEngine.get();
     }
 
-    void addDropPendingIdent(
-        const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
-        std::shared_ptr<Ident> ident,
-        DropIdentCallback&& onDrop) override;
-
-    std::set<std::string> getDropPendingIdents() override {
-        return _dropPendingIdentReaper.getAllIdentNames();
-    };
+    void dropIdent(RecoveryUnit& ru, StringData ident) override;
+    void addDropPendingIdent(const DropTime& dropTime,
+                             std::shared_ptr<Ident> ident,
+                             DropIdentCallback&& onDrop) override;
+    void dropUnknownIdent(RecoveryUnit& ru,
+                          const Timestamp& stableTimestamp,
+                          StringData ident) override;
 
     std::shared_ptr<Ident> markIdentInUse(StringData ident) override;
 
@@ -250,10 +247,6 @@ public:
     void stopTimestampMonitor() override;
 
     void restartTimestampMonitor() override;
-
-    std::set<std::string> getDropPendingIdents() const override {
-        return _dropPendingIdentReaper.getAllIdentNames();
-    }
 
     size_t getNumDropPendingIdents() const override {
         return _dropPendingIdentReaper.getNumIdents();

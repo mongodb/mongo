@@ -32,6 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
@@ -797,6 +799,11 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
         return swTimestamp;
     }
 
+    // Remove all idents from the drop-pending reaper which have drop timestamps after the stable
+    // timestamp, as we've rolled back those drops. Any drops on idents not present in the catalog
+    // were converted to untimestamped drops when we reopened the catalog.
+    _dropPendingIdentReaper.rollbackDropsAfterStableTimestamp(swTimestamp.getValue());
+
     LOGV2(22259,
           "recoverToStableTimestamp successful",
           "stableTimestamp"_attr = swTimestamp.getValue());
@@ -813,10 +820,6 @@ boost::optional<Timestamp> StorageEngineImpl::getLastStableRecoveryTimestamp() c
 
 bool StorageEngineImpl::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
-}
-
-void StorageEngineImpl::clearDropPendingState(OperationContext* opCtx) {
-    _dropPendingIdentReaper.clearDropPendingState(opCtx);
 }
 
 Status StorageEngineImpl::immediatelyCompletePendingDrop(OperationContext* opCtx,
@@ -860,11 +863,30 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 
-void StorageEngineImpl::addDropPendingIdent(
-    const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
-    std::shared_ptr<Ident> ident,
-    DropIdentCallback&& onDrop) {
+void StorageEngineImpl::dropIdent(RecoveryUnit& ru, StringData ident) {
+    Status status = _engine->dropIdent(ru, ident, ident::isCollectionIdent(ident));
+    if (!status.isOK()) {
+        // A concurrent operation, such as a checkpoint could be holding an open data
+        // handle on the ident. Handoff the ident drop to the ident reaper to retry
+        // later.
+        addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident), nullptr);
+    }
+}
+
+void StorageEngineImpl::addDropPendingIdent(const DropTime& dropTime,
+                                            std::shared_ptr<Ident> ident,
+                                            DropIdentCallback&& onDrop) {
     _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident, std::move(onDrop));
+}
+
+void StorageEngineImpl::dropUnknownIdent(RecoveryUnit& ru,
+                                         const Timestamp& stableTimestamp,
+                                         StringData ident) {
+    if (stableTimestamp.isNull()) {
+        if (_engine->dropIdent(ru, ident, ident::isCollectionIdent(ident)).isOK())
+            return;
+    }
+    _dropPendingIdentReaper.dropUnknownIdent(stableTimestamp, ident);
 }
 
 std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(StringData ident) {

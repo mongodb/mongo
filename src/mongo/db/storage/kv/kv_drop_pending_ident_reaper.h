@@ -39,13 +39,11 @@
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
 
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -71,12 +69,8 @@ class Ident;
  * unversioned: once it is dropped, it is gone for all readers.
  */
 class KVDropPendingIdentReaper {
-    KVDropPendingIdentReaper(const KVDropPendingIdentReaper&) = delete;
-    KVDropPendingIdentReaper& operator=(const KVDropPendingIdentReaper&) = delete;
-
 public:
     explicit KVDropPendingIdentReaper(KVEngine* engine);
-    virtual ~KVDropPendingIdentReaper() = default;
 
     /**
      * Adds a new drop-pending ident, with its drop time and namespace, to be managed by this
@@ -91,10 +85,19 @@ public:
      *
      * onDrop must not call dropIdentsOlderThan() or immediatelyCompletePendingDrop().
      */
-    void addDropPendingIdent(
-        const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
-        std::shared_ptr<Ident> ident,
-        StorageEngine::DropIdentCallback&& onDrop = nullptr);
+    void addDropPendingIdent(const StorageEngine::DropTime& dropTime,
+                             std::shared_ptr<Ident> ident,
+                             StorageEngine::DropIdentCallback&& onDrop = nullptr);
+
+    /**
+     * Adds an ident with an unknown drop time that is no later than `stableTimestamp`.
+     *
+     * When opening the catalog, all idents found in the storage engine but not the catalog are
+     * dropped. The exact drop time is unknown, but as it is known to be missing at the stable
+     * timestamp it must either be no greater than that or be an ident *created* after the stable
+     * timestamp.
+     */
+    void dropUnknownIdent(const Timestamp& stableTimestamp, StringData ident);
 
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
@@ -115,10 +118,9 @@ public:
     bool hasExpiredIdents(const Timestamp& ts) const;
 
     /**
-     * Returns drop-pending idents in a sorted set.
-     * Used by the storage engine during catalog reconciliation.
+     * Returns a list of ident names currently tracked by the reaper.
      */
-    std::set<std::string> getAllIdentNames() const;
+    std::vector<std::string> getAllIdentNames() const;
 
     /**
      * Returns the number of drop-pending idents.
@@ -134,14 +136,16 @@ public:
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts);
 
     /**
-     * Clears maps of drop pending idents for timestamped writes but does not drop idents in storage
-     * engine. Used by rollback before recovering to a stable timestamp.
+     * Clears maps of drop pending idents for drops with timestamps greater than or equal to the
+     * given stable timestamp.
      *
-     * This function is called under the same critical section as rollback-to-stable, which happens
-     * under the global exclusive lock, and has to be called prior to re-opening the catalog, which
-     * can add drop pending idents.
+     * This function is called following a rollback-to-stable to roll back all drops which occurred
+     * after the stable timestamp. It must be called before the timestamp listener is restarted
+     * following RTS. Idents which were created and then dropped after the stable timestamp will
+     * have already been converted to untimestamped drops as part of opening the catalog at the
+     * stable timestamp.
      */
-    void clearDropPendingState(OperationContext* opCtx);
+    void rollbackDropsAfterStableTimestamp(Timestamp stableTimestamp);
 
     /**
      * If the given ident has been registered with the reaper, attempts to immediately drop it,
@@ -149,12 +153,6 @@ public:
      * ident could not be dropped due to being in use. Returns Status::OK() if the ident was not
      * tracked as the reaper cannot distinguish "ident has already been dropped" from "ident was
      * never drop pending".
-     *
-     * This function currently ignores drop timestamps. This is incorrect but required because
-     * the startup process can produce drops which have timestamps greater than the oldest timestamp
-     * even though there can't be snapshot reads on those idents.
-     * TODO(SERVER-107862): Fix cases where idents are dropped with overly conservative drop
-     * timestamps so that this can honor them.
      */
     Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
@@ -165,39 +163,46 @@ private:
         // Identifier for the storage to drop the associated collection or index data.
         std::string identName;
 
-        // Ident drop state.
-        // - 'kNotDropped': The ident is pending removal, but no progress has been made.
-        // - 'kBeingDropped': The ident is in the process of being dropped by the storage engine.
-        enum class State { kNotDropped, kBeingDropped };
-        State identState;
-
         // The collection or index data can be safely dropped when no references to this token
         // remain and the catalog has checkpointed the changes. The latter is mostly useful for
         // untimestamped writes.
-        std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+        StorageEngine::DropTime dropTime;
         std::weak_ptr<Ident> dropToken;
 
         // Callback to run once the ident has been dropped.
         StorageEngine::DropIdentCallback onDrop;
 
+        // Set to false if the dropTime is an upper bound rather than the exact drop time
+        bool dropTimeIsExact = true;
+        // Set to true while the ident is in the process of being dropped. Idents are not
+        // unregistered until the drop has completed, but once a drop has started it's too late to
+        // keep the ident alive.
+        bool dropInProgress = false;
+
         bool isExpired(const KVEngine* engine, const Timestamp& ts) const;
     };
 
-    boost::optional<std::pair<Timestamp, std::shared_ptr<IdentInfo>>> _getDropPendingTSAndInfo(
-        WithLock, StringData ident) const;
-
     Status _tryToDrop(WithLock,  // Must hold _dropMutex but *not* _mutex
                       OperationContext* opCtx,
-                      Timestamp dropTimestamp,
                       IdentInfo& identInfo);
 
     Status _immediatelyAttemptToCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
-    // Container type for drop-pending namespaces. We use a multimap so that we can order the
+    struct CompareByDropTime {
+        using is_transparent = bool;
+        bool operator()(const std::shared_ptr<IdentInfo>& a,
+                        const std::shared_ptr<IdentInfo>& b) const;
+        bool operator()(const StorageEngine::DropTime& a,
+                        const std::shared_ptr<IdentInfo>& b) const;
+        bool operator()(const std::shared_ptr<IdentInfo>& a,
+                        const StorageEngine::DropTime& b) const;
+    };
+
+    // Container type for drop-pending namespaces. We use a multiset so that we can order the
     // namespaces by drop optime. Additionally, it is possible for certain user operations (such
     // as renameCollection across databases) to generate more than one drop-pending namespace for
     // the same drop optime.
-    using DropPendingIdents = std::multimap<Timestamp, std::shared_ptr<IdentInfo>>;
+    using DropPendingIdents = std::multiset<std::shared_ptr<IdentInfo>, CompareByDropTime>;
 
     // Used to access the KV engine for the purposes of dropping the ident.
     KVEngine* const _engine;
@@ -210,15 +215,15 @@ private:
      * 1. Acquire _dropMutex
      * 2. Acquire _mutex
      * 3. Find ident(s) to drop.
-     * 4. Set identState = State::kBeingDropped
+     * 4. Set dropInProgress = true
      * 5. Release _mutex
      * 6. Attempt to drop ident
      * 7. Acquire _mutex
-     * 8. Either set identState = State::kNotDropped or remove ident from maps
+     * 8. Either set dropInProgress = false or remove ident from maps
      * 9. Release _mutex
      * 10. Release _dropMutex
      *
-     * Note that identState should only ever be State::kBeingDropped while a thread holds
+     * Note that dropInProgress should only ever be true while a thread holds
      * _dropMutex. This is used so that markIdentInUse() can avoid returning an ident which is being
      * dropped without having to acquire _dropMutex.
      */
@@ -228,10 +233,10 @@ private:
     mutable stdx::mutex _mutex;
 
     // Drop-pending idents. Ordered by drop timestamp.
-    DropPendingIdents _dropPendingIdents;
+    DropPendingIdents _timestampOrderedIdents;
 
-    // Ident to drop timestamp map. Used for efficient lookups into _dropPendingIdents.
-    StringMap<Timestamp> _identToTimestamp;
+    // Ident to drop timestamp map. Used for efficient lookups into _timestampOrderedIdents.
+    StringMap<std::shared_ptr<IdentInfo>> _dropPendingIdents;
 };
 
 }  // namespace mongo

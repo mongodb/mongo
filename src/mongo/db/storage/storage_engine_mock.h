@@ -116,7 +116,6 @@ public:
     bool supportsReadConcernSnapshot() const final {
         return false;
     }
-    void clearDropPendingState(OperationContext* opCtx) final {}
     Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) final {
         return Status::OK();
     }
@@ -164,16 +163,16 @@ public:
     std::string getFilesystemPathForDb(const DatabaseName& dbName) const final {
         return "";
     }
-    std::set<std::string> getDropPendingIdents() const final {
-        return {};
-    }
     size_t getNumDropPendingIdents() const final {
         return 0;
     }
-    void addDropPendingIdent(
-        const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
-        std::shared_ptr<Ident> ident,
-        DropIdentCallback&& onDrop) final {}
+    void dropIdent(RecoveryUnit& ru, StringData ident) final {}
+    void addDropPendingIdent(const DropTime& dropTime,
+                             std::shared_ptr<Ident> ident,
+                             DropIdentCallback&& onDrop) final {}
+    void dropUnknownIdent(RecoveryUnit& ru,
+                          const Timestamp& stableTimestamp,
+                          StringData ident) final {}
     std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
         return nullptr;
     }
@@ -233,9 +232,6 @@ public:
     }
     const MDBCatalog* getMDBCatalog() const final {
         return nullptr;
-    }
-    std::set<std::string> getDropPendingIdents() final {
-        return {};
     }
 
     StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,

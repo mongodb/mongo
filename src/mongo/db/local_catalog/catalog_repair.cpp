@@ -186,8 +186,6 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
     stdx::unordered_set<std::string> internalIdentsToKeep;
     stdx::unordered_set<std::string> allInternalIdents;
 
-    auto dropPendingIdents = engine->getDropPendingIdents();
-
     // Drop all idents in the storage engine that are not known to the catalog. This can happen in
     // the case of a collection or index creation being rolled back.
     StorageEngine::ReconcileResult reconcileResult;
@@ -216,37 +214,12 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         // recovered in the catalog in loadMDBCatalog().
         invariant(!(ident::isCollectionIdent(it) && forRepair));
 
-        // Leave drop-pending idents alone.
-        // These idents have to be retained as long as the corresponding drops are not part of a
-        // checkpoint.
-        if (dropPendingIdents.find(it) != dropPendingIdents.cend()) {
-            LOGV2(22250,
-                  "Not removing ident for uncheckpointed collection or index drop",
-                  "ident"_attr = it);
-            continue;
-        }
-
         const auto& toRemove = it;
         const Timestamp identDropTs = stableTs;
         LOGV2_PROD_ONLY(
             22251, "Dropping unknown ident", "ident"_attr = toRemove, "ts"_attr = identDropTs);
-        if (!identDropTs.isNull()) {
-            engine->addDropPendingIdent(
-                identDropTs, std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
-        } else {
-            WriteUnitOfWork wuow(opCtx);
-            Status status =
-                engine->getEngine()->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                               toRemove,
-                                               ident::isCollectionIdent(toRemove));
-            if (!status.isOK()) {
-                // A concurrent operation, such as a checkpoint could be holding an open data handle
-                // on the ident. Handoff the ident drop to the ident reaper to retry later.
-                engine->addDropPendingIdent(
-                    identDropTs, std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
-            }
-            wuow.commit();
-        }
+        engine->dropUnknownIdent(
+            *shard_role_details::getRecoveryUnit(opCtx), identDropTs, toRemove);
     }
 
     // Scan all collections in the catalog and make sure their ident is known to the storage
@@ -354,18 +327,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                       "Dropping unfinished index",
                       logAttrs(md->nss),
                       "index"_attr = indexName);
-                // Ensure the `ident` is dropped while we have the `indexIdent` value.
-                Status status =
-                    engine->getEngine()->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                                   indexIdent,
-                                                   /*identHasSizeInfo=*/false);
-                if (!status.isOK()) {
-                    // A concurrent operation, such as a checkpoint could be holding an open data
-                    // handle on the ident. Handoff the ident drop to the ident reaper to retry
-                    // later.
-                    engine->addDropPendingIdent(
-                        Timestamp::min(), std::make_shared<Ident>(indexIdent), /*onDrop=*/nullptr);
-                }
+                engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx), indexIdent);
                 indexesToDrop.push_back(std::string{indexName});
                 continue;
             }
@@ -392,16 +354,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
             continue;
         }
         LOGV2(22257, "Dropping internal ident", "ident"_attr = temp);
-        WriteUnitOfWork wuow(opCtx);
-        Status status = engine->getEngine()->dropIdent(
-            *shard_role_details::getRecoveryUnit(opCtx), temp, ident::isCollectionIdent(temp));
-        if (!status.isOK()) {
-            // A concurrent operation, such as a checkpoint could be holding an open data handle on
-            // the ident. Handoff the ident drop to the ident reaper to retry later.
-            engine->addDropPendingIdent(
-                Timestamp::min(), std::make_shared<Ident>(temp), /*onDrop=*/nullptr);
-        }
-        wuow.commit();
+        engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx), temp);
     }
 
     return reconcileResult;

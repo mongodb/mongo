@@ -168,16 +168,6 @@ boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx, const Names
 }
 
 namespace {
-BSONObj toBSON(const std::variant<Timestamp, StorageEngine::CheckpointIteration>& x) {
-    return visit(OverloadedVisitor{[](const Timestamp& ts) { return ts.toBSON(); },
-                                   [](const StorageEngine::CheckpointIteration& iter) {
-                                       auto underlyingValue = uint64_t{iter};
-                                       return BSON("checkpointIteration"
-                                                   << std::to_string(underlyingValue));
-                                   }},
-                 x);
-}
-
 /**
  * Returns the first `dropCollection` error that this method encounters. This method will attempt
  * to drop all collections, regardless of the error status. This method will attempt to drop all
@@ -262,7 +252,7 @@ void removeIndex(OperationContext* opCtx,
          ident,
          isTwoPhaseDrop](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
             if (isTwoPhaseDrop) {
-                std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+                StorageEngine::DropTime dropTime;
                 if (!commitTimestamp) {
                     // Standalone mode and unreplicated drops will not provide a timestamp. Use the
                     // checkpoint iteration instead.
@@ -276,7 +266,7 @@ void removeIndex(OperationContext* opCtx,
                                 logAttrs(nss),
                                 "uuid"_attr = uuid,
                                 "ident"_attr = ident->getIdent(),
-                                "dropTime"_attr = toBSON(dropTime));
+                                "dropTime"_attr = dropTime);
                 storageEngine->addDropPendingIdent(dropTime, ident);
             } else {
                 LOGV2(6361201,
@@ -323,7 +313,7 @@ Status dropCollection(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             OperationContext*, boost::optional<Timestamp> commitTimestamp) {
-            std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+            StorageEngine::DropTime dropTime;
             if (!commitTimestamp) {
                 // Standalone mode and unreplicated drops will not provide a timestamp. Use the
                 // checkpoint iteration instead.
@@ -335,7 +325,7 @@ Status dropCollection(OperationContext* opCtx,
                             "Deferring table drop for collection",
                             logAttrs(nss),
                             "ident"_attr = ident->getIdent(),
-                            "dropTime"_attr = toBSON(dropTime));
+                            "dropTime"_attr = dropTime);
             storageEngine->addDropPendingIdent(dropTime, ident);
         });
 
