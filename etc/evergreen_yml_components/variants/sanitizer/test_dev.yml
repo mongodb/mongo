@@ -683,7 +683,7 @@ buildvariants:
       - name: .query_fuzzer
       - name: .read_write_concern
       - name: replica_sets_large_txns_format_jscore_passthrough_gen
-      - name: .replica_sets !.multi_oplog
+      - name: .replica_sets !.multi_oplog !.uninitialized_fcv
       - name: .replica_sets .encrypt
       - name: .resharding_fuzzer
       - name: .retry
@@ -692,7 +692,7 @@ buildvariants:
       - name: sasl
       - name: secondary_reads_passthrough_gen
       - name: session_jscore_passthrough
-      - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
+      - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded !.uninitialized_fcv
       - name: .sharding .common !.csrs !.jstestfuzz !.feature_flag_guarded
       - name: .updatefuzzer
       - name: unittest_shell_hang_analyzer_gen

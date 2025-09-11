@@ -40,7 +40,6 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
     {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
     {"task": r"noPassthrough", "factor": 0.75},
-    {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
     {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.125},
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
     {
@@ -61,7 +60,6 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         # as otherwise TSAN variants occasionally run out of memory
         # Non-TSAN variants don't need this adjustment as they have a reasonable free memory margin
         {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.*", "factor": 0.27},
-        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
         {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
     ],
@@ -75,7 +73,6 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
             "factor": 0.125,
         },
         {"task": r"fcv_upgrade_downgrade_replica_sets_jscore_passthrough.*", "factor": 0.27},
-        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
     ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
