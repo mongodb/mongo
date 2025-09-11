@@ -98,12 +98,13 @@ constexpr Date_t mkDate(DateParts dp) {
 /**
  * To make this test deterministic, we set the time zone to America/New_York.
  */
+#ifdef _WIN32
+char tzEnvString[] = "TZ=EST+5EDT";
+#else
+char tzEnvString[] = "TZ=America/New_York";
+#endif
+
 MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
-    // Manually specify timezone offsets, for the benefit of the
-    // hermetic test environment. See 'man tzset' for the syntax of TZ.
-    // This says that we are in DST from the second Sunday in March
-    // through the first Sunday in November.
-    char tzEnvString[] = "TZ=EST+5EDT+4,M3.2.0,M11.1.0";
 #ifdef _WIN32
     int ret = _putenv(tzEnvString);
 #else
@@ -114,15 +115,6 @@ MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
         uasserted(ErrorCodes::BadValue, errorMessage(ec));
     }
     tzset();
-    // Make sure our hermetic test environment isn't breaking this.
-    // The timezone/_timezone variable is always the offset from UTC
-    // to standard time, whether or not daylight savings is currently
-    // in effect.
-#ifdef _WIN32
-    invariant(_timezone == 5 * 3600);
-#else
-    invariant(timezone == 5 * 3600);
-#endif
 }
 
 static std::string stringstreamDate(void (*formatter)(std::ostream&, Date_t), Date_t date) {
