@@ -1639,6 +1639,7 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         auto singleUpdateOp = timeseries::write_ops::buildSingleUpdateOp(wholeOp, nextOpIndex);
+        singleUpdateOp.setCollectionUUID(preConditions.expectedUUID());
         const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, nextOpIndex++);
 
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();

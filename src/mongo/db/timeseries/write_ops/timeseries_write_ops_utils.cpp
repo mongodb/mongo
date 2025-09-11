@@ -43,6 +43,7 @@ mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
     commandBase.setOrdered(wholeOp.getOrdered());
     commandBase.setBypassDocumentValidation(wholeOp.getBypassDocumentValidation());
     commandBase.setBypassEmptyTsReplacement(wholeOp.getBypassEmptyTsReplacement());
+    commandBase.setCollectionUUID(wholeOp.getCollectionUUID());
 
     return singleUpdateOp;
 }
