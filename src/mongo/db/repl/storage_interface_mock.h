@@ -370,6 +370,8 @@ public:
         return false;
     }
 
+    void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const override {}
+
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override {
         return boost::none;
     }

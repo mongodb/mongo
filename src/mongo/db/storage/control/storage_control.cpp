@@ -32,12 +32,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
-#include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
@@ -94,18 +91,6 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
         Checkpointer::set(serviceContext, std::move(checkpointer));
     }
 
-    // TODO SERVER-110729 Remove the replication dependencies here.
-    if (!forTestOnly &&
-        repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet() &&
-        !repl::ReplSettings::shouldSkipOplogSampling() &&
-        !storageGlobalParams.queryableBackupMode && !storageGlobalParams.repair &&
-        serviceContext->userWritesAllowed()) {
-        std::unique_ptr<OplogCapMaintainerThread> maintainerThread =
-            std::make_unique<OplogCapMaintainerThread>();
-        OplogCapMaintainerThread::set(serviceContext, std::move(maintainerThread));
-        OplogCapMaintainerThread::get(serviceContext)->go();
-    }
-
     areControlsStarted = true;
 }
 
@@ -122,11 +107,6 @@ void stopStorageControls(ServiceContext* serviceContext, const Status& reason, b
         auto checkpointer = Checkpointer::get(serviceContext);
         if (checkpointer) {
             checkpointer->shutdown(reason);
-        }
-        if (OplogCapMaintainerThread* maintainerThread =
-                OplogCapMaintainerThread::get(serviceContext);
-            maintainerThread) {
-            maintainerThread->shutdown(reason);
         }
 
         areControlsStarted = false;

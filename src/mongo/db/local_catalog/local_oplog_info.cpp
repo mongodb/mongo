@@ -40,7 +40,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
-#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -96,11 +95,11 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
 
     stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _rs = rs;
-    // If the server was started in read-only mode, if we are restoring the node, or if async
-    // sampling is enabled, skip calculating the oplog truncate markers here.
+    // If the server was started in read-only mode or if we are restoring the node, skip
+    // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
+    // in this instance.
     bool needsTruncateMarkers = opCtx->getServiceContext()->userWritesAllowed() &&
-        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling() &&
-        !gOplogSamplingAsyncEnabled;
+        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling();
     if (needsTruncateMarkers) {
         _truncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     }

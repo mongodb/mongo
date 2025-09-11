@@ -30,51 +30,44 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/util/background.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 
 /**
  * Responsible for deleting oplog truncate markers once their max capacity has been reached.
  */
-class OplogCapMaintainerThread : public BackgroundJob {
+class OplogCapMaintainerThread {
 public:
-    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
-
     static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
-    static OplogCapMaintainerThread* get(OperationContext* opCtx);
-    static void set(ServiceContext* serviceCtx,
-                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
 
-    std::string name() const override {
-        return _name;
-    }
-
-    void run() override;
+    /**
+     * Create the maintainer thread. Must be called at most once.
+     */
+    void start();
 
     /**
      * Waits until the maintainer thread finishes. Must not be called concurrently with start().
      */
-    void shutdown(const Status& reason);
+    void shutdown();
+
+    void appendStats(BSONObjBuilder& builder) const;
 
 private:
+    void _run();
+
     /**
      * Returns true iff there was an oplog to delete from.
      */
     bool _deleteExcessDocuments(OperationContext* opCtx);
 
-    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable stdx::mutex _opCtxMutex;
+    stdx::thread _thread;
 
-    // Saves a reference to the cap maintainer thread's operation context.
-    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
+    // Cumulative amount of time spent truncating the oplog.
+    AtomicWord<int64_t> _totalTimeTruncating;
 
-    mutable stdx::mutex _stateMutex;
-    bool _shuttingDown = false;
-    Status _shutdownReason = Status::OK();
-
-    std::string _name = std::string("OplogCapMaintainerThread-") +
-        toStringForLogging(NamespaceString::kRsOplogNamespace);
+    // Cumulative number of truncates of the oplog.
+    AtomicWord<int64_t> _truncateCount;
 };
 
 }  // namespace mongo
