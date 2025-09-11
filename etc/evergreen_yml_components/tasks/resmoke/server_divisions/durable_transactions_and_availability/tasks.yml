@@ -977,7 +977,7 @@ tasks:
         vars:
           suite: no_passthrough
           resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/**/*.js
-          use_large_distro: "true"
+          use_xlarge_distro: "true"
 
   - <<: *gen_task_template
     name: queryableWT_gen
