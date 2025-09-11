@@ -479,14 +479,6 @@ public:
     virtual bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const = 0;
 
     /**
-     * Responsible for initializing independent processes for replication that manage
-     * and interact with the storage layer.
-     *
-     * Initializes the OplogCapMaintainerThread to control deletion of oplog truncate markers.
-     */
-    virtual void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const = 0;
-
-    /**
      * Returns the stable timestamp that the storage engine recovered to on startup. If the
      * recovery point was not stable, returns "none".
      */

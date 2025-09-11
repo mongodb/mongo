@@ -139,6 +139,10 @@ private:
         auto service = getServiceContext();
         auto replCoord = std::make_unique<ReplicationCoordinatorMock>(service);
         ReplicationCoordinator::set(service, std::move(replCoord));
+        // Turn off async sampling before creating the oplog so we get the right value of
+        // needsTruncateMarkers in setRecordStore.
+        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+            "oplogSamplingAsyncEnabled", false);
         repl::createOplog(_opCtx.get());
     }
 
@@ -157,6 +161,11 @@ private:
  * Insert records into an oplog and verify the number of truncate markers that are created.
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_CreateNewMarker) {
+
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
 
     auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
@@ -209,6 +218,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CreateNewMarker) {
  * should leave no truncate markers, including the partially filled one.
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_Truncate) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
     auto& storage = getStorage();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
@@ -245,6 +258,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Truncate) {
  * record is changed.
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_UpdateRecord) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
     auto& storage = getStorage();
 
@@ -307,6 +324,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_UpdateRecord) {
  * partially truncated, then it should become the truncate marker currently being filled.
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
     auto& storage = getStorage();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
@@ -415,6 +436,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
  * Verify that oplog truncate markers are reclaimed when cappedMaxSize is exceeded.
  */
 TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
     auto engine = getServiceContext()->getStorageEngine();
@@ -604,6 +629,10 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
  * of the records to not be in increasing order.
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_AscendingOrder) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
 
     auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
@@ -649,6 +678,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AscendingOrder) {
 //  (2) OplogTruncateMarkers::currentBytes_forTest() reflects the actual size of the oplog instead
 //  of the estimated size.
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
     auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
@@ -687,6 +720,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
 // sampled multiple times during startup, which can be very likely if the size storer is very
 // inaccurate.
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
+    // Turn off async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", false);
+
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
     auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
@@ -754,176 +791,5 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
     }
 }
 
-// In async mode, markers are created as expected.
-TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsynchronousModeMarkerCreation) {
-    auto opCtx = getOperationContext();
-    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-
-    // Turn on async mode
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagOplogSamplingAsyncEnabled", true);
-
-
-    auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
-    ASSERT(oplogTruncateMarkers);
-
-    oplogTruncateMarkers->setMinBytesPerMarker(100);
-
-    // Inserting a record smaller than 'minBytesPerTruncateMarker' shouldn't create a new oplog
-    // truncate marker.
-    insertOplog(1, 99);
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
-    ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(99, oplogTruncateMarkers->currentBytes_forTest());
-
-    // Inserting another record such that their combined size exceeds
-    // 'minBytesPerTruncateMarker' should cause a new truncate marker to be created.
-    insertOplog(2, 51);
-    ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
-
-    // Inserting a record such that the combined size of this record and the previously inserted
-    // one exceed 'minBytesPerTruncateMarker' shouldn't cause a new truncate marker to be
-    // created because we've started filling a new truncate marker.
-    insertOplog(3, 50);
-    ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
-    ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
-
-    // Inserting a record such that the combined size of this record and the previously inserted
-    // one is exactly equal to 'minBytesPerTruncateMarker' should cause a new truncate marker to
-    // be created.
-    insertOplog(4, 50);
-    ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
-
-    ASSERT_EQ(4, rs->numRecords());
-    ASSERT_EQ(250, rs->dataSize());
-}
-
-// In async mode, sampleAndUpdate is called seperately from createOplogTruncateMarkers, and
-// creates the initial set of markers.
-TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampleAndUpdate) {
-    auto opCtx = getOperationContext();
-    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-
-    // Turn on async mode
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagOplogSamplingAsyncEnabled", true);
-
-    // Populate oplog to force marker creation to occur
-    int realNumRecords = 4;
-    int realSizePerRecord = 1024 * 1024;
-    for (int i = 1; i <= realNumRecords; i++) {
-        insertOplog(i, realSizePerRecord);
-    }
-
-    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    ASSERT(oplogTruncateMarkers);
-
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
-
-    // Continue finishing the initial scan / sample
-    oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
-
-    // Confirm that some truncate markers were generated.
-    ASSERT_LT(0U, oplogTruncateMarkers->numMarkers_forTest());
-}
-
-// In async mode, during startup but before sampling finishes, creation method is InProgress. This
-// should then resolve to either the Scanning or Sampling method once initial marker creation has
-// finished
-TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsynchronousModeInProgressState) {
-    auto opCtx = getOperationContext();
-    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-
-    // Turn on async mode
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagOplogSamplingAsyncEnabled", true);
-
-    // Populate oplog to so that initial marker creation method is not EmptyCollection
-    insertOplog(1, 100);
-
-    // Note if in async mode, at this point we have not yet sampled.
-    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    ASSERT(oplogTruncateMarkers);
-
-    // Confirm that we are in InProgress state since sampling/scanning has not begun.
-    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
-              oplogTruncateMarkers->getMarkersCreationMethod());
-
-    // Continue finishing the initial scan / sample
-    oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
-
-    // Check that the InProgress state has now been resolved.
-    ASSERT(oplogTruncateMarkers->getMarkersCreationMethod() ==
-           CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-}
-
-// In async mode, we are still able to sample when expected, and some markers can be created.
-TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) {
-    auto opCtx = getOperationContext();
-    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-    auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
-
-    // Turn on async mode
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagOplogSamplingAsyncEnabled", true);
-
-    {
-        // Before initializing the RecordStore, populate with a few records.
-        insertOplog(1, 100);
-        insertOplog(2, 100);
-        insertOplog(3, 100);
-        insertOplog(4, 100);
-    }
-
-    {
-        // Force initialize the oplog truncate markers to use sampling by providing very large,
-        // inaccurate sizes. This should cause us to over sample the records in the oplog.
-        ASSERT_OK(wtRS->updateSize(1024 * 1024 * 1024));
-        wtRS->setNumRecords(1024 * 1024);
-        wtRS->setDataSize(1024 * 1024 * 1024);
-    }
-
-    LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);
-    // Note if in async mode, at this point we have not yet sampled.
-    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    ASSERT(oplogTruncateMarkers);
-
-    // Continue finishing the initial scan / sample
-    oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
-    ASSERT(oplogTruncateMarkers);
-
-    // Confirm that we can in fact sample
-    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
-              oplogTruncateMarkers->getMarkersCreationMethod());
-    // Confirm that some truncate markers were generated.
-    ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
-    auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
-    ASSERT_GT(truncateMarkersBefore, 0U);
-    ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
-}
-
-// In async mode, markers are not created during createOplogTruncateMarkers (which instead returns
-// empty OplogTruncateMarkers object)
-TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplogTruncateMarkers) {
-    auto opCtx = getOperationContext();
-    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-
-    // Turn on async mode
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagOplogSamplingAsyncEnabled", true);
-
-    // Note if in async mode, at this point we have not yet sampled.
-    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    ASSERT(oplogTruncateMarkers);
-
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
-}
 }  // namespace repl
 }  // namespace mongo
