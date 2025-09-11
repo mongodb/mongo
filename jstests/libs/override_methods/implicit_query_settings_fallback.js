@@ -78,7 +78,6 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
         }
 
         if (innerCmd.hasOwnProperty("rawData")) {
-            // TODO(SERVER-106438): Review interaction of setQuerySettings with rawData
             // Query settings can't be applied on rawData queries
             return;
         }

@@ -77,6 +77,12 @@ struct RepresentativeQueryInfo {
     // Name of the leading stage if it is "system"/"administrative" and is not eligible for
     // rejection by query settings.
     const boost::optional<std::string> systemStage;
+
+    // Value of the rawData parameter in the query, or false if the parameter was not included.
+    // Some collection types can store data in a different format than users expect.
+    // If this parameter is true, then the query operates on documents directly in the format in
+    // which they are stored.
+    const bool isRawDataQuery;
 };
 
 /**

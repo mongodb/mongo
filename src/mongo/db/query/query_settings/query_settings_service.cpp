@@ -45,6 +45,7 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -186,6 +187,7 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
         .isIdHackQuery =
             isIdHackEligibleQueryWithoutCollator(*parsedFindCommand->findCommandRequest),
         .systemStage = {/* no unsupported agg stages */},
+        .isRawDataQuery = parsedFindCommand->findCommandRequest->getRawData().value_or(false),
     };
 }
 
@@ -233,6 +235,8 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
         .encryptionInformation = boost::none,
         .isIdHackQuery = false,
         .systemStage = {/* no unsupported agg stages */},
+        .isRawDataQuery =
+            parsedDistinctCommand->distinctCommandRequest->getRawData().value_or(false),
     };
 }
 
@@ -289,6 +293,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
         .encryptionInformation = aggregateCommandRequest.getEncryptionInformation(),
         .isIdHackQuery = false,
         .systemStage = getStageExemptedFromRejection(aggregateCommandRequest.getPipeline()),
+        .isRawDataQuery = aggregateCommandRequest.getRawData().value_or(false),
     };
 }
 
@@ -879,6 +884,10 @@ void QuerySettingsService::validateQueryCompatibleWithAnyQuerySettings(
     uassert(8584901,
             "setQuerySettings command cannot be used on system collections",
             !representativeQueryInfo.namespaceString.isSystem());
+
+    uassert(1064380,
+            "setQuerySetting command cannot be used with rawData enabled",
+            !representativeQueryInfo.isRawDataQuery);
 
     validateQuerySettingsEncryptionInformation(representativeQueryInfo);
 

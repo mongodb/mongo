@@ -124,6 +124,20 @@ export function getExplainCommand(cmdObj, verbosity = "queryPlanner") {
 }
 
 /**
+ * Returns the value of the rawData parameter for the given 'cmdObj'.
+ * Returns false if the parameter is not included.
+ */
+export function getRawData(cmdObj) {
+    const [cmd, genericArgs] = extractGenericArgs(cmdObj);
+
+    if ("rawData" in genericArgs) {
+        return genericArgs.rawData;
+    }
+
+    return false;
+}
+
+/**
  * Resolves the collection name for the given 'cmdObj'. If the command targets a view, then this
  * will recursively find the underlying collection's name and return it. Returns 'undefined' if the
  * collection does not exist.

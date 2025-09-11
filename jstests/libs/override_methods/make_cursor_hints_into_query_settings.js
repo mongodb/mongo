@@ -8,6 +8,7 @@ import {
     getExplainCommand,
     getInnerCommand,
     isSystemBucketNss,
+    getRawData,
 } from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
@@ -65,12 +66,15 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     }
 
     const isSystemBucketColl = isSystemBucketNss(innerCmd);
+    const isRawDataQuery = getRawData(innerCmd);
 
     // Construct the equivalent query settings, remove the hint from the original command object and
     // build the representative query.
-    const allowedIndexes = isSystemBucketColl
-        ? [transformIndexHintsFromTimeseriesToView(innerCmd.hint)]
-        : [innerCmd.hint];
+    const allowedIndexes =
+        isSystemBucketColl || isRawDataQuery
+            ? [transformIndexHintsFromTimeseriesToView(innerCmd.hint)]
+            : [innerCmd.hint];
+    // This also deletes the hint field from innerCmd's parent object cmdObj.
     delete innerCmd.hint;
 
     const explainCmd = getExplainCommand(innerCmd);
@@ -104,8 +108,16 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     // remove all the settings.
     const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
+
+    // We need to make a copy of the innerCmd here so that we only remove the rawData parameter from the query used
+    // in the setQuerySettings object, and cmdObj will retain the rawData parameter for the query run with those settings.
+    let innerCmdCopy = {...innerCmd};
+    if (isRawDataQuery) {
+        delete innerCmdCopy.rawData;
+    }
+
     const representativeQuery = qsutils.makeQueryInstance(
-        isSystemBucketColl ? {...innerCmd, [getCommandName(innerCmd)]: collectionName} : innerCmd,
+        isSystemBucketColl ? {...innerCmdCopy, [getCommandName(innerCmdCopy)]: collectionName} : innerCmdCopy,
     );
     return qsutils.withQuerySettings(representativeQuery, settings, () =>
         clientFunction.apply(conn, makeFuncArgs(cmdObj)),
