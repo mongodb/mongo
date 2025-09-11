@@ -194,7 +194,7 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
             assert.soonRetryOnAcceptableErrors(() => {
                 assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard}));
                 return true;
-            }, ErrorCodes.FailedToSatisfyReadPreference);
+            }, [ErrorCodes.FailedToSatisfyReadPreference, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
         },
         st.s.host,
         ns,
