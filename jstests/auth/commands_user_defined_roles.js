@@ -221,7 +221,8 @@ const opts = {
 };
 const impls = {
     createUsers: createUsers,
-    runOneTest: runOneTest
+    runOneTest: runOneTest,
+    getSideChannel: conn => conn.sidechannel,
 };
 
 // run all tests standalone

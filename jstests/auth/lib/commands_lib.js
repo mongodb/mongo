@@ -208,6 +208,23 @@ var testcases_transformationOnly = [
 var testcases_transformationOnlyExpectFail =
     testcases_transformationOnly.map(t => Object.extend({expectFail: true}, t));
 
+// The following agggregation stages are skipped in 'authCommandsLib' because they are unable to be
+// tested here and already have auth tests elsewhere.
+const skippedAuthTestingAggStages = [
+    "$_analyzeShardKeyReadWriteDistribution",  // Already covered. And it cannot not be tested in
+                                               // commands_lib framework due to its requirement on
+                                               // non-mongos node on a sharded cluster.
+    "$merge",  // Already covered in 'aggregate_merge_insert_documents' and
+               // 'aggregate_merge_replace_documents'.
+    "$set",    // Alias for "$addFields" and already covered.
+
+    // The following stages are required to be tested in stream processors.
+    "$hoppingWindow",
+    "$tumblingWindow",
+    "$sessionWindow",
+    "$validate",
+];
+
 load("jstests/libs/uuid_util.js");
 // For isReplSet
 load("jstests/libs/fixture_helpers.js");
@@ -6859,6 +6876,36 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_$searchMeta",
+          command: {
+              aggregate: "foo",
+              cursor: {},
+              pipeline: [{$searchMeta: {}}]
+          },
+          // Only enterprise knows of this aggregation stage.
+          skipTest:
+              (conn) =>
+                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
+          // Instead of calling to mongot, lets make the search to return EOF early.
+          disableSearch: true,
+          testcases: testcases_transformationOnlyExpectFail
+        },
+        {
+          testname: "aggregate_$vectorSearch",
+          command: {
+              aggregate: "foo",
+              cursor: {},
+              pipeline: [{$vectorSearch: {}}]
+          },
+          // Only enterprise knows of this aggregation stage.
+          skipTest:
+              (conn) =>
+                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
+          // Instead of calling to mongot, lets make the search to return EOF early.
+          disableSearch: true,
+          testcases: testcases_transformationOnlyExpectFail
+        },
+        {
           testname: "startRecordingTraffic",
           command: {startRecordingTraffic: 1, filename: "notARealPath"},
           testcases: [
@@ -7070,7 +7117,7 @@ export const authCommandsLib = {
           testname: "aggregate_$_unpackBucket",
           command: {
               aggregate: "foo",
-              pipeline: [{$_internalUnpackBucket: {timeField: "start", metaField: "tags", bucketMaxSpanSeconds: NumberInt(3000)}}],
+              pipeline: [{$_unpackBucket: {timeField: "start"}}],
               cursor: {}
           },
           setup: function(db) {
@@ -7307,6 +7354,30 @@ export const authCommandsLib = {
           }],
         },
         {
+          testname: "aggregate_$listCachedAndActiveUsers",
+          command: {
+            aggregate: 1,
+            pipeline: [{$listCachedAndActiveUsers: {}}],
+            cursor: {}
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {userAdminAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {anyResource: true}, actions: ["listCachedAndActiveUsers"]},
+                ],
+              },
+              {
+                runOnDb: firstDbName,
+                roles: {userAdminAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {anyResource: true}, actions: ["listCachedAndActiveUsers"]},
+                ],
+              }
+            ]
+        },
+        {
           testname: "aggregate_$listCatalog_admin",
           command: {
             aggregate: 1,
@@ -7425,6 +7496,18 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnly,
         },
         {
+          testname: "aggregate_$_internalBoundedSort",
+          command: {
+              aggregate: "foo",
+              pipeline: [
+                {$skip: 5}, // Adding $skip because $_internalBoundedSort cannot be the first stage on the merger when running in a sharded cluster.
+                {$_internalBoundedSort: {sortKey: {bar: 1}, bound: {base: "min"}}}
+              ],
+              cursor: {}
+          },
+          testcases: testcases_transformationOnly,
+        },
+        {
           testname: "aggregate_$_internalComputeGeoNearDistance",
           command: {
               aggregate: "foo",
@@ -7529,6 +7612,19 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnly,
         },
         {
+          testname: "aggregate_$_internalSearchMongotRemote",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$_internalSearchMongotRemote: {}}],
+              cursor: {}
+          },
+          // Only enterprise knows of this aggregation stage.
+          skipTest:
+              (conn) =>
+                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
+          testcases: testcases_transformationOnlyExpectFail
+        },
+        {
           testname: "aggregate_$_internalSetWindowFields",
           command: {
               aggregate: "foo",
@@ -7610,10 +7706,40 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnly,
         },
         {
+          testname: "aggregate_$externalAPI",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$externalAPI: {}}],
+              cursor: {},
+          },
+          // TODO SERVER-74961: Windows is not yet supported in stream processing.
+          skipTest: (_) => _isWindows() || !getBuildInfo().modules.includes("enterprise") || getBuildInfo().version < "8.1",
+          skipSharded: true,
+          testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
+          testname: "aggregate_$fill",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$fill: {output: {bar: {value: 0}}}}],
+              cursor: {},
+          },
+          testcases: testcases_transformationOnly,
+        },
+        {
           testname: "aggregate_$group",
           command: {
               aggregate: "foo",
               pipeline: [{$group: {_id: "$bar", count: {$sum: 1}}}],
+              cursor: {},
+          },
+          testcases: testcases_transformationOnly,
+        },
+        {
+          testname: "aggregate_$limit",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$limit: 10}],
               cursor: {},
           },
           testcases: testcases_transformationOnly,
@@ -8001,6 +8127,11 @@ export const authCommandsLib = {
 
         impls.createUsers(conn);
 
+        // A test may provide a secondary connection to be intermittently authed
+        // with admin privileges for setup/teardown.
+        const setupConn = ("getSideChannel" in impls)? impls.getSideChannel(conn) : conn;
+        checkAggStageCoverage(setupConn);
+
         var failures = [];
 
 
@@ -8015,3 +8146,40 @@ export const authCommandsLib = {
         assert.eq(0, failures.length);
     }
 };
+
+/**
+ * Checks the test coverage on aggregation stages. If it finds any aggregation stage misses
+ * authorization testing, it throws an error to remind developers to add them.
+ */
+function checkAggStageCoverage(conn) {
+    const adminDb = conn.getDB(adminDbName);
+
+    // Ensures to login as admin.
+    assert(adminDb.auth("admin", "password"));
+    const aggStages = adminDb.serverStatus().metrics.aggStageCounters;
+    adminDb.logout();
+
+    const unvisited = {};
+    for (let aggStage of Object.keys(aggStages)) {
+        // Tracks 'aggStage' unless listed in the exception list 'skippedAuthTestingAggStages'.
+        if (!skippedAuthTestingAggStages.includes(aggStage)) {
+            unvisited[aggStage] = 1;
+        }
+    }
+
+    for (let test of authCommandsLib.tests) {
+        if (!("aggregate" in test.command)) {
+            continue;
+        }
+        for (let stage of test.command.pipeline) {
+            let stageName = Object.keys(stage)[0];
+            delete unvisited[stageName];
+        }
+    }
+
+    const unvisitedList = Object.keys(unvisited);
+    assert.eq(unvisitedList.length,
+              0,
+              `'authCommandsLib.tests' misses auth testing for ${
+                  unvisitedList.length} aggregation stages: ${unvisitedList.join(", ")}`);
+}
