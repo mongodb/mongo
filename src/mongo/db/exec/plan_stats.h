@@ -45,6 +45,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace mongo {
 
