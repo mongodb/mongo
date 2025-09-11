@@ -9,19 +9,3 @@ filters:
   - "compact_options*":
     approvers:
       - 10gen/server-compact
-  - "mdb_catalog*":
-    approvers:
-      - 10gen/server-storage-engine-integration
-      - 10gen/server-storage-engine-api
-  - "storage_engine*":
-    approvers:
-      - 10gen/server-storage-engine-api
-  - "record_store*":
-    approvers:
-      - 10gen/server-storage-engine-api
-  - "recovery_unit*":
-    approvers:
-      - 10gen/server-storage-engine-api
-  - "sorted_data_interface*":
-    approvers:
-      - 10gen/server-storage-engine-api

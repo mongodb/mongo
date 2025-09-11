@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "batched_write*":
     approvers:
-      - 10gen/server-storage-engine-integration
+      - 10gen/server-collection-write-path
   - "op_observer*":
     approvers:
       - 10gen/server-oplog

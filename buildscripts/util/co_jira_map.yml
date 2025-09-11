@@ -54,8 +54,6 @@
   - Storage Engines Server Integration
 10gen/server-validate:
   - Storage Engines Server Integration
-10gen/server-storage-engine-api:
-  - Storage Engines Server Integration
 10gen/server-storage-engine-integration:
   - Storage Engines Server Integration
 10gen/server-security:

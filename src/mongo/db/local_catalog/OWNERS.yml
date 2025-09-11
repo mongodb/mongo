@@ -21,7 +21,7 @@ filters:
       - 10gen/server-index-builds
   - "index_repair*":
     approvers:
-      - 10gen/server-storage-engine-integration
+      - 10gen/server-index-builds
   - "throttle_cursor*":
     approvers:
       - 10gen/server-validate

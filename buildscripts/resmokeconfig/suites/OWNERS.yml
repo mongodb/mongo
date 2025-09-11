@@ -92,7 +92,7 @@ filters:
       - 10gen/server-backup-restore
   - "read_only*":
     approvers:
-      - 10gen/server-storage-engine-api
+      - 10gen/server-storage-engine-integration
   - "no_passthrough_network*":
     approvers:
       - 10gen/server-networking-and-observability

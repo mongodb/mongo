@@ -8,7 +8,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "server_integration.yml":
     approvers:
-      - 10gen/server-storage-engine-api
+      - 10gen/server-storage-engine-integration
   - "server_integration_backup.yml":
     approvers:
       - 10gen/server-backup-restore

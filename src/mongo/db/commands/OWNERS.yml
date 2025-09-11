@@ -92,7 +92,7 @@ filters:
       - 10gen/server-collection-write-path
   - "resize_oplog*":
     approvers:
-      - 10gen/server-storage-engine-integration
+      - 10gen/server-oplog
   - "apply_ops*":
     approvers:
       - 10gen/server-oplog
