@@ -27,25 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/idl/error_status_idl.h"
+#pragma once
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::idl {
 
-void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder) {
-    uassert(7418500, "Status must be an error", !status.isOK());
-    BSONObjBuilder sub{builder->subobjStart(fieldName)};
-    status.serialize(&sub);
-}
+namespace MONGO_MOD_PUB mongo {
+namespace idl {
 
-Status deserializeErrorStatus(const BSONElement& bsonElem) {
-    const auto& bsonObj = bsonElem.Obj();
-    long long code;
-    uassertStatusOK(bsonExtractIntegerField(bsonObj, "code", &code));
-    uassert(7418501, "Status must be an error", code != ErrorCodes::OK);
-    return getErrorStatusFromCommandResult(bsonElem.Obj());
-}
+// Serializers and deserializers for basic_types.idl
 
-}  // namespace mongo::idl
+// OK statuses will throw.
+void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder);
+
+// OK status codes will throw. The BSON object may include fields "code" and "errmsg", which
+// are parsed into the returned Status.
+Status deserializeErrorStatus(const BSONElement& bsonElem);
+
+Timestamp deserializeTimestamp(const BSONElement& bsonElem);
+
+// Asserts that the BSONElement has bson type Timestamp.
+LogicalTime deserializeLogicalTime(const BSONElement& e);
+
+}  // namespace idl
+}  // namespace MONGO_MOD_PUB mongo

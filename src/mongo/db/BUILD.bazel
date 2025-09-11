@@ -1734,7 +1734,6 @@ mongo_cc_library(
         "generic_argument_util.cpp",
         "index_names.cpp",
         "keypattern.cpp",
-        "logical_time.cpp",
         "mirror_maestro_feature_flag_gen",
         "read_write_concern_provenance.cpp",
         "server_options.cpp",
@@ -1769,7 +1768,6 @@ mongo_cc_library(
         "//src/mongo/db/repl:read_concern_args.cpp",
         "//src/mongo/db/repl:read_concern_args_gen",
         "//src/mongo/db/repl:read_concern_gen",
-        "//src/mongo/db/repl:read_concern_idl.cpp",
         "//src/mongo/db/sharding_environment:shard_id.cpp",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/db/vector_clock:vector_clock_gen",
@@ -1781,10 +1779,8 @@ mongo_cc_library(
         "//src/mongo/db/versioning_protocol:shard_version.cpp",
         "//src/mongo/db/versioning_protocol:shard_version_gen",
         "//src/mongo/idl:command_generic_argument.cpp",
-        "//src/mongo/idl:error_status_idl.cpp",
         "//src/mongo/idl:generic_argument.cpp",
         "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/rpc:get_status_from_command_result.cpp",
         "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/util:database_name_util.cpp",
         "//src/mongo/util:fail_point.cpp",
@@ -1822,11 +1818,14 @@ mongo_cc_library(
     ],
     deps = [
         ":cluster_role",
+        ":logical_time",
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:optime",
         "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/idl:basic_types_serialization",
         "//src/mongo/idl:idl_parser",
+        "//src/mongo/rpc:get_status_from_command_result",
         "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util/net:hostandport_impl",
     ],
@@ -2335,6 +2334,19 @@ mongo_cc_library(
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:string_listset",
         "//src/mongo/util:summation",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "logical_time",
+    srcs = [
+        "logical_time.cpp",
+    ],
+    hdrs = [
+        "logical_time.h",
+    ],
+    deps = [
+        "//src/mongo:base",
     ],
 )
 

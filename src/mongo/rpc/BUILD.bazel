@@ -213,6 +213,19 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "get_status_from_command_result",
+    srcs = [
+        "get_status_from_command_result.cpp",
+    ],
+    hdrs = [
+        "get_status_from_command_result.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 mongo_cc_integration_test(
     name = "rpc_integration_test",
     srcs = [

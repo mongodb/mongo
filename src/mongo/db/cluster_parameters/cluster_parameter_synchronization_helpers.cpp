@@ -164,7 +164,7 @@ void updateParameter(OperationContext* opCtx,
     }
 
     auto cptElem = doc[kCPTField];
-    if ((cptElem.type() != BSONType::date) && (cptElem.type() != BSONType::timestamp)) {
+    if ((cptElem.type() != BSONType::timestamp)) {
         LOGV2_DEBUG(6226302,
                     1,
                     "Update to cluster server parameter has invalid clusterParameterTime",

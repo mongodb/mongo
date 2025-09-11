@@ -685,6 +685,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/idl:basic_types_serialization",
         "//src/mongo/idl:idl_parser",
     ],
 )
@@ -1706,12 +1707,6 @@ mongo_cc_library(
 filegroup(
     name = "optime_hdrs",
     srcs = [":optime.h"],
-)
-
-# TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db/repl:read_concern_idl.h to //src/mongo/db:server_base
-filegroup(
-    name = "read_concern_idl_hdrs",
-    srcs = [":read_concern_idl.h"],
 )
 
 mongo_cc_library(

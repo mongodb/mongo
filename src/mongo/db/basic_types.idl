@@ -41,7 +41,7 @@ global:
         - "mongo/bson/bson_time_support.h"
         - "mongo/util/uuid.h"
         - "mongo/idl/command_generic_argument.h"
-        - "mongo/idl/error_status_idl.h"
+        - "mongo/idl/basic_types_serialization.h"
 
 types:
     string:
@@ -290,16 +290,16 @@ types:
     logicalTime:
         bson_serialization_type: any
         description: "A MongoDB LogicalTime."
-        cpp_type: LogicalTime
-        serializer: LogicalTime::serializeToBSON
-        deserializer: LogicalTime::parseFromBSON
+        cpp_type: "mongo::LogicalTime"
+        serializer: "mongo::LogicalTime::serializeToBSON"
+        deserializer: "mongo::idl::deserializeLogicalTime"
         is_view: false
 
     timestamp:
         bson_serialization_type: timestamp
         description: "A BSON TimeStamp"
         cpp_type: "mongo::Timestamp"
-        deserializer: "mongo::BSONElement::timestamp"
+        deserializer: "mongo::idl::deserializeTimestamp"
         is_view: false
 
     namespacestring:

@@ -5194,8 +5194,8 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
     NonViewStruct idlStruct;
     BSONObj ownedBSON = BSON("a" << "b");
     ASSERT_TRUE(ownedBSON.isOwned());
-    BSONObj ownedElementBSON = BSON("field34" << "a");
-    BSONElement ownedElement = ownedElementBSON.getField("field34");
+    BSONObj ownedElementBSON = BSON("field33" << "a");
+    BSONElement ownedElement = ownedElementBSON.getField("field33");
     ASSERT_TRUE(ownedElementBSON.isOwned());
     {
         uint8_t testArray[] = {1, 2, 3};
@@ -5248,18 +5248,17 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
         bob.append("field23", 23);
         bob.append("field24", 25);
         bob.append("field25", 26);
-        bob.append("field26", testLogicalTimeBSON);
-        bob.append("field27", testLogicalTimeBSON);
-        bob.append("field28", testTimestamp);
-        bob.append("field29", testNamespaceString);
+        bob.append("field26", testTimestamp);
+        bob.append("field27", testTimestamp);
+        bob.append("field28", testNamespaceString);
+        bob.append("field29", "abcd");
         bob.append("field30", "abcd");
-        bob.append("field31", "abcd");
-        bob.append("field32", testConnectionString);
-        bob.append("field33", testFCVstring);
+        bob.append("field31", testConnectionString);
+        bob.append("field32", testFCVstring);
         bob.append(ownedElement);
-        bob.append("field35", testOID);
-        bob.append("field36", testTenantIdStr);
-        bob.append("field37", testDatabaseNameStr);
+        bob.append("field34", testOID);
+        bob.append("field35", testTenantIdStr);
+        bob.append("field36", testDatabaseNameStr);
         auto tmp = bob.obj();
         // We want to test that idlStruct is internally a non view type, and that the struct
         // inherently owns all its members.
@@ -5306,7 +5305,6 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
     idlStruct.getField34();
     idlStruct.getField35();
     idlStruct.getField36();
-    idlStruct.getField37();
     ASSERT_BSONOBJ_EQ(idlStruct.getField20(), BSON("a" << "b"));
 }
 
@@ -5357,6 +5355,38 @@ TEST(IDLTrie, TestPrefixes) {
     ASSERT_TRUE(TestTrieArgs::hasField("swimmer"));
     ASSERT_FALSE(TestTrieArgs::hasField("swimmers"));
     ASSERT_TRUE(TestTrieArgs::hasField("swimmed"));
+}
+
+template <typename StructType, typename ParseValueType>
+void testBasicTypeSerialization(StringData fieldName, ParseValueType value) {
+    // Positive: parse correct type.
+    {
+        auto testDoc = BSON(fieldName << value);
+        StructType::parse(testDoc);
+    }
+
+    // Negative: parsing date bson type should fail.
+    {
+        auto testDoc = BSON(fieldName << Date_t::max());
+        ASSERT_THROWS_CODE(
+            StructType::parse(testDoc), AssertionException, ErrorCodes::TypeMismatch);
+    }
+
+    // Negative: parsing other bson type should fail.
+    {
+        auto testDoc = BSON(fieldName << "string");
+        ASSERT_THROWS_CODE(
+            StructType::parse(testDoc), AssertionException, ErrorCodes::TypeMismatch);
+    }
+}
+
+TEST(IDLBasicTypeSerialization, Timestamp) {
+    testBasicTypeSerialization<TimestampStruct, Timestamp>("timestamp", Timestamp::max());
+}
+
+TEST(IDLBasicTypeSerialization, LogicalTime) {
+    // The LogicalTime type parses from BSON using the timestamp BSON type.
+    testBasicTypeSerialization<LogicalTimeStruct, Timestamp>("logicalTime", Timestamp::max());
 }
 
 }  // namespace

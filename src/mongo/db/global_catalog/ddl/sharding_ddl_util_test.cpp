@@ -54,7 +54,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/idl/error_status_idl.h"
+#include "mongo/idl/basic_types_serialization.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

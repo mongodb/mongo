@@ -27,21 +27,46 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/idl/basic_types_serialization.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo::idl {
 
-// Serializes an error status. OK statuses will throw.
-void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder);
+void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder) {
+    uassert(7418500, "Status must be an error", !status.isOK());
+    BSONObjBuilder sub{builder->subobjStart(fieldName)};
+    status.serialize(&sub);
+}
 
-// Deserializes an error status from the BSONElement which must hold an object.
-// OK status codes will throw. The BSON object may include fields "code" and "errmsg", which
-// are parsed into the returned Status.
-Status deserializeErrorStatus(const BSONElement& bsonElem);
+Status deserializeErrorStatus(const BSONElement& bsonElem) {
+    const auto& bsonObj = bsonElem.Obj();
+    long long code;
+    uassertStatusOK(bsonExtractIntegerField(bsonObj, "code", &code));
+    uassert(7418501, "Status must be an error", code != ErrorCodes::OK);
+    return getErrorStatusFromCommandResult(bsonElem.Obj());
+}
+
+void assertBSONIsTimestamp(const BSONElement& e) {
+    uassert(ErrorCodes::TypeMismatch,
+            fmt::format("\"{}\" had the wrong type. Expected {}, found {}",
+                        e.fieldNameStringData(),
+                        BSONType::timestamp,
+                        typeName(e.type())),
+            e.type() == BSONType::timestamp);
+}
+
+LogicalTime deserializeLogicalTime(const BSONElement& e) {
+    assertBSONIsTimestamp(e);
+
+    return LogicalTime(Timestamp(e.timestampValue()));
+}
+
+Timestamp deserializeTimestamp(const BSONElement& e) {
+    assertBSONIsTimestamp(e);
+
+    return Timestamp(e.timestampValue());
+}
 
 }  // namespace mongo::idl

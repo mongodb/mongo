@@ -18,7 +18,10 @@ const clusterParameterInsertSucceeds = (doc) => {
 };
 
 clusterParameterInsertSucceeds({"_id": "testIntClusterParameter"});
-clusterParameterInsertSucceeds({"_id": "testStrClusterParameter", "clusterParameterTime": "abcd"});
+assert.commandFailedWithCode(
+    conn.getDB("config").clusterParameters.insert({"_id": "testStrClusterParameter", "clusterParameterTime": "abcd"}),
+    ErrorCodes.TypeMismatch,
+);
 assert.commandFailedWithCode(conn.getDB("config").clusterParameters.insert({"_id": 12345}), ErrorCodes.OperationFailed);
 assert.commandFailedWithCode(conn.getDB("config").clusterParameters.insert({"_id": ""}), ErrorCodes.OperationFailed);
 

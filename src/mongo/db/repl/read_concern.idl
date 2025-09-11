@@ -29,7 +29,6 @@ global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
         - "mongo/db/logical_time.h"
-        - "mongo/db/repl/read_concern_idl.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -46,18 +45,6 @@ enums:
             kLinearizableReadConcern: "linearizable"
             kAvailableReadConcern: "available"
             kSnapshotReadConcern: "snapshot"
-
-types:
-    # TODO: SERVER-89143 delete this type, use logicalTime from basic_types.idl.
-    ReadConcernLogicalTime:
-        bson_serialization_type: any
-        description:
-            "A MongoDB LogicalTime. This type has stricter deserialization rules than the
-            logicalTime defined in basic_types.idl."
-        cpp_type: ::mongo::LogicalTime
-        serializer: ::mongo::serializeReadConcernLogicalTime
-        deserializer: ::mongo::deserializeReadConcernLogicalTime
-        is_view: false
 
 structs:
     ReadConcernIdl:
@@ -77,11 +64,11 @@ structs:
                 optional: true
             afterClusterTime:
                 description: Read data after cluster-wide cluster time.
-                type: ReadConcernLogicalTime
+                type: logicalTime
                 optional: true
             atClusterTime:
                 description: Read data at a particular cluster time.
-                type: ReadConcernLogicalTime
+                type: logicalTime
                 optional: true
             provenance:
                 type: ReadWriteConcernProvenanceSource

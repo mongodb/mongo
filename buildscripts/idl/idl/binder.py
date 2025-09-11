@@ -218,16 +218,6 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
                     idl_type, syntax_type, idl_type.name, "deserializer"
                 )
 
-            if idl_type.deserializer is not None and "BSONElement" not in idl_type.deserializer:
-                ctxt.add_not_custom_scalar_serialization_not_supported_error(
-                    idl_type, syntax_type, idl_type.name, bson_type
-                )
-
-            if idl_type.serializer is not None:
-                ctxt.add_not_custom_scalar_serialization_not_supported_error(
-                    idl_type, syntax_type, idl_type.name, bson_type
-                )
-
         if bson_type == "bindata" and isinstance(idl_type, syntax.Type) and idl_type.default:
             ctxt.add_bindata_no_default(idl_type, syntax_type, idl_type.name)
 

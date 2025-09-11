@@ -1186,6 +1186,7 @@ mongo_cc_library(
         "//src/mongo/util/version:releases_header",
     ],
     deps = [
+        "//src/mongo/idl:basic_types_serialization",
         "//src/mongo/idl:idl_parser",
     ],
 )

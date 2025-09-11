@@ -214,6 +214,22 @@ structs:
 
     ##################################################################################################
     #
+    # Structs to test serialization and parsing of basic types
+    #
+    ##################################################################################################
+
+    TimestampStruct:
+        description: UnitTest for parsing and serialization of timestamp
+        fields:
+            timestamp: timestamp
+
+    LogicalTimeStruct:
+        description: UnitTest for parsing and serialization of logicalTime
+        fields:
+            logicalTime: logicalTime
+
+    ##################################################################################################
+    #
     # Struct to test non view basic types
     #
     ##################################################################################################
@@ -247,21 +263,20 @@ structs:
             field24: milliseconds
             field25: seconds
             field26: logicalTime
-            field27: logicalTime
-            field28: timestamp
-            field29: namespacestring
-            field30: base64string
-            field31: base64urlstring
-            field32: connection_string
-            field33: fcv_string
-            field34: IDLAnyTypeOwned
-            field35:
+            field27: timestamp
+            field28: namespacestring
+            field29: base64string
+            field30: base64urlstring
+            field31: connection_string
+            field32: fcv_string
+            field33: IDLAnyTypeOwned
+            field34:
                 type: tenant_id
                 optional: true
-            field36:
+            field35:
                 type: tenant_id_hex
                 optional: true
-            field37: database_name
+            field36: database_name
 
     ##################################################################################################
     #

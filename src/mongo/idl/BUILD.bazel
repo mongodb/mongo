@@ -342,3 +342,20 @@ mongo_cc_benchmark(
         "//src/mongo/rpc:message",
     ],
 )
+
+mongo_cc_library(
+    name = "basic_types_serialization",
+    srcs = [
+        "basic_types_serialization.cpp",
+    ],
+    hdrs = [
+        "basic_types_serialization.h",
+        "//src/mongo:core_headers",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:logical_time",
+        "//src/mongo/rpc:get_status_from_command_result",
+    ],
+)

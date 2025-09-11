@@ -582,53 +582,6 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_BAD_ANY_TYPE_USE,
         )
 
-        # Test unsupported serialization
-        for bson_type in [
-            "bool",
-            "date",
-            "null",
-            "decimal",
-            "double",
-            "int",
-            "long",
-            "objectid",
-            "regex",
-            "timestamp",
-            "undefined",
-        ]:
-            self.assert_bind_fail(
-                textwrap.dedent(
-                    """
-                types:
-                    foofoo:
-                        description: foo
-                        cpp_type: std::string
-                        bson_serialization_type: %s
-                        serializer: foo
-                        deserializer: BSONElement::fake
-                        is_view: false
-                    """
-                    % (bson_type)
-                ),
-                idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED,
-            )
-
-            self.assert_bind_fail(
-                textwrap.dedent(
-                    """
-                types:
-                    foofoo:
-                        description: foo
-                        cpp_type: std::string
-                        bson_serialization_type: %s
-                        deserializer: foo
-                        is_view: false
-                    """
-                    % (bson_type)
-                ),
-                idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED,
-            )
-
         # Test 'any' serialization needs deserializer
         self.assert_bind_fail(
             textwrap.dedent("""
