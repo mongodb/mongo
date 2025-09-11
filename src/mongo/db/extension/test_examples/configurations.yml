@@ -1,0 +1,14 @@
+# Holds extension-specific configuration information necessary to generate configuration files for passthrough tests.
+#
+# If a test extension does not require any unique configuration, no changes to this file are necessary. Notably,
+# "sharedLibraryPath" should _not_ be included in this file. load_all_extensions() will generate correct configuration
+# files for all loadable test extensions, including "sharedLibraryPath"s for both local and Evergreen runs.
+extensions:
+  # TODO SERVER-110634: Change extension names to test_options and parse_options, respectively.
+  libtest_options_mongo_extension:
+    extensionOptions:
+      optionA: True
+  libparse_options_mongo_extension:
+    extensionOptions:
+      checkMax: true
+      max: 10

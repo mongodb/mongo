@@ -47,6 +47,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             preserve_dbpath (bool, optional): preserve_dbpath. Defaults to False.
             port (Optional[int], optional): Port to use for mongod. Defaults to None.
             launch_mongot (bool, optional): Should mongot be launched as well. Defaults to False.
+            load_all_extensions (bool, optional): Whether to load all test extensions upon startup. Defaults to False.
 
         Raises
             ValueError: _description_
@@ -56,8 +57,11 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.fixturelib.default_if_none(mongod_options, {})
         )
 
-        if load_all_extensions:
-            self.fixturelib.load_all_extensions(self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger)
+        self.load_all_extensions = load_all_extensions
+        if self.load_all_extensions:
+            self.fixturelib.load_all_extensions(
+                self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger
+            )
 
         if "set_parameters" not in self.mongod_options:
             self.mongod_options["set_parameters"] = {}
@@ -263,6 +267,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
     def _do_teardown(self, mode=None):
+        if self.load_all_extensions:
+            self.fixturelib.delete_extension_conf_dir()
+
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             self.logger.info(
                 "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."
