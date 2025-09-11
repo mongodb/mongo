@@ -31,6 +31,8 @@
 
 #ifdef MONGO_CONFIG_OTEL
 
+#include "mongo/otel/traces/tracing_utils.h"
+
 #include <opentelemetry/trace/provider.h>
 #include <opentelemetry/trace/span.h>
 #include <opentelemetry/trace/span_context.h>
@@ -44,10 +46,6 @@ static constexpr StringData errorCodeStringKey = "errorCodeString"_sd;
 
 using ScopedSpan = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
 using OtelSpanContext = opentelemetry::trace::SpanContext;
-
-opentelemetry::nostd::string_view view(StringData data) {
-    return opentelemetry::nostd::string_view{data.data(), data.length()};
-}
 
 class TracingContext : public Traceable::SpanContext {
 public:
@@ -79,7 +77,7 @@ public:
     }
 
     void setStatus(const Status& status) {
-        _span->SetAttribute(view(errorCodeKey), status.code());
+        _span->SetAttribute(asOtelStringView(errorCodeKey), status.code());
         _error = !status.isOK();
     }
 

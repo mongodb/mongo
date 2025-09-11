@@ -27,6 +27,9 @@ idl_generator(
     ],
 )
 
+# Library for public facing tracing API used by the larger codebase. Files
+# included in this library must use ifdefs to provide no-op implementations if
+# MONGO_CONFIG_OTEL is not defined.
 mongo_cc_library(
     name = "tracing",
     srcs = [
@@ -46,6 +49,7 @@ mongo_cc_library(
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
+                ":tracing_internal",
                 "//src/third_party/opentelemetry-cpp/api",
                 "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
                 "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
@@ -59,9 +63,31 @@ mongo_cc_library(
     ),
 )
 
+# Private implementation for the tracing library. These files are only built
+# when OTEL is enabled and must only be included from regions where
+# MONGO_CONFIG_OTEL is defined.
+mongo_cc_library(
+    name = "tracing_internal",
+    srcs = [
+        "bson_text_map_carrier.cpp",
+        "tracing_utils.cpp",
+    ],
+    hdrs = [
+        "bson_text_map_carrier.h",
+        "tracing_utils.h",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "//src/mongo/base:system_error",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "tracing_test",
     srcs = [
+        "bson_text_map_carrier_test.cpp",
         "mock_exporter.cpp",
         "mock_exporter.h",
         "trace_initialization_test.cpp",
