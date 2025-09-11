@@ -101,13 +101,6 @@ void SetVariableFromSubPipelineStage::detachFromOperationContext() {
 }
 
 void SetVariableFromSubPipelineStage::doDispose() {
-    // TODO SERVER-102417: Remove the following if-block when all sources are split into
-    // QO and QE parts and the QO stage auto-disposes resources in destructor.
-    if (_subPipeline && !_sharedState->_subExecPipeline) {
-        // Create an execution pipeline to make sure the resources are correctly disposed.
-        _sharedState->_subExecPipeline = exec::agg::buildPipeline(_subPipeline->freeze());
-        _sharedState->_subExecPipeline->reattachToOperationContext(pExpCtx->getOperationContext());
-    }
     if (_sharedState->_subExecPipeline) {
         _sharedState->_subExecPipeline->dispose();
         _sharedState->_subExecPipeline.reset();

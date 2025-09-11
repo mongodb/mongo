@@ -246,8 +246,6 @@ void AsyncResultsMerger::detachFromOperationContext() {
     if (_opCtx == nullptr) {
         // This early exit allows 'AsyncResultMerger' to be 'detached' twice without consequences
         // during SPM-4106.
-        // TODO SERVER-102417: Try to remove this early exit once all 'DocumentSource' sub-classes
-        // are split into QO and QE components.
         return;
     }
 
@@ -270,9 +268,9 @@ void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
 
     if (_opCtx == opCtx) {
         // This early exit allows 'AsyncResultMerger' to be 're-attached' to the same 'opCtx' twice
-        // without consequences during SPM-4106.
-        // TODO SERVER-102417: Try to remove this early exit once all 'DocumentSource' sub-classes
-        // are split into QO and QE components.
+        // without consequences.
+        // TODO SERVER-107976: Try to remove this early exit once all 'ExpressionContext' class is
+        // split into QO and QE components.
         return;
     }
     invariant(!_opCtx);

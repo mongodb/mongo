@@ -57,10 +57,7 @@ StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds) {
     if (auto it = stageBuildersMap.find(ds->getId()); it != stageBuildersMap.end()) {
         return (it->second)(ds);
     }
-    // TODO SERVER-102417: Remove the following if at the and of the project.
-    if (auto stagePtr = boost::dynamic_pointer_cast<agg::Stage>(ds)) {
-        return stagePtr;
-    };
+
     tasserted(10395401,
               str::stream() << "Missing 'DocumentSource' to 'agg::Stage' mapping function for "
                             << ds->getSourceName());
