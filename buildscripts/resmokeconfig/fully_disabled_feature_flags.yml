@@ -26,8 +26,6 @@
 # TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
 - featureFlagSbeFull
 - featureFlagSessionsCollectionCoordinatorOnConfigServer
-# TODO (SERVER-101672) : Delete featureFlagOplogSamplingAsyncEnabled.
-- featureFlagOplogSamplingAsyncEnabled
 - featureFlagReplicateLocalCatalogIdentifiers
 # TODO (SERVER-108818): test primary-driven index builds in allFeatureFlag variant.
 - featureFlagPrimaryDrivenIndexBuilds

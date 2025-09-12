@@ -307,11 +307,6 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers
         default: false
         fcv_gated: true
-    featureFlagOplogSamplingAsyncEnabled:
-        description: "Enable oplog sampling to run asynchronously to startup on the OplogCapMaintainerThread"
-        cpp_varname: feature_flags::gOplogSamplingAsyncEnabled
-        default: false
-        fcv_gated: false
     featureFlagPrimaryDrivenIndexBuilds:
         description: "Enable primary-driven index builds."
         cpp_varname: feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
