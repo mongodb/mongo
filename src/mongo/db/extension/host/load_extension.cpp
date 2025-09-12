@@ -183,7 +183,6 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
     LOGV2(11042903,
           "Successfully loaded config file",
           "sharedLibraryPath"_attr = config.sharedLibraryPath,
-          // TODO SERVER-110474: Remove or modify 'extensionOptions' logging.
           "extensionOptions"_attr = YAML::Dump(config.extOptions));
 
     return config;
