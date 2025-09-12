@@ -75,7 +75,7 @@ inline std::vector<ScopedSetShardRole> createScopedShardRoles(
 }
 
 /**
- * Helper that constructs an 'AutoGetCollectionForReadCommandMaybeLockFree' using 'initAutoGetFn'.
+ * Helper that constructs a ShardRole CollectionAcquisition using 'initAutoGetFn'.
  * Returns whether any namespaces in 'secondaryExecNssList' are non local.
  */
 template <typename F>

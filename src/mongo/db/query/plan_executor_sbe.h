@@ -188,8 +188,6 @@ public:
         _mustReturnOwnedBson = returnOwnedData;
     }
 
-    bool usesCollectionAcquisitions() const final;
-
     /**
      * For queries that have multiple executors, this can be used to differentiate between them.
      */

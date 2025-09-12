@@ -566,7 +566,7 @@ public:
                 shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(true);
             }
             exec->reattachToOperationContext(opCtx);
-            exec->restoreState(locks.readLock ? &locks.readLock->getCollection() : nullptr);
+            exec->restoreState(nullptr);
 
             {
                 auto planSummary = exec->getPlanExplainer().getPlanSummary();

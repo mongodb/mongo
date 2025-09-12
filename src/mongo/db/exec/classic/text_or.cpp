@@ -72,7 +72,7 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
                          size_t keyPrefixSize,
                          WorkingSet* ws,
                          const MatchExpression* filter,
-                         VariantCollectionPtrOrAcquisition collection)
+                         CollectionAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _keyPrefixSize(keyPrefixSize),
       _ws(ws),

@@ -197,30 +197,4 @@ void PlanExecutor::releaseAllAcquiredResources() {
     reattachToOperationContext(opCtx);
 }
 
-const CollectionPtr& VariantCollectionPtrOrAcquisition::getCollectionPtr() const {
-    return *visit(OverloadedVisitor{
-                      [](const CollectionPtr* collectionPtr) { return collectionPtr; },
-                      [](const CollectionAcquisition& collectionAcquisition) {
-                          return &collectionAcquisition.getCollectionPtr();
-                      },
-                  },
-                  _collectionPtrOrAcquisition);
-}
-
-boost::optional<ScopedCollectionFilter> VariantCollectionPtrOrAcquisition::getShardingFilter(
-    OperationContext* opCtx) const {
-    return visit(
-        OverloadedVisitor{
-            [&](const CollectionPtr* collPtr) -> boost::optional<ScopedCollectionFilter> {
-                auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
-                    opCtx, collPtr->get()->ns());
-                return scopedCss->getOwnershipFilter(
-                    opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
-            },
-            [](const CollectionAcquisition& acq) -> boost::optional<ScopedCollectionFilter> {
-                return acq.getShardingFilter();
-            }},
-        _collectionPtrOrAcquisition);
-}
-
 }  // namespace mongo

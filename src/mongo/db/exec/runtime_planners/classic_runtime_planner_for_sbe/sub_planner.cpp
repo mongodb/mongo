@@ -45,12 +45,8 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
                                        cq(),
                                        makeCallbacks());
 
-    auto trialPeriodYieldPolicy =
-        makeClassicYieldPolicy(opCtx(),
-                               cq()->nss(),
-                               static_cast<PlanStage*>(_subplanStage.get()),
-                               yieldPolicy(),
-                               collections().getMainCollectionPtrOrAcquisition());
+    auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
+        opCtx(), cq()->nss(), static_cast<PlanStage*>(_subplanStage.get()), yieldPolicy());
     uassertStatusOK(_subplanStage->pickBestPlan(plannerParams(),
                                                 trialPeriodYieldPolicy.get(),
                                                 false /* shouldConstructClassicExecutableTree */));

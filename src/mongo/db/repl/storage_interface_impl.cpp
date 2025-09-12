@@ -718,10 +718,8 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             }
             // Use collection scan.
             planExecutor = isFind
-                ? InternalPlanner::collectionScan(opCtx,
-                                                  &collection.getCollectionPtr(),
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  direction)
+                ? InternalPlanner::collectionScan(
+                      opCtx, collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, direction)
                 : InternalPlanner::deleteWithCollectionScan(
                       opCtx,
                       collection,
@@ -772,7 +770,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
 
             planExecutor = isFind
                 ? InternalPlanner::collectionScan(opCtx,
-                                                  &collection.getCollectionPtr(),
+                                                  collection,
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                   direction,
                                                   boost::none /* resumeAfterId */,
@@ -820,7 +818,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             }
             planExecutor = isFind
                 ? InternalPlanner::indexScan(opCtx,
-                                             &collection.getCollectionPtr(),
+                                             collection,
                                              indexDescriptor,
                                              bounds.first,
                                              bounds.second,

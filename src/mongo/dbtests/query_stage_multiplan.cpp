@@ -279,8 +279,7 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
 
     // Plan 0 aka the first plan aka the index scan should be the best.
     NoopYieldPolicy yieldPolicy(expCtx->getOperationContext(),
-                                &expCtx->getOperationContext()->fastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+                                &expCtx->getOperationContext()->fastClockSource());
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
     ASSERT_EQUALS(getBestPlanRoot(mps.get()), ixScanRootPtr);
@@ -341,8 +340,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     auto planYieldPolicy = makeClassicYieldPolicy(opCtx(),
                                                   nss,
                                                   static_cast<PlanStage*>(mpsPtr),
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  coll);
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     ASSERT_OK(mpsPtr->pickBestPlan(planYieldPolicy.get()));
     ASSERT_TRUE(mpsPtr->bestPlanChosen());
     ASSERT_EQUALS(mpsPtr->getChildren()[mpsPtr->bestPlanIdx().get()].get(), ixScanRootPtr);
@@ -386,7 +384,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
             opCtx(), nss, AcquisitionPrerequisites::OperationType::kRead));
 
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll.getCollectionPtr());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
 
     // Run an index scan and collection scan, searching for {foo: 7}.
     auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
@@ -446,7 +444,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisa
             opCtx(), nss, AcquisitionPrerequisites::OperationType::kRead));
 
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll.getCollectionPtr());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
 
     // Run an index scan and collection scan, searching for {foo: 7}.
     auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
@@ -483,7 +481,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
 
     // Force index intersection and enable AND_SORTED intersection.
     RAIIServerParameterControllerForTest forceIntersectionPlans{
@@ -517,8 +515,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     }
 
     // This sets a backup plan.
-    NoopYieldPolicy yieldPolicy(
-        _expCtx->getOperationContext(), _clock, PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
     ASSERT(mps->hasBackupPlan());
@@ -616,8 +613,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     auto planYieldPolicy = makeClassicYieldPolicy(opCtx(),
                                                   nss,
                                                   static_cast<PlanStage*>(mps.get()),
-                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                  coll);
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     ASSERT_OK(mps->pickBestPlan(planYieldPolicy.get()));
     ASSERT_TRUE(mps->bestPlanChosen());
     ASSERT_EQ(getBestPlanRoot(mps.get()), firstPlanPtr);
@@ -749,8 +745,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->getOperationContext(),
-                                                 serviceContext()->getFastClockSource(),
-                                                 PlanYieldPolicy::YieldThroughAcquisitions{});
+                                                 serviceContext()->getFastClockSource());
     const auto status = multiPlanStage.pickBestPlan(&alwaysTimeOutPolicy);
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
     ASSERT_STRING_CONTAINS(status.reason(), "error while multiplanner was selecting best plan");
@@ -793,10 +788,8 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
-    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(
-        _expCtx->getOperationContext(),
-        serviceContext()->getFastClockSource(),
-        PlanYieldPolicy::YieldThroughAcquisitions{});
+    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->getOperationContext(),
+                                                            serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled,
               multiPlanStage.pickBestPlan(&alwaysPlanKilledYieldPolicy));
 }
@@ -846,8 +839,7 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
     multiPlanStage.addPlan(
         createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());
 
-    NoopYieldPolicy yieldPolicy(
-        _expCtx->getOperationContext(), _clock, PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     auto status = multiPlanStage.pickBestPlan(&yieldPolicy);
     ASSERT_EQ(ErrorCodes::InternalError, status);
     ASSERT_STRING_CONTAINS(status.reason(), "error while multiplanner was selecting best plan");

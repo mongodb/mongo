@@ -64,7 +64,7 @@ using std::vector;
 const char* SubplanStage::kStageType = "SUBPLAN";
 
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
-                           VariantCollectionPtrOrAcquisition collection,
+                           CollectionAcquisition collection,
                            WorkingSet* ws,
                            CanonicalQuery* cq,
                            PlanSelectionCallbacks planSelectionCallbacks)
@@ -187,11 +187,11 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     ON_BLOCK_EXIT([this] { releaseAllIndicesRequirement(); });
 
     std::function<std::unique_ptr<SolutionCacheData>(const CanonicalQuery& cq,
-                                                     const CollectionPtr& coll)>
+                                                     const CollectionAcquisition& coll)>
         getSolutionCachedData =
             [](const CanonicalQuery& cq,
-               const CollectionPtr& coll) -> std::unique_ptr<SolutionCacheData> {
-        auto planCache = CollectionQueryInfo::get(coll).getPlanCache();
+               const CollectionAcquisition& coll) -> std::unique_ptr<SolutionCacheData> {
+        auto planCache = CollectionQueryInfo::get(coll.getCollectionPtr()).getPlanCache();
         tassert(5969800, "Classic Plan Cache not found", planCache);
         if (shouldCacheQuery(cq)) {
             auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(cq, coll);
@@ -203,12 +203,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         return nullptr;
     };
 
-    auto multiCollectionAccessor = [&]() -> MultipleCollectionAccessor {
-        if (collection().isAcquisition()) {
-            return MultipleCollectionAccessor{collection().getAcquisition()};
-        }
-        return MultipleCollectionAccessor{collection().getCollectionPtr()};
-    }();
+    MultipleCollectionAccessor multiCollectionAccessor{collection()};
     auto rankerMode = _query->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     // Populating the 'topLevelSampleFieldNames' requires 2 steps:
     //  1. Extract the set of top level fields from the filter, sort and project components of the
@@ -240,13 +235,13 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
     } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
         exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
-            collectionPtr(), *_query, expCtx()->getOperationContext());
+            collection(), *_query, expCtx()->getOperationContext());
     }
 
     auto subplanningStatus = samplingEstimator
         ? QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
                                        getSolutionCachedData,
-                                       collectionPtr(),
+                                       collection(),
                                        *_query,
                                        plannerParams,
                                        samplingEstimator.get(),
@@ -254,7 +249,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
                                        topLevelSampleFieldNames)
         : QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
                                        getSolutionCachedData,
-                                       collectionPtr(),
+                                       collection(),
                                        *_query,
                                        plannerParams,
                                        samplingEstimator.get(),

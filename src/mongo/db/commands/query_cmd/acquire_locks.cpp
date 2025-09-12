@@ -107,7 +107,7 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
     //
     // - Cursors which read from a single collection, such as those generated via the
     //   find command. For these cursors, we hold the appropriate collection lock for the
-    //   duration of the getMore using AutoGetCollectionForRead. These cursors have the
+    //   duration of the getMore using shard role acquisitions. These cursors have the
     //   'kLockExternally' lock policy.
     //
     // - Cursors which may read from many collections, e.g. those generated via the
@@ -118,9 +118,7 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
     //
     // While we only need to acquire locks for 'kLockExternally' cursors, we need to create
     // an AutoStatsTracker in either case. This is responsible for updating statistics in
-    // CurOp and Top. We avoid using AutoGetCollectionForReadCommand because we may need to
-    // drop and reacquire locks when the cursor is awaitData, but we don't want to update
-    // the stats twice.
+    // CurOp and Top.
     if (cursorPin->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLocksInternally) {
         // Profile whole-db/cluster change stream getMore commands.
         if (!nss.isCollectionlessCursorNamespace() ||
@@ -136,34 +134,10 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
         invariant(cursorPin->getExecutor()->lockPolicy() ==
                   PlanExecutor::LockPolicy::kLockExternally);
 
-        if (cursorPin->getExecutor()->usesCollectionAcquisitions()) {
-            // Restore the acquisitions used in the original call. This takes care of
-            // checking that the preconditions for the original acquisition still hold and
-            // restores any locks necessary.
-            txnResourcesHandler.emplace(opCtx, cursorPin.getCursor());
-        } else {
-            // Lock the backing collection by using the executor's namespace. Note that it
-            // may be different from the cursor's namespace. One such possible scenario is
-            // when getMore() is executed against a view. Technically, views are pipelines
-            // and under normal circumstances use 'kLocksInternally' policy, so we shouldn't
-            // be getting into here in the first place. However, if the pipeline was
-            // optimized away and replaced with a query plan, its lock policy would have
-            // also been changed to 'kLockExternally'. So, we'll use the executor's
-            // namespace to take the lock (which is always the backing collection
-            // namespace), but will use the namespace provided in the user request for
-            // profiling.
-            //
-            // Otherwise, these two namespaces will match.
-            //
-            // Note that some pipelines which were optimized away may require locking
-            // multiple namespaces. As such, we pass any secondary namespaces required by
-            // the pinned cursor's executor when constructing 'readLock'.
-            const auto& secondaryNamespaces = cursorPin->getExecutor()->getSecondaryNamespaces();
-            readLock.emplace(opCtx,
-                             cursorPin->getExecutor()->nss(),
-                             AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                 secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
-        }
+        // Restore the acquisitions used in the original call. This takes care of
+        // checking that the preconditions for the original acquisition still hold and
+        // restores any locks necessary.
+        txnResourcesHandler.emplace(opCtx, cursorPin.getCursor());
 
         statsTracker.emplace(opCtx,
                              nss,
@@ -173,11 +147,9 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
                                  .getDatabaseProfileLevel(nss.dbName()));
 
         // Check whether we are allowed to read from this node after acquiring our locks.
-        // When using ShardRole, only check when there is at least one acquired collection/view – it
-        // is possible that a ShardRole acquisition is empty when the enclosed executor is a trivial
-        // EOF plan.
-        if (!cursorPin->getExecutor()->usesCollectionAcquisitions() ||
-            !shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
+        // Only check when there is at least one acquired collection/view – it is possible that a
+        // ShardRole acquisition is empty when the enclosed executor is a trivial EOF plan.
+        if (!shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
             uassertStatusOK(
                 repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true));
         }

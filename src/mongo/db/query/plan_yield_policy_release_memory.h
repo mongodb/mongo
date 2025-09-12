@@ -48,14 +48,11 @@ class PlanYieldPolicyReleaseMemory final : public PlanYieldPolicy {
 public:
     PlanYieldPolicyReleaseMemory(OperationContext* opCtx,
                                  PlanYieldPolicy::YieldPolicy policy,
-                                 std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                                  std::unique_ptr<YieldPolicyCallbacks> callbacks);
 
-    static std::unique_ptr<PlanYieldPolicyReleaseMemory> make(
-        OperationContext* opCtx,
-        PlanYieldPolicy::YieldPolicy policy,
-        const boost::optional<AutoGetCollectionForReadMaybeLockFree>& readLock,
-        NamespaceString nss);
+    static std::unique_ptr<PlanYieldPolicyReleaseMemory> make(OperationContext* opCtx,
+                                                              PlanYieldPolicy::YieldPolicy policy,
+                                                              NamespaceString nss);
 
 private:
     void saveState(OperationContext* opCtx) override;

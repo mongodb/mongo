@@ -153,7 +153,7 @@ auto& multiPlannerAllPlansHitMemoryLimitTotal =
 MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
 
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
-                               VariantCollectionPtrOrAcquisition collection,
+                               CollectionAcquisition collection,
                                CanonicalQuery* cq,
                                OnPickBestPlan onPickBestPlan,
                                boost::optional<std::string> replanReason)
@@ -215,7 +215,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
         CollectionQueryInfo::get(collectionPtr())
             .getPlanCache()
-            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collectionPtr()));
+            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collection()));
 
         switchToBackupPlan();
         return _candidates[_bestPlanIdx].root->work(out);
@@ -246,7 +246,7 @@ MultiPlanTicket MultiPlanStage::rateLimit(PlanYieldPolicy* yieldPolicy,
     auto& rateLimiter = MultiPlanRateLimiter::get(opCtx()->getServiceContext());
 
     auto ticketManager =
-        rateLimiter.getTicketManager(opCtx(), collectionPtr(), *_query, candidatesSize);
+        rateLimiter.getTicketManager(opCtx(), collection(), *_query, candidatesSize);
     // Attempt to acquire tickets immediately without waiting.
     auto ticket = ticketManager.tryAcquire();
     if (!ticket) {

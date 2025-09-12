@@ -104,7 +104,7 @@ struct CountScanParams {
 class CountScan final : public RequiresIndexStage {
 public:
     CountScan(ExpressionContext* expCtx,
-              VariantCollectionPtrOrAcquisition collection,
+              CollectionAcquisition collection,
               CountScanParams params,
               WorkingSet* workingSet);
 

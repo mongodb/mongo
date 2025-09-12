@@ -41,9 +41,8 @@ class MockYieldPolicy : public PlanYieldPolicy {
 public:
     MockYieldPolicy(OperationContext* opCtx,
                     ClockSource* clockSource,
-                    PlanYieldPolicy::YieldPolicy policy,
-                    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable)
-        : PlanYieldPolicy(opCtx, policy, clockSource, 0, Milliseconds{0}, yieldable, nullptr) {}
+                    PlanYieldPolicy::YieldPolicy policy)
+        : PlanYieldPolicy(opCtx, policy, clockSource, 0, Milliseconds{0}, nullptr) {}
 
 private:
     void saveState(OperationContext* opCtx) final {
@@ -63,10 +62,8 @@ private:
  */
 class AlwaysTimeOutYieldPolicy final : public MockYieldPolicy {
 public:
-    AlwaysTimeOutYieldPolicy(OperationContext* opCtx,
-                             ClockSource* cs,
-                             std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable)
-        : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT, yieldable) {}
+    AlwaysTimeOutYieldPolicy(OperationContext* opCtx, ClockSource* cs)
+        : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT) {}
 
     bool doShouldYieldOrInterrupt(OperationContext*) override {
         return true;
@@ -88,10 +85,8 @@ public:
  */
 class AlwaysPlanKilledYieldPolicy final : public MockYieldPolicy {
 public:
-    AlwaysPlanKilledYieldPolicy(OperationContext* opCtx,
-                                ClockSource* cs,
-                                std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable)
-        : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED, yieldable) {}
+    AlwaysPlanKilledYieldPolicy(OperationContext* opCtx, ClockSource* cs)
+        : MockYieldPolicy(opCtx, cs, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED) {}
 
     bool doShouldYieldOrInterrupt(OperationContext*) override {
         return true;
@@ -112,11 +107,8 @@ public:
  */
 class NoopYieldPolicy final : public MockYieldPolicy {
 public:
-    NoopYieldPolicy(OperationContext* opCtx,
-                    ClockSource* clockSource,
-                    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable)
-        : MockYieldPolicy(
-              opCtx, clockSource, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, yieldable) {}
+    NoopYieldPolicy(OperationContext* opCtx, ClockSource* clockSource)
+        : MockYieldPolicy(opCtx, clockSource, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY) {}
 
     bool doShouldYieldOrInterrupt(OperationContext*) override {
         return false;

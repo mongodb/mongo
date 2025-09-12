@@ -81,7 +81,7 @@ public:
     GeoNear2DStage(const GeoNearParams& nearParams,
                    ExpressionContext* expCtx,
                    WorkingSet* workingSet,
-                   VariantCollectionPtrOrAcquisition collection,
+                   CollectionAcquisition collection,
                    const IndexDescriptor* twoDIndex);
 
 protected:
@@ -97,7 +97,7 @@ protected:
 private:
     class DensityEstimator {
     public:
-        DensityEstimator(const VariantCollectionPtrOrAcquisition* collection,
+        DensityEstimator(const CollectionAcquisition* collection,
                          PlanStage::Children* children,
                          BSONObj infoObj,
                          const GeoNearParams* nearParams,
@@ -114,8 +114,7 @@ private:
                             WorkingSet* workingSet,
                             const IndexDescriptor* twoDIndex);
 
-        const VariantCollectionPtrOrAcquisition*
-            _collection;                   // Points to the internal stage _collection.
+        const CollectionAcquisition* _collection;  // Points to the internal stage _collection.
         PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
         const GeoNearParams* _nearParams;  // Not owned here.
         const R2Annulus& _fullBounds;
@@ -150,7 +149,7 @@ public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
                          ExpressionContext* expCtx,
                          WorkingSet* workingSet,
-                         VariantCollectionPtrOrAcquisition collection,
+                         CollectionAcquisition collection,
                          const IndexDescriptor* s2Index);
 
 protected:
@@ -167,7 +166,7 @@ private:
     // Estimate the density of data by search the nearest cells level by level around center.
     class DensityEstimator {
     public:
-        DensityEstimator(const VariantCollectionPtrOrAcquisition* collection,
+        DensityEstimator(const CollectionAcquisition* collection,
                          PlanStage::Children* children,
                          const GeoNearParams* nearParams,
                          const S2IndexingParams& indexParams,
@@ -186,8 +185,7 @@ private:
                             WorkingSet* workingSet,
                             const IndexDescriptor* s2Index);
 
-        const VariantCollectionPtrOrAcquisition*
-            _collection;                   // Points to the internal stage _collection
+        const CollectionAcquisition* _collection;  // Points to the internal stage _collection
         PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
         const GeoNearParams* _nearParams;  // Not owned here.
         const S2IndexingParams _indexParams;

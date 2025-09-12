@@ -66,12 +66,8 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
         _multiPlanStage->addPlan(std::move(solution), std::move(nextPlanRoot), ws());
     }
 
-    auto trialPeriodYieldPolicy =
-        makeClassicYieldPolicy(opCtx(),
-                               cq()->nss(),
-                               static_cast<PlanStage*>(_multiPlanStage.get()),
-                               yieldPolicy(),
-                               collections().getMainCollectionPtrOrAcquisition());
+    auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
+        opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
 }
 
@@ -89,7 +85,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
             plan_executor_factory::make(std::move(canonicalQuery),
                                         extractWs(),
                                         std::move(_multiPlanStage),
-                                        collections().getMainCollectionPtrOrAcquisition(),
+                                        collections().getMainCollectionAcquisition(),
                                         yieldPolicy(),
                                         plannerOptions(),
                                         std::move(nss),
@@ -144,7 +140,7 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
     if (_shouldWriteToPlanCache && !useSbePlanCache()) {
         plan_cache_util::updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
             opCtx(),
-            collections().getMainCollection(),
+            collections().getMainCollectionAcquisition(),
             queryToCache,
             *numReads,
             std::move(ranking),

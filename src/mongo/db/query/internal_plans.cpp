@@ -196,7 +196,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleColl
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
-    const VariantCollectionPtrOrAcquisition& collection,
+    const CollectionAcquisition& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction,
     const boost::optional<RecordId>& resumeAfterRecordId,
@@ -248,7 +248,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
-    const VariantCollectionPtrOrAcquisition& coll,
+    const CollectionAcquisition& coll,
     const CollectionScanParams& params,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
     tassert(10415300, "InternalPlanner::collectionScan expects collection to exist", coll.exists());
@@ -308,7 +308,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      boundInclusion,
                                                      shouldReturnEofOnFilterMismatch);
 
-    auto root = _collectionScan(expCtx, ws.get(), &collectionPtr, collScanParams, filter);
+    auto root = _collectionScan(expCtx, ws.get(), coll, collScanParams, filter);
 
     root = _createAppropriateDeleteStage(
         expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
@@ -327,7 +327,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     OperationContext* opCtx,
-    const VariantCollectionPtrOrAcquisition& coll,
+    const CollectionAcquisition& coll,
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
     const BSONObj& endKey,
@@ -396,7 +396,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIndexScan(
     OperationContext* opCtx,
-    const VariantCollectionPtrOrAcquisition& collection,
+    const CollectionAcquisition& collection,
     const ShardKeyIndex& shardKeyIdx,
     const BSONObj& startKey,
     const BSONObj& endKey,
@@ -457,14 +457,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                                        boundInclusion,
                                                                        direction);
 
-    const auto& collectionPtr = coll.getCollectionPtr();
-    invariant(collectionPtr);
-
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(coll.nss()).build();
 
-    auto root = _collectionScan(expCtx, ws.get(), &collectionPtr, collectionScanParams);
+    auto root = _collectionScan(expCtx, ws.get(), coll, collectionScanParams);
 
     root = _createAppropriateDeleteStage(
         expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
@@ -516,7 +513,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
 std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
-    const VariantCollectionPtrOrAcquisition& coll,
+    const CollectionAcquisition& coll,
     const CollectionScanParams& params,
     const MatchExpression* filter) {
 
@@ -528,7 +525,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
-    const VariantCollectionPtrOrAcquisition& coll,
+    const CollectionAcquisition& coll,
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
     const BSONObj& endKey,

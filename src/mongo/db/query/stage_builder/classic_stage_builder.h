@@ -57,7 +57,7 @@ public:
     using PlanType = std::unique_ptr<PlanStage>;
 
     ClassicStageBuilder(OperationContext* opCtx,
-                        VariantCollectionPtrOrAcquisition collection,
+                        CollectionAcquisition collection,
                         const CanonicalQuery& cq,
                         const QuerySolution& solution,
                         WorkingSet* ws,
@@ -70,7 +70,7 @@ public:
     PlanType build(const QuerySolutionNode* root) final;
 
 private:
-    VariantCollectionPtrOrAcquisition _collection;
+    CollectionAcquisition _collection;
     WorkingSet* _ws;
 
     boost::optional<size_t> _ftsKeyPrefixSize;

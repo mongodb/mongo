@@ -45,7 +45,7 @@ IdHackPlanner::IdHackPlanner(PlannerData plannerData, const IndexDescriptor* des
 
     // Might have to filter out orphaned docs.
     if (plannerOptions() & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto shardFilterer = collection.getShardingFilter(opCtx());
+        auto shardFilterer = collection.getShardingFilter();
         invariant(shardFilterer,
                   "Attempting to use shard filter when there's no shard filter available for "
                   "the collection");

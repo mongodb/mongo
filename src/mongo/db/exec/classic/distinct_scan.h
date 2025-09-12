@@ -112,7 +112,7 @@ struct DistinctParams {
 class DistinctScan final : public RequiresIndexStage {
 public:
     DistinctScan(ExpressionContext* expCtx,
-                 VariantCollectionPtrOrAcquisition collection,
+                 CollectionAcquisition collection,
                  DistinctParams params,
                  WorkingSet* workingSet,
                  std::unique_ptr<ShardFiltererImpl> _shardFilterer = nullptr,

@@ -125,7 +125,7 @@ public:
     };
 
     IndexScan(ExpressionContext* expCtx,
-              VariantCollectionPtrOrAcquisition collection,
+              CollectionAcquisition collection,
               IndexScanParams params,
               WorkingSet* workingSet,
               const MatchExpression* filter);

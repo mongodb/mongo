@@ -533,26 +533,29 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
     auto opStr = "getTagsFromStorage"_sd;
     return writeConflictRetry(
         opCtx, opStr, nsOrUUID, [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
-            AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nsOrUUID);
+            const auto collectionAcquisition = acquireCollectionMaybeLockFree(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, nsOrUUID, AcquisitionPrerequisites::kRead));
 
-            const auto& collection = autoColl.getCollection();
+            const auto& collectionPtr = collectionAcquisition.getCollectionPtr();
 
             // If there is no collection, run through the algorithm with a special reader that only
             // returns empty documents. This simplifies the implementation of other readers.
-            if (!collection) {
+            if (!collectionAcquisition.exists()) {
                 MissingCollectionReader reader;
                 return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
             }
 
             // numRecords is signed so guard against negative numbers
-            auto docCountSigned = collection->numRecords(opCtx);
+            auto docCountSigned = collectionPtr->numRecords(opCtx);
             uint64_t docCount = docCountSigned < 0 ? 0 : static_cast<uint64_t>(docCountSigned);
 
-            std::unique_ptr<SeekableRecordCursor> cursor = collection->getCursor(opCtx, true);
+            std::unique_ptr<SeekableRecordCursor> cursor = collectionPtr->getCursor(opCtx, true);
 
             // If clustered collection, we have simpler searches
-            if (collection->isClustered() &&
-                collection->getClusteredInfo()
+            if (collectionPtr->isClustered() &&
+                collectionPtr->getClusteredInfo()
                         ->getIndexSpec()
                         .getKey()
                         .firstElement()
@@ -566,7 +569,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
 
             // Non-clustered case, we need to look a index entry in _id index and then the
             // collection
-            auto indexCatalog = collection->getIndexCatalog();
+            auto indexCatalog = collectionPtr->getIndexCatalog();
 
             const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
                 opCtx, IndexConstants::kIdIndexName, IndexCatalog::InclusionPolicy::kReady);

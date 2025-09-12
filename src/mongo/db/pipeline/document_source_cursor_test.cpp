@@ -232,10 +232,6 @@ public:
         return QueryFramework::kUnknown;
     }
 
-    bool usesCollectionAcquisitions() const override {
-        return true;
-    }
-
 private:
     OperationContext* _opCtx;
 

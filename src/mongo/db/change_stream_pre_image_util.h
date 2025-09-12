@@ -88,7 +88,7 @@ UUID getPreImageNsUUID(const BSONObj& preImageObj);
  * next collection in 'firstDocWallTime'.
  */
 boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
-                                             const CollectionPtr* preImagesCollPtr,
+                                             const CollectionAcquisition& preImagesColl,
                                              boost::optional<UUID> currentNsUUID,
                                              Date_t& firstDocWallTime);
 

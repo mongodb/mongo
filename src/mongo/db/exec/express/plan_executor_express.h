@@ -44,14 +44,14 @@ namespace mongo {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindById(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    CollectionAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson);
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByClusteredId(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    CollectionAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson);
 
@@ -70,7 +70,7 @@ std::ostream& operator<<(std::ostream& stream, const IndexForExpressEquality& i)
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByUserIndex(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    CollectionAcquisition coll,
     const IndexForExpressEquality& index,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson);

@@ -144,10 +144,6 @@ DocumentSourceCursor::DocumentSourceCursor(
             cursorType != CursorType::kEmptyDocuments ||
                 resumeTrackingType == ResumeTrackingType::kNone);
 
-    tassert(10240803,
-            "Expected enclosed executor to use ShardRole",
-            _sharedState->exec->usesCollectionAcquisitions());
-
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _sharedState->exec->saveState();
 

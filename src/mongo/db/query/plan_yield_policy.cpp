@@ -56,25 +56,11 @@ PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
                                  ClockSource* cs,
                                  int yieldIterations,
                                  Milliseconds yieldPeriod,
-                                 std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                                  std::unique_ptr<const YieldPolicyCallbacks> callbacks)
     : _policy(getPolicyOverrideForOperation(opCtx, policy)),
-      _yieldable(yieldable),
       _callbacks(std::move(callbacks)),
       _elapsedTracker(cs, yieldIterations, yieldPeriod),
       _fastClock(&opCtx->fastClockSource()) {
-    visit(OverloadedVisitor{[&](const Yieldable* collectionPtr) {
-                                invariant(!collectionPtr || collectionPtr->yieldable() ||
-                                          policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY ||
-                                          policy == YieldPolicy::INTERRUPT_ONLY ||
-                                          policy == YieldPolicy::ALWAYS_TIME_OUT ||
-                                          policy == YieldPolicy::ALWAYS_MARK_KILLED);
-                            },
-                            [&](const YieldThroughAcquisitions& yieldThroughAcquisitions) {
-                                // CollectionAcquisitions are always yieldable.
-                            }},
-          _yieldable);
-
     // If 'internalQueryExecYieldIterations' is the default value, we will only reply on time period
     // to check for yielding, so we can avoid do the check for every iteration instead do the check
     // every half of the period.
@@ -153,12 +139,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
     _forceYield = false;
 
-    // Saving and restoring can modify '_yieldable', so we make a copy before we start. This copying
-    // cannot throw.
-    const std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable = _yieldable;
     for (int attempt = 1; true; attempt++) {
         try {
-            // This sets _yieldable to a nullptr.
             saveState(opCtx);
 
             boost::optional<ScopeGuard<std::function<void()>>> exitGuard;
@@ -174,26 +156,13 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                     afterSnapshotAbandonFn();
                 }
             } else {
-                if (usesCollectionAcquisitions()) {
-                    performYieldWithAcquisitions(opCtx, whileYieldingFn, afterSnapshotAbandonFn);
-                } else {
-                    const Yieldable* yieldablePtr = get<const Yieldable*>(yieldable);
-                    tassert(9762900,
-                            str::stream()
-                                << "no yieldable object available for yield policy "
-                                << serializeYieldPolicy(getPolicy()) << " in attempt " << attempt,
-                            yieldablePtr);
-                    performYield(opCtx, *yieldablePtr, whileYieldingFn, afterSnapshotAbandonFn);
-                }
+                performYieldWithAcquisitions(opCtx, whileYieldingFn, afterSnapshotAbandonFn);
             }
 
-            // This copies 'yieldable's contents back to '_yieldable' where needed.
-            auto yieldablePtr = get_if<const Yieldable*>(&yieldable);
-            restoreState(opCtx, yieldablePtr ? *yieldablePtr : nullptr, restoreType);
+            restoreState(opCtx, nullptr, restoreType);
             return Status::OK();
         } catch (const StorageUnavailableException& e) {
             // Restore '_yieldable' before the retry.
-            _yieldable = yieldable;
             logAndRecordWriteConflictAndBackoff(opCtx,
                                                 attempt,
                                                 "query yield",

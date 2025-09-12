@@ -309,7 +309,7 @@ protected:
                                          PlannerDataForSBE plannerData,
                                          NumReads numReads) {
         auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(
-            *cq, plannerData.collections.getMainCollection());
+            *cq, plannerData.collections.getMainCollectionAcquisition());
 
         auto cacheEntry = getClassicPlanCache().getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(static_cast<bool>(cacheEntry));
@@ -403,8 +403,7 @@ private:
             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
             operationContext()->getServiceContext()->getFastClockSource(),
             0,
-            Milliseconds::zero(),
-            PlanYieldPolicy::YieldThroughAcquisitions{});
+            Milliseconds::zero());
     }
 
     boost::optional<MultipleCollectionAccessor> _collections;
@@ -461,7 +460,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
             // No cache entry is created when using the classic cache.
             auto [cq, plannerData] = createPlannerData();
             auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(
-                *cq, plannerData.collections.getMainCollection());
+                *cq, plannerData.collections.getMainCollectionAcquisition());
 
             auto cacheEntry = getClassicPlanCache().getCacheEntryIfActive(planCacheKey);
             ASSERT_FALSE(static_cast<bool>(cacheEntry));

@@ -28,11 +28,12 @@
  */
 
 #pragma once
-#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
+
 namespace mongo::ce {
 
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
@@ -48,10 +49,10 @@ using CEResult = StatusWith<CardinalityEstimate>;
  */
 class ExactCardinalityImpl : public ExactCardinalityEstimator {
 public:
-    ExactCardinalityImpl(const CollectionPtr& collection,
+    ExactCardinalityImpl(const CollectionAcquisition& collection,
                          const CanonicalQuery& query,
                          OperationContext* opCtx)
-        : _cq(query), _opCtx(opCtx), _coll(&collection) {}
+        : _cq(query), _opCtx(opCtx), _coll(collection) {}
 
     ExactCardinalityImpl(const ExactCardinalityImpl&) = delete;
     ExactCardinalityImpl(ExactCardinalityImpl&&) = delete;
@@ -75,6 +76,6 @@ private:
                                    cost_based_ranker::EstimateMap& cardinalities) const;
     const CanonicalQuery& _cq;
     OperationContext* _opCtx;
-    const CollectionPtr* _coll;
+    const CollectionAcquisition _coll;
 };
 }  // namespace mongo::ce

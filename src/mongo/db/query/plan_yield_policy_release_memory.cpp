@@ -37,41 +37,24 @@ namespace mongo {
 PlanYieldPolicyReleaseMemory::PlanYieldPolicyReleaseMemory(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy policy,
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,
                       &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                      yieldable,
                       std::move(callbacks)) {}
 
 std::unique_ptr<PlanYieldPolicyReleaseMemory> PlanYieldPolicyReleaseMemory::make(
-    OperationContext* opCtx,
-    PlanYieldPolicy::YieldPolicy policy,
-    const boost::optional<AutoGetCollectionForReadMaybeLockFree>& readLock,
-    NamespaceString nss) {
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable = YieldThroughAcquisitions{};
-    if (readLock) {
-        yieldable = &readLock->getCollection();
-    }
+    OperationContext* opCtx, PlanYieldPolicy::YieldPolicy policy, NamespaceString nss) {
     return std::make_unique<PlanYieldPolicyReleaseMemory>(
-        opCtx, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
+        opCtx, policy, std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
 }
 
-void PlanYieldPolicyReleaseMemory::saveState(OperationContext* opCtx) {
-    if (!usesCollectionAcquisitions()) {
-        setYieldable(nullptr);
-    }
-}
+void PlanYieldPolicyReleaseMemory::saveState(OperationContext* opCtx) {}
 
 void PlanYieldPolicyReleaseMemory::restoreState(OperationContext* opCtx,
                                                 const Yieldable* yieldable,
-                                                RestoreContext::RestoreType restoreType) {
-    if (!usesCollectionAcquisitions()) {
-        setYieldable(yieldable);
-    }
-}
+                                                RestoreContext::RestoreType restoreType) {}
 
 }  // namespace mongo

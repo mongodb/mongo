@@ -170,7 +170,7 @@ UUID getPreImageNsUUID(const BSONObj& preImageObj) {
 }
 
 boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
-                                             const CollectionPtr* preImagesCollPtr,
+                                             const CollectionAcquisition& preImagesColl,
                                              boost::optional<UUID> currentNsUUID,
                                              Date_t& firstDocWallTime) {
     BSONObj preImageObj;
@@ -184,7 +184,7 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
         : boost::none;
     auto planExecutor =
         InternalPlanner::collectionScan(opCtx,
-                                        preImagesCollPtr,
+                                        preImagesColl,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         InternalPlanner::Direction::FORWARD,
                                         boost::none /* resumeAfterRecordId */,
@@ -203,10 +203,7 @@ stdx::unordered_set<UUID, UUID::Hash> getNsUUIDs(OperationContext* opCtx,
     boost::optional<UUID> currentCollectionUUID = boost::none;
     Date_t firstWallTime{};
     while ((currentCollectionUUID = change_stream_pre_image_util::findNextCollectionUUID(
-                opCtx,
-                &preImagesCollection.getCollectionPtr(),
-                currentCollectionUUID,
-                firstWallTime))) {
+                opCtx, preImagesCollection, currentCollectionUUID, firstWallTime))) {
         nsUUIDs.emplace(*currentCollectionUUID);
     }
     return nsUUIDs;

@@ -51,9 +51,7 @@ namespace mongo {
  */
 class MultiIteratorStage final : public RequiresCollectionStage {
 public:
-    MultiIteratorStage(ExpressionContext* expCtx,
-                       WorkingSet* ws,
-                       VariantCollectionPtrOrAcquisition collection);
+    MultiIteratorStage(ExpressionContext* expCtx, WorkingSet* ws, CollectionAcquisition collection);
 
     void addIterator(std::unique_ptr<RecordCursor> it);
 

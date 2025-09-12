@@ -149,7 +149,7 @@ public:
                      std::unique_ptr<QuerySolution> qs,
                      std::unique_ptr<CanonicalQuery> cq,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     VariantCollectionPtrOrAcquisition collection,
+                     const boost::optional<CollectionAcquisition>& collection,
                      bool returnOwnedBson,
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
@@ -216,8 +216,6 @@ public:
     void setReturnOwnedData(bool returnOwnedData) final {
         _mustReturnOwnedBson = returnOwnedData;
     }
-
-    bool usesCollectionAcquisitions() const final;
 
     /**
      * It is used to detect if the plan executor obtained after multiplanning is using a distinct

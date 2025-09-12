@@ -178,8 +178,6 @@ public:
      */
     static YieldPolicy getPolicyOverrideForOperation(OperationContext* opCtx, YieldPolicy desired);
 
-    class YieldThroughAcquisitions {};
-
     /**
      * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
      * to keep track of elapsed time, which is initialized from the parameters 'cs',
@@ -196,7 +194,6 @@ public:
                     ClockSource* cs,
                     int yieldIterations,
                     Milliseconds yieldPeriod,
-                    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                     std::unique_ptr<const YieldPolicyCallbacks> callbacks);
 
     virtual ~PlanYieldPolicy() = default;
@@ -292,15 +289,6 @@ public:
         return _policy;
     }
 
-    void setYieldable(const Yieldable* yieldable) {
-        invariant(!usesCollectionAcquisitions());
-        _yieldable = yieldable;
-    }
-
-    bool usesCollectionAcquisitions() const {
-        return holds_alternative<YieldThroughAcquisitions>(_yieldable);
-    }
-
 protected:
     /**
      * The function that actually do check for interrupt or release locks or storage engine state.
@@ -333,7 +321,6 @@ private:
                                       std::function<void()> afterSnapshotAbandonFn);
 
     const YieldPolicy _policy;
-    std::variant<const Yieldable*, YieldThroughAcquisitions> _yieldable;
     std::unique_ptr<const YieldPolicyCallbacks> _callbacks;
 
     ElapsedTracker _elapsedTracker;

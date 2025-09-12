@@ -59,7 +59,7 @@ public:
                WorkingSet* ws,
                std::unique_ptr<PlanStage> child,
                const MatchExpression* filter,
-               VariantCollectionPtrOrAcquisition collection);
+               CollectionAcquisition collection);
 
     ~FetchStage() override;
 

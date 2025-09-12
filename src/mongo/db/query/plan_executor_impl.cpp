@@ -93,7 +93,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    std::unique_ptr<QuerySolution> qs,
                                    std::unique_ptr<CanonicalQuery> cq,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   VariantCollectionPtrOrAcquisition collection,
+                                   const boost::optional<CollectionAcquisition>& collection,
                                    bool returnOwnedBson,
                                    NamespaceString nss,
                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
@@ -117,15 +117,13 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     invariant(!_expCtx || _expCtx->getOperationContext() == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
-    const CollectionPtr* collectionPtr = &collection.getCollectionPtr();
-    invariant(collectionPtr);
-    const bool collectionExists = static_cast<bool>(*collectionPtr);
+    const bool collectionExists = collection.is_initialized() && collection->exists();
 
     // If we don't yet have a namespace string, then initialize it from either 'collection' or
     // '_cq'.
     if (_nss.isEmpty()) {
         if (collectionExists) {
-            _nss = (*collectionPtr)->ns();
+            _nss = collection->nss();
         } else {
             invariant(_cq);
             if (_cq->getFindCommandRequest().getNamespaceOrUUID().isNamespaceString()) {
@@ -138,8 +136,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         _opCtx,
         _nss,
         this,
-        collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-        collection);
+        collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
     if (_qs) {
         _planExplainer->setQuerySolution(_qs.get());
@@ -214,9 +211,6 @@ void PlanExecutorImpl::saveState() {
         _root->saveState();
     }
 
-    if (!_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(nullptr);
-    }
     _currentState = kSaved;
 }
 
@@ -237,9 +231,6 @@ void PlanExecutorImpl::restoreState(const RestoreContext& context) {
 void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context) {
     invariant(_currentState == kSaved);
 
-    if (!_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(context.collection());
-    }
     if (!isMarkedAsKilled()) {
         _root->restoreState(context);
     }
@@ -843,7 +834,4 @@ MultiPlanStage* PlanExecutorImpl::getMultiPlanStage() const {
     return static_cast<MultiPlanStage*>(ps);
 }
 
-bool PlanExecutorImpl::usesCollectionAcquisitions() const {
-    return _yieldPolicy->usesCollectionAcquisitions();
-}
 }  // namespace mongo

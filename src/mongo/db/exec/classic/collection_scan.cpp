@@ -80,8 +80,7 @@ bool shouldIncludeStartRecord(const CollectionScanParams& params) {
         params.boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
 }
 
-const char* getStageName(const VariantCollectionPtrOrAcquisition& coll,
-                         const CollectionScanParams& params) {
+const char* getStageName(const CollectionAcquisition& coll, const CollectionScanParams& params) {
     return (!coll.getCollectionPtr()->ns().isOplog() && (params.minRecord || params.maxRecord))
         ? "CLUSTERED_IXSCAN"
         : "COLLSCAN";
@@ -90,7 +89,7 @@ const char* getStageName(const VariantCollectionPtrOrAcquisition& coll,
 
 
 CollectionScan::CollectionScan(ExpressionContext* expCtx,
-                               VariantCollectionPtrOrAcquisition collection,
+                               CollectionAcquisition collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)

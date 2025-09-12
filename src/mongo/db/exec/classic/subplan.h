@@ -91,7 +91,7 @@ public:
     };
 
     SubplanStage(ExpressionContext* expCtx,
-                 VariantCollectionPtrOrAcquisition collection,
+                 CollectionAcquisition collection,
                  WorkingSet* ws,
                  CanonicalQuery* cq,
                  PlanSelectionCallbacks PlanSelectionCallbacks);

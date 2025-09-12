@@ -88,7 +88,7 @@ const char* CountScan::kStageType = "COUNT_SCAN";
 // the CountScanParams rather than resolving them via the IndexDescriptor, since these may differ
 // from the descriptor's contents.
 CountScan::CountScan(ExpressionContext* expCtx,
-                     VariantCollectionPtrOrAcquisition collection,
+                     CollectionAcquisition collection,
                      CountScanParams params,
                      WorkingSet* workingSet)
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),

@@ -229,8 +229,7 @@ public:
         StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
             CollectionQueryInfo::get(collection.getCollectionPtr())
                 .getPlanCache()
-                ->getEntry(
-                    plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr()));
+                ->getEntry(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
         ASSERT_OK(planCacheEntryWithStatus.getStatus());
         auto debugInfo = planCacheEntryWithStatus.getValue()->debugInfo;
         ASSERT(debugInfo);

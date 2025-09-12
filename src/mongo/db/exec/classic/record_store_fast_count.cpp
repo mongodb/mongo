@@ -38,7 +38,7 @@ namespace mongo {
 const char* RecordStoreFastCountStage::kStageType = "RECORD_STORE_FAST_COUNT";
 
 RecordStoreFastCountStage::RecordStoreFastCountStage(ExpressionContext* expCtx,
-                                                     VariantCollectionPtrOrAcquisition collection,
+                                                     CollectionAcquisition collection,
                                                      long long skip,
                                                      long long limit)
     : RequiresCollectionStage(kStageType, expCtx, collection), _skip(skip), _limit(limit) {

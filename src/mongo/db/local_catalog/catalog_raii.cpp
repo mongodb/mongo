@@ -292,13 +292,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      LockMode modeColl,
                                      const Options& options,
-                                     ForReadTag reader)
-    : AutoGetCollection(opCtx, nsOrUUID, modeColl, options, /*verifyWriteEligible=*/false) {}
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     LockMode modeColl,
-                                     const Options& options,
                                      bool verifyWriteEligible)
     : _autoDb(AutoGetDb::createForAutoGetCollection(opCtx, nsOrUUID, modeColl, options)) {
 

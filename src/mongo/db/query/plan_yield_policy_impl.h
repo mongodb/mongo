@@ -46,7 +46,6 @@ public:
     PlanYieldPolicyImpl(OperationContext* opCtx,
                         PlanExecutorImpl* exec,
                         PlanYieldPolicy::YieldPolicy policy,
-                        std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                         std::unique_ptr<YieldPolicyCallbacks> callbacks);
 
 private:
@@ -66,12 +65,10 @@ private:
  */
 class PlanYieldPolicyClassicTrialPeriod final : public PlanYieldPolicy {
 public:
-    PlanYieldPolicyClassicTrialPeriod(
-        OperationContext* opCtx,
-        PlanStage* root,
-        PlanYieldPolicy::YieldPolicy policy,
-        std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-        std::unique_ptr<YieldPolicyCallbacks> callbacks);
+    PlanYieldPolicyClassicTrialPeriod(OperationContext* opCtx,
+                                      PlanStage* root,
+                                      PlanYieldPolicy::YieldPolicy policy,
+                                      std::unique_ptr<YieldPolicyCallbacks> callbacks);
 
 private:
     void saveState(OperationContext* opCtx) override;
@@ -89,25 +86,10 @@ private:
  * otherwise if we are using classic executor, the PolicyType is PlanYieldPolicyClassicExecutor.
  */
 template <typename PlanType>
-std::unique_ptr<PlanYieldPolicy> makeClassicYieldPolicy(
-    OperationContext* opCtx,
-    NamespaceString nss,
-    PlanType* plan,
-    PlanYieldPolicy::YieldPolicy policy,
-    VariantCollectionPtrOrAcquisition collection) {
-    const std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
-        visit(OverloadedVisitor{[](const CollectionPtr* coll) {
-                                    return std::variant<const Yieldable*,
-                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
-                                        *coll ? coll : nullptr);
-                                },
-                                [](const CollectionAcquisition& coll) {
-                                    return std::variant<const Yieldable*,
-                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
-                                        PlanYieldPolicy::YieldThroughAcquisitions{});
-                                }},
-              collection.get());
-
+std::unique_ptr<PlanYieldPolicy> makeClassicYieldPolicy(OperationContext* opCtx,
+                                                        NamespaceString nss,
+                                                        PlanType* plan,
+                                                        PlanYieldPolicy::YieldPolicy policy) {
     using PolicyType = std::conditional_t<std::is_same_v<PlanType, PlanStage>,
                                           PlanYieldPolicyClassicTrialPeriod,
                                           PlanYieldPolicyImpl>;
@@ -118,19 +100,13 @@ std::unique_ptr<PlanYieldPolicy> makeClassicYieldPolicy(
         case PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
         case PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY: {
             return std::make_unique<PolicyType>(
-                opCtx,
-                plan,
-                policy,
-                yieldable,
-                std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
+                opCtx, plan, policy, std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
-            return std::make_unique<AlwaysTimeOutYieldPolicy>(
-                opCtx, &opCtx->fastClockSource(), yieldable);
+            return std::make_unique<AlwaysTimeOutYieldPolicy>(opCtx, &opCtx->fastClockSource());
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED: {
-            return std::make_unique<AlwaysPlanKilledYieldPolicy>(
-                opCtx, &opCtx->fastClockSource(), yieldable);
+            return std::make_unique<AlwaysPlanKilledYieldPolicy>(opCtx, &opCtx->fastClockSource());
         }
     }
     MONGO_UNREACHABLE;

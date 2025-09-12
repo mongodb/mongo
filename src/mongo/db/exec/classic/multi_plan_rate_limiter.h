@@ -172,7 +172,7 @@ public:
                                                   const std::string& key);
 
     MultiPlanTicketManager getTicketManager(OperationContext* opCtx,
-                                            const CollectionPtr& coll,
+                                            const CollectionAcquisition& coll,
                                             const CanonicalQuery& cq,
                                             size_t numCandidatePlans);
 

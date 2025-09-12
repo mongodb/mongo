@@ -48,7 +48,6 @@ struct CursorLocks {
     // A reference to the shared_ptr so that we drop the virtual collections (via the
     // destructor) after deleting our cursors and releasing our read locks.
     std::shared_ptr<ExternalDataSourceScopeGuard> extDataSourceScopeGuard;
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock;
     boost::optional<AutoStatsTracker> statsTracker;
     boost::optional<HandleTransactionResourcesFromStasher> txnResourcesHandler;
 };

@@ -104,7 +104,7 @@ protected:
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,
-              VariantCollectionPtrOrAcquisition collection,
+              CollectionAcquisition collection,
               const IndexDescriptor* indexDescriptor);
 
     //

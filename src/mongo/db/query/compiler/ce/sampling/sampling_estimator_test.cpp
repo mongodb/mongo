@@ -1091,15 +1091,10 @@ DEATH_TEST_F(SamplingEstimatorTest,
              "topLevelSampleFieldNames must be a non-empty set if specified.") {
     insertDocuments(kTestNss, createDocuments(10));
 
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
+    auto coll = acquireCollection(operationContext(), kTestNss);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
-                                                  colls,
+                                                  MultipleCollectionAccessor{coll},
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,

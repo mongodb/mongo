@@ -61,19 +61,25 @@ namespace mongo::express {
 namespace {
 class ExpressPlanTest : public CatalogTestFixture {
 public:
-    AutoGetCollection createAndPopulateTestCollectionWithOptions(
+    CollectionAcquisition createAndPopulateTestCollectionWithOptions(
         CollectionOptions options,
         std::vector<BSONObj> indexSpecList,
         std::vector<BSONObj> documentList) {
         auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
         ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-        AutoGetCollection collection(operationContext(), nss, MODE_X);
-        ASSERT(collection);
+        CollectionAcquisition collection = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, boost::none),
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_X);
+        ASSERT(collection.exists());
 
         for (const auto& indexSpec : indexSpecList) {
             WriteUnitOfWork wuow(operationContext());
-            CollectionWriter writer{operationContext(), collection};
+            CollectionWriter writer{operationContext(), &collection};
 
             auto writeableCollection = writer.getWritableCollection(operationContext());
             auto* indexCatalog = writeableCollection->getIndexCatalog();
@@ -85,27 +91,30 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         for (const auto& document : documentList) {
             WriteUnitOfWork wuow(operationContext());
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), *collection, InsertStatement(document), nullOpDebug));
+            ASSERT_OK(collection_internal::insertDocument(operationContext(),
+                                                          collection.getCollectionPtr(),
+                                                          InsertStatement(document),
+                                                          nullOpDebug));
             wuow.commit();
         }
 
         auto isIdIndexExpected =
             !bool(options.clusteredIndex) && options.autoIndexId != CollectionOptions::NO;
         int expectedNumIndexes = (isIdIndexExpected ? 1 : 0) + indexSpecList.size();
-        ASSERT_EQ(collection->getIndexCatalog()->numIndexesTotal(), expectedNumIndexes);
+        ASSERT_EQ(collection.getCollectionPtr()->getIndexCatalog()->numIndexesTotal(),
+                  expectedNumIndexes);
 
         return collection;
     }
 
     // std::convertible_to is not yet universally supported.
-    AutoGetCollection createAndPopulateTestCollection(
+    CollectionAcquisition createAndPopulateTestCollection(
         /* std::convertible_to<StringData> */ auto... documents) {
         return createAndPopulateTestCollectionWithOptions(
             CollectionOptions(), {}, {fromjson(documents)...});
     }
 
-    AutoGetCollection createAndPopulateTestClusteredCollection(
+    CollectionAcquisition createAndPopulateTestClusteredCollection(
         /* std::convertible_to<StringData> */ auto... documents) {
         bool unique = true;
         bool legacyFormat = false;
@@ -116,7 +125,7 @@ public:
             {fromjson(documents)...});
     }
 
-    AutoGetCollection createAndPopulateTestCollectionWithIndex(
+    CollectionAcquisition createAndPopulateTestCollectionWithIndex(
         BSONObj indexSpec, /* std::convertible_to<StringData> */ auto... documents) {
         return createAndPopulateTestCollectionWithOptions(
             CollectionOptions(), {std::move(indexSpec)}, {fromjson(documents)...});
@@ -129,8 +138,8 @@ public:
 static std::pair<PlanProgress, BSONObj> iterateAndExpectDocument(
     OperationContext* opCtx, auto& iterator, PlanProgress continuationReturnValue = Ready()) {
     boost::optional<BSONObj> producedObj;
-    auto result =
-        iterator.consumeOne(opCtx, [&](const CollectionPtr*, RecordId, Snapshotted<BSONObj> obj) {
+    auto result = iterator.consumeOne(
+        opCtx, [&](const CollectionAcquisition, RecordId, Snapshotted<BSONObj> obj) {
             ASSERT(!bool(producedObj));
             producedObj.emplace(std::move(obj.value()));
             return std::move(continuationReturnValue);
@@ -143,7 +152,7 @@ static std::pair<PlanProgress, BSONObj> iterateAndExpectDocument(
 // not produce an output document).
 static PlanProgress iterateButExpectNoDocument(OperationContext* opCtx, auto& iterator) {
     return iterator.consumeOne(
-        opCtx, [](const CollectionPtr*, RecordId, Snapshotted<BSONObj>) -> PlanProgress {
+        opCtx, [](const CollectionAcquisition, RecordId, Snapshotted<BSONObj>) -> PlanProgress {
             MONGO_UNREACHABLE;
         });
 }
@@ -151,11 +160,10 @@ static PlanProgress iterateButExpectNoDocument(OperationContext* opCtx, auto& it
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
     auto collection = createAndPopulateTestCollection(
         "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupViaIndex<const CollectionPtr*> iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    IdLookupViaIndex iterator(fromjson("{_id: 2}"));
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -177,11 +185,10 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
 TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
     auto collection = createAndPopulateTestCollection(
         "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupViaIndex<const CollectionPtr*> iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    IdLookupViaIndex iterator(fromjson("{_id: 4}"));
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -200,11 +207,10 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
     auto collection = createAndPopulateTestClusteredCollection(
         "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupOnClusteredCollection<const CollectionPtr*> iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    IdLookupOnClusteredCollection iterator(fromjson("{_id: 2}"));
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -226,11 +232,10 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
     auto collection = createAndPopulateTestClusteredCollection(
         "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
 
     IteratorStats iteratorStats;
-    IdLookupOnClusteredCollection<const CollectionPtr*> iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    IdLookupOnClusteredCollection iterator(fromjson("{_id: 4}"));
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -251,7 +256,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
     auto collection = createAndPopulateTestCollectionWithIndex(
         indexSpec, "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexDescriptor =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
@@ -259,13 +264,13 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 5}");
     CollatorInterface* collator = nullptr;
-    LookupViaUserIndex<const CollectionPtr*, FetchFromCollectionCallback<const CollectionPtr*>>
-        iterator(filter.firstElement(),
-                 indexDescriptor->getEntry()->getIdent(),
-                 std::string{indexName},
-                 collator,
-                 nullptr);
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(),
+        indexDescriptor->getEntry()->getIdent(),
+        std::string{indexName},
+        collator,
+        nullptr);
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -292,7 +297,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
                               << collationSpec);
     auto collection = createAndPopulateTestCollectionWithIndex(
         indexSpec, "{_id: 0, a: 'II'}"_sd, "{_id: 1, a: 'III'}"_sd, "{_id: 2, a: 'V'}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexDescriptor =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
@@ -300,13 +305,13 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
 
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 'iii'}");
-    LookupViaUserIndex<const CollectionPtr*, FetchFromCollectionCallback<const CollectionPtr*>>
-        iterator(filter.firstElement(),
-                 indexDescriptor->getEntry()->getIdent(),
-                 std::string{indexName},
-                 collator,
-                 nullptr);
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(),
+        indexDescriptor->getEntry()->getIdent(),
+        std::string{indexName},
+        collator,
+        nullptr);
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -330,7 +335,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
     auto collection = createAndPopulateTestCollectionWithIndex(
         indexSpec, "{_id: 0, a: 2}"_sd, "{_id: 1, a: 3}"_sd, "{_id: 2, a: 5}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexDescriptor =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
@@ -338,13 +343,13 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     IteratorStats iteratorStats;
     auto filter = fromjson("{a: 7}");
     CollatorInterface* collator = nullptr;
-    LookupViaUserIndex<const CollectionPtr*, FetchFromCollectionCallback<const CollectionPtr*>>
-        iterator(filter.firstElement(),
-                 indexDescriptor->getEntry()->getIdent(),
-                 std::string{indexName},
-                 collator,
-                 nullptr);
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(),
+        indexDescriptor->getEntry()->getIdent(),
+        std::string{indexName},
+        collator,
+        nullptr);
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -358,48 +363,6 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
     ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
-}
-
-TEST_F(ExpressPlanTest, TestIdLookupNullCollectionOnRestoreThrows) {
-    auto collection = createAndPopulateTestCollection();
-    const CollectionPtr& collectionPtr = *collection;
-    IteratorStats iteratorStats;
-
-    IdLookupViaIndex<const CollectionPtr*> iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
-
-    auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
-    const CollectionPtr nullCollection;
-
-    iterator.releaseResources();
-    ASSERT_THROWS(iterator.restoreResources(operationContext(), &nullCollection, nss),
-                  ExceptionFor<ErrorCodes::QueryPlanKilled>);
-}
-
-TEST_F(ExpressPlanTest, TestLookupViaUserIndexNullCollectionOnRestoreThrows) {
-    StringData indexName = "a_1"_sd;
-    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
-    auto collection = createAndPopulateTestCollectionWithIndex(indexSpec);
-    const CollectionPtr& collectionPtr = *collection;
-    IteratorStats iteratorStats;
-
-    auto indexDescriptor =
-        collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
-    auto filter = fromjson("{a: 2}");
-    CollatorInterface* collator = nullptr;
-    LookupViaUserIndex<const CollectionPtr*, FetchFromCollectionCallback<const CollectionPtr*>>
-        iterator(filter.firstElement(),
-                 indexDescriptor->getEntry()->getIdent(),
-                 std::string{indexName},
-                 collator,
-                 nullptr);
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
-    auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
-    const CollectionPtr nullCollection;
-
-    iterator.releaseResources();
-    ASSERT_THROWS(iterator.restoreResources(operationContext(), &nullCollection, nss),
-                  ExceptionFor<ErrorCodes::QueryPlanKilled>);
 }
 
 projection_ast::Projection parseProjection(OperationContext* opCtx, BSONObj projection) {
@@ -416,7 +379,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
                                                                "{_id: 0, a: 2, b: 3, c: 4}"_sd,
                                                                "{_id: 1, a: 5, b: 6, c: 7}"_sd,
                                                                "{_id: 2, a: 8, b: 9, c: 10}"_sd);
-    const CollectionPtr& collectionPtr = *collection;
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
 
     auto indexDescriptor =
         collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
@@ -427,13 +390,12 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
 
     auto projection = parseProjection(operationContext(), fromjson("{_id: 0, a: 1, c: 1}"));
 
-    LookupViaUserIndex<const CollectionPtr*, CreateDocumentFromIndexKey<const CollectionPtr*>>
-        iterator(filter.firstElement(),
-                 indexDescriptor->getEntry()->getIdent(),
-                 std::string{indexName},
-                 collator,
-                 &projection);
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
+    LookupViaUserIndex<CreateDocumentFromIndexKey> iterator(filter.firstElement(),
+                                                            indexDescriptor->getEntry()->getIdent(),
+                                                            std::string{indexName},
+                                                            collator,
+                                                            &projection);
+    iterator.open(operationContext(), collection, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -451,21 +413,6 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
     ASSERT_EQ(iteratorStats.indexName(), "a_1_b_1_c_1");
     ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1, b: 1, c: 1 }");
     ASSERT_EQ(iteratorStats.projectionCovered(), true);
-}
-
-TEST_F(ExpressPlanTest, TestLookupClusteredIdIndexNullCollectionOnRestoreThrows) {
-    auto collection = createAndPopulateTestClusteredCollection();
-    const CollectionPtr& collectionPtr = *collection;
-
-    IteratorStats iteratorStats;
-    IdLookupOnClusteredCollection<const CollectionPtr*> iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), &collectionPtr, &iteratorStats);
-    auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");
-    const CollectionPtr nullCollection;
-
-    iterator.releaseResources();
-    ASSERT_THROWS(iterator.restoreResources(operationContext(), &nullCollection, nss),
-                  ExceptionFor<ErrorCodes::QueryPlanKilled>);
 }
 
 }  // namespace

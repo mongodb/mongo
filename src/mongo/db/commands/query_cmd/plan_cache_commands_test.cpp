@@ -70,7 +70,7 @@ public:
     }
 
     PlanCacheKey makeClassicKey(CanonicalQuery& cq) {
-        return plan_cache_key_factory::make<PlanCacheKey>(cq, _collectionAcq->getCollectionPtr());
+        return plan_cache_key_factory::make<PlanCacheKey>(cq, *_collectionAcq);
     }
 
 

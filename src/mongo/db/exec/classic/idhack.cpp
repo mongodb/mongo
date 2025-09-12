@@ -55,7 +55,7 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          CanonicalQuery* query,
                          WorkingSet* ws,
-                         VariantCollectionPtrOrAcquisition collection,
+                         CollectionAcquisition collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws), _workingSet(ws) {
     auto cmpExpr = dynamic_cast<ComparisonMatchExpressionBase*>(query->getPrimaryMatchExpression());
@@ -68,7 +68,7 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const BSONObj& key,
                          WorkingSet* ws,
-                         VariantCollectionPtrOrAcquisition collection,
+                         CollectionAcquisition collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),

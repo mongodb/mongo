@@ -2198,8 +2198,7 @@ protected:
 
     sbe::PlanCacheKey makeSbeKey(const CanonicalQuery& cq) {
         ASSERT_TRUE(cq.isSbeCompatible());
-        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq,
-                                                               _collectionAcq->getCollectionPtr());
+        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq, *_collectionAcq);
     }
 
     /**

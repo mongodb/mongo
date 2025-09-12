@@ -596,34 +596,6 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     }
 }
 
-TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
-    Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
-    ASSERT(shard_role_details::getLocker(_opCtx.get())->isCollectionLockedForMode(nss, MODE_X));
-    try {
-        AutoGetCollectionForReadCommand db(
-            _opCtx.get(), nss, AutoGetCollection::Options{}.deadline(Date_t::now()));
-    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-        FAIL("Should get the db within the timeout");
-    }
-}
-
-TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
-    Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
-    ASSERT(shard_role_details::getLocker(_opCtx.get())->isCollectionLockedForMode(nss, MODE_X));
-    try {
-        AutoGetCollectionForReadCommand db(
-            _opCtx.get(), nss, AutoGetCollection::Options{}.deadline(Date_t()));
-    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-        FAIL("Should get the db within the timeout");
-    }
-}
-
 TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex) {
     writeConflictRetry(_opCtx.get(),
                        "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",

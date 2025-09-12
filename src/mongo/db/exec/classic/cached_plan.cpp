@@ -69,7 +69,7 @@ namespace mongo {
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
 CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
-                                 VariantCollectionPtrOrAcquisition collection,
+                                 CollectionAcquisition collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  size_t decisionWorks,
@@ -230,7 +230,7 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(collectionPtr()).getPlanCache();
         size_t evictedCount = cache->deactivate(
-            plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, collectionPtr()));
+            plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, collection()));
         planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
     }
 

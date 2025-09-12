@@ -2031,8 +2031,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
 StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     OperationContext* opCtx,
     std::function<std::unique_ptr<SolutionCacheData>(
-        const CanonicalQuery& cq, const CollectionPtr& coll)> getSolutionCachedData,
-    const CollectionPtr& collection,
+        const CanonicalQuery& cq, const CollectionAcquisition& coll)> getSolutionCachedData,
+    const CollectionAcquisition& collection,
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     ce::SamplingEstimator* samplingEstimator,

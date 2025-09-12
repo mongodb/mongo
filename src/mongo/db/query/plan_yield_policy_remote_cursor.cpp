@@ -46,26 +46,14 @@ std::unique_ptr<PlanYieldPolicyRemoteCursor> PlanYieldPolicyRemoteCursor::make(
     const MultipleCollectionAccessor& collections,
     NamespaceString nss,
     PlanExecutor* exec) {
-    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
-    if (collections.isAcquisition()) {
-        yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
-    } else {
-        yieldable = &collections.getMainCollection();
-    }
-
-    auto yieldPolicy = std::unique_ptr<PlanYieldPolicyRemoteCursor>(
-        new PlanYieldPolicyRemoteCursor(opCtx,
-                                        policy,
-                                        yieldable,
-                                        std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)),
-                                        exec));
+    auto yieldPolicy = std::unique_ptr<PlanYieldPolicyRemoteCursor>(new PlanYieldPolicyRemoteCursor(
+        opCtx, policy, std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)), exec));
     return yieldPolicy;
 }
 
 PlanYieldPolicyRemoteCursor::PlanYieldPolicyRemoteCursor(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy policy,
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks,
     PlanExecutor* exec)
     : PlanYieldPolicy(opCtx,
@@ -73,7 +61,6 @@ PlanYieldPolicyRemoteCursor::PlanYieldPolicyRemoteCursor(
                       &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                      yieldable,
                       std::move(callbacks)),
       _exec(exec) {}
 

@@ -226,12 +226,11 @@ static R2Annulus twoDDistanceBounds(const GeoNearParams& nearParams,
     return fullBounds;
 }
 
-GeoNear2DStage::DensityEstimator::DensityEstimator(
-    const VariantCollectionPtrOrAcquisition* collection,
-    PlanStage::Children* children,
-    BSONObj infoObj,
-    const GeoNearParams* nearParams,
-    const R2Annulus& fullBounds)
+GeoNear2DStage::DensityEstimator::DensityEstimator(const CollectionAcquisition* collection,
+                                                   PlanStage::Children* children,
+                                                   BSONObj infoObj,
+                                                   const GeoNearParams* nearParams,
+                                                   const R2Annulus& fullBounds)
     : _collection(collection),
       _children(children),
       _nearParams(nearParams),
@@ -416,7 +415,7 @@ static const string kTwoDIndexNearStage("GEO_NEAR_2D");
 GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                                ExpressionContext* expCtx,
                                WorkingSet* workingSet,
-                               VariantCollectionPtrOrAcquisition collection,
+                               CollectionAcquisition collection,
                                const IndexDescriptor* twoDIndex)
     : NearStage(expCtx,
                 kTwoDIndexNearStage.c_str(),
@@ -442,7 +441,7 @@ public:
                         WorkingSet* ws,
                         std::unique_ptr<PlanStage> child,
                         MatchExpression* filter,
-                        VariantCollectionPtrOrAcquisition collection)
+                        CollectionAcquisition collection)
         : FetchStage(expCtx, ws, std::move(child), filter, collection), _matcher(filter) {}
 
 private:
@@ -659,7 +658,7 @@ static const string kS2IndexNearStage("GEO_NEAR_2DSPHERE");
 GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
                                            ExpressionContext* expCtx,
                                            WorkingSet* workingSet,
-                                           VariantCollectionPtrOrAcquisition collection,
+                                           CollectionAcquisition collection,
                                            const IndexDescriptor* s2Index)
     : NearStage(expCtx,
                 kS2IndexNearStage.c_str(),
@@ -739,12 +738,11 @@ S2Region* buildS2Region(const R2Annulus& sphereBounds) {
 }
 }  // namespace
 
-GeoNear2DSphereStage::DensityEstimator::DensityEstimator(
-    const VariantCollectionPtrOrAcquisition* collection,
-    PlanStage::Children* children,
-    const GeoNearParams* nearParams,
-    const S2IndexingParams& indexParams,
-    const R2Annulus& fullBounds)
+GeoNear2DSphereStage::DensityEstimator::DensityEstimator(const CollectionAcquisition* collection,
+                                                         PlanStage::Children* children,
+                                                         const GeoNearParams* nearParams,
+                                                         const S2IndexingParams& indexParams,
+                                                         const R2Annulus& fullBounds)
     : _collection(collection),
       _children(children),
       _nearParams(nearParams),

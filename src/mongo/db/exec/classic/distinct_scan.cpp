@@ -62,7 +62,7 @@ using std::unique_ptr;
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
 DistinctScan::DistinctScan(ExpressionContext* expCtx,
-                           VariantCollectionPtrOrAcquisition collection,
+                           CollectionAcquisition collection,
                            DistinctParams params,
                            WorkingSet* workingSet,
                            std::unique_ptr<ShardFiltererImpl> shardFilterer,

@@ -225,8 +225,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
     auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     // Plan selection should succeed due to falling back on regular planning.
-    NoopYieldPolicy yieldPolicy(
-        _expCtx->getOperationContext(), _clock, PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 }
 
@@ -263,9 +262,7 @@ void QueryStageSubplanTest::assertSubplanFromCache(QueryStageSubplanTest* test,
     WorkingSet ws;
     auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(test->opCtx(),
-                                test->serviceContext()->getFastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(test->opCtx(), test->serviceContext()->getFastClockSource());
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
@@ -347,8 +344,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDoesNotCacheZeroResults) {
 
     auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(
-        _expCtx->getOperationContext(), _clock, PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
@@ -404,8 +400,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     WorkingSet ws;
     auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(
-        _expCtx->getOperationContext(), _clock, PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
@@ -576,8 +571,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     WorkingSet ws;
     auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(
-        _expCtx->getOperationContext(), _clock, PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
     ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     size_t numResults = 0;
@@ -623,8 +617,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
     auto subplanStage = makeSubplanStage(coll, canonicalQuery.get(), workingSet);
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->getOperationContext(),
-                                                 serviceContext()->getFastClockSource(),
-                                                 PlanYieldPolicy::YieldThroughAcquisitions{});
+                                                 serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit,
               subplanStage->pickBestPlan(plannerParams, &alwaysTimeOutPolicy));
 }
@@ -650,10 +643,8 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     WorkingSet workingSet;
     auto subplanStage = makeSubplanStage(coll, canonicalQuery.get(), workingSet);
 
-    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(
-        _expCtx->getOperationContext(),
-        serviceContext()->getFastClockSource(),
-        PlanYieldPolicy::YieldThroughAcquisitions{});
+    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->getOperationContext(),
+                                                            serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled,
               subplanStage->pickBestPlan(plannerParams, &alwaysPlanKilledYieldPolicy));
 }
@@ -745,8 +736,7 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     auto subplanStage = makeSubplanStage(collection, canonicalQuery.get(), workingSet);
 
     NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(),
-                                serviceContext()->getFastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+                                serviceContext()->getFastClockSource());
     ASSERT_OK(subplanStage->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Mimic a yield by saving the state of the subplan stage and dropping our lock. Then drop

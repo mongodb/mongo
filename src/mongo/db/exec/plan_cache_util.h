@@ -77,7 +77,7 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
  */
 void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionAcquisition& collection,
     const CanonicalQuery& query,
     NumReads numReads,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
@@ -90,7 +90,7 @@ void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
  */
 void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionAcquisition& collection,
     const CanonicalQuery& query,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates);
@@ -147,7 +147,7 @@ struct NoopPlanCacheWriter {
  */
 struct ClassicPlanCacheWriter {
     ClassicPlanCacheWriter(OperationContext* opCtx,
-                           const VariantCollectionPtrOrAcquisition& collection,
+                           const CollectionAcquisition& collection,
                            bool executeInSbe)
         : _opCtx(opCtx), _collection(collection), _executeInSbe(executeInSbe) {}
 
@@ -158,7 +158,7 @@ struct ClassicPlanCacheWriter {
 
 protected:
     OperationContext* _opCtx;
-    VariantCollectionPtrOrAcquisition _collection;
+    CollectionAcquisition _collection;
     bool _executeInSbe;
 };
 
@@ -193,7 +193,7 @@ public:
 
     ConditionalClassicPlanCacheWriter(Mode planCachingMode,
                                       OperationContext* opCtx,
-                                      const VariantCollectionPtrOrAcquisition& collection,
+                                      const CollectionAcquisition& collection,
                                       bool executeInSbe)
         : ClassicPlanCacheWriter(opCtx, collection, executeInSbe),
           _planCachingMode{planCachingMode} {}

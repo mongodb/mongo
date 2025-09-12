@@ -492,7 +492,7 @@ public:
                     internalQueryNumChunksForChunkBasedSampling.load());
             } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
                 exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
-                    getCollections().getMainCollection(), *_cq, _opCtx);
+                    getCollections().getMainCollectionAcquisition(), *_cq, _opCtx);
             }
 
             // Populating the 'topLevelSampleFields' requires 2 steps:
@@ -730,8 +730,8 @@ private:
     }
 
     PlanCacheKey buildPlanCacheKey() const override {
-        return plan_cache_key_factory::make<PlanCacheKey>(*_cq,
-                                                          getCollections().getMainCollection());
+        return plan_cache_key_factory::make<PlanCacheKey>(
+            *_cq, getCollections().getMainCollectionAcquisition());
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildCachedPlan(
@@ -1025,7 +1025,8 @@ public:
 
 private:
     PlanCacheKey buildPlanCacheKey() const override {
-        return plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collections.getMainCollection());
+        return plan_cache_key_factory::make<PlanCacheKey>(
+            *_cq, _collections.getMainCollectionAcquisition());
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> tryToBuildCachedPlanFromClassicCache(
@@ -1183,7 +1184,7 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     const MultipleCollectionAccessor& collections,
     const QueryPlannerParams& plannerParams) {
     if (plannerParams.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto collFilter = collections.getMainCollectionPtrOrAcquisition().getShardingFilter(opCtx);
+        auto collFilter = collections.getMainCollectionPtrOrAcquisition().getShardingFilter();
         invariant(collFilter,
                   "Attempting to use shard filter when there's no shard filter available for "
                   "the collection");
@@ -1860,7 +1861,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             expCtx,
             std::move(ws),
             std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
-            &CollectionPtr::null,
+            boost::none,
             policy,
             false, /* whether owned BSON must be returned */
             nss);
@@ -2006,7 +2007,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::move(root),
-                                           &CollectionPtr::null,
+                                           boost::none,
                                            yieldPolicy,
                                            false, /* whether we must return owned BSON */
                                            cq->getFindCommandRequest().getNamespaceOrUUID().nss());
@@ -2014,7 +2015,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     // Can't encode plan cache key for non-existent collections. Add plan cache key information to
     // curOp here so both FastCountStage and multi-planner codepaths properly populate it.
-    auto planCache = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll.getCollectionPtr());
+    auto planCache = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
     setOpDebugPlanCacheInfo(opCtx,
                             PlanCacheInfo{.planCacheKey = planCache.planCacheKeyHash(),
                                           .planCacheShapeHash = planCache.planCacheShapeHash()});
@@ -2037,7 +2038,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::move(root),
-                                           &CollectionPtr::null,
+                                           boost::none,
                                            yieldPolicy,
                                            false, /* whether we must returned owned BSON */
                                            cq->getFindCommandRequest().getNamespaceOrUUID().nss());

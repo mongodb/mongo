@@ -189,13 +189,6 @@ struct WrapInOptionalIfNeeded<T> {
     using type = T;
 };
 
-/**
- * The overloads below provide ways for the iterator classes to interact with a CollectionType
- * object that may be either a CollectionAcquisition or a CollectionPtr.
- *
- * TODO SERVER-76397: Once all PlanExecutors use CollectionAcquisition exclusively, these adapaters
- * won't be necessary.
- */
 inline const CollectionAcquisition& unwrapCollection(
     const boost::optional<CollectionAcquisition>& collectionAcquisition) {
     tassert(8375913,
@@ -204,41 +197,13 @@ inline const CollectionAcquisition& unwrapCollection(
     return *collectionAcquisition;
 }
 
-inline const CollectionPtr* unwrapCollection(const CollectionPtr* collectionPtr) {
-    tassert(8375912,
-            "Access to invalided plan: plan is not yet open or is yielded",
-            collectionPtr != nullptr);
-    return collectionPtr;
-}
-
-inline const Collection& accessCollection(const CollectionPtr* collectionPtr) {
-    return *collectionPtr->get();
-}
-
 inline const Collection& accessCollection(const CollectionAcquisition& collectionAcquisition) {
     return *collectionAcquisition.getCollectionPtr().get();
-}
-
-inline const CollectionPtr& accessCollectionPtr(const CollectionPtr* collectionPtr) {
-    return *collectionPtr;
 }
 
 inline const CollectionPtr& accessCollectionPtr(
     const CollectionAcquisition& collectionAcquisition) {
     return collectionAcquisition.getCollectionPtr();
-}
-
-inline void prepareForCollectionInvalidation(CollectionPtr const*& referenceToCollectionPtr) {
-    // Any caller holding a raw pointer to a CollectionPtr should destroy that pointer before any
-    // operation that can invalidate it in order to avoid the bad practice of storing a dangling
-    // pointer.
-    referenceToCollectionPtr = nullptr;
-}
-
-inline void prepareForCollectionInvalidation(const boost::optional<CollectionAcquisition>&) {
-    // When collection resources are released, an associated CollectionAcquisition that was valid
-    // before the release becomes valid again after the collection is restored, so it is safe to
-    // leave the CollectionAcquisition as is.
 }
 
 inline void checkRestoredCollection(OperationContext* opCtx,
@@ -266,16 +231,6 @@ inline void checkRestoredCollection(OperationContext* opCtx,
 }
 
 inline void restoreInvalidatedCollection(OperationContext* opCtx,
-                                         CollectionPtr const*& referenceToCollectionPtr,
-                                         const CollectionPtr* restoredCollectionPtr,
-                                         const UUID& expectedUUID,
-                                         const NamespaceString& expectedNss) {
-
-    checkRestoredCollection(opCtx, *restoredCollectionPtr, expectedUUID, expectedNss);
-    referenceToCollectionPtr = restoredCollectionPtr;
-}
-
-inline void restoreInvalidatedCollection(OperationContext* opCtx,
                                          const boost::optional<CollectionAcquisition>& collAcq,
                                          const CollectionPtr*,
                                          const UUID& expectedUUID,
@@ -283,46 +238,6 @@ inline void restoreInvalidatedCollection(OperationContext* opCtx,
 
     const auto& collPtr = collAcq->getCollectionPtr();
     checkRestoredCollection(opCtx, collPtr, expectedUUID, expectedNss);
-}
-
-template <class Callable>
-void temporarilyYieldCollection(OperationContext* opCtx,
-                                const CollectionPtr* collection,
-                                Callable whileYieldedCallback) {
-
-    tassert(8375910,
-            "Cannot yield inside a write unit of work",
-            !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-
-    collection->yield();
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
-    opCtx->checkForInterrupt();
-
-    Locker* locker = shard_role_details::getLocker(opCtx);
-    Locker::LockSnapshot lockSnapshot;
-    locker->saveLockStateAndUnlock(&lockSnapshot);
-
-    // All PlanExecutor resources are now free.
-    CurOp::get(opCtx)->yielded();  // Count the yield in the operation's metrics.
-    whileYieldedCallback();  // Perform any work that we intended to do while resources are yielded.
-
-    // Keep trying to recover the yielded resources until we succeed or encounter an
-    // unrecoverable error.
-    for (int attempt = 1; true; ++attempt) {
-        try {
-            locker->restoreLockState(opCtx, lockSnapshot);
-            collection->restore();
-
-            return;
-        } catch (const StorageUnavailableException& exception) {
-            logAndRecordWriteConflictAndBackoff(opCtx,
-                                                attempt,
-                                                "query yield"_sd,
-                                                exception.reason(),
-                                                NamespaceStringOrUUID(NamespaceString::kEmpty));
-        }
-    }
 }
 
 template <class Callable>
@@ -392,20 +307,12 @@ PlanProgress recoverFromNonFatalWriteException(
  * unique, so the iterator will produce at most one document.
  *
  * The iterator owns the resources associated with the collection it iterates.
- *
- * TODO SERVER-76397: The CollectionType template parameter allows the iterator to hold collection
- * resources as either a <const CollectionPtr*> or a <const CollectionAcquisition>. Once
- * PlanExecutors use CollectionAcquisition exclusively, this parameter will no longer need to be
- * templated.
  */
-template <class CollectionType>
 class IdLookupViaIndex {
 public:
-    using CollectionTypeChoice = CollectionType;
-
     IdLookupViaIndex(const BSONObj& queryFilter) : _queryFilter(queryFilter.getOwned()) {}
 
-    void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
         _indexCatalogEntry =
             IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(collection));
         _collection = std::move(collection);
@@ -472,7 +379,6 @@ public:
     };
 
     void releaseResources() {
-        prepareForCollectionInvalidation(_collection);
         _indexCatalogEntry = nullptr;
     }
 
@@ -513,7 +419,7 @@ private:
 
     BSONObj _queryFilter;  // Owned BSON.
 
-    typename WrapInOptionalIfNeeded<CollectionType>::type _collection{};
+    typename WrapInOptionalIfNeeded<CollectionAcquisition>::type _collection{};
     boost::optional<UUID> _collectionUUID;
     uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
@@ -527,21 +433,13 @@ private:
  * so the iterator will produce at most one document.
  *
  * The iterator owns the resources associated with the collection it iterates.
- *
- * TODO SERVER-76397: The CollectionType template parameter allows the iterator to hold collection
- * resources as either a <const CollectionPtr*> or a <const CollectionAcquisition>. Once
- * PlanExecutors use CollectionAcquisition exclusively, this class will no longer need to be
- * templated.
  */
-template <class CollectionType>
 class IdLookupOnClusteredCollection {
 public:
-    using CollectionTypeChoice = CollectionType;
-
     IdLookupOnClusteredCollection(const BSONObj& queryFilter)
         : _queryFilter(queryFilter.getOwned()) {}
 
-    void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
         _collection = std::move(collection);
         _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
@@ -585,9 +483,7 @@ public:
         return _exhausted;
     };
 
-    void releaseResources() {
-        prepareForCollectionInvalidation(_collection);
-    }
+    void releaseResources() {}
 
     void restoreResources(OperationContext* opCtx,
                           const CollectionPtr* collection,
@@ -611,7 +507,7 @@ public:
 private:
     BSONObj _queryFilter;  // Owned BSON.
 
-    typename WrapInOptionalIfNeeded<CollectionType>::type _collection{};
+    typename WrapInOptionalIfNeeded<CollectionAcquisition>::type _collection{};
     boost::optional<UUID> _collectionUUID;
     uint64_t _catalogEpoch{0};
 
@@ -620,10 +516,9 @@ private:
     IteratorStats* _stats{nullptr};
 };
 
-template <typename CollectonType>
 struct CreateDocumentFromIndexKey {
     bool operator()(OperationContext* opCtx,
-                    const CollectonType& _,
+                    const CollectionAcquisition& _,
                     const IndexCatalogEntry* indexCatalogEntry,
                     const SortedDataKeyValueView& keyEntry,
                     const projection_ast::Projection* projection,
@@ -666,10 +561,9 @@ struct CreateDocumentFromIndexKey {
     }
 };
 
-template <typename CollectonType>
 struct FetchFromCollectionCallback {
     bool operator()(OperationContext* opCtx,
-                    const CollectonType& collection,
+                    const CollectionAcquisition& collection,
                     const IndexCatalogEntry* _,
                     const SortedDataKeyValueView& keyEntry,
                     const projection_ast::Projection* projection,
@@ -691,17 +585,10 @@ struct FetchFromCollectionCallback {
  * documents.
  *
  * The iterator owns the resources associated with the collection it iterates.
- *
- * TODO SERVER-76397: The CollectionType template parameter allows the iterator to hold collection
- * resources as either a <const CollectionPtr*> or a <const CollectionAcquisition>. Once
- * PlanExecutors use CollectionAcquisition exclusively, this class will no longer need to be
- * templated.
  */
-template <class CollectionType, class FetchCallback>
+template <class FetchCallback>
 class LookupViaUserIndex {
 public:
-    using CollectionTypeChoice = CollectionType;
-
     LookupViaUserIndex(const BSONElement& filterValue,
                        std::string indexIdent,
                        std::string indexName,
@@ -713,7 +600,7 @@ public:
           _collator(collator),
           _projection(projection) {}
 
-    void open(OperationContext* opCtx, CollectionType collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
             opCtx, accessCollection(collection), _indexIdent, _indexName);
         _collection = std::move(collection);
@@ -725,7 +612,7 @@ public:
         _stats->setIndexName(_indexName);
         _stats->setIndexKeyPattern(
             KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
-        if constexpr (std::is_same_v<FetchCallback, CreateDocumentFromIndexKey<CollectionType>>) {
+        if constexpr (std::is_same_v<FetchCallback, CreateDocumentFromIndexKey>) {
             _stats->setProjectionCovered(true);
         }
     }
@@ -812,7 +699,6 @@ public:
     };
 
     void releaseResources() {
-        prepareForCollectionInvalidation(_collection);
         _indexCatalogEntry = nullptr;
     }
 
@@ -859,7 +745,7 @@ private:
     const std::string _indexIdent;
     const std::string _indexName;
 
-    typename WrapInOptionalIfNeeded<CollectionType>::type _collection{};
+    typename WrapInOptionalIfNeeded<CollectionAcquisition>::type _collection{};
     boost::optional<UUID> _collectionUUID;
     uint64_t _catalogEpoch{0};
     const IndexCatalogEntry* _indexCatalogEntry{nullptr};  // Unowned.
@@ -1372,8 +1258,6 @@ template <class IteratorChoice,
           class ProjectionChoice>
 class ExpressPlan {
 public:
-    using CollectionType = typename IteratorChoice::CollectionTypeChoice;
-
     ExpressPlan(IteratorChoice iterator,
                 WriteOperationChoice writeOperation,
                 ShardFilterChoice shardFilter,
@@ -1384,7 +1268,7 @@ public:
           _projection(std::move(projection)) {}
 
     void open(OperationContext* opCtx,
-              CollectionType collection,
+              CollectionAcquisition collection,
               const ExceptionRecoveryPolicy* exceptionRecoveryPolicy,
               PlanStats* planStats,
               IteratorStats* iteratorStats,

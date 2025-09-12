@@ -410,7 +410,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     auto planCache =
         CollectionQueryInfo::get(collectionsAccessor.getMainCollection()).getPlanCache();
     auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(
-        *cq.get(), collectionsAccessor.getMainCollection());
+        *cq.get(), collectionsAccessor.getMainCollectionAcquisition());
 
     // At first, there is no entry for the plan cache key.
     ASSERT_EQ(planCache->get(planCacheKey).state, PlanCache::CacheEntryState::kNotPresent);

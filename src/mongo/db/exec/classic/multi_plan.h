@@ -87,7 +87,7 @@ public:
      * does not interact with either the classic or SBE plan caches directly.
      */
     MultiPlanStage(ExpressionContext* expCtx,
-                   VariantCollectionPtrOrAcquisition collection,
+                   CollectionAcquisition collection,
                    CanonicalQuery* cq,
                    OnPickBestPlan onPickBestPlan,
                    boost::optional<std::string> replanReason = boost::none);

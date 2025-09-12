@@ -47,20 +47,11 @@ void populateShardFiltererSlot(OperationContext* opCtx,
                                sbe::value::SlotId shardFiltererSlot,
                                const MultipleCollectionAccessor& collections) {
     auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
-        if (collections.isAcquisition()) {
-            const auto& acquisition = collections.getMainCollectionAcquisition();
-            tassert(7900701,
-                    "Setting shard filterer slot on un-sharded collection",
-                    acquisition.getShardingDescription().isSharded());
-            return std::make_unique<ShardFiltererImpl>(*acquisition.getShardingFilter());
-        } else {
-            const auto& collection = collections.getMainCollection();
-            tassert(6108307,
-                    "Setting shard filterer slot on un-sharded collection",
-                    collection.isSharded_DEPRECATED());
-            ShardFiltererFactoryImpl shardFiltererFactory(collection);
-            return shardFiltererFactory.makeShardFilterer(opCtx);
-        }
+        const auto& acquisition = collections.getMainCollectionAcquisition();
+        tassert(7900701,
+                "Setting shard filterer slot on un-sharded collection",
+                acquisition.getShardingDescription().isSharded());
+        return std::make_unique<ShardFiltererImpl>(*acquisition.getShardingFilter());
     }();
     env.resetSlot(shardFiltererSlot,
                   sbe::value::TypeTags::shardFilterer,

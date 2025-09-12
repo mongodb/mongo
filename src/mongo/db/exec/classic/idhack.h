@@ -59,13 +59,13 @@ public:
     IDHackStage(ExpressionContext* expCtx,
                 CanonicalQuery* query,
                 WorkingSet* ws,
-                VariantCollectionPtrOrAcquisition collection,
+                CollectionAcquisition collection,
                 const IndexDescriptor* descriptor);
 
     IDHackStage(ExpressionContext* expCtx,
                 const BSONObj& key,
                 WorkingSet* ws,
-                VariantCollectionPtrOrAcquisition collection,
+                CollectionAcquisition collection,
                 const IndexDescriptor* descriptor);
 
     ~IDHackStage() override;

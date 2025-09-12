@@ -62,69 +62,6 @@
 
 namespace mongo {
 
-// TODO: SERVER-76397 Remove this once we use CollectionAcquisition everywhere.
-class VariantCollectionPtrOrAcquisition {
-public:
-    VariantCollectionPtrOrAcquisition(const CollectionPtr* collectionPtr)
-        : _collectionPtrOrAcquisition(collectionPtr) {}
-    VariantCollectionPtrOrAcquisition(CollectionAcquisition collection)
-        : _collectionPtrOrAcquisition(collection) {}
-
-    const std::variant<const CollectionPtr*, CollectionAcquisition>& get() {
-        return _collectionPtrOrAcquisition;
-    };
-
-    const CollectionPtr& getCollectionPtr() const;
-
-    bool isCollectionPtr() const {
-        return holds_alternative<const CollectionPtr*>(_collectionPtrOrAcquisition);
-    }
-
-    bool isAcquisition() const {
-        return holds_alternative<CollectionAcquisition>(_collectionPtrOrAcquisition);
-    }
-
-    const CollectionAcquisition& getAcquisition() const {
-        return std::get<CollectionAcquisition>(_collectionPtrOrAcquisition);
-    }
-
-    boost::optional<ScopedCollectionFilter> getShardingFilter(OperationContext* opCtx) const;
-
-    const NamespaceString& nss() const {
-        return std::visit([](const auto& choice) -> const NamespaceString& { return nss(choice); },
-                          _collectionPtrOrAcquisition);
-    }
-
-    const RecordStore* getRecordStore() const {
-        return std::visit(
-            [](const auto& choice) -> const RecordStore* { return recordStore(choice); },
-            _collectionPtrOrAcquisition);
-    }
-
-    bool exists() const {
-        return static_cast<bool>(getCollectionPtr());
-    }
-
-private:
-    static const NamespaceString& nss(const CollectionPtr* collectionPtr) {
-        return (*collectionPtr)->ns();
-    }
-
-    static const NamespaceString& nss(const CollectionAcquisition& acquisition) {
-        return acquisition.nss();
-    }
-
-    static const RecordStore* recordStore(const CollectionPtr* collectionPtr) {
-        return (*collectionPtr)->getRecordStore();
-    }
-
-    static const RecordStore* recordStore(const CollectionAcquisition& acquisition) {
-        return acquisition.getCollectionPtr()->getRecordStore();
-    }
-
-    std::variant<const CollectionPtr*, CollectionAcquisition> _collectionPtrOrAcquisition;
-};
-
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
  * waiting for new data as soon as the committed op time changes.
@@ -568,13 +505,6 @@ public:
      * Sets whether the executor needs to return owned data.
      */
     virtual void setReturnOwnedData(bool returnOwnedData) {};
-
-    /** TODO: SERVER-76397 Remove this once we use acquisitions everywhere.
-     *
-     * Returns whether the plan executor uses shard role acquisitions or the legacy
-     * CollectionPtr/AutoGet approach.
-     */
-    virtual bool usesCollectionAcquisitions() const = 0;
 
     virtual bool isUsingDistinctScan() const {
         return false;

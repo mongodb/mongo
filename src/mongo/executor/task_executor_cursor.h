@@ -192,12 +192,6 @@ public:
         _options.yieldPolicy = std::move(yieldPolicy);
     }
 
-    void setYieldable(const Yieldable* yieldable) {
-        if (_options.yieldPolicy && !_options.yieldPolicy->usesCollectionAcquisitions()) {
-            _options.yieldPolicy->setYieldable(yieldable);
-        }
-    }
-
     PlanYieldPolicy* getYieldPolicy() {
         return _options.yieldPolicy.get();
     }

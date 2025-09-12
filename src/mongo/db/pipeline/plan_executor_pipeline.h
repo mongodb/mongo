@@ -205,10 +205,6 @@ public:
 
     PlanExecutor::QueryFramework getQueryFramework() const final;
 
-    bool usesCollectionAcquisitions() const final {
-        return true;
-    }
-
 private:
     /**
      * Obtains the next document from the underlying Pipeline, and does change streams-related

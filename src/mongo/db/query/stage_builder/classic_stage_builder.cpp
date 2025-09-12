@@ -364,7 +364,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
                 auto childStage = build(fn->children[0].get());
 
-                auto shardFilterer = _collection.getShardingFilter(_opCtx);
+                auto shardFilterer = _collection.getShardingFilter();
                 invariant(
                     shardFilterer,
                     "Attempting to use shard filter when there's no shard filter available for "
@@ -383,7 +383,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
 
                 std::unique_ptr<ShardFiltererImpl> shardFilterer;
                 if (dn->isShardFiltering) {
-                    auto shardingFilter = _collection.getShardingFilter(_opCtx);
+                    auto shardingFilter = _collection.getShardingFilter();
                     tassert(
                         9245806,
                         "Attempting to use shard filter when there's no shard filter available for "

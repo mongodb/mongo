@@ -38,20 +38,11 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
     PlanYieldPolicy::YieldPolicy policy,
     const MultipleCollectionAccessor& collections,
     NamespaceString nss) {
-
-    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
-    if (collections.isAcquisition()) {
-        yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
-    } else {
-        yieldable = &collections.getMainCollection();
-    }
-
     return make(opCtx,
                 policy,
                 &opCtx->fastClockSource(),
                 internalQueryExecYieldIterations.load(),
                 Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                yieldable,
                 std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
 }
 
@@ -61,27 +52,19 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
     ClockSource* clockSource,
     int yieldFrequency,
     Milliseconds yieldPeriod,
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks) {
     return std::unique_ptr<PlanYieldPolicySBE>(new PlanYieldPolicySBE(
-        opCtx, policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)));
+        opCtx, policy, clockSource, yieldFrequency, yieldPeriod, std::move(callbacks)));
 }
 
-PlanYieldPolicySBE::PlanYieldPolicySBE(
-    OperationContext* opCtx,
-    YieldPolicy policy,
-    ClockSource* clockSource,
-    int yieldFrequency,
-    Milliseconds yieldPeriod,
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-    std::unique_ptr<YieldPolicyCallbacks> callbacks)
-    : PlanYieldPolicy(opCtx,
-                      policy,
-                      clockSource,
-                      yieldFrequency,
-                      yieldPeriod,
-                      yieldable,
-                      std::move(callbacks)) {
+PlanYieldPolicySBE::PlanYieldPolicySBE(OperationContext* opCtx,
+                                       YieldPolicy policy,
+                                       ClockSource* clockSource,
+                                       int yieldFrequency,
+                                       Milliseconds yieldPeriod,
+                                       std::unique_ptr<YieldPolicyCallbacks> callbacks)
+    : PlanYieldPolicy(
+          opCtx, policy, clockSource, yieldFrequency, yieldPeriod, std::move(callbacks)) {
     uassert(4822879,
             "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
             policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);

@@ -176,12 +176,12 @@ MultiPlanRateLimiter& MultiPlanRateLimiter::get(ServiceContext* serviceContext) 
 }
 
 MultiPlanTicketManager MultiPlanRateLimiter::getTicketManager(OperationContext* opCtx,
-                                                              const CollectionPtr& coll,
+                                                              const CollectionAcquisition& coll,
                                                               const CanonicalQuery& cq,
                                                               size_t numCandidatePlans) {
     auto key = plan_cache_key_factory::make<PlanCacheKey>(cq, coll).toString();
-    auto ticketHolder =
-        ticketTableDecoration(coll.get())->get(opCtx->getServiceContext(), key, numCandidatePlans);
+    auto ticketHolder = ticketTableDecoration(coll.getCollectionPtr().get())
+                            ->get(opCtx->getServiceContext(), key, numCandidatePlans);
     return MultiPlanTicketManager{std::move(ticketHolder), opCtx};
 }
 

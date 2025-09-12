@@ -211,9 +211,7 @@ public:
             _expCtx.get(), collection, &_ws, cq, decisionWorks, std::move(mockChild));
 
         // This should succeed after triggering a replan.
-        NoopYieldPolicy yieldPolicy(&_opCtx,
-                                    _opCtx.getServiceContext()->getFastClockSource(),
-                                    PlanYieldPolicy::YieldThroughAcquisitions{});
+        NoopYieldPolicy yieldPolicy(&_opCtx, _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(plannerParams, &yieldPolicy));
     }
 
@@ -245,7 +243,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollectionPtr()).getPlanCache();
@@ -264,9 +262,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
         _expCtx.get(), collection, &_ws, cq.get(), decisionWorks, std::move(mockChild));
 
     // This should succeed after triggering a replan.
-    NoopYieldPolicy yieldPolicy(&_opCtx,
-                                _opCtx.getServiceContext()->getFastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(&_opCtx, _opCtx.getServiceContext()->getFastClockSource());
     ASSERT_OK(cachedPlanStage.pickBestPlan(plannerParams, &yieldPolicy));
 
     ASSERT_EQ(getNumResultsForStage(_ws, &cachedPlanStage, cq.get()), 2U);
@@ -294,7 +290,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollectionPtr()).getPlanCache();
@@ -316,9 +312,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
         _expCtx.get(), collection, &_ws, cq.get(), decisionWorks, std::move(mockChild));
 
     // This should succeed after triggering a replan.
-    NoopYieldPolicy yieldPolicy(&_opCtx,
-                                _opCtx.getServiceContext()->getFastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(&_opCtx, _opCtx.getServiceContext()->getFastClockSource());
     ASSERT_OK(cachedPlanStage.pickBestPlan(plannerParams, &yieldPolicy));
 
     ASSERT_EQ(getNumResultsForStage(_ws, &cachedPlanStage, cq.get()), 2U);
@@ -343,8 +337,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
-    auto planCacheKey =
-        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollectionPtr());
+    auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection);
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
@@ -410,8 +403,7 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
-    auto planCacheKey =
-        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollectionPtr());
+    auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection);
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
@@ -433,11 +425,9 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     forceReplanning(collection, noResultsCq.get());
 
     // The works should be 1 for the entry since the query we ran should not have any results.
-    ASSERT_EQ(cache
-                  ->get(plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq,
-                                                                   collection.getCollectionPtr()))
-                  .state,
-              PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(
+        cache->get(plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq, collection)).state,
+        PlanCache::CacheEntryState::kPresentActive);
     auto entry = assertGet(cache->getEntry(planCacheKey));
     size_t works = 1U;
     ASSERT_TRUE(entry->readsOrWorks);
@@ -483,14 +473,12 @@ TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
-    auto planCacheKey =
-        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollectionPtr());
+    auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection);
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 11}, b: {$gte: 11}}"));
-    auto noResultKey =
-        plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq, collection.getCollectionPtr());
+    auto noResultKey = plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq, collection);
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollectionPtr()).getPlanCache();
@@ -602,9 +590,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAfterP
                                     decisionWorks,
                                     std::make_unique<MockStage>(_expCtx.get(), &_ws));
 
-    NoopYieldPolicy yieldPolicy(&_opCtx,
-                                _opCtx.getServiceContext()->getFastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(&_opCtx, _opCtx.getServiceContext()->getFastClockSource());
     ASSERT_OK(cachedPlanStage.pickBestPlan(plannerParams, &yieldPolicy));
 
     // Drop an index while the CachedPlanStage is in a saved state. We should be able to restore

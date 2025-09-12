@@ -218,19 +218,19 @@ sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
 }  // namespace
 
 PlanCacheKey make(const CanonicalQuery& query,
-                  const CollectionPtr& collection,
+                  const CollectionAcquisition& collection,
                   PlanCacheKeyTag<PlanCacheKey> tag) {
     auto shapeString = canonical_query_encoder::encodeClassic(query);
     return {
         plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                 query.getPrimaryMatchExpression(),
-                                                collection,
+                                                collection.getCollectionPtr(),
                                                 query.getExpCtx()->getQuerySettings()),
     };
 }
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
-                       const CollectionPtr& collection,
+                       const CollectionAcquisition& collection,
                        PlanCacheKeyTag<sbe::PlanCacheKey> tag) {
     return plan_cache_key_factory::make(query, MultipleCollectionAccessor(collection));
 }

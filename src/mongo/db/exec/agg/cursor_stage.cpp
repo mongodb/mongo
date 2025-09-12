@@ -179,11 +179,8 @@ void CursorStage::doForceSpill() {
         return;
     }
     auto opCtx = pExpCtx->getOperationContext();
-    std::unique_ptr<PlanYieldPolicy> yieldPolicy =
-        PlanYieldPolicyReleaseMemory::make(opCtx,
-                                           PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                           boost::none,
-                                           _sharedState->exec->nss());
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = PlanYieldPolicyReleaseMemory::make(
+        opCtx, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, _sharedState->exec->nss());
     _sharedState->exec->forceSpill(yieldPolicy.get());
 }
 

@@ -45,6 +45,8 @@
 #include "mongo/db/local_catalog/index_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/server_options.h"
@@ -343,20 +345,30 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         return Status::OK();
     };
 
-    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl;
+    boost::optional<CollectionAcquisition> collectionAcquisition;
     try {
-        autoColl.emplace(
+        collectionAcquisition = acquireCollectionMaybeLockFree(
             opCtx,
-            collNss,
-            AutoGetCollection::Options{}.deadline(waitForLock ? Date_t::max() : Date_t::now()));
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    collNss,
+                                                    AcquisitionPrerequisites::kRead,
+                                                    waitForLock ? Date_t::max() : Date_t::now()));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
         return failed(ex);
     } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>& ex) {
         return failed(ex);
     }
 
-    const auto& collection = autoColl->getCollection();  // Will be set if present
-    const bool isTimeseries = collection && collection->getTimeseriesOptions().has_value();
+    AutoStatsTracker statsTracker(opCtx,
+                                  collNss,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(collNss.dbName()));
+
+    const auto& collectionPtr =
+        collectionAcquisition->getCollectionPtr();  // Will be set if present
+    const bool isTimeseries = collectionPtr && collectionPtr->getTimeseriesOptions().has_value();
 
     // We decided the requested namespace was a time series view, so we redirected to the underlying
     // buckets collection. However, when we tried to acquire that collection, it did not exist or it
@@ -364,7 +376,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     // between the two calls. Logically, the collection that we were looking for does not exist.
     bool logicallyNotFound = collNss != nss && !isTimeseries;
 
-    if (!collection || logicallyNotFound) {
+    if (!collectionPtr || logicallyNotFound) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
         result->appendNumber("numOrphanDocs", 0);
@@ -410,7 +422,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         switch (group) {
             case StorageStatsGroups::kRecordStatsField:
                 _appendRecordStats(opCtx,
-                                   collection,
+                                   collectionPtr,
                                    collNss,
                                    serializationCtx,
                                    nss.isNamespaceAlwaysUntracked(),
@@ -419,13 +431,13 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                                    result);
                 break;
             case StorageStatsGroups::kRecordStoreField:
-                _appendRecordStore(opCtx, collection, verbose, scale, numericOnly, result);
+                _appendRecordStore(opCtx, collectionPtr, verbose, scale, numericOnly, result);
                 break;
             case StorageStatsGroups::kInProgressIndexesField:
-                _appendInProgressIndexesStats(opCtx, collection, scale, result);
+                _appendInProgressIndexesStats(opCtx, collectionPtr, scale, result);
                 break;
             case StorageStatsGroups::kTotalSizeField:
-                _appendTotalSize(opCtx, collection, verbose, scale, result);
+                _appendTotalSize(opCtx, collectionPtr, verbose, scale, result);
                 break;
         }
     }
@@ -435,13 +447,22 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 Status appendCollectionRecordCount(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    BSONObjBuilder* result) {
-    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
-    if (!collection) {
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+    AutoStatsTracker statsTracker(opCtx,
+                                  nss,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
+    if (!collection.exists()) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection [" << nss.toStringForErrorMsg() << "] not found."};
     }
 
-    result->appendNumber("count", static_cast<long long>(collection->numRecords(opCtx)));
+    result->appendNumber("count",
+                         static_cast<long long>(collection.getCollectionPtr()->numRecords(opCtx)));
 
     return Status::OK();
 }

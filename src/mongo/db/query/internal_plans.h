@@ -94,7 +94,7 @@ public:
      */
     struct CreateCollectionScanParams {
         OperationContext* opCtx;
-        VariantCollectionPtrOrAcquisition collection;
+        CollectionAcquisition collection;
         PlanYieldPolicy::YieldPolicy yieldPolicy;
         Direction direction = FORWARD;
         const boost::optional<RecordId>& resumeAfterRecordId = boost::none;
@@ -126,7 +126,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
-        const VariantCollectionPtrOrAcquisition& collection,
+        const CollectionAcquisition& collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
         const boost::optional<RecordId>& resumeAfterRecordId = boost::none,
@@ -141,7 +141,7 @@ public:
 
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
-        const VariantCollectionPtrOrAcquisition& collection,
+        const CollectionAcquisition& collection,
         const CollectionScanParams& params,
         PlanYieldPolicy::YieldPolicy yieldPolicy);
 
@@ -168,7 +168,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> indexScan(
         OperationContext* opCtx,
-        const VariantCollectionPtrOrAcquisition& collection,
+        const CollectionAcquisition& collection,
         const IndexDescriptor* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,
@@ -200,7 +200,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> shardKeyIndexScan(
         OperationContext* opCtx,
-        const VariantCollectionPtrOrAcquisition& collection,
+        const CollectionAcquisition& collection,
         const ShardKeyIndex& shardKeyIdx,
         const BSONObj& startKey,
         const BSONObj& endKey,
@@ -247,7 +247,7 @@ private:
     static std::unique_ptr<PlanStage> _collectionScan(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
-        const VariantCollectionPtrOrAcquisition& coll,
+        const CollectionAcquisition& coll,
         Direction direction,
         const boost::optional<RecordId>& resumeAfterRecordId = boost::none,
         const boost::optional<RecordId>& minRecord = boost::none,
@@ -256,7 +256,7 @@ private:
     static std::unique_ptr<PlanStage> _collectionScan(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
-        const VariantCollectionPtrOrAcquisition& coll,
+        const CollectionAcquisition& coll,
         const CollectionScanParams& params,
         const MatchExpression* filter = nullptr);
 
@@ -268,7 +268,7 @@ private:
     static std::unique_ptr<PlanStage> _indexScan(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
-        const VariantCollectionPtrOrAcquisition& collection,
+        const CollectionAcquisition& collection,
         const IndexDescriptor* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,

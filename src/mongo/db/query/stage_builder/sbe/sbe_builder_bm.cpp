@@ -157,8 +157,7 @@ void BM_Simple(benchmark::State& state) {
                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                 &opCtx->fastClockSource(),
                                                 0,
-                                                Milliseconds::zero(),
-                                                PlanYieldPolicy::YieldThroughAcquisitions{});
+                                                Milliseconds::zero());
 
     for (auto _ : state) {
         auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(

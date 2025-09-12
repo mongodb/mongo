@@ -165,7 +165,7 @@ class PlanExecutorExpress final : public PlanExecutor {
 public:
     PlanExecutorExpress(OperationContext* opCtx,
                         std::unique_ptr<CanonicalQuery> cq,
-                        typename Plan::CollectionType coll,
+                        CollectionAcquisition coll,
                         Plan plan,
                         const express::ExceptionRecoveryPolicy* recoveryPolicy,
                         bool returnOwnedBson);
@@ -300,10 +300,6 @@ public:
         _mustReturnOwnedBson = returnOwnedData;
     }
 
-    bool usesCollectionAcquisitions() const override {
-        return std::is_same_v<std::decay_t<typename Plan::CollectionType>, CollectionAcquisition>;
-    }
-
     const Plan& getPlan() const {
         return _plan;
     }
@@ -355,7 +351,7 @@ template <class Plan>
 PlanExecutorExpress<Plan>::PlanExecutorExpress(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    typename Plan::CollectionType collection,
+    CollectionAcquisition collection,
     Plan plan,
     const express::ExceptionRecoveryPolicy* recoveryPolicy,
     bool returnOwnedBson)
@@ -483,7 +479,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     IteratorChoice iterator,
     WriteOperationChoice writeOperation,
     std::unique_ptr<CanonicalQuery> cq,
-    typename IteratorChoice::CollectionTypeChoice coll,
+    CollectionAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
     using ShardFilterForRead = std::variant<express::NoShardFilter, ScopedCollectionFilter>;
@@ -555,70 +551,59 @@ bool isExactMatchOnId(const BSONObj& queryObj) {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindById(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    CollectionAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
-    return std::visit(
-        [&](auto collectionAlternative) {
-            BSONObj queryFilter;
-            // We can use the original BSON command if the shape of the command was exactly {_id:
-            // <value>}. Note that if the value of the '_id' field was an object with operators, we
-            // will only reach this code if there is one operator and that operator is $eq. (We
-            // check this during IDHACK/EXRESS eligibility checks.)
-            if (isExactMatchOnId(cq->getQueryObj())) {
-                queryFilter = cq->getQueryObj();
-            } else {
-                ComparisonMatchExpressionBase* me =
-                    dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
-                tassert(10269301, "Invalid match expression", me);
-                queryFilter = me->getData().wrap("_id");
-            }
+    BSONObj queryFilter;
+    // We can use the original BSON command if the shape of the command was exactly {_id:
+    // <value>}. Note that if the value of the '_id' field was an object with operators, we
+    // will only reach this code if there is one operator and that operator is $eq. (We
+    // check this during IDHACK/EXRESS eligibility checks.)
+    if (isExactMatchOnId(cq->getQueryObj())) {
+        queryFilter = cq->getQueryObj();
+    } else {
+        ComparisonMatchExpressionBase* me =
+            dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+        tassert(10269301, "Invalid match expression", me);
+        queryFilter = me->getData().wrap("_id");
+    }
 
-            return makeExpressExecutor(
-                opCtx,
-                express::IdLookupViaIndex<decltype(collectionAlternative)>(queryFilter),
-                express::NoWriteOperation(),
-                std::move(cq),
-                collectionAlternative,
-                std::move(collectionFilter),
-                returnOwnedBson);
-        },
-        coll.get());
+    return makeExpressExecutor(opCtx,
+                               express::IdLookupViaIndex(queryFilter),
+                               express::NoWriteOperation(),
+                               std::move(cq),
+                               coll,
+                               std::move(collectionFilter),
+                               returnOwnedBson);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByClusteredId(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    CollectionAcquisition coll,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
-    return std::visit(
-        [&](auto collectionAlternative) {
-            BSONObj queryFilter;
-            // We can use the original BSON command if the shape of the command was exactly {_id:
-            // <value>}. Note that if the value of the '_id' field was an object with operators, we
-            // will only reach this code if there is one operator and that operator is $eq. (We
-            // check this during IDHACK/EXRESS eligibility checks.)
-            if (isExactMatchOnId(cq->getQueryObj())) {
-                queryFilter = cq->getQueryObj();
-            } else {
-                ComparisonMatchExpressionBase* me =
-                    dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
-                tassert(10269302, "Invalid match expression", me);
-                queryFilter = me->getData().wrap("_id");
-            }
+    BSONObj queryFilter;
+    // We can use the original BSON command if the shape of the command was exactly {_id:
+    // <value>}. Note that if the value of the '_id' field was an object with operators, we
+    // will only reach this code if there is one operator and that operator is $eq. (We
+    // check this during IDHACK/EXRESS eligibility checks.)
+    if (isExactMatchOnId(cq->getQueryObj())) {
+        queryFilter = cq->getQueryObj();
+    } else {
+        ComparisonMatchExpressionBase* me =
+            dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+        tassert(10269302, "Invalid match expression", me);
+        queryFilter = me->getData().wrap("_id");
+    }
 
-            return makeExpressExecutor(
-                opCtx,
-                express::IdLookupOnClusteredCollection<decltype(collectionAlternative)>(
-                    queryFilter),
-                express::NoWriteOperation(),
-                std::move(cq),
-                collectionAlternative,
-                std::move(collectionFilter),
-                returnOwnedBson);
-        },
-        coll.get());
+    return makeExpressExecutor(opCtx,
+                               express::IdLookupOnClusteredCollection(queryFilter),
+                               express::NoWriteOperation(),
+                               std::move(cq),
+                               coll,
+                               std::move(collectionFilter),
+                               returnOwnedBson);
 }
 
 std::ostream& operator<<(std::ostream& stream, const IndexForExpressEquality& i) {
@@ -629,7 +614,7 @@ std::ostream& operator<<(std::ostream& stream, const IndexForExpressEquality& i)
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindByUserIndex(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    VariantCollectionPtrOrAcquisition coll,
+    CollectionAcquisition coll,
     const IndexForExpressEquality& indexForExpressEquality,
     boost::optional<ScopedCollectionFilter> collectionFilter,
     bool returnOwnedBson) {
@@ -644,42 +629,32 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
                         index.toString()),
             indexDescriptor);
 
-    return std::visit(
-        [&](auto collectionAlternative) {
-            const CollatorInterface* collator = cq->getCollator();
-            const projection_ast::Projection* projection = cq->getProj();
-            auto cmpExpr =
-                dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
-            tassert(10269303, "Invalid match expression", cmpExpr);
-            BSONElement queryFilter = cmpExpr->getData();
+    const CollatorInterface* collator = cq->getCollator();
+    const projection_ast::Projection* projection = cq->getProj();
+    auto cmpExpr = dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+    tassert(10269303, "Invalid match expression", cmpExpr);
+    BSONElement queryFilter = cmpExpr->getData();
 
-            using CollectionType = decltype(collectionAlternative);
+    const auto expressExecutorFactor = [&]<typename FetchCallback>() {
+        return makeExpressExecutor(
+            opCtx,
+            express::LookupViaUserIndex<FetchCallback>(queryFilter,
+                                                       indexDescriptor->getEntry()->getIdent(),
+                                                       index.identifier.catalogName,
+                                                       collator,
+                                                       projection),
+            express::NoWriteOperation(),
+            std::move(cq),
+            coll,
+            std::move(collectionFilter),
+            returnOwnedBson);
+    };
 
-            const auto expressExecutorFactor = [&]<typename FetchCallback>() {
-                return makeExpressExecutor(
-                    opCtx,
-                    express::LookupViaUserIndex<CollectionType, FetchCallback>(
-                        queryFilter,
-                        indexDescriptor->getEntry()->getIdent(),
-                        index.identifier.catalogName,
-                        collator,
-                        projection),
-                    express::NoWriteOperation(),
-                    std::move(cq),
-                    collectionAlternative,
-                    std::move(collectionFilter),
-                    returnOwnedBson);
-            };
-
-            if (coversProjection) {
-                return expressExecutorFactor
-                    .template operator()<express::CreateDocumentFromIndexKey<CollectionType>>();
-            } else {
-                return expressExecutorFactor
-                    .template operator()<express::FetchFromCollectionCallback<CollectionType>>();
-            }
-        },
-        coll.get());
+    if (coversProjection) {
+        return expressExecutorFactor.template operator()<express::CreateDocumentFromIndexKey>();
+    } else {
+        return expressExecutorFactor.template operator()<express::FetchFromCollectionCallback>();
+    }
 }
 
 
@@ -712,8 +687,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
 
     const UpdateRequest* request = parsedUpdate->getRequest();
 
-    using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
-                                  express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
+    using Iterator =
+        std::variant<express::IdLookupViaIndex, express::IdLookupOnClusteredCollection>;
     auto iterator = [&]() -> Iterator {
         BSONObj queryFilter = getQueryFilterMaybeUnwrapEq(request->getQuery());
 
@@ -726,9 +701,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
         bool isClusteredOnId =
             clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
         if (isClusteredOnId) {
-            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(queryFilter);
+            return express::IdLookupOnClusteredCollection(queryFilter);
         } else {
-            return express::IdLookupViaIndex<CollectionAcquisition>(queryFilter);
+            return express::IdLookupViaIndex(queryFilter);
         }
     }();
 
@@ -772,8 +747,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
     OperationContext* opCtx, CollectionAcquisition collection, ParsedDelete* parsedDelete) {
     const DeleteRequest* request = parsedDelete->getRequest();
 
-    using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
-                                  express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
+    using Iterator =
+        std::variant<express::IdLookupViaIndex, express::IdLookupOnClusteredCollection>;
     auto iterator = [&]() -> Iterator {
         BSONObj queryFilter = getQueryFilterMaybeUnwrapEq(request->getQuery());
         tassert(9248804,
@@ -785,9 +760,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
         bool isClusteredOnId =
             clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
         if (isClusteredOnId) {
-            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(queryFilter);
+            return express::IdLookupOnClusteredCollection(queryFilter);
         } else {
-            return express::IdLookupViaIndex<CollectionAcquisition>(queryFilter);
+            return express::IdLookupViaIndex(queryFilter);
         }
     }();
 

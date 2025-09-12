@@ -103,13 +103,12 @@ protected:
     }
 
     PlanCacheKey makeClassicKey(const CanonicalQuery& cq) {
-        return plan_cache_key_factory::make<PlanCacheKey>(cq, _collectionAcq->getCollectionPtr());
+        return plan_cache_key_factory::make<PlanCacheKey>(cq, *_collectionAcq);
     }
 
     sbe::PlanCacheKey makeSbeKey(const CanonicalQuery& cq) {
         ASSERT_TRUE(cq.isSbeCompatible());
-        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq,
-                                                               _collectionAcq->getCollectionPtr());
+        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq, *_collectionAcq);
     }
 
     Status clearIndexFilter(const std::string& cmdJson) {

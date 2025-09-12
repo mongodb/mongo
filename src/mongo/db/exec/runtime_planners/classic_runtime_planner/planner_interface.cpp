@@ -102,7 +102,6 @@ void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,
                                              projection_ast::Projection* projection,
                                              std::unique_ptr<DeleteStageParams> deleteStageParams) {
     invariant(_state == kNotInitialized);
-    invariant(collections().isAcquisition());
     invariant(collections().hasMainCollection());
     const auto& coll = collections().getMainCollectionAcquisition();
     const auto& collectionPtr = coll.getCollectionPtr();
@@ -156,7 +155,6 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
                                              projection_ast::Projection* projection,
                                              UpdateStageParams updateStageParams) {
     invariant(_state == kNotInitialized);
-    invariant(collections().isAcquisition());
     invariant(collections().hasMainCollection());
     const auto& request = parsedUpdate->getRequest();
     const bool isUpsert = updateStageParams.request->isUpsert();
@@ -217,12 +215,7 @@ void ClassicPlannerInterface::addCountStage(long long limit, long long skip) {
 }
 
 Status ClassicPlannerInterface::plan() {
-    auto classicTrialPolicy =
-        makeClassicYieldPolicy(opCtx(),
-                               _nss,
-                               _root.get(),
-                               yieldPolicy(),
-                               collections().getMainCollectionPtrOrAcquisition());
+    auto classicTrialPolicy = makeClassicYieldPolicy(opCtx(), _nss, _root.get(), yieldPolicy());
     if (auto status = doPlan(classicTrialPolicy.get()); !status.isOK()) {
         return status;
     }
@@ -235,21 +228,20 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     invariant(_state == kInitialized);
     _state = kDisposed;
-    return uassertStatusOK(
-        plan_executor_factory::make(opCtx(),
-                                    std::move(_plannerData.workingSet),
-                                    std::move(_root),
-                                    extractQuerySolution(),
-                                    std::move(canonicalQuery),
-                                    cq()->getExpCtx(),
-                                    collections().getMainCollectionPtrOrAcquisition(),
-                                    plannerOptions(),
-                                    std::move(_nss),
-                                    yieldPolicy(),
-                                    cachedPlanHash(),
-                                    std::move(_costBasedRankerResult),
-                                    std::move(_planStageQsnMap),
-                                    std::move(_cbrRejectedPlanStages)));
+    return uassertStatusOK(plan_executor_factory::make(opCtx(),
+                                                       std::move(_plannerData.workingSet),
+                                                       std::move(_root),
+                                                       extractQuerySolution(),
+                                                       std::move(canonicalQuery),
+                                                       cq()->getExpCtx(),
+                                                       collections().getMainCollectionAcquisition(),
+                                                       plannerOptions(),
+                                                       std::move(_nss),
+                                                       yieldPolicy(),
+                                                       cachedPlanHash(),
+                                                       std::move(_costBasedRankerResult),
+                                                       std::move(_planStageQsnMap),
+                                                       std::move(_cbrRejectedPlanStages)));
 }
 
 std::unique_ptr<PlanStage> ClassicPlannerInterface::buildExecutableTree(const QuerySolution& qs) {

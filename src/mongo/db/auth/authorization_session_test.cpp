@@ -105,7 +105,7 @@ public:
             plan_executor_factory::make(expCtx,
                                         std::move(workingSet),
                                         std::move(queuedDataStage),
-                                        &CollectionPtr::null,
+                                        boost::none,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT,
                                         nss));

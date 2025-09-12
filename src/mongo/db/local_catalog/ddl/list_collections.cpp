@@ -566,7 +566,7 @@ public:
                     plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                &CollectionPtr::null,
+                                                boost::none,
                                                 PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                 false, /* whether owned BSON must be returned */
                                                 cursorNss));

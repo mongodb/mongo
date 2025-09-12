@@ -48,39 +48,14 @@ class MultipleCollectionAccessor final {
 public:
     MultipleCollectionAccessor() = default;
 
-    MultipleCollectionAccessor(OperationContext* opCtx,
-                               const CollectionPtr* mainColl,
-                               const NamespaceString& mainCollNss,
-                               bool isAnySecondaryNamespaceAViewOrNotFullyLocal,
-                               const std::vector<NamespaceStringOrUUID>& secondaryExecNssList)
-        : _mainColl(mainColl),
-          _isAnySecondaryNamespaceAViewOrNotFullyLocal(isAnySecondaryNamespaceAViewOrNotFullyLocal),
-          _opCtx(opCtx) {
-        auto catalog = CollectionCatalog::get(opCtx);
-        for (const auto& secondaryNssOrUuid : secondaryExecNssList) {
-            auto readTimestamp =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
-            // We ignore the collection pointer returned as we don't need it.
-            catalog->establishConsistentCollection(opCtx, secondaryNssOrUuid, readTimestamp);
-            auto secondaryNss = catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUuid);
-
-            // Don't store secondaryNss if it is also the main nss.
-            if (secondaryNss != mainCollNss) {
-                _secondaryColls.emplace(secondaryNss,
-                                        catalog->lookupUUIDByNSS(opCtx, secondaryNss));
-            }
-        }
-    }
-
-    explicit MultipleCollectionAccessor(const CollectionPtr* mainColl) : _mainColl(mainColl) {}
-
-    explicit MultipleCollectionAccessor(const CollectionPtr& mainColl)
-        : MultipleCollectionAccessor(&mainColl) {}
-
     explicit MultipleCollectionAccessor(CollectionAcquisition mainAcq)
         : _mainAcq(CollectionOrViewAcquisition(std::move(mainAcq))) {}
 
     explicit MultipleCollectionAccessor(CollectionOrViewAcquisition mainAcq) : _mainAcq(mainAcq) {}
+
+    explicit MultipleCollectionAccessor(const boost::optional<CollectionOrViewAcquisition>& mainAcq)
+        : _mainAcq(mainAcq) {}
+
 
     MultipleCollectionAccessor(const CollectionOrViewAcquisition& mainAcq,
                                const CollectionOrViewAcquisitionMap& secondaryAcquisitions,
@@ -91,58 +66,39 @@ public:
               isAnySecondaryNamespaceAViewOrNotFullyLocal) {}
 
     bool hasMainCollection() const {
-        return (_mainColl && _mainColl->get()) || (_mainAcq && _mainAcq->collectionExists());
+        return _mainAcq && _mainAcq->collectionExists();
     }
 
     const CollectionPtr& getMainCollection() const {
-        return _mainAcq ? _mainAcq->getCollectionPtr() : *_mainColl;
+        return _mainAcq ? _mainAcq->getCollectionPtr() : CollectionPtr::null;
     }
 
     std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
-        if (isAcquisition()) {
-            return _getSecondaryAcquisitions();
-        } else {
-            return _getSecondaryCollectionsAutoGetters();
-        }
+        return _getSecondaryAcquisitions();
     }
 
     bool isAnySecondaryNamespaceAViewOrNotFullyLocal() const {
         return _isAnySecondaryNamespaceAViewOrNotFullyLocal;
     }
 
-    bool isAcquisition() const {
-        return bool(_mainAcq);
-    }
-
     const CollectionAcquisition& getMainCollectionAcquisition() const {
         return _mainAcq->getCollection();
     }
 
-    VariantCollectionPtrOrAcquisition getMainCollectionPtrOrAcquisition() const {
-        return isAcquisition() ? VariantCollectionPtrOrAcquisition(_mainAcq->getCollection())
-                               : VariantCollectionPtrOrAcquisition(_mainColl);
+    CollectionAcquisition getMainCollectionPtrOrAcquisition() const {
+        return CollectionAcquisition(_mainAcq->getCollection());
     }
 
     CollectionPtr lookupCollection(const NamespaceString& nss) const {
-        if (isAcquisition()) {
-            return _lookupCollectionAcquisitionAndGetCollPtr(nss);
-        } else {
-            return _lookupCollectionAutoGetters(nss);
-        }
+        return _lookupCollectionAcquisitionAndGetCollPtr(nss);
     }
 
     boost::optional<CollectionAcquisition> getCollectionAcquisitionFromUuid(const UUID uuid) const {
-        if (isAcquisition()) {
-            return _lookupCollectionAcquisition(uuid);
-        }
-        tasserted(9367602, "No collection acquisition with associated UUID");
-        return boost::none;
+        return _lookupCollectionAcquisition(uuid);
     }
 
     void clear() {
-        _mainColl = &CollectionPtr::null;
         _mainAcq.reset();
-        _secondaryColls.clear();
         _secondaryAcq.clear();
     }
 
@@ -164,20 +120,6 @@ private:
             // TODO(SERVER-103403): Investigate usage validity of
             // CollectionPtr::CollectionPtr_UNSAFE
             collMap.emplace(nss, CollectionPtr::CollectionPtr_UNSAFE(acq.getCollectionPtr().get()));
-        }
-        return collMap;
-    }
-
-    inline std::map<NamespaceString, CollectionPtr> _getSecondaryCollectionsAutoGetters() const {
-        std::map<NamespaceString, CollectionPtr> collMap;
-        for (const auto& [nss, uuid] : _secondaryColls) {
-            collMap.emplace(nss,
-                            uuid ? CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                                       _opCtx,
-                                       NamespaceStringOrUUID{nss.dbName(), *uuid},
-                                       shard_role_details::getRecoveryUnit(_opCtx)
-                                           ->getPointInTimeReadTimestamp())
-                                 : ConsistentCollection{});
         }
         return collMap;
     }
@@ -214,29 +156,9 @@ private:
         MONGO_UNREACHABLE_TASSERT(9367601);
     }
 
-    inline CollectionPtr _lookupCollectionAutoGetters(const NamespaceString& nss) const {
-        if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            return CollectionPtr::CollectionPtr_UNSAFE(_mainColl->get());
-        } else if (auto itr = _secondaryColls.find(nss);
-                   itr != _secondaryColls.end() && itr->second) {
-            auto timestamp =
-                shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
-            return CollectionPtr{CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                _opCtx, NamespaceStringOrUUID{nss.dbName(), *itr->second}, timestamp)};
-        }
-        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        return CollectionPtr::CollectionPtr_UNSAFE(nullptr);
-    }
-
     // Shard role api collection access.
     boost::optional<CollectionOrViewAcquisition> _mainAcq;
     CollectionOrViewAcquisitionMap _secondaryAcq;
-
-    // Manual collection access state
-    const CollectionPtr* _mainColl{&CollectionPtr::null};
-    stdx::unordered_map<NamespaceString, boost::optional<UUID>> _secondaryColls{};
 
     // Tracks whether any secondary namespace is a view or is not fully local based on
     // information captured at the time of AutoGet* object acquisition. This is used to

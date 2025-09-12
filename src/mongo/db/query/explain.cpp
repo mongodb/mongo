@@ -567,7 +567,7 @@ Explain::PlannerContext Explain::makePlannerContext(const PlanExecutor& exec,
             planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
         } else {
             const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
-                *exec.getCanonicalQuery(), collections.getMainCollection());
+                *exec.getCanonicalQuery(), collections.getMainCollectionAcquisition());
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
         }

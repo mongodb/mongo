@@ -55,7 +55,7 @@ FetchStage::FetchStage(ExpressionContext* expCtx,
                        WorkingSet* ws,
                        std::unique_ptr<PlanStage> child,
                        const MatchExpression* filter,
-                       VariantCollectionPtrOrAcquisition collection)
+                       CollectionAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _ws(ws),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),

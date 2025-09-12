@@ -681,7 +681,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
             return boost::none;
         }
         auto exec = InternalPlanner::collectionScan(opCtx.get(),
-                                                    &collectionAcquisition.getCollectionPtr(),
+                                                    collectionAcquisition,
                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                     InternalPlanner::Direction::FORWARD);
 

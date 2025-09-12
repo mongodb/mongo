@@ -68,7 +68,7 @@ Status ReleaseMemoryCmd::releaseMemory(OperationContext* opCtx, ClientCursorPin&
         std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr;
         if (exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
             yieldPolicy = PlanYieldPolicyReleaseMemory::make(
-                opCtx, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, boost::none, exec->nss());
+                opCtx, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, exec->nss());
         }
 
         exec->reattachToOperationContext(opCtx);

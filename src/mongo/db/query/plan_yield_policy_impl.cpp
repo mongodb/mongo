@@ -39,18 +39,15 @@
 
 namespace mongo {
 
-PlanYieldPolicyImpl::PlanYieldPolicyImpl(
-    OperationContext* opCtx,
-    PlanExecutorImpl* exec,
-    PlanYieldPolicy::YieldPolicy policy,
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-    std::unique_ptr<YieldPolicyCallbacks> callbacks)
+PlanYieldPolicyImpl::PlanYieldPolicyImpl(OperationContext* opCtx,
+                                         PlanExecutorImpl* exec,
+                                         PlanYieldPolicy::YieldPolicy policy,
+                                         std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,
                       &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                      yieldable,
                       std::move(callbacks)),
       _planYielding(exec) {}
 
@@ -70,32 +67,22 @@ PlanYieldPolicyClassicTrialPeriod::PlanYieldPolicyClassicTrialPeriod(
     OperationContext* opCtx,
     PlanStage* root,
     PlanYieldPolicy::YieldPolicy policy,
-    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,
                       &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                      yieldable,
                       std::move(callbacks)),
       _root(root) {}
 
 void PlanYieldPolicyClassicTrialPeriod::saveState(OperationContext* opCtx) {
     _root->saveState();
-
-    if (!usesCollectionAcquisitions()) {
-        setYieldable(nullptr);
-    }
 }
 
 void PlanYieldPolicyClassicTrialPeriod::restoreState(OperationContext* opCtx,
                                                      const Yieldable* yieldable,
                                                      RestoreContext::RestoreType restoreType) {
-    if (!usesCollectionAcquisitions()) {
-        setYieldable(yieldable);
-    }
-
     _root->restoreState({restoreType, dynamic_cast<const CollectionPtr*>(yieldable)});
 }
 

@@ -103,9 +103,7 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
         mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
     }
     // This is what sets a backup plan, should we test for it.
-    NoopYieldPolicy yieldPolicy(&opCtx,
-                                opCtx.getServiceContext()->getFastClockSource(),
-                                PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(&opCtx, opCtx.getServiceContext()->getFastClockSource());
     mps->pickBestPlan(&yieldPolicy).transitional_ignore();
     ASSERT(mps->bestPlanChosen());
     auto bestPlanIdx = mps->bestPlanIdx();

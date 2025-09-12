@@ -84,7 +84,7 @@ CEResult ExactCardinalityImpl::calculateExactCardinality(
     WorkingSet ws;
     WorkingSetID id = ws.allocate();
     auto root = stage_builder::buildClassicExecutableTree(
-        _opCtx, VariantCollectionPtrOrAcquisition(_coll), _cq, qs, &ws);
+        _opCtx, CollectionAcquisition(_coll), _cq, qs, &ws);
     while (!root->isEOF()) {
         root->work(&id);
     }

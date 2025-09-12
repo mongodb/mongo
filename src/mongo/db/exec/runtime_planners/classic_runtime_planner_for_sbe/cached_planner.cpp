@@ -314,10 +314,11 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromClassicCacheEntry::makePla
     // created.
     AllIndicesRequiredChecker indexExistenceChecker{_plannerData.collections};
     auto deactivateEntry = [](const PlannerData& plannerData) {
-        auto& collection = plannerData.collections.getMainCollection();
+        auto& collection = plannerData.collections.getMainCollectionAcquisition();
         auto classicCacheKey =
             plan_cache_key_factory::make<PlanCacheKey>(*plannerData.cq, collection);
-        auto classicPlanCache = CollectionQueryInfo::get(collection).getPlanCache();
+        auto classicPlanCache =
+            CollectionQueryInfo::get(collection.getCollectionPtr()).getPlanCache();
         size_t evictedCount = classicPlanCache->deactivate(classicCacheKey);
         planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
     };

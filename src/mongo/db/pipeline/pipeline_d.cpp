@@ -371,7 +371,7 @@ SortAndUnpackInPipeline findUnpackAndSort(const DocumentSourceContainer& sources
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRandomCursorExecutor(
-    const VariantCollectionPtrOrAcquisition& coll,
+    const CollectionAcquisition& coll,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* pipeline,
     long long sampleSize,
@@ -418,8 +418,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     }
 
     // Attempt to get a random cursor from the RecordStore.
-    auto rsRandCursor =
-        coll.getRecordStore()->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto rsRandCursor = coll.getCollectionPtr()->getRecordStore()->getRandomCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     if (!rsRandCursor) {
         // The storage engine has no random cursor support.
         return nullptr;
@@ -583,8 +583,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         auto classicTrialPolicy = makeClassicYieldPolicy(expCtx->getOperationContext(),
                                                          coll.nss(),
                                                          static_cast<PlanStage*>(trialStage),
-                                                         yieldPolicy,
-                                                         coll);
+                                                         yieldPolicy);
         if (auto status = trialStage->pickBestPlan(classicTrialPolicy.get()); !status.isOK()) {
             return status;
         }
@@ -631,14 +630,14 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
 PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
     DocumentSourceSample* sampleStage,
     DocumentSourceInternalUnpackBucket* unpackBucketStage,
-    const VariantCollectionPtrOrAcquisition& collection,
+    const CollectionAcquisition& collection,
     Pipeline* pipeline) {
     tassert(5422105, "sampleStage cannot be a nullptr", sampleStage);
 
     auto expCtx = pipeline->getContext();
 
     const long long sampleSize = sampleStage->getSampleSize();
-    const long long numRecords = collection.getRecordStore()->numRecords();
+    const long long numRecords = collection.getCollectionPtr()->getRecordStore()->numRecords();
 
     boost::optional<timeseries::BucketUnpacker> bucketUnpacker;
     if (unpackBucketStage) {

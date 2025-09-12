@@ -65,7 +65,7 @@ class OperationContext;
 class CollectionScan final : public RequiresCollectionStage {
 public:
     CollectionScan(ExpressionContext* expCtx,
-                   VariantCollectionPtrOrAcquisition collection,
+                   CollectionAcquisition collection,
                    const CollectionScanParams& params,
                    WorkingSet* workingSet,
                    const MatchExpression* filter);

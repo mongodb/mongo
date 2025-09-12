@@ -57,7 +57,7 @@ class RequiresCollectionStage : public PlanStage {
 public:
     RequiresCollectionStage(const char* stageType,
                             ExpressionContext* expCtx,
-                            VariantCollectionPtrOrAcquisition coll)
+                            CollectionAcquisition coll)
         : PlanStage(stageType, expCtx),
           _collection(coll),
           _collectionPtr(&coll.getCollectionPtr()),
@@ -82,7 +82,7 @@ protected:
      */
     virtual void doRestoreStateRequiresCollection() = 0;
 
-    const VariantCollectionPtrOrAcquisition& collection() const {
+    const CollectionAcquisition& collection() const {
         return _collection;
     }
 
@@ -104,7 +104,7 @@ private:
     // helper. It needs to stay valid until the PlanExecutor saves its state. To avoid this pointer
     // from dangling it needs to be reset when doRestoreState() is called and it is reset to a
     // different CollectionPtr.
-    VariantCollectionPtrOrAcquisition _collection;
+    CollectionAcquisition _collection;
     const CollectionPtr* _collectionPtr;
     const UUID _collectionUUID;
     const uint64_t _catalogEpoch;

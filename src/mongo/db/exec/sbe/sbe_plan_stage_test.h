@@ -352,8 +352,7 @@ protected:
             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
             operationContext()->getServiceContext()->getFastClockSource(),
             0,
-            Milliseconds::zero(),
-            &_yieldable);
+            Milliseconds::zero());
     }
 
 private:

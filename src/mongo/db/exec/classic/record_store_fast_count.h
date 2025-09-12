@@ -51,7 +51,7 @@ public:
     static const char* kStageType;
 
     RecordStoreFastCountStage(ExpressionContext* expCtx,
-                              VariantCollectionPtrOrAcquisition collection,
+                              CollectionAcquisition collection,
                               long long skip,
                               long long limit);
 

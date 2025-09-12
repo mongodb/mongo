@@ -64,7 +64,7 @@ MONGO_FAIL_POINT_DEFINE(throwDuringIndexScanRestore);
 const char* IndexScan::kStageType = "IXSCAN";
 
 IndexScan::IndexScan(ExpressionContext* expCtx,
-                     VariantCollectionPtrOrAcquisition collection,
+                     CollectionAcquisition collection,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)

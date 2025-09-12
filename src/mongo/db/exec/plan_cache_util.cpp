@@ -129,7 +129,7 @@ bool shouldCacheBasedOnQueryAndPlan(const CanonicalQuery& query, const QuerySolu
 
 void updateClassicPlanCacheFromClassicCandidatesImpl(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionAcquisition& collection,
     const CanonicalQuery& query,
     ReadsOrWorks readsOrWorks,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
@@ -149,7 +149,7 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
         return plan.toString();
     };
     PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
-        callbacks{query, buildDebugInfoFn, printCachedPlanFn, collection};
+        callbacks{query, buildDebugInfoFn, printCachedPlanFn, collection.getCollectionPtr()};
     winningPlan.solution->cacheData->indexFilterApplied = winningPlan.solution->indexFilterApplied;
     winningPlan.solution->cacheData->solutionHash = winningPlan.solution->hash();
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
@@ -157,7 +157,7 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
     auto key = plan_cache_key_factory::make<PlanCacheKey>(query, collection);
 
     size_t evictedCount = uassertStatusOK(
-        CollectionQueryInfo::get(collection)
+        CollectionQueryInfo::get(collection.getCollectionPtr())
             .getPlanCache()
             ->set(std::move(key),
                   winningPlan.solution->cacheData->clone(),
@@ -204,7 +204,7 @@ void updateSbePlanCache(OperationContext* opCtx,
 
 void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionAcquisition& collection,
     const CanonicalQuery& query,
     NumReads reads,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
@@ -217,7 +217,7 @@ void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
 
 void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionAcquisition& collection,
     const CanonicalQuery& query,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates) {
@@ -407,11 +407,11 @@ void ClassicPlanCacheWriter::operator()(const CanonicalQuery& cq,
         auto nReads = computeNumReadsFromStats(*stats, *ranking);
 
         updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
-            _opCtx, _collection.getCollectionPtr(), cq, nReads, std::move(ranking), candidates);
+            _opCtx, _collection, cq, nReads, std::move(ranking), candidates);
     } else {
         // We've been asked to write a works value, for classic execution.
         updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
-            _opCtx, _collection.getCollectionPtr(), cq, std::move(ranking), candidates);
+            _opCtx, _collection, cq, std::move(ranking), candidates);
     }
 }
 

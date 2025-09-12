@@ -99,9 +99,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _remoteExplains(std::move(remoteExplains)) {
     invariant(!_nss.isEmpty());
     invariant(_root);
-    if (mca.isAcquisition()) {
-        _root->attachCollectionAcquisition(mca);
-    }
+    _root->attachCollectionAcquisition(mca);
     auto& env = _rootData.env;
     if (auto slot = _rootData.staticData->resultSlot) {
         _result = _root->getAccessor(env.ctx, *slot);
@@ -183,24 +181,10 @@ void PlanExecutorSBE::saveState() {
     // method call.
     const bool discardSlotState = true;
     _root->saveState(discardSlotState);
-
-    if (_yieldPolicy && !_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(nullptr);
-    }
     _lastGetNext = BSONObj();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
-    if (_yieldPolicy && !_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(context.collection());
-    }
-
-    if (_remoteCursors) {
-        for (auto& [_, cursor] : *_remoteCursors) {
-            cursor->setYieldable(context.collection());
-        }
-    }
-
     _root->restoreState();
 }
 
@@ -457,10 +441,6 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
     }
 
     return {};
-}
-
-bool PlanExecutorSBE::usesCollectionAcquisitions() const {
-    return _yieldPolicy && _yieldPolicy->usesCollectionAcquisitions();
 }
 
 namespace {
