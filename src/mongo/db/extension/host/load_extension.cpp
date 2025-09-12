@@ -29,7 +29,6 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host_adapter/extension_handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
@@ -51,14 +50,8 @@
 
 namespace mongo::extension::host {
 namespace {
-
-const std::filesystem::path& getExtensionConfDir() {
-    // Use /tmp/mongo/extensions in test environments, otherwise use /etc/mongo/extensions.
-    static const std::filesystem::path kExtensionConfDir =
-        getTestCommandsEnabled() ? "/tmp/mongo/extensions" : "/etc/mongo/extensions";
-
-    return kExtensionConfDir;
-}
+// TODO SERVER-110326: Check if we are in a test environment. If so, use /tmp/mongo/extensions.
+static const std::filesystem::path kExtensionConfDir{"/etc/mongo/extensions"};
 
 void assertVersionCompatibility(const ::MongoExtensionAPIVersionVector* hostVersions,
                                 const ::MongoExtensionAPIVersion& extensionVersion) {
@@ -154,18 +147,13 @@ bool loadExtensions(const std::vector<std::string>& extensionPaths) {
 ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensionPath) {
     // TODO SERVER-110317: 'extensionPath' shouldn't represent a path anymore. We can omit the
     // truncation.
-    const auto confPath = getExtensionConfDir() /
+    const auto confPath = kExtensionConfDir /
         std::filesystem::path(extensionPath).filename().replace_extension(".conf");
-
-    // TODO SERVER-110634: Remove this once we have proper loading for tests in Evergreen.
+    // TODO SERVER-110326: Remove this once we have proper loading for tests.
     if (!std::filesystem::exists(confPath)) {
-        LOGV2(11032600,
-              "Could not find configuration file for extension, using default configuration",
-              "confPath"_attr = confPath.string());
         return ExtensionConfig{.sharedLibraryPath = extensionPath,
                                .extOptions = YAML::Node(YAML::NodeType::Map)};
     }
-
     uassert(11042900,
             str::stream() << "Loading extension '" << extensionPath
                           << "' failed: Expected configuration file not found at '"

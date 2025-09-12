@@ -86,13 +86,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {})
         )
-
-        self.load_all_extensions = load_all_extensions
-        if self.load_all_extensions:
-            self.fixturelib.load_all_extensions(
-                self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger
-            )
-
+        
+        if load_all_extensions:
+            self.fixturelib.load_all_extensions(self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger)
+        
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node
         self.electable_initial_sync_node = electable_initial_sync_node
@@ -468,12 +465,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         primary = self.nodes[0]
         client = primary.mongo_client()
         while True:
-            self.logger.info("Waiting for primary on port %d to be elected.", primary.port)
+            self.logger.info(
+                "Waiting for primary on port %d to be elected.", primary.port)
             cmd_result = client.admin.command("isMaster")
             if cmd_result["ismaster"]:
                 break
             time.sleep(0.1)  # Wait a little bit before trying again.
-        self.logger.info("Primary on port %d successfully elected.", primary.port)
+        self.logger.info(
+            "Primary on port %d successfully elected.", primary.port)
 
     def _await_secondaries(self):
         # Wait for the secondaries to become available.
@@ -682,9 +681,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def _do_teardown(self, mode=None):
         self.logger.info("Stopping all members of the replica set '%s'...", self.replset_name)
-
-        if self.load_all_extensions:
-            self.fixturelib.delete_extension_conf_dir()
 
         running_at_start = self.is_running()
         if not running_at_start:

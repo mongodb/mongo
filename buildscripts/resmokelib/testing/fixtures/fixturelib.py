@@ -2,11 +2,8 @@
 
 import glob
 import os
-import shutil
 from logging import Handler, Logger
 from typing import Dict, Optional
-
-import yaml
 
 from buildscripts.resmokelib import config, core, errors, logging, utils
 from buildscripts.resmokelib.core import network
@@ -140,87 +137,9 @@ class FixtureLib:
         original[self.SET_PARAMETERS_KEY] = merged_set_parameters
 
         return original
-
-    conf_out_dir = os.path.join(os.path.abspath(os.sep), "tmp", "mongo", "extensions")
-
-    def delete_extension_conf_dir(self):
-        """Delete the directory containing extension configuration files."""
-        try:
-            # Ignore errors if the directory does not exist.
-            shutil.rmtree(os.path.dirname(self.conf_out_dir), ignore_errors=True)
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to delete configuration directory {os.path.dirname(self.conf_out_dir)}"
-            ) from e
-
-    def generate_extension_configuration_files(
-        self,
-        so_files: list[str],
-        logger: logging.Logger,
-    ) -> list[str]:
-        """Return a list of extension names with configuration files generated."""
-        conf_in_path = os.path.join(
-            os.getcwd(), "src", "mongo", "db", "extension", "test_examples", "configurations.yml"
-        )
-        try:
-            with open(conf_in_path, "r") as fstream:
-                yml = yaml.safe_load(fstream)
-                logger.debug("Loaded test extensions' configuration file %s", conf_in_path)
-        except FileNotFoundError as e:
-            raise RuntimeError(
-                f"Cannot find test extensions' configuration file {conf_in_path}"
-            ) from e
-
-        extensions = yml.get("extensions") or {}
-        extension_names = []
-
-        for so_file in so_files:
-            # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
-            file_name = os.path.basename(so_file)
-            extension_name = os.path.splitext(file_name)[0]
-
-            # TODO SERVER-110634: Remove 'lib' prefix and '_mongo_extension' suffix from extension names.
-
-            # Add the parsed extension name to the list.
-            extension_names.append(extension_name)
-
-            conf_file_path = os.path.join(self.conf_out_dir, f"{extension_name}.conf")
-            try:
-                os.makedirs(os.path.dirname(conf_file_path), exist_ok=True)
-
-                # Create the configuration file for the extension.
-                with open(conf_file_path, "w+") as conf_file:
-                    # All extension configuration files will have a sharedLibrary path.
-                    conf_file.write(f"sharedLibraryPath: {so_file}\n")
-
-                    # Copy over extensionOptions if they exist.
-                    if ext_config := extensions.get(extension_name):
-                        yaml.dump(ext_config, conf_file)
-
-                    logger.debug(
-                        "Created configuration file for extension %s at %s",
-                        extension_name,
-                        conf_file_path,
-                    )
-            except (IOError, OSError) as e:
-                # Clean up created directories on failure.
-                self.delete_extension_conf_dir()
-                raise RuntimeError(
-                    f"Failed to create configuration file for extension {extension_name} at {conf_file_path}"
-                ) from e
-
-        return extension_names
-
-    def load_all_extensions(
-        self,
-        is_evergreen: bool,
-        mongod_options: dict,
-        logger: logging.Logger,
-        mongos_options: Optional[dict] = None,
-    ):
-        """Find extensions, generate configuration files, and add them to mongod/mongos startup parameters."""
+    
+    def load_all_extensions(self, is_evergreen: bool, mongod_options: dict, logger: logging.Logger, mongos_options: Optional[dict] = None):
         cwd = os.getcwd()
-
         if is_evergreen:
             search_dirs = [os.path.join(cwd, "dist-test", "lib")]
         else:
@@ -242,8 +161,6 @@ class FixtureLib:
 
         if so_files:
             logger.debug("Found extension files: %s", so_files)
-            # TODO SERVER-110634: Pass through extension names instead of paths to mongod/mongos.
-            self.generate_extension_configuration_files(so_files, logger)
             joined_files = ",".join(so_files)
             mongod_options["loadExtensions"] = joined_files
             if mongos_options is not None:
