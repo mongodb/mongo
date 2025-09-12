@@ -220,7 +220,7 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     if (!isRootedOr) {
         assertCbrExplain(w1);
         // Both explains must have the same number of rejected plans
-        assert.eq(r0.length, r1.length);
+        assert.eq(r0.length, r1.length, {r0: tojson(r0), r1: tojson(r1)});
     }
     r1.map((e) => assertCbrExplain(e));
 

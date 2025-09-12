@@ -995,8 +995,6 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     ExplainOptions::Verbosity verbosity) const {
     std::vector<PlanStatsDetails> res;
     auto mps = getMultiPlanStage(_root);
-    // Plan index
-    size_t i = 0;
     if (mps) {
         auto bestPlanIdx = mps->bestPlanIdx();
 
@@ -1005,7 +1003,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
 
         const auto mpsStats = mps->getStats();
         // Get the stats from the trial period for all the plans.
-        for (; i < mpsStats->children.size(); ++i) {
+        for (size_t i = 0; i < mpsStats->children.size(); ++i) {
             if (i != *bestPlanIdx) {
                 const auto& candidate = mps->getCandidate(i);
                 const auto candidateSolutionHash = candidate.solution->hash();
@@ -1055,7 +1053,6 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
         auto stats = rejectedPlan->getStats();
         statsToBSON(
             _planStageQsnMap, _cbrResult.estimates, *stats, verbosity, i, &bob, &bob, isCached);
-        ++i;
         res.push_back({bob.obj(), boost::none /*summary*/});
     }
 

@@ -64,6 +64,17 @@ function testQueryWithMultipleEnumeratedPlans() {
     assert.eq(2, allPlans.length);
 }
 
+function testQueryWithThreeEnumeratedPlans() {
+    const allPlans = explainAndRunAllPlans({
+        find: jsTestName(),
+        filter: {$and: [{a: {$gt: 0}}, {$or: [{b: 99}, {a: 2, b: {$lt: 10}}]}]},
+        sort: {b: 1},
+    });
+
+    // We should see a plan with a bounds on index a:1 and a plan with a sort on b:1.
+    assert.eq(3, allPlans.length);
+}
+
 function testNonMatchingHash() {
     // Command should fail if the forced solution hash doesn't match any candidate plan.
     assert.commandFailedWithCode(
@@ -110,6 +121,7 @@ try {
     originalParamValue = db.adminCommand({getParameter: 1, internalQueryAllowForcedPlanByHash: 1});
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryAllowForcedPlanByHash: true}));
 
+    testQueryWithThreeEnumeratedPlans();
     testQueryWithMultipleEnumeratedPlans();
     testNonMatchingHash();
     testSingleSolution();
