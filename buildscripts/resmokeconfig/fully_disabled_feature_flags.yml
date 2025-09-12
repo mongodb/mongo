@@ -28,7 +28,6 @@
 - featureFlagSessionsCollectionCoordinatorOnConfigServer
 # TODO (SERVER-101672) : Delete featureFlagOplogSamplingAsyncEnabled.
 - featureFlagOplogSamplingAsyncEnabled
-- featureFlagReplicateLocalCatalogIdentifiers
 # TODO (SERVER-108818): test primary-driven index builds in allFeatureFlag variant.
 - featureFlagPrimaryDrivenIndexBuilds
 # TODO SERVER-104494 SERVER-104258: Turn this back on once the issues are fixed.

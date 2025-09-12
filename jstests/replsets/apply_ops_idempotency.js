@@ -223,6 +223,18 @@ function testIdempotency(primary, testFun, testName) {
     assert.gt(ops.length, 0, "Could not find any matching ops in the oplog");
     testdbs.forEach((db) => assert.commandWorked(db.dropDatabase()));
 
+    // In actual initial sync, oplog application will never try to create a collection with an ident
+    // that is drop pending, as the first phase won't create and then drop the collection. Reapplying
+    // the same oplog to a database multiple times does, however. Rather than test something which
+    // doesn't happen in practice (and doesn't work), remove the replicated idents from the oplog we reapply.
+    // TODO(SERVER-107069): Once initial sync replicates idents we may want to reevaluate this. We
+    // could instead wait for pending drops to complete, but that significantly slows down this test (20s -> 200s).
+    for (let op of ops) {
+        if (op.op == "c") {
+            delete op.o2;
+        }
+    }
+
     if (debug) {
         print(testName + ": replaying suffixes of " + ops.length + " operations");
         printjson(ops);
