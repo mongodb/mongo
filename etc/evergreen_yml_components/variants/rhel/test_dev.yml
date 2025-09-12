@@ -441,3 +441,15 @@ buildvariants:
       - name: run_unit_tests_TG
         distros:
           - rhel8.8-xlarge
+
+  - name: &upload-sbom-if-changed upload-sbom-if-changed
+    display_name: "Upload SBOM if changed"
+    allowed_requesters: ["commit"]
+    tags: []
+    paths:
+      - "sbom.json"
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    tasks:
+      - name: upload_sbom_via_silkbomb_if_changed
