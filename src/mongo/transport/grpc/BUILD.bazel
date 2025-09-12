@@ -70,10 +70,7 @@ mongo_cc_library(
         "util.h",
         "wire_version_provider.h",
     ],
-    target_compatible_with = select({
-        "//bazel/config:build_grpc_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/mongo/client:connection_string",
         "//src/mongo/db:server_base",
@@ -101,10 +98,7 @@ mongo_cc_library(
     hdrs = [
         "async_client_factory.h",
     ],
-    target_compatible_with = select({
-        "//bazel/config:build_grpc_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         ":grpc_transport_layer",
         "//src/mongo/db:service_context",
@@ -178,10 +172,7 @@ mongo_cc_library(
     srcs = [
         ":grpc_parameters_gen",
     ],
-    target_compatible_with = select({
-        "//bazel/config:build_grpc_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",
@@ -287,15 +278,19 @@ mongo_cc_unit_test(
     srcs = [
         "core_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
-    target_compatible_with = select({
-        "//bazel/config:build_grpc_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
+    tags = [
+        "incompatible_with_bazel_remote_test",
+        "mongo_unittest_first_group",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH + select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
     }),
     deps = [
         "core_test_cc_grpc",
         "core_test_strip_prefix_cc_grpc",
         "//src/mongo:base",
+        "//src/third_party/abseil-cpp:absl_status",
         "//src/third_party/grpc:grpc++_reflection",
         "//src/third_party/protobuf",
     ],

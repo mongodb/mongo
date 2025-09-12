@@ -35,32 +35,45 @@
 
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include "cool/import/replacement/core_test_strip_prefix.grpc.pb.h"
+#include <absl/status/status.h>
 #include <grpcpp/grpcpp.h>
+#include <grpcpp/support/status.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
 namespace test {
+namespace {
+
+std::string grpcStatusCodeToString(grpc::StatusCode statusCode) {
+    // `absl::StatusCode` enumerates the same values as `grpc::StatusCode`, but `absl::StatusCode`
+    // is newer and has a string representation.
+    return absl::StatusCodeToString(absl::StatusCode(int(statusCode)));
+}
+
+}  // namespace
 
 class GreeterClient {
 public:
     GreeterClient(std::shared_ptr<grpc::Channel> channel) : _stub(Greeter::NewStub(channel)) {}
 
-    std::string sayHello(const std::string& user) {
+    std::tuple<grpc::Status, std::string> sayHello(const std::string& user) {
         grpc::ClientContext context;
         HelloReply reply;
         HelloRequest request;
         request.set_name(user);
         if (auto status = _stub->sayHello(&context, request, &reply); status.ok()) {
-            return reply.message();
+            return {status, reply.message()};
         } else {
             LOGV2_ERROR(7516103,
                         "RPC failed",
                         "code"_attr = status.error_code(),
+                        "codeName"_attr = grpcStatusCodeToString(status.error_code()),
                         "message"_attr = status.error_message());
-            return "RPC failed";
+            return {status, ""};
         }
     }
 
@@ -68,7 +81,7 @@ private:
     std::unique_ptr<Greeter::Stub> _stub;
 };
 
-std::string runClient(std::string serverAddress) {
+std::tuple<grpc::Status, std::string> runClient(std::string serverAddress) {
     LOGV2(7516102, "Client is connecting to the server");
     GreeterClient greeter(grpc::CreateChannel(serverAddress, grpc::InsecureChannelCredentials()));
     return greeter.sayHello("world");
@@ -99,10 +112,12 @@ TEST(GRPCCore, HelloWorld) {
         server->Wait();
     });
 
-    auto pf = makePromiseFuture<std::string>();
+    auto pf = makePromiseFuture<std::tuple<grpc::Status, std::string>>();
     stdx::thread clientThread(
         [&] { pf.promise.setWith([&] { return runClient(kServerAddress); }); });
-    ASSERT_EQ(pf.future.get(), "Hello world");
+    const auto& [grpcStatus, response] = pf.future.get();
+    ASSERT_EQ(grpcStatus.error_code(), grpc::StatusCode::OK);
+    ASSERT_EQ(response, "Hello world");
 
     server->Shutdown();
     clientThread.join();
