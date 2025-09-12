@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/traces/tracing.h"
+#include "mongo/otel/traces/span/span.h"
 
-#include "mongo/config.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/mock_exporter.h"
-#include "mongo/otel/traces/traceable.h"
-#include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
@@ -45,7 +44,7 @@ namespace {
 
 using namespace opentelemetry::sdk::trace;
 
-class SpanTest : public unittest::Test {
+class SpanTest : public ServiceContextTest {
 public:
     void setProvider() {
         auto uniqueExporter = std::make_unique<MockExporter>();
@@ -64,6 +63,7 @@ public:
     }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         setProvider();
     }
 
@@ -73,6 +73,7 @@ public:
     }
 
     void tearDown() override {
+        ServiceContextTest::tearDown();
         clearProvider();
     }
 
@@ -91,11 +92,16 @@ public:
         return mock;
     }
 
+    int getBaseAttributesSize() {
+        // We always set the "DROP_SPAN" attribute, so we expect at least one attribute.
+        return 1;
+    }
+
 protected:
     MockExporter* _mockExporter;
 };
 
-TEST_F(SpanTest, NoTraceableStartSpan) {
+TEST_F(SpanTest, NoOpCtxStartSpan) {
     {
         auto span = Span::start(nullptr, "firstSpan");
         TRACING_SPAN_ATTR(span, "test", 1);
@@ -115,9 +121,9 @@ TEST_F(SpanTest, NoTracerStartSpan) {
 }
 
 TEST_F(SpanTest, ExporterSingleSpan) {
-    traces::Traceable traceable;
+    auto opCtx = makeOperationContext();
     {
-        auto span = Span::start(&traceable, "firstSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
         ASSERT_TRUE(isEmpty());
     }
 
@@ -127,17 +133,16 @@ TEST_F(SpanTest, ExporterSingleSpan) {
 }
 
 TEST_F(SpanTest, ParentSpan) {
-    traces::Traceable traceable;
+    auto opCtx = makeOperationContext();
     {
-        auto span = Span::start(&traceable, "firstSpan");
-
-        auto secondSpan = Span::start(&traceable, "secondSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto secondSpan = Span::start(opCtx.get(), "secondSpan");
         ASSERT_TRUE(isEmpty());
     }
     ASSERT_FALSE(isEmpty());
 
     {
-        auto span = Span::start(&traceable, "thirdSpan");
+        auto span = Span::start(opCtx.get(), "thirdSpan");
     }
 
     auto firstRecord = getSpan(1, "firstSpan");
@@ -151,11 +156,11 @@ TEST_F(SpanTest, ParentSpan) {
 }
 
 TEST_F(SpanTest, SpanDepthThree) {
-    traces::Traceable traceable;
+    auto opCtx = makeOperationContext();
     {
-        auto span = Span::start(&traceable, "firstSpan");
-        auto secondSpan = Span::start(&traceable, "secondSpan");
-        auto thirdSpan = Span::start(&traceable, "thirdSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto secondSpan = Span::start(opCtx.get(), "secondSpan");
+        auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
 
         ASSERT_TRUE(isEmpty());
     }
@@ -172,40 +177,100 @@ TEST_F(SpanTest, SpanDepthThree) {
 }
 
 TEST_F(SpanTest, ParallelSpan) {
-    traces::Traceable traceable;
+    auto opCtx = makeOperationContext();
     {
-        auto span = Span::start(&traceable, "firstSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
 
-        traces::Traceable traceable2{traceable};
-        traces::Traceable traceable3{traceable};
-
-        auto secondSpan = Span::start(&traceable2, "secondSpan");
-        auto thirdSpan = Span::start(&traceable3, "thirdSpan");
-
-        ASSERT_TRUE(isEmpty());
+        {
+            auto secondSpan = Span::start(opCtx.get(), "secondSpan");
+        }
+        {
+            auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+        }
     }
 
     auto firstRecord = getSpan(2, "firstSpan");
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
 
-    auto secondRecord = getSpan(1, "secondSpan");
+    auto secondRecord = getSpan(1, "thirdSpan");
     ASSERT_EQ(secondRecord->parentId, firstRecord->context.span_id());
 
-    auto thirdRecord = getSpan(0, "thirdSpan");
+    auto thirdRecord = getSpan(0, "secondSpan");
     ASSERT_EQ(thirdRecord->parentId, firstRecord->context.span_id());
 }
 
-TEST_F(SpanTest, SetIntAttribute) {
-    Traceable t;
+TEST_F(SpanTest, AsyncSpan) {
+    auto opCtx = makeOperationContext();
     {
-        auto span = Span::start(&t, "firstSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto future = Future<void>::makeReady().then(
+            [telemetryCtx = TelemetryContextHolder::get(opCtx.get()).get()]() mutable {
+                auto span = Span::start(telemetryCtx, "secondSpan");
+            });
+        future.get();
+        auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+    }
+
+    auto firstRecord = getSpan(2, "firstSpan");
+    ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
+
+    auto secondRecord = getSpan(1, "thirdSpan");
+    ASSERT_EQ(secondRecord->parentId, firstRecord->context.span_id());
+
+    auto thirdRecord = getSpan(0, "secondSpan");
+    ASSERT_EQ(thirdRecord->parentId, firstRecord->context.span_id());
+}
+
+TEST_F(SpanTest, TestShouldDrop) {
+    auto opCtx = makeOperationContext();
+    {
+        auto span = Span::start(opCtx.get(), "firstSpan");
+
+        auto secondSpan = Span::start(opCtx.get(), "secondSpan", true);
+        auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+
+        ASSERT_TRUE(isEmpty());
+    }
+
+    auto firstRecord = getSpan(2, "firstSpan");
+    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize());
+    {
+        auto dropSpan = firstRecord->attributes.find("DROP_SPAN");
+        ASSERT_NE(dropSpan, firstRecord->attributes.end());
+        ASSERT_TRUE(absl::holds_alternative<bool>(dropSpan->second));
+        ASSERT_TRUE(static_cast<int>(absl::get<bool>(dropSpan->second)));
+    }
+
+    auto secondRecord = getSpan(1, "secondSpan");
+    ASSERT_EQ(secondRecord->attributes.size(), getBaseAttributesSize());
+    {
+        auto dropSpan = secondRecord->attributes.find("DROP_SPAN");
+        ASSERT_NE(dropSpan, secondRecord->attributes.end());
+        ASSERT_TRUE(absl::holds_alternative<bool>(dropSpan->second));
+        ASSERT_FALSE(static_cast<int>(absl::get<bool>(dropSpan->second)));
+    }
+
+    auto thirdRecord = getSpan(0, "thirdSpan");
+    ASSERT_EQ(thirdRecord->attributes.size(), getBaseAttributesSize());
+    {
+        auto dropSpan = thirdRecord->attributes.find("DROP_SPAN");
+        ASSERT_NE(dropSpan, thirdRecord->attributes.end());
+        ASSERT_TRUE(absl::holds_alternative<bool>(dropSpan->second));
+        ASSERT_FALSE(static_cast<int>(absl::get<bool>(dropSpan->second)));
+    }
+}
+
+TEST_F(SpanTest, SetIntAttribute) {
+    auto opCtx = makeOperationContext();
+    {
+        auto span = Span::start(opCtx.get(), "firstSpan");
         TRACING_SPAN_ATTR(span, "value1", 15);
         TRACING_SPAN_ATTR(span, "value2", 32);
     }
 
     auto firstRecord = getSpan(0, "firstSpan");
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), 2);
+    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize() + 2);
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kOk);
 
     auto value1 = firstRecord->attributes.find("value1");
@@ -220,15 +285,15 @@ TEST_F(SpanTest, SetIntAttribute) {
 }
 
 TEST_F(SpanTest, ErrorCode) {
-    Traceable t;
+    auto opCtx = makeOperationContext();
     {
-        auto span = Span::start(&t, "firstSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
         span.setStatus(Status{ErrorCodes::InternalError, "failed"});
     }
 
     auto firstRecord = getSpan(0, "firstSpan");
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), 1);
+    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize() + 1);
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kError);
 
     auto value1 = firstRecord->attributes.find("errorCode");
@@ -238,17 +303,32 @@ TEST_F(SpanTest, ErrorCode) {
 }
 
 TEST_F(SpanTest, SpanDuringException) {
-    Traceable t;
+    auto opCtx = makeOperationContext();
     try {
-        auto span = Span::start(&t, "firstSpan");
+        auto span = Span::start(opCtx.get(), "firstSpan");
         throw std::runtime_error{"testing"};
     } catch (const std::exception&) {
     }
 
     auto firstRecord = getSpan(0, "firstSpan");
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), 0);
+    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize());
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kError);
+}
+
+TEST_F(SpanTest, CreateTelemetryContext) {
+    auto telemetryCtx = Span::createTelemetryContext();
+    ASSERT_EQ(telemetryCtx->type(), "SpanTelemetryContextImpl");
+}
+
+TEST_F(SpanTest, StartWithTelemetryContextDoesNotCrash) {
+    // Using the base TelemetryContext class instead of SpanTelemetryContextImpl should not crash.
+    auto telemetryCtx = std::make_shared<TelemetryContext>();
+    {
+        auto span = Span::start(telemetryCtx, "firstSpan");
+        TRACING_SPAN_ATTR(span, "test", 1);
+    }
+    ASSERT_TRUE(isEmpty());
 }
 
 }  // namespace

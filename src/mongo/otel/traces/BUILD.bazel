@@ -2,8 +2,6 @@ load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_
 
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["traceable.h"])
-
 OTEL_TARGET_COMPATIBLE_WITH = select({
     "//bazel/config:build_otel_enabled": [],
     "//conditions:default": ["@platforms//:incompatible"],
@@ -27,36 +25,32 @@ idl_generator(
     ],
 )
 
-# Library for public facing tracing API used by the larger codebase. Files
+# This library is the base for both tracing and tracing_internal libraries. Files
 # included in this library must use ifdefs to provide no-op implementations if
 # MONGO_CONFIG_OTEL is not defined.
 mongo_cc_library(
+    name = "tracing_base",
+    hdrs = [
+        "span/span.h",
+        "trace_initialization.h",
+    ],
+)
+
+# Library for public facing tracing API used by the larger codebase.
+mongo_cc_library(
     name = "tracing",
     srcs = [
-        "trace_initialization.cpp",
-        "trace_settings_gen",
-        "tracing.cpp",
         ":tracing_feature_flag_gen",
     ],
-    hdrs = [
-        "trace_initialization.h",
-        "traceable.h",
-        "tracing.h",
-    ],
     deps = [
+        ":tracing_base",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/otel",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
                 ":tracing_internal",
-                "//src/third_party/opentelemetry-cpp/api",
-                "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
-                "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
-                "//src/third_party/opentelemetry-cpp/sdk/src/trace",
-                "//src/third_party/opentelemetry-proto:resource_proto_cc",
-                "//src/third_party/opentelemetry-proto:trace_proto_cc",
-                "//src/third_party/protobuf",
             ],
             "//conditions:default": [],
         },
@@ -70,17 +64,30 @@ mongo_cc_library(
     name = "tracing_internal",
     srcs = [
         "bson_text_map_carrier.cpp",
+        "span/span.cpp",
+        "span/span_telemetry_context_impl.cpp",
+        "trace_initialization.cpp",
+        "trace_settings_gen",
         "tracing_utils.cpp",
     ],
     hdrs = [
         "bson_text_map_carrier.h",
+        "span/span_telemetry_context_impl.h",
         "tracing_utils.h",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
+        ":tracing_base",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/otel",
         "//src/third_party/opentelemetry-cpp/api",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
+        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+        "//src/third_party/opentelemetry-proto:resource_proto_cc",
+        "//src/third_party/opentelemetry-proto:trace_proto_cc",
+        "//src/third_party/protobuf",
     ],
 )
 
@@ -90,8 +97,9 @@ mongo_cc_unit_test(
         "bson_text_map_carrier_test.cpp",
         "mock_exporter.cpp",
         "mock_exporter.h",
+        "span/span_telemetry_context_impl_test.cpp",
+        "span/span_test.cpp",
         "trace_initialization_test.cpp",
-        "tracing_test.cpp",
     ],
     tags = [
         "mongo_unittest_fourth_group",
@@ -100,6 +108,8 @@ mongo_cc_unit_test(
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":tracing",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )

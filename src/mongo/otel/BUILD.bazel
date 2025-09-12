@@ -1,0 +1,21 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+mongo_cc_library(
+    name = "otel",
+    srcs = [
+        "telemetry_context_holder.cpp",
+    ],
+    hdrs = [
+        "telemetry_context.h",
+        "telemetry_context_holder.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ],
+)

@@ -31,7 +31,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
-#include "mongo/otel/traces/traceable.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/otel/telemetry_context.h"
 
 #include <memory>
 
@@ -61,24 +62,30 @@ namespace traces {
 class Span {
     class SpanImpl;
 
-    /**
-     * Construction of Spans should be done through Span::start(traceable, name).
-     */
-    Span();
-    Span(std::unique_ptr<SpanImpl> impl);
-
 public:
     /**
-     * When tracing is enabled and a valid Traceable is provided, Span::start creates a valid Span.
-     * This Span becomes a child of the Traceable's active span (if it exists) and Span::start
-     * replaces the Traceable's context with the new Span's context.
-     *
-     * If Traceable is null or tracing is disabled, this returns an empty no-op span.
+     * Starts a new Span with the provided `name` and using the provided `telemetryCtx` to allow for
+     * propagation of parent-child relationships. The `keepSpan` parameter indicates whether this
+     * Span will be ingested by our Trace backend or dropped. It should only be set if you have
+     * confirmed it is valid to send the Span to the Trace backend.
      */
-    static Span start(Traceable* traceable, const std::string& name);
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                      const std::string& name,
+                      bool keepSpan = false);
+
+    /**
+     * Wrapper around the other start function. It will also fetch and store the current
+     * TelemetryContext from the provided OperationContext. This function is preferred when
+     * OperationContext is available so that the calling code does not have to manage its own
+     * TelemetryContext.
+     */
+    static Span start(OperationContext* opCtx, const std::string& name, bool keepSpan = false);
+
+    static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
     ~Span();
     Span& operator=(Span&&);
+    Span(Span&&);
 
     /**
      * Caller should use `TRACING_SPAN_ATTR` instead of calling `setAttribute` directly.
@@ -96,6 +103,11 @@ public:
 
 private:
     std::unique_ptr<SpanImpl> _impl;
+    /**
+     * Construction of Spans should be done through Span::start(traceable, name).
+     */
+    Span();
+    Span(std::unique_ptr<SpanImpl> impl);
 };
 
 #else
@@ -110,8 +122,17 @@ private:
  */
 class Span {
 public:
-    static Span start(Traceable* traceable, const std::string&) {
+    static Span start(OperationContext* opCtx, const std::string&, bool keepSpan = false) {
         return Span{};
+    }
+    static Span start(std::shared_ptr<TelemetryContext> telemetryCtx,
+                      const std::string& name,
+                      bool keepSpan = false) {
+        return Span{};
+    }
+
+    static std::shared_ptr<TelemetryContext> createTelemetryContext() {
+        return std::make_shared<TelemetryContext>();
     }
 
     void setAttribute(StringData, int) {}

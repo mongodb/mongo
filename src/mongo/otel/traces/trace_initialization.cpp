@@ -29,8 +29,6 @@
 
 #include "mongo/otel/traces/trace_initialization.h"
 
-#ifdef MONGO_CONFIG_OTEL
-
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/stdx/chrono.h"
@@ -141,5 +139,3 @@ void shutdown() {
 }  // namespace traces
 }  // namespace otel
 }  // namespace mongo
-
-#endif

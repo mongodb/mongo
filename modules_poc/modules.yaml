@@ -661,6 +661,7 @@ observability:
     - src/mongo/executor/split_timer*
     - src/mongo/util/observable_mutex*
     - src/mongo/watchdog/
+    - src/mongo/otel/
 
 observability.logging:
   meta:
