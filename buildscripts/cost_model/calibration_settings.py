@@ -460,6 +460,40 @@ qsn_nodes = [
             axis=1,
         ),
     ),
+    config.QsNodeCalibrationConfig(
+        name="SORT_LIMIT_SIMPLE",
+        type="SORT",
+        # Note: n_returned = min(limitAmount, n_processed)
+        variables_override=lambda df: pd.concat(
+            [
+                df["n_processed"],
+                (df["n_processed"] * np.log2(df["n_returned"])).rename(
+                    "n_processed * log2(n_returned)"
+                ),
+                (df["n_returned"] * np.log2(df["n_returned"])).rename(
+                    "n_returned * log2(n_returned)"
+                ),
+            ],
+            axis=1,
+        ),
+    ),
+    config.QsNodeCalibrationConfig(
+        name="SORT_LIMIT_DEFAULT",
+        type="SORT",
+        # Note: n_returned = min(limitAmount, n_processed)
+        variables_override=lambda df: pd.concat(
+            [
+                df["n_processed"],
+                (df["n_processed"] * np.log2(df["n_returned"])).rename(
+                    "n_processed * log2(n_returned)"
+                ),
+                (df["n_returned"] * np.log2(df["n_returned"])).rename(
+                    "n_returned * log2(n_returned)"
+                ),
+            ],
+            axis=1,
+        ),
+    ),
     config.QsNodeCalibrationConfig(type="LIMIT"),
     config.QsNodeCalibrationConfig(
         type="SKIP",

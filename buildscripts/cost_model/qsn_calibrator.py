@@ -132,7 +132,17 @@ def calibrate_node(
 
             ax.legend()
         else:
-            raise ValueError(f"Currently only support 1 or 2 input variables, got {n_vars}")
+            # For 3 variables or more, we just plot the predicted vs actual execution time
+            y_pred = model.predict(X)
+            fig, ax = plt.subplots()
+            ax.scatter(y_pred, y, alpha=0.6)
+            min_val = min(y.min(), y_pred.min())
+            max_val = max(y.max(), y_pred.max())
+            ax.plot([min_val, max_val], [min_val, max_val], "r--", lw=2)
+            ax.set_xlabel("Predicted Execution Time (ns)")
+            ax.set_ylabel("Actual Execution Time (ns)")
+            ax.set_title(f"Predicted vs Actual for {node_name}")
+            plt.tight_layout()
 
         if fig:
             fig.savefig(f"{node_name}.png")

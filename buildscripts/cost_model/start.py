@@ -233,7 +233,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
 
 async def execute_sorts(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     # Using collections of varying sizes instead of limits, as the limit + sort combination
-    # would trigger the optimized top-N sorting algorithm, which requires separate calibration.
+    # would trigger the optimized top-K sorting algorithm, which is calibrated separately below.
     collections = [c for c in collections if c.name.startswith("sort")]
 
     requests = [
@@ -245,6 +245,23 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
             note="SORT_DEFAULT",
         ),
     ]
+
+    # By combining a sort with a limit, we trigger the top-K sorting algorithm, which works
+    # for both the simple and default sort algorithms.
+    limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
+    for limit in limits:
+        requests.append(Query({"sort": {"payload": 1}, "limit": limit}, note="SORT_LIMIT_SIMPLE"))
+        requests.append(
+            Query(
+                {
+                    "projection": {"$recordId": {"$meta": "recordId"}},
+                    "sort": {"payload": 1},
+                    "limit": limit,
+                },
+                note="SORT_LIMIT_DEFAULT",
+            )
+        )
+
     await workload_execution.execute(
         database, main_config.workload_execution, collections, requests
     )
