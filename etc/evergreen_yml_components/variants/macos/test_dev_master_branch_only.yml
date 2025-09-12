@@ -17,7 +17,7 @@ buildvariants:
     tasks:
       - name: compile_test_serial_TG
       - name: run_bazel_compiledb
-      - name: run_unit_tests_TG
+      - name: run_unit_tests_8_way_split_TG
       - name: audit
       - name: auth_audit_gen
       - name: fle
