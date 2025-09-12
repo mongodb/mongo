@@ -144,6 +144,8 @@ enum StageType {
     STAGE_SEARCH,
     STAGE_WINDOW,
     STAGE_SENTINEL,
+    STAGE_HASH_JOIN_EMBEDDING_NODE,
+    STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE,
     // Stage for the DocumentSource to unpack timeseries buckets.
     STAGE_UNPACK_TS_BUCKET,
 };

@@ -150,10 +150,12 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         case STAGE_COUNT_SCAN:
         case STAGE_DELETE:
         case STAGE_IDHACK:
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
         case STAGE_MATCH:
         case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:
         case STAGE_MULTI_PLAN:
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
         case STAGE_QUEUED_DATA:
         case STAGE_RECORD_STORE_FAST_COUNT:
         case STAGE_REPLACE_ROOT:

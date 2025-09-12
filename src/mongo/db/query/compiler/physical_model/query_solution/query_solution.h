@@ -58,6 +58,7 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
+#include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -2207,4 +2208,117 @@ struct WindowNode : public QuerySolutionNode {
     OrderedPathSet sortByRequiredFields;
     OrderedPathSet outputRequiredFields;
 };
+
+/**
+ * Abstract class representing a binary join. This is useful for answering queries with
+ * $lookup-$unwind pairs, which is MQL's way of expressing an inner-join.
+ * This node also contains field embeddings, allowing the optimizer to represent plans which differ
+ * from the syntactic order of a $lookup-$unwind pair but maintain the semantics of the "as" field.
+ * The embeddings are what distinguish this operator from a typical relational join operator.
+ *
+ * For example, the pipeline on collection A:
+ *   [{$lookup: {from: "B", localField: "c", foreignField: "c", as: "b"}}, {$unwind: '$b'}]
+ * will produce documents like: {<fields of A>, "b": {<fields of B>}}.
+ *
+ * A plan which uses the syntactic join order will look like:
+ * BinaryJoinEmbeddingNode(A.c = B.c)
+ *   - leftEmbeddingField = boost::none, rightEmbeddingField = "b"
+ *   - Left child: Scan(A)
+ *   - Right child: Scan(B)
+ *
+ * A plan which uses the other order may look like:
+ * BinaryJoinEmbeddingNode(A.c = B.c)
+ *   - leftEmbeddingField = "b", rightEmbeddingField = boost::none
+ *   - Left child: Scan(B)
+ *   - Right child: Scan(A)
+ */
+struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
+    BinaryJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
+                            std::unique_ptr<QuerySolutionNode> rightChildArg,
+                            std::vector<JoinPredicate> joinPredicatesArg,
+                            boost::optional<std::string> leftEmbeddingFieldArg,
+                            boost::optional<std::string> rightEmbeddingFieldArg)
+        : joinPredicates(std::move(joinPredicatesArg)),
+          leftEmbeddingField(std::move(leftEmbeddingFieldArg)),
+          rightEmbeddingField(std::move(rightEmbeddingFieldArg)) {
+        children.push_back(std::move(leftChildArg));
+        children.push_back(std::move(rightChildArg));
+        // Prevent accidental creation of a plan which doesn't have an embedding field for either
+        // side of the join.
+        tassert(10976201,
+                "BinaryJoinEmbeddingNode must have at least one child with an embedding field",
+                leftEmbeddingField.has_value() || rightEmbeddingField.has_value());
+    }
+
+    // As an initial implementation, provide conservative implementations of all QuerySolutionNode
+    // virtual functions.
+    // TODO SERVER-110765: Provide a proper implementation for these functions.
+    bool fetched() const override {
+        return false;
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const override {
+        return FieldAvailability::kNotProvided;
+    }
+
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        return kEmptySet;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    // Set of join predicates that this node satisfies.
+    std::vector<JoinPredicate> joinPredicates;
+
+    // String representing the field under which the left/right results will be nested under. If one
+    // is boost::none, then the results from the corresponding child will be embedded in top-level
+    // fields. These fields allow us to reorder $lookup-$unwind pairs while maintaining the
+    // semantics of the $lookup "as" field.
+    boost::optional<std::string> leftEmbeddingField;
+    boost::optional<std::string> rightEmbeddingField;
+};
+
+/**
+ * Represents a hash join where the outer side is built into a hash table using the equi-join
+ * values as a compound key and the inner side probes it. Returns documents respecting the specified
+ * field embeddings.
+ */
+struct HashJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
+    HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
+                          std::unique_ptr<QuerySolutionNode> rightChildArg,
+                          std::vector<JoinPredicate> joinPredicatesArg,
+                          boost::optional<std::string> leftEmbeddingFieldArg,
+                          boost::optional<std::string> rightEmbeddingFieldArg);
+
+    StageType getType() const override {
+        return STAGE_HASH_JOIN_EMBEDDING_NODE;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
+};
+
+/**
+ * Represents a nested loop join which respects the specified field embeddings and applies the join
+ * predicates. Plans of this shape will look like:
+ * NestedLoopJoinEmbeddingNode(A.c = B.c)
+ *   - Access path on A
+ *   - CollScan(B)
+ */
+struct NestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
+    // Inherit the constructor from BinaryJoinEmbeddingNode
+    using BinaryJoinEmbeddingNode::BinaryJoinEmbeddingNode;
+
+    StageType getType() const override {
+        return STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
+};
+
 }  // namespace mongo

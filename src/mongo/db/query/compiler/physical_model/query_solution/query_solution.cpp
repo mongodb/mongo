@@ -1982,4 +1982,73 @@ void WindowNode::appendToString(str::stream* ss, int indent) const {
     *ss << "Child:" << '\n';
     children[0]->appendToString(ss, indent + 2);
 }
+
+HashJoinEmbeddingNode::HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
+                                             std::unique_ptr<QuerySolutionNode> rightChildArg,
+                                             std::vector<JoinPredicate> joinPredicatesArg,
+                                             boost::optional<std::string> leftEmbeddingFieldArg,
+                                             boost::optional<std::string> rightEmbeddingFieldArg)
+    : BinaryJoinEmbeddingNode(std::move(leftChildArg),
+                              std::move(rightChildArg),
+                              std::move(joinPredicatesArg),
+                              std::move(leftEmbeddingFieldArg),
+                              std::move(rightEmbeddingFieldArg)) {
+    for (auto&& joinPred : joinPredicates) {
+        tassert(10976202,
+                "HashJoinEmbeddingNode only supports equijoin predicates",
+                joinPred.op == JoinPredicate::ComparisonOp::Eq);
+    }
+}
+
+void BinaryJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent + 1);
+    *ss << "leftEmbeddingField: " << leftEmbeddingField.value_or("(none)") << "\n";
+    addIndent(ss, indent + 1);
+    *ss << "rightEmbeddingField: " << rightEmbeddingField.value_or("(none)") << "\n";
+    addIndent(ss, indent + 1);
+    *ss << "joinPredicates:\n";
+    for (auto&& joinPred : joinPredicates) {
+        addIndent(ss, indent + 2);
+        std::string op = [&joinPred] {
+            switch (joinPred.op) {
+                case JoinPredicate::ComparisonOp::Eq:
+                    return "=";
+            }
+            return "(unknown op)";
+        }();
+        *ss << joinPred.leftField.fullPath() << " " << op << " " << joinPred.rightField.fullPath()
+            << "\n";
+    }
+    *ss << "Outer:\n";
+    children[0]->appendToString(ss, indent + 2);
+    *ss << "Inner:\n";
+    children[1]->appendToString(ss, indent + 2);
+}
+
+void HashJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
+    *ss << "HASH_JOIN\n";
+    BinaryJoinEmbeddingNode::appendToString(ss, indent);
+}
+
+std::unique_ptr<QuerySolutionNode> HashJoinEmbeddingNode::clone() const {
+    return std::make_unique<HashJoinEmbeddingNode>(children[0]->clone(),
+                                                   children[0]->clone(),
+                                                   joinPredicates,
+                                                   leftEmbeddingField,
+                                                   rightEmbeddingField);
+}
+
+void NestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
+    *ss << "NESTED_LOOP_JOIN\n";
+    BinaryJoinEmbeddingNode::appendToString(ss, indent);
+}
+
+std::unique_ptr<QuerySolutionNode> NestedLoopJoinEmbeddingNode::clone() const {
+    return std::make_unique<NestedLoopJoinEmbeddingNode>(children[0]->clone(),
+                                                         children[0]->clone(),
+                                                         joinPredicates,
+                                                         leftEmbeddingField,
+                                                         rightEmbeddingField);
+}
+
 }  // namespace mongo

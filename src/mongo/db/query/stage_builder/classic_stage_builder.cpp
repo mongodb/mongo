@@ -479,11 +479,13 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_EQ_LOOKUP_UNWIND:
             case STAGE_GROUP:
             case STAGE_IDHACK:
+            case STAGE_HASH_JOIN_EMBEDDING_NODE:
             case STAGE_MATCH:
             case STAGE_REPLACE_ROOT:
             case STAGE_MOCK:
             case STAGE_MULTI_ITERATOR:
             case STAGE_MULTI_PLAN:
+            case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
             case STAGE_QUEUED_DATA:
             case STAGE_RECORD_STORE_FAST_COUNT:
             case STAGE_SAMPLE_FROM_TIMESERIES_BUCKET:
