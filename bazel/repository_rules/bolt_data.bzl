@@ -83,8 +83,6 @@ def _setup_bolt_data(repository_ctx):
                     fdata_file_name = "bolt" + str(processed_fdata_files) + ".fdata"
                     arguments = [repository_ctx.attr._perf2bolt_binary, "-nl", "-p", file, "-o", fdata_file_name, binary]
 
-                    # We execute perf through path so it doesn't get executable permissions normally
-                    repository_ctx.execute(["chmod", "+x", repository_ctx.attr._perf_binary])
                     result = repository_ctx.execute(arguments, environment = {"PATH": perf_path_env})
                     print(result.stdout)
                     if result.return_code != 0:

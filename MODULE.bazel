@@ -55,9 +55,9 @@ filegroup(
     srcs = ["bolt/lib/libbolt_rt_instr.a"],
 )
     """,
-    sha256 = "9bf3a978edd852b7975c65921ad207a5dad44254fd39eb223830057d35bb9c94",
+    sha256 = "7de026eb0f82d1d113ce323d70cd35070b3d40cfea0c8f55c303c111a63feda3",
     urls = [
-        "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/bolt_perf.tar.gz",
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/bolt_perf_rseqbugfix2.tar.gz",
     ] * 5,
 )
 

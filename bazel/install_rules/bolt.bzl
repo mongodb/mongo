@@ -1,19 +1,4 @@
-SKIP_FUNCTIONS = [
-    "_ZN8tcmalloc17tcmalloc_internal6subtle6percpu12TcmallocSlab4GrowEimmN4absl12lts_2023080211FunctionRefIFmhEEE",
-    "_ZN8tcmalloc17tcmalloc_internal18cpu_cache_internal8CpuCacheINS1_15StaticForwarderEE21DeallocateSlowNoHooksEPvm",
-    "_ZN8tcmalloc17tcmalloc_internal18cpu_cache_internal8CpuCacheINS1_15StaticForwarderEE19AllocateSlowNoHooksEm",
-    "calloc*",
-    "malloc*",
-    "_Znwm*",
-    "_ZnwmSt11align_val_t*",
-    "_ZdaPv*",
-    "realloc*",
-    "_ZdlPvmSt11align_val_t*",
-    "_ZdlPvm*",
-    "_ZN8tcmalloc17tcmalloc_internal6subtle6percpu12TcmallocSlab16CacheCpuSlabSlowEv",
-    "TcmallocSlab_Internal_Push.*",
-    "TcmallocSlab_Internal_Pop.*",
-]
+SKIP_FUNCTIONS = []
 
 def _bolt_instrument_impl(ctx):
     input_binary = ctx.files.binary_to_instrument[0]
