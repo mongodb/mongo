@@ -215,7 +215,7 @@ public:
     /**
      * Mark the session as unable to authenticate.
      */
-    void markFailed(const Status& status);
+    void markFailed(const Status& status, boost::optional<StepType> currentStep = boost::none);
 
     /**
      * Returns the metrics recorder for this Authentication Session.
@@ -244,12 +244,12 @@ public:
             // failed in order to allow the session to persist into another authentication
             // attempt. If we ran into an exception for another reason, mark the session as failed.
             if (!specAuthFailed) {
-                session->markFailed(ex.toStatus());
+                session->markFailed(ex.toStatus(), state);
             }
             throw;
         } catch (...) {
             session->markFailed(
-                Status(ErrorCodes::InternalError, "Encountered an unhandleable error"));
+                Status(ErrorCodes::InternalError, "Encountered an unhandleable error"), state);
             throw;
         }
     }
