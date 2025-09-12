@@ -36,11 +36,11 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/local_catalog/virtual_collection_options.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/container_base.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/stub_container.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
@@ -53,33 +53,6 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-// TODO(SERVER-110243): Use TestIntegerKeyedContainer
-class ExternalIntegerKeyedContainer : public IntegerKeyedContainerBase {
-public:
-    ExternalIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
-
-    Status insert(RecoveryUnit& ru, int64_t key, std::span<const char> value) final {
-        return Status::OK();
-    }
-
-    Status remove(RecoveryUnit& ru, int64_t key) final {
-        return Status::OK();
-    }
-};
-
-class ExternalStringKeyedContainer : public StringKeyedContainerBase {
-public:
-    ExternalStringKeyedContainer() : StringKeyedContainerBase(nullptr) {}
-
-    Status insert(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) final {
-        return Status::OK();
-    }
-
-    Status remove(RecoveryUnit& ru, std::span<const char> key) final {
-        return Status::OK();
-    }
-};
 
 class ExternalRecordStore : public RecordStore {
 public:
@@ -273,9 +246,9 @@ private:
         MONGO_UNIMPLEMENTED_TASSERT(6968600);
     }
 
-    std::variant<ExternalIntegerKeyedContainer, ExternalStringKeyedContainer> _makeContainer();
+    std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer> _makeContainer();
 
     VirtualCollectionOptions _vopts;
-    std::variant<ExternalIntegerKeyedContainer, ExternalStringKeyedContainer> _container;
+    std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer> _container;
 };
 }  // namespace mongo

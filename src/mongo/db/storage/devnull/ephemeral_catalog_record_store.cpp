@@ -270,9 +270,9 @@ private:
 // RecordStore
 //
 
-std::variant<EphemeralForTestIntegerKeyedContainer, EphemeralForTestStringKeyedContainer>
+std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer>
 EphemeralForTestRecordStore::_makeContainer() {
-    auto container = EphemeralForTestIntegerKeyedContainer();
+    auto container = StubIntegerKeyedContainer();
     return container;
 }
 

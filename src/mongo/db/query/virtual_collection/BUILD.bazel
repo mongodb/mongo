@@ -23,8 +23,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:external_data_source_option_gen",
     ],
     deps = [
-        "//src/mongo/db/storage:container",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:stub_container",
         "//src/mongo/transport/named_pipe",
     ],
 )

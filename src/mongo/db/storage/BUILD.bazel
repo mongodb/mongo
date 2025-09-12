@@ -600,6 +600,16 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "stub_container",
+    hdrs = [
+        "stub_container.h",
+    ],
+    deps = [
+        ":container",
+    ],
+)
+
+mongo_cc_library(
     name = "container",
     srcs = [
         "container_base.cpp",

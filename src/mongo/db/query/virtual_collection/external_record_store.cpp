@@ -32,15 +32,16 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/virtual_collection/multi_bson_stream_cursor.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/stub_container.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-std::variant<ExternalIntegerKeyedContainer, ExternalStringKeyedContainer>
+std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer>
 ExternalRecordStore::_makeContainer() {
-    auto container = ExternalIntegerKeyedContainer();
+    auto container = StubIntegerKeyedContainer();
     return container;
 }
 // 'ident' is an identifer to WT table and a virtual collection does not have any persistent data

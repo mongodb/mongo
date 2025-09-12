@@ -47,6 +47,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/stub_container.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -61,34 +62,6 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-// TODO(SERVER-110243): Use TestIntegerKeyedContainer
-class DevNullIntegerKeyedContainer : public IntegerKeyedContainerBase {
-public:
-    DevNullIntegerKeyedContainer() : IntegerKeyedContainerBase(nullptr) {}
-
-    Status insert(RecoveryUnit& ru, int64_t key, std::span<const char> value) final {
-        return Status::OK();
-    }
-
-    Status remove(RecoveryUnit& ru, int64_t key) final {
-        return Status::OK();
-    }
-};
-
-class DevNullStringKeyedContainer : public StringKeyedContainerBase {
-public:
-    DevNullStringKeyedContainer() : StringKeyedContainerBase(nullptr) {}
-
-    Status insert(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) final {
-        return Status::OK();
-    }
-
-    Status remove(RecoveryUnit& ru, std::span<const char> key) final {
-        return Status::OK();
-    }
-};
-
 class EmptyRecordCursor final : public SeekableRecordCursor {
 public:
     boost::optional<Record> next() final {
@@ -141,10 +114,8 @@ public:
     KeyFormat keyFormat() const override {
         return std::visit(
             OverloadedVisitor(
-                [](const DevNullIntegerKeyedContainer& v) -> KeyFormat { return KeyFormat::Long; },
-                [](const DevNullStringKeyedContainer& v) -> KeyFormat {
-                    return KeyFormat::String;
-                }),
+                [](const StubIntegerKeyedContainer& v) -> KeyFormat { return KeyFormat::Long; },
+                [](const StubStringKeyedContainer& v) -> KeyFormat { return KeyFormat::String; }),
             _container);
     }
 
@@ -276,22 +247,22 @@ private:
         return Status::OK();
     }
 
-    std::variant<DevNullIntegerKeyedContainer, DevNullStringKeyedContainer> _makeContainer(
+    std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer> _makeContainer(
         KeyFormat& keyFormat) {
         switch (keyFormat) {
             case KeyFormat::Long: {
-                auto container = DevNullIntegerKeyedContainer();
+                auto container = StubIntegerKeyedContainer();
                 return container;
             }
             case KeyFormat::String: {
-                auto container = DevNullStringKeyedContainer();
+                auto container = StubStringKeyedContainer();
                 return container;
             }
         }
         MONGO_UNREACHABLE;
     }
 
-    std::variant<DevNullIntegerKeyedContainer, DevNullStringKeyedContainer> _container;
+    std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer> _container;
     long long _numInserts;
     BSONObj _dummy;
 };
@@ -465,7 +436,7 @@ public:
     }
 
 private:
-    DevNullStringKeyedContainer _container;
+    StubStringKeyedContainer _container;
 };
 
 DevNullKVEngine::DevNullKVEngine() : _engineDbPath(storageGlobalParams.dbpath) {
