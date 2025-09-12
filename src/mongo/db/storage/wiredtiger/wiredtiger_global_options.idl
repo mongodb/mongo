@@ -462,13 +462,15 @@ server_parameters:
         redact: false
 
     spillWiredTigerSessionMax:
-        description: "The WiredTiger session limit for the spill engine"
+        description: >-
+            The WiredTiger session limit for the spill engine. The default value of 0 indicates that
+            the value of wiredTigerSessionMax will be used.
         set_at: startup
         cpp_vartype: int32_t
         cpp_varname: gSpillWiredTigerSessionMax
-        default: 1024
+        default: 0
         validator:
-            gte: 1
+            gte: 0
         redact: false
 
     spillWiredTigerEngineConfig:
