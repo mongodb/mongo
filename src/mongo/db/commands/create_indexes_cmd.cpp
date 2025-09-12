@@ -636,7 +636,14 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
           "indexes"_attr = specs.size(),
           "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName],
           "command"_attr = cmd.toBSON());
-    hangCreateIndexesBeforeStartingIndexBuild.pauseWhileSet(opCtx);
+
+    hangCreateIndexesBeforeStartingIndexBuild.executeIf(
+        [&](const BSONObj&) { hangCreateIndexesBeforeStartingIndexBuild.pauseWhileSet(opCtx); },
+        [&](const BSONObj& obj) {
+            auto comment = opCtx->getComment();
+            return !obj.hasField("comment") ||
+                (comment && comment->checkAndGetStringData() == obj["comment"].str());
+        });
 
     bool shouldContinueInBackground = false;
     try {
@@ -752,21 +759,19 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
         }
 
         LOGV2(20447, "Index build: completed", "buildUUID"_attr = buildUUID);
-    } catch (DBException& ex) {
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         // If the collection is dropped after the initial checks in this function (before the
         // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
         // the the task running the index build) may return NamespaceNotFound. This is not
         // considered an error and the command should return success.
-        if (ErrorCodes::NamespaceNotFound == ex.code()) {
-            LOGV2(20448,
-                  "Index build: failed because collection dropped",
-                  "buildUUID"_attr = buildUUID,
-                  logAttrs(ns),
-                  "collectionUUID"_attr = *collectionUUID,
-                  "exception"_attr = ex);
-            return reply;
-        }
-
+        LOGV2(20448,
+              "Index build: failed because collection dropped",
+              "buildUUID"_attr = buildUUID,
+              logAttrs(ns),
+              "collectionUUID"_attr = *collectionUUID,
+              "exception"_attr = ex);
+        return reply;
+    } catch (DBException& ex) {
         if (shouldContinueInBackground) {
             LOGV2(4760400,
                   "Index build: ignoring interrupt and continuing in background",
@@ -779,11 +784,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
         ex.addContext(str::stream()
                       << "Index build failed: " << buildUUID << ": Collection "
                       << ns.toStringForErrorMsg() << " ( " << *collectionUUID << " )");
-
-        // Set last op on error to provide the client with a specific optime to read the state of
-        // the server when the createIndexes command failed.
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-
         throw;
     }
 
@@ -919,6 +919,14 @@ public:
                 return request();
             }();
 
+            // We can only wait for an existing index build to finish if we are able to
+            // release our locks, in order to allow the existing index build to proceed. We
+            // cannot release locks in transactions, so we bypass the below logic in
+            // transactions.
+            if (opCtx->inMultiDocumentTransaction()) {
+                return runCreateIndexesWithCoordinator(opCtx, cmd, scopedReplicaSetDDL);
+            }
+
             // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index
             // specs, then we will wait for the build(s) to finish before trying again unless we are
             // in a multi-document transaction.
@@ -926,16 +934,7 @@ public:
             while (true) {
                 try {
                     return runCreateIndexesWithCoordinator(opCtx, cmd, scopedReplicaSetDDL);
-                } catch (const DBException& ex) {
-                    // We can only wait for an existing index build to finish if we are able to
-                    // release our locks, in order to allow the existing index build to proceed. We
-                    // cannot release locks in transactions, so we bypass the below logic in
-                    // transactions.
-                    if (ex.toStatus() != ErrorCodes::IndexBuildAlreadyInProgress ||
-                        opCtx->inMultiDocumentTransaction()) {
-                        throw;
-                    }
-
+                } catch (const ExceptionFor<ErrorCodes::IndexBuildAlreadyInProgress>& ex) {
                     if (cmd.getReturnOnStart()) {
                         auto coll = acquireCollectionMaybeLockFree(
                             opCtx,
@@ -985,6 +984,12 @@ public:
                     // in-progress build and starting to listen for completion. It is good enough,
                     // however: we can only wait longer than needed, not less.
                     IndexBuildsCoordinator::get(opCtx)->waitUntilAnIndexBuildFinishes(opCtx);
+                } catch (const DBException&) {
+                    // Set last op on error to provide the client with a specific optime to read the
+                    // state of the server when the createIndexes command failed.
+                    repl::ReplClientInfo::forClient(opCtx->getClient())
+                        .setLastOpToSystemLastOpTime(opCtx);
+                    throw;
                 }
             }
         }
