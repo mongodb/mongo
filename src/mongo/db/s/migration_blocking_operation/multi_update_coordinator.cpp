@@ -477,6 +477,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
             if (newPhase == Phase::kSuccess) {
                 newDocument.getMutableFields().setResult(_cmdResponse);
             } else if (newPhase == Phase::kFailure) {
+                stdx::lock_guard lock(_mutex);
                 if (_abortReason) {
                     newDocument.getMutableFields().setAbortReason(
                         sharding_ddl_util::possiblyTruncateErrorStatus(*_abortReason));
