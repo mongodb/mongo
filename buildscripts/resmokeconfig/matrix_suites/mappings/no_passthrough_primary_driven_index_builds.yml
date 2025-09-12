@@ -10,3 +10,6 @@ overrides:
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"
+
+eval:
+  - "recordids_replicated.enable"

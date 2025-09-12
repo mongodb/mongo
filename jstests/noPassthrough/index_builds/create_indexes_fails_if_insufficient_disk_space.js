@@ -2,6 +2,8 @@
  * Ensures that a createIndexes command request fails when the available disk space is below the
  * indexBuildMinAvailableDiskSpaceMB threshold.
  * @tags: [
+ *   # TODO (SERVER-110805): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_fcv_71,
  *   requires_replication,
  * ]

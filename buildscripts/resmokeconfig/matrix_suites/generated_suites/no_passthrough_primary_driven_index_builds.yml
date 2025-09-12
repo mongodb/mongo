@@ -28,13 +28,16 @@ executor:
       - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*.js
   config:
     shell_options:
+      eval: await import('jstests/libs/override_methods/collection_write_path/set_recordids_replicated.js');
       global_vars:
         TestData:
           setParameters:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: true
           setParametersMongos:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: true
           skipCheckDBHashes: true
           skipCollectionAndIndexValidation: true
@@ -45,7 +48,7 @@ selector:
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
     - requires_commit_quorum
+    - requires_capped
   roots:
     - jstests/noPassthrough/index_builds/*.js
-    - jstests/noPassthrough/timeseries/index_builds/*.js
 test_kind: js_test

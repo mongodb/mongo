@@ -16,9 +16,11 @@ executor:
         TestData:
           setParameters:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: true
           setParametersMongos:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: true
           skipCheckDBHashes: true
           skipCollectionAndIndexValidation: true
@@ -29,6 +31,7 @@ selector:
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
     - requires_commit_quorum
+    - requires_capped
   roots:
     - jstests/sharding/*index_build*.js
 test_kind: js_test

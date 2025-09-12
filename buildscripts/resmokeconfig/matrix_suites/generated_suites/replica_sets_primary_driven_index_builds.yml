@@ -13,6 +13,7 @@ executor:
         TestData:
           setParameters:
             featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: true
           skipCheckDBHashes: true
           skipCollectionAndIndexValidation: true
@@ -23,6 +24,7 @@ selector:
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
     - requires_commit_quorum
+    - requires_capped
   roots:
     - jstests/replsets/*index_build*.js
     - jstests/replsets/**/*index_build*.js

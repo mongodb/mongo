@@ -5,6 +5,7 @@
         mongod_options:
           set_parameters:
             featureFlagPrimaryDrivenIndexBuilds: 1
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: 1
       config:
         shell_options:
@@ -20,6 +21,7 @@
         mongos_options:
           set_parameters:
             featureFlagPrimaryDrivenIndexBuilds: 1
+            featureFlagRecordIdsReplicated: 1
             featureFlagReplicateLocalCatalogIdentifiers: 1
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod
   value:
@@ -30,6 +32,7 @@
             TestData:
               setParameters:
                 featureFlagPrimaryDrivenIndexBuilds: true
+                featureFlagRecordIdsReplicated: 1
                 featureFlagReplicateLocalCatalogIdentifiers: true
               # TODO(SERVER-110172): Re-enable these checks.
               skipCheckDBHashes: true
@@ -43,6 +46,7 @@
             TestData:
               setParametersMongos:
                 featureFlagPrimaryDrivenIndexBuilds: true
+                featureFlagRecordIdsReplicated: 1
                 featureFlagReplicateLocalCatalogIdentifiers: true
 - name: exclude_primary_driven_index_builds_incompatible_tag
   value:
@@ -50,13 +54,13 @@
       - primary_driven_index_builds_incompatible
       - rolling_index_builds
       - requires_commit_quorum
+      - requires_capped
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:
       exclude_files: null
       roots:
         - jstests/noPassthrough/index_builds/*.js
-        - jstests/noPassthrough/timeseries/index_builds/*.js
 - name: all_replica_sets_index_builds_tests_selector
   value:
     selector:

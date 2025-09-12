@@ -1,6 +1,10 @@
 /**
  * Capped cursors return CappedPositionLost when the document they were positioned on gets deleted.
  * When this occurs during the collection scan phase of an index build, it will get restarted.
+ *
+ * @tags: [
+ *   requires_capped,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
