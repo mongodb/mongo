@@ -146,7 +146,7 @@ def mongod_program(
         suite_set_parameters, "enableAutoCompaction", bin_version, "7.3.0"
     )
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "findShardsOnConfigTimeoutMS", bin_version, "8.2.0"
+        suite_set_parameters, "findShardsOnConfigTimeoutMS", bin_version, "8.3.0"
     )
 
     if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
@@ -221,7 +221,7 @@ def mongos_program(
         suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0"
     )
     remove_set_parameter_if_before_version(
-        suite_set_parameters, "findShardsOnConfigTimeoutMS", bin_version, "8.2.0"
+        suite_set_parameters, "findShardsOnConfigTimeoutMS", bin_version, "8.3.0"
     )
     remove_set_parameter_if_before_version(
         suite_set_parameters, "maxRoundsWithoutProgressParameter", bin_version, "8.2.0"
