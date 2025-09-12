@@ -101,4 +101,8 @@ bool AttachedPersistenceProvider::supportsCrossShardTransactions() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsOplogSampling() const {
+    return true;
+}
+
 }  // namespace mongo::rss

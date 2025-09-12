@@ -105,6 +105,11 @@ public:
      * We can support cross-shard transactions.
      */
     bool supportsCrossShardTransactions() const override;
+
+    /**
+     * We can support oplog cap maintainer thread and oplog sampling.
+     */
+    bool supportsOplogSampling() const override;
 };
 
 }  // namespace mongo::rss

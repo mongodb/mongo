@@ -219,8 +219,6 @@ public:
 
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
-    void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const override;
-
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;

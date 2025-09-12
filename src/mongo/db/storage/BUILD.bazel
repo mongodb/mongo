@@ -352,6 +352,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:oplog_truncation",
     ],
 )
 
@@ -788,6 +789,19 @@ mongo_cc_unit_test(
         "oplog_truncation_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
+        "//src/mongo/db/repl:replication_recovery",
+        "//src/mongo/db/repl:storage_interface",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_async_sampling_test",
+    srcs = [
+        "oplog_async_sampling_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
         "//src/mongo/db/repl:replication_recovery",

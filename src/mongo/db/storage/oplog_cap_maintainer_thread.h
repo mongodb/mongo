@@ -30,44 +30,51 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 
 /**
  * Responsible for deleting oplog truncate markers once their max capacity has been reached.
  */
-class OplogCapMaintainerThread {
+class OplogCapMaintainerThread : public BackgroundJob {
 public:
-    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
 
-    /**
-     * Create the maintainer thread. Must be called at most once.
-     */
-    void start();
+    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+    static OplogCapMaintainerThread* get(OperationContext* opCtx);
+    static void set(ServiceContext* serviceCtx,
+                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
+
+    std::string name() const override {
+        return _name;
+    }
+
+    void run() override;
 
     /**
      * Waits until the maintainer thread finishes. Must not be called concurrently with start().
      */
-    void shutdown();
-
-    void appendStats(BSONObjBuilder& builder) const;
+    void shutdown(const Status& reason);
 
 private:
-    void _run();
-
     /**
      * Returns true iff there was an oplog to delete from.
      */
     bool _deleteExcessDocuments(OperationContext* opCtx);
 
-    stdx::thread _thread;
+    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
+    mutable stdx::mutex _opCtxMutex;
 
-    // Cumulative amount of time spent truncating the oplog.
-    AtomicWord<int64_t> _totalTimeTruncating;
+    // Saves a reference to the cap maintainer thread's operation context.
+    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
-    // Cumulative number of truncates of the oplog.
-    AtomicWord<int64_t> _truncateCount;
+    mutable stdx::mutex _stateMutex;
+    bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
+
+    std::string _name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
 };
 
 }  // namespace mongo
