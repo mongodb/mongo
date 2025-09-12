@@ -496,8 +496,12 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     WT_ERR(__wt_rollback_to_stable_reconfig(session, cfg));
 
 done:
-    /* Third, merge everything together, creating a new connection state. */
-    WT_ERR(__wt_config_merge(session, cfg, NULL, &p));
+    /*
+     * Third, merge everything together, creating a new connection state. Exclude any configuration
+     * parameters that should not be preserved across calls to reconfigure.
+     */
+    WT_ERR(__wt_config_merge(
+      session, cfg, "disaggregated=(checkpoint_meta=,last_materialized_lsn=)", &p));
     __wt_free(session, conn->cfg);
     conn->cfg = p;
 

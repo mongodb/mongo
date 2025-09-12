@@ -450,6 +450,12 @@ struct __wt_block_header {
  *	Block manager handle for disaggregated storage block manager.
  */
 struct __wt_block_disagg {
+    /*
+     * The structure needs to exactly match the WT_BLOCK structure, since it can be treated as one
+     * for connection caching and a few other things. For custom fields, see below. Ideally we would
+     * split this into a public/private structure, similar to session handles, and customize file
+     * and disagg handles as necessary. That's invasive so save the grunt work for now.
+     */
     const char *name;  /* Name */
     uint32_t objectid; /* Object id */
     uint32_t ref;      /* References */
@@ -457,14 +463,8 @@ struct __wt_block_disagg {
     TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
 
-    /*
-     * Custom disaggregated fields - above this line the structure needs to exactly match the
-     * WT_BLOCK structure, since it can be treated as one for connection caching and a few other
-     * things. Ideally we would split this into a public/private structure, similar to session
-     * handles, and customize file and disagg handles as necessary. That's invasive so save the
-     * grunt work for now.
-     */
-
+    /* Custom disaggregated fields. */
+    uint64_t tableid;
     WT_PAGE_LOG_HANDLE *plhandle;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

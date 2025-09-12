@@ -1437,6 +1437,18 @@ variables:
           format_args: disagg.mode=leader runs.tables=1 runs.timer=3
           times: 5
 
+  - &format-stress-data-validation-test-disagg-leader
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          # FIXME-WT-14566 Limit the runs for now.
+          format_args: disagg.mode=leader ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.tables=2 runs.rows=100000 runs.ops=300000
+          times: 5
+
   - &format-stress-test-disagg-switch
     depends_on:
       - name: compile
@@ -1455,6 +1467,16 @@ variables:
       - func: "format test disagg"
         vars:
           format_args: disagg.mode=follower
+          times: 5
+
+  - &format-stress-data-validation-test-disagg-follower
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.mode=follower ops.verify=1 runs.mirror=1
           times: 5
 
   - &format-stress-test
@@ -4300,6 +4322,21 @@ tasks:
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-5
     tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader
+    name: format-stress-data-validation-test-disagg-leader-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader
+    name: format-stress-data-validation-test-disagg-leader-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader
+    name: format-stress-data-validation-test-disagg-leader-3
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader
+    name: format-stress-data-validation-test-disagg-leader-4
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-data-validation-test-disagg-leader
+    name: format-stress-data-validation-test-disagg-leader-5
+    tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-1
     tags: ["stress-test-disagg"]
@@ -4314,6 +4351,21 @@ tasks:
     tags: ["stress-test-disagg"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-5
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower
+    name: format-stress-data-validation-test-disagg-follower-1
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower
+    name: format-stress-data-validation-test-disagg-follower-2
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower
+    name: format-stress-data-validation-test-disagg-follower-3
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower
+    name: format-stress-data-validation-test-disagg-follower-4
+    tags: ["stress-test-disagg"]
+  - <<: *format-stress-data-validation-test-disagg-follower
+    name: format-stress-data-validation-test-disagg-follower-5
     tags: ["stress-test-disagg"]
   # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures has been resolved.
   - <<: *format-stress-test-disagg-switch

@@ -160,8 +160,10 @@ checkpoint(void *arg)
         if (backup_locked)
             lock_writeunlock(session, &g.backup_lock);
 
-        /* Verify the checkpoints. */
-        wts_verify_mirrors(conn, ckpt_vrfy_name, NULL);
+        /* FIXME-WT-15357 Checkpoint cursors are not compatible with disagg for now. */
+        if (!g.disagg_storage_config)
+            /* Verify the checkpoints. */
+            wts_verify_mirrors(conn, ckpt_vrfy_name, NULL);
 
         max_secs = g.disagg_storage_config ? 10 : 40;
         secs = mmrand(&g.extra_rnd, 5, max_secs);

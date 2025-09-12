@@ -1967,6 +1967,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     if (F_ISSET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH))
         return (false);
 
+    if (F_ISSET(btree, WT_BTREE_READONLY))
+        return (true);
+
     /*
      * Pages without modify structures can always be evicted as long as they were created via a read
      * from the underlying storage. If they were created via a scrub eviction in disaggregated

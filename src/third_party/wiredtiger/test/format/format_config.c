@@ -1528,11 +1528,11 @@ config_disagg_storage(void)
         config_single(NULL, "transaction.timestamps=on", true);
 
         /* It makes sense to do checkpoints. */
-        config_single(NULL, "checkpoint=on", false);
+        if (!config_explicit(NULL, "checkpoint"))
+            config_single(NULL, "checkpoint=on", false);
 
         /* TODO: Some operations are not yet supported for disaggregated storage. */
         config_off(NULL, "ops.salvage");
-        config_off(NULL, "ops.verify");
         config_off(NULL, "backup");
         config_off(NULL, "backup.incremental");
         config_off(NULL, "ops.compaction");

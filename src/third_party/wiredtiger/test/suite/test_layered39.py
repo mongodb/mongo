@@ -100,3 +100,15 @@ class test_layered39(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.get_stat(wiredtiger.stat.conn.checkpoint_pages_reconciled_bytes), self.nitems * 3 * 10)
         self.assertGreaterEqual(scrub_restore,
             self.get_stat(wiredtiger.stat.conn.cache_eviction_ahead_of_last_materialized_lsn))
+
+        # Now let's also ensure that reconfigure does not preserve the last_materialized_lsn
+        # across calls.
+        self.conn.reconfigure(f'disaggregated=(last_materialized_lsn={last_lsn})')
+        self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN,
+                                               last_lsn + 10)
+        self.conn.reconfigure(f'disaggregated=(role=leader)')
+
+        # Ensure that the latest materialized LSN cannot go backwards.
+        self.assertRaisesException(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN,
+                                               last_lsn + 5))

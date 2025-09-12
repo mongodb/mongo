@@ -60,6 +60,12 @@
         __wt_session_set_last_error(session, v, sub_v, __VA_ARGS__); \
         goto err;                                                    \
     } while (0)
+#define WT_ERR_MSG_CHK(session, v, ...)            \
+    do {                                           \
+        ret = (v);                                 \
+        if (ret != 0)                              \
+            WT_ERR_MSG(session, ret, __VA_ARGS__); \
+    } while (0)
 #define WT_ERR_TEST(a, v, keep) \
     do {                        \
         if (a) {                \

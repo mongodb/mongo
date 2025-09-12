@@ -70,7 +70,7 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
     WT_BLOCK_DISAGG *block_disagg;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    uint64_t bucket, hash;
+    uint64_t bucket, hash, tableid;
 
     WT_UNUSED(cfg);
     WT_UNUSED(forced_salvage);
@@ -112,8 +112,11 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
     if (WT_STREQ(block_disagg->name, WT_HS_FILE_SHARED))
         F_SET(block_disagg, WT_BLOCK_DISAGG_HS);
 
+    tableid = S2BT(session)->id;
+    block_disagg->tableid = tableid;
+
     WT_ERR(S2BT(session)->page_log->pl_open_handle(
-      S2BT(session)->page_log, &session->iface, S2BT(session)->id, &block_disagg->plhandle));
+      S2BT(session)->page_log, &session->iface, tableid, &block_disagg->plhandle));
 
     WT_ASSERT_ALWAYS(session, block_disagg->plhandle != NULL, "disagg tables need a page log");
 

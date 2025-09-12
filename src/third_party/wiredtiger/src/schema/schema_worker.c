@@ -68,29 +68,87 @@ err:
 
 /*
  * __schema_layered_worker_verify --
- *     Run a schema worker operation (which is verification) on the stable table; ingest is not
- *     supported currently.
+ *     Run a schema worker operation (which is verification) on the layered table.
  *
- * FIXME-WT-15047: Implement ingest table verification (and update the function description)
+ * FIXME-WT-15047: Implement ingest table verification on followers.
  */
 static int
 __schema_layered_worker_verify(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
+    int ingest_ret, stable_ret;
+
+    conn = S2C(session);
+    ingest_ret = 0;
 
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, open_flags));
     WT_LAYERED_TABLE *layered = (WT_LAYERED_TABLE *)session->dhandle;
+
+    const char *ingest_uri = layered->ingest_uri;
     const char *stable_uri = layered->stable_uri;
 
+    /*
+     * FIXME-WT-15413 - Verify assumes the stable table always exists. However, on followers that
+     * have not yet picked up their first checkpoint, the stable constituent will be missing. We
+     * should handle this transient state by skipping stable verification instead of failing with
+     * ENOENT.
+     */
     WT_ASSERT(session, stable_uri != NULL);
+    WT_ASSERT(session, ingest_uri != NULL);
     WT_ASSERT(session, file_func == __wt_verify);
 
+    /*
+     * Verifying stable tables of layered tables uses the existing verify logic.
+     * Ingest tables, however, require special handling:
+     * - On leader: ingest must always be empty/no-op.
+     * - On followers: FIXME-WT-15047 ingest tables are not checkpointed.
+     */
+
+    /* Verify the stable table of the layered table. */
     WT_WITHOUT_DHANDLE(session,
-      ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
+      stable_ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
+
+    if (stable_ret != 0 && stable_ret != EBUSY)
+        WT_ERR_MSG(session, stable_ret, "Verify (layered): %s stable table verification failed. ",
+          stable_uri);
+
+    /*
+     * Verify the ingest table of the layered table. FIXME-WT-15047: Implement ingest table
+     * verification on followers.
+     */
+    if (conn->layered_table_manager.leader) {
+        /*
+         * On leader, if verifying ingest returns EBUSY, it means ingest is not empty (dirty
+         * content, or open cursors), which is an invalid state.
+         */
+        WT_WITHOUT_DHANDLE(session,
+          ingest_ret =
+            __wt_schema_worker(session, ingest_uri, file_func, name_func, cfg, open_flags));
+
+        /*
+         * FIXME-WT-15433 Add an assertion that verifying the ingest table of the leader never
+         * returns EBUSY.
+         */
+        if (ingest_ret != 0)
+            WT_ERR_MSG(session, ingest_ret,
+              "Verify (layered): %s ingest table verification failed. Ingest must always be empty "
+              "on leader.",
+              ingest_uri);
+    }
+
+err:
+    __wt_verbose_level(session, WT_VERB_VERIFY, WT_VERBOSE_DEBUG_2,
+      "Verify (layered): stable table %s returned %s, ingest table %s returned %s", stable_uri,
+      __wt_wiredtiger_error(stable_ret), ingest_uri, __wt_wiredtiger_error(ingest_ret));
 
     WT_TRET(__wt_session_release_dhandle(session));
+
+    /* Ingest is expected to never return EBUSY so it's enough to check it for 0 only */
+    ret = ingest_ret != 0 ? ingest_ret : stable_ret;
+
     return (ret);
 }
 

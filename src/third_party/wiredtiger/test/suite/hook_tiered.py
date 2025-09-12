@@ -65,7 +65,7 @@ from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 def wiredtiger_open_tiered(ignored_self, args):
 
     tiered_storage_sources = gen_tiered_storage_sources()
-    testcase = WiredTigerTestCase.currentTestCase()
+    testcase = WiredTigerTestCase.getCurrentTestCase()
     extension_name = testcase.getTierStorageSource()
     extension_config = testcase.getTierStorageSourceConfig()
 
@@ -158,19 +158,19 @@ def wiredtiger_open_tiered(ignored_self, args):
 #    Except that some tests enable readonly and call these functions, expecting an exception.
 #    So for these "modifying" APIs, we want to actually do the operation (but only when readonly).
 def testcase_is_readonly():
-    testcase = WiredTigerTestCase.currentTestCase()
+    testcase = WiredTigerTestCase.getCurrentTestCase()
     return getattr(testcase, '_readonlyTieredTest', False)
 
 def testcase_has_failed():
-    testcase = WiredTigerTestCase.currentTestCase()
+    testcase = WiredTigerTestCase.getCurrentTestCase()
     return testcase.failed()
 
 def testcase_has_skipped():
-    testcase = WiredTigerTestCase.currentTestCase()
+    testcase = WiredTigerTestCase.getCurrentTestCase()
     return testcase.skipped
 
 def skip_test(comment):
-    testcase = WiredTigerTestCase.currentTestCase()
+    testcase = WiredTigerTestCase.getCurrentTestCase()
     testcase.skipTest(comment)
 
 # Called to replace Connection.close

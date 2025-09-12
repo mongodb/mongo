@@ -331,7 +331,7 @@ real_checkpointer(THREAD_DATA *td)
             goto done;
 
         /* Verify the checkpoint we just wrote. */
-        /* FIXME-WT-15378 Disagg: Implement checkpoint cursors */
+        /* FIXME-WT-15357 Disagg: Implement checkpoint cursors */
         if (!g.opts.disagg_storage) {
             if ((ret = verify_consistency(session, WT_TS_NONE, true)) != 0)
                 return (log_print_err("verify_consistency (checkpoint)", ret, 1));

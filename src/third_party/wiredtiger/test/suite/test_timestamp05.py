@@ -65,6 +65,8 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         # Checkpoint at 50
         s.checkpoint('use_timestamp=true')
 
+    # FIXME-WT-14563
+    @wttest.skip_for_hook("disagg", "bulk load is not currently supported for layered cursors")
     def test_bulk(self):
         s = self.session
         conn = self.conn

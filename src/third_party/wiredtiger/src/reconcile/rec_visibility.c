@@ -40,7 +40,15 @@ __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT
     supd->tw = *tw;
     supd->restore = supd_restore;
     ++r->supd_next;
-    r->supd_memsize += upd_memsize;
+    /*
+     * We don't need to worry about the saved update's impact on page split if we only have a
+     * tombstone as we will skip writing it to the disk.
+     */
+    if (onpage_upd != NULL || supd_restore) {
+        ++r->supd_onpage_or_restore;
+        r->supd_memsize += upd_memsize;
+    } else
+        WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT) || upd_memsize == 0);
     return (0);
 }
 

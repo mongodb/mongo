@@ -152,8 +152,9 @@ __layered_create_missing_stable_tables(WT_SESSION_IMPL *session)
 
         /* Create the stable table if it does not exist. */
         if (ret == WT_NOTFOUND) {
-            WT_ERR(
-              __layered_create_missing_stable_table(internal_session, stable_uri, layered_cfg));
+            WT_ERR_MSG_CHK(session,
+              __layered_create_missing_stable_table(internal_session, stable_uri, layered_cfg),
+              "Failed to create missing stable table \"%s\" from \"%s\"", stable_uri, layered_cfg);
             /* Ensure that we properly handle empty tables. */
             WT_ERR(__wt_disagg_copy_metadata_later(
               internal_session, stable_uri, layered_uri + strlen("layered:")));
@@ -185,35 +186,43 @@ __disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_I
 
     conn = S2C(session);
     disagg = &conn->disaggregated_storage;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    if (disagg->page_log_meta == NULL)
+        return (ENOTSUP);
+
+    WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_METADATA_MAX_PAGE_ID,
+      "Metadata page ID %" PRIu64 " out of range", page_id);
+
     WT_CLEAR(get_args);
     get_args.lsn = lsn;
 
-    if (disagg->page_log_meta != NULL) {
-        retry = 0;
-        for (;;) {
-            count = 1;
-            WT_RET(disagg->page_log_meta->plh_get(
-              disagg->page_log_meta, &session->iface, page_id, 0, &get_args, item, &count));
-            WT_ASSERT(session, count <= 1); /* Corrupt data. */
+    retry = 0;
+    for (;;) {
+        count = 1;
+        WT_RET(disagg->page_log_meta->plh_get(
+          disagg->page_log_meta, &session->iface, page_id, 0, &get_args, item, &count));
+        WT_ASSERT(session, count <= 1); /* Corrupt data. */
 
-            /* Found the data. */
-            if (count == 1)
-                break;
+        /* Found the data. */
+        if (count == 1)
+            break;
 
-            /* Otherwise retry up to 100 times to account for page materialization delay. */
-            if (retry > 100)
-                return (WT_NOTFOUND);
-            __wt_verbose_notice(session, WT_VERB_READ,
-              "retry #%" PRIu32 " for metadata page_id %" PRIu64 ", lsn %" PRIu64, retry, page_id,
-              lsn);
-            __wt_sleep(0, 10000 + retry * 5000);
-            ++retry;
+        /* Otherwise retry up to 100 times to account for page materialization delay. */
+        if (retry > 100) {
+            __wt_verbose_error(session, WT_VERB_READ,
+              "read failed for metadata page ID %" PRIu64 ", lsn %" PRIu64, page_id, lsn);
+            return (WT_NOTFOUND);
         }
-
-        return (0);
+        __wt_verbose_notice(session, WT_VERB_READ,
+          "retry #%" PRIu32 " for metadata page_id %" PRIu64 ", lsn %" PRIu64, retry, page_id, lsn);
+        __wt_sleep(0, 10000 + retry * 5000);
+        ++retry;
     }
 
-    return (ENOTSUP);
+    disagg->last_metadata_page_lsn[page_id] = get_args.lsn;
+    return (0);
 }
 
 /*
@@ -230,12 +239,21 @@ __disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *ite
     conn = S2C(session);
     disagg = &conn->disaggregated_storage;
 
-    WT_CLEAR(put_args);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
     if (disagg->page_log_meta == NULL)
         return (ENOTSUP);
 
+    WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_METADATA_MAX_PAGE_ID,
+      "Metadata page ID %" PRIu64 " out of range", page_id);
+
+    WT_CLEAR(put_args);
+    put_args.backlink_lsn = disagg->last_metadata_page_lsn[page_id];
+
     WT_RET(disagg->page_log_meta->plh_put(
       disagg->page_log_meta, &session->iface, page_id, 0, &put_args, item));
+    disagg->last_metadata_page_lsn[page_id] = put_args.lsn;
+
     if (lsnp != NULL)
         *lsnp = put_args.lsn;
     __wt_atomic_addv64(&disagg->num_meta_put, 1);
@@ -314,7 +332,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
     WT_ITEM item;
     WT_SESSION_IMPL *internal_session, *shared_metadata_session;
     size_t len, metadata_value_cfg_len;
-    uint64_t checkpoint_timestamp;
+    uint64_t checkpoint_timestamp, current_meta_lsn;
     char *buf, *cfg_ret, *checkpoint_config, *root, *metadata_value_cfg, *layered_ingest_uri;
     const char *cfg[3], *current_value, *metadata_key, *metadata_value;
 
@@ -334,6 +352,16 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
     WT_CLEAR(item);
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    /* We should not pick up a checkpoint with an earlier LSN. */
+    WT_ACQUIRE_READ(current_meta_lsn, conn->disaggregated_storage.last_checkpoint_meta_lsn);
+    if (meta_lsn < current_meta_lsn)
+        WT_RET_MSG(session, EINVAL,
+          "Attempting to pick up an older checkpoint: current metadata LSN = %" PRIu64
+          ", new metadata LSN = %" PRIu64,
+          current_meta_lsn, meta_lsn);
+
+    /* FIXME-WT-15448 We might also want to add a check for picking up the same checkpoint again. */
 
     /*
      * Part 1: Get the metadata of the shared metadata table and insert it into our metadata table.
@@ -439,7 +467,8 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
 
             /* Put our new config in */
             md_cursor->set_value(md_cursor, cfg_ret);
-            WT_ERR(md_cursor->insert(md_cursor));
+            WT_ERR_MSG_CHK(session, md_cursor->insert(md_cursor),
+              "Failed to insert metadata for key \"%s\"", metadata_key);
 
             /*
              * Mark any matching data handles to be out of date. Any new opens will get the new
@@ -461,8 +490,11 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
                     md_cursor->set_key(md_cursor, layered_ingest_uri);
                     WT_ERR_NOTFOUND_OK(md_cursor->search(md_cursor), true);
                     if (ret == WT_NOTFOUND)
-                        WT_ERR(__layered_create_missing_ingest_table(
-                          internal_session, layered_ingest_uri, metadata_value));
+                        WT_ERR_MSG_CHK(session,
+                          __layered_create_missing_ingest_table(
+                            internal_session, layered_ingest_uri, metadata_value),
+                          "Failed to create missing ingest table \"%s\" from \"%s\"",
+                          layered_ingest_uri, metadata_value);
                     __wt_free(session, layered_ingest_uri);
                 }
             }
@@ -470,7 +502,8 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
             /* Insert the actual metadata. */
             md_cursor->set_key(md_cursor, metadata_key);
             md_cursor->set_value(md_cursor, metadata_value);
-            WT_ERR(md_cursor->insert(md_cursor));
+            WT_ERR_MSG_CHK(session, md_cursor->insert(md_cursor),
+              "Failed to insert metadata for key \"%s\"", metadata_key);
         }
     }
     WT_ERR_NOTFOUND_OK(ret, false);
@@ -1021,8 +1054,9 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     if (reconfig) {
 
         /* Pick up a new checkpoint (followers only). */
-        WT_ERR(__wt_config_gets(session, cfg, "disaggregated.checkpoint_meta", &cval));
-        if (cval.len > 0) {
+        WT_ERR_NOTFOUND_OK(
+          __wt_config_gets(session, cfg, "disaggregated.checkpoint_meta", &cval), true);
+        if (ret == 0 && cval.len > 0) {
             /*
              * FIXME-WT-14733: currently the leader silently ignores the checkpoint_meta
              * configuration as it may have an obsolete configuration in its base config when it is
@@ -1031,7 +1065,8 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
             if (!leader) {
                 WT_WITH_CHECKPOINT_LOCK(
                   session, ret = __disagg_pick_up_checkpoint_meta(session, &cval));
-                WT_ERR(ret);
+                WT_ERR_MSG_CHK(session, ret, "Failed to pick up a new checkpoint with config: %.*s",
+                  (int)cval.len, cval.str);
             }
         }
     }
@@ -1039,9 +1074,12 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     /* Common settings between initial connection config and reconfig. */
 
     /* Get the last materialized LSN. */
-    WT_ERR(__wt_config_gets(session, cfg, "disaggregated.last_materialized_lsn", &cval));
-    if (cval.len > 0 && cval.val >= 0)
-        WT_ERR(__wti_disagg_set_last_materialized_lsn(session, (uint64_t)cval.val));
+    /* FIXME-WT-15447 Consider deprecating this. */
+    WT_ERR_NOTFOUND_OK(
+      __wt_config_gets(session, cfg, "disaggregated.last_materialized_lsn", &cval), true);
+    if (ret == 0 && cval.len > 0 && cval.val >= 0)
+        WT_ERR_MSG_CHK(session, __wti_disagg_set_last_materialized_lsn(session, (uint64_t)cval.val),
+          "Failed to set the last materialized LSN to %" PRIu64, (uint64_t)cval.val);
 
     /* Set the role. */
     WT_ERR(__wt_config_gets(session, cfg, "disaggregated.role", &cval));
@@ -1058,13 +1096,15 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
         /* Follower step-up. */
         if (reconfig && !was_leader && leader) {
             WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_begin_checkpoint(session));
-            WT_ERR(ret);
+            WT_ERR_MSG_CHK(session, ret, "Failed to begin a new checkpoint");
 
             /* Create any missing stable tables. */
-            WT_ERR(__layered_create_missing_stable_tables(session));
+            WT_ERR_MSG_CHK(session, __layered_create_missing_stable_tables(session),
+              "Failed to create missing stable tables");
 
             /* Drain the ingest tables before switching to leader. */
-            WT_ERR(__layered_drain_ingest_tables(session));
+            WT_ERR_MSG_CHK(
+              session, __layered_drain_ingest_tables(session), "Failed to drain ingest tables");
         }
 
         /* Leader step-down. */
@@ -1102,11 +1142,13 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
         WT_ERR(__disagg_metadata_table_init(session));
 
         /* Pick up the selected checkpoint. */
-        WT_ERR(__wt_config_gets(session, cfg, "disaggregated.checkpoint_meta", &cval));
-        if (cval.len > 0) {
+        WT_ERR_NOTFOUND_OK(
+          __wt_config_gets(session, cfg, "disaggregated.checkpoint_meta", &cval), true);
+        if (ret == 0 && cval.len > 0) {
             WT_WITH_CHECKPOINT_LOCK(
               session, ret = __disagg_pick_up_checkpoint_meta(session, &cval));
-            WT_ERR(ret);
+            WT_ERR_MSG_CHK(session, ret, "Failed to pick up a new checkpoint with config: %.*s",
+              (int)cval.len, cval.str);
             picked_up = true;
         }
 
@@ -1124,10 +1166,10 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
                   ret = __disagg_pick_up_checkpoint_meta_item(session, &complete_checkpoint_meta));
 
                 __wt_buf_free(session, &complete_checkpoint_meta);
-                WT_ERR(ret);
+                WT_ERR_MSG_CHK(session, ret, "Failed to pick up checkpoint metadata");
             }
             WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_begin_checkpoint(session));
-            WT_ERR(ret);
+            WT_ERR_MSG_CHK(session, ret, "Failed to begin a new checkpoint");
         }
 
         WT_ERR(__wt_config_gets(session, cfg, "page_delta.flatten_leaf_page_delta", &cval));
@@ -1681,8 +1723,12 @@ __layered_drain_ingest_tables(WT_SESSION_IMPL *session)
     /* FIXME-WT-14735: skip empty ingest tables. */
     for (i = 0; i < table_count; i++) {
         if ((entry = manager->entries[i]) != NULL) {
-            WT_ERR(__layered_copy_ingest_table(internal_session, entry));
-            WT_ERR(__layered_clear_ingest_table(internal_session, entry->ingest_uri));
+            WT_ERR_MSG_CHK(session, __layered_copy_ingest_table(internal_session, entry),
+              "Failed to copy ingest table \"%s\" to stable table \"%s\"", entry->ingest_uri,
+              entry->stable_uri);
+            WT_ERR_MSG_CHK(session,
+              __layered_clear_ingest_table(internal_session, entry->ingest_uri),
+              "Failed to clear ingest table \"%s\"", entry->ingest_uri);
         }
     }
 
@@ -1734,8 +1780,10 @@ __layered_update_gc_ingest_tables_prune_timestamps(WT_SESSION_IMPL *session)
              * If we've never seen a checkpoint, then there's nothing in the ingest table we can
              * remove. Move on.
              */
-            if (ret == WT_NOTFOUND)
+            if (ret == WT_NOTFOUND) {
+                ret = 0;
                 continue;
+            }
 
             /*
              * For each layered table, we want to see what is the oldest checkpoint on that table

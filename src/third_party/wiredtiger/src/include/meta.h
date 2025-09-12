@@ -45,6 +45,7 @@
 #define WT_DISAGG_METADATA_URI "file:WiredTigerShared.wt_stable" /* Shared metadata table URI */
 #define WT_DISAGG_METADATA_TABLE_ID 1                            /* Table ID for metadata strings */
 #define WT_DISAGG_METADATA_MAIN_PAGE_ID 1                        /* Page ID for the main metadata */
+#define WT_DISAGG_METADATA_MAX_PAGE_ID 1                         /* Max page ID in the metadata */
 
 #define WT_SYSTEM_PREFIX "system:"                               /* System URI prefix */
 #define WT_SYSTEM_CKPT_TS "checkpoint_timestamp"                 /* Checkpoint timestamp name */
