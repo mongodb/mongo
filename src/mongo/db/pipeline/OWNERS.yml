@@ -315,3 +315,6 @@ filters:
   - "document_source_list_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "document_source_list_extensions*":
+    approvers:
+      - 10gen/query-integration-extensions-api

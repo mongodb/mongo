@@ -222,4 +222,15 @@ void ExtensionLoader::load(const ExtensionConfig& config) {
     HostPortal portal{extHandle.getVersion(), maxWireVersion, YAML::Dump(config.extOptions)};
     extHandle.initialize(portal);
 }
+
+std::vector<std::string> ExtensionLoader::getLoadedExtensions() {
+    std::vector<std::string> result;
+    result.reserve(loadedExtensions.size());
+
+    for (const auto& [name, _] : loadedExtensions) {
+        result.push_back(name);
+    }
+
+    return result;
+}
 }  // namespace mongo::extension::host

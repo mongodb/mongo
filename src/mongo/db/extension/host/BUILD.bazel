@@ -29,7 +29,10 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "extension_loader",
-    srcs = ["load_extension.cpp"],
+    srcs = [
+        "load_extension.cpp",
+        "//src/mongo/db/pipeline:document_source_list_extensions.cpp",
+    ],
     hdrs = ["load_extension.h"],
     deps = [
         "//src/mongo:base",

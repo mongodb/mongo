@@ -8968,6 +8968,23 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "aggregate_$listExtensions",
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagExtensionsAPI"),
+            command: {
+                aggregate: 1,
+                pipeline: [{$listExtensions: {}}],
+                cursor: {},
+            },
+            testcases: [
+                // TODO(SERVER-110415): Check if the roles and privileges fields must be updated.
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_all,
+                    privileges: [],
+                },
+            ],
+        },
+        {
             testname: "raw_data",
             command: {
                 count: "raw_data",

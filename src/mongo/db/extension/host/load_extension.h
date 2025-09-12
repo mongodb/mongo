@@ -69,6 +69,13 @@ public:
      */
     static void load(const ExtensionConfig& config);
 
+
+    /**
+     * TODO(SERVER-110317): Change "paths" to "names."
+     * Returns the paths of the currently registered extensions.
+     */
+    static std::vector<std::string> getLoadedExtensions();
+
 private:
     // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
     // and track what extensions have been loaded. Initialized during process initialization and

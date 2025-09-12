@@ -435,6 +435,7 @@ const skips = new Set([
     "$listCachedAndActiveUsers",
     "$listCatalog",
     "$listClusterCatalog",
+    "$listExtensions",
     "$listLocalSessions",
     "$listMqlEntities",
     "$listSampledQueries", // Tested in list_sampled_queries.js.
