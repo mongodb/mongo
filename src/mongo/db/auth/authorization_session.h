@@ -125,9 +125,17 @@ public:
     virtual void startRequest(OperationContext* opCtx) = 0;
 
     /**
-     * Start tracking permissions and privileges in the authorization contract.
+     * Start tracking permissions and privileges in the authorization contract. Will only track for
+     * top level commands.
      */
     virtual void startContractTracking() = 0;
+
+
+    /**
+     * Stop tracking permissions and privileges in the authorization contract.
+     */
+    virtual void endContractTracking() = 0;
+
 
     /**
      * Adds the User identified by "UserName" to the authorization session, acquiring privileges

@@ -42,6 +42,7 @@
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_contract_guard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
@@ -485,7 +486,8 @@ const CommandNameAtom isMasterAtom("isMaster");
 class ExecCommandDatabase {
 public:
     explicit ExecCommandDatabase(HandleRequest::ExecutionContext& execContext)
-        : _execContext(execContext) {
+        : _execContext(execContext),
+          _contractGuard(AuthorizationSession::get(_execContext.client())) {
         _parseCommand();
     }
 
@@ -663,6 +665,7 @@ private:
                                                           bool startOrContinueTransaction);
 
     const HandleRequest::ExecutionContext& _execContext;
+    AuthorizationContractGuard _contractGuard;
 
     // The following allows `_initiateCommand`, `_commandExec`, and `_handleFailure` to share
     // execution state without concerning the lifetime of these variables.
@@ -1566,10 +1569,6 @@ void ExecCommandDatabase::_initiateCommand() {
     auto& genericArgs = _invocation->getGenericArguments();
 
     Client* client = opCtx->getClient();
-
-    // Start authz contract tracking before we evaluate failpoints
-    auto authzSession = AuthorizationSession::get(client);
-    authzSession->startContractTracking();
 
     if (validatedTenancyScope && validatedTenancyScope->hasAuthenticatedUser()) {
         uassert(ErrorCodes::Unauthorized,

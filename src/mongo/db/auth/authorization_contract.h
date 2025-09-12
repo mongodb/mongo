@@ -35,6 +35,7 @@
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 #include <array>
 #include <bitset>
@@ -54,6 +55,9 @@ namespace mongo {
  * This class is a lossy set.
  * 1. It does not record a count of times a check has been performed.
  * 2. It does not record which namespace a check is performed against.
+ *
+ * When commands execute other commands via DBDirectClient, we only want
+ * the top-level command to accumulate authorization checks.
  */
 class AuthorizationContract {
 public:
@@ -71,10 +75,24 @@ public:
     }
 
     AuthorizationContract(const AuthorizationContract& other) {
+        stdx::lock_guard<stdx::mutex> lck(other._mutex);
         _checks = other._checks;
         _privilegeChecks = other._privilegeChecks;
         _isPermissionChecked.storeRelaxed(other._isPermissionChecked.loadRelaxed());
+        _commandDepth = other._commandDepth;
     }
+
+    /**
+     * Start tracking permissions and privileges in the authorization contract.
+     * Will only track top level commands to prevent nested direct client operations from polluting
+     * the parent command's authorization contract.
+     */
+    void enterCommandScope();
+
+    /**
+     * Stops tracking the contract and reduces the command depth counter.
+     */
+    void exitCommandScope();
 
     /**
      * Clear the authorization contract
@@ -114,6 +132,9 @@ public:
     }
 
 private:
+    // Clear the authorization contract.
+    void clear(WithLock lk);
+
     mutable stdx::mutex _mutex;
 
     // Set of access checks performed
@@ -127,6 +148,9 @@ private:
 
     // If false accounting and mutex guards are disabled
     bool _isTestModeEnabled{true};
+
+    // Depth of commands running as DBDirectClient.
+    int _commandDepth{0};
 };
 
 }  // namespace mongo

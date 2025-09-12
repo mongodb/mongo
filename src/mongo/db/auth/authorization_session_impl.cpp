@@ -220,7 +220,15 @@ void AuthorizationSessionImpl::startContractTracking() {
         return;
     }
 
-    _contract.clear();
+    _contract.enterCommandScope();
+}
+
+void AuthorizationSessionImpl::endContractTracking() {
+    if (!checkContracts()) {
+        return;
+    }
+
+    _contract.exitCommandScope();
 }
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,

@@ -30,7 +30,6 @@
 
 #include "mongo/db/auth/authorization_contract.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/access_checks_gen.h"
 #include "mongo/db/auth/action_type.h"
@@ -47,10 +46,28 @@
 
 
 namespace mongo {
+void AuthorizationContract::enterCommandScope() {
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+
+    // Only clear checks when its a top level command.
+    if (_commandDepth == 0) {
+        clear(lck);
+    }
+    _commandDepth++;
+}
+
+void AuthorizationContract::exitCommandScope() {
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    invariant(_commandDepth > 0);
+    _commandDepth--;
+}
 
 void AuthorizationContract::clear() {
     stdx::lock_guard<stdx::mutex> lck(_mutex);
+    clear(lck);
+}
 
+void AuthorizationContract::clear(WithLock lk) {
     _checks.reset();
     for (size_t i = 0; i < _privilegeChecks.size(); ++i) {
         _privilegeChecks[i].removeAllActions();
@@ -65,6 +82,9 @@ void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
     }
 
     stdx::lock_guard<stdx::mutex> lck(_mutex);
+    if (_commandDepth > 1) {
+        return;
+    }
 
     _checks.set(static_cast<size_t>(check), true);
 
@@ -83,6 +103,9 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
     }
 
     stdx::lock_guard<stdx::mutex> lck(_mutex);
+    if (_commandDepth > 1) {
+        return;
+    }
 
     auto matchType = p.getResourcePattern().matchType();
 

@@ -89,6 +89,8 @@ public:
 
     void startContractTracking() override;
 
+    void endContractTracking() override;
+
     Status addAndAuthorizeUser(OperationContext* opCtx,
                                std::unique_ptr<UserRequest> userRequest,
                                boost::optional<Date_t> expirationTime) override;
@@ -160,6 +162,19 @@ public:
     Status checkCursorSessionPrivilege(OperationContext* opCtx,
                                        boost::optional<LogicalSessionId> cursorSessionId) override;
 
+    /**
+     * Verifies that the authorization session recorded checks are a subset of the allowed contract
+     * passed as a parameter.
+     *
+     * This method validates that the session did NOT perform any unauthorized checks,
+     * but does NOT validate that the session performed all checks in the given parameter contract.
+     *
+     * Example checks scenarios:
+     * 1. Session performed {A, B}, Contract allows {A, B, C} -> PASS (subset)
+     * 2. Session performed {}, Contract allows {A, B, C} -> PASS (empty set is subset of all)
+     * 3. Session performed {A, B, D}, Contract allows {A, B, C} -> FAIL (D not in allowed set)
+     *
+     **/
     void verifyContract(const AuthorizationContract* contract) const override;
 
     bool mayBypassWriteBlockingMode() const override;

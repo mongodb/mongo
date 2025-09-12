@@ -346,6 +346,7 @@ mongo_cc_library(
         "access_checks_gen",
         "action_type_gen",
         "auth_types_gen",
+        "authorization_contract_guard.h",
         "parsed_privilege_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/auth:privilege_format.h",

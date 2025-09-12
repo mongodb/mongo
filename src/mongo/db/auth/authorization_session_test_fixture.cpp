@@ -78,7 +78,6 @@ void AuthorizationSessionTestFixture::setUp() {
     sessionState = localSessionState.get();
     authzSession =
         std::make_unique<AuthorizationSessionForTest>(std::move(localSessionState), _client.get());
-    authzSession->startContractTracking();
 
     credentials =
         BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(

@@ -38,6 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_contract.h"
+#include "mongo/db/auth/authorization_contract_guard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session_test_fixture.h"
 #include "mongo/db/auth/builtin_roles.h"
@@ -1435,6 +1436,12 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
             Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID)});
 
     authzSession->verifyContract(&ac);
+
+    const auto& sessionContract = authzSession->getAuthorizationContract();
+    ASSERT_TRUE(
+        sessionContract.hasAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement));
+    ASSERT_TRUE(sessionContract.hasPrivileges(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID)));
 }
 
 const UserName kGMarksAdmin("gmarks", "admin");
@@ -2583,6 +2590,119 @@ TEST_F(AuthorizationSessionTest, AggStagePassesRequiresAuthzChecksWithPrivileges
         ASSERT_OK(
             auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq_test_three, false));
     }
+}
+
+TEST_F(AuthorizationSessionTest, DBDirectClientDoesNotPolluteContract) {
+    ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
+
+    // Simulate a top-level command
+    authzSession->startContractTracking();
+
+    // Top-level command checks
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::remove));
+
+    // Simulate DBDirectClient starting a nested command
+    authzSession->startContractTracking();
+
+    // Nested command tries to add checks (should be ignored)
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(testFooCollResource,
+                                                               ActionType::createCollection));
+    // End nested command
+    authzSession->endContractTracking();
+
+    // Verify only the top-level checks are recorded
+    AuthorizationContract expectedContract(
+        std::initializer_list<AccessCheckEnum>{},
+        std::initializer_list<Privilege>{
+            Privilege(ResourcePattern::forExactNamespace(testFooCollResource.ns()),
+                      {ActionType::find, ActionType::remove})});
+
+    ASSERT_TRUE(authzSession->getAuthorizationContract().contains(expectedContract));
+
+    // The nested checks should not be in the contract
+    AuthorizationContract wrongContract(
+        std::initializer_list<AccessCheckEnum>{},
+        std::initializer_list<Privilege>{
+            Privilege(ResourcePattern::forExactNamespace(testFooCollResource.ns()),
+                      {ActionType::find,
+                       ActionType::remove,
+                       ActionType::insert,
+                       ActionType::createCollection})});
+
+    ASSERT_FALSE(authzSession->getAuthorizationContract().contains(wrongContract));
+
+    authzSession->endContractTracking();
+    authzSession->logoutDatabase(kTestDB, "Kill the test!"_sd);
+}
+
+
+TEST_F(AuthorizationSessionTest, AuthorizationContractGuardRAII) {
+    ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
+
+    // Test normal flow
+    {
+        AuthorizationContractGuard guard(authzSession.get());
+
+        ASSERT_TRUE(
+            authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
+
+        AuthorizationContract ac(
+            std::initializer_list<AccessCheckEnum>{},
+            std::initializer_list<Privilege>{Privilege(
+                ResourcePattern::forExactNamespace(testFooCollResource.ns()), ActionType::find)});
+
+        ASSERT_TRUE(authzSession->getAuthorizationContract().contains(ac));
+        // Guard destructor will call endContractTracking()
+    }
+
+    {
+        AuthorizationContractGuard guard1(authzSession.get());
+        ASSERT_TRUE(
+            authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
+
+        {
+            AuthorizationContractGuard guard2(authzSession.get());
+
+            // This should be at depth 2, so these checks should be ignored
+            ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(testFooCollResource,
+                                                                       ActionType::insert));
+            ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(testFooCollResource,
+                                                                       ActionType::remove));
+        }
+
+        // After nested guard destroyed, we're back at depth 1
+        // Add one more check at depth 1 to verify we can still add checks
+        ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(testFooCollResource,
+                                                                   ActionType::update));
+
+        // Verify the contract contains only depth 1 checks and NOT the depth 2 checks
+        AuthorizationContract expectedContract(
+            std::initializer_list<AccessCheckEnum>{},
+            std::initializer_list<Privilege>{
+                Privilege(ResourcePattern::forExactNamespace(testFooCollResource.ns()),
+                          {ActionType::find, ActionType::update})});
+
+        ASSERT_TRUE(authzSession->getAuthorizationContract().contains(expectedContract));
+
+        // Verify that a contract including the nested checks would fail
+        AuthorizationContract wrongContract(
+            std::initializer_list<AccessCheckEnum>{},
+            std::initializer_list<Privilege>{Privilege(
+                ResourcePattern::forExactNamespace(testFooCollResource.ns()),
+                {ActionType::find, ActionType::update, ActionType::insert, ActionType::remove})});
+
+        ASSERT_FALSE(authzSession->getAuthorizationContract().contains(wrongContract));
+    }
+    authzSession->logoutDatabase(kTestDB, "Kill the test!"_sd);
 }
 }  // namespace
 }  // namespace mongo
