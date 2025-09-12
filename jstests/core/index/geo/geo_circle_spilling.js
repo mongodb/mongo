@@ -4,7 +4,6 @@
 //   requires_fcv_83,
 //   requires_getmore,
 //   requires_persistence,
-//   featureFlagExtendedAutoSpilling,
 //   assumes_unsharded_collection,
 //   # Insertions make transactions too big
 //   does_not_support_transactions
@@ -76,12 +75,15 @@ function insertDocuments(coll, generateDocument) {
 }
 
 {
-    // Check clustered collection - RecordIdDeduplicator should also spill
-    db.runCommand({
-        create: "geo_circle_spilling_clustered",
-        clusteredIndex: {"key": {_id: 1}, "unique": true, "name": "large string clustered key"},
-    });
+    // Check clustered collection
     const clusteredColl = db.geo_circle_spilling_clustered;
+    clusteredColl.drop();
+    assert.commandWorked(
+        db.runCommand({
+            create: clusteredColl.getName(),
+            clusteredIndex: {"key": {_id: 1}, "unique": true, "name": "large string clustered key"},
+        }),
+    );
     clusteredColl.createIndex({geo: "2dsphere"});
 
     insertDocuments(clusteredColl, (i) => {

@@ -275,7 +275,7 @@ feature_flags:
     featureFlagExtendedAutoSpilling:
         description: "Feature flag to enable auto spilling to additional stages"
         cpp_varname: gFeatureFlagExtendedAutoSpilling
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagQueryStatsWriteCommand:

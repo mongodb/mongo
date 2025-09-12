@@ -1,10 +1,9 @@
 // Test that $text query can spill when textScore is needed.
 // @tags: [
 //   not_allowed_with_signed_security_token,
-//   requires_fcv_81,
+//   requires_fcv_83,
 //   requires_persistence,
 //   requires_non_retryable_commands,
-//   featureFlagExtendedAutoSpilling,
 // ]
 
 import {arrayDiff} from "jstests/aggregation/extras/utils.js";

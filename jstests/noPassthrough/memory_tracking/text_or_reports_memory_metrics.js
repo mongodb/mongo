@@ -11,9 +11,8 @@
  * queries_system_profile_collection,
  * # The test runs the profile and getLog commands, which are not supported in Serverless.
  * command_not_supported_in_serverless,
- * requires_fcv_82,
+ * requires_fcv_83,
  * assumes_against_mongod_not_mongos,
- * featureFlagExtendedAutoSpilling,
  * ]
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
