@@ -107,6 +107,11 @@ public:
     static constexpr auto kExpressionName = "$function"_sd;
     static constexpr auto kJavaScript = "js";
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return ExpressionFunction::create(
+            getExpressionContext(), cloneChild(0), _funcSource, _lang);
+    }
+
 private:
     ExpressionFunction(ExpressionContext* expCtx,
                        boost::intrusive_ptr<Expression> passedArgs,

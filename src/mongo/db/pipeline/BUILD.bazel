@@ -1499,6 +1499,7 @@ mongo_cc_unit_test(
         "document_source_union_with_test.cpp",
         "document_source_unwind_test.cpp",
         "expression_and_test.cpp",
+        "expression_clone_test.cpp",
         "expression_compare_test.cpp",
         "expression_context_test.cpp",
         "expression_convert_test.cpp",
@@ -1767,6 +1768,18 @@ mongo_cc_benchmark(
     tags = ["query_bm"],
     deps = [
         ":expression_context_for_test",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "expression_clone_bm",
+    srcs = [
+        "expression_clone_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":expression_context_for_test",
+        "//src/mongo/db/exec:expression_bm_fixture",
     ],
 )
 

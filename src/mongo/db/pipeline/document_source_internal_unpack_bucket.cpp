@@ -410,14 +410,7 @@ boost::intrusive_ptr<Expression> rewriteMetaFieldPaths(
     // We need to clone here to avoid corrupting the original expression if the optimization cannot
     // be made. E.g., if a subsequent group by element contains a field path that references a time
     // series field.
-    //
-    // Clone by serializing and reparsing. There does not seem to be a more idiomatic way to do this
-    // at the moment.
-    auto serialized = expr->serialize();
-    auto obj = BSON("f" << serialized);
-    auto clonedExpr =
-        Expression::parseOperand(pExpCtx.get(), obj.firstElement(), pExpCtx->variablesParseState);
-
+    auto clonedExpr = expr->clone();
     auto renameMap =
         StringMap<std::string>{{metaField.value(), std::string{timeseries::kBucketMetaFieldName}}};
     SubstituteFieldPathWalker walker{renameMap};

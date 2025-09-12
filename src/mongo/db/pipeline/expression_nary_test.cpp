@@ -103,6 +103,11 @@ public:
         return new Testable(expCtx, associative, commutative);
     }
 
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return Testable::create(getExpressionContext(), _associativity, _isCommutative);
+    }
+
 private:
     Testable(ExpressionContext* const expCtx, Associativity associativity, bool isCommutative)
         : ExpressionNary(expCtx), _associativity(associativity), _isCommutative(isCommutative) {}

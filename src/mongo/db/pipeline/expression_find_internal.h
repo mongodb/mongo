@@ -114,7 +114,18 @@ public:
         return _matchExpr;
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalFindPositional>(getExpressionContext(),
+                                                                cloneChild(_kPreImageExpr),
+                                                                cloneChild(_kPostImageExpr),
+                                                                _path,
+                                                                _matchExpr);
+    }
+
 private:
+    static constexpr size_t _kPreImageExpr = 0;
+    static constexpr size_t _kPostImageExpr = 1;
+
     const FieldPath _path;
     const CopyableMatchExpression _matchExpr;
 };
@@ -172,6 +183,11 @@ public:
 
     int getLimit() const {
         return _limit;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalFindSlice>(
+            getExpressionContext(), cloneChild(0), _path, _skip, _limit);
     }
 
 private:
@@ -234,6 +250,11 @@ public:
 
     const CopyableMatchExpression& getMatchExpression() const {
         return _matchExpr;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalFindElemMatch>(
+            getExpressionContext(), cloneChild(0), _path, _matchExpr);
     }
 
 private:

@@ -51,6 +51,8 @@ public:
     static constexpr auto kUnstableField = "unstable";
     static constexpr auto kDeprecatedField = "deprecated";
 
+    ExpressionTestApiVersion(ExpressionContext* expCtx, bool unstable, bool deprecated);
+
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
@@ -67,9 +69,12 @@ public:
         return visitor->visit(this);
     }
 
-private:
-    ExpressionTestApiVersion(ExpressionContext* expCtx, bool unstable, bool deprecated);
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTestApiVersion>(
+            getExpressionContext(), _unstable, _deprecated);
+    }
 
+private:
     bool _unstable;
     bool _deprecated;
 };

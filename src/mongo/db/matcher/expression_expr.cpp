@@ -101,12 +101,7 @@ void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
 
 
 std::unique_ptr<MatchExpression> ExprMatchExpression::clone() const {
-    // TODO SERVER-31003: Replace Expression clone via serialization with Expression::clone().
-    BSONObjBuilder bob;
-    bob << "" << _expression->serialize();
-    boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
-        _expCtx.get(), bob.obj().firstElement(), _expCtx->variablesParseState);
-
+    boost::intrusive_ptr<Expression> clonedExpr = _expression->clone();
     auto clone =
         std::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx, _errorAnnotation);
     if (_rewriteResult) {

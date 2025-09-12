@@ -166,7 +166,7 @@ boost::intrusive_ptr<Expression> ExpressionLet::create(
 
 ExpressionLet::ExpressionLet(ExpressionContext* const expCtx,
                              VariableMap&& vars,
-                             std::vector<boost::intrusive_ptr<Expression>> children,
+                             ExpressionVector&& children,
                              std::vector<Variables::Id> orderedVariableIds)
     : Expression(expCtx, std::move(children)),
       _kSubExpression(_children.size() - 1),

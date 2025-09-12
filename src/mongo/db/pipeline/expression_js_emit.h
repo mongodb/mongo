@@ -89,6 +89,10 @@ public:
         return _funcSource;
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return ExpressionInternalJsEmit::create(getExpressionContext(), cloneChild(0), _funcSource);
+    }
+
 private:
     ExpressionInternalJsEmit(ExpressionContext* expCtx,
                              boost::intrusive_ptr<Expression> thisRef,

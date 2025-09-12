@@ -1703,12 +1703,8 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
         }
         case MatchExpression::EXPRESSION: {
             // Agg expressions are rewritten in-place, so we must clone the expression tree.
-            auto origExprVal =
-                static_cast<const ExprMatchExpression*>(root)->getExpression()->serialize(
-                    SerializationOptions{});
-            auto clonedExpr = Expression::parseOperand(
-                expCtx.get(), BSON("" << origExprVal).firstElement(), expCtx->variablesParseState);
-
+            auto clonedExpr =
+                static_cast<const ExprMatchExpression*>(root)->getExpression()->clone();
             // Attempt to rewrite the aggregation expression and return a new ExprMatchExpression.
             if (auto rewrittenExpr = rewriteAggExpressionTree(
                     expCtx, clonedExpr, fields, allowInexact, backingBsonObjs)) {

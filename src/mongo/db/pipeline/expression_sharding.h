@@ -72,6 +72,11 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalOwningShard>(getExpressionContext(),
+                                                             cloneChildren());
+    }
 };
 
 /**
@@ -166,7 +171,15 @@ public:
         return _spec.get();
     }
 
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalIndexKey>(
+            getExpressionContext(), cloneChild(_kDocExpr), cloneChild(_kSpecExpr));
+    }
+
 private:
+    static constexpr size_t _kDocExpr = 0;
+    static constexpr size_t _kSpecExpr = 1;
     constexpr static auto kDocField = "doc"_sd;
     constexpr static auto kSpecField = "spec"_sd;
 

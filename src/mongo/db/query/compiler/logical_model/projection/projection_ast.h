@@ -359,22 +359,7 @@ class ExpressionASTNode final : public ASTNode {
 public:
     ExpressionASTNode(boost::intrusive_ptr<Expression> expr) : _expr(std::move(expr)) {}
     ExpressionASTNode(const ExpressionASTNode& other) : ASTNode(other) {
-        BSONObjBuilder bob;
-        bob << "" << other._expr->serialize();
-
-        // TODO SERVER-31003: add a clone() method to Expression.
-        // Temporary stop expression counters while processing the cloned expression.
-        auto otherCtx = other._expr->getExpressionContext();
-        auto activeCounting = otherCtx->expressionCountersAreActive();
-        if (activeCounting) {
-            otherCtx->setEnabledCounters(false);
-        }
-        boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
-            otherCtx, bob.obj().firstElement(), otherCtx->variablesParseState);
-        if (activeCounting) {
-            otherCtx->setEnabledCounters(true);
-        }
-        _expr = clonedExpr;
+        _expr = other._expr->clone();
     }
 
     void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {

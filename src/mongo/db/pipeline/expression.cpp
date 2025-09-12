@@ -77,6 +77,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -88,6 +89,29 @@ using boost::intrusive_ptr;
 using std::pair;
 using std::string;
 using std::vector;
+
+Expression::ExpressionVector Expression::cloneChildren() const {
+    if (_children.empty()) {
+        return {};
+    }
+
+    ExpressionVector copy;
+
+    copy.resize(_children.size());
+    for (size_t childIdx = 0; childIdx < _children.size(); ++childIdx) {
+        copy[childIdx] = cloneChild(childIdx);
+    }
+
+    return copy;
+}
+
+boost::intrusive_ptr<Expression> Expression::cloneChild(size_t childIdx) const {
+    tassert(
+        3100300,
+        fmt::format("Child index is out of bounds: idx={}, size={}", childIdx, _children.size()),
+        childIdx < _children.size());
+    return _children[childIdx] ? _children[childIdx]->clone() : nullptr;
+}
 
 Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
                                             Value val,
@@ -171,6 +195,28 @@ void Expression::registerExpression(string key,
 
 void Expression::registerDisabledExpressionName(string key, ExpressionDisabledReason reason) {
     disabledExpressionNames[key] = reason;
+}
+
+stdx::unordered_set<std::string> Expression::listRegisteredExpressions() {
+    stdx::unordered_set<std::string> expressions;
+
+    expressions.reserve(parserMap.size());
+    for (auto&& [exprName, _] : parserMap) {
+        expressions.insert(exprName);
+    }
+
+    return expressions;
+}
+
+stdx::unordered_set<std::string> Expression::listDisabledExpressions() {
+    stdx::unordered_set<std::string> expressions;
+
+    expressions.reserve(disabledExpressionNames.size());
+    for (auto&& [exprName, _] : disabledExpressionNames) {
+        expressions.insert(exprName);
+    }
+
+    return expressions;
 }
 
 std::string Expression::getErrorMessage(const StringData key) {

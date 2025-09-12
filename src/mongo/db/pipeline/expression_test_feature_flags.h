@@ -83,6 +83,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTestFeatureFlagLatest>(getExpressionContext());
+    }
 };
 
 class ExpressionTestFeatureFlagLastLTS final : public ExpressionTestFeatureFlags {
@@ -102,6 +106,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTestFeatureFlagLastLTS>(getExpressionContext());
     }
 };
 }  // namespace mongo

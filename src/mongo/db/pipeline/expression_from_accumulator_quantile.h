@@ -58,7 +58,7 @@ template <typename TAccumulator>
 class ExpressionFromAccumulatorQuantile : public Expression {
 public:
     explicit ExpressionFromAccumulatorQuantile(ExpressionContext* const expCtx,
-                                               std::vector<double>& ps,
+                                               const std::vector<double>& ps,
                                                boost::intrusive_ptr<Expression> input,
                                                PercentileMethodEnum method)
         : Expression(expCtx, {input}), _ps(ps), _input(input), _method(method) {
@@ -95,6 +95,11 @@ public:
 
     PercentileMethodEnum getMethod() const {
         return _method;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionFromAccumulatorQuantile<TAccumulator>>(
+            getExpressionContext(), _ps, cloneChild(0), _method);
     }
 
 private:

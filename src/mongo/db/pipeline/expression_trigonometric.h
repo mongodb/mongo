@@ -200,6 +200,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionArcTangent2>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -235,6 +239,9 @@ public:
                                                                                                    \
         void acceptVisitor(ExpressionConstVisitor* visitor) const final {                          \
             return visitor->visit(this);                                                           \
+        }                                                                                          \
+        boost::intrusive_ptr<Expression> clone() const final {                                     \
+            return make_intrusive<Expression##className>(getExpressionContext(), cloneChildren()); \
         }                                                                                          \
     };
 
@@ -277,29 +284,32 @@ CREATE_BOUNDED_TRIGONOMETRIC_CLASS(Tangent,
 /* ----------------------- Unbounded Trigonometric Functions ---------------------------- */
 
 
-#define CREATE_TRIGONOMETRIC_CLASS(className, funcName)                         \
-    class Expression##className final                                           \
-        : public ExpressionUnboundedTrigonometric<Expression##className> {      \
-    public:                                                                     \
-        explicit Expression##className(ExpressionContext* const expCtx)         \
-            : ExpressionUnboundedTrigonometric(expCtx) {}                       \
-        explicit Expression##className(ExpressionContext* const expCtx,         \
-                                       ExpressionVector&& children)             \
-            : ExpressionUnboundedTrigonometric(expCtx, std::move(children)) {}  \
-                                                                                \
-        Value evaluate(const Document& root, Variables* variables) const final; \
-                                                                                \
-        const char* getOpName() const final {                                   \
-            return "$" #funcName;                                               \
-        }                                                                       \
-                                                                                \
-        void acceptVisitor(ExpressionMutableVisitor* visitor) final {           \
-            return visitor->visit(this);                                        \
-        }                                                                       \
-                                                                                \
-        void acceptVisitor(ExpressionConstVisitor* visitor) const final {       \
-            return visitor->visit(this);                                        \
-        }                                                                       \
+#define CREATE_TRIGONOMETRIC_CLASS(className, funcName)                                            \
+    class Expression##className final                                                              \
+        : public ExpressionUnboundedTrigonometric<Expression##className> {                         \
+    public:                                                                                        \
+        explicit Expression##className(ExpressionContext* const expCtx)                            \
+            : ExpressionUnboundedTrigonometric(expCtx) {}                                          \
+        explicit Expression##className(ExpressionContext* const expCtx,                            \
+                                       ExpressionVector&& children)                                \
+            : ExpressionUnboundedTrigonometric(expCtx, std::move(children)) {}                     \
+                                                                                                   \
+        Value evaluate(const Document& root, Variables* variables) const final;                    \
+                                                                                                   \
+        const char* getOpName() const final {                                                      \
+            return "$" #funcName;                                                                  \
+        }                                                                                          \
+                                                                                                   \
+        void acceptVisitor(ExpressionMutableVisitor* visitor) final {                              \
+            return visitor->visit(this);                                                           \
+        }                                                                                          \
+                                                                                                   \
+        void acceptVisitor(ExpressionConstVisitor* visitor) const final {                          \
+            return visitor->visit(this);                                                           \
+        }                                                                                          \
+        boost::intrusive_ptr<Expression> clone() const final {                                     \
+            return make_intrusive<Expression##className>(getExpressionContext(), cloneChildren()); \
+        }                                                                                          \
     };
 
 CREATE_TRIGONOMETRIC_CLASS(ArcTangent, atan);
@@ -334,6 +344,11 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDegreesToRadians>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionRadiansToDegrees final
@@ -357,6 +372,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRadiansToDegrees>(getExpressionContext(), cloneChildren());
     }
 };
 
