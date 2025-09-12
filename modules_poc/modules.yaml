@@ -907,6 +907,7 @@ validate:
     - src/mongo/db/commands/validate.cpp
     - src/mongo/db/validate
     - src/mongo/dbtests/validate_tests.cpp
+    - src/mongo/dbtests/extended_validate_tests.cpp
     - src/mongo/s/commands/cluster_validate_cmd.cpp
 
 dbhash:

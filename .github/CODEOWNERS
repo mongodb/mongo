@@ -2770,6 +2770,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/storage_debug_util* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/dbtests/**/dbhelper_tests.cpp @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/dbtests/**/validate_tests.cpp @10gen/server-validate @svc-auto-approve-bot
+/src/mongo/dbtests/**/extended_validate_tests.cpp @10gen/server-replication @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/dbtests/**/deferred_writer.cpp @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/dbtests/**/pdfiletests.cpp @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/dbtests/**/wildcard_access_method_test.cpp @10gen/query-optimization @svc-auto-approve-bot

@@ -183,6 +183,10 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         resultObj->appendNumber("nrecords", _numRecords.value());
     }
 
+    if (_collectionHash.has_value()) {
+        resultObj->append("all", _collectionHash.value());
+    }
+
     // Need to convert RecordId to a printable type.
     BSONArrayBuilder builder;
     for (const RecordId& corruptRecord : getCorruptRecords()) {

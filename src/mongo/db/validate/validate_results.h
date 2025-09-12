@@ -184,6 +184,13 @@ public:
         _corruptRecords.push_back(std::move(record));
     }
 
+    const boost::optional<std::string>& getCollectionHash() const {
+        return _collectionHash;
+    }
+    void addCollectionHash(std::string collectionHash) {
+        _collectionHash = std::move(collectionHash);
+    }
+
     bool getRepaired() const {
         return _repaired;
     }
@@ -308,6 +315,9 @@ private:
     boost::optional<long long> _numInvalidDocuments;
     boost::optional<long long> _numNonCompliantDocuments;
     boost::optional<long long> _numRecords;
+
+    // Hashes computed for extended validate.
+    boost::optional<std::string> _collectionHash;
 
     // Timestamps (startTs, startDurable, stopTs, stopDurableTs) related to records
     // with validation errors. See WiredTigerRecordStore::printRecordMetadata().

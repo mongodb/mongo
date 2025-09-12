@@ -41,6 +41,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/matcher/matcher.h"
@@ -818,6 +819,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
     const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
         _validateState->getTraverseRecordStoreCursor();
+
+    // Accumulates each record's SHA256 block as they are XORed together. Starts off
+    // zeroed out.
+    SHA256Block accumulatedBlock;
+    accumulatedBlock.xorInline(accumulatedBlock);
+
     for (auto record =
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
          record;
@@ -838,6 +845,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                        &validatedSize,
                                        results,
                                        validationVersion);
+
+        if (_validateState->isCollHashValidation()) {
+            SHA256Block block = SHA256Block::computeHash(
+                {ConstDataRange(record->data.data(), record->data.size())});
+            accumulatedBlock.xorInline(block);
+        }
 
         // Log the out-of-order entries as errors.
         //
@@ -975,6 +988,10 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 interruptIntervalNumBytes = 0;
             }
         }
+    }
+
+    if (_validateState->isCollHashValidation()) {
+        results->addCollectionHash(accumulatedBlock.toHexString());
     }
 
     if (results->getNumRemovedCorruptRecords() > 0) {

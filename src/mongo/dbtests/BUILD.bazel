@@ -99,6 +99,7 @@ mongo_cc_binary(
         "deferred_writer.cpp",
         "directclienttests.cpp",
         "documentsourcetests.cpp",
+        "extended_validate_tests.cpp",
         "extensions_callback_real_test.cpp",
         "indexupdatetests.cpp",
         "insert_test.cpp",

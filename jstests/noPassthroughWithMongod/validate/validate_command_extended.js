@@ -3,7 +3,9 @@
 // Set the number of documents to insert
 let count = 10;
 
-function testValidate(output) {
+function testValidate(options) {
+    const output = t.validate(options);
+
     assert.eq(output.nrecords, count, "validate returned an invalid count");
     assert.eq(output.nIndexes, 3, "validate returned an invalid number of indexes");
 
@@ -12,6 +14,10 @@ function testValidate(output) {
     for (let i in indexNames) {
         if (!indexNames.hasOwnProperty(i)) continue;
         assert.eq(indexNames[i], count, "validate returned an invalid number of indexes");
+    }
+
+    if (options.collHash && !options.hashPrefixes) {
+        assert(output.all, output);
     }
 }
 
@@ -29,28 +35,20 @@ t.createIndex({x: 1}, {name: "forward"});
 t.createIndex({x: -1}, {name: "reverse"});
 
 // test collHash
-var output = t.validate({collHash: true});
-testValidate(output);
+testValidate({collHash: true});
 
 // Test hashPrefixes
-var output = t.validate({collHash: true, hashPrefixes: ["aaa"]});
-testValidate(output);
+testValidate({collHash: true, hashPrefixes: ["aaa"]});
 
-var output = t.validate({collHash: true, hashPrefixes: []});
-testValidate(output);
+testValidate({collHash: true, hashPrefixes: []});
 
-var output = t.validate({hashPrefixes: ["aaa"]});
-assert.commandFailed(output);
+assert.commandFailed(t.validate({hashPrefixes: ["aaa"]}));
 
 // Test unhash
-var output = t.validate({collHash: true, unhash: ["aaa"]});
-testValidate(output);
+testValidate({collHash: true, unhash: ["aaa"]});
 
-var output = t.validate({collHash: true, unhash: []});
-assert.commandFailed(output);
+assert.commandFailed(t.validate({collHash: true, unhash: []}));
 
-var output = t.validate({unhash: ["aaa"]});
-assert.commandFailed(output);
+assert.commandFailed(t.validate({unhash: ["aaa"]}));
 
-var output = t.validate({collHash: true, unhash: ["aaa"], hashPrefixes: ["aaa"]});
-assert.commandFailed(output);
+assert.commandFailed(t.validate({collHash: true, unhash: ["aaa"], hashPrefixes: ["aaa"]}));

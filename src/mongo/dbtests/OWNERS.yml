@@ -36,6 +36,10 @@ filters:
   - "validate_tests.cpp":
     approvers:
       - 10gen/server-validate
+  - "extended_validate_tests.cpp":
+    approvers:
+      - 10gen/server-replication
+      - 10gen/server-validate
   - "deferred_writer.cpp":
     approvers:
       - 10gen/server-dbcheck
