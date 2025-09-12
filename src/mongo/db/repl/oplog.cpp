@@ -229,8 +229,6 @@ boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
     const auto& catalogId = parsedO2.getCatalogId();
     auto replicatedIdent = parsedO2.getIdent();
     auto replicatedIdIndexIdent = parsedO2.getIdIndexIdent();
-    auto directoryPerDB = parsedO2.getDirectoryPerDB();
-    auto directoryForIndexes = parsedO2.getDirectoryForIndexes();
 
     uassert(
         ErrorCodes::InvalidOptions,
@@ -248,11 +246,8 @@ boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
               oplogEntry.getNss().dbName(), replicatedIdIndexIdent))
         : boost::none;
 
-    return CreateCollCatalogIdentifier{.catalogId = catalogId,
-                                       .ident = ident,
-                                       .idIndexIdent = idIndexIdent,
-                                       .directoryPerDB = directoryPerDB,
-                                       .directoryForIndexes = directoryForIndexes};
+    return CreateCollCatalogIdentifier{
+        .catalogId = catalogId, .ident = ident, .idIndexIdent = idIndexIdent};
 }
 }  // namespace
 

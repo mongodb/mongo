@@ -172,9 +172,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern,
                                      const UUID& uuid,
-                                     const BSONObj& options,
-                                     bool directoryPerDB,
-                                     bool directoryForIndexes) {
+                                     const BSONObj& options) {
     BSONObjBuilder spec;
     spec.append("v", 2);
     spec.append("key", keyPattern);
@@ -184,9 +182,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     boost::optional<BSONObj> o2;
     if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
         o2 = BSON("indexIdent" << ident::generateNewIndexIdent(
-                                      nss.dbName(), directoryPerDB, directoryForIndexes)
-                               << "directoryPerDB" << directoryPerDB << "directoryForIndexes"
-                               << directoryForIndexes);
+                      nss.dbName(), /*directoryPerDB=*/false, /*directoryForIndexes=*/false));
     }
 
     BSONObjBuilder oBuilder;
@@ -218,10 +214,7 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
     return makeCommandOplogEntry(opTime,
                                  nss,
                                  oplogEntryBuilder.obj(),
-                                 BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdent))
-                                                << "directoryPerDB" << indexBuildInfo.directoryPerDB
-                                                << "directoryForIndexes"
-                                                << indexBuildInfo.directoryForIndexes),
+                                 BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdent))),
                                  uuid);
 }
 

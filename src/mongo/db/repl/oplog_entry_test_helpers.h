@@ -114,9 +114,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern,
                                      const UUID& uuid,
-                                     const BSONObj& options = {},
-                                     bool directoryPerDB = false,
-                                     bool directoryForIndexes = false);
+                                     const BSONObj& options = {});
 /**
  * Creates a two-phase index build start oplog entry with a given optime, namespace, and index
  * build UUID.

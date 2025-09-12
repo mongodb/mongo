@@ -48,12 +48,6 @@ structs:
                 description: "The unique tag of the ident where the collection's _id index is stored. Present if the _id index is generated as a part of collection creation"
                 type: string
                 optional: true
-            directoryPerDB:
-                description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
-                type: bool
-            directoryForIndexes:
-                description: "Whether 'directoryForIndexes' storage option is set, which decides how idents are created."
-                type: bool
     CreateIndexesOplogEntryO2:
         description: "In a 'createIndexes' oplog entry, defines the fields expected in the 'o2' subobject."
         strict: false
@@ -61,12 +55,6 @@ structs:
             indexIdent:
                 description: "The unique tag of the ident where the index's table is stored."
                 type: string
-            directoryPerDB:
-                description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
-                type: bool
-            directoryForIndexes:
-                description: "Whether 'directoryForIndexes' storage option is set, which decides how idents are created."
-                type: bool
     IndexIdents:
         description: "The idents used for an index build."
         strict: false
@@ -81,9 +69,3 @@ structs:
             indexes:
                 description: "The array of index build idents."
                 type: array<IndexIdents>
-            directoryPerDB:
-                description: "Whether 'directoryPerDB' storage option is set, which decides how idents are created."
-                type: bool
-            directoryForIndexes:
-                description: "Whether 'directoryForIndexes' storage option is set, which decides how idents are created."
-                type: bool

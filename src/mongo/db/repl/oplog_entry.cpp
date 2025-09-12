@@ -257,17 +257,13 @@ BSONObj MutableOplogEntry::makeCreateCollObject(const NamespaceString& collectio
 
 BSONObj MutableOplogEntry::makeCreateCollObject2(const RecordId& catalogId,
                                                  StringData ident,
-                                                 const boost::optional<StringData>& idIndexIdent,
-                                                 bool directoryPerDB,
-                                                 bool directoryForIndexes) {
+                                                 const boost::optional<StringData>& idIndexIdent) {
     BSONObjBuilder b;
     catalogId.serializeToken("catalogId", &b);
     b.append("ident", ident);
     if (idIndexIdent) {
         b.append("idIndexIdent", *idIndexIdent);
     }
-    b.append("directoryPerDB", directoryPerDB);
-    b.append("directoryForIndexes", directoryForIndexes);
     return b.obj();
 }
 

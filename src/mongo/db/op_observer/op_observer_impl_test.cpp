@@ -5460,9 +5460,7 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
     ASSERT_FALSE(disabledEntry.getObject2());
     auto enabledO2 = enabledEntry.getObject2();
     ASSERT(enabledO2);
-    ASSERT_BSONOBJ_EQ(
-        *enabledO2,
-        BSON("indexIdent" << "1" << "directoryPerDB" << false << "directoryForIndexes" << false));
+    ASSERT_BSONOBJ_EQ(*enabledO2, BSON("indexIdent" << "1"));
 }
 
 TEST_F(OpObserverTest, OnCreateIndexTimeseriesFlag) {
@@ -5514,12 +5512,8 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     auto indexIdentUniqueTag1 =
         storageEngine->getIndexIdentUniqueTag(indexes[1].indexIdent, nss.dbName());
 
-    ASSERT_BSONOBJ_EQ(*entry1.getObject2(),
-                      BSON("indexIdent" << indexIdentUniqueTag0 << "directoryPerDB" << false
-                                        << "directoryForIndexes" << false));
-    ASSERT_BSONOBJ_EQ(*entry2.getObject2(),
-                      BSON("indexIdent" << indexIdentUniqueTag1 << "directoryPerDB" << false
-                                        << "directoryForIndexes" << false));
+    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("indexIdent" << indexIdentUniqueTag0));
+    ASSERT_BSONOBJ_EQ(*entry2.getObject2(), BSON("indexIdent" << indexIdentUniqueTag1));
 }
 
 TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {

@@ -354,9 +354,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto indexIdentUniqueTag =
             storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
-        oplogEntry.setObject2(BSON(
-            "indexIdent" << indexIdentUniqueTag << "directoryPerDB" << indexBuildInfo.directoryPerDB
-                         << "directoryForIndexes" << indexBuildInfo.directoryForIndexes));
+        oplogEntry.setObject2(BSON("indexIdent" << indexIdentUniqueTag));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
@@ -425,11 +423,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     if (shouldReplicateLocalCatalogIdentifers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
             VersionContext::getDecoration(opCtx))) {
-        // TODO (SERVER-109824): Move 'directoryPerDB' and 'directoryForIndexes' to the function
-        // parameters.
-        oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr() << "directoryPerDB"
-                                             << indexes[0].directoryPerDB << "directoryForIndexes"
-                                             << indexes[0].directoryForIndexes));
+        oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr()));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
@@ -1345,11 +1339,7 @@ void OpObserverImpl::onCreateCollection(
                   *createCollCatalogIdentifier->idIndexIdent, collectionName.dbName()))
             : boost::none;
         const auto o2 = repl::MutableOplogEntry::makeCreateCollObject2(
-            createCollCatalogIdentifier->catalogId,
-            identUniqueTag,
-            idIndexIdentUniqueTag,
-            createCollCatalogIdentifier->directoryPerDB,
-            createCollCatalogIdentifier->directoryForIndexes);
+            createCollCatalogIdentifier->catalogId, identUniqueTag, idIndexIdentUniqueTag);
         oplogEntry.setObject2(o2);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);

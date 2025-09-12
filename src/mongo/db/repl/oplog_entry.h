@@ -297,9 +297,7 @@ public:
      */
     static BSONObj makeCreateCollObject2(const RecordId& catalogId,
                                          StringData ident,
-                                         const boost::optional<StringData>& idIndexIdent,
-                                         bool directoryPerDB,
-                                         bool directoryForIndexes);
+                                         const boost::optional<StringData>& idIndexIdents);
 
     static StatusWith<MutableOplogEntry> parse(const BSONObj& object);
 

@@ -546,11 +546,7 @@ OplogEntry makeCreateCollectionOplogEntry(
                   *createCollCatalogIdentifier->idIndexIdent, nss.dbName()))
             : boost::none;
         o2 = MutableOplogEntry::makeCreateCollObject2(
-            createCollCatalogIdentifier->catalogId,
-            identUniqueTag,
-            idIndexIdentUniqueTag,
-            createCollCatalogIdentifier->directoryPerDB,
-            createCollCatalogIdentifier->directoryForIndexes);
+            createCollCatalogIdentifier->catalogId, identUniqueTag, idIndexIdentUniqueTag);
     }
     return makeCommandOplogEntry(opTime, nss, object, o2, collectionOptions.uuid);
 }
