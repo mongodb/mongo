@@ -1311,20 +1311,11 @@ boost::optional<query_shape::QueryShapeHash> OpDebug::getQueryShapeHash() const 
     return _queryShapeHash;
 }
 
-/**
- * Convenience method that sets 'queryShapeHash' if 'queryShapeHash' has not been previously
- * set. Currently QueryShapeHash for a given command may be computed twice (due to view
- * resolution). By preventing new QueryShapeHash overwrites we ensure that original
- * QueryShapeHash is recorded in CurOp::OpDebug.
- */
-void OpDebug::setQueryShapeHashIfNotPresent(
-    OperationContext* opCtx, const boost::optional<query_shape::QueryShapeHash>& hash) {
-    // Field 'queryShapeHash' is computed by the command handler but may be accessed by
-    // $currentOp thread and therefore needs to be synchronized.
+void OpDebug::setQueryShapeHash(OperationContext* opCtx,
+                                const boost::optional<query_shape::QueryShapeHash>& hash) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    if (!_queryShapeHash) {
-        _queryShapeHash = hash;
-    }
+    _queryShapeHash = hash;
+    _didComputeQueryShapeHash = true;
 }
 
 BSONArray OpDebug::getResolvedViewsInfo() const {

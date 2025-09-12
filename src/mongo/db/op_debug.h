@@ -313,16 +313,39 @@ public:
      */
     CursorMetrics getCursorMetrics() const;
 
+    /**
+     * Convenience method that computes QueryShapeHash if '_queryShapeHash' has not been previously
+     * set, sets and returns it. Currently QueryShapeHash for a given command may be computed twice
+     * (due to view resolution). By preventing new QueryShapeHash overwrites we ensure that original
+     * QueryShapeHash is recorded in CurOp::OpDebug.
+     */
+    template <typename Fn>
+    boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(OperationContext* opCtx,
+                                                                      Fn&& queryShapeHashFn) {
+        // QueryShapeHash may be accessed by other thread running $currentOp and therefore needs to
+        // be synchronized.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        if (_didComputeQueryShapeHash) {
+            return _queryShapeHash;
+        }
+
+        auto qsh = queryShapeHashFn();
+        _queryShapeHash = qsh;
+        _didComputeQueryShapeHash = true;
+        return qsh;
+    }
+
+    /**
+     * Returns '_queryShapeHash' value without acquiring the lock.
+     */
     boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
 
     /**
-     * Convenience method that sets 'queryShapeHash' if 'queryShapeHash' has not been previously
-     * set. Currently QueryShapeHash for a given command may be computed twice (due to view
-     * resolution). By preventing new QueryShapeHash overwrites we ensure that original
-     * QueryShapeHash is recorded in CurOp::OpDebug.
+     * Sets '_queryShapeHash' value to the new  'hash'. Acquires Client lock prior to setting the
+     * hash.
      */
-    void setQueryShapeHashIfNotPresent(OperationContext* opCtx,
-                                       const boost::optional<query_shape::QueryShapeHash>& hash);
+    void setQueryShapeHash(OperationContext* opCtx,
+                           const boost::optional<query_shape::QueryShapeHash>& hash);
 
     // -------------------
 
@@ -537,5 +560,8 @@ public:
 private:
     // The hash of query_shape::QueryShapeHash.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
+
+    // Flag indicates if query_shape::QueryShapeHash has already been computed.
+    bool _didComputeQueryShapeHash{false};
 };
 }  // namespace MONGO_MOD_PUB mongo

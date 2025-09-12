@@ -524,9 +524,9 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
             request, nsStruct.executionNss, involvedNamespaces, *pipeline, expCtx);
     }};
-    auto queryShapeHash =
-        shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
-    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, queryShapeHash);
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
+    });
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     // In case query settings have already been looked up (in case the agg request is

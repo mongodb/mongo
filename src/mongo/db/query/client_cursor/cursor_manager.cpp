@@ -240,7 +240,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     // logging.
     CurOp::get(opCtx)->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
     CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
-    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, cursor->_queryShapeHash);
+    CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
 
     // Pass along queryStats context so it is retrievable after query execution for storing metrics.
     CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursor->_queryStatsKeyHash;

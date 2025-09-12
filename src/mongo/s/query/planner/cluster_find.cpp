@@ -722,8 +722,9 @@ std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
     }};
-    auto queryShapeHash = shape_helpers::computeQueryShapeHash(expCtx, deferredShape, origNss);
-    CurOp::get(opCtx)->debug().setQueryShapeHashIfNotPresent(opCtx, queryShapeHash);
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, origNss);
+    });
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);

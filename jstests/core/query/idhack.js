@@ -9,6 +9,7 @@
 // Include helpers for analyzing explain output.
 import {getWinningPlanFromExplain, isExpress, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const t = db.idhack;
 t.drop();
@@ -158,3 +159,28 @@ assert.eq(0, t.find({_id: 1}).hint({_id: 1}).min({_id: 2}).itcount());
 explain = t.find({_id: 2}).hint({_id: 1}).min({_id: 1}).max({_id: 3}).explain();
 winningPlan = getWinningPlanFromExplain(explain);
 assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
+
+// Ensure that QueryShapeHash is not computed for IDHACK queries.
+// TODO: SERVER-102484 Provide fast path QueryShape and QueryShapeHash computation for IDHACK queries.
+{
+    const coll = t;
+    const qsutils = new QuerySettingsUtils(db, coll.getName());
+    const query = qsutils.makeFindQueryInstance({filter: {_id: 1}});
+    const queryShapeHash = qsutils.getQueryShapeHashFromExplain(query);
+    assert(!queryShapeHash, `Expected no QueryShapeHash for IDHACK query, found ${queryShapeHash}`);
+}
+{
+    // On old versions prior to 8.3 IDHACK queries over views do report QueryShapeHash in explain.
+    const hasIdHackFixForIdHackQueriesOverViews =
+        !jsTestOptions().mongosBinVersion ||
+        MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "8.3") >= 0;
+    if (hasIdHackFixForIdHackQueriesOverViews) {
+        const coll = t;
+        const viewName = coll.getName() + "_view";
+        assert.commandWorked(db.createView(viewName, coll.getName(), []));
+        const qsutils = new QuerySettingsUtils(db, viewName);
+        const query = qsutils.makeFindQueryInstance({filter: {_id: 1}});
+        const queryShapeHash = qsutils.getQueryShapeHashFromExplain(query);
+        assert(!queryShapeHash, `Expected no QueryShapeHash for IDHACK query, found ${queryShapeHash}`);
+    }
+}
