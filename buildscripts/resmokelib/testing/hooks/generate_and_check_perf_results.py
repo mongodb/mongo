@@ -393,6 +393,10 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                         " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True
+            else:
+                self.logger.info(
+                    f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has passed the threshold check. The reported value of {reported_metric.value} is within the threshold limit of {metric_to_check.threshold_limit} from the base commit value of {metric_to_check.value}."
+                )
         if any_metric_has_failed:
             raise ServerFailure(
                 f"One or more of the metrics reported by this task have failed the threshold check. These thresholds can be found in {THRESHOLD_LOCATION}."
