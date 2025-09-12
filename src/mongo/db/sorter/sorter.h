@@ -308,67 +308,70 @@ public:
         return _stats;
     }
 
-    /**
-     * Represents the file that a Sorter uses to spill to disk. Supports reading and writing
-     * (append-only).
-     */
-    class File {
-    public:
-        File(boost::filesystem::path path, SorterFileStats* stats = nullptr);
-
-        ~File();
-
-        const boost::filesystem::path& path() const {
-            return _path;
-        }
-
-        /**
-         * Signals that the on-disk file should not be cleaned up.
-         */
-        void keep() {
-            _keep = true;
-        };
-
-        /**
-         * Reads the requested data from the file. Cannot write more to the file once this has been
-         * called.
-         */
-        void read(std::streamoff offset, std::streamsize size, void* out);
-
-        /**
-         * Writes the given data to the end of the file. Cannot be called after reading.
-         */
-        void write(const char* data, std::streamsize size);
-
-        /**
-         * Returns the current offset of the end of the file. Cannot be called after reading.
-         */
-        std::streamoff currentOffset();
-
-    private:
-        void _open();
-
-        /**
-         * Ensures that the file is open and that _offset is set to the end of the file.
-         */
-        void _ensureOpenForWriting();
-
-        boost::filesystem::path _path;
-        std::fstream _file;
-
-        // The current offset of the end of the file if there may be unflushed data, or -1 if the
-        // file either has not yet been opened or has been flushed.
-        std::streamoff _offset = -1;
-
-        // Whether to keep the on-disk file even after this in-memory object has been destructed.
-        bool _keep = false;
-
-        // If set, this points to an external metrics holder for tracking file open/close activity.
-        SorterFileStats* _stats;
-    };
-
 protected:
     SorterStats _stats;
+};
+
+
+/**
+ * Represents the file that a Sorter uses to spill to disk. Supports reading and writing
+ * (append-only).
+ */
+class SorterFile {
+public:
+    SorterFile(boost::filesystem::path path, SorterFileStats* stats);
+    ~SorterFile();
+
+    const boost::filesystem::path& path() const {
+        return _path;
+    }
+
+    /**
+     * Signals that the on-disk storage should not be cleaned up.
+     */
+    void keep() {
+        _keep = true;
+    };
+
+    /**
+     * Reads the requested data from the storage. Cannot write more to the storage once this has
+     * been called.
+     */
+    void read(std::streamoff offset, std::streamsize size, void* out);
+
+
+    /**
+     * Writes the given data to the end of the storage. Cannot be called after reading.
+     */
+    void write(const char* data, std::streamsize size);
+
+    /**
+     * Returns the current offset of the end of the storage. Cannot be called after reading.
+     */
+    std::streamoff currentOffset();
+
+private:
+    void _open();
+
+    /**
+     * Ensures that the file is open and that _offset is set to the end of the file.
+     */
+    void _ensureOpenForWriting();
+
+    // The current offset of the end of the storage if there may be unflushed data, or -1 if the
+    // file either has not yet been opened or has been flushed.
+    std::streamoff _offset = -1;
+
+    std::fstream _file;
+
+    // Whether to keep the on-disk storage even after this in-memory object has been destructed.
+    bool _keep = false;
+
+    // If set, this points to an external metrics holder for tracking storage open/close
+    // activity.
+    SorterFileStats* _stats;
+
+    boost::filesystem::path _path;
 };
 
 /**
@@ -463,7 +466,7 @@ public:
 protected:
     SortOptions _opts;
 
-    std::shared_ptr<File> _file;
+    std::shared_ptr<SorterFile> _file;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 
@@ -631,7 +634,7 @@ private:
     using KV = std::pair<Key, Value>;
     std::priority_queue<KV, std::vector<KV>, Greater> _heap;
 
-    std::shared_ptr<SorterBase::File> _file;
+    std::shared_ptr<SorterFile> _file;
     std::unique_ptr<SpillIterator> _spillIter;
 
     boost::optional<Key> _min;
@@ -696,7 +699,7 @@ public:
         Settings;
 
     explicit SortedFileWriter(const SortOptions& opts,
-                              std::shared_ptr<SorterBase::File> file,
+                              std::shared_ptr<SorterFile> file,
                               const Settings& settings = Settings());
 
     ~SortedFileWriter() override = default;
@@ -709,7 +712,7 @@ public:
     void writeChunk() override;
 
 private:
-    std::shared_ptr<SorterBase::File> _file;
+    std::shared_ptr<SorterFile> _file;
 
     // Tracks where in the file we started writing the sorted data range so that the information can
     // be given to the Iterator in done().

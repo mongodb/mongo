@@ -205,7 +205,7 @@ public:
             *(opts.tempDir), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         auto spillsFile =
-            std::make_shared<SorterBase::File>(nextFileName(*(opts.tempDir)), opts.sorterFileStats);
+            std::make_shared<SorterFile>(nextFileName(*(opts.tempDir)), opts.sorterFileStats);
         SortedFileWriter<Key, Value> writer(opts, spillsFile, settings);
 
         for (size_t i = _index; i < _data.size(); ++i) {
@@ -281,7 +281,7 @@ public:
         Settings;
     typedef std::pair<Key, Value> Data;
 
-    FileIterator(std::shared_ptr<SorterBase::File> file,
+    FileIterator(std::shared_ptr<SorterFile> file,
                  std::streamoff fileStartOffset,
                  std::streamoff fileEndOffset,
                  const Settings& settings,
@@ -439,10 +439,10 @@ private:
 
     std::unique_ptr<char[]> _buffer;
     std::unique_ptr<BufReader> _bufferReader;
-    std::shared_ptr<SorterBase::File> _file;  // File containing the sorted data range.
-    std::streamoff _fileStartOffset;          // File offset at which the sorted data range starts.
-    std::streamoff _fileCurrentOffset;        // File offset at which we are currently reading from.
-    std::streamoff _fileEndOffset;            // File offset at which the sorted data range ends.
+    std::shared_ptr<SorterFile> _file;  // File containing the sorted data range.
+    std::streamoff _fileStartOffset;    // File offset at which the sorted data range starts.
+    std::streamoff _fileCurrentOffset;  // File offset at which we are currently reading from.
+    std::streamoff _fileEndOffset;      // File offset at which the sorted data range ends.
     boost::optional<DatabaseName> _dbName;
 
     // Points to the beginning of a serialized key in the key-value pair currently being read, and
@@ -685,7 +685,7 @@ protected:
      * {1234567}
      */
     void _mergeSpills(std::size_t numTargetedSpills, std::size_t numParallelSpills) {
-        using File = SorterBase::File;
+        using File = SorterFile;
 
         if (numTargetedSpills == 0) {
             numTargetedSpills = 1;
@@ -1355,8 +1355,8 @@ template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
-      _file(opts.tempDir ? std::make_shared<SorterBase::File>(sorter::nextFileName(*(opts.tempDir)),
-                                                              opts.sorterFileStats)
+      _file(opts.tempDir ? std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)),
+                                                        opts.sorterFileStats)
                          : nullptr) {
     if (opts.useMemPool) {
         _memPool.emplace(sorter::makeMemPool());
@@ -1367,8 +1367,7 @@ template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
-      _file(std::make_shared<SorterBase::File>(*(opts.tempDir) + "/" + fileName,
-                                               opts.sorterFileStats)) {
+      _file(std::make_shared<SorterFile>(*(opts.tempDir) + "/" + fileName, opts.sorterFileStats)) {
     invariant(opts.tempDir);
     invariant(!fileName.empty());
     if (opts.useMemPool) {
@@ -1391,18 +1390,18 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
 }
 
 //
-// SorterBase::File members
+// SorterFile members
 //
 
-inline SorterBase::File::File(boost::filesystem::path path, SorterFileStats* stats)
-    : _path(std::move(path)), _stats(stats) {
+inline SorterFile::SorterFile(boost::filesystem::path path, SorterFileStats* stats)
+    : _stats(stats), _path(path) {
     invariant(!_path.empty());
     if (_stats && boost::filesystem::exists(_path) && boost::filesystem::is_regular_file(_path)) {
         _stats->addSpilledDataSize(boost::filesystem::file_size(_path));
     }
 }
 
-inline SorterBase::File::~File() {
+inline SorterFile::~SorterFile() {
     if (_stats && _file.is_open()) {
         _stats->closed.addAndFetch(1);
     }
@@ -1446,7 +1445,7 @@ inline SorterBase::File::~File() {
     }
 }
 
-inline void SorterBase::File::read(std::streamoff offset, std::streamsize size, void* out) {
+inline void SorterFile::read(std::streamoff offset, std::streamsize size, void* out) {
     if (!_file.is_open()) {
         _open();
     }
@@ -1481,7 +1480,7 @@ inline void SorterBase::File::read(std::streamoff offset, std::streamsize size, 
             _file.tellg() >= 0);
 }
 
-inline void SorterBase::File::write(const char* data, std::streamsize size) {
+inline void SorterFile::write(const char* data, std::streamsize size) {
     _ensureOpenForWriting();
 
     try {
@@ -1505,13 +1504,13 @@ inline void SorterBase::File::write(const char* data, std::streamsize size) {
     }
 }
 
-inline std::streamoff SorterBase::File::currentOffset() {
+inline std::streamoff SorterFile::currentOffset() {
     _ensureOpenForWriting();
     invariant(_offset >= 0);
     return _offset;
 }
 
-inline void SorterBase::File::_open() {
+inline void SorterFile::_open() {
     invariant(!_file.is_open());
 
     boost::filesystem::create_directories(_path.parent_path());
@@ -1531,7 +1530,7 @@ inline void SorterBase::File::_open() {
     }
 }
 
-inline void SorterBase::File::_ensureOpenForWriting() {
+inline void SorterFile::_ensureOpenForWriting() {
     if (!_file.is_open()) {
         _open();
     }
@@ -1564,7 +1563,7 @@ SortedStorageWriter<Key, Value>::SortedStorageWriter(const SortOptions& opts,
 
 template <typename Key, typename Value>
 SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
-                                               std::shared_ptr<SorterBase::File> file,
+                                               std::shared_ptr<SorterFile> file,
                                                const Settings& settings)
     : SortedStorageWriter<Key, Value>(opts, settings),
       _file(std::move(file)),
@@ -1674,8 +1673,8 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptio
       _checkInput(checkInput),
       _opts(opts),
       _heap(Greater{&compare}),
-      _file(opts.tempDir ? std::make_shared<typename SorterBase::File>(
-                               sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats)
+      _file(opts.tempDir ? std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)),
+                                                        opts.sorterFileStats)
                          : nullptr) {}
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>

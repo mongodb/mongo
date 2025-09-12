@@ -102,7 +102,7 @@ private:
     // Machinery for spilling to disk.
     MemoryUsageTracker _memTracker;
     std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<Sorter<RecordId, NullValue>::File> _file;
+    std::shared_ptr<SorterFile> _file;
 
     // Iterators over the file that has been spilled to disk. These must be exhausted in addition to
     // '_buffer' when returning results.

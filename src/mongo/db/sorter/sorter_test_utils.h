@@ -251,10 +251,9 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::T
     if (!inputIter->more()) {
         return std::make_shared<EmptyIterator>();
     }
-    SorterFileStats sorterFileStats(nullptr /* sorterTracker */);
     const SortOptions opts = SortOptions().TempDir(tempDir.path());
-    auto spillFile = std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-        sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
+    auto spillFile =
+        std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
     SortedFileWriter<IntWrapper, IntWrapper> writer(opts, spillFile);
     while (inputIter->more()) {
         auto pair = inputIter->next();

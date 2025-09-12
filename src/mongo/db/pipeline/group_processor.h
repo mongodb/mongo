@@ -120,7 +120,7 @@ private:
 
     // Tracks the size of the spill file.
     std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<Sorter<Value, Value>::File> _file;
+    std::shared_ptr<SorterFile> _file;
     std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _sortedFiles;
     bool _spilled{false};
 

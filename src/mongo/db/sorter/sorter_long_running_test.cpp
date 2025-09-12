@@ -70,8 +70,8 @@ public:
 private:
     int _appendToFile(const SortOptions* opts, int currentFileSize, int range) {
         auto makeFile = [&] {
-            return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(
-                sorter::nextFileName(*(opts->tempDir)), opts->sorterFileStats);
+            return std::make_shared<SorterFile>(sorter::nextFileName(*(opts->tempDir)),
+                                                opts->sorterFileStats);
         };
 
         int currentBufSize = 0;

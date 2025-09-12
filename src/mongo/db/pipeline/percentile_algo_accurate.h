@@ -108,7 +108,7 @@ protected:
     // Only used if the accumulator needs to spill to disk after $group spills are merged together.
     // File where spilled data will be written to disk.
     std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<Sorter<Value, Value>::File> _spillFile;
+    std::shared_ptr<SorterFile> _spillFile;
 
     // Vector of file iterators tracking each sorted segment that is written to disk when we spill.
     std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _spilledSortedSegments;

@@ -252,8 +252,8 @@ void GroupProcessor::spill() {
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {
         _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
-        _file = std::make_shared<Sorter<Value, Value>::File>(
-            sorter::nextFileName(_expCtx->getTempDir()), _spillStats.get());
+        _file = std::make_shared<SorterFile>(sorter::nextFileName(_expCtx->getTempDir()),
+                                             _spillStats.get());
     }
     SortedFileWriter<Value, Value> writer(SortOptions().TempDir(_expCtx->getTempDir()), _file);
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.

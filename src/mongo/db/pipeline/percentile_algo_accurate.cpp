@@ -76,8 +76,8 @@ void AccuratePercentile::spill() {
     // Initialize '_spillFile' in a lazy manner only when it is needed.
     if (!_spillFile) {
         _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
-        _spillFile = std::make_shared<Sorter<Value, Value>::File>(
-            sorter::nextFileName(_expCtx->getTempDir()), _spillStats.get());
+        _spillFile = std::make_shared<SorterFile>(sorter::nextFileName(_expCtx->getTempDir()),
+                                                  _spillStats.get());
     }
 
     if (_accumulatedValues.size() == 0) {
