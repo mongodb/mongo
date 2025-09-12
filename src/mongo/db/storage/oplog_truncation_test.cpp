@@ -161,6 +161,7 @@ private:
  * Insert records into an oplog and verify the number of truncate markers that are created.
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_CreateNewMarker) {
+
     // Turn off async mode
     RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
         "oplogSamplingAsyncEnabled", false);

@@ -80,12 +80,8 @@ public:
                 ts);
             ASSERT_OK(recordIdStatus);
             auto recordId = recordIdStatus.getValue();
-            testMarkers.updateCurrentMarkerAfterInsertOnCommit(opCtx,
-                                                               insertedData.length(),
-                                                               recordId,
-                                                               now,
-                                                               1,
-                                                               /*oplogSamplingAsyncEnabled*/ false);
+            testMarkers.updateCurrentMarkerAfterInsertOnCommit(
+                opCtx, insertedData.length(), recordId, now, 1);
             records.push_back(RecordIdAndWall{std::move(recordId), std::move(now)});
         }
         wuow.commit();
@@ -121,7 +117,7 @@ public:
         ASSERT_EQ(recordIdStatus.getValue(), recordId);
         auto now = Date_t::fromMillisSinceEpoch(timestampToUse.asInt64());
         testMarkers.updateCurrentMarkerAfterInsertOnCommit(
-            opCtx, insertedData.length(), recordId, now, 1, /*oplogSamplingAsyncEnabled*/ false);
+            opCtx, insertedData.length(), recordId, now, 1);
         wuow.commit();
         return recordId;
     }

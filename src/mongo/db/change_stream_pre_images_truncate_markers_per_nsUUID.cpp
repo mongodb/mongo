@@ -39,7 +39,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -277,7 +276,7 @@ void PreImagesTruncateMarkersPerNsUUID::updateMarkers(int64_t numBytes,
                                                       RecordId recordId,
                                                       Date_t wallTime,
                                                       int64_t numRecords) {
-    updateCurrentMarker(numBytes, recordId, wallTime, numRecords, gOplogSamplingAsyncEnabled);
+    updateCurrentMarker(numBytes, recordId, wallTime, numRecords);
 }
 
 bool PreImagesTruncateMarkersPerNsUUID::_hasExcessMarkers(OperationContext* opCtx) const {

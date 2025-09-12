@@ -122,10 +122,12 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
 
 std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateMarkers(
     OperationContext* opCtx, RecordStore& rs) {
+    bool samplingAsynchronously =
+        feature_flags::gOplogSamplingAsyncEnabled.isEnabled() && gOplogSamplingAsyncEnabled;
     LOGV2(10621000,
           "Creating oplog markers",
-          "sampling asynchronously"_attr = gOplogSamplingAsyncEnabled);
-    if (!gOplogSamplingAsyncEnabled) {
+          "sampling asynchronously"_attr = samplingAsynchronously);
+    if (!samplingAsynchronously) {
         return sampleAndUpdate(opCtx, rs);
     }
     return createEmptyOplogTruncateMarkers(rs);
