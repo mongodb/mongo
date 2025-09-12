@@ -1,3 +1,5 @@
+#! /bin/bash
+
 failed_setup=false
 
 source ~/.bashrc

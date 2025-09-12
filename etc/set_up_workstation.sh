@@ -1,3 +1,5 @@
+#! /bin/bash
+
 silent_grep() {
     command grep -q "$@" >/dev/null 2>&1
 }
