@@ -13,6 +13,7 @@
  *   assumes_against_mongod_not_mongos,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
@@ -91,6 +92,10 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             "Temporary agg collection left behind: " + tojson(temporaryAggCollections),
         );
 
+        // TODO SERVER-102039: Update this check to work with viewless requires_timeseries,
+        // and remove 'does_not_support_viewless_timeseries_yet' tag.
+        // Also, if possible, understand in BF-39536 / SERVER-110820 why this test would usually
+        // pass (and intermittently fail) before viewless timeseries were enabled with $out.
         const bucketCollectionPresent = collNames.includes("system.buckets.interrupt_temp_out");
         const viewPresent = collNames.includes("interrupt_temp_out");
         assert(
