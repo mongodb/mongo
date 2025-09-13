@@ -22,11 +22,19 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
 
-// TODO SERVER-104607.
+// The tests expect that memory metrics appear right after memory is used. Decrease the threshold
+// for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
+// limit.
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}));
+
+// Since this test is run against all execution engine variants, we don't have to force both SBE and
+// classic in this test and save a bit of compute.
+let stageName;
 if (checkSbeFullyEnabled(db)) {
-    MongoRunner.stopMongod(conn);
-    jsTest.log.info("Skipping test for classic '$setWindowFields' stage when SBE is fully enabled.");
-    quit();
+    jsTest.log.info("SBE is fully enabled.");
+    stageName = "window";
+} else {
+    stageName = "$_internalSetWindowFields";
 }
 
 const collName = jsTestName();
@@ -76,7 +84,7 @@ const pipeline = [
             cursor: {batchSize: 1},
             allowDiskUse: false,
         },
-        stageName: "$_internalSetWindowFields",
+        stageName: stageName,
         expectedNumGetMores: 10,
         // This stage does not release memory on EOF.
         checkInUseTrackedMemBytesResets: false,
@@ -89,7 +97,7 @@ const pipeline = [
         {$match: {symbol: "AAPL"}},
         {$limit: 5},
     ];
-    jsTest.log.info("Running pipeline " + tojson(pipelineWithLimit));
+    jsTest.log.info("Running pipeline with limit " + tojson(pipelineWithLimit));
 
     runMemoryStatsTest({
         db: db,
@@ -101,7 +109,7 @@ const pipeline = [
             cursor: {batchSize: 1},
             allowDiskUse: false,
         },
-        stageName: "$_internalSetWindowFields",
+        stageName: stageName,
         expectedNumGetMores: 3,
         // This stage does not release memory on EOF.
         checkInUseTrackedMemBytesResets: false,
@@ -123,7 +131,7 @@ const pipeline = [
             cursor: {batchSize: 1},
             allowDiskUse: true,
         },
-        stageName: "$_internalSetWindowFields",
+        stageName: stageName,
         expectedNumGetMores: 10,
         skipInUseTrackedMemBytesCheck: true,
     });

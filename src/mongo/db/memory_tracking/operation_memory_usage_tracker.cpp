@@ -69,36 +69,47 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
-        expCtx.isIncompatibleWithMemoryTracking()) {
-        return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
-    }
-
-    OperationContext* opCtx = expCtx.getOperationContext();
-    OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
+    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(),
+                                              expCtx.isIncompatibleWithMemoryTracking(),
+                                              maxMemoryUsageBytes);
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
     OperationContext* opCtx, int64_t maxMemoryUsageBytes) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-        return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
-    }
-    OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
+    return createSimpleMemoryUsageTrackerImpl(
+        opCtx, false /*isIncompatibleWithMemoryTracking*/, maxMemoryUsageBytes);
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
+    return createSimpleMemoryUsageTrackerImpl(
+        expCtx.getOperationContext(),
+        expCtx.isIncompatibleWithMemoryTracking(),
+        maxMemoryUsageBytes,
+        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+}
+
+SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+    OperationContext* opCtx, int64_t maxMemoryUsageBytes) {
+    return createSimpleMemoryUsageTrackerImpl(
+        opCtx,
+        false /*isIncompatibleWithMemoryTracking*/,
+        maxMemoryUsageBytes,
+        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+}
+
+SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerImpl(
+    OperationContext* opCtx,
+    bool isIncompatibleWithMemoryTracking,
+    int64_t maxMemoryUsageBytes,
+    int64_t chunkSize) {
     if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
-        expCtx.isIncompatibleWithMemoryTracking()) {
-        return SimpleMemoryUsageTracker{maxMemoryUsageBytes, 0 /* chunkSize */};
+        isIncompatibleWithMemoryTracking) {
+        return SimpleMemoryUsageTracker{maxMemoryUsageBytes, chunkSize};
     }
 
-    OperationContext* opCtx = expCtx.getOperationContext();
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return SimpleMemoryUsageTracker{
-        opTracker, maxMemoryUsageBytes, internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed()};
+    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes, chunkSize};
 }
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(

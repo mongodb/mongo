@@ -213,6 +213,10 @@ void WindowStage::spill() {
     // Clear the in memory window buffer.
     _rows.clear();
 
+    // Update memory tracking after spilling. Note that memory usage may be non-zero if
+    // windowMemorySize was incremented during execution.
+    _memoryTracker.value().set(getMemoryEstimation());
+
     // Fail if spilling cannot reduce memory usage below threshold.
     uassert(7870900,
             "Exceeded memory limit for $setWindowFields, but cannot reduce memory usage by "
@@ -258,6 +262,7 @@ bool WindowStage::fetchNextRow() {
         if (_windowBufferMemoryEstimator.shouldSample()) {
             auto memory = size_estimator::estimate(_rows.back());
             _windowBufferMemoryEstimator.sample(memory);
+            _memoryTracker.value().set(getMemoryEstimation());
         }
 
         // Spill if the memory estimation is above threshold.
@@ -276,6 +281,8 @@ void WindowStage::freeUntilRow(size_t requiredId) {
     for (size_t id = getLastSpilledRowId() + 1; id < requiredId && _rows.size(); id++) {
         _rows.pop_front();
     }
+    _memoryTracker.value().set(getMemoryEstimation());
+
     _firstRowId = std::max(_firstRowId, requiredId);
     // Clear next partition id once we free everything from the previous partition.
     if (_nextPartitionId && _firstRowId >= *_nextPartitionId) {
@@ -515,6 +522,9 @@ void WindowStage::prepare(CompileCtx& ctx) {
     }
 
     _compiled = true;
+
+    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+        _opCtx, _memoryThreshold);
 }
 
 value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -550,6 +560,8 @@ void WindowStage::setPartition(int id) {
             }
             stateMemoryEstimators[exprIdx].reset();
         }
+
+        _memoryTracker.value().set(getMemoryEstimation());
     }
 }
 
@@ -650,6 +662,7 @@ PlanState WindowStage::getNext() {
                             auto [tag, value] = windowAccessors[exprIdx]->getViewOfValue();
                             auto memory = size_estimator::estimate(tag, value);
                             stateMemoryEstimator.sample(frameSize, memory);
+                            _memoryTracker.value().set(getMemoryEstimation());
                         }
                     }
                 }
@@ -747,6 +760,9 @@ void WindowStage::close() {
 
     _children[0]->close();
     freeRows();
+
+    _memoryTracker.value().set(getMemoryEstimation());
+    _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
 std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
@@ -846,6 +862,10 @@ std::unique_ptr<PlanStageStats> WindowStage::getStats(bool includeDebugInfo) con
         bob.appendNumber(
             "spilledDataStorageSize",
             static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
 
         ret->debugInfo = bob.obj();
     }

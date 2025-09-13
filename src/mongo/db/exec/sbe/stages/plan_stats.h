@@ -379,6 +379,9 @@ struct WindowStats : public SpecificStats {
     // Whether the window buffer was spilled.
     bool usedDisk{false};
     SpillingStats spillingStats;
+
+    // The maximum amount of memory that was used.
+    uint64_t peakTrackedMemBytes = 0u;
 };
 
 /**
