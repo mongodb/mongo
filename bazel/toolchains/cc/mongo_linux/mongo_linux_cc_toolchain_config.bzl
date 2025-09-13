@@ -1341,6 +1341,17 @@ def _impl(ctx):
         ],
     )
 
+    strip_debug_feature = feature(
+        name = "strip_debug",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = ["-Wl,--strip-debug"])],
+            ),
+        ],
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1412,6 +1423,7 @@ def _impl(ctx):
         thinlto_feature,
         debug_types_section_feature,
         no_debug_types_section_feature,
+        strip_debug_feature,
     ] + get_common_features(ctx)
 
     return [

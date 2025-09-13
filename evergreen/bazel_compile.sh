@@ -94,7 +94,7 @@ if [ "${skip_debug_link}" = "true" ]; then
     export compile_variant="${compile_variant}"
     export version_id="${version_id}"
     if [ "${task_name}" = "archive_dist_test" ]; then
-        task_compile_flags="${task_compile_flags} --simple_build_id=True --linkopt='-Wl,-S' --separate_debug=False"
+        task_compile_flags="${task_compile_flags} --simple_build_id=True --features=strip_debug --separate_debug=False"
         if [ "${remote_link}" = "true" ]; then
             ARCH=$(uname -m)
             # Remote linking is currently only supported on arm
