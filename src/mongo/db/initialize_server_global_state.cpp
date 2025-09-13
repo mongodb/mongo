@@ -374,11 +374,18 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
-        std::string absoluteLogpath =
-            boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
-                .string();
-
-        bool exists = checkAndMoveLogFile(absoluteLogpath);
+        auto [absoluteLogpath, exists] = [&] {
+#ifdef _WIN32
+            constexpr auto kWindowsNUL = "NUL"_sd;
+            if (serverGlobalParams.logpath == kWindowsNUL) {
+                return std::make_tuple(std::string(kWindowsNUL), true);
+            }
+#endif  // defined(_WIN32)
+            std::string absolutePath =
+                boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
+                    .string();
+            return std::make_tuple(absolutePath, checkAndMoveLogFile(absolutePath));
+        }();
 
         lv2Config.consoleEnabled = false;
         lv2Config.fileEnabled = true;
