@@ -207,26 +207,31 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allDonorsReportedMinFetchTimestamp.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allRecipientsFinishedCloning.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsInStrictConsistency() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allRecipientsReportedStrictConsistencyTimestamp.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsDone() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allDonorsDone.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsDone() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allRecipientsDone.getFuture();
 }
 
