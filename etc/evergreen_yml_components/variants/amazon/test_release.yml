@@ -527,7 +527,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: streams_aspio
+      - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
 
   - name: enterprise-amazon2023-streams-arm64
@@ -580,7 +580,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: streams_aspio
+      - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_al2023_gen
@@ -634,7 +634,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: streams_aspio
+      - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
 
   - name: enterprise-amazon2-streams-arm64
@@ -687,7 +687,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: streams_aspio
+      - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_gen

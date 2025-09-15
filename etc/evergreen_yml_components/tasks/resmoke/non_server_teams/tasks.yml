@@ -348,8 +348,8 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  - <<: *task_template
-    name: streams_aspio
+  - <<: *gen_task_template
+    name: streams_aspio_gen
     tags:
       [
         "assigned_to_jira_team_streams",
@@ -358,8 +358,10 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          fallback_num_sub_suites: 2
+          resmoke_jobs_max: 1
 
   - name: streams_build_and_publish_gen
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
