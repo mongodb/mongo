@@ -361,7 +361,7 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
         // Collection instances remain valid, and the collator is not invalidated.
-        auto catalog = CollectionCatalog::get(opCtx);
+        std::shared_ptr<const CollectionCatalog> catalog;
         NamespaceString nss;
         const CollatorInterface* collator = nullptr;
 
@@ -376,6 +376,13 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 CollectionAcquisitionRequest::fromOpCtx(
                     opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
                 MODE_IS);
+
+            // We want to ensure that the catalog instance after the scope of the acquisition is the
+            // same as before the acquisition. Acquiring the collection involves stashing the
+            // current catalog instance, so assigning the catalog in scope of the try block ensures
+            // that we have a consistent catalog with the acquisition.
+            catalog = CollectionCatalog::get(opCtx);
+
             nss = bucketsAq.nss();
             collator = bucketsAq.getCollectionPtr()->getDefaultCollator();
         } catch (const DBException& ex) {
@@ -1073,7 +1080,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
-    auto catalog = CollectionCatalog::get(opCtx);
+    std::shared_ptr<const CollectionCatalog> catalog;
     const CollatorInterface* collator = nullptr;
     NamespaceString nss;
 
@@ -1088,6 +1095,13 @@ commit_result::Result commitTimeseriesBucketForBatch(
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
+
+        // We want to ensure that the catalog instance after the scope of the acquisition is the
+        // same as before the acquisition. Acquiring the collection involves stashing the
+        // current catalog instance, so assigning the catalog in scope of the try block ensures
+        // that we have a consistent catalog with the acquisition.
+        catalog = CollectionCatalog::get(opCtx);
+
         nss = bucketsAcq.nss();
         collator = bucketsAcq.getCollectionPtr()->getDefaultCollator();
     } catch (const DBException& ex) {
