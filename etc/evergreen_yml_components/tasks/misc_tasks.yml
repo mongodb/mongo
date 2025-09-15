@@ -1799,7 +1799,7 @@ tasks:
           args:
             - "./src/evergreen/run_python_script.sh"
             - "evergreen/functions/upload_sbom_via_silkbomb.py"
-            - "--dry-run"
+            - "--run"
           env:
             REQUESTER: ${requester}
             BRANCH_NAME: ${branch_name}

@@ -1584,7 +1584,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "R&D Security team"
+          "value": "Query Integration"
         },
         {
           "name": "emits_persisted_data",
