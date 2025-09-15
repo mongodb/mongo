@@ -893,6 +893,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinZipArrays(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTrim(ArityType arity,
                                                                bool trimLeft,
                                                                bool trimRight);
