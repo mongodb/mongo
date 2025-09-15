@@ -227,6 +227,7 @@ selected_tests_config
 codereview.rc
 
 # Python venvs and virtualenvs
+python-venv
 python3-venv
 python2-venv
 

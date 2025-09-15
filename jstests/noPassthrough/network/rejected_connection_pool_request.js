@@ -39,7 +39,9 @@ assert.commandWorked(database.runCommand({create: collectionName, writeConcern: 
 
 assert.commandWorked(database.runCommand({find: collectionName}));
 
-const kMaxWaitTimeInSeconds = 10;
+const kFailPointTimeoutInSeconds = 5;
+const kMaxWaitTimeInSeconds = 30;
+const kRetryIntervalInMilliseconds = 1000;
 const kMaxQueueDepth = 2;
 const kMaxPoolSize = 2;
 admin.runCommand({setParameter: 1, ShardingTaskExecutorPoolMaxQueueDepth: kMaxQueueDepth});
@@ -57,7 +59,7 @@ for (let i = 0; i < kMaxPoolSize; ++i) {
     t.start();
 }
 
-primaryFP.wait(5000, kMaxPoolSize);
+primaryFP.wait(1000 * kFailPointTimeoutInSeconds, kMaxPoolSize);
 
 // New requests should go and wait in the queue.
 for (let i = 0; i < kMaxQueueDepth; ++i) {
@@ -67,11 +69,18 @@ for (let i = 0; i < kMaxQueueDepth; ++i) {
 }
 
 // Wait until new requests populate the queue.
+const actuals = [];
+const expected = kMaxQueueDepth;
 assert.soon(
-    () => getPendingCount() == kMaxQueueDepth,
-    "Failed to wait for the queue size to reach the limit",
+    () => {
+        const actual = getPendingCount();
+        actuals.push(actual);
+        return expected == actual;
+    },
+    () =>
+        `Failed to wait for the queue size to reach the limit. Was expecting the pending connection count to reach ${expected}, but instead it had the following values: ${tojson(actuals)}`,
     1000 * kMaxWaitTimeInSeconds,
-    1000,
+    kRetryIntervalInMilliseconds,
 );
 
 const res = database.runCommand({find: collectionName});
