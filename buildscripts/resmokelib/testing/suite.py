@@ -44,7 +44,7 @@ EXIT_CODE_MAP = {
 }
 
 # One out of TSS_ENDPOINT_FREQUENCY times, the TSS endpoint is used when selecting tests.
-TSS_ENDPOINT_FREQUENCY = 5
+TSS_ENDPOINT_FREQUENCY = 1
 
 
 def translate_exit_code(exit_code):
