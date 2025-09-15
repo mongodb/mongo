@@ -23,6 +23,8 @@ selector:
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding
   - requires_replication
+  # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+  - query_intensive_pbt
 
 executor:
   archive:

@@ -282,6 +282,7 @@ selector:
   - jstests/core/rename_system_buckets_collections.js
   # Inserts documents that are too large for a timeseries collection.
   - jstests/core/query/bson_size_limit.js
+  - jstests/core/**/*_pbt.js
 
   exclude_with_any_tags:
   - requires_sharding

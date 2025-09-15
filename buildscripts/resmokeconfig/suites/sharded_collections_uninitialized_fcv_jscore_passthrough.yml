@@ -117,6 +117,8 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+  - query_intensive_pbt
 
 executor:
   config:

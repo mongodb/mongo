@@ -1,3 +1,5 @@
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 /**
  * Executes a test case that inserts documents, issues an aggregate command on a collection
  * 'collection' and compares the results with the expected.
@@ -29,4 +31,15 @@ export function executeAggregationTestCase(collection, testCase) {
         }
         assert.commandFailedWithCode(error, testCase.expectedErrorCode);
     }
+}
+
+/**
+ * For tests that run many aggregations, different build settings can affect whether we can finish
+ * the test before the timeout.
+ */
+export function isSlowBuild(db) {
+    const debugBuild = db.adminCommand("buildInfo").debug;
+    return debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
+        _isLeakSanitizerActive() || _isThreadSanitizerActive() ||
+        _isUndefinedBehaviorSanitizerActive();
 }

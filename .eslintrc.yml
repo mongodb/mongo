@@ -129,6 +129,7 @@ globals:
   isRetryableError: true
   numberDecimalsAlmostEqual: true
   numberDecimalsEqual: true
+  _resultSetsEqualUnordered: true
   debug: true
   bsonsize: true
   _DelegatingDriverSession: true

@@ -57,6 +57,8 @@ selector:
   - uses_transactions
   # Parallel shell is not causally consistent because it uses a different session.
   - uses_parallel_shell
+  # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+  - query_intensive_pbt
 
 executor:
   archive:

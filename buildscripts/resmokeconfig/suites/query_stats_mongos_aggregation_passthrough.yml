@@ -36,6 +36,8 @@ selector:
   - requires_profiling
   # Running $queryStats will increment these counters which can screw up some test assertions.
   - inspects_command_opcounters
+  # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+  - query_intensive_pbt
 
 executor:
   archive:

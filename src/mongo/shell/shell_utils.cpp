@@ -61,6 +61,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
@@ -611,6 +612,109 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
 }
 
 
+void sortBSONObjectInternallyHelper(const BSONObj& input, BSONObjBuilder& bob);
+
+// Helper for `sortBSONObjectInternally`, handles a BSONElement for different recursion cases.
+void sortBSONElementInternally(const BSONElement& el, BSONObjBuilder& bob) {
+    if (el.type() == BSONType::Array) {
+        BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
+        for (const auto& child : el.Array()) {
+            sortBSONElementInternally(child, sub);
+        }
+        sub.doneFast();
+    } else if (el.type() == BSONType::Object) {
+        BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
+        sortBSONObjectInternallyHelper(el.Obj(), sub);
+        sub.doneFast();
+    } else {
+        bob.append(el);
+    }
+}
+
+void sortBSONObjectInternallyHelper(const BSONObj& input, BSONObjBuilder& bob) {
+    BSONObjIteratorSorted it(input);
+    while (it.more()) {
+        sortBSONElementInternally(it.next(), bob);
+    }
+}
+
+// Returns a new BSON with the same field/value pairings, but is recursively sorted by the fields.
+// Arrays are not changed.
+BSONObj sortBSONObjectInternally(const BSONObj& input) {
+    BSONObjBuilder bob(input.objsize());
+    sortBSONObjectInternallyHelper(input, bob);
+    return bob.obj();
+}
+
+// Sorts a vector of BSON objects by their fields as they appear in the BSON.
+void sortQueryResults(std::vector<BSONObj>& input) {
+    std::sort(input.begin(), input.end(), [&](const BSONObj& lhs, const BSONObj& rhs) {
+        return SimpleBSONObjComparator::kInstance.evaluate(lhs < rhs);
+    });
+}
+
+/*
+ * Takes two arrays of documents, and returns whether they contain the same set of BSON Objects. The
+ * BSON do not need to be in the same order for this to return true. Has no special logic for
+ * handling double/NumberDecimal closeness.
+ */
+BSONObj _resultSetsEqualUnordered(const BSONObj& input, void*) {
+    BSONObjIterator i(input);
+    auto first = i.next();
+    auto second = i.next();
+    uassert(9193201,
+            str::stream() << "_resultSetsEqualUnordered expects two arrays of containing objects "
+                             "as input received "
+                          << first.type() << " and " << second.type(),
+            first.type() == BSONType::Array && second.type() == BSONType::Array);
+
+    auto firstAsBson = first.Array();
+    auto secondAsBson = second.Array();
+
+    for (const auto& el : firstAsBson) {
+        uassert(9193202,
+                str::stream() << "_resultSetsEqualUnordered expects all elements of input arrays "
+                                 "to be objects, received "
+                              << el.type(),
+                el.type() == BSONType::Object);
+    }
+    for (const auto& el : secondAsBson) {
+        uassert(9193203,
+                str::stream() << "_resultSetsEqualUnordered expects all elements of input arrays "
+                                 "to be objects, received "
+                              << el.type(),
+                el.type() == BSONType::Object);
+    }
+
+    if (firstAsBson.size() != secondAsBson.size()) {
+        return BSON("" << false);
+    }
+
+    // Optimistically assume they're already in the same order.
+    if (first.binaryEqualValues(second)) {
+        return BSON("" << true);
+    }
+
+    std::vector<BSONObj> firstSorted;
+    std::vector<BSONObj> secondSorted;
+    for (size_t i = 0; i < firstAsBson.size(); i++) {
+        firstSorted.push_back(sortBSONObjectInternally(firstAsBson[i].Obj()));
+        secondSorted.push_back(sortBSONObjectInternally(secondAsBson[i].Obj()));
+    }
+
+    sortQueryResults(firstSorted);
+    sortQueryResults(secondSorted);
+
+    for (size_t i = 0; i < firstSorted.size(); i++) {
+        if (!firstSorted[i].binaryEqual(secondSorted[i])) {
+            return BSON("" << false);
+        }
+    }
+
+    return BSON("" << true);
+}
+
+
 class GoldenTestContextShell : public unittest::GoldenTestContextBase {
 public:
     explicit GoldenTestContextShell(const unittest::GoldenTestConfig* config,
@@ -804,6 +908,8 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_closeGoldenData", _closeGoldenData);
     scope.injectNative("_buildBsonObj", _buildBsonObj);
     scope.injectNative("_fnvHashToHexString", _fnvHashToHexString);
+    scope.injectNative("_resultSetsEqualUnordered", _resultSetsEqualUnordered);
+
 
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);

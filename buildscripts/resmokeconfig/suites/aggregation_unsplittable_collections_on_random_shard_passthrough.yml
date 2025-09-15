@@ -28,6 +28,8 @@ selector:
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - requires_profiling
+  # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+  - query_intensive_pbt
 
 executor:
   archive:
