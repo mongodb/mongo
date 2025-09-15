@@ -70,8 +70,10 @@ std::string ShardLocal::toString() const {
     return getId().toString() + ":<local>";
 }
 
-bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) const {
-    return localIsRetriableError(code, options);
+bool ShardLocal::isRetriableError(ErrorCodes::Error code,
+                                  std::span<const std::string> errorLabels,
+                                  RetryPolicy options) const {
+    return localIsRetriableError(code, errorLabels, options);
 }
 
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,
@@ -118,7 +120,6 @@ RetryStrategy::Result<std::monostate> ShardLocal::_runAggregation(
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
     // TODO: SERVER-104141 return the result of runAggregation directly.
     auto status = _rsLocalClient.runAggregation(opCtx, aggRequest, callback);
-
     if (status.isOK()) {
         return std::monostate{};
     }

@@ -98,6 +98,13 @@ public:
          */
         static Status getEffectiveStatus(const StatusWith<CommandResponse>& swResponse);
 
+        /**
+         * Returns the list of error labels from the response. If an error status
+         * is received instead of a CommandResponse an empty vector is returned.
+         */
+        static std::vector<std::string> getErrorLabels(
+            const StatusWith<CommandResponse>& swResponse);
+
         boost::optional<HostAndPort> hostAndPort;
         BSONObj response;
         Status commandStatus;
@@ -204,9 +211,17 @@ public:
      *
      * isRetriableError() routes to either of the static functions depending on object type.
      */
-    static bool localIsRetriableError(ErrorCodes::Error code, RetryPolicy options);
-    static bool remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options);
-    virtual bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) const = 0;
+    static bool localIsRetriableError(ErrorCodes::Error code,
+                                      std::span<const std::string> errorLabels,
+                                      RetryPolicy options);
+
+    static bool remoteIsRetriableError(ErrorCodes::Error code,
+                                       std::span<const std::string> errorLabels,
+                                       RetryPolicy options);
+
+    virtual bool isRetriableError(ErrorCodes::Error code,
+                                  std::span<const std::string> errorLabels,
+                                  RetryPolicy options) const = 0;
 
     /**
      * Runs the specified command returns the BSON command response plus parsed out Status of this

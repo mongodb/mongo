@@ -37,14 +37,17 @@
 
 namespace mongo {
 
-bool DefaultRetryStrategy::defaultRetryCriteria(Status s,
-                                                std::span<const std::string> errorLabels) {
+bool containsRetryableLabels(std::span<const std::string> errorLabels) {
     constexpr auto isRetryableErrorLabel = [](StringData label) {
         return label == ErrorLabel::kRetryableWrite || label == ErrorLabel::kRetryableError;
     };
 
-    return s.isA<ErrorCategory::RetriableError>() ||
-        std::ranges::find_if(errorLabels, isRetryableErrorLabel) != errorLabels.end();
+    return std::ranges::find_if(errorLabels, isRetryableErrorLabel) != errorLabels.end();
+}
+
+bool DefaultRetryStrategy::defaultRetryCriteria(Status s,
+                                                std::span<const std::string> errorLabels) {
+    return s.isA<ErrorCategory::RetriableError>() || containsRetryableLabels(errorLabels);
 }
 
 bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(

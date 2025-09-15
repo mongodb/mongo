@@ -31,6 +31,7 @@
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/retry_strategy.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -53,7 +54,7 @@ Atomic<std::int32_t>* gRetryBudgetCapacityServerParameter;
 
 auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy) {
     return [retryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
-        return shard->isRetriableError(s.code(), retryPolicy);
+        return shard->isRetriableError(s.code(), errorLabels, retryPolicy);
     };
 }
 
@@ -90,6 +91,32 @@ Status Shard::CommandResponse::getEffectiveStatus(
     }
 
     return Status::OK();
+}
+
+std::vector<std::string> Shard::CommandResponse::getErrorLabels(
+    const StatusWith<Shard::CommandResponse>& swResponse) {
+    // Check if the request even reached the shard.
+    if (!swResponse.isOK()) {
+        return {};
+    }
+
+    auto& response = swResponse.getValue();
+
+    if (BSONElement errorLabelsElement = response.response[kErrorLabelsFieldName];
+        !errorLabelsElement.eoo()) {
+        auto errorLabelsArray = errorLabelsElement.Array();
+
+        std::vector<std::string> errorLabels{};
+        errorLabels.resize(errorLabelsArray.size());
+
+        std::ranges::transform(errorLabelsArray, errorLabels.begin(), [](const BSONElement& data) {
+            return data.String();
+        });
+
+        return errorLabels;
+    }
+
+    return {};
 }
 
 Status Shard::CommandResponse::processBatchWriteResponse(
@@ -137,18 +164,20 @@ bool Shard::isConfig() const {
     return _id == ShardId::kConfigServerId;
 }
 
-bool Shard::localIsRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+bool Shard::localIsRetriableError(ErrorCodes::Error code,
+                                  std::span<const std::string> errorLabels,
+                                  RetryPolicy options) {
     switch (options) {
         case Shard::RetryPolicy::kNoRetry: {
             return false;
         } break;
 
         case Shard::RetryPolicy::kIdempotent: {
-            return code == ErrorCodes::WriteConcernTimeout;
+            return code == ErrorCodes::WriteConcernTimeout || containsRetryableLabels(errorLabels);
         } break;
 
         case Shard::RetryPolicy::kIdempotentOrCursorInvalidated: {
-            return localIsRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
+            return localIsRetriableError(code, errorLabels, Shard::RetryPolicy::kIdempotent) ||
                 ErrorCodes::isCursorInvalidatedError(code);
         } break;
 
@@ -160,7 +189,9 @@ bool Shard::localIsRetriableError(ErrorCodes::Error code, RetryPolicy options) {
     MONGO_UNREACHABLE;
 }
 
-bool Shard::remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+bool Shard::remoteIsRetriableError(ErrorCodes::Error code,
+                                   std::span<const std::string> errorLabels,
+                                   RetryPolicy options) {
     if (gInternalProhibitShardOperationRetry.loadRelaxed()) {
         return false;
     }
@@ -171,11 +202,11 @@ bool Shard::remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options) 
         } break;
 
         case RetryPolicy::kIdempotent: {
-            return isMongosRetriableError(code);
+            return isMongosRetriableError(code) || containsRetryableLabels(errorLabels);
         } break;
 
         case RetryPolicy::kIdempotentOrCursorInvalidated: {
-            return remoteIsRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
+            return remoteIsRetriableError(code, errorLabels, Shard::RetryPolicy::kIdempotent) ||
                 ErrorCodes::isCursorInvalidatedError(code);
         } break;
 
@@ -212,7 +243,9 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithIndefiniteRetries(
 
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto status = CommandResponse::getEffectiveStatus(swResponse);
-        if (isRetriableError(status.code(), retryPolicy)) {
+
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
+        if (isRetriableError(status.code(), {}, retryPolicy)) {
             LOGV2_DEBUG(22719,
                         2,
                         "Command failed with retryable error and will be retried",
@@ -248,7 +281,8 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
 
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto status = CommandResponse::getEffectiveStatus(swResponse);
-        if (retry < kOnErrorNumRetries && isRetriableError(status.code(), retryPolicy)) {
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
+        if (retry < kOnErrorNumRetries && isRetriableError(status.code(), {}, retryPolicy)) {
             LOGV2(22720,
                   "Command failed with a retryable error and will be retried",
                   "command"_attr = redact(cmdObj),
@@ -271,8 +305,9 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
         auto result =
             _runExhaustiveCursorCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
 
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
         if (retry < kOnErrorNumRetries &&
-            isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
+            isRetriableError(result.getStatus().code(), {}, RetryPolicy::kIdempotent)) {
             continue;
         }
         return result;
@@ -296,8 +331,9 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
         auto result = _exhaustiveFindOnConfig(
             opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint);
 
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
         if (retry < kOnErrorNumRetries &&
-            isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
+            isRetriableError(result.getStatus().code(), {}, RetryPolicy::kIdempotent)) {
             continue;
         }
 
@@ -329,7 +365,8 @@ BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
 
         BatchedCommandResponse batchResponse;
         auto writeStatus = CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
-        if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
+        if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), {}, retryPolicy)) {
             LOGV2_DEBUG(22721,
                         2,
                         "Batch write command failed with retryable error and will be retried",

@@ -598,7 +598,7 @@ TEST_F(FetcherTest, FindCommandFailed2) {
     ASSERT_EQUALS("bad hint", status.reason());
 }
 
-TEST_F(FetcherTest, FindCommandFailed3) {
+TEST_F(FetcherTest, FindCommandFailedWithErrorLabels) {
     auto responseErrorLabels =
         std::array{ErrorLabel::kSystemOverloadedError, ErrorLabel::kRetryableError};
     BSONArrayBuilder labelArray;

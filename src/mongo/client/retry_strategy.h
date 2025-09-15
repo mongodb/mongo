@@ -339,6 +339,8 @@ public:
     };
 };
 
+bool containsRetryableLabels(std::span<const std::string> errorLabels);
+
 /**
  * Implements the basic behavior for retryability of failed requests.
  *
@@ -352,12 +354,6 @@ class DefaultRetryStrategy final : public RetryStrategy {
 public:
     using RetryCriteria = std::function<bool(Status s, std::span<const std::string> errorLabels)>;
 
-    /**
-     * The default retry criteria will return true if the error is in the 'RetriableError'
-     * error category or if the error has one of the labels:
-     *  - 'RetryableWriteError'
-     *  - 'RetryableError'
-     */
     static bool defaultRetryCriteria(Status s, std::span<const std::string> errorLabels);
 
     struct BackoffParameters {

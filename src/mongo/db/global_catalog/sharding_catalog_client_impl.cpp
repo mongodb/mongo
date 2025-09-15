@@ -615,8 +615,9 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     const auto configShard = _getConfigShard(opCtx);
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
         if (retry < kMaxWriteRetry &&
-            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
+            configShard->isRetriableError(status.code(), {}, Shard::RetryPolicy::kIdempotent)) {
             aggResult.clear();
             continue;
         }
@@ -1273,8 +1274,9 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
         Status status = response.toStatus();
 
+        // TODO: SERVER-108322 Send error labels to isRetriableError.
         if (retry < kMaxWriteRetry &&
-            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
+            configShard->isRetriableError(status.code(), {}, Shard::RetryPolicy::kIdempotent)) {
             // Pretend like the operation is idempotent because we're handling DuplicateKey errors
             // specially
             continue;

@@ -370,7 +370,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     });
 
     if (!rcbd.response.isOK()) {
-        _work(RetryStrategy::Result<QueryResponse>{rcbd.response.status}, nullptr, nullptr);
+        _work(rcbd.response.status, nullptr, nullptr);
         return;
     }
 
@@ -382,8 +382,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     const BSONObj& queryResponseObj = rcbd.response.data;
     Status status = getStatusFromCommandResult(queryResponseObj);
     if (!status.isOK()) {
-        _work(RetryStrategy::Result<QueryResponse>(
-                  status, rcbd.response.getErrorLabels(), rcbd.request.target),
+        _work(QueryResponseStatus(status, rcbd.response.getErrorLabels(), rcbd.request.target),
               nullptr,
               nullptr);
         return;
@@ -391,7 +390,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
 
     status = parseCursorResponse(queryResponseObj, batchFieldName, &batchData);
     if (!status.isOK()) {
-        _work(RetryStrategy::Result<Fetcher::QueryResponse>{status}, nullptr, nullptr);
+        _work(status, nullptr, nullptr);
         return;
     }
 
@@ -404,14 +403,14 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     }
 
     if (!batchData.cursorId) {
-        _work(RetryStrategy::Result<QueryResponse>{batchData}, &nextAction, nullptr);
+        _work(batchData, &nextAction, nullptr);
         return;
     }
 
     nextAction = NextAction::kGetMore;
 
     BSONObjBuilder bob;
-    _work(RetryStrategy::Result<QueryResponse>{batchData}, &nextAction, &bob);
+    _work(batchData, &nextAction, &bob);
 
     // Callback function _work may modify nextAction to request the fetcher
     // not to schedule a getMore command.
@@ -429,7 +428,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     status = _scheduleGetMore(cmdObj);
     if (!status.isOK()) {
         nextAction = NextAction::kNoAction;
-        _work(RetryStrategy::Result<Fetcher::QueryResponse>{status}, nullptr, nullptr);
+        _work(status, nullptr, nullptr);
         return;
     }
 

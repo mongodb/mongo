@@ -370,8 +370,10 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs&&
             }
 
             bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();
+            // TODO: SERVER-108324 Retrieve error labels properly from the request in order to
+            // evaluate isRetriableError.
             if (!_ars->_stopRetrying &&
-                shard->isRetriableError(status.code(), _ars->_retryPolicy) &&
+                shard->isRetriableError(status.code(), {}, _ars->_retryPolicy) &&
                 _retryCount < kMaxNumFailedHostRetryAttempts && !isStartingTransaction) {
 
                 LOGV2_DEBUG(

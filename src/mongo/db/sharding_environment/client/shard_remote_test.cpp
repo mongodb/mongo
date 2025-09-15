@@ -39,6 +39,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/client/shard_remote.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -114,6 +115,25 @@ protected:
 
     inline static auto errorLabelsSystemOverloaded =
         std::vector{std::string{ErrorLabel::kSystemOverloadedError}};
+};
+
+class ShardRetryabilityTest : public ShardRemoteTest {
+protected:
+    inline static const std::array retryableErrorLabel = {std::string{ErrorLabel::kRetryableError}};
+    inline static const std::array retryableWriteLabel = {std::string{ErrorLabel::kRetryableWrite}};
+
+    void setUp() override {
+        ShardRemoteTest::setUp();
+        _shard =
+            uassertStatusOK(shardRegistry()->getShard(operationContext(), kTestShardIds.front()));
+    }
+
+    void tearDown() override {
+        _shard = nullptr;
+        ShardRemoteTest::tearDown();
+    }
+
+    std::shared_ptr<Shard> _shard;
 };
 
 TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
@@ -281,6 +301,122 @@ TEST_F(ShardRemoteTest, TimeoutCodeUnsetWhenMaxTimeMSNotSet) {
     });
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorRemoteNoRetry) {
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::CommandFailed, {}, Shard::RetryPolicy::kNoRetry));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, {}, Shard::RetryPolicy::kNoRetry));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::CommandFailed, retryableErrorLabel, Shard::RetryPolicy::kNoRetry));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, retryableWriteLabel, Shard::RetryPolicy::kNoRetry));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorRemoteIdempotent) {
+    ASSERT(_shard->remoteIsRetriableError(
+        ErrorCodes::CommandFailed, retryableErrorLabel, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT(_shard->remoteIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, retryableWriteLabel, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::CommandFailed, {}, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, {}, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT(_shard->remoteIsRetriableError(
+        ErrorCodes::BalancerInterrupted, {}, Shard::RetryPolicy::kIdempotent));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorRemoteIdempotentOrCursorInvalidated) {
+    ASSERT(_shard->remoteIsRetriableError(ErrorCodes::CommandFailed,
+                                          retryableErrorLabel,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT(_shard->remoteIsRetriableError(ErrorCodes::WriteConcernTimeout,
+                                          retryableWriteLabel,
+                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::CommandFailed, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT(_shard->remoteIsRetriableError(
+        ErrorCodes::CursorNotFound, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT(_shard->remoteIsRetriableError(
+        ErrorCodes::BalancerInterrupted, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorRemoteNotIdempotent) {
+    ASSERT_FALSE(_shard->remoteIsRetriableError(
+        ErrorCodes::CommandFailed, retryableErrorLabel, Shard::RetryPolicy::kNotIdempotent));
+
+    ASSERT(_shard->remoteIsRetriableError(
+        ErrorCodes::PrimarySteppedDown, {}, Shard::RetryPolicy::kNotIdempotent));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorLocalNoRetry) {
+    ASSERT_FALSE(
+        _shard->localIsRetriableError(ErrorCodes::CommandFailed, {}, Shard::RetryPolicy::kNoRetry));
+
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, {}, Shard::RetryPolicy::kNoRetry));
+
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::CommandFailed, retryableErrorLabel, Shard::RetryPolicy::kNoRetry));
+
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, retryableWriteLabel, Shard::RetryPolicy::kNoRetry));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorLocalIdempotent) {
+    ASSERT(_shard->localIsRetriableError(
+        ErrorCodes::CommandFailed, retryableErrorLabel, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT(_shard->localIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, retryableWriteLabel, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::CommandFailed, {}, Shard::RetryPolicy::kIdempotent));
+
+    ASSERT(_shard->localIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, {}, Shard::RetryPolicy::kIdempotent));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorLocalIdempotentOrCursorInvalidated) {
+    ASSERT(_shard->localIsRetriableError(ErrorCodes::CommandFailed,
+                                         retryableErrorLabel,
+                                         Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT(_shard->localIsRetriableError(ErrorCodes::WriteConcernTimeout,
+                                         retryableWriteLabel,
+                                         Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::CommandFailed, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT(_shard->localIsRetriableError(
+        ErrorCodes::WriteConcernTimeout, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+
+    ASSERT(_shard->localIsRetriableError(
+        ErrorCodes::CursorNotFound, {}, Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
+}
+
+TEST_F(ShardRetryabilityTest, RetryableErrorLocalNotIdempotent) {
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::CommandFailed, retryableErrorLabel, Shard::RetryPolicy::kNotIdempotent));
+
+    ASSERT_FALSE(_shard->localIsRetriableError(
+        ErrorCodes::PrimarySteppedDown, {}, Shard::RetryPolicy::kNotIdempotent));
 }
 
 }  // namespace

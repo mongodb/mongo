@@ -58,8 +58,9 @@ public:
         if (extraInfo->isLocal()) {
             return false;
         }
-        return Shard::remoteIsRetriableError(extraInfo->asRemote().getRemoteCommandResult().code(),
-                                             _shardInternalRetryPolicy);
+        // TODO: SERVER-108325 Propagate error labels to the shard retry strategy.
+        return Shard::remoteIsRetriableError(
+            extraInfo->asRemote().getRemoteCommandResult().code(), {}, _shardInternalRetryPolicy);
     }
 
     bool recordAndEvaluateRetry(Status s) override {
