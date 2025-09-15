@@ -261,8 +261,6 @@ private:
     // returned, or the current resume token at EOF.
     BSONObj _latestNonOplogResumeToken;
 
-    PlanExecutor::QueryFramework _queryFramework;
-
     // The size of each batch, grows exponentially. 0 means unlimited.
     size_t _batchSizeCount = 0;
     // The size limit in bytes of each batch.
