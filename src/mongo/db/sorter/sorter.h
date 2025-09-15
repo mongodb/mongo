@@ -124,7 +124,7 @@ struct SortOptions {
 
     // Directory into which we place a file when spilling to disk. boost::none means we aren't
     // allowing external sorting.
-    boost::optional<std::string> tempDir;
+    boost::optional<boost::filesystem::path> tempDir;
 
     // If set, allows us to observe Sorter file handle usage.
     SorterFileStats* sorterFileStats;
@@ -166,8 +166,8 @@ struct SortOptions {
         return *this;
     }
 
-    SortOptions& TempDir(const std::string& newTempDir) {
-        tempDir = newTempDir;
+    SortOptions& TempDir(boost::filesystem::path newTempDir) {
+        tempDir = std::move(newTempDir);
         return *this;
     }
 
@@ -406,7 +406,7 @@ public:
     /**
      * ExtSort-only constructor. fileName is the base name of a file in the temp directory.
      */
-    Sorter(const SortOptions& opts, const std::string& fileName);
+    Sorter(const SortOptions& opts, std::string fileName);
 
     template <typename Comparator>
     static std::unique_ptr<Sorter> make(const SortOptions& opts,
@@ -414,7 +414,7 @@ public:
                                         const Settings& settings = Settings());
 
     template <typename Comparator>
-    static std::unique_ptr<Sorter> makeFromExistingRanges(const std::string& fileName,
+    static std::unique_ptr<Sorter> makeFromExistingRanges(std::string fileName,
                                                           const std::vector<SorterRange>& ranges,
                                                           const SortOptions& opts,
                                                           const Comparator& comp,

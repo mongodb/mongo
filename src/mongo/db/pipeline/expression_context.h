@@ -642,10 +642,8 @@ public:
         return _params.forPerShardCursor;
     }
 
-    std::string getTempDir() const {
-        // TODO SERVER-109634: Return boost::filesystem::path directly when it is supported by
-        // SortOptions.
-        return _params.tmpDir.string();
+    boost::filesystem::path getTempDir() const {
+        return _params.tmpDir;
     }
 
     void setTempDir(boost::filesystem::path tempDir) {

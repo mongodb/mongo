@@ -1364,10 +1364,10 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts)
 }
 
 template <typename Key, typename Value>
-Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
+Sorter<Key, Value>::Sorter(const SortOptions& opts, std::string fileName)
     : SorterBase(opts.sorterTracker),
       _opts(opts),
-      _file(std::make_shared<SorterFile>(*(opts.tempDir) + "/" + fileName, opts.sorterFileStats)) {
+      _file(std::make_shared<SorterFile>(*(opts.tempDir) / fileName, opts.sorterFileStats)) {
     invariant(opts.tempDir);
     invariant(!fileName.empty());
     if (opts.useMemPool) {
@@ -1887,7 +1887,7 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(const SortOptions& 
 template <typename Key, typename Value>
 template <typename Comparator>
 std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::makeFromExistingRanges(
-    const std::string& fileName,
+    std::string fileName,
     const std::vector<SorterRange>& ranges,
     const SortOptions& opts,
     const Comparator& comp,

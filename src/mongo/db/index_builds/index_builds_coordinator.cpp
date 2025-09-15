@@ -2085,8 +2085,10 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                       "file"_attr = index.getFileName());
 
                 boost::system::error_code ec;
-                boost::filesystem::remove(
-                    storageGlobalParams.dbpath + "/_tmp/" + std::string{*index.getFileName()}, ec);
+                boost::filesystem::remove(boost::filesystem::path(storageGlobalParams.dbpath) /
+                                              std::string{"_tmp"} /
+                                              std::string{*index.getFileName()},
+                                          ec);
 
                 if (ec) {
                     LOGV2(5043101,

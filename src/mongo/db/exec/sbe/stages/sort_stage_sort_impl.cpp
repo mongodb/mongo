@@ -216,9 +216,7 @@ private:
                        : 0);
         opts.MoveSortedDataIntoIterator(true);
         if (_stage._allowDiskUse) {
-            // TODO SERVER-109634: Use boost::filesystem::path directly when it is supported by
-            // SortOptions.
-            opts.TempDir((boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp").string());
+            opts.TempDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp");
             if (!_sorterFileStats) {
                 _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
             }

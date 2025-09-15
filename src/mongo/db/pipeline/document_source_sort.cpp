@@ -135,11 +135,12 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
                                        const SortPattern& sortOrder,
                                        SortStageOptions options)
     : DocumentSource(kStageName, pExpCtx),
+      // TODO(SERVER-110826): Remove .string() to directly use boost::filesystem::path.
       _sortExecutor(std::make_shared<SortExecutor<Document>>(
           sortOrder,
           options.limit,
           loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes),
-          pExpCtx->getTempDir(),
+          pExpCtx->getTempDir().string(),
           pExpCtx->getAllowDiskUse())),
       _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
