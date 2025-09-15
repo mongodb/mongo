@@ -3,6 +3,9 @@
  * against a sharded collection is wrapped in a "shards" object with keys for each shard.
  *
  * @tags: [
+ *   # The 'totalDocsExamined' values reported by explain queries can be higher than expected by
+ *   # this test if the balancer moves chunks around while the explain queries are running.
+ *   assumes_balancer_off,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   requires_fastcount,
@@ -180,10 +183,12 @@ assert.commandWorked(explain);
 
 // .maxTimeMS()
 // Provide longer maxTime when the test runs in suites which can affect query execution time.
+// In slow suites set the maxTime to at least 5s to account for the suites' overhead.
 const numConn = db.serverStatus().connections.current;
-explain = t.explain().find().maxTimeMS(200 * numConn).finish();
+const maxTimeMS = Math.max(500 * numConn, 5000);
+explain = t.explain().find().maxTimeMS(maxTimeMS).finish();
 assert.commandWorked(explain);
-explain = t.find().maxTimeMS(200 * numConn).explain();
+explain = t.find().maxTimeMS(maxTimeMS).explain();
 assert.commandWorked(explain);
 
 // .readPref()
