@@ -35,7 +35,7 @@ export class DataGenerator {
         this.seed = seed;
     }
 
-    execute({spec = null, size = null, indices = null, analyze = false} = {}) {
+    execute({spec = null, size = null, indices = null, analyze = false, serial_inserts = true} = {}) {
         let args = [
             getPython3Binary(),
             DataGenerator.PROGRAM_PATH,
@@ -59,6 +59,10 @@ export class DataGenerator {
 
         if (this.seed !== null) {
             args.push("--seed", this.seed);
+        }
+
+        if (serial_inserts) {
+            args.push("--serial-inserts");
         }
 
         if (this.analyze) {

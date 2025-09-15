@@ -30,7 +30,9 @@
 import pathlib
 import shlex
 import typing
+from contextlib import nullcontext
 from dataclasses import fields
+from typing import ContextManager
 
 import datagen.database_instance
 
@@ -129,6 +131,7 @@ async def upstream(
     collection_name: str,
     source: typing.Generator,
     count: int,
+    context_manager: ContextManager
 ):
     """Bulk insert generated objects into a collection."""
     import dataclasses
@@ -147,6 +150,7 @@ async def upstream(
                         datagen.serialize.serialize_doc(dataclasses.asdict(next(source)))
                         for _ in range(num)
                     ],
+                    context_manager
                 )
             )
         )
@@ -211,6 +215,7 @@ async def main():
         help="Number of objects to generate. Set to 0 to skip data generation.",
     )
     parser.add_argument("--seed", type=str, help="The seed to use.")
+    parser.add_argument("--serial-inserts", action='store_true', default=False, help="Force single-threaded insertion")
 
     args = parser.parse_args()
     module = importlib.import_module(args.module)
@@ -243,7 +248,8 @@ async def main():
             seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
             generator_factory = CorrelatedGeneratorFactory(spec, seed)
             generator = generator_factory.make_generator()
-            await upstream(database_instance, collection_name, generator, args.size)
+            context_manager = asyncio.Semaphore(1) if args.serial_inserts else nullcontext()
+            await upstream(database_instance, collection_name, generator, args.size, context_manager)
             generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
 
         # 3. Create indices after documents.
