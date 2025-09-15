@@ -479,6 +479,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_EQ_LOOKUP_UNWIND:
             case STAGE_GROUP:
             case STAGE_IDHACK:
+            case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+            case STAGE_INDEX_PROBE_NODE:
             case STAGE_HASH_JOIN_EMBEDDING_NODE:
             case STAGE_MATCH:
             case STAGE_REPLACE_ROOT:

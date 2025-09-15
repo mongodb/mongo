@@ -2321,4 +2321,56 @@ struct NestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
     std::unique_ptr<QuerySolutionNode> clone() const override;
 };
 
+/**
+ * Represents an indexed nested loop join which respects the specfied field embeddings. The inner
+ * side is expected to be an 'IndexProbeNode' which constructs index bounds and performs a lookup on
+ * an index over the fields in the join predicates.
+ */
+struct IndexedNestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
+    // Inherit the constructor from BinaryJoinEmbeddingNode
+    using BinaryJoinEmbeddingNode::BinaryJoinEmbeddingNode;
+
+    StageType getType() const override {
+        return STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
+};
+
+/**
+ * Represents the inner side of an indexed nested loop join. The outer side will produce index keys
+ * and for each one, this node will construct index bounds corresponding to the join predicates and
+ * use the index to produce the corresponding documents.
+ */
+struct IndexProbeNode : public QuerySolutionNode {
+    IndexProbeNode(NamespaceString, IndexEntry);
+
+    bool fetched() const override {
+        return false;
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const override {
+        return FieldAvailability::kNotProvided;
+    }
+
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        return kEmptySet;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
+
+    StageType getType() const override {
+        return STAGE_INDEX_PROBE_NODE;
+    }
+
+    NamespaceString nss;
+    IndexEntry index;
+};
+
 }  // namespace mongo
