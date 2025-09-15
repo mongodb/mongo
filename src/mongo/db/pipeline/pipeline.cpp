@@ -198,7 +198,11 @@ std::unique_ptr<Pipeline> Pipeline::clone(
     for (auto&& stage : _sources) {
         clonedStages.push_back(stage->clone(expCtx));
     }
-    return create(std::move(clonedStages), expCtx);
+    auto pipe = create(std::move(clonedStages), expCtx);
+    if (_translatedForViewlessTimeseries) {
+        pipe->setTranslated();
+    }
+    return pipe;
 }
 
 template <class T>

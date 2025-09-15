@@ -772,6 +772,10 @@ BSONObj createPassthroughCommandForShard(
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
         targetedCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline->serialize());
+        if (auto isTranslated = pipeline->isTranslated()) {
+            targetedCmd[AggregateCommandRequest::kTranslatedForViewlessTimeseriesFieldName] =
+                Value(isTranslated);
+        }
     }
 
     if (overrideBatchSize.has_value()) {
@@ -832,6 +836,10 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     // send to the shards.
     targetedCmd[AggregateCommandRequest::kPipelineFieldName] =
         Value(splitPipeline.shardsPipeline->serialize());
+    if (auto isTranslated = splitPipeline.shardsPipeline->isTranslated()) {
+        targetedCmd[AggregateCommandRequest::kTranslatedForViewlessTimeseriesFieldName] =
+            Value(isTranslated);
+    }
 
     if (expCtx->isHybridSearch()) {
         targetedCmd[AggregateCommandRequest::kIsHybridSearchFieldName] = Value(true);

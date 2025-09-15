@@ -82,6 +82,7 @@ TEST_F(TimeseriesRewritesTest, EmptyPipelineRewriteTest) {
     translateStagesHelper(*pipeline);
 
     const auto translatedSources = pipeline->getSources();
+    ASSERT(pipeline->isTranslated());
     ASSERT_EQ(translatedSources.size(), 1);
     ASSERT_EQ(translatedSources.front()->getSourceName(),
               DocumentSourceInternalUnpackBucket::kStageNameInternal);
@@ -92,6 +93,7 @@ TEST_F(TimeseriesRewritesTest, InternalUnpackBucketRewriteTest) {
     const size_t originalPipelineSize = pipeline->size();
 
     translateStagesHelper(*pipeline);
+    ASSERT(pipeline->isTranslated());
     const auto translatedSources = pipeline->getSources();
     ASSERT_EQ(translatedSources.size(), originalPipelineSize + 1);
     ASSERT_EQ(translatedSources.front()->getSourceName(),
@@ -104,6 +106,7 @@ TEST_F(TimeseriesRewritesTest, InsertIndexStatsConversionStage) {
     auto pipeline = Pipeline::parse(originalSources, expCtx);
 
     translateStagesHelper(*pipeline);
+    ASSERT(pipeline->isTranslated());
     const auto translatedSources = pipeline->getSources();
     ASSERT_EQ(translatedSources.size(), originalSources.size() + 1);
 
@@ -120,6 +123,7 @@ TEST_F(TimeseriesRewritesTest, InsertIndexStatsConversionStageWithMatch) {
     auto pipeline = Pipeline::parse(originalSources, expCtx);
 
     translateStagesHelper(*pipeline);
+    ASSERT(pipeline->isTranslated());
     const auto translatedSources = pipeline->getSources();
     ASSERT_EQ(translatedSources.size(), originalSources.size() + 1);
 
@@ -149,6 +153,7 @@ TEST_F(TimeseriesRewritesTest, DontInsertUnpackStageWhenStagesDontExpectUserDocu
         auto pipeline = Pipeline::parse(originalSources, expCtx);
 
         translateStagesHelper(*pipeline);
+        ASSERT(pipeline->isTranslated());
         const auto translatedSources = pipeline->getSources();
         ASSERT_EQ(translatedSources.size(), originalSources.size());
 
