@@ -124,7 +124,7 @@ filters:
   - "tomcrypt*":
     approvers:
       - 10gen/server-security
-  - "unicode*":
+  - "unicode-8.0.0":
     approvers:
       - 10gen/query-execution
   - "unwind":
