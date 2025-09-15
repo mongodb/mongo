@@ -29,7 +29,7 @@
 
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util_gen.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/namespace_string.h"

@@ -29,7 +29,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cache_pressure_monitor.h"
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"

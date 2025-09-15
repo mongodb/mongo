@@ -130,7 +130,7 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/client:fetcher",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/repl:multiapplier",
         "//src/mongo/db/repl:oplog",

@@ -65,7 +65,7 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
         "//src/mongo/db/query:canonical_query_base",
@@ -197,7 +197,7 @@ mongo_cc_library(
     ],
     header_deps = [
         "//src/mongo/db/repl:oplog_buffer_batched_queue",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
     deps = [
         "//src/mongo/db:server_base",

@@ -32,7 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/classic/histogram_server_status_metric.h"
 #include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/trial_period_utils.h"

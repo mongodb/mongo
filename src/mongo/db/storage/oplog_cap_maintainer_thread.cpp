@@ -34,7 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/local_catalog/catalog_raii.h"
 #include "mongo/db/local_catalog/local_oplog_info.h"
 #include "mongo/db/operation_context.h"

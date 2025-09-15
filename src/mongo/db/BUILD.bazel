@@ -985,8 +985,8 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:user_acquisition_stats",
         "//src/mongo/db/commands:create_command",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/exec/mutable_bson",
         "//src/mongo/db/local_catalog:collection_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/local_catalog:local_oplog_info",
@@ -1279,7 +1279,7 @@ mongo_cc_library(
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec:projection_executor",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/exec:sort_executor",
@@ -1352,7 +1352,7 @@ mongo_cc_library(
         ":record_id_helpers",
         ":shard_role",
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/query/write_ops:parsed_update_and_delete",
@@ -1393,7 +1393,7 @@ mongo_cc_library(
         ":read_write_concern_defaults",
         ":shard_role",
         ":shared_request_handling",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_server_parameters",
@@ -1637,7 +1637,7 @@ mongo_cc_library(
     deps = [
         ":server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/rpc",
     ],
@@ -1965,7 +1965,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec/document_value",
     ],
 )
@@ -2039,7 +2039,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec/document_value",
     ],
 )
@@ -2159,7 +2159,7 @@ mongo_cc_library(
     ],
     header_deps = [
         "//src/mongo/db/exec/mutable_bson:mutable_bson",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
     deps = [
         "keys_collection_document",
@@ -2615,7 +2615,7 @@ mongo_cc_library(
         ":service_context",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/auth:security_token_auth",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/repl:replica_set_messages",
@@ -3147,7 +3147,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 
@@ -3188,8 +3188,8 @@ mongo_cc_library(
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/db/auth:user_acquisition_stats",
         "//src/mongo/db/commands:fsync_locked",
-        "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/commands:txn_cmd_request",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:replica_set_messages",
         "//src/mongo/db/s:sharding_runtime_d",
@@ -3310,7 +3310,7 @@ mongo_cc_library(
         "collection_index_usage_tracker",
         "//src/mongo/db/commands:mongod",
         "//src/mongo/db/commands:mongod_fcv",
-        "//src/mongo/db/commands:server_status_servers",
+        "//src/mongo/db/commands/server_status:server_status_servers",
         "common",
         "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
         "curop_metrics",

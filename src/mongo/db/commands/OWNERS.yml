@@ -109,12 +109,6 @@ filters:
   - "dbhash*":
     approvers:
       - 10gen/server-dbhash
-  - "server_status*":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "server_status_security_servers.cpp":
-    approvers:
-      - 10gen/server-security
   - "sysprofile*":
     approvers:
       - 10gen/query-execution
@@ -169,9 +163,6 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-transactions
-  - "*read_write_concern_defaults_server_status*":
-    approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology
   - "generic_servers*":
     approvers:
       - 10gen/server-networking-and-observability

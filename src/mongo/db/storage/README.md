@@ -140,7 +140,7 @@ details.
 - [RecoveryUnit](recovery_unit.h)
 - [SeekableRecordCursor](record_store.h)
 - [SortedDataInterface](sorted_data_interface.h)
-- [ServerStatusSection](../commands/server_status.h)
+- [ServerStatusSection](../commands/server_status/server_status.h)
 
 [Concurrency FAQ]: http://docs.mongodb.org/manual/faq/concurrency/
 [Storage FAQ]: http://docs.mongodb.org/manual/faq/storage

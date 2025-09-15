@@ -153,7 +153,7 @@ mongo_cc_library(
     deps = [
         "storage_wiredtiger_core",
         "storage_wiredtiger_customization_hooks",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/db/storage:storage_engine_lock_file",

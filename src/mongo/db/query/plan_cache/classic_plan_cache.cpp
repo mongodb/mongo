@@ -33,7 +33,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/find_command.h"
@@ -125,15 +125,14 @@ std::string SolutionCacheData::toString() const {
     switch (this->solnType) {
         case WHOLE_IXSCAN_SOLN:
             MONGO_verify(this->tree.get());
-            return str::stream() << "(whole index scan solution: "
-                                 << "dir=" << this->wholeIXSolnDir << "; "
-                                 << "tree=" << this->tree->toString() << ")";
+            return str::stream() << "(whole index scan solution: " << "dir=" << this->wholeIXSolnDir
+                                 << "; " << "tree=" << this->tree->toString() << ")";
         case COLLSCAN_SOLN:
             return "(collection scan)";
         case USE_INDEX_TAGS_SOLN:
             MONGO_verify(this->tree.get());
-            return str::stream() << "(index-tagged expression tree: "
-                                 << "tree=" << this->tree->toString() << ")";
+            return str::stream() << "(index-tagged expression tree: " << "tree="
+                                 << this->tree->toString() << ")";
         case VIRTSCAN_SOLN:
             return "(virtual scan)";
     }

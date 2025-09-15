@@ -436,7 +436,7 @@ mongo_cc_library(
     deps = [
         ":replica_set_messages",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
@@ -1214,7 +1214,7 @@ mongo_cc_library(
         "//src/mongo/db:logical_time_metadata_hook",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
         "//src/mongo/db/stats:counters",
@@ -1321,7 +1321,7 @@ mongo_cc_library(
         ":topology_coordinator",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 
@@ -1484,7 +1484,7 @@ mongo_cc_library(
         ":intent_registry",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/util/moving_average.h"
 
 namespace mongo {
@@ -40,7 +40,7 @@ namespace mongo {
  *
  * For example:
  *
- *     #include "mongo/db/commands/server_status_metric.h"
+ *     #include "mongo/db/commands/server_status/server_status_metric.h"
  *     #include "mongo/util/moving_average_metric.h"
  *
  *     auto& someAverageMetricThing =

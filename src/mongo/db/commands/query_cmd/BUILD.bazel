@@ -134,7 +134,7 @@ mongo_cc_library(
         "update_metrics.h",
     ],
     deps = [
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/write_ops:write_ops_parsers",
     ],
 )

@@ -127,7 +127,7 @@ mongo_cc_library(
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth:sasl_mechanism_protocol",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:command_status",
         "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.

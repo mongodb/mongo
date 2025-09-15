@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/active_index_builds.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"

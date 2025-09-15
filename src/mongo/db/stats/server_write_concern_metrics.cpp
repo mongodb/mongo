@@ -30,7 +30,7 @@
 #include "mongo/db/stats/server_write_concern_metrics.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/service_context.h"

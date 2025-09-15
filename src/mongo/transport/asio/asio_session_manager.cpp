@@ -29,7 +29,7 @@
 
 #include "mongo/transport/asio/asio_session_manager.h"
 
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_reserved.h"

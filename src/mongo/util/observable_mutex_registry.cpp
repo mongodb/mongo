@@ -30,7 +30,7 @@
 #include "mongo/util/observable_mutex_registry.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/static_immortal.h"
 

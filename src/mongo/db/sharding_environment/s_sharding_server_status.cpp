@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/cluster_parameters/cluster_server_parameter_server_status.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"

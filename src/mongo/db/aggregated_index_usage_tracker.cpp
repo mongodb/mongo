@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/operation_context.h"

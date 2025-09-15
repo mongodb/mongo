@@ -35,7 +35,7 @@
 #include "mongo/db/admission/flow_control.h"
 #include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/local_catalog/lock_manager/lock_stats.h"

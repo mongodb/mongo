@@ -29,7 +29,7 @@
 
 #include "mongo/db/repl/initial_sync/initial_syncer_common_stats.h"
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync

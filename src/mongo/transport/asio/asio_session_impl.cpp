@@ -34,7 +34,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
@@ -546,8 +546,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
             if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
                 StringBuilder sb;
-                sb << "recv(): message msgLen " << msgLen << " is invalid. "
-                   << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
+                sb << "recv(): message msgLen " << msgLen << " is invalid. " << "Min "
+                   << kHeaderSize << " Max: " << MaxMessageSizeBytes;
                 const auto str = sb.str();
                 LOGV2(4615638,
                       "recv(): message mstLen is invalid.",

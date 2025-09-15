@@ -45,7 +45,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/global_catalog/router_role_api/collection_uuid_mismatch.h"
 #include "mongo/db/local_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/namespace_string.h"

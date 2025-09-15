@@ -29,7 +29,7 @@
 
 #include "mongo/util/moving_average_metric.h"
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

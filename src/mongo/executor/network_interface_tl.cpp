@@ -44,7 +44,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
@@ -471,9 +471,9 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
                 return;
             }
 
-            const std::string message = str::stream() << "Request " << request.id << " timed out"
-                                                      << ", deadline was " << deadline.toString()
-                                                      << ", op was " << redact(request.toString());
+            const std::string message = str::stream()
+                << "Request " << request.id << " timed out" << ", deadline was "
+                << deadline.toString() << ", op was " << redact(request.toString());
 
             LOGV2_DEBUG(22595,
                         2,

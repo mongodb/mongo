@@ -29,7 +29,7 @@
 
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 
 #include <utility>
 

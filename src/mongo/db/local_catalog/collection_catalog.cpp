@@ -47,7 +47,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/collection_record_store_options.h"
 #include "mongo/db/local_catalog/durable_catalog.h"

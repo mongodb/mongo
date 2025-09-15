@@ -40,7 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_out_of_line_executor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/mirror_maestro_gen.h"
 #include "mongo/db/mirroring_sampler.h"
 #include "mongo/db/namespace_string.h"

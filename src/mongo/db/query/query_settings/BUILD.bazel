@@ -93,7 +93,7 @@ mongo_cc_library(
         "//src/mongo/crypto:sha256_block",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/local_catalog:index_key_validate",
         "//src/mongo/db/local_catalog/lock_manager",

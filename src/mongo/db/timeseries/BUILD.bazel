@@ -136,7 +136,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/write_ops:measurement.h",
     ],
     header_deps = [
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/util/tracking",
     ],
     deps = [

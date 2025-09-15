@@ -56,7 +56,7 @@ mongo_cc_library(
         ":watchdog_register",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
     ],
 )

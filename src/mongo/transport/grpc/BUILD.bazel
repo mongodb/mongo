@@ -76,7 +76,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:wire_version",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/transport:grpc_connection_stats",
         "//src/mongo/transport:service_executor",

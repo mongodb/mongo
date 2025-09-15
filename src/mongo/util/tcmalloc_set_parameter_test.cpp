@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"

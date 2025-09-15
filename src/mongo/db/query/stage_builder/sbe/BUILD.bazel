@@ -183,7 +183,7 @@ mongo_cc_library(
         "//src/mongo/db:sbe_values",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_filterer",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec:docval_to_sbeval",
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/exec/document_value",

@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
 
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 
 namespace mongo::query_settings {
 namespace {

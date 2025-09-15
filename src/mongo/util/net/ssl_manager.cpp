@@ -36,7 +36,7 @@
 #include "mongo/client/internal_auth.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"

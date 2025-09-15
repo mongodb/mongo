@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/local_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"

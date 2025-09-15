@@ -124,7 +124,7 @@ mongo_cc_library(
         # TODO(SERVER-93876): Remove many of these.
         "//src/mongo/base:secure_allocator",
         "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db:common",

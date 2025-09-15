@@ -53,7 +53,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/local_catalog/collection_catalog.h"
@@ -3571,8 +3571,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                           str::stream()
                               << "Cannot run replSetReconfig because the current config: "
                               << _rsConfig.unsafePeek().getConfigVersionAndTerm().toString()
-                              << " is not "
-                              << "majority committed.");
+                              << " is not " << "majority committed.");
         }
 
         // Make sure that the latest committed optime from the previous config is committed in the

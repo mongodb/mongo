@@ -748,7 +748,7 @@ mongo_cc_library(
         "tcmalloc_set_parameter",
         "//src/mongo:base",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec/document_value",
     ],
 )
@@ -920,7 +920,7 @@ mongo_cc_unit_test(
         "tcmalloc_server_status",
         "tcmalloc_set_parameter",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 
@@ -1093,7 +1093,7 @@ mongo_cc_library(
     hdrs = ["observable_mutex_registry.h"],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 
@@ -1129,7 +1129,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 

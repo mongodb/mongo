@@ -285,7 +285,7 @@ mongo_cc_library(
     deps = [
         ":backup_cursor_hooks",  # TODO(SERVER-93876): Remove.
         ":storage_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 
@@ -314,7 +314,7 @@ mongo_cc_library(
         ":storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 
@@ -365,7 +365,7 @@ mongo_cc_library(
         "write_unit_of_work.h",
     ],
     header_deps = [
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/op_observer:op_observer",
     ],
     deps = [
@@ -405,7 +405,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/local_catalog:collection_catalog",
         "//src/mongo/db/local_catalog:local_oplog_info",
         "//src/mongo/db/local_catalog/lock_manager",
@@ -578,7 +578,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 

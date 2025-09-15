@@ -1805,8 +1805,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/snapshot_management* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/commands/**/*compact* @10gen/server-compact @svc-auto-approve-bot
 /src/mongo/db/commands/**/dbhash* @10gen/server-dbhash @svc-auto-approve-bot
-/src/mongo/db/commands/**/server_status* @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/mongo/db/commands/**/server_status_security_servers.cpp @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/sysprofile* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/commands/**/fle* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/hashcmd* @10gen/server-security @svc-auto-approve-bot
@@ -1825,7 +1823,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/shardsvr_resolve_view_command* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/commands/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/db/commands/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
-/src/mongo/db/commands/**/*read_write_concern_defaults_server_status* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /src/mongo/db/commands/**/generic_servers* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
@@ -1844,6 +1841,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/mr_* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/release_memory_cmd.* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/update_metrics.* @10gen/query-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/commands/server_status/OWNERS.yml
+/src/mongo/db/commands/server_status/ @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/commands/server_status/server_status_security_servers.cpp @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/commands/server_status/read_write_concern_defaults_server_status.cpp @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
+/src/mongo/db/commands/server_status/logical_session_server_status_section.cpp @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
 /src/mongo/db/exec/**/* @10gen/query-execution-classic @svc-auto-approve-bot

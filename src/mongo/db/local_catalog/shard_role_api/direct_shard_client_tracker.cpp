@@ -30,7 +30,7 @@
 #include "mongo/db/local_catalog/shard_role_api/direct_shard_client_tracker.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 
 #include <algorithm>
 

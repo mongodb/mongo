@@ -30,7 +30,7 @@
 #include "mongo/db/repl/replication_metrics.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/repl/election_reason_counter.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

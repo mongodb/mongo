@@ -24,7 +24,7 @@ mongo_cc_library(
         "//src/mongo/util:histogram.h",
     ],
     deps = [
-        "//src/mongo/db/commands:server_status_metric",
+        "//src/mongo/db/commands/server_status:server_status_metric",
     ],
 )
 

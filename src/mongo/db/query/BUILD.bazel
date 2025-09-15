@@ -431,7 +431,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/query/collation:collator_factory_icu",
         "//src/mongo/db/query/compiler/ce/exact:exact_cardinality_interface",
         "//src/mongo/db/query/compiler/metadata:query_metadata",

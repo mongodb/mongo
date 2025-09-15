@@ -30,7 +30,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/local_catalog/util/partitioned.h"

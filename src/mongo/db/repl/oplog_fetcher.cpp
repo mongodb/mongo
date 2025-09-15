@@ -46,7 +46,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/matcher.h"

@@ -29,7 +29,7 @@
 
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"

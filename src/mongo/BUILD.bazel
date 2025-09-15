@@ -572,7 +572,7 @@ filegroup(
         "//src/mongo/db/commands:feature_compatibility_version.h",
         "//src/mongo/db/commands:fle2_cleanup_gen",
         "//src/mongo/db/local_catalog/ddl:list_databases_gen",
-        "//src/mongo/db/commands:server_status_metric.h",
+        "//src/mongo/db/commands/server_status:server_status_metric.h",
         "//src/mongo/db/commands:set_feature_compatibility_version_gen",
         "//src/mongo/db/commands:test_commands_enabled.h",
         "//src/mongo/db/local_catalog:index_descriptor.h",

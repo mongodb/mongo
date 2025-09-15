@@ -207,7 +207,7 @@ mongo_cc_library(
         "//src/mongo/client:async_client",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer_manager",
     ],
@@ -228,7 +228,7 @@ mongo_cc_library(
         ":egress_networking_parameters",
         "//src/mongo/client:async_client",
         "//src/mongo/db/auth",
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -421,7 +421,7 @@ mongo_cc_library(
         "connection_pool_stats.h",
     ],
     header_deps = [
-        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
     deps = [
         "//src/mongo/db:server_base",
