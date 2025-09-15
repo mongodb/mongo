@@ -132,13 +132,10 @@ possible without support assistance.
 
 As part of an upgrade/downgrade, the FCV will transition through these states:
 
-<pre><code>
-Upgrade:
-   kVersion_X → kUpgradingFrom_X_To_Y → kVersion_Y
-
-Downgrade:
-   kVersion_X → kDowngradingFrom_X_To_Y → isCleaningServerMetadata → kVersion_Y
-</code></pre>
+```
+Upgrade:   kVersion_X → kUpgradingFrom_X_To_Y   → kUpgradingFrom_X_To_Y   (isCleaningServerMetadata: true) → kVersion_Y
+Downgrade: kVersion_X → kDowngradingFrom_X_To_Y → kDowngradingFrom_X_To_Y (isCleaningServerMetadata: true) → kVersion_Y
+```
 
 In above, X will be the source version that we are upgrading/downgrading from while Y is the target
 version that we are upgrading/downgrading to.
@@ -200,20 +197,20 @@ for more information on how to add upgrade/downgrade code to the command.
       for more information on the locks used in the setFCV command.
     - Finally, we check for any user data or settings that will be incompatible on
       the new FCV, and uassert with the `CannotUpgrade` or `CannotDowngrade` code if the user needs to manually clean up
-      incompatible user data. This is especially important on downgrade.
+      incompatible user data.
     - If an FCV downgrade fails at this point, the user can either remove the incompatible user data and retry the FCV downgrade, or they can upgrade the FCV back to the original FCV.
+    - Similarly, if an FCV upgrade fails at this point, the user can either remove the incompatible user data (i.e. stop using discontinued features) and retry the FCV upgrade, or they can downgrade the FCV back to the original FCV.
     - On this part no metadata cleanup is performed yet.
 
-3.  **Complete any [upgrade or downgrade specific code](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L524-L528), done in `_runUpgrade` or `_runDowngrade`.** This may include metadata cleanup.
+3.  **Set the [`isCleaningServerMetadata` flag](https://github.com/mongodb/mongo/blob/0afb563897d4db79fe50e81b07d2384e1d05a939/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L801-L827):**
 
-    - For upgrade, we update metadata to make sure the new features in the upgraded version work for
-      both sharded and non-sharded clusters.
-    - For downgrade, we transition from `kDowngradingFrom_X_to_Y` to
-      `isCleaningServerMetadata`, which indicates that we have started [cleaning up internal server metadata](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1495). Transitioning to
-      `isCleaningServerMetadata` will add a `isCleaningServerMetadata` field, which will be removed upon
-      transitioning to `kVersion_Y`. This update is also done using `writeConcern: majority`.
-      After this point, if the FCV downgrade fails, it is no longer safe to transition back to the original
-      upgraded FCV, and the user must retry the FCV downgrade. Then we perform any internal server downgrade cleanup.
+    - This indicates that we have started [cleaning up internal server metadata](https://github.com/mongodb/mongo/blob/0afb563897d4db79fe50e81b07d2384e1d05a939/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L829-L837) to be consistent with the persisted formats of the new FCV.
+
+      The `isCleaningServerMetadata` flag is added as a new field to the FCV document, which will later be removed upon transitioning to `kVersion_Y`.
+      This update is also done using `writeConcern: majority`.
+
+      After this point, if the FCV upgrade or downgrade is interrupted, it is no longer safe to transition back to the original FCV, and the user can retry the transition until it succeeds.
+      Any non-transient failure after this point indicates a server bug.
 
       Examples on-disk representation of the `isCleaningServerMetadata` state:
 
@@ -227,10 +224,17 @@ for more information on how to add upgrade/downgrade code to the command.
       }
       ```
 
-4.  Finally, we [complete transition](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L541-L548) by updating the
+4.  **Complete any [upgrade or downgrade specific code](https://github.com/mongodb/mongo/blob/0afb563897d4db79fe50e81b07d2384e1d05a939/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L829-L837), done in `_runUpgrade` or `_runDowngrade`.**
+
+    - For downgrade, this may include cleaning up any metadata from the upgraded FCV that is not needed in the downgraded FCV.
+
+    - For upgrade, we update metadata to make sure the new features in the upgraded version work for
+      both sharded and non-sharded clusters.
+
+5.  Finally, we [complete transition](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L541-L548) by updating the
     local FCV document to the fully upgraded or downgraded version. As part of transitioning to the
     `kVersion_Y` state, the `targetVersion`, `previousVersion`, and `isCleaningServerMetadata`
-    (if applicable) fields of the FCV document are deleted while the `version` field is updated to
+    fields of the FCV document are deleted while the `version` field is updated to
     reflect the new upgraded or downgraded state. This update is also done using `writeConcern: majority`.
     The new in-memory FCV value will be updated to reflect the on-disk changes.
 
@@ -268,17 +272,16 @@ will fail.
    - c. Shard servers run `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
      and verifies user data compatibility for upgrade/downgrade.
 4. Phase-3
-   - a. Config server runs `_runUpgrade` or `_runDowngrade`. For downgrade, this means the config
-     server enters the `isCleaningServerMetadata` phase and cleans up any internal server metadata.
+   - a. Config server runs `_runUpgrade` or `_runDowngrade`. This means the config
+     server sets the `isCleaningServerMetadata` flag and cleans up any internal server metadata.
    - b. Config server [sends phase-3 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1499).
-   - c. Shard servers run `_runUpgrade` or `_runDowngrade`. For downgrade, this means the shard
-     servers enter the `isCleaningServerMetadata` phase and cleans up any internal server metadata.
-   - d. Shards finish and enter the fully upgraded or downgraded state (on upgrade, the config
-     server would still be in the `kUpgradingFrom_X_To_Y` phase, and on downgrade the config server
-     would still be in the `isCleaningServerMetadata` phase).
+   - c. Shard servers run `_runUpgrade` or `_runDowngrade`. This means the shard
+     servers sets the `isCleaningServerMetadata` flag and cleans up any internal server metadata.
+   - d. Shards finish and enter the fully upgraded or downgraded state (the config server is still
+     in the transitional upgrade/downgrading phase, with the `isCleaningServerMetadata` flag set).
    - e. Config finishes and enters the fully upgraded or downgraded state.
 
-Note that on downgrade, if the setFCV command fails at any point between 4a and 4e, the user will
+Note that if the setFCV command fails at any point between 4a and 4e, the user will
 not be able to transition back to the original upgraded FCV, since either the config server and/or
 the shard servers are in the middle of cleaning up internal server metadata.
 
@@ -336,7 +339,11 @@ The setFCV command can only fail with these error cases:
     transitional `kDowngradingFrom_X_To_Y` state.
   - The code in the FCV downgrade path must be idempotent and retryable.
 - `CannotUpgrade`:
-  - The user would need to fix the incompatible user data and retry the FCV upgrade.
+  - The user can either remove the incompatible user data (i.e. stop using discontinued features)
+    and retry the FCV upgrade, or they can downgrade the FCV back to the original FCV.
+  - Because of this, the code in the downgrade path must be able to work if started from any point in the
+    transitional `kUpgradingFrom_X_To_Y` state.
+  - The code in the FCV upgrade path must be idempotent and retryable.
 - Other `uasserts`:
   - For example, if the user attempted to upgrade the FCV after the previous FCV downgrade failed
     during `isCleaningServerMetadata`. In this case the user would need to retry the FCV downgrade.
@@ -356,11 +363,10 @@ There are three locks used in the setFCV command:
   - This ensures that only one invocation of the setFCV command can run at a time (i.e. if you
     ran setFCV twice in a row, the second invocation would not run until the first had completed)
 - [fcvDocumentLock](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L215)
-  - The setFCV command takes this lock in X mode when it modifies the FCV document. This includes
-    from [fully upgraded -> downgrading](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L350),
-    [downgrading -> isCleaningServerMetadata](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L1459-L1460),
-    [isCleaningServerMetadata -> fully downgraded](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L533),
-    and vice versa.
+  - The setFCV command takes this lock in X mode when it modifies the FCV document. This is done:
+    - From [fully downgraded → upgrading, or fully upgraded → downgrading](https://github.com/mongodb/mongo/blob/a87555389a8e5e39f87db6b9b6a9309c56723378/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L635),
+    - From [upgrading → upgrading (isCleaningServerMetadata: true), or downgrading → downgrading (isCleaningServerMetadata: true)](https://github.com/mongodb/mongo/blob/a87555389a8e5e39f87db6b9b6a9309c56723378/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L812),
+    - From [upgrading (isCleaningServerMetadata: true) → fully upgraded, or downgrading (isCleaningServerMetadata: true) → fully downgraded](https://github.com/mongodb/mongo/blob/a87555389a8e5e39f87db6b9b6a9309c56723378/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L842).
   - Other operations should [take this lock in shared mode](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
     if they want to ensure that the FCV state _does not change at all_ during the operation.
     See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
@@ -431,8 +437,8 @@ in the helper functions:
   with the `CannotUpgrade` code if users need to manually clean up user data or settings. It must
   not modify any user data or system state. It only checks preconditions for upgrades and fails
   if they are unmet (see [guidelines for adding new compatibility checks](#guidelines-for-adding-new-compatibility-checks)).
-- `_userCollectionsWorkForUpgrade`: for any user collections uasserts (with the `CannotUpgrade` error code),
-  creations, or deletions that need to happen during the upgrade. This happens after the global lock.
+- `_userCollectionsWorkForUpgrade`: for any creations, changes or deletions that need to happen
+  during the upgrade. This happens after the global lock.
   It is required that the code in this helper function is idempotent and could be
   done after `_runDowngrade` even if `_runDowngrade` failed at any point.
 

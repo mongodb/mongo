@@ -1,7 +1,7 @@
 /**
  * Test that:
  * 1. If a FCV downgrade fails during the isCleaningServerMetadata phase, starting an FCV upgrade is
- * disallowed until the downgrade is completed (covered by featureFlagUpgradingToDowngrading).
+ * disallowed until the downgrade is completed.
  * 2. If a FCV upgrade fails during the isCleaningServerMetadata phase, starting an FCV downgrade is
  * disallowed until the upgrade is completed.
  */

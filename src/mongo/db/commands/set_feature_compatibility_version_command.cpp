@@ -697,7 +697,7 @@ public:
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV
-                // doc field. This is to protect against the case where a previous FCV downgrade
+                // doc field. This is to protect against the case where a previous FCV transition
                 // failed in the isCleaningServerMetadata phase, and the user runs setFCV again. In
                 // that case we do not want to remove the existing isCleaningServerMetadata FCV doc
                 // field because it would not be safe to upgrade the FCV.
@@ -1017,7 +1017,7 @@ private:
         }
     }
 
-    // This helper function is for any user collections uasserts, creations, or deletions that need
+    // This helper function is for any user collections creations, changes or deletions that need
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
     // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
@@ -1136,7 +1136,9 @@ private:
     // _prepareToUpgrade performs all actions and checks that need to be done before proceeding to
     // make any metadata changes as part of FCV upgrade. Any new feature specific upgrade code
     // should be placed in the _prepareToUpgrade helper functions:
-    //  * _userCollectionsWorkForUpgrade: for any user collections uasserts, creations, or deletions
+    //  * _userCollectionsUassertsForUpgrade: for any checks on user data or settings that will
+    //    uassert with the `CannotUpgrade` code if users need to manually clean up.
+    //  * _userCollectionsWorkForUpgrade: for any user collections creations, changes or deletions
     //    that need to happen during the upgrade. This happens after the global lock.
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
@@ -1162,7 +1164,7 @@ private:
 
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
-        // This helper function is for any user collections uasserts, creations, or deletions that
+        // This helper function is for any user collections creations, changes or deletions that
         // need to happen during the upgrade. It is required that the code in this helper function
         // is idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.

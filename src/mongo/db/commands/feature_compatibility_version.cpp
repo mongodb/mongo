@@ -466,7 +466,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         // If we don't want to update the isCleaningServerMetadata, we need to make sure not to
         // override the existing field if it exists, so get the current isCleaningServerMetadata
         // field value from the current FCV document and set it in newFCVDoc.
-        // This is to protect against the case where a previous FCV downgrade failed
+        // This is to protect against the case where a previous FCV transition failed
         // in the isCleaningServerMetadata phase, and the user runs setFCV again. In that
         // case we do not want to remove the existing isCleaningServerMetadata FCV doc field
         // because it would not be safe to upgrade the FCV.

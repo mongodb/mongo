@@ -1,7 +1,7 @@
 /**
  * Verifies that the validate hook is able to upgrade the feature compatibility version of the
  * server regardless of what state any previous upgrades or downgrades have left it in (besides
- * the isCleaningServerMetadata state, where we must complete the downgrade before upgrading).
+ * the isCleaningServerMetadata state, where we must complete the transition before upgrading).
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
