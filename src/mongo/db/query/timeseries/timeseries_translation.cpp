@@ -131,11 +131,6 @@ void prependUnpackStageToPipeline(const boost::intrusive_ptr<ExpressionContext>&
 void translatePipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        Pipeline& pipeline,
                        const TimeseriesTranslationParams& params) {
-    // The query has been translated to something that should run directly against the
-    // raw timeseries buckets. We set this flag to indicate that this translation should not happen
-    // again.
-    pipeline.setTranslated();
-
     // When the pipeline is empty, all documents in the collection are returned. Therefore, we need
     // to add the unpack stage.
     if (MONGO_unlikely(pipeline.empty())) {
@@ -201,11 +196,6 @@ template <class T>
 void translateStagesIfRequiredImpl(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    Pipeline& pipeline,
                                    const T& catalogData) {
-    // Do not double translate.
-    if (pipeline.isTranslated()) {
-        return;
-    }
-
     const boost::optional<TimeseriesTranslationParams> params =
         getTimeseriesTranslationParamsIfRequired(expCtx->getOperationContext(), catalogData);
     if (!params) {
@@ -213,16 +203,17 @@ void translateStagesIfRequiredImpl(const boost::intrusive_ptr<ExpressionContext>
     }
 
     translatePipeline(expCtx, pipeline, params.get());
+    // TODO SERVER-106876 remove this.
+    // The query has been translated to something that should run directly against the
+    // bucket collection. Set this flag to indicate that this translation should not happen
+    // again.
+    isRawDataOperation(expCtx->getOperationContext()) = true;
 }
 
 template <class T>
 void translateIndexHintIfRequiredImpl(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const T& catalogData,
                                       AggregateCommandRequest& request) {
-    if (request.getTranslatedForViewlessTimeseries()) {
-        return;
-    }
-
     const auto& hint = request.getHint();
     if (!hint || !timeseries::isHintIndexKey(*hint)) {
         return;

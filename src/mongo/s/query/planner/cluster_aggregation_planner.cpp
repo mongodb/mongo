@@ -252,11 +252,6 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     MutableDocument mergeCmd(serializedCommand);
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
-    if (auto isTranslated = pipelineForMerging->isTranslated()) {
-        mergeCmd[AggregateCommandRequest::kTranslatedForViewlessTimeseriesFieldName] =
-            Value(isTranslated);
-    }
-
     aggregation_request_helper::setFromRouter(
         VersionContext::getDecoration(mergeCtx->getOperationContext()), mergeCmd, Value(true));
 

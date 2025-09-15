@@ -363,17 +363,11 @@ commands:
                 stability: internal
             $_isHybridSearch:
                 description: >-
-                    Internal usage only. If present, indicates that the pipeline is the
+                    Internal usage only. If present, indicates that the pipeline is the 
                     desugared representation of a user's $rankFusion or $scoreFusion pipeline.
                 cpp_name: isHybridSearch
                 type: optionalBool
                 stability: internal
-            $_translatedForViewlessTimeseries:
-                description: >-
-                    Internal usage only. If present, indicates that the pipeline has already been
-                    translated if necessary.
-                cpp_name: translatedForViewlessTimeseries
-                type: optionalBool
             forcedPlanSolutionHash:
                 description: "Solution hash to force a execution with a given plan."
                 type: safeInt64

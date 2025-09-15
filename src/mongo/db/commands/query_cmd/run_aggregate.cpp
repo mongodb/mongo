@@ -951,12 +951,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     auto pipeline = Pipeline::parse(userRequest.getPipeline(), expCtx);
     expCtx->stopExpressionCounters();
 
-    const auto& request = aggExState.getRequest();
-    if (request.getTranslatedForViewlessTimeseries()) {
-        pipeline->setTranslated();
-    }
-
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
             userRequest,

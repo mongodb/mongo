@@ -101,8 +101,7 @@ class PipelineSplitter {
 public:
     PipelineSplitter(std::unique_ptr<Pipeline> pipelineToSplit,
                      boost::optional<OrderedPathSet> shardKeyPaths)
-        : _isTranslated(pipelineToSplit->isTranslated()),
-          _splitPipeline(
+        : _splitPipeline(
               SplitPipeline::mergeOnlyWithEmptyShardsPipeline(std::move(pipelineToSplit))),
 
           _initialShardKeyPaths(std::move(shardKeyPaths)) {}
@@ -138,15 +137,6 @@ public:
         _abandonCacheIfSentToShards();
         _splitPipeline.shardsPipeline->setSplitState(PipelineSplitState::kSplitForShards);
         _splitPipeline.mergePipeline->setSplitState(PipelineSplitState::kSplitForMerge);
-
-        if (_isTranslated) {
-            if (!_splitPipeline.shardsPipeline->isTranslated()) {
-                _splitPipeline.shardsPipeline->setTranslated();
-            }
-            if (!_splitPipeline.mergePipeline->isTranslated()) {
-                _splitPipeline.mergePipeline->setTranslated();
-            }
-        }
 
         return *this;
     };
@@ -490,8 +480,6 @@ private:
             }
         }
     }
-
-    bool _isTranslated;
 
     // Output.
     SplitPipeline _splitPipeline;

@@ -8,10 +8,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    areViewlessTimeseriesEnabled,
-    getTimeseriesCollForDDLOps,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {isClusteredIxscan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -90,15 +87,6 @@ function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = tru
 
         const shard0Entries = shard0DB.system.profile.find(filter).toArray();
         const shard1Entries = shard1DB.system.profile.find(filter).toArray();
-
-        // Checks that viewless timeseries translations are happening and only once.
-        if (areViewlessTimeseriesEnabled(sDB)) {
-            assert(
-                [...shard0Entries, ...shard1Entries].every(
-                    (entry) => entry.command["$_translatedForViewlessTimeseries"] === true,
-                ),
-            );
-        }
 
         const primaryShard = st.getPrimaryShard(dbName);
         if (expectedShards.includes(primaryShard.shardName)) {
