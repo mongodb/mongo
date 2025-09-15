@@ -205,6 +205,18 @@ server_parameters:
         default: true
         redact: false
 
+    periodicNoopIntervalSecs:
+        description: <-
+            Number of seconds between noop writer writes.
+        set_at: [startup]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: periodicNoopIntervalSecs
+        default: 10
+        validator:
+            gt: 0
+            lte: 10
+        redact: false
+
     collectionClonerUsesExhaust:
         description: Whether to use the "exhaust cursor" feature when retrieving collection data.
         set_at: startup

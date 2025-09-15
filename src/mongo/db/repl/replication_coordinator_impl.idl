@@ -60,18 +60,6 @@ server_parameters:
             gte: 0
         redact: false
 
-    periodicNoopIntervalSecs:
-        description: <-
-            Number of seconds between noop writer writes.
-        set_at: [startup]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: periodicNoopIntervalSecs
-        default: 10
-        validator:
-            gt: 0
-            lte: 10
-        redact: false
-
     testingSnapshotBehaviorInIsolation:
         # SERVER-31304 rename this parameter to something more appropriate.
         description: >-
