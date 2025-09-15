@@ -136,6 +136,7 @@ enums:
             listCollections: "listCollections"
             listCursors: "listCursors"
             listDatabases: "listDatabases"
+            listExtensions: "listExtensions"
             listIndexes: "listIndexes"
             listSampledQueries: "listSampledQueries"
             listSearchIndexes: "listSearchIndexes"
