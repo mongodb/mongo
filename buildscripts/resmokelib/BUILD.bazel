@@ -24,6 +24,7 @@ py_library(
         "//buildscripts/idl",
         "//buildscripts/resmokelib/core",
         "//buildscripts/resmokelib/discovery",
+        "//buildscripts/resmokelib/extensions",
         "//buildscripts/resmokelib/generate_fcv_constants",
         "//buildscripts/resmokelib/generate_fuzz_config",
         "//buildscripts/resmokelib/hang_analyzer",

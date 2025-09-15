@@ -8,6 +8,10 @@ import pymongo
 import pymongo.errors
 import yaml
 
+from buildscripts.resmokelib.extensions import (
+    delete_extension_configs,
+    find_and_generate_extension_configs,
+)
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
 from buildscripts.resmokelib.utils.sharded_cluster_util import (
     inject_catalog_metadata_on_the_csrs,
@@ -71,8 +75,11 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         self.load_all_extensions = load_all_extensions
         if self.load_all_extensions:
-            self.fixturelib.load_all_extensions(
-                self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger, self.mongos_options
+            self.loaded_extensions = find_and_generate_extension_configs(
+                is_evergreen=self.config.EVERGREEN_TASK_ID,
+                logger=self.logger,
+                mongod_options=self.mongod_options,
+                mongos_options=self.mongos_options,
             )
 
         self.mongod_executable = mongod_executable
@@ -388,8 +395,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
-        if self.load_all_extensions:
-            self.fixturelib.delete_extension_conf_dir()
+        if self.load_all_extensions and self.loaded_extensions:
+            delete_extension_configs(self.loaded_extensions, self.logger)
 
         running_at_start = self.is_running()
         if not running_at_start:

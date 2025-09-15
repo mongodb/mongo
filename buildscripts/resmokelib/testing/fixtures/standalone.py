@@ -12,6 +12,10 @@ import pymongo.errors
 import yaml
 
 from buildscripts.resmokelib import logging
+from buildscripts.resmokelib.extensions import (
+    delete_extension_configs,
+    find_and_generate_extension_configs,
+)
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils.history import HistoryDict
@@ -59,8 +63,10 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         self.load_all_extensions = load_all_extensions
         if self.load_all_extensions:
-            self.fixturelib.load_all_extensions(
-                self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger
+            self.loaded_extensions = find_and_generate_extension_configs(
+                is_evergreen=self.config.EVERGREEN_TASK_ID,
+                logger=self.logger,
+                mongod_options=self.mongod_options,
             )
 
         if "set_parameters" not in self.mongod_options:
@@ -267,8 +273,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
     def _do_teardown(self, mode=None):
-        if self.load_all_extensions:
-            self.fixturelib.delete_extension_conf_dir()
+        if self.load_all_extensions and self.loaded_extensions:
+            delete_extension_configs(self.loaded_extensions, self.logger)
 
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             self.logger.info(
