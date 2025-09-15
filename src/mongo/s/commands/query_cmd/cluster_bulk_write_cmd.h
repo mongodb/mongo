@@ -236,7 +236,7 @@ public:
             bulk_write_exec::BulkWriteReplyInfo replyInfo) const {
             const auto& req = bulkRequest;
             auto reqObj = unparsedRequest.body;
-            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds, _] = replyInfo;
+            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds] = replyInfo;
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDbName().tenantId());
 
@@ -398,6 +398,7 @@ public:
                 //   a transaction, where per-operation WC settings are not supported);
                 // - Once done, The original WC is re-established to allow _populateCursorReply
                 //   evaluating whether a reply needs to be returned to the external client.
+                bulk_write_exec::BulkWriteExecStats execStats;
                 auto bulkWriteReply = [&] {
                     WriteConcernOptions originalWC = opCtx->getWriteConcern();
                     ScopeGuard resetWriteConcernGuard(
@@ -407,12 +408,11 @@ public:
                         wc.w = 1;
                         opCtx->setWriteConcern(wc);
                     }
-                    return cluster::bulkWrite(opCtx, bulkRequest, targeters);
+                    return cluster::bulkWrite(opCtx, bulkRequest, targeters, execStats);
                 }();
 
                 bool updatedShardKey = handleWouldChangeOwningShardError(
                     opCtx, bulkRequest, bulkWriteReply, targeters);
-                bulk_write_exec::BulkWriteExecStats execStats = std::move(bulkWriteReply.execStats);
                 // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
                 // updates that modify a document’s owning shard.
                 execStats.updateMetrics(opCtx, targeters, updatedShardKey);
@@ -523,7 +523,8 @@ public:
                         nss,
                         // RerunOriginalWriteFn:
                         [&]() {
-                            response = cluster::bulkWrite(opCtx, request, targeters);
+                            bulk_write_exec::BulkWriteExecStats execStats;
+                            response = cluster::bulkWrite(opCtx, request, targeters, execStats);
                             return getWouldChangeOwningShardErrorInfo(
                                 response, opCtx->inMultiDocumentTransaction());
                         },

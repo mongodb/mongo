@@ -73,6 +73,10 @@ public:
         return WriteType(_ref.getOpType());
     }
 
+    const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation() const {
+        return _ref.getEncryptionInformation();
+    }
+
     BulkWriteOpVariant getBulkWriteOp() const {
         return _ref.visitOpData(
             OverloadedVisitor{[&](const BSONObj& insertDoc) -> BulkWriteOpVariant {

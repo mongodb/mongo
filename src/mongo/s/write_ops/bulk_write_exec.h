@@ -45,6 +45,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -83,48 +84,6 @@ private:
 };
 
 /**
- * Contains counters which aggregate all the individual bulk write responses.
- */
-struct SummaryFields {
-    int nErrors = 0;
-    int nInserted = 0;
-    int nMatched = 0;
-    int nModified = 0;
-    int nUpserted = 0;
-    int nDeleted = 0;
-};
-
-/**
- * Contains replies for individual bulk write ops along with the summary fields for all responses.
- */
-struct BulkWriteReplyInfo {
-    std::vector<BulkWriteReplyItem> replyItems;
-    SummaryFields summaryFields;
-    boost::optional<BulkWriteWriteConcernError> wcErrors;
-    boost::optional<std::vector<StmtId>> retriedStmtIds;
-    BulkWriteExecStats execStats;
-};
-
-/**
- * Attempt to run the bulkWriteCommandRequest through Queryable Encryption code path.
- * Returns kNotProcessed if falling back to the regular bulk write code path is needed instead.
- *
- * This function does not throw, any errors are reported via the function return.
- */
-std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
-    OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest);
-
-/**
- * Processes a response from an FLE insert/update/delete command and converts it to equivalent
- * BulkWriteReplyInfo.
- */
-BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
-                                      const BatchedCommandRequest& request,
-                                      const BulkWriteCRUDOp::OpType& firstOpType,
-                                      bool errorsOnly,
-                                      const BatchedCommandResponse& response);
-
-/**
  * Executes a client bulkWrite request by sending child batches to several shard endpoints, and
  * returns a vector of BulkWriteReplyItem (each of which is a reply for an individual op) along
  * with a count of how many of those replies are errors.
@@ -133,7 +92,8 @@ BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
  */
 BulkWriteReplyInfo execute(OperationContext* opCtx,
                            const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                           const BulkWriteCommandRequest& clientRequest);
+                           const BulkWriteCommandRequest& clientRequest,
+                           BulkWriteExecStats& execStats);
 
 
 BulkWriteCommandReply createEmulatedErrorReply(const Status& error,
@@ -394,6 +354,10 @@ public:
 
     bool targeterHasStaleShardResponse() const {
         return _targeterHasStaleShardResponse;
+    }
+
+    BulkWriteExecStats getExecStats() const {
+        return _stats;
     }
 
 private:

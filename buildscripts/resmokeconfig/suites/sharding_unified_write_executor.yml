@@ -52,12 +52,13 @@ selector:
     # - jstests/noPassthrough/query/profile/profile_planning_time_stats.js
     # - jstests/noPassthrough/server_parameters/cluster_commands_require_cluster_node.js
     # - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_insert_ordered_true.js
-    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_bulkwrite_metrics.js
-    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit_bulk_write.js
-    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_mirror_reads.js
-    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
-    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
-    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_bulkwrite_metrics.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit_bulk_write.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_mirror_reads.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
+    - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
 
   exclude_files:
     # TODO: SERVER-104535 support cursor with bulk write.

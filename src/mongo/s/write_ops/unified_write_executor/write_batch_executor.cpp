@@ -67,9 +67,9 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     for (auto& op : ops) {
         auto bulkOp = op.getBulkWriteOp();
         auto& nss = op.getNss();
-
         NamespaceInfoEntry nsInfo(nss);
         nsInfo.setCollectionUUID(op.getCollectionUUID());
+        nsInfo.setEncryptionInformation(op.getEncryptionInformation());
         if (!versionByNss.empty()) {
             auto versionIt = versionByNss.find(nss);
             tassert(10346801,

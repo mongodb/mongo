@@ -243,6 +243,11 @@ bool BatchWriteCommandRefImpl::getUpsert(int index) const {
                                          }});
 }
 
+const boost::optional<mongo::EncryptionInformation>&
+BatchWriteCommandRefImpl::getEncryptionInformation(int index) const {
+    return getRequest().getWriteCommandRequestBase().getEncryptionInformation();
+}
+
 BSONObj BatchWriteCommandRefImpl::toBSON(int index) const {
     return visitOpData(index,
                        OverloadedVisitor{[&](const BSONObj& insertDoc) { return insertDoc; },
@@ -384,6 +389,12 @@ bool BulkWriteCommandRefImpl::getUpsert(int index) const {
                           [&](const BulkWriteDeleteOp& deleteOp) {
                               return false;
                           }});
+}
+
+const boost::optional<mongo::EncryptionInformation>&
+BulkWriteCommandRefImpl::getEncryptionInformation(int index) const {
+    auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
+    return getRequest().getNsInfo()[nsInfoIdx].getEncryptionInformation();
 }
 
 BSONObj BulkWriteCommandRefImpl::toBSON(int index) const {

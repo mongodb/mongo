@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/wc_error.h"
 
@@ -113,6 +114,12 @@ public:
     BatchedCommandResponse generateClientResponseForBatchedCommand();
 
     BulkWriteCommandReply generateClientResponseForBulkWriteCommand(OperationContext* opCtx);
+
+    /**
+     * Generate bulkWrite client response from BulkWriteReplyInfo object.
+     */
+    static BulkWriteCommandReply generateClientResponseForBulkWriteCommand(
+        bulk_write_exec::BulkWriteReplyInfo replyInfo);
 
 private:
     Result _onWriteBatchResponse(OperationContext* opCtx,

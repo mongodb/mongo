@@ -639,9 +639,6 @@ bool attemptGroupedFLEInserts(OperationContext* opCtx,
                               write_ops_exec::WriteResult& out) {
     size_t numOps = docs.size();
 
-    // For BulkWrite, re-entry is un-expected.
-    invariant(!nsInfoEntry.getEncryptionInformation()->getCrudProcessed().value_or(false));
-
     auto request = getConsecutiveInsertRequest(req, firstOpIdx, docs, nsInfoEntry);
     write_ops::InsertCommandReply insertReply;
 
@@ -714,12 +711,15 @@ bool handleGroupedInserts(OperationContext* opCtx,
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
-        auto processed = attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
-        if (processed) {
-            responses.addInsertReplies(opCtx, firstOpIdx, out);
-            return out.canContinue;
+        if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
+            auto processed =
+                attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
+            if (processed) {
+                responses.addInsertReplies(opCtx, firstOpIdx, out);
+                return out.canContinue;
+            }
+            // Fallthrough to standard inserts.
         }
-        // Fallthrough to standard inserts.
     }
 
     // Create nested CurOp for insert.
@@ -893,11 +893,6 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
                              size_t currentOpIdx,
                              BulkWriteReplies& responses,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
-
     write_ops::UpdateCommandRequest updateCommand =
         bulk_write_common::makeUpdateCommandRequestFromUpdateOp(opCtx, op, req, currentOpIdx);
     write_ops::UpdateCommandReply updateReply = processFLEUpdate(opCtx, updateCommand);
@@ -935,11 +930,6 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
                              size_t currentOpIdx,
                              BulkWriteReplies& responses,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
-
     write_ops::DeleteCommandRequest deleteRequest =
         bulk_write_common::makeDeleteCommandRequestForFLE(opCtx, op, req, nsInfoEntry);
     write_ops::DeleteCommandReply deleteReply = processFLEDelete(opCtx, deleteRequest);
@@ -1055,7 +1045,14 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         // Handle FLE deletes.
         if (nsEntry.getEncryptionInformation().has_value()) {
-            return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+            }
+
+            if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
+                return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
+            }
         }
 
         // Non-FLE deletes (including timeseries deletes) will be handled by
@@ -1629,11 +1626,15 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         // Handle FLE updates.
         if (nsEntry.getEncryptionInformation().has_value()) {
-            // For BulkWrite, re-entry is un-expected.
-            invariant(!nsEntry.getEncryptionInformation()->getCrudProcessed().value_or(false));
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+            }
 
-            // Map to processFLEUpdate.
-            return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
+            if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
+                // Map to processFLEUpdate.
+                return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
+            }
         }
 
         const auto [preConditions, isTimeseriesLogicalRequest] =
@@ -1797,13 +1798,6 @@ namespace bulk_write {
 
 BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequest& req) {
     const auto& ops = req.getOps();
-    const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
-
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      bypassDocumentValidation);
-
-    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
-        opCtx, bypassDocumentValidation, false);
 
     auto responses = BulkWriteReplies(req, ops.size());
 
@@ -1865,6 +1859,16 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
                 "BulkWrite with Queryable Encryption supports only a single namespace.",
                 req.getNsInfo().size() == 1);
     }
+
+    const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
+                                                                      bypassDocumentValidation);
+
+    const auto& firstNsInfo = req.getNsInfo()[0];
+    const bool fleCrudProcessed = write_ops_exec::getFleCrudProcessed(
+        opCtx, firstNsInfo.getEncryptionInformation(), firstNsInfo.getNs().dbName().tenantId());
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, bypassDocumentValidation, fleCrudProcessed);
 
     for (; idx < ops.size(); ++idx) {
         if (MONGO_unlikely(hangBetweenProcessingBulkWriteOps.shouldFail())) {

@@ -45,10 +45,7 @@ selector:
     # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
     - jstests/core/timeseries/**/*.js
 
-    # TODO: SERVER-104138 Support FLE integration with write commands.
-    - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
-    - jstests/core/query/queryable_encryption/query_settings_fle.js
-    - jstests/core/query/queryable_encryption/basic_crud.js
+    # TODO: SERVER-104123 Support for 'multi: true' writes in UWE.
     - jstests/core/query/batch_write/batch_write_command_delete.js
 
     # TODO: SERVER-108965 Handle targeting errors in the UWE.

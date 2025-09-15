@@ -56,3 +56,20 @@ mongo_cc_library(
         "//src/mongo/s:sharding_router_api",
     ],
 )
+
+mongo_cc_library(
+    name = "fle",
+    srcs = [
+        "fle.cpp",
+    ],
+    hdrs = [
+        "bulk_write_reply_info.h",
+        "fle.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:fle_crud",
+        "//src/mongo/db/commands/query_cmd:bulk_write_common",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)

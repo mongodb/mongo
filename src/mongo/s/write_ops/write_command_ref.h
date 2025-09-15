@@ -305,6 +305,11 @@ public:
     bool getUpsert(int index) const;
 
     /**
+     * Returns the encryption information for the command nss.
+     */
+    const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
+
+    /**
      * Returns a BSON representation of the specified write op. Note that this representation
      * may be specific to BatchedCommandRequest and may differ from the representation used by
      * other types of write commands.
@@ -574,6 +579,11 @@ public:
      * Otherwise, returns false.
      */
     bool getUpsert(int index) const;
+
+    /**
+     * Returns the encryption information of the specified write op.
+     */
+    const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
 
     /**
      * Returns a BSON representation of the specified write op. Note that this representation may
@@ -976,6 +986,10 @@ public:
     }
     decltype(auto) getUpsert() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getUpsert(_index); });
+    }
+    decltype(auto) getEncryptionInformation() const {
+        return visitImpl(
+            [&](auto&& r) -> decltype(auto) { return r.getEncryptionInformation(_index); });
     }
     decltype(auto) toBSON() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.toBSON(_index); });

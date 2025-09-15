@@ -29,6 +29,8 @@
 
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
+#include "mongo/db/fle_crud.h"
+#include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
@@ -87,10 +89,30 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRe
 }
 
 BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandRequest& request) {
+    if (request.hasEncryptionInformation()) {
+        BatchedCommandResponse response;
+        FLEBatchResult result = processFLEBatch(opCtx, request, &response);
+        if (result == FLEBatchResult::kProcessed) {
+            return response;
+        }
+        // When FLE logic determines there is no need of processing, we fall through to the normal
+        // case.
+    }
+
     return std::get<BatchedCommandResponse>(executeWriteCommand(opCtx, WriteCommandRef{request}));
 }
 
 BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request) {
+    if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
+        auto [result, replyInfo] = attemptExecuteFLE(opCtx, request);
+        if (result == FLEBatchResult::kProcessed) {
+            return WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(
+                std::move(replyInfo));
+        }
+        // When FLE logic determines there is no need of processing, we fall through to the normal
+        // case.
+    }
+
     return std::get<BulkWriteCommandReply>(executeWriteCommand(opCtx, WriteCommandRef{request}));
 }
 

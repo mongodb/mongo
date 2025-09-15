@@ -79,6 +79,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/s/write_ops/fle.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -5721,7 +5722,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     auto insertReply = BatchedCommandResponse();
     insertReply.setStatus(Status::OK());
     insertReply.setN(2); /* nInserted=2 */
-    auto replyInfo = bulk_write_exec::processFLEResponse(
+    auto replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 2);
@@ -5738,7 +5739,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     insertReplyWithError.setN(1); /* nInserted=1 */
     insertReplyWithError.addToErrDetails(
         write_ops::WriteError(1, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(
+    replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
@@ -5755,7 +5756,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     auto deleteReply = BatchedCommandResponse();
     deleteReply.setStatus(Status::OK());
     deleteReply.setN(1); /* nDeleted=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(
+    replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, deleteReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
@@ -5771,7 +5772,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     singleReplyWithError.setStatus(Status::OK());
     singleReplyWithError.addToErrDetails(
         write_ops::WriteError(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(
+    replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
@@ -5789,7 +5790,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     updateReply.setStatus(Status::OK());
     updateReply.setN(1);         /* nMatched=1 */
     updateReply.setNModified(1); /* nModified=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(
+    replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, updateReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
@@ -5799,7 +5800,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
 
     // Reuse the single error reply from delete above.
-    replyInfo = bulk_write_exec::processFLEResponse(
+    replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
@@ -5816,7 +5817,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     upsertDetails->setIndex(0);
     upsertDetails->setUpsertedID(BSON("_id" << 1));
     upsertReply.addToUpsertDetails(upsertDetails.release()); /* nUpserted=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(
+    replyInfo = processFLEResponse(
         _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, upsertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
@@ -5898,7 +5899,9 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
         // try to refresh the targeters upon targeting errors.
         request.setOrdered(false);
-        auto replyInfo = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto replyInfo =
+            bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         ASSERT_EQUALS(replyInfo.replyItems.size(), 2u);
         ASSERT_NOT_OK(replyInfo.replyItems[0].getStatus());
         ASSERT_OK(replyInfo.replyItems[1].getStatus());
@@ -5921,7 +5924,9 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // Test ordered operations. This is mostly the same as the test case above except that we
         // should only return the first error for ordered operations.
         request.setOrdered(true);
-        auto replyInfo = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto replyInfo =
+            bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         ASSERT_EQUALS(replyInfo.replyItems.size(), 1u);
         ASSERT_NOT_OK(replyInfo.replyItems[0].getStatus());
         // We should have another refresh attempt.
@@ -5955,7 +5960,9 @@ TEST_F(BulkWriteExecTest, TestMaxRoundsWithoutProgress) {
         // Both ops will return StaleShardVersion, the MockNSTargeter will never successfully
         // refresh these so we will return them until we eventually get NoProgressMade.
         request.setOrdered(false);
-        auto replyInfo = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto replyInfo =
+            bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         ASSERT_EQUALS(replyInfo.replyItems.size(), 2u);
         ASSERT_NOT_OK(replyInfo.replyItems[0].getStatus());
         ASSERT_EQUALS(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::NoProgressMade);
@@ -6038,7 +6045,8 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
 
     // After the targeting error from the first op, targeter refresh will throw a StaleEpoch
     // exception which should abort the entire bulkWrite.
-    auto replyInfo = bulk_write_exec::execute(operationContext(), targeters, request);
+    bulk_write_exec::BulkWriteExecStats execStats;
+    auto replyInfo = bulk_write_exec::execute(operationContext(), targeters, request, execStats);
     ASSERT_EQUALS(replyInfo.replyItems.size(), 2u);
     ASSERT_EQUALS(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::StaleEpoch);
     ASSERT_EQUALS(replyInfo.replyItems[1].getStatus().code(), ErrorCodes::StaleEpoch);
@@ -6060,7 +6068,8 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
 
     LOGV2(7695401, "Case 1) WCE with successful op.");
     auto future = launchAsync([&] {
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         ASSERT_EQUALS(reply.replyItems.size(), 1u);
         ASSERT_OK(reply.replyItems[0].getStatus());
         ASSERT_EQUALS(reply.summaryFields.nErrors, 0);
@@ -6077,7 +6086,8 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
     // occurs should be returned to the user.
     LOGV2(7695402, "Case 2) WCE with unsuccessful op (BadValue).");
     future = launchAsync([&] {
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         ASSERT_EQUALS(reply.replyItems.size(), 1u);
         ASSERT_NOT_OK(reply.replyItems[0].getStatus());
         ASSERT_EQUALS(reply.summaryFields.nErrors, 1);
@@ -6119,7 +6129,8 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
 
     LOGV2(7695403, "Case 1) WCE in ordered case.");
     auto future = launchAsync([&] {
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         // Both operations executed, therefore the size of reply items is 2.
         ASSERT_EQUALS(reply.replyItems.size(), 2u);
         ASSERT_OK(reply.replyItems[0].getStatus());
@@ -6150,7 +6161,9 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     unorderedReq.setOrdered(false);
 
     future = launchAsync([&] {
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, unorderedReq);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply =
+            bulk_write_exec::execute(operationContext(), targeters, unorderedReq, execStats);
         ASSERT_EQUALS(reply.replyItems.size(), 2u);
         ASSERT_OK(reply.replyItems[0].getStatus());
         ASSERT_OK(reply.replyItems[1].getStatus());
@@ -6179,7 +6192,9 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     oneErrorReq.setOrdered(false);
 
     future = launchAsync([&] {
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, oneErrorReq);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply =
+            bulk_write_exec::execute(operationContext(), targeters, oneErrorReq, execStats);
         ASSERT_EQUALS(reply.replyItems.size(), 2u);
         // We don't really know which of the two mock responses below will be used for
         // which operation, since this is an unordered request, so we can't assert on
@@ -6248,7 +6263,8 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteWriteWithoutShardKeyWithIdAwaitsAllShard
         {NamespaceInfoEntry(nss)});
 
     auto future = launchAsync([&] {
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         ASSERT_EQUALS(reply.replyItems.size(), 1u);
         ASSERT_EQ(reply.replyItems[0].getN(), 1);
     });
@@ -6293,7 +6309,8 @@ TEST_F(BulkWriteExecTest, TestGetMoreFromInitialResponse) {
     auto future = launchAsync([&] {
         auto client = getService()->makeClient("thread");
         getServiceContext()->makeOperationContext(client.get());
-        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        bulk_write_exec::BulkWriteExecStats execStats;
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request, execStats);
         // Should have 2 reply items, 1 from the original response and 1 from the getMore.
         ASSERT_EQUALS(reply.replyItems.size(), 2u);
         ASSERT_EQUALS(reply.summaryFields.nInserted, 2);

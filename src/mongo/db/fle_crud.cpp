@@ -1350,10 +1350,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
 
 FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                const BatchedCommandRequest& request,
-                               BatchWriteExecStats* stats,
-                               BatchedCommandResponse* response,
-                               boost::optional<OID> targetEpoch) {
-
+                               BatchedCommandResponse* response) {
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);

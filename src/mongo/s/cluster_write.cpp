@@ -38,6 +38,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/util/decorable.h"
 
@@ -57,15 +58,6 @@ void write(OperationContext* opCtx,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
-    if (request.hasEncryptionInformation()) {
-        FLEBatchResult result = processFLEBatch(opCtx, request, stats, response, targetEpoch);
-        if (result == FLEBatchResult::kProcessed) {
-            return;
-        }
-
-        // fall through
-    }
-
     NotPrimaryErrorTracker::Disabled scopeDisabledTracker(
         &NotPrimaryErrorTracker::get(opCtx->getClient()));
 
@@ -93,6 +85,15 @@ void write(OperationContext* opCtx,
         // SERVER-109104 This can be removed once we delete BatchWriteExec.
         stats->markIgnore();
     } else {
+        if (request.hasEncryptionInformation()) {
+            FLEBatchResult result = processFLEBatch(opCtx, request, response);
+            if (result == FLEBatchResult::kProcessed) {
+                return;
+            }
+
+            // fall through
+        }
+
         BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
     }
     LOGV2_DEBUG_OPTIONS(
@@ -102,21 +103,16 @@ void write(OperationContext* opCtx,
 bulk_write_exec::BulkWriteReplyInfo bulkWrite(
     OperationContext* opCtx,
     const BulkWriteCommandRequest& request,
-    const std::vector<std::unique_ptr<NSTargeter>>& targeters) {
-    if (request.getNsInfo().size() > 1) {
-        for (const auto& nsInfo : request.getNsInfo()) {
-            uassert(ErrorCodes::BadValue,
-                    "BulkWrite with Queryable Encryption supports only a single namespace.",
-                    !nsInfo.getEncryptionInformation().has_value());
-        }
-    } else if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
-        auto [result, replies] = bulk_write_exec::attemptExecuteFLE(opCtx, request);
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+    bulk_write_exec::BulkWriteExecStats& execStats) {
+    if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
+        auto [result, replies] = attemptExecuteFLE(opCtx, request);
         if (result == FLEBatchResult::kProcessed) {
             return replies;
         }  // else fallthrough.
     }
 
-    return bulk_write_exec::execute(opCtx, targeters, request);
+    return bulk_write_exec::execute(opCtx, targeters, request, execStats);
 }
 
 }  // namespace cluster

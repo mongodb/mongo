@@ -52,10 +52,6 @@ selector:
     # Disabled because some features covered in these tests are not yet supported in the UWE.
     # TODO SERVER-104139: Add timeseries support.
     - jstests/core/timeseries/**/*.js
-    # TODO SERVER-104138: Add FLE support to UWE.
-    - src/mongo/db/modules/*/jstests/fle2/**/*.js
-    - jstests/core/query/queryable_encryption/query_settings_fle.js
-    - jstests/core/query/queryable_encryption/basic_crud.js
     # TODO SERVER-108965: Enable once targeter is equipped to handle errors.
     # Targeter fails to parse 'delete' queries.
     - jstests/core/query/expr/expr.js

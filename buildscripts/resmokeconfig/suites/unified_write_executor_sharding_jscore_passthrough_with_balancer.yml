@@ -56,11 +56,6 @@ selector:
     - jstests/core/**/*timeseries*.js
     - jstests/core_sharding/resharding/reshard_collection_timeseries.js
     - jstests/core_sharding/global_catalog/sharded_data_distribution.js
-    # TODO SERVER-104138: Add FLE support to UWE.
-    - src/mongo/db/modules/*/jstests/fle2/**/*.js
-    - jstests/core/query/queryable_encryption/query_settings_fle.js
-    - jstests/core/query/queryable_encryption/basic_crud.js
-    - jstests/fle2/upsert.js
     # TODO: SERVER-104535 support cursor with bulk write.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
   exclude_with_any_tags:

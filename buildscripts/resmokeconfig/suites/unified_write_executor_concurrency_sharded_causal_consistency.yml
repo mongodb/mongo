@@ -37,10 +37,6 @@ selector:
     # TODO: SERVER-104123 Support for 'multi: true' writes.
     - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
 
-    # TODO: SERVER-104138 Support FLE integration with write commands.
-    - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_compact.js
-    - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_crud.js
-
   exclude_with_any_tags:
     - requires_standalone
     - does_not_support_causal_consistency

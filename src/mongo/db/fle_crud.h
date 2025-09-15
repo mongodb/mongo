@@ -90,9 +90,7 @@ enum class FLEBatchResult {
  */
 FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                const BatchedCommandRequest& request,
-                               BatchWriteExecStats* stats,
-                               BatchedCommandResponse* response,
-                               boost::optional<OID> targetEpoch);
+                               BatchedCommandResponse* response);
 
 /**
  * Rewrite a BatchedCommandRequest for explain commands.

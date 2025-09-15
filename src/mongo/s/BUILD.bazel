@@ -644,6 +644,7 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:batch_write_exec.h",
         "//src/mongo/s/write_ops:batch_write_op.h",
         "//src/mongo/s/write_ops:bulk_write_exec.h",
+        "//src/mongo/s/write_ops:bulk_write_reply_info.h",
         "//src/mongo/s/write_ops:coordinate_multi_update_util.h",
         "//src/mongo/s/write_ops:pause_migrations_during_multi_updates_enablement.h",
         "//src/mongo/s/write_ops:write_op.h",
@@ -653,7 +654,6 @@ mongo_cc_library(
     deps = [
         ":sharding_router_api",
         ":sharding_write_without_shard_key_api",
-        "//src/mongo/db:fle_crud",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:not_primary_error_tracker",
         "//src/mongo/db/commands/query_cmd:bulk_write_common",
@@ -670,6 +670,7 @@ mongo_cc_library(
         "//src/mongo/executor:inline_executor",
         "//src/mongo/s/query/planner:cluster_find",
         "//src/mongo/s/write_ops:batch_write_types",
+        "//src/mongo/s/write_ops:fle",
         "//src/mongo/s/write_ops:wc_error",
         "//src/mongo/s/write_ops/unified_write_executor",
     ],

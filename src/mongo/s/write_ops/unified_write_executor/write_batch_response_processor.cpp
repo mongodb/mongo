@@ -446,6 +446,24 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulk
     return reply;
 }
 
+BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(
+    bulk_write_exec::BulkWriteReplyInfo replyInfo) {
+    // TODO SERVER-104535 cursor support for UnifiedWriteExec. Is it needed given this function is
+    // only used for FLE case?
+    auto reply = BulkWriteCommandReply(
+        BulkWriteCommandResponseCursor(
+            0, std::move(replyInfo.replyItems), NamespaceString::makeBulkWriteNSS(boost::none)),
+        replyInfo.summaryFields.nErrors,
+        replyInfo.summaryFields.nInserted,
+        replyInfo.summaryFields.nMatched,
+        replyInfo.summaryFields.nModified,
+        replyInfo.summaryFields.nUpserted,
+        replyInfo.summaryFields.nDeleted);
+    reply.setWriteConcernError(std::move(replyInfo.wcErrors));
+    reply.setRetriedStmtIds(std::move(replyInfo.retriedStmtIds));
+    return reply;
+}
+
 BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBatchedCommand() {
     BatchedCommandResponse resp;
     resp.setStatus(Status::OK());
