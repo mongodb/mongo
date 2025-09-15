@@ -371,6 +371,7 @@ public:
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(const HostAndPort&,
                                                                         transport::ConnectSSLMode,
+                                                                        PoolConnectionId,
                                                                         size_t generation) final;
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() final {
@@ -441,8 +442,9 @@ public:
                      const std::shared_ptr<AlarmScheduler>& alarmScheduler,
                      const HostAndPort& host,
                      Protocols protocol,
+                     PoolConnectionId id,
                      size_t generation)
-        : ConnectionInterface(generation),
+        : ConnectionInterface(id, generation),
           _executor(std::move(executor)),
           _alarmScheduler(alarmScheduler),
           _timer(clockSource, alarmScheduler),
@@ -535,11 +537,17 @@ void PooledCurlHandle::refresh(Milliseconds timeout, RefreshCallback cb) {
 std::shared_ptr<executor::ConnectionPool::ConnectionInterface>
 CurlHandleTypeFactory::makeConnection(const HostAndPort& host,
                                       transport::ConnectSSLMode sslMode,
+                                      PoolConnectionId id,
                                       size_t generation) {
     _start();
 
-    return std::make_shared<PooledCurlHandle>(
-        _executor, _clockSource, _timerScheduler, host, mapSSLModeToProtocol(sslMode), generation);
+    return std::make_shared<PooledCurlHandle>(_executor,
+                                              _clockSource,
+                                              _timerScheduler,
+                                              host,
+                                              mapSSLModeToProtocol(sslMode),
+                                              id,
+                                              generation);
 }
 
 /**

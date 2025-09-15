@@ -106,7 +106,9 @@ bool connHealthMetricsLoggingEnabled() {
     return gEnableDetailedConnectionHealthMetricLogLines.load();
 }
 
-void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMetrics) {
+void logSlowConnection(const HostAndPort& peer,
+                       const ConnectionMetrics& connMetrics,
+                       ConnectionPool::ConnectionInterface::PoolConnectionId connectionId) {
     static auto& severitySuppressor = *makeSeveritySuppressor().release();
     LOGV2_DEBUG(6496400,
                 severitySuppressor(peer).toInt(),
@@ -117,7 +119,8 @@ void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMet
                 "tlsHandshakeTime"_attr = connMetrics.tlsHandshake(),
                 "authTime"_attr = connMetrics.auth(),
                 "hookTime"_attr = connMetrics.connectionHook(),
-                "totalTime"_attr = connMetrics.total());
+                "totalTime"_attr = connMetrics.total(),
+                "poolConnId"_attr = connectionId);
 }
 
 auto& totalConnectionEstablishmentTime =
@@ -495,23 +498,25 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
                 totalConnectionEstablishmentTime.increment(_connMetrics.total().count());
                 if (connHealthMetricsLoggingEnabled() &&
                     _connMetrics.total() >= Milliseconds(gSlowConnectionThresholdMillis.load())) {
-                    logSlowConnection(_peer, _connMetrics);
+                    logSlowConnection(_peer, _connMetrics, _id);
                 }
                 handler->promise.emplaceValue();
             } else {
                 if (ErrorCodes::isNetworkTimeoutError(status) &&
                     connHealthMetricsLoggingEnabled()) {
-                    logSlowConnection(_peer, _connMetrics);
+                    logSlowConnection(_peer, _connMetrics, _id);
                 }
                 LOGV2_DEBUG(22584,
                             2,
                             "Failed to connect",
                             "hostAndPort"_attr = _peer,
+                            "poolConnId"_attr = _id,
                             "error"_attr = redact(status));
                 handler->promise.setError(status);
             }
         });
-    LOGV2_DEBUG(22585, 2, "Finished connection setup", "hostAndPort"_attr = _peer);
+    LOGV2_DEBUG(
+        22585, 2, "Finished connection setup", "hostAndPort"_attr = _peer, "poolConnId"_attr = _id);
 }
 
 void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
@@ -596,12 +601,16 @@ auto TLTypeFactory::reactor() {
 }
 
 std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnection(
-    const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, size_t generation) {
+    const HostAndPort& hostAndPort,
+    transport::ConnectSSLMode sslMode,
+    PoolConnectionId id,
+    size_t generation) {
     auto conn = std::make_shared<TLConnection>(shared_from_this(),
                                                reactor(),
                                                getGlobalServiceContext(),
                                                hostAndPort,
                                                sslMode,
+                                               id,
                                                generation,
                                                _onConnectHook.get(),
                                                _connPoolOptions.skipAuthentication,

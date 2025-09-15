@@ -619,6 +619,9 @@ private:
         Seconds{5}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
     // The overall number of rejected connections used for stats.
     size_t _numberRejectedConnections{0};
+
+    // The next id to be used when creating a new conneciton, is incremented each time
+    ConnectionInterface::PoolConnectionId _nextConnectionId{0u};
 };
 
 auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
@@ -1521,7 +1524,9 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
         OwnedConnection handle;
         try {
             // make a new connection and put it in processing
-            handle = _parent->_factory->makeConnection(_hostAndPort, _sslMode, _generation);
+            handle = _parent->_factory->makeConnection(
+                _hostAndPort, _sslMode, _nextConnectionId, _generation);
+            ++_nextConnectionId;
         } catch (std::system_error& e) {
             LOGV2_FATAL(40336,
                         "Failed to construct a new connection object: {reason}",

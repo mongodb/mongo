@@ -94,8 +94,11 @@ void TimerImpl::fireIfNecessary() {
 
 std::set<TimerImpl*> TimerImpl::_timers;
 
-ConnectionImpl::ConnectionImpl(const HostAndPort& hostAndPort, size_t generation, PoolImpl* global)
-    : ConnectionInterface(generation),
+ConnectionImpl::ConnectionImpl(const HostAndPort& hostAndPort,
+                               PoolConnectionId id,
+                               size_t generation,
+                               PoolImpl* global)
+    : ConnectionInterface(id, generation),
       _hostAndPort(hostAndPort),
       _timer(global),
       _global(global),
@@ -228,8 +231,11 @@ std::deque<ConnectionImpl*> ConnectionImpl::_refreshQueue;
 size_t ConnectionImpl::_idCounter = 1;
 
 std::shared_ptr<ConnectionPool::ConnectionInterface> PoolImpl::makeConnection(
-    const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, size_t generation) {
-    return std::make_shared<ConnectionImpl>(hostAndPort, generation, this);
+    const HostAndPort& hostAndPort,
+    transport::ConnectSSLMode sslMode,
+    PoolConnectionId id,
+    size_t generation) {
+    return std::make_shared<ConnectionImpl>(hostAndPort, id, generation, this);
 }
 
 std::shared_ptr<ConnectionPool::TimerInterface> PoolImpl::makeTimer() {

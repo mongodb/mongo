@@ -26,6 +26,7 @@ function validateSlowConnectionLogEntry(entry) {
     assert(hasNonNegativeAttr(entry, "authTimeMillis"));
     assert(hasOptionalMillisAttr(entry, "hookTime"));
     assert(hasNonNegativeAttr(entry, "totalTimeMillis"));
+    assert(hasNonNegativeAttr(entry, "poolConnId"));
 
     let total = entry.attr.dnsResolutionTimeMillis + entry.attr.tcpConnectionTimeMillis + entry.attr.authTimeMillis;
     if (entry.attr.tlsHandshakeTimeMillis >= 0) {

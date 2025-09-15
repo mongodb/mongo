@@ -37,6 +37,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/ssl_connection_context.h"
@@ -81,6 +82,7 @@ public:
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
+        PoolConnectionId,
         size_t generation) override;
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
@@ -176,11 +178,12 @@ public:
         ServiceContext* serviceContext,
         HostAndPort peer,
         transport::ConnectSSLMode sslMode,
+        PoolConnectionId id,
         size_t generation,
         NetworkConnectionHook* onConnectHook,
         bool skipAuth,
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr)
-        : ConnectionInterface(generation),
+        : ConnectionInterface(id, generation),
           TLTypeFactory::Type(factory),
           _reactor(reactor),
           _serviceContext(serviceContext),

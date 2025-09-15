@@ -420,7 +420,14 @@ class ConnectionPool::ConnectionInterface : public TimerInterface {
     friend class ConnectionPool;
 
 public:
-    explicit ConnectionInterface(size_t generation) : _generation(generation) {}
+    /**
+     * Unique id of the connection within its SpecificPool.
+     * The type is wide enough to handle a long lifetime without overflow.
+     */
+    using PoolConnectionId = uint64_t;
+
+    explicit ConnectionInterface(PoolConnectionId id, size_t generation)
+        : _id{id}, _generation(generation) {}
 
     ~ConnectionInterface() override = default;
 
@@ -520,6 +527,8 @@ protected:
      */
     virtual void refresh(Milliseconds timeout, RefreshCallback cb) = 0;
 
+    PoolConnectionId _id;
+
 private:
     size_t _generation;
     Date_t _lastUsed;
@@ -615,6 +624,8 @@ class ConnectionPool::DependentTypeFactoryInterface {
     DependentTypeFactoryInterface& operator=(const DependentTypeFactoryInterface&) = delete;
 
 public:
+    using PoolConnectionId = ConnectionInterface::PoolConnectionId;
+
     DependentTypeFactoryInterface() = default;
 
     virtual ~DependentTypeFactoryInterface() = default;
@@ -624,6 +635,7 @@ public:
      */
     virtual std::shared_ptr<ConnectionInterface> makeConnection(const HostAndPort& hostAndPort,
                                                                 transport::ConnectSSLMode sslMode,
+                                                                PoolConnectionId,
                                                                 size_t generation) = 0;
 
     /**
