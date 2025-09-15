@@ -94,6 +94,11 @@ public:
         bool allowDiskUse = false,
         int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
+    void propagateStatsToCurOp() const {
+        CurOp::get(_opCtx)->setMemoryTrackingStats(inUseTrackedMemoryBytes(),
+                                                   peakTrackedMemoryBytes());
+    }
+
     /**
      * Move the memory tracker out from the operation context, if there is one there. The caller
      * will take ownership of the tracker.
@@ -115,12 +120,9 @@ private:
 
     static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
-    // TODO SERVER-108789 Remove isIncompatibleWithMemoryTracking.
-    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(
-        OperationContext* opCtx,
-        bool isIncompatibleWithMemoryTracking,
-        int64_t maxMemoryUsageBytes,
-        int64_t chunkSize = 0);
+    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(OperationContext* opCtx,
+                                                                       int64_t maxMemoryUsageBytes,
+                                                                       int64_t chunkSize = 0);
 
     OperationContext* _opCtx;
 };

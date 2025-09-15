@@ -1,6 +1,9 @@
 /**
  * Collection of helper functions for testing memory tracking statistics in the slow query log,
  * system.profile, and explain("executionStats").
+ *
+ * The functions exported from this file are not designed to work with passthroughs that may retry
+ * queries, since it looks for things like log messages, profiles, etc.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
@@ -79,10 +82,33 @@ function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
  * Helpers to verify that memory tracking stats are correctly reported for each diagnostic source.
  ******************************************************************************************************/
 
-function verifySlowQueryLogMetrics({logLines, verifyOptions}) {
-    if (!verifyOptions.featureFlagEnabled) {
+/**
+ * @typedef {Object} VerifyOptions - Configuration object for memory tracking verification functions
+ * @property {boolean} expectMemoryMetrics - Whether memory tracking metrics should be present in
+ *   logs/profiler
+ * @property {number} expectedNumGetMores - Expected number of getMore operations in the
+ *   logs/profiler
+ * @property {boolean} [skipFindInitialRequest=false] - Whether to skip verification of the initial
+ *   aggregate command (relaxed mode for exchange stage)
+ * @property {boolean} [skipInUseTrackedMemBytesCheck=false] - Whether to skip checking
+ *   inUseTrackedMemBytes values
+ * @property {boolean} [checkInUseTrackedMemBytesResets=true] - Whether to verify
+ *   inUseTrackedMemBytes resets to 0 when cursor exhausted
+ * @property {boolean} [allowMissingPeakMetric=false] - Whether to allow some log lines/profiler
+ *   entries to be missing peakTrackedMemBytes (relaxed mode for exchange stage). With this set,
+ *   we expect to see at least one getMore() produce a peak metric.
+ */
+
+/**
+ * Verifies memory tracking metrics in slow query log entries.
+ * @param {Object} params - Parameters object
+ * @param {string[]} params.logLines - Array of slow query log lines to verify
+ * @param {VerifyOptions} params.verifyOptions - Configuration for verification behavior
+ */
+export function verifySlowQueryLogMetrics({logLines, verifyOptions}) {
+    if (!verifyOptions.expectMemoryMetrics) {
         jsTest.log.info(
-            "Test that memory usage metrics do not appear in the slow query logs when the feature flag is off.",
+            "Test that memory usage metrics do not appear in the slow query logs when memory metrics are not expected.",
         );
 
         logLines.forEach((line) => assertNoMatchInLog(line, peakTrackedMemBytesRegex));
@@ -91,30 +117,27 @@ function verifySlowQueryLogMetrics({logLines, verifyOptions}) {
     }
 
     jsTest.log.info(
-        "Test that memory usage metrics appear in the slow query logs and persists across getMore calls when the feature flag is on.",
+        "Test that memory usage metrics appear in the slow query logs and persist across getMore calls when memory metrics are expected.",
     );
 
-    // Get the cursorId from the initial request. We filter based off of the original cursorId
-    // because some passthrough configs will re-issue queries.
-    //
-    // Because of asynchronous log flushing, the first log line extracted may not correspond to the
-    // original request.
-    const originalRequestLogLine = logLines.find((line) => line.includes('"command":{"aggregate"'));
-    assert(originalRequestLogLine, "Failed to find original aggregate request in log lines: " + tojson(logLines));
-    const cursorId = getMetricFromLog(originalRequestLogLine, cursorIdRegex);
-    logLines = logLines.filter((line) => {
-        return getMetricFromLog(line, cursorIdRegex).valueOf() === cursorId.valueOf();
-    });
+    // Assert that we have the expected number of log lines and getMores.
+    const expectedLogLines = verifyOptions.skipFindInitialRequest
+        ? verifyOptions.expectedNumGetMores
+        : verifyOptions.expectedNumGetMores + 1;
 
-    // Assert that we have one initial request and the expected number of getMores.
     assert.gte(
         logLines.length,
-        verifyOptions.expectedNumGetMores + 1,
-        `Expected at least ${verifyOptions.expectedNumGetMores + 1} log lines ` + tojson(logLines),
+        expectedLogLines,
+        `Expected at least ${expectedLogLines} log lines ${tojson(logLines)}`,
     );
+
     const initialRequests = logLines.filter((line) => line.includes('"command":{"aggregate"'));
     const getMores = logLines.filter((line) => line.includes('"command":{"getMore"'));
-    assert.eq(initialRequests.length, 1, "Expected exactly one initial request: " + tojson(logLines));
+
+    if (!verifyOptions.skipFindInitialRequest) {
+        assert.eq(initialRequests.length, 1, "Expected exactly one initial request: " + tojson(logLines));
+    }
+
     assert.gte(
         getMores.length,
         verifyOptions.expectedNumGetMores,
@@ -122,35 +145,49 @@ function verifySlowQueryLogMetrics({logLines, verifyOptions}) {
     );
 
     // Check that inUseTrackedMemBytes is non-zero when the cursor is still in-use.
-    let peakTrackedMem = 0;
+    let actualPeak = 0;
     let foundInUseTrackedMem = false;
+    let foundPeakTrackedMem = false;
     for (const line of logLines) {
         if (!verifyOptions.skipInUseTrackedMemBytesCheck && !line.includes('"cursorExhausted"')) {
             const inUseTrackedMemBytes = getMetricFromLog(line, inUseTrackedMemBytesRegex, false /* don't assert */);
             if (inUseTrackedMemBytes > 0) {
-                peakTrackedMem = Math.max(inUseTrackedMemBytes, peakTrackedMem);
                 foundInUseTrackedMem = true;
             }
+            actualPeak = Math.max(inUseTrackedMemBytes, actualPeak);
         }
 
-        const peakTrackedMemBytes = getMetricFromLog(line, peakTrackedMemBytesRegex);
-        assert.gte(
-            peakTrackedMemBytes,
-            peakTrackedMem,
-            `peakTrackedMemBytes (${peakTrackedMemBytes}) should be >= peak inUseTrackedMemBytes (${
-                peakTrackedMem
-            }) seen so far\n` + tojson(logLines),
-        );
+        const doAssert = !verifyOptions.allowMissingPeakMetric;
+        const peakTrackedMemBytes = getMetricFromLog(line, peakTrackedMemBytesRegex, doAssert);
+        if (peakTrackedMemBytes > 0) {
+            assert.gte(
+                peakTrackedMemBytes,
+                actualPeak,
+                `peakTrackedMemBytes (${peakTrackedMemBytes}) should be greater or equal to previously found peak (${
+                    actualPeak
+                })\n` + tojson(logLines),
+            );
+            foundPeakTrackedMem = true;
+            actualPeak = Math.max(peakTrackedMemBytes, actualPeak);
+        }
     }
 
     if (!verifyOptions.skipInUseTrackedMemBytesCheck) {
         assert(foundInUseTrackedMem, "Expected to find inUseTrackedMemBytes in slow query logs at least once");
     }
 
+    if (verifyOptions.allowMissingPeakMetric) {
+        assert(foundPeakTrackedMem, "Expected to find peakTrackedMemBytes in slow query logs at least once");
+    }
+
     // The cursor is exhausted and the pipeline's resources have been freed, so the last
     // inUseTrackedMemBytes should be 0.
     const exhaustedLines = logLines.filter((line) => line.includes('"cursorExhausted"'));
-    assert(exhaustedLines.length == 1, "Expected to find one log line with cursorExhausted: true: " + tojson(logLines));
+    assert.eq(
+        1,
+        exhaustedLines.length,
+        "Expected to find one log line with cursorExhausted: true: " + tojson(logLines),
+    );
     if (verifyOptions.checkInUseTrackedMemBytesResets && !verifyOptions.skipInUseTrackedMemBytesCheck) {
         assert(
             !exhaustedLines[0].includes("inUseTrackedMemBytes"),
@@ -160,9 +197,15 @@ function verifySlowQueryLogMetrics({logLines, verifyOptions}) {
     }
 }
 
-function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
-    if (!verifyOptions.featureFlagEnabled) {
-        jsTest.log.info("Test that memory metrics do not appear in the profiler when the feature flag is off.");
+/**
+ * Verifies memory tracking metrics in profiler entries.
+ * @param {Object} params - Parameters object
+ * @param {Object[]} params.profilerEntries - Array of profiler entries to verify
+ * @param {VerifyOptions} params.verifyOptions - Configuration for verification behavior
+ */
+export function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
+    if (!verifyOptions.expectMemoryMetrics) {
+        jsTest.log.info("Test that memory metrics do not appear in the profiler when memory metrics are not expected.");
 
         for (const entry of profilerEntries) {
             assert(
@@ -177,31 +220,26 @@ function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
         return;
     }
     jsTest.log.info(
-        "Test that memory usage metrics appear in the profiler and persists across getMores when the feature flag is on.",
+        "Test that memory usage metrics appear in the profiler and persists across getMores when memory metrics are expected.",
     );
 
-    // Get the cursorId from the initial request. We filter based off of the original cursorId
-    // because we only want to check memory usages corresponding to this test. Otherwise, some
-    // passthrough configs will re-issue queries, which would affect memory entries returned.
-    //
-    // Because of async flushing, the original request might not correspond to the first entry, so
-    // search for the aggregate entry.
-    const originalRequestProfilerEntry = profilerEntries.find((entry) => entry.command.aggregate);
-    assert(originalRequestProfilerEntry, "Could not find original aggregate request in profilerEntries");
-    const cursorId = originalRequestProfilerEntry.cursorid;
-    profilerEntries = profilerEntries.filter(
-        (entry) => entry.cursorid && entry.cursorid.valueOf() === cursorId.valueOf(),
-    );
+    // Assert that we have the expected number of profiler entries and getMores.
+    const expectedProfilerEntries = verifyOptions.skipFindInitialRequest
+        ? verifyOptions.expectedNumGetMores
+        : verifyOptions.expectedNumGetMores + 1;
 
-    // Assert that we have one aggregate and 'expectedNumGetMores' getMores.
     assert.gte(
         profilerEntries.length,
-        verifyOptions.expectedNumGetMores + 1,
-        "Expected at least " + (verifyOptions.expectedNumGetMores + 1) + " profiler entries " + tojson(profilerEntries),
+        expectedProfilerEntries,
+        `Expected at least ${expectedProfilerEntries} profiler entries ${tojson(profilerEntries)}`,
     );
-    const aggregateEntries = profilerEntries.filter((entry) => entry.op === "command");
+
+    if (!verifyOptions.skipFindInitialRequest) {
+        const aggregateEntries = profilerEntries.filter((entry) => entry.op === "command");
+        assert.eq(1, aggregateEntries.length, "Expected exactly one aggregate entry: " + tojson(profilerEntries));
+    }
+
     const getMoreEntries = profilerEntries.filter((entry) => entry.op === "getmore");
-    assert.eq(1, aggregateEntries.length, "Expected exactly one aggregate entry: " + tojson(profilerEntries));
     assert.gte(
         getMoreEntries.length,
         verifyOptions.expectedNumGetMores,
@@ -209,8 +247,9 @@ function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
     );
 
     // Check that inUseTrackedMemBytes is non-zero when the cursor is still in use.
-    let peakTrackedMem = 0;
+    let actualPeak = 0;
     let foundInUseTrackedMem = false;
+    let foundPeakTrackedMem = false;
     for (const entry of profilerEntries) {
         if (!verifyOptions.skipInUseTrackedMemBytesCheck && !entry.cursorExhausted) {
             if (Object.hasOwn(entry, "inUseTrackedMemBytes")) {
@@ -220,25 +259,34 @@ function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
                     0,
                     "Expected inUseTrackedMemBytes to be nonzero in getMore: " + tojson(profilerEntries),
                 );
-                peakTrackedMem = Math.max(peakTrackedMem, entry.inUseTrackedMemBytes);
+                actualPeak = Math.max(actualPeak, entry.inUseTrackedMemBytes);
             }
         }
 
-        assert(
-            entry.hasOwnProperty("peakTrackedMemBytes"),
-            `Missing peakTrackedMemBytes in profiler entry: ${tojson(profilerEntries)}`,
-        );
-        assert.gte(
-            entry.peakTrackedMemBytes,
-            peakTrackedMem,
-            `peakTrackedMemBytes (${entry.peakTrackedMemBytes}) should be >= inUseTrackedMemBytes peak (${
-                peakTrackedMem
-            }) at this point: ` + tojson(entry),
-        );
+        const hasPeak = entry.hasOwnProperty("peakTrackedMemBytes");
+        if (!verifyOptions.allowMissingPeakMetric) {
+            assert(hasPeak, `Missing peakTrackedMemBytes in profiler entry: ${tojson(profilerEntries)}`);
+        }
+        if (hasPeak) {
+            assert.gte(
+                entry.peakTrackedMemBytes,
+                actualPeak,
+                `peakTrackedMemBytes (${
+                    entry.peakTrackedMemBytes
+                }) should be greater than or equal to previoiusly found peak (${actualPeak}) at this point: ` +
+                    tojson(entry),
+            );
+            foundPeakTrackedMem = true;
+            actualPeak = Math.max(actualPeak, entry.peakTrackedMemBytes);
+        }
     }
 
     if (!verifyOptions.skipInUseTrackedMemBytesCheck) {
         assert(foundInUseTrackedMem, "Expected to find inUseTrackedMemBytes at least once in profiler entries");
+    }
+
+    if (verifyOptions.allowMissingPeakMetric) {
+        assert(foundPeakTrackedMem, "Expected to find peakTrackedMemBytes at least once in profiler entries");
     }
 
     // No memory is currently in use because the cursor is exhausted.
@@ -253,7 +301,7 @@ function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
     }
 }
 
-function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEnabled, numStages, options = {}}) {
+function verifyExplainMetrics({db, collName, pipeline, stageName, expectMemoryMetrics, numStages, options = {}}) {
     const explainRes = db[collName].explain("executionStats").aggregate(pipeline, options);
 
     // If a query uses sbe, the explain version will be 2.
@@ -269,7 +317,7 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
         assert.eq(
             stages.length,
             numStages,
-            " Found " +
+            "Found " +
                 stages.length +
                 " but expected to find " +
                 numStages +
@@ -307,8 +355,10 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
         }
     }
 
-    if (!featureFlagEnabled) {
-        jsTest.log.info("Test that memory metrics do not appear in the explain output when the feature flag is off.");
+    if (!expectMemoryMetrics) {
+        jsTest.log.info(
+            "Test that memory metrics do not appear in the explain output when memory metrics are not expected.",
+        );
         assert(
             !explainRes.hasOwnProperty("peakTrackedMemBytes"),
             "Unexpected peakTrackedMemBytes in explain: " + tojson(explainRes),
@@ -320,7 +370,7 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
         return;
     }
 
-    jsTest.log.info("Test that memory usage metrics appear in the explain output when the feature flag is on.");
+    jsTest.log.info("Test that memory usage metrics appear in the explain output when memory metrics are expected.");
 
     // Memory usage metrics should appear in the top-level explain for unsharded explains.
     if (!explainRes.hasOwnProperty("shards")) {
@@ -384,9 +434,10 @@ export function runMemoryStatsTest({
     const logLines = runPipelineAndGetDiagnostics({db: db, collName: collName, commandObj: commandObj, source: "log"});
     const verifyOptions = {
         expectedNumGetMores: expectedNumGetMores,
-        featureFlagEnabled: featureFlagEnabled,
+        expectMemoryMetrics: featureFlagEnabled,
         checkInUseTrackedMemBytesResets: checkInUseTrackedMemBytesResets,
         skipInUseTrackedMemBytesCheck: skipInUseTrackedMemBytesCheck,
+        allowMissingPeakMetric: false,
     };
     verifySlowQueryLogMetrics({
         logLines: logLines,
@@ -409,7 +460,7 @@ export function runMemoryStatsTest({
         collName: collName,
         pipeline: commandObj.pipeline,
         stageName: stageName,
-        featureFlagEnabled: featureFlagEnabled,
+        expectMemoryMetrics: featureFlagEnabled,
         numStages: 1,
         options: commandObj.allowDiskUse !== undefined ? {allowDiskUse: commandObj.allowDiskUse} : {},
     });
@@ -445,8 +496,9 @@ export function runShardedMemoryStatsTest({
     const logLines = runPipelineAndGetDiagnostics({db: db, collName: collName, commandObj: commandObj, source: "log"});
     const verifyOptions = {
         expectedNumGetMores: expectedNumGetMores,
-        featureFlagEnabled: featureFlagEnabled,
+        expectMemoryMetrics: featureFlagEnabled,
         skipInUseTrackedMemBytesCheck: skipInUseTrackedMemBytesCheck,
+        allowMissingPeakMetric: false,
     };
     verifySlowQueryLogMetrics({
         logLines: logLines,
@@ -463,7 +515,7 @@ export function runShardedMemoryStatsTest({
         collName: collName,
         pipeline: commandObj.pipeline,
         stageName: stageName,
-        featureFlagEnabled: featureFlagEnabled,
+        expectMemoryMetrics: featureFlagEnabled,
         numStages: numShards,
         allowDiskUse: commandObj.allowDiskUse,
     });

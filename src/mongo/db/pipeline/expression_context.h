@@ -908,15 +908,6 @@ public:
         _gotTemporarilyUnavailableException = v;
     }
 
-    // Sets a flag which tells DocumentSource parsers whether the pipeline contains an exchange
-    // stage.
-    void setIncompatibleWithMemoryTracking(bool v) {
-        _isIncompatibleWithMemoryTracking = v;
-    }
-    bool isIncompatibleWithMemoryTracking() const {
-        return _isIncompatibleWithMemoryTracking;
-    }
-
     // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
     const query_settings::QuerySettings& getQuerySettings() const {
         static const auto kEmptySettings = query_settings::QuerySettings();
@@ -1270,8 +1261,6 @@ private:
     bool _gotTemporarilyUnavailableException = false;
 
     bool _isCappedDelete = false;
-
-    bool _isIncompatibleWithMemoryTracking = false;
 
     InterruptChecker _interruptChecker;
 

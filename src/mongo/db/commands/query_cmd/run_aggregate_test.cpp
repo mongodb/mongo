@@ -37,8 +37,10 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/assert.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -48,14 +50,269 @@ namespace mongo {
  * This class is declared as a friend of OperationMemoryUsageTracker so it can access private
  * fields. As a result, it needs to be in the mongo namespace.
  */
-class RunAggregateTest : public DBCommandTestFixture {
+class RunAggregateTest : service_context_test::WithSetupTransportLayer,
+                         public DBCommandTestFixture {
 protected:
+    void setUp() override {
+        DBCommandTestFixture::setUp();
+        auto net = executor::makeNetworkInterface("RunAggregateTest");
+
+        ThreadPool::Options options;
+        auto pool = std::make_unique<ThreadPool>(options);
+
+        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
+        _executor->startup();
+    }
+
+    void tearDown() override {
+        _executor->shutdown();
+        _executor.reset();
+        DBCommandTestFixture::tearDown();
+    }
+
     static OperationContext* getTrackerOpCtx(OperationMemoryUsageTracker* tracker) {
         return tracker->_opCtx;
     }
+
+    /**
+     * Generate a $trackingMock stage that generates 'nDocs' documents, with a simple schema:
+     *   {a: 0, b: "aaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+     *   {a: 1, b: "aaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+     *   ...
+     *
+     * If 'errorOffset' is not boost::none, generate a special error document that will produce an
+     * error when the stage is executed at the given offset:
+     *   {error: "<msg>"}
+     */
+    BSONObj generateTrackingMockStage(size_t nDocs,
+                                      boost::optional<size_t> errorOffset = boost::none) {
+        BSONObjBuilder builder;
+        BSONArrayBuilder arrayBuilder{builder.subarrayStart("$trackingMock")};
+        StringData stringVal = "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd;
+        for (size_t i = 0; i < nDocs; ++i) {
+            if (!errorOffset || *errorOffset != i) {
+                arrayBuilder.append(BSON("a" << static_cast<int64_t>(i) << "b" << stringVal));
+            } else {
+                arrayBuilder.append(BSON("error" << "RunAggregateTest error"));
+            }
+        }
+        arrayBuilder.done();
+
+        return builder.obj();
+    }
+
+    /**
+     * This function is assumed to be running on a new thread that can run concurrently with others,
+     * as part of testing exchange pipelines. It calls getMore() repeatedly on the given cursor id,
+     * and checks for expected results and/or an error.
+     */
+    static Status consume(ServiceContext* svcCtx,
+                          size_t nConsumers,
+                          size_t consumerId,
+                          int64_t cursorId,
+                          size_t nExpectedDocs,
+                          bool expectError) {
+        Status status = Status::OK();
+        PseudoRandom prng(Date_t::now().asInt64());
+        ThreadClient client = ThreadClient{svcCtx->getService()};
+
+        BSONObj result;
+        int docCount = 0;
+        do {
+            // Let's simulate how an actual client would do things, where there is a distinct opCtx
+            // for each client request.
+            ServiceContext::UniqueOperationContext opCtxOwned =
+                svcCtx->makeOperationContext(client.get());
+            OperationContext* opCtx = opCtxOwned.get();
+            DBDirectClient dbdClient{opCtx};
+
+            const size_t batchSize = 5;
+            BSONObj getMoreCmdObj = fromjson(fmt::format(
+                R"({{
+                    getMore: {},
+                    collection: "$cmd.aggregate",
+                    batchSize: {}
+                }})",
+                cursorId,
+                batchSize));
+            bool success =
+                dbdClient.runCommand(DBCommandTestFixture::kDatabaseName, getMoreCmdObj, result);
+
+            if (!success && !expectError) {
+                FAIL("Unexpected error: " + result.toString());
+            } else if (!success && expectError) {
+                assertBSONNotOk(result);
+                auto errorCode = result["code"].Int();
+                status =
+                    Status{static_cast<ErrorCodes::Error>(errorCode), result["errmsg"].String()};
+                // We expect there to be no tracker attached to the opCtx at this point, because we
+                // always move it back to the Exchange object before returning.
+                std::unique_ptr<OperationMemoryUsageTracker> tracker =
+                    OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+                ASSERT_EQ(nullptr, tracker.get());
+                break;
+            }
+
+            ASSERT_EQ(result["ok"].Number(), 1.0);
+
+            cursorId = result["cursor"].Obj()["id"].Long();
+            std::vector<BSONElement> docs = result["cursor"].Obj()["nextBatch"].Array();
+            if (cursorId != 0) {
+                // Documents are distributed round-robin, so we can predict which documents will be
+                // received by each thread.
+                ASSERT_LTE(docs.size(), batchSize);
+                for (auto&& doc : docs) {
+                    int64_t expectedA = docCount * nConsumers + consumerId;
+                    ASSERT_BSONOBJ_EQ(
+                        doc.Obj(),
+                        BSON("a" << expectedA << "b" << "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd));
+                    docCount++;
+                }
+            } else {
+                // No more documents.
+                ASSERT_EQ(docs.size(), 0);
+                // Unfortunately, the operation memory tracker stays attached to the Exchage object,
+                // so we don't have a chance to examine it in this test.
+                ASSERT_FALSE(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+            }
+
+            // Let some other threads do some work.
+            sleepmillis(prng.nextInt32() % 20 + 1);
+        } while (cursorId != 0);
+
+        if (expectError) {
+            ASSERT_FALSE(status.isOK());
+        } else {
+            ASSERT_EQ(docCount, nExpectedDocs);
+        }
+
+        return status;
+    }
+
+    /**
+     * Assert a truthy "ok" field in a BSONObj. Some code paths create the "ok" field as a bool, but
+     * more often it's a numeric field.
+     *
+     * TODO SERVER-110496: We shouldn't have to do this.
+     */
+    static void assertBSONOk(BSONObj bson) {
+        BSONElement ok = bson["ok"];
+        if (ok.type() == BSONType::boolean) {
+            ASSERT_TRUE(ok.boolean());
+        } else {
+            ASSERT_NE(ok.Number(), 0.0);
+        }
+    }
+
+    /**
+     * Assert a falsey "ok" field in a BSONObj. Some code paths create the "ok" field as a bool, but
+     * more often it's a numeric field.
+     *
+     * TODO SERVER-110496: We shouldn't have to do this.
+     */
+    static void assertBSONNotOk(BSONObj bson) {
+        BSONElement ok = bson["ok"];
+        if (ok.type() == BSONType::boolean) {
+            ASSERT_FALSE(ok.boolean());
+        } else {
+            ASSERT_EQ(ok.Number(), 0.0);
+        }
+    }
+
+    struct ExchangeTestParams {
+        size_t nConsumers;
+        size_t nTotalDocs;
+        boost::optional<size_t> errorOffset = boost::none;
+    };
+
+    /**
+     * Run a test that executes an exchange pipeline with the given number of consumers, etc. This
+     * function starts one additional thread for each consumer.
+     */
+    void runExchangeMemoryTrackingTest(const ExchangeTestParams& params) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                                   true);
+        // The exchange execution flow is to submit the initial aggregate() request with a batchSize
+        // of 0, and then follow up with standard getMore() requests.
+        auto aggCmdObj = fromjson(
+            fmt::format(R"({{
+                aggregate: 1,
+                pipeline: [{}],
+                cursor: {{batchSize: 0}},
+                exchange: {{
+                    "policy": "roundrobin",
+                    "consumers": {},
+                    "orderPreserving": false,
+                    "bufferSize": 128,
+                    "key": {{}}
+                }}
+            }})",
+                        generateTrackingMockStage(params.nTotalDocs, params.errorOffset).toString(),
+                        params.nConsumers));
+        BSONObj res = runCommand(aggCmdObj.getOwned());
+
+        using Handle = executor::TaskExecutor::CallbackHandle;
+        std::vector<BSONElement> cursors;
+        BSONObj oneConsumerCursor;
+        if (params.nConsumers == 1) {
+            // If there is just one consumer, we get back a single object.
+            oneConsumerCursor = BSON("" << res).getOwned();
+            cursors.push_back(oneConsumerCursor[""]);
+        } else {
+            // For multiple consumers, we get back an array.
+            cursors = res["cursors"].Array();
+        }
+
+        // Spawn a new thread for each consumer to retrieve the result data, via the consume()
+        // method.
+        std::vector<Handle> handles;
+        std::vector<Status> statuses{params.nConsumers, Status::OK()};
+        size_t consumerId = 0;
+        for (auto&& elem : cursors) {
+            BSONObj cursor = elem.Obj();
+            assertBSONOk(cursor);
+
+            CursorId cursorId = cursor["cursor"].Obj()["id"].Long();
+            StatusWith<Handle> swHandle =
+                _executor->scheduleWork([consumerId, cursorId, params, &statuses, this](
+                                            const executor::TaskExecutor::CallbackArgs& cbArgs) {
+                    statuses[consumerId] = RunAggregateTest::consume(
+                        getServiceContext(),
+                        params.nConsumers,
+                        consumerId,
+                        cursorId,
+                        params.nTotalDocs / params.nConsumers /* nExpectedDocs */,
+                        params.errorOffset.has_value() /* expectError */);
+                });
+            ASSERT_OK(swHandle);
+            handles.push_back(swHandle.getValue());
+            consumerId++;
+        }
+
+        for (auto&& handle : handles) {
+            _executor->wait(handle);
+        }
+
+        // If we expected an error make sure we got one internal error and the rest are passthrough
+        // errors.
+        if (params.errorOffset.has_value()) {
+            size_t nInternalErrors = 0;
+            for (const Status& status : statuses) {
+                if (status.code() == ErrorCodes::InternalError) {
+                    ++nInternalErrors;
+                } else {
+                    ASSERT_EQ(status.code(), ErrorCodes::ExchangePassthrough);
+                }
+            }
+            ASSERT_EQ(1, nInternalErrors);
+        }
+    }
+
+    std::shared_ptr<executor::TaskExecutor> _executor;
 };
 
 namespace {
+
 /**
  * This is a subclass of DocumentSourceMock that will track the memory of each document it produces,
  * and reset the in-use memory bytes to zero when EOF is reached.
@@ -69,6 +326,8 @@ public:
     /**
      * Give this mock stage a syntax like this:
      *     {$trackingMock: [ {_id: 1, ... }, {_id: 2, ...} ]}
+     * As a special case, if any of the documents have the form {error: "<msg>"}, then they will
+     * produce an error instead of returning that document from doGetNext().
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -133,14 +392,30 @@ public:
           _tracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)} {}
 
 private:
+    void doDispose() final {
+        // Some interesting edge cases have turned up when tracking memory
+        // during dispose, since if we adjust the amount of memory in use after
+        // the operation memory tracker has been destroyed, we will crash.
+        _tracker.set(0);
+    }
+
     /**
      * Override doGetNext to track memory usage for each document returned, and reset the in-use
      * memory bytes when EOF is reached.
+     *
+     * If any of the documents to be output have the form {error: "<msg>"}, this method will throw
+     * an internal error with the given message.
      */
     GetNextResult doGetNext() override {
         GetNextResult result = MockStage::doGetNext();
         if (result.isAdvanced()) {
-            _tracker.add(result.getDocument().getApproximateSize());
+            const Document& doc = result.getDocument();
+            FieldIterator it = doc.fieldIterator();
+            if (it.more() && it.fieldName() == "error") {
+                std::string errMsg = it.next().second.getString();
+                uasserted(ErrorCodes::InternalError, errMsg);
+            }
+            _tracker.add(doc.getApproximateSize());
         } else if (result.isEOF()) {
             _tracker.add(-_tracker.inUseTrackedMemoryBytes());
         }
@@ -151,6 +426,25 @@ private:
     SimpleMemoryUsageTracker _tracker;
 };
 
+}  // namespace
+
+// We have to define the mapping function outside the anonymous namespace in order to access private
+// members of the DocumentSourceMock class.
+boost::intrusive_ptr<exec::agg::Stage> documentSourceTrackingMockToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSource) {
+    auto* dsMock = dynamic_cast<DocumentSourceTrackingMock*>(documentSource.get());
+
+    tassert(10812602, "expected 'DocumentSourceTrackingMock' type", dsMock);
+
+    return make_intrusive<TrackingMockStage>(
+        dsMock->kStageName, dsMock->getExpCtx(), dsMock->_results);
+}
+
+namespace {
+
+REGISTER_AGG_STAGE_MAPPING(trackingMockStage,
+                           mongo::DocumentSourceTrackingMock::id,
+                           documentSourceTrackingMockToStageFn)
 /**
  * Test that when we have memory tracking turned on, queries producing memory statistics will
  * transfer OperationMemoryUsageTracker to the cursor between the initial request and subsequent
@@ -272,22 +566,28 @@ TEST_F(RunAggregateTest, MemoryTrackerWithinSubpipelineIsProperlyDestroyedOnKill
     auto cursorsKilled = res["cursorsKilled"].Array();
     ASSERT_TRUE(cursorsKilled.size() == 1 && cursorsKilled[0].Long() == cursorId);
 }
-}  // namespace
 
-// We have to define the mapping function outside the anonymous namespace in order to access private
-// members of the DocumentSourceMock class.
-boost::intrusive_ptr<exec::agg::Stage> documentSourceTrackingMockToStageFn(
-    const boost::intrusive_ptr<DocumentSource>& documentSource) {
-    auto* dsMock = dynamic_cast<DocumentSourceTrackingMock*>(documentSource.get());
-
-    tassert(10812602, "expected 'DocumentSourceTrackingMock' type", dsMock);
-
-    return make_intrusive<TrackingMockStage>(
-        dsMock->kStageName, dsMock->getExpCtx(), dsMock->_results);
+TEST_F(RunAggregateTest, ExchangePipelineAndMemoryTrackingWorks1Consumer) {
+    runExchangeMemoryTrackingTest({
+        .nConsumers = 1,
+        .nTotalDocs = 5,
+    });
 }
 
-REGISTER_AGG_STAGE_MAPPING(trackingMockStage,
-                           mongo::DocumentSourceTrackingMock::id,
-                           documentSourceTrackingMockToStageFn)
+TEST_F(RunAggregateTest, ExchangePipelineAndMemoryTrackingWorksNConsumers) {
+    runExchangeMemoryTrackingTest({
+        .nConsumers = 5,
+        .nTotalDocs = 500,
+    });
+}
 
+TEST_F(RunAggregateTest, ExchangePipelineAndMemoryTrackingWorksNConsumersWithError) {
+    runExchangeMemoryTrackingTest({
+        .nConsumers = 5,
+        .nTotalDocs = 500,
+        .errorOffset = 400,
+    });
+}
+
+}  // namespace
 }  // namespace mongo

@@ -36,6 +36,7 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
@@ -114,7 +115,9 @@ public:
 constexpr size_t Exchange::kMaxBufferSize;
 constexpr size_t Exchange::kMaxNumberConsumers;
 
-Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<mongo::Pipeline> pipeline)
+Exchange::Exchange(OperationContext* opCtx,
+                   ExchangeSpec spec,
+                   std::unique_ptr<mongo::Pipeline> pipeline)
     : _spec(std::move(spec)),
       _pipeline(std::move(pipeline)),
       _execPipeline{buildPipeline(_pipeline->freeze())},
@@ -125,7 +128,8 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<mongo::Pipeline> pipeline)
       _consumerIds(extractConsumerIds(_spec.getConsumerIds(), _spec.getConsumers())),
       _policy(_spec.getPolicy()),
       _orderPreserving(_spec.getOrderPreserving()),
-      _maxBufferSize(_spec.getBufferSize()) {
+      _maxBufferSize(_spec.getBufferSize()),
+      _memoryTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx)) {
     uassert(50901, "Exchange must have at least one consumer", _spec.getConsumers() > 0);
 
     uassert(50951,
@@ -271,6 +275,23 @@ void Exchange::unblockLoading(size_t consumerId) {
         _haveBufferSpace.notify_all();
     }
 }
+
+void Exchange::attachContext(OperationContext* opCtx, size_t consumerId) {
+    _pipeline->reattachToOperationContext(opCtx);
+    _execPipeline->reattachToOperationContext(opCtx);
+    if (consumerId == 0) {
+        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(_memoryTracker));
+    }
+}
+
+void Exchange::detachContext(OperationContext* opCtx, size_t consumerId) {
+    if (consumerId == 0) {
+        _memoryTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+    }
+    _execPipeline->detachFromOperationContext();
+    _pipeline->detachFromOperationContext();
+}
+
 DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                                                 size_t consumerId,
                                                 ResourceYielder* resourceYielder) {
@@ -297,19 +318,22 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
 
         // There is not any document so try to load more from the source.
         if (_loadingThreadId == kInvalidThreadId) {
-            LOGV2_DEBUG(
-                20896, 3, "A consumer {consumerId} begins loading", "consumerId"_attr = consumerId);
+            LOGV2_DEBUG(20896, 3, "A consumer begins loading", "consumerId"_attr = consumerId);
 
+            attachContext(opCtx, consumerId);
+            // From this point forward, we need to call detachContext(), no matter what. RAII
+            // helpers like ScopeGuard are not appropriate here because detaching may throw from a
+            // destructor, which can cause std::terminate() to be called if we are already
+            // unwinding. Instead, we call detachContext() below the try/catch for the happy path,
+            // and also inside the catch block if an exception was raised.
             try {
                 // This consumer won the race and will fill the buffers.
                 _loadingThreadId = consumerId;
 
-                _execPipeline->reattachToOperationContext(opCtx);
-                _pipeline->reattachToOperationContext(opCtx);
 
-                // This will return when some exchange buffer is full and we cannot make any forward
-                // progress anymore.
-                // The return value is an index of a full consumer buffer.
+                // This will execute the subpipeline and return when some exchange buffer is full
+                // and we cannot make any forward progress anymore. The return value is an index of
+                // a full consumer buffer.
                 size_t fullConsumerId = loadNextBatch();
 
                 if (MONGO_unlikely(exchangeFailLoadNextBatch.shouldFail())) {
@@ -318,17 +342,19 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                               "Asserting on loading the next batch due to failpoint.");
                 }
 
-                _execPipeline->detachFromOperationContext();
-                _pipeline->detachFromOperationContext();
-
                 // The loading cannot continue until the consumer with the full buffer consumes some
                 // documents.
                 _loadingThreadId = fullConsumerId;
-
-                // Wake up everybody and try to make some progress.
-                _haveBufferSpace.notify_all();
             } catch (const DBException& ex) {
                 _errorInLoadNextBatch = ex.toStatus();
+
+                LOGV2_DEBUG(10878900,
+                            3,
+                            "Exchange failed while loading the next batch",
+                            "error"_attr = ex.toStatus());
+
+                // If this happens to throw, the original exception will be lost.
+                detachContext(opCtx, consumerId);
 
                 // We have to wake up all other blocked threads so they can detect the error and
                 // fail too. They can be woken up only after _errorInLoadNextBatch has been set.
@@ -336,6 +362,12 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
 
                 throw;
             }
+
+            detachContext(opCtx, consumerId);
+
+            // Wake up everybody and try to make some progress.
+            _haveBufferSpace.notify_all();
+
         } else {
             // Some other consumer is already loading the buffers. There is nothing else we can do
             // but wait.
@@ -435,12 +467,30 @@ size_t Exchange::getTargetConsumer(const Document& input) {
     return cid;
 }
 
+void Exchange::updateMemoryTrackingForDispose(OperationContext* opCtx) {
+    // opCtx might be null here if we are disposing outside of an operation. E.g., when the server
+    // shuts down and we are deleting the CursorManager.
+    if (_memoryTracker && opCtx) {
+        OperationMemoryUsageTracker* tracker = _memoryTracker.get();
+        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(_memoryTracker));
+        tracker->propagateStatsToCurOp();
+        // We need the operation memory tracker to stay alive until all consumers have finished, and
+        // dispose has been called for all of the Exchange stage's source stages. So, reattach it to
+        // the Exchange object now.
+        _memoryTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+    }
+}
+
 void Exchange::dispose(OperationContext* opCtx, size_t consumerId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     invariant(_disposeRunDown < getConsumers());
 
     ++_disposeRunDown;
+
+    if (consumerId == 0) {
+        updateMemoryTrackingForDispose(opCtx);
+    }
 
     // If _errorInLoadNextBatch status is not OK then an exception was thrown. In that case the
     // throwing thread will do the dispose.
