@@ -46,8 +46,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         load_all_extensions=False,
         set_cluster_parameter=None,
         inject_catalog_metadata=None,
-        shard_replset_name_prefix = "shard-rs",
-        configsvr_replset_name = "config-rs",
+        shard_replset_name_prefix="shard-rs",
+        configsvr_replset_name="config-rs",
     ):
         """
         Initialize ShardedClusterFixture with different options for the cluster processes.
@@ -68,10 +68,13 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {})
         )
-        
-        if load_all_extensions:
-            self.fixturelib.load_all_extensions(self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger, self.mongos_options)
-        
+
+        self.load_all_extensions = load_all_extensions
+        if self.load_all_extensions:
+            self.fixturelib.load_all_extensions(
+                self.config.EVERGREEN_TASK_ID, self.mongod_options, self.logger, self.mongos_options
+            )
+
         self.mongod_executable = mongod_executable
         self.mongod_options["set_parameters"] = self.fixturelib.make_historic(
             mongod_options.get("set_parameters", {})
@@ -384,6 +387,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def _do_teardown(self, mode=None):
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
+
+        if self.load_all_extensions:
+            self.fixturelib.delete_extension_conf_dir()
 
         running_at_start = self.is_running()
         if not running_at_start:

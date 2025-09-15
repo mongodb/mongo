@@ -32,8 +32,9 @@ if [[ -n "${EXTENSION_NAME}" ]]; then
     echo "extension_paths: \"${EXTENSION_PATH}\"" >"${TOP_LEVEL_DIR}/extension_paths.yml"
 else
     echo "EXTENSION_NAME not provided. Finding all unpacked extensions."
+    # TODO SERVER-110634: Remove exclusions once parse_options and test_options can generate .conf files.
     # Find all *_mongo_extension.so files and create a comma-separated list.
-    EXTENSIONS_LIST=$(find "${LIB_SRC}" -name "*_mongo_extension.so" | paste -sd, -)
+    EXTENSIONS_LIST=$(find "${LIB_SRC}" -name "*_mongo_extension.so" -not -name "libparse_options_mongo_extension.so" -not -name "libtest_options_mongo_extension.so" | paste -sd, -)
 
     if [[ -z "${EXTENSIONS_LIST}" ]]; then
         echo "Error: Could not find any extracted extension files."
