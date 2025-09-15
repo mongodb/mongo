@@ -23,6 +23,8 @@ last-continuous:
   all:
     - test_file: jstests/core/index/elemmatch_index.js
       ticket: SERVER-108945
+    - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
+      ticket: SERVER-107819
     - test_file: jstests/sharding/bulk_shard_insert.js
       ticket: SERVER-108065
     - test_file: jstests/sharding/flush_resharding_state_change_errors.js
@@ -508,6 +510,8 @@ last-lts:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
       ticket: SERVER-99618
+    - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
+      ticket: SERVER-107819
     - test_file: jstests/sharding/check_metadata_consistency.js
       ticket: SERVER-98664
     - test_file: jstests/core/timeseries/query/bucket_unpacking_with_limit.js

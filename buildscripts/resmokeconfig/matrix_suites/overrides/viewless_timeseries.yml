@@ -129,6 +129,7 @@
         - jstests/noPassthrough/cluster_scalability_misc/move_collection_create_options.js
         - jstests/noPassthrough/crud/bulk_write_metrics.js
         - jstests/noPassthrough/crud/vectored_insert_no_oplog_hole.js
+        - jstests/noPassthrough/ddl/coll_mod_concurrent_index_build.js
         - jstests/noPassthrough/global_catalog/shareded_data_distribution_orphan_docs.js
         - jstests/noPassthrough/index_builds/create_indexes_return_on_start.js
         - jstests/noPassthrough/logging/log_collectionType.js
@@ -147,6 +148,7 @@
         - jstests/noPassthrough/cluster_scalability_misc/move_collection_create_options.js
         - jstests/noPassthrough/crud/bulk_write_metrics.js
         - jstests/noPassthrough/crud/vectored_insert_no_oplog_hole.js
+        - jstests/noPassthrough/ddl/coll_mod_concurrent_index_build.js
         - jstests/noPassthrough/global_catalog/shareded_data_distribution_orphan_docs.js
         - jstests/noPassthrough/index_builds/create_indexes_return_on_start.js
         - jstests/noPassthrough/move_collection_not_tracked.js
