@@ -555,6 +555,17 @@ public:
      */
     void checkValidOperationContext() const;
 
+    void setTranslated() {
+        tassert(10687600,
+                "Pipeline has already been translated for viewless time series",
+                !_translatedForViewlessTimeseries);
+        _translatedForViewlessTimeseries = true;
+    }
+
+    bool isTranslated() const {
+        return _translatedForViewlessTimeseries;
+    }
+
 private:
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
     Pipeline(DocumentSourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
@@ -579,6 +590,10 @@ private:
 
     // Do not allow modifications of this pipeline.
     bool _frozen{false};
+
+    // Tracks translation status. E.g. if coll is a viewless timeseries and the pipeline doesn't
+    // operate on raw data.
+    bool _translatedForViewlessTimeseries{false};
 };
 
 using PipelinePtr = std::unique_ptr<Pipeline>;
