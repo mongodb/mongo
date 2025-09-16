@@ -286,7 +286,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(ArityTy
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinObjectToArray(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080026, "Unexpected arity value", arity == 1);
 
     auto [objOwned, objTag, objVal] = getFromStack(0);
 

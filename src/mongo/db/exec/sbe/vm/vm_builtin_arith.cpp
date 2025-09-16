@@ -34,7 +34,7 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAbs(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080079, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -42,7 +42,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAbs(ArityType ar
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCeil(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080078, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -50,7 +50,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCeil(ArityType a
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFloor(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080077, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -58,7 +58,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFloor(ArityType 
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExp(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080076, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -66,7 +66,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExp(ArityType ar
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinLn(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080075, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -74,7 +74,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinLn(ArityType ari
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinLog10(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080074, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -82,7 +82,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinLog10(ArityType 
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSqrt(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080073, "Unexpected arity value", arity == 1);
 
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
@@ -90,7 +90,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSqrt(ArityType a
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinPow(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080072, "Unexpected arity value", arity == 2);
     auto [baseOwned, baseTag, baseValue] = getFromStack(0);
     auto [exponentOwned, exponentTag, exponentValue] = getFromStack(1);
 
@@ -255,7 +255,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericRoundTrunc(
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::scalarRoundTrunc(
     std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity) {
-    invariant(arity == 1 || arity == 2);
+    tassert(11080071, "Unexpected arity value", arity == 1 || arity == 2);
     int32_t place = 0;
     const auto [_, numTag, numVal] = getFromStack(0);
     if (arity == 2) {
@@ -283,7 +283,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType 
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(ArityType arity) {
-    invariant(arity >= 1);
+    tassert(11080070, "Unexpected arity value", arity >= 1);
 
     value::TypeTags resultTag = value::TypeTags::NumberInt32;
     bool haveDate = false;
@@ -378,7 +378,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConvertSimpleSumToDoubleDoubleSum(
     ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080069, "Unexpected arity value", arity == 1);
     auto [_, simpleSumTag, simpleSumVal] = getFromStack(0);
     return builtinConvertSimpleSumToDoubleDoubleSumImpl(simpleSumTag, simpleSumVal);
 }

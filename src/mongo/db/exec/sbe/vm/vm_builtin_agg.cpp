@@ -971,7 +971,7 @@ int32_t aggMinMaxN(value::Array* state,
 
 template <AccumulatorMinMaxN::MinMaxSense S>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxN(ArityType arity) {
-    invariant(arity == 2 || arity == 3);
+    tassert(11080087, "Unexpected arity value", arity == 2 || arity == 3);
 
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
@@ -1005,7 +1005,7 @@ ByteCode::builtinAggMinMaxN<(AccumulatorMinMax::Sense)1>(ArityType arity);
 
 template <AccumulatorMinMaxN::MinMaxSense S>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNMerge(ArityType arity) {
-    invariant(arity == 2 || arity == 3);
+    tassert(11080086, "Unexpected arity value", arity == 2 || arity == 3);
 
     auto [mergeStateTag, mergeStateVal] = moveOwnedFromStack(0);
     value::ValueGuard mergeStateGuard{mergeStateTag, mergeStateVal};
@@ -1050,7 +1050,7 @@ ByteCode::builtinAggMinMaxNMerge<(AccumulatorMinMax::Sense)1>(ArityType arity);
 template <AccumulatorMinMaxN::MinMaxSense S>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinalize(
     ArityType arity) {
-    invariant(arity == 2 || arity == 1);
+    tassert(11080085, "Unexpected arity value", arity == 2 || arity == 1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
 
@@ -1237,7 +1237,7 @@ FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
 }  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankColl(ArityType arity) {
-    invariant(arity == 4);
+    tassert(11080084, "Unexpected arity value", arity == 4);
     auto [collatorOwned, collatorTag, collatorVal] = getFromStack(3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
@@ -1264,7 +1264,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankColl(Arit
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRank(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080083, "Unexpected arity value", arity == 3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
@@ -1279,7 +1279,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRank(Ari
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRank(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080082, "Unexpected arity value", arity == 3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
@@ -1294,7 +1294,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRank(ArityTyp
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRankColl(ArityType arity) {
-    invariant(arity == 4);
+    tassert(11080081, "Unexpected arity value", arity == 4);
     auto [collatorOwned, collatorTag, collatorVal] = getFromStack(3);
     auto [isAscendingOwned, isAscendingTag, isAscendingVal] = getFromStack(2);
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
@@ -1321,7 +1321,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRankColl
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankFinalize(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080080, "Unexpected arity value", arity == 1);
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
     auto [state, lastValue, lastValueIsNothing, lastRank, sameRankCount, sortSpec] =
         rankState(stateTag, stateVal);

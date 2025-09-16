@@ -45,7 +45,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHash(ArityType a
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardHash(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080027, "Unexpected arity value", arity == 1);
 
     auto [ownedShardKey, shardKeyTag, shardKeyValue] = getFromStack(0);
 

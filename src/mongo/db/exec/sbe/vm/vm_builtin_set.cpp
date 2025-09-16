@@ -372,7 +372,7 @@ FastTuple<bool, value::TypeTags, value::Value> setIsSubset(
 }  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnion(ArityType arity) {
-    invariant(arity >= 1);
+    tassert(11080016, "Unexpected arity value", arity >= 1);
 
     auto [_, collTag, collVal] = getFromStack(0);
     if (collTag != value::TypeTags::collator) {
@@ -413,7 +413,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(ArityTy
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIntersection(
     ArityType arity) {
-    invariant(arity >= 1);
+    tassert(11080015, "Unexpected arity value", arity >= 1);
 
     auto [_, collTag, collVal] = getFromStack(0);
     if (collTag != value::TypeTags::collator) {
@@ -454,7 +454,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection(
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetDifference(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080014, "Unexpected arity value", arity == 3);
 
     auto [_, collTag, collVal] = getFromStack(0);
     if (collTag != value::TypeTags::collator) {
@@ -472,7 +472,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetDifferenc
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetEquals(ArityType arity) {
-    invariant(arity >= 3);
+    tassert(11080013, "Unexpected arity value", arity >= 3);
 
     auto [_, collTag, collVal] = getFromStack(0);
     if (collTag != value::TypeTags::collator) {
@@ -510,7 +510,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIsSubset(
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080012, "Unexpected arity value", arity == 2);
 
     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(1);
@@ -523,7 +523,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(Ar
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetEquals(ArityType arity) {
-    invariant(arity >= 2);
+    tassert(11080011, "Unexpected arity value", arity >= 2);
 
     std::vector<value::TypeTags> argTags;
     std::vector<value::Value> argVals;
@@ -551,7 +551,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIsSubset(Arit
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetToArray(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080010, "Unexpected arity value", arity == 1);
 
     auto [owned, tag, val] = getFromStack(0);
 

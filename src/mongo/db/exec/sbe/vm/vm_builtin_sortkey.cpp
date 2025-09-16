@@ -34,7 +34,7 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 std::pair<SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityType arity) {
-    invariant(arity == 2 || arity == 3);
+    tassert(11080009, "Unexpected arity value", arity == 2 || arity == 3);
 
     auto [ssOwned, ssTag, ssVal] = getFromStack(0);
     auto [objOwned, objTag, objVal] = getFromStack(1);
@@ -97,7 +97,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorGetElement(
     ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080008, "Unexpected arity value", arity == 2);
 
     auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
     auto [idxOwned, idxTag, idxVal] = getFromStack(1);
@@ -116,7 +116,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorToArray(
     ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080007, "Unexpected arity value", arity == 1);
 
     auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
     if (sortVecTag != value::TypeTags::sortKeyComponentVector) {
@@ -200,7 +200,7 @@ std::pair<value::TypeTags, value::Value> builtinGetSortKeyImpl(value::TypeTags i
 
 template <bool IsAscending, bool IsLeaf>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey(ArityType arity) {
-    invariant(arity == 1 || arity == 2);
+    tassert(11080006, "Unexpected arity value", arity == 1 || arity == 2);
 
     CollatorInterface* collator = nullptr;
     if (arity == 2) {

@@ -131,7 +131,7 @@ FastTuple<bool, value::TypeTags, value::Value> genericPcreRegexSingleMatch(
 }  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080022, "Unexpected arity value", arity == 2);
 
     auto [patternOwned, patternTypeTag, patternValue] = getFromStack(0);
     auto [optionsOwned, optionsTypeTag, optionsValue] = getFromStack(1);
@@ -152,7 +152,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(Ari
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080021, "Unexpected arity value", arity == 2);
     auto [ownedPcreRegex, tagPcreRegex, valPcreRegex] = getFromStack(0);
     auto [ownedInputStr, tagInputStr, valInputStr] = getFromStack(1);
 
@@ -178,7 +178,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(Arity
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFind(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080020, "Unexpected arity value", arity == 2);
     auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
     auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
 
@@ -187,7 +187,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFind(ArityT
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080019, "Unexpected arity value", arity == 2);
     auto [ownedPcre, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
     auto [ownedStr, typeTagInputStr, valueInputStr] = getFromStack(1);
 
@@ -246,7 +246,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ari
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexPattern(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080018, "Unexpected arity value", arity == 1);
     auto [regexOwned, regexType, regexValue] = getFromStack(0);
 
     if (regexType != value::TypeTags::bsonRegex) {
@@ -260,7 +260,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexPattern(
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080017, "Unexpected arity value", arity == 1);
     auto [regexOwned, regexType, regexValue] = getFromStack(0);
 
     if (regexType != value::TypeTags::bsonRegex) {

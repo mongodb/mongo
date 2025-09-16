@@ -390,7 +390,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::Typ
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080068, "Unexpected arity value", arity == 2);
     auto [_, exprTag, exprVal] = getFromStack(0);
     auto [__, arrTag, arrVal] = getFromStack(1);
 
@@ -398,7 +398,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityTy
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080067, "Unexpected arity value", arity == 3);
     auto [_, exprTag, exprVal] = getFromStack(0);
     auto [__, arrTag, arrVal] = getFromStack(1);
 
@@ -526,7 +526,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(
 }  // ByteCode::builtinExtractSubArray
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080066, "Unexpected arity value", arity == 1);
     auto [arrayOwned, arrayType, arrayValue] = getFromStack(0);
 
     if (!value::isArray(arrayType)) {
@@ -547,7 +547,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(Ari
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080065, "Unexpected arity value", arity == 1);
     auto [inputOwned, inputType, inputVal] = getFromStack(0);
 
     if (!value::isArray(inputType)) {
@@ -608,7 +608,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
 }  // ByteCode::builtinReverseArray
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityType arity) {
-    invariant(arity == 2 || arity == 3);
+    tassert(11080064, "Unexpected arity value", arity == 2 || arity == 3);
     auto [inputOwned, inputType, inputVal] = getFromStack(0);
 
     if (!value::isArray(inputType)) {
@@ -699,7 +699,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityT
 }  // ByteCode::builtinSortArray
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080063, "Unexpected arity value", arity == 1);
 
     auto [arrOwned, arrTag, arrVal] = getFromStack(0);
 
@@ -855,7 +855,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinOfArray(Arity
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::maxMinArrayHelper(ArityType arity,
                                                                            bool isMax) {
-    invariant(arity == 1);
+    tassert(11080062, "Unexpected arity value", arity == 1);
 
     auto [arrOwned, arrTag, arrVal] = getFromStack(0);
 
@@ -896,7 +896,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStdDevSamp(Arity
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::stdDevHelper(ArityType arity,
                                                                       bool isSamp) {
-    invariant(arity == 1);
+    tassert(11080061, "Unexpected arity value", arity == 1);
     auto [arrOwned, arrTag, arrVal] = getFromStack(0);
     if (!value::isArray(arrTag)) {
         return {false, value::TypeTags::Nothing, 0};
@@ -956,7 +956,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSumOfArray(Arity
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::avgOrSumOfArrayHelper(ArityType arity,
                                                                                bool isAvg) {
-    invariant(arity == 1);
+    tassert(11080060, "Unexpected arity value", arity == 1);
     auto [arrOwned, arrTag, arrVal] = getFromStack(0);
 
     if (!value::isArray(arrTag)) {
@@ -991,7 +991,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::avgOrSumOfArrayHelper(A
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinUnwindArray(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080059, "Unexpected arity value", arity == 1);
 
     auto [arrOwned, arrTag, arrVal] = getFromStack(0);
 
@@ -1028,7 +1028,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinUnwindArray(Arit
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToSet(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080058, "Unexpected arity value", arity == 1);
     auto [arrOwned, arrTag, arrVal] = getFromStack(0);
 
     if (!value::isArray(arrTag)) {
@@ -1056,7 +1056,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToSet(Arity
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollArrayToSet(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080057, "Unexpected arity value", arity == 2);
 
     auto [_, collTag, collVal] = getFromStack(0);
     if (collTag != value::TypeTags::collator) {

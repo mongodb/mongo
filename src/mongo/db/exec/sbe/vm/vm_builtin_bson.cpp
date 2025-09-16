@@ -33,7 +33,7 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTypeMatch(ArityType arity) {
-    invariant(arity == 2);
+    tassert(11080053, "Unexpected arity value", arity == 2);
 
     auto [inputOwn, inputTag, inputVal] = getFromStack(0);
     auto [typeMaskOwn, typeMaskTag, typeMaskVal] = getFromStack(1);
@@ -49,7 +49,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTypeMatch(ArityT
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFillType(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080052, "Unexpected arity value", arity == 3);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(0);
     auto [typeMaskOwned, typeMaskTag, typeMaskVal] = getFromStack(1);

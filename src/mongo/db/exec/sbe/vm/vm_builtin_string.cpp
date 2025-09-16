@@ -71,7 +71,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSplit(ArityType 
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080005, "Unexpected arity value", arity == 3);
 
     auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(0);
     auto [ownedFindStr, typeTagFindStr, valueFindStr] = getFromStack(1);
@@ -111,7 +111,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(Arity
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080004, "Unexpected arity value", arity == 1);
 
     auto [_, operandTag, operandVal] = getFromStack(0);
 
@@ -127,7 +127,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(Arit
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080003, "Unexpected arity value", arity == 1);
 
     auto [_, operandTag, operandVal] = getFromStack(0);
 
@@ -143,7 +143,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityTy
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080002, "Unexpected arity value", arity == 3);
 
     auto [strOwned, strTag, strVal] = getFromStack(0);
     auto [startIndexOwned, startIndexTag, startIndexVal] = getFromStack(1);
@@ -188,7 +188,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(Arit
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrCP(ArityType arity) {
-    invariant(arity == 3);
+    tassert(11080001, "Unexpected arity value", arity == 3);
 
     auto [strOwned, strTag, strVal] = getFromStack(0);
     auto [startIndexOwned, startIndexTag, startIndexVal] = getFromStack(1);
@@ -482,7 +482,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValidateFromStri
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHasNullBytes(ArityType arity) {
-    invariant(arity == 1);
+    tassert(11080000, "Unexpected arity value", arity == 1);
     auto [strOwned, strType, strValue] = getFromStack(0);
 
     if (!value::isString(strType)) {
