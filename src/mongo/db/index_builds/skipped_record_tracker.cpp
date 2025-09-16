@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -94,7 +96,9 @@ void SkippedRecordTracker::keepTemporaryTable() {
     }
 }
 
-void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recordId) {
+void SkippedRecordTracker::record(OperationContext* opCtx,
+                                  const CollectionPtr& coll,
+                                  const RecordId& recordId) {
     BSONObjBuilder builder;
     recordId.serializeToken(kRecordIdField, &builder);
     BSONObj toInsert = builder.obj();
@@ -109,13 +113,46 @@ void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recor
     writeConflictRetry(
         opCtx, "recordSkippedRecordTracker", NamespaceString::kIndexBuildEntryNamespace, [&]() {
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(_skippedRecordsTable->rs()
-                                ->insertRecord(opCtx,
-                                               *shard_role_details::getRecoveryUnit(opCtx),
-                                               toInsert.objdata(),
-                                               toInsert.objsize(),
-                                               Timestamp::min())
-                                .getStatus());
+            // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+            auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            if (fcvSnapshot.isVersionInitialized() &&
+                feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                LOGV2_DEBUG(
+                    10966701,
+                    1,
+                    "Index build: writing to skipped record tracker container for primary-driven "
+                    "index build.");
+
+                // We guarantee that the container is an integer container because the skipped
+                // record tracker initialized above has KeyFormat::Long.
+                invariant(_skippedRecordsTable->rs()->keyFormat() == KeyFormat::Long);
+                IntegerKeyedContainer& container =
+                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                        _skippedRecordsTable->rs()->getContainer())
+                        .get();
+
+                std::vector<RecordId> reservedRidBlock;
+                _skippedRecordsTable->rs()->reserveRecordIds(
+                    opCtx, *shard_role_details::getRecoveryUnit(opCtx), &reservedRidBlock, 1);
+                invariant(reservedRidBlock.size() == 1);
+
+                uassertStatusOK(container_write::insert(
+                    opCtx,
+                    *shard_role_details::getRecoveryUnit(opCtx),
+                    coll,
+                    container,
+                    reservedRidBlock[0].getLong(),
+                    std::span<const char>(toInsert.objdata(), toInsert.objsize())));
+            } else {
+                uassertStatusOK(_skippedRecordsTable->rs()
+                                    ->insertRecord(opCtx,
+                                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                                   toInsert.objdata(),
+                                                   toInsert.objsize(),
+                                                   Timestamp::min())
+                                    .getStatus());
+            }
             wuow.commit();
         });
 }

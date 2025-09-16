@@ -79,7 +79,7 @@ public:
      * conclusion of the build, the key generation and insertion into the index should be attempted
      * again by calling 'retrySkippedRecords'.
      */
-    void record(OperationContext* opCtx, const RecordId& recordId);
+    void record(OperationContext* opCtx, const CollectionPtr& coll, const RecordId& recordId);
 
     /**
      * Keeps the temporary table managed by this tracker. This is a no-op when the table is empty or
@@ -117,7 +117,6 @@ public:
 private:
     std::string _ident;
 
-    // This temporary record store is owned by the duplicate key tracker.
     std::unique_ptr<TemporaryRecordStore> _skippedRecordsTable;
 
     AtomicWord<std::uint32_t> _skippedRecordCounter{0};

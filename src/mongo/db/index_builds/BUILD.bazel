@@ -205,6 +205,7 @@ mongo_cc_library(
         ":index_builds_common",
         ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/local_catalog/lock_manager:exception_util",
         "//src/mongo/db/repl:repl_coordinator_interface",

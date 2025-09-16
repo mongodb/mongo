@@ -130,7 +130,8 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsa
     return (maxTotalIndexBuildMemoryBytes / numIndexSpecs);
 }
 
-auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
+auto makeOnSuppressedErrorFn(const CollectionPtr& coll,
+                             const std::function<void()>& saveCursorBeforeWrite,
                              const std::function<void()>& restoreCursorAfterWrite) {
 
     return [&](OperationContext* opCtx,
@@ -156,7 +157,7 @@ auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
             // internally and causes the cursor to be unpositioned.
 
             saveCursorBeforeWrite();
-            interceptor->getSkippedRecordTracker()->record(opCtx, loc.value());
+            interceptor->getSkippedRecordTracker()->record(opCtx, coll, loc.value());
             restoreCursorAfterWrite();
         }
     };
@@ -766,8 +767,8 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     // Callback to handle writing to the side table in case an error is suppressed, it is
     // constructed using the above callbacks to ensure the cursor is well positioned after the
     // write.
-    const auto onSuppressedError =
-        makeOnSuppressedErrorFn(saveCursorBeforeWrite, restoreCursorAfterWrite);
+    const auto onSuppressedError = makeOnSuppressedErrorFn(
+        collection.getCollectionPtr(), saveCursorBeforeWrite, restoreCursorAfterWrite);
 
     RecordId loc;
     PlanExecutor::ExecState state;
@@ -830,7 +831,7 @@ Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(
     const std::function<void()>& saveCursorBeforeWrite,
     const std::function<void()>& restoreCursorAfterWrite) {
     const auto onSuppressedError =
-        makeOnSuppressedErrorFn(saveCursorBeforeWrite, restoreCursorAfterWrite);
+        makeOnSuppressedErrorFn(collection, saveCursorBeforeWrite, restoreCursorAfterWrite);
     return _insert(opCtx, collection, doc, loc, onSuppressedError);
 }
 
