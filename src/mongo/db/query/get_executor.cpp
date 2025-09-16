@@ -1285,6 +1285,11 @@ bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery&
         return false;
     }
 
+    // Tailable and resumed scans are not supported either.
+    if (expCtx->isTailable() || cq.getFindCommandRequest().getRequestResumeToken()) {
+        return false;
+    }
+
     const auto& nss = cq.nss();
 
     const auto isTimeseriesColl = collection && collection->isTimeseriesCollection();

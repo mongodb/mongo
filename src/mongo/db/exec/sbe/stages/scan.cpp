@@ -79,7 +79,6 @@ ScanStage::ScanStage(UUID collUuid,
                      boost::optional<value::SlotId> indexIdentSlot,
                      boost::optional<value::SlotId> indexKeySlot,
                      boost::optional<value::SlotId> indexKeyPatternSlot,
-                     boost::optional<value::SlotId> oplogTsSlot,
                      std::vector<std::string> scanFieldNames,
                      value::SlotVector scanFieldSlots,
                      boost::optional<value::SlotId> seekRecordIdSlot,
@@ -93,8 +92,7 @@ ScanStage::ScanStage(UUID collUuid,
                      bool useRandomCursor,
                      bool participateInTrialRunTracking,
                      bool includeScanStartRecordId,
-                     bool includeScanEndRecordId,
-                     bool tolerateKeyNotFound)
+                     bool includeScanEndRecordId)
     : PlanStage(seekRecordIdSlot ? "seek"_sd : "scan"_sd,
                 yieldPolicy,
                 nodeId,
@@ -108,7 +106,6 @@ ScanStage::ScanStage(UUID collUuid,
                                               indexIdentSlot,
                                               indexKeySlot,
                                               indexKeyPatternSlot,
-                                              oplogTsSlot,
                                               scanFieldNames,
                                               scanFieldSlots,
                                               seekRecordIdSlot,
@@ -116,8 +113,7 @@ ScanStage::ScanStage(UUID collUuid,
                                               maxRecordIdSlot,
                                               forward,
                                               scanCallbacks,
-                                              useRandomCursor,
-                                              tolerateKeyNotFound)),
+                                              useRandomCursor)),
       _includeScanStartRecordId(includeScanStartRecordId),
       _includeScanEndRecordId(includeScanEndRecordId) {
     invariant(!seekRecordIdSlot || forward);
@@ -163,12 +159,6 @@ void ScanStage::prepare(CompileCtx& ctx) {
         uassert(4822815,
                 str::stream() << "duplicate field: " << _state->scanFieldSlots[idx],
                 insertedRename);
-
-        if (_state->oplogTsSlot &&
-            _state->scanFieldNames[idx] == repl::OpTime::kTimestampFieldName) {
-            // Oplog scans only: cache a pointer to the "ts" field accessor for fast access.
-            _tsFieldAccessor = accessorPtr;
-        }
     }
 
     if (_state->seekRecordIdSlot) {
@@ -199,10 +189,6 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _indexKeyPatternAccessor = ctx.getAccessor(*(_state->indexKeyPatternSlot));
     }
 
-    if (_state->oplogTsSlot) {
-        _oplogTsAccessor = ctx.getRuntimeEnvAccessor(*(_state->oplogTsSlot));
-    }
-
     // No-op if using acquisition.
     _coll.acquireCollection(_opCtx, _state->dbName, _state->collUuid);
 }
@@ -214,10 +200,6 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
 
     if (_state->recordIdSlot && *(_state->recordIdSlot) == slot) {
         return &_recordIdAccessor;
-    }
-
-    if (_state->oplogTsSlot && *(_state->oplogTsSlot) == slot) {
-        return _oplogTsAccessor;
     }
 
     if (auto it = _scanFieldAccessorsMap.find(slot); it != _scanFieldAccessorsMap.end()) {
@@ -475,13 +457,9 @@ PlanState ScanStage::getNext() {
                                      "the collection: "
                                   << _seekRecordId);
                 }
-                if (_state->tolerateKeyNotFound) {
-                    nextRecord = _cursor->seek(_seekRecordId,
-                                               SeekableRecordCursor::BoundInclusion::kInclude);
-                } else {
-                    doSeekExact = true;
-                    nextRecord = _cursor->seekExact(_seekRecordId);
-                }
+
+                doSeekExact = true;
+                nextRecord = _cursor->seekExact(_seekRecordId);
             } else if (_minRecordIdAccessor && _state->forward) {
                 // The range may be exclusive of the start record.
                 // Find the first record equal to _minRecordId
@@ -606,18 +584,6 @@ PlanState ScanStage::getNext() {
                 bsonElement = bson::advance(bsonElement, field.size());
             }
         }
-
-        if (_oplogTsAccessor) {
-            // Oplog scans only: if _oplogTsAccessor is set, the value of the "ts" field, if
-            // it exists in the document, will be copied to this slot for use by the clustered scan
-            // EOF filter above this stage and/or because the query asked for the latest "ts" value.
-            tassert(7097200, "Expected _tsFieldAccessor to be defined", _tsFieldAccessor);
-            auto [tag, val] = _tsFieldAccessor->getViewOfValue();
-            if (tag != value::TypeTags::Nothing) {
-                auto&& [copyTag, copyVal] = value::copyValue(tag, val);
-                _oplogTsAccessor->reset(true, copyTag, copyVal);
-            }
-        }
     }
 
     ++_specificStats.numReads;
@@ -689,9 +655,6 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 
     if (_state->seekRecordIdSlot) {
         DebugPrinter::addIdentifier(ret, _state->seekRecordIdSlot.value());
-        if (_state->tolerateKeyNotFound) {
-            DebugPrinter::addKeyword(ret, "tolerateKeyNotFound");
-        }
     }
 
     if (_state->recordSlot) {
@@ -763,8 +726,6 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     ret.emplace_back("`\"");
 
     ret.emplace_back(_state->forward ? "true" : "false");
-
-    ret.emplace_back(_oplogTsAccessor ? "true" : "false");
 
     return ret;
 }

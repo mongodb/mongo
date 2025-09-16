@@ -368,16 +368,6 @@ TEST_F(GoldenSbeStageBuilderTest, TestSkipOnly) {
     runTest(std::move(node), BSON_ARRAY(BSON("_id" << 2 << "a" << 3)));
 }
 
-TEST_F(GoldenSbeStageBuilderTest, TestCollScanTailable) {
-    createCollection(
-        {fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}"), fromjson("{_id: 2, a: 3}")},
-        BSON("a" << 1));
-
-    auto expected = BSON_ARRAY(BSON("_id" << 0 << "a" << 1)
-                               << BSON("_id" << 1 << "a" << 2) << BSON("_id" << 2 << "a" << 3));
-    runTest(getScanNode(), expected, {.tailable = true});
-}
-
 TEST_F(GoldenSbeStageBuilderTest, TestSort) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2)),

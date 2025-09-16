@@ -182,6 +182,7 @@ function runCommandAndCheckPlanCacheMetric({
     {
         command: {find: collCapped.getName(), filter: {a: 1}, comment: "query tailable", tailable: true},
         expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
+        planCacheType: "classic",
     },
     // Trivially false queries never get cached.
     {

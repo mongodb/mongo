@@ -460,7 +460,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
     DatabaseName dbName,
     bool forward,
     boost::optional<SbSlot> seekSlot,
-    bool tolerateKeyNotFound,
     std::vector<std::string> scanFieldNames,
     const SbScanBounds& scanBounds,
     const SbIndexInfoSlots& indexInfoSlots,
@@ -484,7 +483,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 lower(indexInfoSlots.indexIdentSlot),
                                                 lower(indexInfoSlots.indexKeySlot),
                                                 lower(indexInfoSlots.indexKeyPatternSlot),
-                                                lower(oplogTsSlot),
                                                 std::move(scanFieldNames),
                                                 lower(scanFieldSlots),
                                                 lower(seekSlot),
@@ -497,8 +495,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 false /* useRandomCursor */,
                                                 true /* participateInTrialRunTracking */,
                                                 scanBounds.includeScanStartRecordId,
-                                                scanBounds.includeScanEndRecordId,
-                                                tolerateKeyNotFound);
+                                                scanBounds.includeScanEndRecordId);
 
     return {std::move(scanStage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
