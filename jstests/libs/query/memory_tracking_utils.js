@@ -43,7 +43,7 @@ function assertNoMatchInLog(logLine, regex) {
  * log or profiler. The query's cursorId is used to identify the log lines or profiler entries
  * corresponding to this aggregation.
  */
-function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
+export function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
     // Retrieve the cursor.
     const aggregateCommandResult = db.runCommand(commandObj);
     const cursorId = aggregateCommandResult.cursor.id;
