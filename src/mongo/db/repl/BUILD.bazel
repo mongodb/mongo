@@ -301,6 +301,7 @@ mongo_cc_library(
         "always_allow_non_local_writes.h",
         "repl_client_info.h",
         "replication_coordinator.h",
+        "replication_coordinator_external_state.h",
         "replication_coordinator_noop.h",
     ],
     deps = [
@@ -1377,7 +1378,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "data_replicator_external_state_impl.h",
-        "replication_coordinator_external_state.h",
     ],
     deps = [
         ":oplog_application",

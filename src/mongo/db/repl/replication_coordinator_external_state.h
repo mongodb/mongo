@@ -62,7 +62,7 @@ class ReplicationCoordinator;
  * dependencies on large sections of the server code and thus break the unit testability of
  * ReplicationCoordinatorImpl should be moved here.
  */
-class MONGO_MOD_PUB ReplicationCoordinatorExternalState {
+class MONGO_MOD_OPEN ReplicationCoordinatorExternalState {
     ReplicationCoordinatorExternalState(const ReplicationCoordinatorExternalState&) = delete;
     ReplicationCoordinatorExternalState& operator=(const ReplicationCoordinatorExternalState&) =
         delete;
