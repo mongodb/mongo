@@ -35,15 +35,15 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
 
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <utility>
+
+#include <boost/filesystem.hpp>
 
 namespace mongo {
 /**
@@ -77,7 +77,7 @@ public:
     SortExecutor(SortPattern sortPattern,
                  uint64_t limit,
                  uint64_t maxMemoryUsageBytes,
-                 std::string tempDir,
+                 boost::filesystem::path tempDir,
                  bool allowDiskUse,
                  bool moveSortedDataIntoIterator = false)
         : _sortPattern(std::move(sortPattern)),
@@ -291,7 +291,7 @@ private:
     }
 
     const SortPattern _sortPattern;
-    const std::string _tempDir;
+    const boost::filesystem::path _tempDir;
     const bool _diskUseAllowed;
     const bool _moveSortedDataIntoIterator;
 

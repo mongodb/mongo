@@ -151,11 +151,10 @@ SortStageSimple::SortStageSimple(boost::intrusive_ptr<ExpressionContext> expCtx,
                                  bool addSortKeyMetadata,
                                  std::unique_ptr<PlanStage> child)
     : SortStage(expCtx, ws, sortPattern, addSortKeyMetadata, std::move(child)),
-      // TODO(SERVER-110826): Remove .string() to directly use boost::filesystem::path.
       _sortExecutor(std::move(sortPattern),
                     limit,
                     maxMemoryUsageBytes,
-                    expCtx->getTempDir().string(),
+                    expCtx->getTempDir(),
                     expCtx->getAllowDiskUse()) {}
 
 void SortStageSimple::spool(WorkingSetID wsid) {
