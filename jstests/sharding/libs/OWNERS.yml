@@ -21,6 +21,3 @@ filters:
   - "remove_shard_util.js":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "check_port.py":
-    approvers:
-      - 10gen/server-networking-and-observability

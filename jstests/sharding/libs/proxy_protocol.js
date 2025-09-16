@@ -13,7 +13,6 @@ export class ProxyProtocolServer {
 
         print("Using python interpreter: " + this.python);
         this.web_server_py = "jstests/sharding/libs/proxy_protocol_server.py";
-        this.check_port_py = "jstests/sharding/libs/check_port.py";
 
         this.pid = undefined;
         this.ingress_port = ingress_port;
@@ -62,9 +61,12 @@ export class ProxyProtocolServer {
      * Start the server.
      */
     start() {
-        const args = [
+        print("Proxy protocol server is listening on port: " + this.ingress_port);
+        print("Proxy protocol server is proxying to port: " + this.egress_port);
+
+        let args = [
             this.python,
-            "-u", // unbuffered output
+            "-u",
             this.web_server_py,
             "--service",
             this.ingress_address + ":" + this.ingress_port,
@@ -72,42 +74,32 @@ export class ProxyProtocolServer {
         ];
 
         clearRawMongoProgramOutput();
-        this.pid = _startMongoProgram({args});
 
-        // Wait for the web server to listen on the configured port.
-        let checkProgramResult, checkPortResult;
-        const timeoutMillis = 10_000;
-        const retryIntervalMillis = 500;
-        assert.soon(
-            () => {
-                checkProgramResult = checkProgram(this.pid);
-                checkPortResult = this.checkPort();
-                return checkProgramResult["alive"] && checkPortResult === 0;
-            },
-            () => {
-                if (!checkProgramResult["alive"]) {
-                    // TODO(SERVER-110719) the fuser and ps here act as diagnostics for future cases of
-                    // port collision. After more occurences of "address in use", we'll be able to
-                    // figure out which program is using the same port, and this can be removed.
-                    jsTestLog("Printing info from ports " + this.ingress_port);
-                    const commands = [
-                        ["/bin/sh", "-c", "fuser -v -n tcp " + this.ingress_port],
-                        ["/bin/sh", "-c", "ps -ef | grep " + this.ingress_port],
-                    ];
-                    commands.map((args) => _startMongoProgram({args})).map((pid) => waitProgram(pid));
-                }
-                return {checkProgramResult, checkPortResult};
-            },
-            timeoutMillis,
-            retryIntervalMillis,
-        );
+        this.pid = _startMongoProgram({args: args});
+        // We assume proxyprotocol.create_server has run (and possibly error'd) before the 3
+        // second sleep finishes. When `checkProgram` asserts true, we assume that the
+        // proxyprotocol server is up and running.
+        sleep(3000);
+        if (!checkProgram(this.pid)["alive"]) {
+            // TODO the fuser and ps here act as diagnostics for future cases of port collision.
+            // After more occurences of "address in use", we'll be able to figure out which
+            // program is using the same port, and this can be removed.
+            jsTestLog("Printing info from ports " + this.ingress_port);
+            let fuserArgs = ["/bin/sh", "-c", "fuser -v -n tcp " + this.ingress_port];
+            let psArgs = ["/bin/sh", "-c", "ps -ef | grep " + this.ingress_port];
+            _startMongoProgram({args: fuserArgs});
+            _startMongoProgram({args: psArgs});
+            // Give time for fuser to finish running.
+            sleep(3000);
+            assert(false, "Failed to create a ProxyProtocolServer.");
+        }
+
+        // Wait for the web server to start
+        assert.soon(function () {
+            return rawMongoProgramOutput(".*").search("Starting proxy protocol server...") !== -1;
+        });
 
         print("Proxy Protocol Server sucessfully started.");
-    }
-
-    checkPort() {
-        const args = [this.python, this.check_port_py, this.ingress_address, this.ingress_port];
-        return waitProgram(_startMongoProgram({args}));
     }
 
     /**

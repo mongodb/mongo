@@ -1522,7 +1522,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/libs/**/mongos_api_params_util.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/sharding/libs/**/create_sharded_collection_util.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/libs/**/remove_shard_util.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/jstests/sharding/libs/**/check_port.py @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
 /jstests/sharding/load_balancer_support/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot

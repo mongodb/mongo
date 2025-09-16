@@ -44,16 +44,11 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
         new Mongo(uri);
         assert(false, "Client was unable to connect to the load balancer port");
     } catch (err) {
-        let actualCount;
-        const compareCounts = (actual, expected) => {
-            // Capture the actual number of times a matching log entry was found in the mongod log.
-            // This way we can mention it if the assertion fails below.
-            actualCount = actual;
-            return actual === expected;
-        };
         assert(
-            checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true, compareCounts),
-            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} in the log the expected number of times. Expected to see it ${count} times but saw it ${actualCount} times. This assertion failed while handling an expected error. The error was: ${tojson(err)}`,
+            checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
+            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${tojson(
+                count,
+            )} times in the log -- failed with this error: ${tojson(err)}`,
         );
     }
 }
@@ -97,13 +92,9 @@ function standardPortTest(ingressPort, egressPort, version) {
             "errmsg": "ProxyProtocol message detected on mongorpc port",
         },
     };
-    const logId = 22988;
-    // mongod will have produced the error above once already, because `proxy_server.start()`
-    // establishes a connection with the proxy to verify that it's running. The proxy then opens a
-    // connection with mongod, which logs the error. That's what the "1 +" are about below.
-    failInvalidProtocol(node, ingressPort, logId, attrs, true, 1 + 1);
-    failInvalidProtocol(node, ingressPort, logId, attrs, false, 1 + 2);
-    failInvalidProtocol(node, ingressPort, logId, attrs, false, 1 + 3);
+    failInvalidProtocol(node, ingressPort, 22988, attrs, true, 1);
+    failInvalidProtocol(node, ingressPort, 22988, attrs, false, 2);
+    failInvalidProtocol(node, ingressPort, 22988, attrs, false, 3);
     proxy_server.stop();
     rs.stopSet();
 }
