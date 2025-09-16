@@ -2032,7 +2032,7 @@ void HashJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
 
 std::unique_ptr<QuerySolutionNode> HashJoinEmbeddingNode::clone() const {
     return std::make_unique<HashJoinEmbeddingNode>(children[0]->clone(),
-                                                   children[0]->clone(),
+                                                   children[1]->clone(),
                                                    joinPredicates,
                                                    leftEmbeddingField,
                                                    rightEmbeddingField);
@@ -2045,7 +2045,7 @@ void NestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) co
 
 std::unique_ptr<QuerySolutionNode> NestedLoopJoinEmbeddingNode::clone() const {
     return std::make_unique<NestedLoopJoinEmbeddingNode>(children[0]->clone(),
-                                                         children[0]->clone(),
+                                                         children[1]->clone(),
                                                          joinPredicates,
                                                          leftEmbeddingField,
                                                          rightEmbeddingField);
