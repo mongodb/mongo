@@ -88,8 +88,8 @@ FastTuple<bool, value::TypeTags, value::Value> builtinDateHelper(
         return {false, value::TypeTags::Nothing, 0};
     }
 
+    tassert(11054000, "unexpected TZDB value", valueTzdb);
     auto timeZoneDB = value::getTimeZoneDBView(valueTzdb);
-    invariant(timeZoneDB);
 
     auto tzString = value::getStringView(typeTagTz, valueTz);
     const auto tz = tzString == "" ? timeZoneDB->utcZone() : timeZoneDB->getTimeZone(tzString);

@@ -1022,12 +1022,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::blockNativeAggTopBottom
     SortSpec* sortSpec,
     size_t numKeysBlocks,
     size_t numValuesBlocks) {
+
+    static_assert(!ValueIsDecomposedArray);
+
     using Less =
         std::conditional_t<Sense == TopBottomSense::kTop, SortPatternLess, SortPatternGreater>;
 
-    invariant(!ValueIsDecomposedArray);
-    invariant(numKeysBlocks == 1);
-    invariant(numValuesBlocks == 1);
+    tassert(11086818, "Expecting number of keys blocks to be 1", numKeysBlocks == 1);
+    tassert(11086814, "Expecting number of values blocks to be 1", numValuesBlocks == 1);
 
     value::ValueGuard stateGuard{stateTag, stateVal};
 
@@ -1280,10 +1282,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTop
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
     auto ss = value::getSortSpecView(sortSpecVal);
 
-    if (!keyIsDecomposed && !ValueIsDecomposedArray) {
-        stateGuard.reset();
-        return blockNativeAggTopBottomNImpl<Sense, ValueIsDecomposedArray>(
-            stateTag, stateVal, bitsetBlock, ss, numKeysBlocks, numValuesBlocks);
+    if constexpr (!ValueIsDecomposedArray) {
+        if (!keyIsDecomposed) {
+            stateGuard.reset();
+            return blockNativeAggTopBottomNImpl<Sense, ValueIsDecomposedArray>(
+                stateTag, stateVal, bitsetBlock, ss, numKeysBlocks, numValuesBlocks);
+        }
     }
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =

@@ -65,8 +65,7 @@ namespace {
  *'base' and 'exp' are both integers. Assumes 'exp' is in the range [0, 63].
  */
 bool representableAsLong(long long base, long long exp) {
-    invariant(exp <= 63);
-    invariant(exp >= 0);
+    tassert(11086815, "Unexpected exponent value", exp >= 0 && exp <= 63);
     struct MinMax {
         long long min;
         long long max;
@@ -1189,6 +1188,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericPow(value::TypeT
     // Use repeated multiplication, since pow() casts args to doubles which could result in
     // loss of precision if arguments are very large.
     const auto computeWithRepeatedMultiplication = [](int64_t base, int64_t exp) {
+        tassert(11086819, "Expecting exp >= 0 in computeWithRepeatedMultiplication", exp >= 0);
+
         int64_t result = 1;
 
         while (exp > 1) {
@@ -1202,7 +1203,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericPow(value::TypeT
         }
 
         if (exp) {
-            invariant(exp == 1);
             result *= base;
         }
 

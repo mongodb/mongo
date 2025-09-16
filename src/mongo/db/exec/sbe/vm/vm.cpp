@@ -41,7 +41,7 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 void ByteCode::allocStackImpl(size_t newSizeDelta) noexcept {
-    invariant(newSizeDelta > 0);
+    tassert(11086816, "Asking for 0 bytes on stack", newSizeDelta != 0);
 
     auto oldSize = _argStackEnd - _argStack;
     auto oldTop = _argStackTop - _argStack;

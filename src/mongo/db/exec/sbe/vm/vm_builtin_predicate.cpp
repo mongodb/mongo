@@ -52,7 +52,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFtsMatch(ArityTy
             return BSONObj{value::bitcastTo<const char*>(inputVal)};
         }
 
-        invariant(inputTag == value::TypeTags::Object);
+        tassert(
+            11086806, "Unexpected type of input parameter", inputTag == value::TypeTags::Object);
         BSONObjBuilder builder;
         bson::convertToBsonObj(builder, value::getObjectView(inputVal));
         return builder.obj();

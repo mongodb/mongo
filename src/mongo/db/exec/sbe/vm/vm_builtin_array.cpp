@@ -37,6 +37,15 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 
+namespace {
+
+void expectOwnedArray(bool owned, value::TypeTags type) {
+    tassert(11086820, "Expecting owned value", owned);
+    tassert(11086813, "Expecting array type", type == value::TypeTags::Array);
+}
+
+}  // namespace
+
 // We need to ensure that 'size_t' is wide enough to store a 32-bit index.
 // This is assumed by both builtinZipArrays and builtinExtractSubArray.
 static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
@@ -121,8 +130,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arity
         topStack(false, value::TypeTags::Nothing, 0);
     }
     value::ValueGuard guard{tagAgg, valAgg};
-
-    invariant(ownAgg && tagAgg == value::TypeTags::Array);
+    expectOwnedArray(ownAgg, tagAgg);
     auto arr = value::getArrayView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
@@ -167,15 +175,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped
     }
     value::ValueGuard guardArr{tagArr, valArr};
 
-    invariant(ownArr && tagArr == value::TypeTags::Array);
+    expectOwnedArray(ownArr, tagArr);
     auto arr = value::getArrayView(valArr);
-    invariant(arr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+    tassert(11086812,
+            "Unexpected size of arr parameter",
+            arr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
     // Check that the accumulated size of the array doesn't exceed the limit.
     int elemSize = value::getApproximateSize(tagNewElem, valNewElem);
     auto [tagAccSize, valAccSize] =
         arr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
-    invariant(tagAccSize == value::TypeTags::NumberInt64);
+    tassert(11086811,
+            "Unexpected type of AccSize parameter",
+            tagAccSize == value::TypeTags::NumberInt64);
     const int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
     const int64_t newSize = currentSize + elemSize;
 
@@ -1041,7 +1053,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToSet(Arity
     value::ArraySet* arrSet = value::getArraySetView(val);
 
     auto [sizeOwned, sizeTag, sizeVal] = getArraySize(arrTag, arrVal);
-    invariant(sizeTag == value::TypeTags::NumberInt64);
+    tassert(11086810, "Unexpected type of size", sizeTag == value::TypeTags::NumberInt64);
     arrSet->reserve(static_cast<int64_t>(sizeVal));
 
     value::ArrayEnumerator arrayEnumerator(arrTag, arrVal);
@@ -1075,7 +1087,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollArrayToSet(A
     value::ArraySet* arrSet = value::getArraySetView(val);
 
     auto [sizeOwned, sizeTag, sizeVal] = getArraySize(arrTag, arrVal);
-    invariant(sizeTag == value::TypeTags::NumberInt64);
+    tassert(11086809, "Unexpected type of size", sizeTag == value::TypeTags::NumberInt64);
     arrSet->reserve(static_cast<int64_t>(sizeVal));
 
     value::ArrayEnumerator arrayEnumerator(arrTag, arrVal);

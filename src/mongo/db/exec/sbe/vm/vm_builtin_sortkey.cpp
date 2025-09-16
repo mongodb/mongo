@@ -109,7 +109,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
     auto* sortObj = value::getSortKeyComponentVectorView(sortVecVal);
     const auto idxInt32 = value::bitcastTo<int32_t>(idxVal);
 
-    invariant(idxInt32 >= 0 && static_cast<size_t>(idxInt32) < sortObj->elts.size());
+    tassert(11086803,
+            "Unexpected idx parameter value",
+            idxInt32 >= 0 && static_cast<size_t>(idxInt32) < sortObj->elts.size());
     auto [outTag, outVal] = sortObj->elts[idxInt32];
     return {false, outTag, outVal};
 }

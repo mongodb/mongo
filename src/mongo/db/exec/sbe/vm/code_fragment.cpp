@@ -594,7 +594,7 @@ void CodeFragment::appendGetField(Instruction::Parameter lhs, Instruction::Param
 
 void CodeFragment::appendGetField(Instruction::Parameter input, StringData fieldName) {
     auto size = fieldName.size();
-    invariant(size < Instruction::kMaxInlineStringSize);
+    tassert(11086817, "Field name is too long", size < Instruction::kMaxInlineStringSize);
 
     Instruction i;
     i.tag = Instruction::getFieldImm;

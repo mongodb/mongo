@@ -50,7 +50,7 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
 
     // This function should only be called if 'collator' is non-null and 'tag' is a collatable type.
     invariant(collator);
-    invariant(value::isCollatableType(tag));
+    tassert(11086802, "Unexpected value of non-collatable type", value::isCollatableType(tag));
 
     // For strings, call CollatorInterface::getComparisonKey() to obtain the comparison key.
     if (value::isString(tag)) {
@@ -211,10 +211,10 @@ MONGO_COMPILER_NORETURN void reportSwapFailure() {
 
 MONGO_COMPILER_NORETURN void ByteCode::runFailInstruction() {
     auto [ownedCode, tagCode, valCode] = getFromStack(1);
-    invariant(tagCode == value::TypeTags::NumberInt64);
+    tassert(11086801, "Unexpected error code type", tagCode == value::TypeTags::NumberInt64);
 
     auto [ownedMsg, tagMsg, valMsg] = getFromStack(0);
-    invariant(value::isString(tagMsg));
+    tassert(11086800, "Unexpected error message type", value::isString(tagMsg));
 
     ErrorCodes::Error code{static_cast<ErrorCodes::Error>(value::bitcastTo<int64_t>(valCode))};
     std::string message{value::getStringView(tagMsg, valMsg)};

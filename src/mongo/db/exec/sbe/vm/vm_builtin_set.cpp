@@ -49,7 +49,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityTy
     }
     value::ValueGuard guard{tagAgg, valAgg};
 
-    invariant(ownAgg && tagAgg == value::TypeTags::ArraySet);
+    tassert(11086805,
+            "Unexpected type of Agg parameter",
+            ownAgg && tagAgg == value::TypeTags::ArraySet);
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
@@ -109,7 +111,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(Ari
     }
     value::ValueGuard guard{tagAgg, valAgg};
 
-    invariant(ownAgg && tagAgg == value::TypeTags::ArraySet);
+
+    tassert(11086804,
+            "Unexpected type of Agg parameter",
+            ownAgg && tagAgg == value::TypeTags::ArraySet);
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.

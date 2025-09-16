@@ -43,7 +43,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(
     // behavior is used to determine if we need to bail out of the bit position comparison early in
     // the depending if a bit is found to be set or unset.
     auto [_, tagBitTestBehavior, valueBitTestBehavior] = getFromStack(2);
-    invariant(tagBitTestBehavior == value::TypeTags::NumberInt32);
+    tassert(11086808,
+            "Unexpected BitTestBehavior type",
+            tagBitTestBehavior == value::TypeTags::NumberInt32);
 
     if (!value::isArray(maskTag) || !value::isBinData(valueTag)) {
         return {false, value::TypeTags::Nothing, 0};
