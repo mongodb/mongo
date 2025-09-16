@@ -72,6 +72,23 @@
 
 namespace mongo {
 
+
+std::unique_ptr<Pipeline>
+NonShardServerProcessInterface::finalizeAndMaybePreparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool attachCursorAfterOptimizing,
+    std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern,
+    bool shouldUseCollectionDefaultCollator) {
+    return finalizeAndAttachCursorToPipelineForLocalRead(expCtx,
+                                                         ownedPipeline,
+                                                         attachCursorAfterOptimizing,
+                                                         finalizePipeline,
+                                                         shouldUseCollectionDefaultCollator);
+}
+
 std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,

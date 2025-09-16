@@ -57,6 +57,7 @@
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
 #include "mongo/db/local_catalog/lock_manager/fill_locker_info.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -270,6 +271,165 @@ bool isQEColl(const CollectionOrViewAcquisition& acquisition) {
         Date_t::max(),
         Lock::InterruptBehavior::kThrow,
         Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
+}
+
+bool acquireCollectionsForPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   const std::vector<BSONObj>& pipeline,
+                                   CollectionOrViewAcquisitionMap& allAcquisitions) {
+    // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
+    // when constructing our query executor.
+    auto lpp = LiteParsedPipeline(expCtx->getNamespaceString(), pipeline);
+    std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
+    auto* opCtx = expCtx->getOperationContext();
+
+    const auto& primaryNss = expCtx->getNamespaceString();
+    AutoStatsTracker tracker{opCtx,
+                             primaryNss,
+                             Top::LockType::ReadLocked,
+                             AutoStatsTracker::LogMode::kUpdateTop,
+                             DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                 .getDatabaseProfileLevel(primaryNss.dbName()),
+                             Date_t::max(),
+                             secondaryNamespaces.cbegin(),
+                             secondaryNamespaces.cend()};
+
+    auto initAutoGetCallback = [&]() {
+        CollectionOrViewAcquisitionRequests requests;
+        requests.reserve(secondaryNamespaces.size() + 1);
+        std::transform(secondaryNamespaces.begin(),
+                       secondaryNamespaces.end(),
+                       std::back_inserter(requests),
+                       [opCtx](const NamespaceStringOrUUID& nsOrUuid) {
+                           return CollectionOrViewAcquisitionRequest::fromOpCtx(
+                               opCtx, nsOrUuid, AcquisitionPrerequisites::kRead);
+                       });
+        // Append acquisition for the primary nss.
+        requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx,
+            primaryNss,
+            AcquisitionPrerequisites::kRead,
+            AcquisitionPrerequisites::kMustBeCollection));
+
+        // Acquire all the nss at the same snapshot.
+        allAcquisitions =
+            makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(opCtx, requests));
+    };
+
+    return initializeAutoGet(opCtx, primaryNss, secondaryNamespaces, initAutoGetCallback);
+}
+
+bool requiresCollectionAcquisition(const Pipeline& pipeline) {
+    const auto& sources = pipeline.getSources();
+    boost::optional<DocumentSource*> firstStage =
+        sources.empty() ? boost::optional<DocumentSource*>{} : sources.front().get();
+
+    tassert(10287400,
+            "Pipeline must not yet have a DocumentSourceCursor as the first stage.",
+            !firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
+
+    const bool isMongotPipeline = search_helpers::isMongotPipeline(&pipeline);
+    if (!isMongotPipeline && firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
+        // There's no need to attach a cursor or perform collection acquisition here (for stages
+        // like $documents or $collStats that will not read from a user collection). Mongot
+        // pipelines will not need a cursor but _do_ need to acquire the collection to check for a
+        // stale shard version.
+        return false;
+    }
+
+    return true;
+}
+
+std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadImpl(
+    Pipeline* ownedPipeline,
+    CollectionOrViewAcquisitionMap& allAcquisitions,
+    bool isAnySecondaryCollectionNotLocal,
+    boost::optional<const AggregateCommandRequest&> aggRequest,
+    bool shouldUseCollectionDefaultCollator,
+    ExecShardFilterPolicy shardFilterPolicy) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx = ownedPipeline->getContext();
+
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+
+    if (expCtx->eligibleForSampling()) {
+        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
+                expCtx->getOperationContext(),
+                expCtx->getNamespaceString(),
+                analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
+            auto [_, letParameters] =
+                expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
+            analyze_shard_key::QueryAnalysisWriter::get(expCtx->getOperationContext())
+                ->addAggregateQuery(*sampleId,
+                                    expCtx->getNamespaceString(),
+                                    pipeline->getInitialQuery(),
+                                    expCtx->getCollatorBSON(),
+                                    letParameters)
+                .getAsync([](auto) {});
+        }
+    }
+
+    // Extract the main acquisition from the provided acquisitions.
+    auto* opCtx = expCtx->getOperationContext();
+    const auto& primaryNss = expCtx->getNamespaceString();
+    boost::optional<CollectionOrViewAcquisition> primaryAcquisition =
+        allAcquisitions.extract(primaryNss).mapped();
+    auto secondaryAcquisitions = std::move(allAcquisitions);
+
+    tassert(10004200,
+            "Expected the primary namespace to be a collection.",
+            primaryAcquisition.has_value() && primaryAcquisition->isCollection());
+
+    bool isAnySecondaryNamespaceAView =
+        std::any_of(secondaryAcquisitions.begin(),
+                    secondaryAcquisitions.end(),
+                    [](const auto& acq) { return acq.second.isView(); });
+
+    bool isAnySecondaryNamespaceAViewOrNotFullyLocal =
+        isAnySecondaryNamespaceAView || isAnySecondaryCollectionNotLocal;
+
+    const auto& collPtr = primaryAcquisition->getCollection().getCollectionPtr();
+    if (aggRequest && aggRequest->getCollectionUUID() && collPtr) {
+        checkCollectionUUIDMismatch(
+            opCtx, expCtx->getNamespaceString(), collPtr, aggRequest->getCollectionUUID());
+    }
+
+    // Attach collection's default collator to the 'expCtx' if 'shouldUseCollectionDefaultCollator'
+    // is specified.
+    const bool canCloneCollectionDefaultCollator = collPtr && collPtr->getDefaultCollator();
+    if (shouldUseCollectionDefaultCollator && canCloneCollectionDefaultCollator) {
+        expCtx->setCollator(collPtr->getDefaultCollator()->clone());
+    }
+
+    MultipleCollectionAccessor holder{
+        *primaryAcquisition, secondaryAcquisitions, isAnySecondaryNamespaceAViewOrNotFullyLocal};
+
+    auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
+    auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(sharedStasher);
+    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(holder,
+                                                          expCtx->getNamespaceString(),
+                                                          resolvedAggRequest,
+                                                          pipeline.get(),
+                                                          catalogResourceHandle,
+                                                          shardFilterPolicy);
+
+    const bool isMongotPipeline = search_helpers::isMongotPipeline(ownedPipeline);
+    if (isMongotPipeline) {
+        // For mongot pipelines, we will not have a cursor attached and now must perform
+        // $search-specific stage preparation. It's important that we release locks early, before
+        // preparing the pipeline, so that we don't hold them during network calls to mongot. This
+        // is fine for search pipelines since they are not reading any local (lock-protected) data
+        // in the main pipeline. It was important that we still acquired the collection in order to
+        // check for a stale shard version.
+        holder.clear();
+        primaryAcquisition.reset();
+        secondaryAcquisitions.clear();
+        search_helpers::prepareSearchForNestedPipelineLegacyExecutor(pipeline.get());
+    }
+
+    // Stash resources to free locks.
+    stashTransactionResourcesFromOperationContext(opCtx, sharedStasher.get());
+
+    return pipeline;
 }
 
 }  // namespace
@@ -597,12 +757,16 @@ query_shape::CollectionType CommonMongodProcessInterface::getCollectionType(
     return getCollectionTypeLocally(opCtx, nss);
 }
 
-std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
+std::unique_ptr<Pipeline>
+CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
-    boost::optional<const AggregateCommandRequest&> aggRequest,
+    bool attachCursorAfterOptimizing,
+    std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline,
     bool shouldUseCollectionDefaultCollator,
+    boost::optional<const AggregateCommandRequest&> aggRequest,
     ExecShardFilterPolicy shardFilterPolicy) {
-    auto expCtx = ownedPipeline->getContext();
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
 
     // TODO: SPM-4050 Remove this.
     boost::optional<BypassCheckAllShardRoleAcquisitionsVersioned>
@@ -611,144 +775,75 @@ std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipe
             std::holds_alternative<ProofOfUpstreamFiltering>(shardFilterPolicy),
             expCtx->getOperationContext());
 
-    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
-
-    const auto& sources = pipeline->getSources();
-    boost::optional<DocumentSource*> firstStage =
-        sources.empty() ? boost::optional<DocumentSource*>{} : sources.front().get();
-    tassert(10287400,
-            "Pipeline must not yet have a DocumentSourceCursor as the first stage.",
-            !firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
-
-    const bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
-    if (!isMongotPipeline && firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
-        // There's no need to attach a cursor or perform collection acquisition here (for stages
-        // like $documents or $collStats that will not read from a user collection). Mongot
-        // pipelines will not need a cursor but _do_ need to acquire the collection to check for a
-        // stale shard version.
+    if (!requiresCollectionAcquisition(*pipeline)) {
+        // There's no need to attach a cursor here or acquire collections for viewless timeseries
+        // translations, so we can just make and optimize the pipeline and return early.
+        if (finalizePipeline) {
+            finalizePipeline(pipeline.get(), std::monostate{});
+        }
         return pipeline;
     }
 
-    if (expCtx->eligibleForSampling()) {
-        if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
-                expCtx->getOperationContext(),
-                expCtx->getNamespaceString(),
-                analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
-            auto [_, letParameters] =
-                expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
-            analyze_shard_key::QueryAnalysisWriter::get(expCtx->getOperationContext())
-                ->addAggregateQuery(*sampleId,
-                                    expCtx->getNamespaceString(),
-                                    pipeline->getInitialQuery(),
-                                    expCtx->getCollatorBSON(),
-                                    letParameters)
-                .getAsync([](auto) {});
-        }
+    CollectionOrViewAcquisitionMap allAcquisitions;
+    bool isAnySecondaryCollectionNotLocal =
+        acquireCollectionsForPipeline(expCtx, pipeline->serializeToBson(), allAcquisitions);
+
+    // Find the primary acquisition, so we can use it in makePipeline.
+    const auto& itr = allAcquisitions.find(expCtx->getNamespaceString());
+    tassert(10313201, "Must acquire the primary namespace", itr != allAcquisitions.end());
+    const CollectionOrViewAcquisition& primaryAcquisition = itr->second;
+
+    // After acquiring all of the collections, we can make and optimize the pipeline.
+    if (finalizePipeline) {
+        finalizePipeline(pipeline.get(), primaryAcquisition);
+    }
+    if (!attachCursorAfterOptimizing) {
+        // If 'attachCursorAfterOptimizing' is false, we will not have a cursor attached. This means
+        // the pipeline will receive documents from an in-memory local source. For example, $lookup
+        // uses a cache. It was important that we still acquired the collection in order to check
+        // for a stale shard version and for viewless timeseries translations.
+        allAcquisitions.clear();
+        return pipeline;
     }
 
-    // Reparse 'pipeline' to discover whether there are secondary namespaces that we need to lock
-    // when constructing our query executor.
-    auto lpp = LiteParsedPipeline(expCtx->getNamespaceString(), pipeline->serializeToBson());
-    std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
-    auto* opCtx = expCtx->getOperationContext();
+    return attachCursorSourceToPipelineForLocalReadImpl(pipeline.release(),
+                                                        allAcquisitions,
+                                                        isAnySecondaryCollectionNotLocal,
+                                                        aggRequest,
+                                                        shouldUseCollectionDefaultCollator,
+                                                        shardFilterPolicy);
+}
 
-    const auto& primaryNss = expCtx->getNamespaceString();
-    AutoStatsTracker tracker{opCtx,
-                             primaryNss,
-                             Top::LockType::ReadLocked,
-                             AutoStatsTracker::LogMode::kUpdateTop,
-                             DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                 .getDatabaseProfileLevel(primaryNss.dbName()),
-                             Date_t::max(),
-                             secondaryNamespaces.cbegin(),
-                             secondaryNamespaces.cend()};
+std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
+    Pipeline* ownedPipeline,
+    boost::optional<const AggregateCommandRequest&> aggRequest,
+    bool shouldUseCollectionDefaultCollator,
+    ExecShardFilterPolicy shardFilterPolicy) {
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
+
+    // TODO: SPM-4050 Remove this.
+    boost::optional<BypassCheckAllShardRoleAcquisitionsVersioned>
+        bypassCheckAllShardRoleAcquisitionsAreVersioned(
+            boost::in_place_init_if,
+            std::holds_alternative<ProofOfUpstreamFiltering>(shardFilterPolicy),
+            expCtx->getOperationContext());
+
+    if (!requiresCollectionAcquisition(*pipeline)) {
+        // There's no need to attach a cursor here so we can just return the pipeline.
+        return pipeline;
+    }
 
     CollectionOrViewAcquisitionMap allAcquisitions;
-    auto initAutoGetCallback = [&]() {
-        CollectionOrViewAcquisitionRequests requests;
-        requests.reserve(secondaryNamespaces.size() + 1);
-        std::transform(secondaryNamespaces.begin(),
-                       secondaryNamespaces.end(),
-                       std::back_inserter(requests),
-                       [opCtx](const NamespaceStringOrUUID& nsOrUuid) {
-                           return CollectionOrViewAcquisitionRequest::fromOpCtx(
-                               opCtx, nsOrUuid, AcquisitionPrerequisites::kRead);
-                       });
-        // Append acquisition for the primary nss.
-        requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx,
-            primaryNss,
-            AcquisitionPrerequisites::kRead,
-            AcquisitionPrerequisites::kMustBeCollection));
-
-        // Acquire all the nss at the same snapshot.
-        allAcquisitions =
-            makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(opCtx, requests));
-    };
-
     bool isAnySecondaryCollectionNotLocal =
-        initializeAutoGet(opCtx, primaryNss, secondaryNamespaces, initAutoGetCallback);
+        acquireCollectionsForPipeline(expCtx, pipeline->serializeToBson(), allAcquisitions);
 
-    // Extract the main acquisition.
-    boost::optional<CollectionOrViewAcquisition> primaryAcquisition =
-        allAcquisitions.extract(primaryNss).mapped();
-    auto secondaryAcquisitions = std::move(allAcquisitions);
-
-    tassert(10004200,
-            "Expected the primary namespace to be a collection.",
-            primaryAcquisition.has_value() && primaryAcquisition->isCollection());
-
-    bool isAnySecondaryNamespaceAView =
-        std::any_of(secondaryAcquisitions.begin(),
-                    secondaryAcquisitions.end(),
-                    [](const auto& acq) { return acq.second.isView(); });
-
-    bool isAnySecondaryNamespaceAViewOrNotFullyLocal =
-        isAnySecondaryNamespaceAView || isAnySecondaryCollectionNotLocal;
-
-    const auto& collPtr = primaryAcquisition->getCollection().getCollectionPtr();
-    if (aggRequest && aggRequest->getCollectionUUID() && collPtr) {
-        checkCollectionUUIDMismatch(
-            opCtx, expCtx->getNamespaceString(), collPtr, aggRequest->getCollectionUUID());
-    }
-
-    // Attach collection's default collator to the 'expCtx' if 'shouldUseCollectionDefaultCollator'
-    // is specified.
-    const bool canCloneCollectionDefaultCollator = collPtr && collPtr->getDefaultCollator();
-    if (shouldUseCollectionDefaultCollator && canCloneCollectionDefaultCollator) {
-        expCtx->setCollator(collPtr->getDefaultCollator()->clone());
-    }
-
-    MultipleCollectionAccessor holder{
-        *primaryAcquisition, secondaryAcquisitions, isAnySecondaryNamespaceAViewOrNotFullyLocal};
-
-    auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
-    auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-    auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(sharedStasher);
-    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(holder,
-                                                          expCtx->getNamespaceString(),
-                                                          resolvedAggRequest,
-                                                          pipeline.get(),
-                                                          catalogResourceHandle,
-                                                          shardFilterPolicy);
-
-    if (isMongotPipeline) {
-        // For mongot pipelines, we will not have a cursor attached and now must perform
-        // $search-specific stage preparation. It's important that we release locks early, before
-        // preparing the pipeline, so that we don't hold them during network calls to mongot. This
-        // is fine for search pipelines since they are not reading any local (lock-protected) data
-        // in the main pipeline. It was important that we still acquired the collection in order to
-        // check for a stale shard version.
-        holder.clear();
-        primaryAcquisition.reset();
-        secondaryAcquisitions.clear();
-        search_helpers::prepareSearchForNestedPipelineLegacyExecutor(pipeline.get());
-    }
-
-    // Stash resources to free locks.
-    stashTransactionResourcesFromOperationContext(opCtx, sharedStasher.get());
-
-    return pipeline;
+    return attachCursorSourceToPipelineForLocalReadImpl(pipeline.release(),
+                                                        allAcquisitions,
+                                                        isAnySecondaryCollectionNotLocal,
+                                                        aggRequest,
+                                                        shouldUseCollectionDefaultCollator,
+                                                        shardFilterPolicy);
 }
 
 std::string CommonMongodProcessInterface::getShardName(OperationContext* opCtx) const {

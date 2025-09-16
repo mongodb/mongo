@@ -37,7 +37,6 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -72,6 +71,39 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceLookUpToStageFn(
         lookupDS->getAdditionalFilter(),
         lookupDS->_sharedState);
 }
+
+namespace {
+void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
+                              mongo::Pipeline& pipeline) {
+    // The cache needs to see the full pipeline in its correct order in order to properly place
+    // itself, therefore we are adding it to the end of the pipeline, and calling
+    // optimizeContainer on the pipeline to ensure the rest of the pipeline is in its correct
+    // order before optimizing the cache.
+    // TODO SERVER-84113: We will no longer have separate logic based on if a cache is present
+    // in doOptimizeAt(), so we can instead only add and optimize the cache after
+    // optimizeContainer is called.
+    pipeline.addFinalSource(std::move(source));
+
+    auto& container = pipeline.getSources();
+
+    mongo::Pipeline::optimizeContainer(&container);
+
+    // We want to ensure the cache has been optimized prior to any calls to optimize().
+    auto itr = (&container)->begin();
+    while (itr != (&container)->end()) {
+        if (auto* sequentialCache =
+                dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get())) {
+            if (!sequentialCache->hasOptimizedPos()) {
+                sequentialCache->optimizeAt(itr, &container);
+            }
+        }
+        itr = std::next(itr);
+    }
+
+    // Optimize the pipeline, with the cache in its correct position if it exists.
+    mongo::Pipeline::optimizeEachStage(&container);
+}
+}  // namespace
 
 namespace exec::agg {
 
@@ -275,7 +307,15 @@ void LookUpStage::doDispose() {
 }
 
 std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
-    std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace) {
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
+    const NamespaceString& resolvedNs,
+    const std::vector<BSONObj>& viewPipeline,
+    std::vector<BSONObj> currentPipeline,
+    bool attachCursorAfterOptimizing,
+    ShardTargetingPolicy shardTargetingPolicy,
+    std::function<void(mongo::Pipeline* pipeline,
+                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline) {
+
     // We don't want to optimize or attach a cursor source here because we need to update
     // _sharedState->resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we
     // may need to update _fieldMatchPipelineIdx as well in the case of a field join.
@@ -285,34 +325,55 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     opts.validator = mongo::lookupPipeValidator;
 
     // Resolve the view definition.
-    auto pipeline = mongo::Pipeline::makePipelineFromViewDefinition(
-        _fromExpCtx, resolvedNamespace, std::move(serializedPipeline), opts, _fromNs);
+    std::unique_ptr<mongo::Pipeline> resolvedPipeline =
+        mongo::Pipeline::makePipelineFromViewDefinition(fromExpCtx,
+                                                        ResolvedNamespace{resolvedNs, viewPipeline},
+                                                        std::move(currentPipeline),
+                                                        opts,
+                                                        _fromNs);
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
     // first input document.
-    _sharedState->resolvedPipeline = pipeline->serializeToBson();
+    _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson();
+
+    LOGV2_DEBUG(3254800,
+                3,
+                "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
+                "$lookup sub-pipeline: {new_pipe}",
+                logAttrs(resolvedNs),
+                "pipeline"_attr = mongo::Pipeline::serializePipelineForLogging(viewPipeline),
+                "new_pipe"_attr =
+                    mongo::Pipeline::serializePipelineForLogging(_sharedState->resolvedPipeline));
 
     // The index of the field join match stage needs to be set to the length of the view
     // pipeline, as it is no longer the first stage in the resolved pipeline.
     if (hasLocalFieldForeignFieldJoin()) {
-        _fieldMatchPipelineIdx = resolvedNamespace.pipeline.size();
+        _fieldMatchPipelineIdx = viewPipeline.size();
     }
 
-    // Update the expression context with any new namespaces the resolved pipeline has introduced.
-    LiteParsedPipeline liteParsedPipeline(resolvedNamespace.ns, resolvedNamespace.pipeline);
-    _fromExpCtx =
-        makeCopyFromExpressionContext(_fromExpCtx,
-                                      resolvedNamespace.ns,
-                                      resolvedNamespace.uuid,
-                                      boost::none,
-                                      std::make_pair(_fromNs, resolvedNamespace.pipeline));
+    // Update the expression context with any new namespaces the resolved pipeline has
+    // introduced.
+    LiteParsedPipeline liteParsedPipeline(resolvedNs, viewPipeline);
+    _fromExpCtx = makeCopyFromExpressionContext(
+        _fromExpCtx, resolvedNs, boost::none, boost::none, std::make_pair(_fromNs, viewPipeline));
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
-    return pipeline;
+    // Parse the new pipeline and prepare it again. We must resolve the view before entering
+    // 'finalizeAndMaybePreparePipelineForExecution', since that function requires accessing
+    // collection catalog data.
+    std::unique_ptr<mongo::Pipeline> parsedPipeline = mongo::Pipeline::parse(
+        _sharedState->resolvedPipeline, _fromExpCtx, mongo::lookupPipeValidator);
+    _fromExpCtx->initializeReferencedSystemVariables();
+
+    return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
+        _fromExpCtx,
+        parsedPipeline.release(),
+        attachCursorAfterOptimizing,
+        finalizePipeline,
+        shardTargetingPolicy);
 }
 
-template <bool isStreamsEngine>
-std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
+void LookUpStage::prepareStateToBuildPipeline(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc) {
     if (hasLocalFieldForeignFieldJoin()) {
         auto matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
@@ -334,110 +395,140 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &fromExpCtx->variables);
 
-    std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
-        expectUnshardedCollectionInScope;
-
-    const auto allowForeignShardedColl = foreignShardedLookupAllowed();
-    if (!allowForeignShardedColl && !fromExpCtx->getInRouter()) {
+    if (!foreignShardedLookupAllowed() && !fromExpCtx->getInRouter()) {
         // Enforce that the foreign collection must be unsharded for lookup.
-        expectUnshardedCollectionInScope =
-            fromExpCtx->getMongoProcessInterface()->expectUnshardedCollectionInScope(
-                fromExpCtx->getOperationContext(), fromExpCtx->getNamespaceString(), boost::none);
+        fromExpCtx->getMongoProcessInterface()->expectUnshardedCollectionInScope(
+            fromExpCtx->getOperationContext(), fromExpCtx->getNamespaceString(), boost::none);
+    }
+}
+
+std::unique_ptr<mongo::Pipeline> LookUpStage::buildStreamsPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc) {
+    prepareStateToBuildPipeline(fromExpCtx, inputDoc);
+
+    MakePipelineOptions pipelineOpts;
+    pipelineOpts.alreadyOptimized = false;
+    pipelineOpts.optimize = true;
+    pipelineOpts.validator = mongo::lookupPipeValidator;
+    // The streams engine attaches its own remote cursor source, so we don't need to do it here.
+    pipelineOpts.attachCursorSource = false;
+    // The streams engine does not care about sharding, and so it does not allow shard targeting.
+    pipelineOpts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
+
+    return mongo::Pipeline::makePipeline(_sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
+}
+
+std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc) {
+    prepareStateToBuildPipeline(fromExpCtx, inputDoc);
+
+    // Avoid adding the cache optimization if optimizations are disabled.
+    if (auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
+        fp && fp->shouldFail() && _cache) {
+        _cache->abandon();
     }
 
-    // If we don't have a cache, build and return the pipeline immediately. We don't support caching
-    // for the streams engine.
-    if (isStreamsEngine || !_cache || _cache->isAbandoned()) {
-        MakePipelineOptions pipelineOpts;
-        pipelineOpts.alreadyOptimized = false;
-        pipelineOpts.optimize = true;
-        // The streams engine attaches its own remote cursor source, so we don't need to do it here.
-        pipelineOpts.attachCursorSource = !isStreamsEngine;
-        pipelineOpts.validator = mongo::lookupPipeValidator;
-        // By default, $lookup does not support sharded 'from' collections. The streams engine does
-        // not care about sharding, and so it does not allow shard targeting.
-        pipelineOpts.shardTargetingPolicy = !isStreamsEngine && allowForeignShardedColl
-            ? ShardTargetingPolicy::kAllowed
-            : ShardTargetingPolicy::kNotAllowed;
+    // By default, $lookup does not support sharded 'from' collections.
+    const ShardTargetingPolicy shardTargetingPolicy = foreignShardedLookupAllowed()
+        ? ShardTargetingPolicy::kAllowed
+        : ShardTargetingPolicy::kNotAllowed;
+
+    // Parse the pipeline.
+    std::unique_ptr<mongo::Pipeline> parsedPipeline = mongo::Pipeline::parse(
+        _sharedState->resolvedPipeline, fromExpCtx, mongo::lookupPipeValidator);
+    fromExpCtx->initializeReferencedSystemVariables();
+
+    // If we don't have a cache, optimize and translate, and attach a cursor to the pipeline
+    // immediately.
+    if (!_cache || _cache->isAbandoned()) {
+        const auto& finalizePipeline = [this](mongo::Pipeline* pipeline,
+                                              MongoProcessInterface::CollectionMetadata collData) {
+            tassert(11028104, "Expected pipeline to finalize", pipeline);
+            // TODO SERVER-103133 enable for viewless timeseries.
+            // visit(OverloadedVisitor{
+            //           [&](std::monostate) {},
+            //           [&](std::reference_wrapper<const CollectionOrViewAcquisition> collOrView) {
+            //               pipeline->validateWithCollectionMetadata(collOrView);
+            //               pipeline->performPreOptimizationRewrites(_fromExpCtx, collOrView);
+            //           },
+            //           [&](std::reference_wrapper<const CollectionRoutingInfo> cri) {
+            //               pipeline->validateWithCollectionMetadata(cri);
+            //               pipeline->performPreOptimizationRewrites(_fromExpCtx, cri);
+            //           }},
+            //       collData);
+            pipeline->optimizePipeline();
+            pipeline->validateCommon(true /* alreadyOptimized */);
+        };
+
         try {
-            return mongo::Pipeline::makePipeline(
-                _sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
+            return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
+                fromExpCtx,
+                parsedPipeline.release(),
+                true /* attachCursorAfterOptimizing */,
+                finalizePipeline,
+                shardTargetingPolicy);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             // This exception returns the information we need to resolve a sharded view. Update the
             // pipeline with the resolved view definition.
-            auto pipeline = buildPipelineFromViewDefinition(
-                _sharedState->resolvedPipeline,
-                ResolvedNamespace{e->getNamespace(), e->getPipeline()});
-
-            LOGV2_DEBUG(
-                3254800,
-                3,
-                "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
-                "$lookup sub-pipeline: {new_pipe}",
-                logAttrs(e->getNamespace()),
-                "pipeline"_attr = mongo::Pipeline::serializePipelineForLogging(e->getPipeline()),
-                "new_pipe"_attr =
-                    mongo::Pipeline::serializePipelineForLogging(_sharedState->resolvedPipeline));
-
-            // We can now safely optimize and reattempt attaching the cursor source.
-            pipeline = mongo::Pipeline::makePipeline(
-                _sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
-
-            return pipeline;
+            return buildPipelineFromViewDefinition(fromExpCtx,
+                                                   e->getNamespace(),
+                                                   e->getPipeline(),
+                                                   _sharedState->resolvedPipeline,
+                                                   true /* attachCursorAfterOptimizing */,
+                                                   shardTargetingPolicy,
+                                                   finalizePipeline);
         }
     }
 
-    // Construct the basic pipeline without a cache stage. Avoid optimizing here since we need to
-    // add the cache first, as detailed below.
-    MakePipelineOptions pipelineOpts;
-    pipelineOpts.alreadyOptimized = false;
-    pipelineOpts.optimize = false;
-    pipelineOpts.attachCursorSource = false;
-    pipelineOpts.validator = mongo::lookupPipeValidator;
-    auto pipeline =
-        mongo::Pipeline::makePipeline(_sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
+    std::unique_ptr<mongo::Pipeline> pipeline;
+    // If the cache has either been abandoned or has not yet been built, attach a cursor.
+    bool attachCursorAfterOptimizing = !_cache->isServing();
 
     // We can store the unoptimized serialization of the pipeline so that if we need to resolve
     // a sharded view later on, and we have a local-foreign field join, we will need to update
     // metadata tracking the position of this join in the _sharedState->resolvedPipeline.
-    auto serializedPipeline = pipeline->serializeToBson();
+    std::vector<BSONObj> serializedPipeline = parsedPipeline->serializeToBson();
 
-    addCacheStageAndOptimize(*pipeline);
+    const auto& finalizePipeline = [this](mongo::Pipeline* pipeline,
+                                          MongoProcessInterface::CollectionMetadata collData) {
+        tassert(11028105, "Expected pipeline to finalize", pipeline);
 
-    if (!_cache->isServing()) {
-        // The cache has either been abandoned or has not yet been built. Attach a cursor.
-        auto shardTargetingPolicy = allowForeignShardedColl ? ShardTargetingPolicy::kAllowed
-                                                            : ShardTargetingPolicy::kNotAllowed;
-        try {
-            pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
-                pipeline.release(), shardTargetingPolicy);
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
-            // This exception returns the information we need to resolve a sharded view. Update the
-            // pipeline with the resolved view definition.
-            pipeline = buildPipelineFromViewDefinition(
-                std::move(serializedPipeline),
-                ResolvedNamespace{e->getNamespace(), e->getPipeline()});
-
-            // The serialized pipeline does not have a cache stage, so we will add it back to the
-            // pipeline here if the cache has not been abandoned.
-            if (_cache && !_cache->isAbandoned()) {
-                addCacheStageAndOptimize(*pipeline);
-            }
-
-            LOGV2_DEBUG(
-                3254801,
-                3,
-                "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
-                "$lookup sub-pipeline: {new_pipe}",
-                logAttrs(e->getNamespace()),
-                "pipeline"_attr = mongo::Pipeline::serializePipelineForLogging(e->getPipeline()),
-                "new_pipe"_attr =
-                    mongo::Pipeline::serializePipelineForLogging(_sharedState->resolvedPipeline));
-
-            // Try to attach the cursor source again.
-            pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
-                pipeline.release(), shardTargetingPolicy);
+        // TODO SERVER-103133 enable for viewless timeseries.
+        // visit(OverloadedVisitor{
+        //           [&](std::monostate) {},
+        //           [&](std::reference_wrapper<const CollectionOrViewAcquisition> collOrView) {
+        //               pipeline->validateWithCollectionMetadata(collOrView);
+        //               pipeline->performPreOptimizationRewrites(_fromExpCtx, collOrView);
+        //           },
+        //           [&](std::reference_wrapper<const CollectionRoutingInfo> cri) {
+        //               pipeline->validateWithCollectionMetadata(cri);
+        //               pipeline->performPreOptimizationRewrites(_fromExpCtx, cri);
+        //           }},
+        //       collData);
+        if (_cache && !_cache->isAbandoned()) {
+            addCacheStageAndOptimize(
+                DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache), *pipeline);
+            pipeline->validateCommon(true /* alreadyOptimized */);
         }
+    };
+
+    try {
+        pipeline = pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
+            fromExpCtx,
+            parsedPipeline.release(),
+            attachCursorAfterOptimizing,
+            finalizePipeline,
+            shardTargetingPolicy);
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+        // This exception returns the information we need to resolve a sharded view. Update the
+        // pipeline with the resolved view definition and retry to attach the cursor.
+        pipeline = buildPipelineFromViewDefinition(fromExpCtx,
+                                                   e->getNamespace(),
+                                                   e->getPipeline(),
+                                                   std::move(serializedPipeline),
+                                                   attachCursorAfterOptimizing,
+                                                   shardTargetingPolicy,
+                                                   finalizePipeline);
     }
 
     // If the cache has been abandoned, release it.
@@ -447,66 +538,6 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
 
     invariant(pipeline);
     return pipeline;
-}
-
-// Explicit instantiations for buildPipeline().
-template std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline<false /*isStreamsEngine*/>(
-    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
-
-template std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline<true /*isStreamsEngine*/>(
-    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
-
-/**
- * Method that looks for a DocumentSourceSequentialDocumentCache stage and calls optimizeAt() on
- * it if it has yet to be optimized.
- */
-void findAndOptimizeSequentialDocumentCache(mongo::Pipeline& pipeline) {
-    auto& container = pipeline.getSources();
-    auto itr = (&container)->begin();
-    while (itr != (&container)->end()) {
-        if (auto* sequentialCache =
-                dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get())) {
-            if (!sequentialCache->hasOptimizedPos()) {
-                sequentialCache->optimizeAt(itr, &container);
-            }
-        }
-        itr = std::next(itr);
-    }
-}
-
-void LookUpStage::addCacheStageAndOptimize(mongo::Pipeline& pipeline) {
-    // Adds the cache to the end of the pipeline and calls optimizeContainer which will ensure the
-    // stages of the pipeline are in the correct and optimal order, before the cache runs
-    // doOptimizeAt. During the optimization process, the cache will either move itself to the
-    // correct position in the pipeline, or abandon itself if no suitable cache position exists.
-    // Once the cache is finished optimizing, the entire pipeline is optimized.
-    //
-    // When pipeline optimization is disabled, 'Pipeline::optimizePipeline()' exits early and so the
-    // cache would not be placed correctly. So we only add the cache when pipeline optimization is
-    // enabled.
-    if (auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
-        fp && fp->shouldFail()) {
-        _cache->abandon();
-    } else {
-        // The cache needs to see the full pipeline in its correct order in order to properly place
-        // itself, therefore we are adding it to the end of the pipeline, and calling
-        // optimizeContainer on the pipeline to ensure the rest of the pipeline is in its correct
-        // order before optimizing the cache.
-        // TODO SERVER-84113: We will no longer have separate logic based on if a cache is present
-        // in doOptimizeAt(), so we can instead only add and optimize the cache after
-        // optimizeContainer is called.
-        pipeline.addFinalSource(DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache));
-
-        auto& container = pipeline.getSources();
-
-        mongo::Pipeline::optimizeContainer(&container);
-
-        // We want to ensure the cache has been optimized prior to any calls to optimize().
-        findAndOptimizeSequentialDocumentCache(pipeline);
-
-        // Optimize the pipeline, with the cache in its correct position if it exists.
-        mongo::Pipeline::optimizeEachStage(&container);
-    }
 }
 
 GetNextResult LookUpStage::unwindResult() {

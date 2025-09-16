@@ -51,6 +51,28 @@
 namespace mongo {
 
 std::unique_ptr<Pipeline>
+StubLookupSingleDocumentProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool attachCursorAfterOptimizing,
+    std::function<void(Pipeline* pipeline, MongoProcessInterface::CollectionMetadata collData)>
+        finalizePipeline,
+    bool shouldUseCollectionDefaultCollator,
+    boost::optional<const AggregateCommandRequest&> aggRequest,
+    ExecShardFilterPolicy shardFilterPolicy) {
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+
+    if (finalizePipeline) {
+        finalizePipeline(pipeline.get(), std::monostate{});
+    }
+    if (attachCursorAfterOptimizing) {
+        return attachCursorSourceToPipelineForLocalRead(
+            pipeline.release(), aggRequest, shouldUseCollectionDefaultCollator, shardFilterPolicy);
+    }
+    return pipeline;
+}
+
+std::unique_ptr<Pipeline>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
     Pipeline* ownedPipeline,
     boost::optional<const AggregateCommandRequest&> aggRequest,
@@ -60,6 +82,19 @@ StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRe
     pipeline->addInitialSource(
         DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
     return pipeline;
+}
+
+std::unique_ptr<Pipeline>
+StubLookupSingleDocumentProcessInterface::finalizeAndMaybePreparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool attachCursorAfterOptimizing,
+    std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern,
+    bool shouldUseCollectionDefaultCollator) {
+    return finalizeAndAttachCursorToPipelineForLocalRead(
+        expCtx, ownedPipeline, attachCursorAfterOptimizing, finalizePipeline);
 }
 
 std::unique_ptr<Pipeline> StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(

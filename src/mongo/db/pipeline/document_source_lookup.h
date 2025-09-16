@@ -382,7 +382,6 @@ private:
      */
     void initializeResolvedIntrospectionPipeline();
 
-
     /**
      * Given a mutable document, appends execution stats such as 'totalDocsExamined',
      * 'totalKeysExamined', 'collectionScans', 'indexesUsed', etc. to it.

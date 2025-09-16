@@ -232,6 +232,17 @@ std::unique_ptr<Pipeline> preparePipelineForExecution(
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);
 
+
+std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool attachCursorAfterOptimizing,
+    std::function<void(Pipeline* pipeline, MongoProcessInterface::CollectionMetadata collData)>
+        finalizePipeline = nullptr,
+    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+    boost::optional<BSONObj> readConcern = boost::none,
+    bool shouldUseCollectionDefaultCollator = false);
+
 /**
  * For a sharded collection, establishes remote cursors on each shard that may have results, and
  * creates a DocumentSourceMergeCursors stage to merge the remote cursors. Returns a pipeline

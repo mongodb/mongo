@@ -144,6 +144,28 @@ MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
     return std::make_unique<TargetPrimaryWriteSizeEstimator>();
 }
 
+std::unique_ptr<Pipeline> MongosProcessInterface::finalizeAndMaybePreparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool attachCursorAfterOptimizing,
+    std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern,
+    bool shouldUseCollectionDefaultCollator) {
+    // On mongos we can't have local cursors.
+    tassert(11028100,
+            "shardTargetingPolicy cannot be kNotAllowed on mongos",
+            shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
+    return sharded_agg_helpers::finalizeAndMaybePreparePipelineForExecution(
+        expCtx,
+        ownedPipeline,
+        attachCursorAfterOptimizing,
+        finalizePipeline,
+        shardTargetingPolicy,
+        readConcern,
+        shouldUseCollectionDefaultCollator);
+}
+
 std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,

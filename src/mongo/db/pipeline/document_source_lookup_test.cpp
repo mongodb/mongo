@@ -86,10 +86,87 @@
 namespace mongo {
 namespace {
 
+/**
+ * A mock MongoProcessInterface which allows mocking a foreign pipeline. If
+ * 'removeLeadingQueryStages' is true then any $match, $sort or $project fields at the start of the
+ * pipeline will be removed, simulating the pipeline changes which occur when
+ * PipelineD::prepareCursorSource absorbs stages into the PlanExecutor.
+ */
+class MockMongoInterface final : public StubMongoProcessInterface {
+public:
+    MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults,
+                       bool removeLeadingQueryStages = false)
+        : _mockResults(std::move(mockResults)),
+          _removeLeadingQueryStages(removeLeadingQueryStages) {}
+
+    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) final {
+        return false;
+    }
+
+    std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline =
+            nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) override {
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+        if (finalizePipeline) {
+            finalizePipeline(pipeline.get(), std::monostate{});
+        }
+
+        if (attachCursorAfterOptimizing) {
+            return preparePipelineForExecution(
+                pipeline.release(), shardTargetingPolicy, readConcern);
+        }
+        return pipeline;
+    }
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        Pipeline* ownedPipeline,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) final {
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
+
+        while (_removeLeadingQueryStages && !pipeline->empty()) {
+            if (pipeline->popFrontWithName("$match") || pipeline->popFrontWithName("$sort") ||
+                pipeline->popFrontWithName("$project")) {
+                continue;
+            }
+            break;
+        }
+
+        pipeline->addInitialSource(
+            DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
+        return pipeline;
+    }
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final {
+        return preparePipelineForExecution(pipeline, shardTargetingPolicy, readConcern);
+    }
+
+private:
+    std::deque<DocumentSource::GetNextResult> _mockResults;
+    bool _removeLeadingQueryStages = false;
+};
+
 class DocumentSourceLookUpTest : public AggregationContextFixture {
 protected:
     DocumentSourceLookUpTest() {
         ShardingState::create(getServiceContext());
+        // By default, make a mock mongo interface without any results from the foreign collection.
+        // Individual tests will make their own interface if they need mock results.
+        getExpCtx()->setMongoProcessInterface(
+            std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
     }
 };
 
@@ -1120,58 +1197,6 @@ TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
 // Execution tests.
 //
 
-/**
- * A mock MongoProcessInterface which allows mocking a foreign pipeline. If
- * 'removeLeadingQueryStages' is true then any $match, $sort or $project fields at the start of the
- * pipeline will be removed, simulating the pipeline changes which occur when
- * PipelineD::prepareCursorSource absorbs stages into the PlanExecutor.
- */
-class MockMongoInterface final : public StubMongoProcessInterface {
-public:
-    MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults,
-                       bool removeLeadingQueryStages = false)
-        : _mockResults(std::move(mockResults)),
-          _removeLeadingQueryStages(removeLeadingQueryStages) {}
-
-    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) final {
-        return false;
-    }
-
-    std::unique_ptr<Pipeline> preparePipelineForExecution(
-        Pipeline* ownedPipeline,
-        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-        boost::optional<BSONObj> readConcern = boost::none) final {
-        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
-
-        while (_removeLeadingQueryStages && !pipeline->empty()) {
-            if (pipeline->popFrontWithName("$match") || pipeline->popFrontWithName("$sort") ||
-                pipeline->popFrontWithName("$project")) {
-                continue;
-            }
-            break;
-        }
-
-        pipeline->addInitialSource(
-            DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
-        return pipeline;
-    }
-
-    std::unique_ptr<Pipeline> preparePipelineForExecution(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const AggregateCommandRequest& aggRequest,
-        Pipeline* pipeline,
-        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
-        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-        boost::optional<BSONObj> readConcern = boost::none,
-        bool shouldUseCollectionDefaultCollator = false) final {
-        return preparePipelineForExecution(pipeline, shardTargetingPolicy, readConcern);
-    }
-
-private:
-    std::deque<DocumentSource::GetNextResult> _mockResults;
-    bool _removeLeadingQueryStages = false;
-};
-
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs =
@@ -1335,9 +1360,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheNonCorrelatedSubPipelinePrefix) {
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
-
     auto lookupDS = makeLookUpFromJson(
         "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x:1}}, {$sort: {x: 1}}, "
         "{$addFields: {varField: '$$var1'}}], from: 'coll', as: 'as'}}",
@@ -1362,9 +1384,6 @@ TEST_F(DocumentSourceLookUpTest,
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
     // In the $facet stage here, the correlated $match stage comes after a $group stage which
     // returns EXHAUSTIVE_ALL for its dependencies. Verify that we continue enumerating the $facet
@@ -1404,9 +1423,6 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
-
     // This pipeline includes a $match stage that itself includes a $expr expression.
     auto lookupDS = makeLookUpFromJson(
         "{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {$expr: {$eq: "
@@ -1439,9 +1455,6 @@ TEST_F(DocumentSourceLookUpTest,
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
     // The $project stage defines a local variable with the same name as the $lookup 'let'
     // variable. Verify that the $project is identified as non-correlated and the cache is
@@ -1476,9 +1489,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldInsertCacheBeforeCorrelatedNestedLookup) 
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
-
     // Create a $lookup stage whose pipeline contains nested $lookups. The third-level $lookup
     // refers to a 'let' variable defined in the top-level $lookup. Verify that the second-level
     // $lookup is correctly identified as a correlated stage and the cache is placed before it.
@@ -1512,9 +1522,6 @@ TEST_F(DocumentSourceLookUpTest,
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
     // The nested $lookup stage defines a 'let' variable with the same name as the top-level 'let'.
     // Verify the nested $lookup is identified as non-correlated and the cache is placed after it.
@@ -1553,9 +1560,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
         expCtx);
 
     auto lookupStage = buildLookUpStage(lookupDS);
-
-    expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
     auto subPipeline =
         lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 5));

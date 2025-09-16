@@ -133,6 +133,17 @@ public:
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         bool shouldUseCollectionDefaultCollator = false,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
+
+    std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline =
+            nullptr,
+        bool shouldUseCollectionDefaultCollator = false,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
+
     std::string getShardName(OperationContext* opCtx) const final;
 
     boost::optional<ShardId> getShardId(OperationContext* opCtx) const final;

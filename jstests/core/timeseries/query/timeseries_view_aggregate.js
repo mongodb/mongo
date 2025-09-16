@@ -143,4 +143,4 @@ dataset.forEach((doc) => {
 runTest(dataset, pipeline, expectedResults, viewPipeline);
 
 // TODO SERVER-103134 Add tests for pipelines with sub-pipelines, including $graphLookup.
-// TODO SERVER-103132 Add tests for pipelines with sub-pipelines, including $lookup.
+// TODO SERVER-103133 Add tests for pipelines with sub-pipelines, including $lookup.

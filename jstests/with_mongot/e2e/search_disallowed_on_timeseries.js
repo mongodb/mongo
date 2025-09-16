@@ -8,8 +8,8 @@
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     expectCreateSearchIndexFails,
-    expectUpdateSearchIndexFails,
     expectDropSearchIndexFails,
+    expectUpdateSearchIndexFails,
 } from "jstests/libs/search.js";
 
 const timeFieldName = "time";
@@ -34,7 +34,7 @@ assert.commandWorked(bulk.execute());
         [{$search: {index: "default", text: {query: "example", path: metaFieldName}}}],
         [{$vectorSearch: {index: "default", vector: {$meta: "searchVector"}}}],
         [{$searchMeta: {index: "default", text: {query: "example", path: metaFieldName}}}],
-        // TODO SERVER-103132 Add tests for $search in a $lookup.
+        // TODO SERVER-103133 Add tests for $search in a $lookup.
         // TODO SERVER-103133 Add tests for $search in a $unionWith.
         // TODO SERVER-103134 Add tests for $search in a $graphLookup.
     ];
@@ -61,7 +61,8 @@ assert.commandWorked(bulk.execute());
         );
     });
 
-    // All queries on a timeseries collection on a view with $search in the view definition should fail.
+    // All queries on a timeseries collection on a view with $search in the view definition should
+    // fail.
     const searchView = "searchview_" + timeseriesCollName;
     assert.commandWorked(
         db.createView(searchView, timeseriesCollName, [

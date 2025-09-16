@@ -53,7 +53,7 @@ function assertLocalReadCount(comment, actualCount, expectedCount) {
     );
 }
 
-function assertLookupExecution(pipeline, opts, expected) {
+function assertLookupExecution(pipeline, opts, expected, forceRoutingTableRefresh = false) {
     assert.commandWorked(
         ordersColl.insert([
             {
@@ -93,7 +93,11 @@ function assertLookupExecution(pipeline, opts, expected) {
     );
 
     // Here we perform the query through 'mongosDB', which may still have a stale view of the
-    // 'reviews' collection.
+    // 'reviews' collection. For some tests, we must ensure the shard executing $lookup operations
+    // has up-to-date routing information, so the profiler entries are correct.
+    if (forceRoutingTableRefresh) {
+        mongosDB.getCollection(ordersColl.getName()).aggregate(pipeline).toArray();
+    }
     let actual = ordersColl.aggregate(pipeline, opts).toArray();
     assert(
         resultsEq(expected.results, actual),
@@ -573,6 +577,7 @@ assertLookupExecution(
         nestedExec: [0, 2],
         nestedLocalExec: [1, 0],
     },
+    true, // forceRoutingTableRefresh
 );
 
 // Test that a targeted $lookup on a sharded collection can execute correctly on mongos.

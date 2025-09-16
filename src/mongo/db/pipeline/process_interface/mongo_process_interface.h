@@ -100,6 +100,10 @@ class JsExecution;
 
 class Pipeline;
 class RoutingContext;
+// TODO SERVER-110774 investigate removing 'CollectionRoutingInfo' and
+// 'CollectionOrViewAcquisition' forward declarations.
+class CollectionRoutingInfo;
+class CollectionOrViewAcquisition;
 class TransactionHistoryIteratorBase;
 
 /**
@@ -124,6 +128,11 @@ public:
     using BatchObject =
         std::tuple<BSONObj, write_ops::UpdateModification, boost::optional<BSONObj>>;
     using BatchedObjects = std::vector<BatchObject>;
+    using CollectionMetadata =
+        std::variant<std::monostate,
+                     std::reference_wrapper<const CollectionOrViewAcquisition>,
+                     std::reference_wrapper<const CollectionRoutingInfo>>;
+
 
     enum class UpsertType {
         kNone,              // This operation is not an upsert.
@@ -420,6 +429,26 @@ public:
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying
+     * collection. Behavior for how to finalize the pipeline, such as optimizations and
+     * translations, before a cursor is attached must be defined inside 'finalizePipeline'. To
+     * attach a cursor this function calls 'preparePipelineForExecution' (see below).
+     *
+     * This function guarantees that optimizing, translating and preparing the pipeline for
+     * execution will use a single snapshot of collection metadata ('CollectionOrViewAcquisition' or
+     * 'RoutingContext').
+     */
+    virtual std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline =
+            nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) = 0;
+
+    /**
+     * Accepts a pipeline and returns a new one which will draw input from the underlying
      * collection. Performs no further optimization of the pipeline. NamespaceNotFound will be
      * thrown if ExpressionContext has a UUID and that UUID doesn't exist anymore. That should be
      * the only case where NamespaceNotFound is returned.
@@ -493,6 +522,25 @@ public:
         Pipeline* pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         bool shouldUseCollectionDefaultCollator = false,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
+
+    /**
+     * Accepts a pipeline and returns a new one which will draw input from the underlying collection
+     * _locally_. Behavior for how to finalize the pipeline, such as optimizations and translations,
+     * before a cursor is attached must be defined inside 'finalizePipeline'. To attach a cursor
+     * this function calls 'attachCursorSourceToPipelineForLocalRead' (see below).
+     *
+     * This function guarantees that parsing and preparing the pipeline for execution will use a
+     * single snapshot of collection metadata ('CollectionOrViewAcquisition').
+     */
+    virtual std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline =
+            nullptr,
+        bool shouldUseCollectionDefaultCollator = false,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) = 0;
 
     /**

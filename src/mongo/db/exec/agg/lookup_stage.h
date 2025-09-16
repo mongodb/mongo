@@ -97,10 +97,14 @@ public:
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
      * cursor and/or cache source as appropriate.
      */
-    // TODO SERVER-84208: Refactor this method so as to clearly separate the logic for the streams
-    // engine from the logic for the classic $lookup.
-    template <bool isStreamsEngine = false>
     std::unique_ptr<mongo::Pipeline> buildPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
+
+    /**
+     * Builds the $lookup pipeline for the streams engine, and should not be used in classic
+     * $lookup.
+     */
+    std::unique_ptr<mongo::Pipeline> buildStreamsPipeline(
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
 
     /**
@@ -127,13 +131,15 @@ private:
      * of a 'foreign' join.
      */
     std::unique_ptr<mongo::Pipeline> buildPipelineFromViewDefinition(
-        std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace);
-
-    /**
-     * Method to add a DocumentSourceSequentialDocumentCache stage and optimize the pipeline to
-     * move the cache to its final position.
-     */
-    void addCacheStageAndOptimize(mongo::Pipeline& pipeline);
+        const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
+        const NamespaceString& resolvedNs,
+        const std::vector<BSONObj>& viewPipeline,
+        std::vector<BSONObj> currentPipeline,
+        bool attachCursorAfterOptimizing,
+        ShardTargetingPolicy shardTargetingPolicy,
+        std::function<void(mongo::Pipeline* pipeline,
+                           MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
+            nullptr);
 
     bool hasLocalFieldForeignFieldJoin() const {
         return _localField != boost::none;
@@ -148,6 +154,9 @@ private:
      * Resolves let defined variables against 'localDoc' and stores the results in 'variables'.
      */
     void resolveLetVariables(const Document& localDoc, Variables* variables);
+
+    void prepareStateToBuildPipeline(const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
+                                     const Document& inputDoc);
 
     // The ExpressionContext used when performing aggregation pipelines against the '_resolvedNs'
     // namespace.
