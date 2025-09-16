@@ -66,7 +66,9 @@ public:
         }
 
         LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _privileges({Privilege(ResourcePattern::forClusterResource(boost::none),
+                                     ActionType::listExtensions)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -74,17 +76,15 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return {};
-        }
-
-        // TODO(SERVER-110415): Delete override to use default implementation which returns true.
-        bool requiresAuthzChecks() const final {
-            return false;
+            return _privileges;
         }
 
         bool isInitialSource() const final {
             return true;
         }
+
+    private:
+        const PrivilegeVector _privileges;
     };
 
     /**
