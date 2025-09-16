@@ -506,18 +506,7 @@ buildvariants:
       compile_variant: enterprise-amazon2023-streams
       large_distro_name: amazon2023-latest-large
     tasks:
-      - name: compile_test_and_package_serial_TG
-        distros:
-          - amazon2023-latest-large
-      - name: run_unit_tests_TG
-        distros:
-          - amazon2023-latest-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2023-latest-large
-      - name: .release_critical !.requires_large_host !crypt_push
-      - name: .release_critical .requires_large_host !crypt_push
+      - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023-latest-large
       - name: streams_gen
@@ -527,6 +516,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: aggregation
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
 
@@ -558,18 +548,7 @@ buildvariants:
       compile_variant: enterprise-amazon2023-streams-arm64
       large_distro_name: amazon2023-arm64-latest-large
     tasks:
-      - name: compile_test_and_package_serial_TG
-        distros:
-          - amazon2023-arm64-latest-large
-      - name: run_unit_tests_TG
-        distros:
-          - amazon2023-arm64-latest-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2023-arm64-latest-large
-      - name: .release_critical !.requires_large_host !crypt_push
-      - name: .release_critical .requires_large_host !crypt_push
+      - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023-arm64-latest-large
       - name: streams_gen
@@ -580,6 +559,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: aggregation
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
       # Only needed once to generate the streams manifest for both x86 and arm
@@ -613,18 +593,7 @@ buildvariants:
       compile_variant: enterprise-amazon2-streams
       large_distro_name: amazon2-latest-large
     tasks:
-      - name: compile_test_and_package_serial_TG
-        distros:
-          - amazon2-latest-large
-      - name: run_unit_tests_TG
-        distros:
-          - amazon2-latest-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2-latest-large
-      - name: .release_critical !.requires_large_host !crypt_push
-      - name: .release_critical .requires_large_host !crypt_push
+      - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2-latest-large
       - name: streams_gen
@@ -634,6 +603,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: aggregation
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
 
@@ -665,18 +635,7 @@ buildvariants:
       compile_variant: enterprise-amazon2-streams-arm64
       large_distro_name: amazon2-arm64-latest-large
     tasks:
-      - name: compile_test_and_package_serial_TG
-        distros:
-          - amazon2-arm64-latest-large
-      - name: run_unit_tests_TG
-        distros:
-          - amazon2-arm64-latest-large
-      - name: .development_critical !.requires_large_host
-      - name: .development_critical .requires_large_host
-        distros:
-          - amazon2-arm64-latest-large
-      - name: .release_critical !.requires_large_host !crypt_push
-      - name: .release_critical .requires_large_host !crypt_push
+      - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2-arm64-latest-large
       - name: streams_gen
@@ -687,6 +646,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
+      - name: aggregation
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
       # Only needed once to generate the streams manifest for both x86 and arm
