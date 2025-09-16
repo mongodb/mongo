@@ -815,7 +815,7 @@ FILE_VERSION_FILTER    =
 # DoxygenLayout.xml, doxygen will parse it automatically even if the LAYOUT_FILE
 # tag is left empty.
 
-LAYOUT_FILE            = style/DoxygenLayout.xml
+LAYOUT_FILE            = style/DoxygenLayout.11.xml
 
 # The CITE_BIB_FILES tag can be used to specify one or more bib files containing
 # the reference definitions. This must be a list of .bib files. The .bib
@@ -860,7 +860,10 @@ WARN_IF_UNDOCUMENTED   = YES
 # using markup commands wrongly.
 # The default value is: YES.
 
-WARN_IF_DOC_ERROR      = YES
+# FIXME-WT-15445: Temporarily setting WARN_IF_DOC_ERROR to NO to bypass the issue
+# introduced in Doxygen 1.11.  
+# This workaround should be removed once the root cause is identified and fixed.  
+WARN_IF_DOC_ERROR = NO  
 
 # This WARN_NO_PARAMDOC option can be enabled to get warnings for functions that
 # are documented, but have no documentation for their parameters or return
@@ -871,6 +874,11 @@ WARN_IF_DOC_ERROR      = YES
 # The default value is: NO.
 
 WARN_NO_PARAMDOC       = YES
+
+# This WARN_IF_INCOMPLETE_DOC is used to warn when not all parameters have doc
+# The default value is: YES
+
+WARN_IF_INCOMPLETE_DOC = NO
 
 # If the WARN_AS_ERROR tag is set to YES then doxygen will immediately stop when
 # a warning is encountered. If the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS

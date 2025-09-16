@@ -724,6 +724,20 @@ __wt_evict_app_assist_worker_check(
         return (0);
 
     /*
+     * If incremental application eviction flag is set, involve application threads proportionally
+     * to the aggressiveness score, when the cache usage is less than target. 5% at score 1 to 100%
+     * at score 20.
+     */
+    WT_EVICT *evict = conn->evict;
+    if (F_ISSET_ATOMIC_32(
+          &(conn->cache->cache_eviction_controls), WT_CACHE_EVICT_INCREMENTAL_APP) &&
+      !__wt_evict_clean_needed(session, &pct_full)) {
+        if (pct_full <= evict->eviction_target &&
+          ((__wt_atomic_load32(&evict->evict_aggressive_score)) <= (session->id % 20)))
+            return (0);
+    }
+
+    /*
      * Some callers (those waiting for slow operations), will sleep if there was no cache work to
      * do. After this point, let them skip the sleep.
      */

@@ -96,6 +96,7 @@ test_stat_log02.py
 test_sweep03.py
 test_sweep06.py
 test_timestamp06.py
+test_timestamp20.py
 test_txn02.py
 test_txn04.py
 test_txn06.py

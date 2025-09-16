@@ -816,6 +816,26 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
+        # no_run will contain a list of files we don't want to run,
+        # do_run will contain a list of files we want to run.
+        no_run=$(mktemp)
+        do_run=$(mktemp)
+
+        # We need a local variable for this. If unit_test_ignore isn't provided by the caller, it
+        # ends up substituting a blank value. This breaks the -n check below, since there will be a
+        # bare -n with no arguments (which returns true, for some reason).
+        ignore="${unit_test_ignore}"
+
+        if [ -n "$ignore" ]; then
+            sed -e 's/ *#.*//' -e '/^$/d' < "$ignore" > $no_run
+            (cd ./test/suite; ls test_*.py) | fgrep -vf $no_run > $do_run
+        else
+            # Some hooks prune out specific tests if we don't give them a list, e.g. hook_tiered.
+            # But if there's anything in the list, they'll run that directly instead of pruning, so
+            # generate an empty list.
+            echo > $do_run
+        fi
+
         cd cmake_build
         threads_command=""
         if [[ -n "${num_jobs}" ]]; then
@@ -823,9 +843,9 @@ functions:
           threads_command="-j ${num_jobs}"
         fi
         if [ ${check_coverage|false} = true ]; then
-            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1 || echo "Ignoring failed test as we are checking test coverage"
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command $(cat $do_run) 2>&1 || echo "Ignoring failed test as we are checking test coverage"
         else
-            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command $(cat $do_run) 2>&1
         fi
 
   "unit test parallel":
@@ -2292,33 +2312,148 @@ tasks:
           upload_source_dir: "wiredtiger"
           upload_filename: unit-test-tsan.tgz
 
-  - name: unit-test-hook-disagg-leader
-    tags: ["python"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "unit test parallel"
-        vars:
-          # As leader, run the set of tests that are not in the fail list.
-          unit_test_parallel_ignore: test/suite/hook_disagg.fail
-          # The timeout for this command is on a test file basis. Make the timeouts long,
-          # as there are a few files that contain a large number of slower tests.
-          unit_test_parallel_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)"
+  # A large number of unit tests are run with the disagg hook. Break them into buckets to prevent
+  # the individual jobs from taking too long.
 
-  - name: unit-test-hook-disagg-leader-table
-    tags: ["python"]
+  - name: unit-test-hook-disagg-leader-bucket00
+    tags: ["pull_request", "python"]
     depends_on:
     - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "unit test parallel"
+      - func: "unit test"
         vars:
           # As leader, run the set of tests that are not in the fail list.
-          unit_test_parallel_ignore: test/suite/hook_disagg.fail
+          unit_test_ignore: test/suite/hook_disagg.fail
           # The timeout for this command is on a test file basis. Make the timeouts long,
           # as there are a few files that contain a large number of slower tests.
-          unit_test_parallel_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)"
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)" --batch 0/5
+
+  - name: unit-test-hook-disagg-leader-bucket01
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)" --batch 1/5
+
+  - name: unit-test-hook-disagg-leader-bucket02
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)" --batch 2/5
+
+  - name: unit-test-hook-disagg-leader-bucket03
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)" --batch 3/5
+
+  - name: unit-test-hook-disagg-leader-bucket04
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)" --batch 4/5
+
+  - name: unit-test-hook-disagg-leader-table-bucket00
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)" --batch 0/5
+
+  - name: unit-test-hook-disagg-leader-table-bucket01
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)" --batch 1/5
+
+  - name: unit-test-hook-disagg-leader-table-bucket02
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)" --batch 2/5
+
+  - name: unit-test-hook-disagg-leader-table-bucket03
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)" --batch 3/5
+
+  - name: unit-test-hook-disagg-leader-table-bucket04
+    tags: ["pull_request", "python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)" --batch 4/5
 
   - name: unit-test-hook-disagg-follower
     tags: ["python"]
@@ -6083,9 +6218,7 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-random-seed
-    - name: unit-test-hook-disagg-leader
     - name: unit-test-hook-disagg-follower
-    - name: unit-test-hook-disagg-leader-table
     - name: unit-test-hook-disagg-follower-table
     - name: unit-test-hook-tiered
     - name: unit-test-hook-tiered-with-delays
