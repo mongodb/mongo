@@ -44,7 +44,7 @@
 namespace mongo {
 namespace repl {
 
-class MONGO_MOD_PUB ReplSetWriteConcernModeDefinitions {
+class MONGO_MOD_PARENT_PRIVATE ReplSetWriteConcernModeDefinitions {
 public:
     // Default constructor for use as an IDL default.
     ReplSetWriteConcernModeDefinitions() {}

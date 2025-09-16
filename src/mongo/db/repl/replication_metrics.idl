@@ -32,6 +32,7 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: private
     cpp_includes:
         - "mongo/db/repl/election_reason_counter_parser.h"
         - "mongo/db/repl/optime.h"

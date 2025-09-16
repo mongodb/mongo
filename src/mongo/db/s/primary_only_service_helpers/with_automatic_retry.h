@@ -31,8 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace primary_only_service_helpers {
 
 using RetryabilityPredicate = std::function<bool(const Status&)>;
@@ -153,4 +154,4 @@ private:
 };
 
 }  // namespace primary_only_service_helpers
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

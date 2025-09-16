@@ -32,8 +32,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/database_name.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
 
@@ -92,4 +93,4 @@ Status waitForLinearizableReadConcern(OperationContext* opCtx, Milliseconds read
 Status waitForSpeculativeMajorityReadConcern(OperationContext* opCtx,
                                              repl::SpeculativeMajorityReadInfo speculativeReadInfo);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

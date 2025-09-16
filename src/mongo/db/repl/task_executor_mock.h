@@ -34,11 +34,12 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/unittest/task_executor_proxy.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -93,4 +94,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

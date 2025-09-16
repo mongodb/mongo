@@ -36,6 +36,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>

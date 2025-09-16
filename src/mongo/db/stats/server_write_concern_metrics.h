@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -46,7 +47,7 @@ namespace mongo {
 /**
  * Container for server-wide statistics on writeConcern levels used by operations.
  */
-class ServerWriteConcernMetrics {
+class MONGO_MOD_PUB ServerWriteConcernMetrics {
     ServerWriteConcernMetrics(const ServerWriteConcernMetrics&) = delete;
     ServerWriteConcernMetrics& operator=(const ServerWriteConcernMetrics&) = delete;
 

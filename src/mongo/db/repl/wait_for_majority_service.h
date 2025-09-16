@@ -42,6 +42,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -175,7 +176,7 @@ private:
  * Provides a facility for asynchronously waiting a local opTime to be majority committed.
  */
 
-class WaitForMajorityService {
+class MONGO_MOD_PUB WaitForMajorityService {
 public:
     ~WaitForMajorityService();
 

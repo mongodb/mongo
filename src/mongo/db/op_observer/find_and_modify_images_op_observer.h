@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
  * This OpObserver ensures that images for retryable findAndModify are written to
  * config.image_collection.
  */
-class FindAndModifyImagesOpObserver final : public OpObserverNoop {
+class MONGO_MOD_NEEDS_REPLACEMENT FindAndModifyImagesOpObserver final : public OpObserverNoop {
     FindAndModifyImagesOpObserver(const FindAndModifyImagesOpObserver&) = delete;
     FindAndModifyImagesOpObserver& operator=(const FindAndModifyImagesOpObserver&) = delete;
 

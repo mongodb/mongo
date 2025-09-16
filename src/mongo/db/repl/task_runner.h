@@ -35,11 +35,12 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 
 class Status;
 class OperationContext;
@@ -154,4 +155,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

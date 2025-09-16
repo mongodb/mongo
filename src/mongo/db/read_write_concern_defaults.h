@@ -43,6 +43,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/time_support.h"
 
@@ -51,7 +52,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Class to manage Read Concern and Write Concern (RWC) defaults.
@@ -181,7 +182,7 @@ public:
      * Gets a bool indicating whether the implicit default write concern is majority.
      * This function should only be used for testing purposes.
      */
-    bool getImplicitDefaultWriteConcernMajority_forTest();
+    MONGO_MOD_PARENT_PRIVATE bool getImplicitDefaultWriteConcernMajority_forTest();
 
     /**
      * Gets the cluster-wide write concern (CWWC) persisted on disk.
@@ -221,4 +222,4 @@ private:
     AtomicWord<bool> _implicitDefaultWriteConcernMajority;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

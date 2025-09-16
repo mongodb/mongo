@@ -33,6 +33,9 @@ filters:
   - "commands_*":
     approvers:
       - 10gen/server-programmability
+  - "command_can_run_here*":
+    approvers:
+      - 10gen/server-replication
   - "connection_health_metrics_parameter.idl":
     approvers:
       - 10gen/server-networking-and-observability

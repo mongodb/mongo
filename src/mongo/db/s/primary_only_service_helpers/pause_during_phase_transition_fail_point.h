@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/s/primary_only_service_helpers/phase_transition_progress_gen.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace primary_only_service_helpers {
 
@@ -110,4 +111,4 @@ private:
 };
 }  // namespace primary_only_service_helpers
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

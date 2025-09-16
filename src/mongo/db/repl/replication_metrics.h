@@ -39,13 +39,14 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <string>
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 namespace repl {
 
 /**
@@ -153,4 +154,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

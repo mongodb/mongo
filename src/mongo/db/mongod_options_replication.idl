@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/db/mongod_options_replication.h"
     configs:

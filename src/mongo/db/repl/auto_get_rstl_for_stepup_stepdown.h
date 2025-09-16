@@ -37,6 +37,7 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

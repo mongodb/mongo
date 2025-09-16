@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
+#include "mongo/util/modules.h"
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
@@ -42,7 +43,7 @@ namespace mongo {
 /**
  * A class which handles looking up RWConcernDefault values from an in-memory location.
  */
-class ReadWriteConcernDefaultsLookupMock {
+class MONGO_MOD_PUB ReadWriteConcernDefaultsLookupMock {
 public:
     ReadWriteConcernDefaults::FetchDefaultsFn getFetchDefaultsFn();
 

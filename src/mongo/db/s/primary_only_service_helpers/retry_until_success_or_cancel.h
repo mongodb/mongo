@@ -32,6 +32,7 @@
 #include "mongo/db/s/primary_only_service_helpers/retrying_cancelable_operation_context_factory.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace primary_only_service_helpers {

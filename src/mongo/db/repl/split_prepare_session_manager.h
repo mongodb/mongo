@@ -33,6 +33,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <utility>
@@ -40,7 +41,7 @@
 
 #include <boost/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 using PooledSession = InternalSessionPool::Session;
@@ -137,4 +138,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/util/cancellation.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace primary_only_service_helpers {
 
 /**
@@ -59,4 +60,4 @@ private:
 };
 
 }  // namespace primary_only_service_helpers
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -1123,6 +1123,7 @@ replication.replication_coordinator:
     - src/mongo/db/repl/*always_allow_non_local_writes*
     - src/mongo/db/repl/*isself*
     - src/mongo/db/repl/replication_waiter_list_bm.cpp
+    - src/mongo/db/modules/atlas/src/disagg_storage/replication_coordinator*
 
 replication.utils:
   meta:

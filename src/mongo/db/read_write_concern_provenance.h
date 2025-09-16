@@ -34,12 +34,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/modules.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * This class represents the "provenance" (ie. original source) of a read or write concern.
@@ -164,4 +165,4 @@ public:
     }
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

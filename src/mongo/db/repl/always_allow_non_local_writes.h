@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {
@@ -40,7 +41,7 @@ namespace repl {
  *
  * Resets to original value when leaving scope so it is safe to nest.
  */
-class AllowNonLocalWritesBlock {
+class MONGO_MOD_PUB AllowNonLocalWritesBlock {
     AllowNonLocalWritesBlock(const AllowNonLocalWritesBlock&) = delete;
     AllowNonLocalWritesBlock& operator=(const AllowNonLocalWritesBlock&) = delete;
 

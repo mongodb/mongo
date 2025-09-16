@@ -38,12 +38,13 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 template <typename T>
@@ -128,4 +129,4 @@ _tryGetWCFailureFromFailPoint_ForTest(const repl::OpTime& replOpTime,
                                       const WriteConcernOptions& writeConcern);
 
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -32,10 +32,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A function which handles looking up RWConcernDefault values from where they are persisted in
@@ -46,4 +47,4 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
 
 void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx, bool isReplicaSet);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

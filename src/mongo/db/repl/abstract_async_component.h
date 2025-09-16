@@ -35,6 +35,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -54,7 +55,7 @@ namespace repl {
  * The _state variable in this class is protected by the concrete class's mutex (returned by
  * _getMutex()).
  */
-class AbstractAsyncComponent {
+class MONGO_MOD_OPEN AbstractAsyncComponent {
     AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
     AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
 

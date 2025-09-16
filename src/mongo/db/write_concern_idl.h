@@ -32,11 +32,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <variant>
 
-namespace mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 
 using WTags = StringMap<std::int64_t>;
 using WriteConcernW = std::variant<std::string, std::int64_t, WTags>;
@@ -47,4 +48,4 @@ void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONOb
 std::int64_t parseWTimeoutFromBSON(BSONElement element);
 void serializeWTimeout(std::int64_t wTimeout, StringData fieldName, BSONObjBuilder* builder);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

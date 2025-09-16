@@ -1664,6 +1664,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/cloner.* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/**/commands.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/commands_* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/**/command_can_run_here* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/**/connection_health_metrics_parameter.idl @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/dbmessage* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/default_baton* @10gen/server-networking-and-observability @svc-auto-approve-bot

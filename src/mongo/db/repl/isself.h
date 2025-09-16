@@ -31,11 +31,12 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 struct HostAndPort;
 class ServiceContext;
 
@@ -77,4 +78,4 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort, ServiceContext* ctx, Millise
 std::vector<std::string> getBoundAddrs(bool ipv6enabled);
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

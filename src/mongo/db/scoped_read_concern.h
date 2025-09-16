@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
  * Overrides the ReadConcern in the OperationContext while in scope, mainly useful for
  * DBDirectClient.
  */
-class ScopedReadConcern {
+class MONGO_MOD_PUB ScopedReadConcern {
 public:
     ScopedReadConcern(OperationContext* opCtx, repl::ReadConcernArgs requestReadConcernArgs);
     ~ScopedReadConcern();

@@ -32,8 +32,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 namespace repl {
 
 /**
@@ -44,4 +45,4 @@ namespace repl {
 Status replAuthenticate(DBClientBase* conn);
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

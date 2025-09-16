@@ -27,6 +27,7 @@
 #
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/db/logical_time.h"
 

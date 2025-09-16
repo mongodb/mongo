@@ -37,13 +37,14 @@
 #include "mongo/db/write_concern_gen.h"
 #include "mongo/db/write_concern_idl.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <string>
 #include <variant>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 struct WriteConcernOptions {
 public:
@@ -239,16 +240,16 @@ public:
     //          - without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Internal commands set empty WC ({writeConcern: {}}).
-    bool notExplicitWValue{true};
+    MONGO_MOD_PRIVATE bool notExplicitWValue{true};
 
     // Used only for tracking opWriteConcernCounters metric.
     // True if the "w" value of the write concern used is "majority" and the "j" value is true,
     // but "j" was originally false.
-    bool majorityJFalseOverridden{false};
+    MONGO_MOD_PRIVATE bool majorityJFalseOverridden{false};
 
     CheckCondition checkCondition{CheckCondition::OpTime};
 
 private:
     ReadWriteConcernProvenance _provenance;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
