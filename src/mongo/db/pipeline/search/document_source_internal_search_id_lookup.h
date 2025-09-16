@@ -148,7 +148,7 @@ public:
          * this function would return 0.5 = 50%.
          */
         double getIdLookupSuccessRate() const {
-            // Ensure division by zero never occurs if no docs have been seen yet
+            // Ensure division by zero never occurs if no docs have been seen yet.
             if (_docsSeenByIdLookup == 0) {
                 return 0;
             }
