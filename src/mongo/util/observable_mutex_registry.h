@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/platform/atomic.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/system_clock_source.h"
@@ -65,19 +64,15 @@ public:
     ObservableMutexRegistry() : ObservableMutexRegistry(SystemClockSource::get()) {}
     explicit ObservableMutexRegistry(ClockSource* clk) : _clockSource(clk) {}
 
-    /**
-     * This may have performance implications as it serializes registering
-     * with lookups, so avoid using it for registering mutex objects that are
-     * created on a hot path, with visible performance implications for the user.
-     */
     template <typename MutexType>
     void add(StringData tag, const MutexType& mutex) {
 #ifdef MONGO_CONFIG_MUTEX_OBSERVATION
-        std::list<MutexEntry> newNode{{_getNextMutexId(), _clockSource->now(), mutex.token()}};
-        const auto hashedTag = _mutexEntries.hash_function().hashed_key(tag);
+        std::list<NewMutexEntry> newNode;
+        newNode.push_back({.tag = std::string(tag),
+                           .registrationTime = _clockSource->now(),
+                           .token = mutex.token()});
         stdx::lock_guard lk(_registrationMutex);
-        auto& mutexList = _mutexEntries[hashedTag];
-        mutexList.splice(mutexList.end(), newNode);
+        _newMutexEntries.splice(_newMutexEntries.end(), newNode);
 #endif
     }
 
@@ -122,18 +117,21 @@ public:
      */
     BSONObj report(bool listAll);
 
-    size_t getNumRegistered_forTest() const;
-
 private:
+    // `MutexEntry` is what is stored for each registered mutex.
     struct MutexEntry {
         int64_t id;
         Date_t registrationTime;
         std::shared_ptr<ObservationToken> token;
     };
 
-    int64_t _getNextMutexId() {
-        return _nextMutexId.fetchAndAdd(1);
-    }
+    // When a mutex is `add`ed, a `NewMutexEntry` is stored for later retrieval within `report`.
+    // `report` then converts the `NewMutexEntry` into a `MutexEntry`.
+    struct NewMutexEntry {
+        std::string tag;
+        Date_t registrationTime;
+        std::shared_ptr<ObservationToken> token;
+    };
 
     /**
      * Visits all registered mutex objects stored in the registry and collects their stats. For any
@@ -149,12 +147,13 @@ private:
     void _includeRemovedSnapshots(WithLock, StringMap<std::vector<StatsRecord>>& statsMap);
 
     ClockSource* _clockSource;
-    Atomic<int64_t> _nextMutexId{0};
 
     mutable stdx::mutex _registrationMutex;
-    StringMap<std::list<MutexEntry>> _mutexEntries;
+    std::list<NewMutexEntry> _newMutexEntries;
 
     mutable stdx::mutex _collectionMutex;
+    int64_t _nextMutexId{0};
+    StringMap<std::list<MutexEntry>> _mutexEntries;
     // Maps a Mutex tag to the sum of all its invalidated token stats.
     StringMap<MutexStats> _removedTokensSnapshots;
 };

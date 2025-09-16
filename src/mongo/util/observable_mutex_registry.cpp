@@ -128,39 +128,38 @@ BSONObj ObservableMutexRegistry::report(bool listAll) {
     return serializeStats(stats, listAll);
 }
 
-size_t ObservableMutexRegistry::getNumRegistered_forTest() const {
-    stdx::lock_guard lk(_registrationMutex);
-    size_t size = 0;
-    for (const auto& [_, entries] : _mutexEntries) {
-        size += entries.size();
-    }
-    return size;
-}
-
 StringMap<std::vector<ObservableMutexRegistry::StatsRecord>>
 ObservableMutexRegistry::_collectStats() {
     stdx::lock_guard lk(_collectionMutex);
-    decltype(_mutexEntries) mutexEntriesSnapshot;
+
+    std::list<NewMutexEntry> newEntries;
     {
         stdx::lock_guard lk(_registrationMutex);
-        mutexEntriesSnapshot = _mutexEntries;
+        newEntries.splice(newEntries.end(), _newMutexEntries);
+    }
+    // Integrate the new entries into `_mutexEntries`.
+    for (NewMutexEntry& entry : newEntries) {
+        _mutexEntries[std::move(entry.tag)].push_back({.id = _nextMutexId++,
+                                                       .registrationTime = entry.registrationTime,
+                                                       .token = std::move(entry.token)});
     }
 
     StringMap<std::vector<StatsRecord>> statsMap;
-    for (auto& [tag, value] : mutexEntriesSnapshot) {
-        for (auto& entry : value) {
-            const auto stats = entry.token->getStats();
-            if (MONGO_unlikely(!entry.token->isValid())) {
-                // Token is invalid, so store its last known stats.
-                _removedTokensSnapshots[tag] += stats;
-
-                stdx::lock_guard lk(_registrationMutex);
-                // Remove the invalidated mutex from the registry. O(N) removal is acceptable since
-                // we don't expect many invalidated mutexes.
-                _mutexEntries[tag].remove_if([&](const auto& elem) { return elem.id == entry.id; });
-                continue;
+    for (auto& [tag, entries] : _mutexEntries) {
+        auto& records = statsMap[tag];
+        MutexStats* removedTotal = nullptr;
+        for (auto it = entries.begin(); it != entries.end();) {
+            const auto stats = it->token->getStats();
+            if (MONGO_unlikely(!it->token->isValid())) {
+                if (!removedTotal) {
+                    removedTotal = &_removedTokensSnapshots[tag];
+                }
+                *removedTotal += stats;
+                it = entries.erase(it);
+            } else {
+                records.push_back(StatsRecord{stats, it->id, it->registrationTime});
+                ++it;
             }
-            statsMap[tag].push_back(StatsRecord{stats, entry.id, entry.registrationTime});
         }
     }
 
@@ -172,7 +171,7 @@ void ObservableMutexRegistry::_includeRemovedSnapshots(
     WithLock, StringMap<std::vector<StatsRecord>>& statsMap) {
     for (const auto& [tag, stats] : _removedTokensSnapshots) {
         // The mutexId and registered field within entry are left blank to indicate that these stats
-        // came from an invalidated mutex.
+        // came from invalidated mutexes.
         StatsRecord entry{stats};
         statsMap[tag].push_back(entry);
     }
