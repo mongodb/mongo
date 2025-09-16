@@ -1,8 +1,15 @@
-// Confirms that change streams only see committed operations for sharded transactions.
-// TODO SERVER-109890: The test 'change_stream_transaction_sharded_commit_timestamp.js'
-// is a clone of this file with additional testing for the 'commitTimestamp' field.
-// Once v9.0 becomes last LTS we can remove this file in favor of the other.
+// This is a clone of 'change_stream_transaction_sharded.js' that also validates
+// that the 'commitTimestamp' field of qualifying change stream events is present.
+// The 'commitTimestamp' field for DML events in prepared transactions is only
+// emitted from v8.2.1 onwards if the change stream is opened with the
+// 'showCommitTimestamp' flag.
+// We cannot run this test in multiversion environments at the moment, as older
+// versions do not understand the 'showCommitTimestamp' flag and error out if set.
+// TODO SERVER-109890: enable multiversion testing for this file once v9.0 becomes
+// last LTS.
 // @tags: [
+//   multiversion_incompatible,
+//   requires_fcv_82,
 //   requires_sharding,
 //   uses_change_streams,
 //   uses_multi_shard_transaction,
@@ -14,7 +21,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {isTimestamp} from "jstests/libs/timestamp_util.js";
 
 const dbName = "test";
-const collName = "change_stream_transaction_sharded";
+const collName = "change_stream_transaction_sharded_commit_timestamp";
 const namespace = dbName + "." + collName;
 
 const st = new ShardingTest({
@@ -87,12 +94,41 @@ function assertWritesVisibleWithCapture(
     expectedChangesShard2,
     changeCaptureListShard1,
     changeCaptureListShard2,
+    expectCommitTimestamp = false,
 ) {
     function assertChangeEqualWithCapture(changeDoc, expectedChange, changeCaptureList) {
         assert.eq(expectedChange.operationType, changeDoc.operationType);
         assert.eq(expectedChange._id, changeDoc.documentKey._id);
         changeCaptureList.push(changeDoc);
     }
+
+    // Verify that all commit timestamps are identical.
+    let commitTimestamp = null;
+    const assertCommitTimestamp = (changeDoc) => {
+        if (expectCommitTimestamp) {
+            assert(changeDoc.hasOwnProperty("commitTimestamp"),
+                   "expecting doc to have a 'commitTimestamp' field",
+                   {
+                       changeDoc,
+                   });
+            assert(
+                isTimestamp(changeDoc["commitTimestamp"]),
+                "expecting 'commitTimestamp' field to be a timestamp",
+                {changeDoc},
+            );
+            if (commitTimestamp === null) {
+                commitTimestamp = changeDoc["commitTimestamp"];
+            } else {
+                assert.eq(commitTimestamp,
+                          changeDoc["commitTimestamp"],
+                          "expecting equal commitTimestamps",
+                          {
+                              commitTimestamp,
+                              changeDoc,
+                          });
+            }
+        }
+    };
 
     // Cross-shard transaction, and "endOfTransaction" events are enabled.
     const expectEndOfTransaction = expectedChangesShard1.length && expectedChangesShard2.length &&
@@ -105,15 +141,24 @@ function assertWritesVisibleWithCapture(
         if (changeDoc.documentKey.shard === 1) {
             assert(expectedChangesShard1.length);
             assertChangeEqualWithCapture(
-                changeDoc, expectedChangesShard1[0], changeCaptureListShard1);
+                changeDoc,
+                expectedChangesShard1[0],
+                changeCaptureListShard1,
+                expectCommitTimestamp,
+            );
             expectedChangesShard1.shift();
         } else {
             assert.eq(2, changeDoc.documentKey.shard);
             assert(expectedChangesShard2.length);
             assertChangeEqualWithCapture(
-                changeDoc, expectedChangesShard2[0], changeCaptureListShard2);
+                changeDoc,
+                expectedChangesShard2[0],
+                changeCaptureListShard2,
+                expectCommitTimestamp,
+            );
             expectedChangesShard2.shift();
         }
+        assertCommitTimestamp(changeDoc);
     }
 
     if (expectEndOfTransaction) {
@@ -125,7 +170,7 @@ function assertWritesVisibleWithCapture(
     assertNoChanges(cursor);
 }
 
-const changeStreamCursor = coll.watch([], {showExpandedEvents: true});
+const changeStreamCursor = coll.watch([], {showExpandedEvents: true, showCommitTimestamp: true});
 
 // Insert a document and confirm that the change stream has it.
 assert.commandWorked(coll.insert({shard: 1, _id: "no-txn-doc-1"}, {writeConcern: {w: "majority"}}));
@@ -200,6 +245,7 @@ assertWritesVisibleWithCapture(
     ],
     changeListShard1,
     changeListShard2,
+    true /* expectCommitTimestamp */,
 );
 
 // Perform a write outside of the transaction.
@@ -246,13 +292,6 @@ function shardHasDocumentAtChangeListIndex(changeDoc, shardChangeList, changeLis
     assert(changeListIndex < shardChangeList.length);
 
     const expectedChangeDoc = shardChangeList[changeListIndex];
-    // Remove 'commitTimestamp' field from expected and actual events, as this field is only exposed
-    // by default in v8.2.0. Versions before v8.2.0 do not expose this field, and versions after
-    // v8.2.0 only expose this field when the internal flag 'showCommitTimestamp' is set when
-    // opening the change stream.
-    delete expectedChangeDoc.commitTimestamp;
-    delete changeDoc.commitTimestamp;
-
     assert.eq(changeDoc, expectedChangeDoc);
     assert.eq(
         expectedChangeDoc.documentKey,
@@ -270,7 +309,11 @@ function confirmResumeForChangeList(changeList, changeListShard1, changeListShar
         const resumeDoc = changeList[i];
         let indexShard1 = getPostTokenChangeIndex(resumeDoc, changeListShard1);
         let indexShard2 = getPostTokenChangeIndex(resumeDoc, changeListShard2);
-        const resumeCursor = coll.watch([], {startAfter: resumeDoc._id, showExpandedEvents: true});
+        const resumeCursor = coll.watch([], {
+            startAfter: resumeDoc._id,
+            showExpandedEvents: true,
+            showCommitTimestamp: true,
+        });
 
         while (indexShard1 + indexShard2 < changeListShard1.length + changeListShard2.length) {
             assert.soon(() => resumeCursor.hasNext());

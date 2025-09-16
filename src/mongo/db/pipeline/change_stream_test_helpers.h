@@ -61,6 +61,8 @@ static const NamespaceString nss =
 static const BSONObj kDefaultSpec = BSON("$changeStream" << BSONObj());
 static const BSONObj kShowExpandedEventsSpec =
     BSON("$changeStream" << BSON("showExpandedEvents" << true));
+static const BSONObj kShowCommitTimestampSpec =
+    BSON("$changeStream" << BSON("showCommitTimestamp" << true));
 
 
 /**

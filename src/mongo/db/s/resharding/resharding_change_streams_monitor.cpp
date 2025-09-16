@@ -251,6 +251,11 @@ int64_t ReshardingChangeStreamsMonitor::numBatchesForTest() {
 
 std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() const {
     DocumentSourceChangeStreamSpec changeStreamSpec;
+
+    // This field must be enabled so that change streams return the 'commitTimestamp' field for
+    // events that are part of a prepared transaction.
+    changeStreamSpec.setShowCommitTimestamp(true);
+
     changeStreamSpec.setAllowToRunOnSystemNS(_monitorNss.isSystem());
     // The monitor for a recipient needs to set 'showMigrationEvents' to true since the events
     // against the temporary resharding collection are only output when 'showMigrationEvents'

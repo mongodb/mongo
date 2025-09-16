@@ -278,6 +278,7 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_no_shards.js
     - jstests/sharding/query/change_streams/change_stream_on_system_collection.js
     - jstests/sharding/query/change_streams/change_stream_transaction_sharded.js
+    - jstests/sharding/query/change_streams/change_stream_transaction_sharded_commit_timestamp.js
     - jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
     - jstests/sharding/query/change_streams/change_stream_update_lookup_read_concern.js
     - jstests/sharding/query/change_streams/change_streams.js

@@ -27,8 +27,9 @@ function compareChanges(expectedChanges, observedChanges) {
             assert.eq(expectedChanges[i].fullDocument, observedChanges[i].fullDocument);
         }
         if (expectedChanges[i].hasOwnProperty("updateDescription")) {
-            // Need to remove this field because it is only exposed by default from v8.2 onwards,
-            // but in previous versions it is only exposed when the change stream is opened with
+            // Need to remove this field because it is only exposed by default in v8.2.0,
+            // but in previous versions and versions >= v8.2.1 it is only exposed when the change
+            // stream is opened with
             // '{showExpandedEvents: true}'.
             delete observedChanges[i].updateDescription.disambiguatedPaths;
             assert.eq(expectedChanges[i].updateDescription, observedChanges[i].updateDescription);
