@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/local_catalog/index_catalog_entry.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -86,6 +88,7 @@ void DuplicateKeyTracker::keepTemporaryTable() {
 }
 
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
+                                      const CollectionPtr& coll,
                                       const IndexCatalogEntry* indexCatalogEntry,
                                       const key_string::View& key) {
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
@@ -101,14 +104,44 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
     StackBufBuilder builder;
     key.serializeWithoutRecordId(builder);
 
-    auto status =
-        _keyConstraintsTable->rs()->insertRecord(opCtx,
-                                                 *shard_role_details::getRecoveryUnit(opCtx),
-                                                 builder.buf(),
-                                                 builder.len(),
-                                                 Timestamp());
-    if (!status.isOK())
-        return status.getStatus();
+    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+        LOGV2_DEBUG(10966700,
+                    1,
+                    "Index build: writing to duplicate key tracker container for primary-driven "
+                    "index build.",
+                    "index"_attr = indexCatalogEntry->descriptor()->indexName());
+        invariant(_keyConstraintsTable->rs()->keyFormat() == KeyFormat::Long);
+        IntegerKeyedContainer& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                                               _keyConstraintsTable->rs()->getContainer())
+                                               .get();
+
+
+        std::vector<RecordId> reservedRidBlock;
+        _keyConstraintsTable->rs()->reserveRecordIds(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), &reservedRidBlock, 1);
+        invariant(reservedRidBlock.size() == 1);
+        auto status = container_write::insert(opCtx,
+                                              *shard_role_details::getRecoveryUnit(opCtx),
+                                              coll,
+                                              container,
+                                              reservedRidBlock[0].getLong(),
+                                              std::span<const char>(builder.buf(), builder.len()));
+        if (!status.isOK())
+            return status;
+    } else {
+        auto status =
+            _keyConstraintsTable->rs()->insertRecord(opCtx,
+                                                     *shard_role_details::getRecoveryUnit(opCtx),
+                                                     builder.buf(),
+                                                     builder.len(),
+                                                     Timestamp());
+        if (!status.isOK())
+            return status.getStatus();
+    }
 
     auto numDuplicates = _duplicateCounter.addAndFetch(1);
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(

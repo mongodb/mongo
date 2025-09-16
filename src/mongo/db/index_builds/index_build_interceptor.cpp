@@ -57,6 +57,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -129,10 +130,11 @@ void IndexBuildInterceptor::keepTemporaryTables() {
 }
 
 Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
+                                                 const CollectionPtr& coll,
                                                  const IndexCatalogEntry* indexCatalogEntry,
                                                  const key_string::View& key) const {
     invariant(indexCatalogEntry->descriptor()->unique());
-    return _duplicateKeyTracker->recordKey(opCtx, indexCatalogEntry, key);
+    return _duplicateKeyTracker->recordKey(opCtx, coll, indexCatalogEntry, key);
 }
 
 Status IndexBuildInterceptor::checkDuplicateKeyConstraints(
@@ -357,12 +359,12 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
                                           TrackDuplicates trackDups,
                                           int64_t* const keysInserted,
                                           int64_t* const keysDeleted) {
-    // Sorted index types may choose to disallow duplicates (enforcing an unique index). Columnar
-    // indexes are not sorted and therefore cannot enforce uniqueness constraints. Only sorted
-    // indexes will use this lambda passed through the IndexAccessMethod interface.
-    auto onDuplicateKeyFn = [=, this](const key_string::View& duplicateKey) {
+    // Sorted index types may choose to disallow duplicates (enforcing an unique index).
+    // Only sorted indexes will use this lambda passed through the IndexAccessMethod interface.
+    auto onDuplicateKeyFn = [=, this](const CollectionPtr& coll,
+                                      const key_string::View& duplicateKey) {
         return trackDups == TrackDuplicates::kTrack
-            ? recordDuplicateKey(opCtx, indexCatalogEntry, duplicateKey)
+            ? recordDuplicateKey(opCtx, coll, indexCatalogEntry, duplicateKey)
             : Status::OK();
     };
 

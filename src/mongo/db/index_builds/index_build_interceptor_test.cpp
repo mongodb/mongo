@@ -43,9 +43,13 @@
 #include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <span>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -119,6 +123,21 @@ protected:
         return getTable(std::move(interceptor), *skippedRecordsIdent);
     }
 
+    /**
+     * Accessor for the duplicate key table from the IndexBuildInterceptor.
+     * To access the interceptor's duplicate key table, we have to mark the table as permanent and
+     * then destroy the interceptor.
+     * Requires that there is a duplicate key table instantiated for the index build (the index
+     * being built is a unique index).
+     */
+    std::unique_ptr<TemporaryRecordStore> getDuplicateKeyTable(
+        std::unique_ptr<IndexBuildInterceptor> interceptor) {
+        interceptor->keepTemporaryTables();
+        auto duplicateKeyIdent = interceptor->getDuplicateKeyTrackerTableIdent();
+        invariant(duplicateKeyIdent);
+        return getTable(std::move(interceptor), *duplicateKeyIdent);
+    }
+
     std::vector<BSONObj> getTableContents(std::unique_ptr<TemporaryRecordStore> table) {
         std::vector<BSONObj> contents;
         auto cursor = table->rs()->getCursor(
@@ -137,6 +156,19 @@ protected:
     std::vector<BSONObj> getSkippedRecordsTrackerTableContents(
         std::unique_ptr<IndexBuildInterceptor> interceptor) {
         return getTableContents(getSkippedRecordsTrackerTable(std::move(interceptor)));
+    }
+
+    std::vector<std::string> getDuplicateKeyTableContents(
+        std::unique_ptr<IndexBuildInterceptor> interceptor) {
+        std::vector<std::string> contents;
+        auto duplicateKeyTable = getDuplicateKeyTable(std::move(interceptor));
+        auto cursor = duplicateKeyTable->rs()->getCursor(
+            operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
+        while (auto record = cursor->next()) {
+            std::string str(record->data.data(), record->data.size());
+            contents.push_back(str);
+        }
+        return contents;
     }
 
     const IndexDescriptor* getIndexDescriptor(const std::string& indexName) {
@@ -268,6 +300,51 @@ TEST_F(IndexBuilderInterceptorTest,
     ASSERT_BSONOBJ_EQ(builder.obj(), skippedRecordsTrackerTable[0]);
 }
 
+TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTable) {
+    auto interceptor =
+        createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    const IndexDescriptor* desc = getIndexDescriptor("a_1");
+
+    key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
+    ksBuilder.appendNumberLong(10);
+    key_string::Value keyString(ksBuilder.release());
+
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_OK(interceptor->recordDuplicateKey(
+        operationContext(), _coll->getCollection(), desc->getEntry(), keyString));
+    wuow.commit();
+
+    key_string::View keyStringView(keyString);
+    StackBufBuilder builder;
+    keyStringView.serializeWithoutRecordId(builder);
+    std::string ksWithoutRid(builder.buf(), builder.len());
+    auto duplicates = getDuplicateKeyTableContents(std::move(interceptor));
+    ASSERT_EQ(duplicates[0], ksWithoutRid);
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimaryDriven) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    auto interceptor =
+        createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    const IndexDescriptor* desc = getIndexDescriptor("a_1");
+
+    key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
+    ksBuilder.appendNumberLong(10);
+    key_string::Value keyString(ksBuilder.release());
+
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_OK(interceptor->recordDuplicateKey(
+        operationContext(), _coll->getCollection(), desc->getEntry(), keyString));
+    wuow.commit();
+
+    key_string::View keyStringView(keyString);
+    StackBufBuilder builder;
+    keyStringView.serializeWithoutRecordId(builder);
+    std::string ksWithoutRid(builder.buf(), builder.len());
+    auto duplicates = getDuplicateKeyTableContents(std::move(interceptor));
+    ASSERT_EQ(duplicates[0], ksWithoutRid);
+}
 
 }  // namespace
 }  // namespace mongo

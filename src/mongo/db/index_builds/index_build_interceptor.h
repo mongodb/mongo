@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/skipped_record_tracker.h"
@@ -121,6 +122,7 @@ public:
      * checkDuplicateKeyConstraints();
      */
     Status recordDuplicateKey(OperationContext* opCtx,
+                              const CollectionPtr& coll,
                               const IndexCatalogEntry* indexCatalogEntry,
                               const key_string::View& key) const;
 

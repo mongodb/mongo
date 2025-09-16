@@ -93,7 +93,8 @@ public:
                                                      Status status,
                                                      const BSONObj& obj,
                                                      const boost::optional<RecordId>& loc)>;
-    using KeyHandlerFn = unique_function<Status(const key_string::View&)>;
+    using KeyHandlerFn =
+        unique_function<Status(const CollectionPtr& coll, const key_string::View&)>;
     using RecordIdHandlerFn = unique_function<Status(const RecordId&)>;
     using YieldFn = unique_function<std::pair<const CollectionPtr*, const IndexCatalogEntry*>(
         OperationContext*)>;

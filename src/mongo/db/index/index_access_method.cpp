@@ -444,7 +444,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 opCtx, ru, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
             if (auto status = std::get_if<Status>(&result)) {
                 if (status->isOK() && onDuplicateKey) {
-                    result = onDuplicateKey(keyString);
+                    result = onDuplicateKey(coll, keyString);
                 }
             }
         }
@@ -1200,7 +1200,7 @@ Status SortedDataIndexAccessMethod::BaseBulkBuilder::commit(
         }
 
         if (isDup) {
-            if (auto status = onDuplicateKeyInserted(data.first); !status.isOK())
+            if (auto status = onDuplicateKeyInserted(*collection, data.first); !status.isOK())
                 return status;
         }
 

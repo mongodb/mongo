@@ -1015,7 +1015,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 entry,
                 dupsAllowed,
                 kYieldIterations,
-                [&](const key_string::View& duplicateKey) {
+                [&](const CollectionPtr& coll, const key_string::View& duplicateKey) {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
                     if (!dupsAllowed || onDuplicateRecord || _ignoreUnique ||
@@ -1026,7 +1026,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                         opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx), [&] {
                             WriteUnitOfWork wuow(opCtx);
                             Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
-                                opCtx, entry, duplicateKey);
+                                opCtx, coll, entry, duplicateKey);
                             if (status.isOK()) {
                                 wuow.commit();
                             }

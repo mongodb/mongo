@@ -72,6 +72,7 @@ public:
      * Given a duplicate key, insert it into the key constraint table.
      */
     Status recordKey(OperationContext* opCtx,
+                     const CollectionPtr& coll,
                      const IndexCatalogEntry* indexCatalogEntry,
                      const key_string::View& key);
 
