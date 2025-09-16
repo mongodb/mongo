@@ -9,7 +9,6 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const serverParams = {
@@ -25,7 +24,7 @@ const dbName = jsTestName();
 const collName = "test";
 
 function runStandaloneTest(dbName, collName) {
-    jsTest.log.info("Running standalone test");
+    jsTestLog("Running standalone test");
     const conn = MongoRunner.runMongod(serverParams);
     const db = conn.getDB(dbName);
     const coll = db[collName];
@@ -36,7 +35,7 @@ function runStandaloneTest(dbName, collName) {
 }
 
 function runShardedTest(dbName, collName) {
-    jsTest.log.info("Running sharded test");
+    jsTestLog("Running sharded test");
     const st = new ShardingTest({
         shards: 2,
         rs: {nodes: 1},
@@ -66,19 +65,11 @@ function insertData(coll) {
 }
 
 function runTest(conn, db, coll) {
-    const shouldAppear = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
-    checkCurrentOpMemoryTracking(
-        "group",
-        conn,
-        db,
-        coll,
-        [{$group: {_id: {$mod: ["$_id", 3]}, count: {$sum: 1}}}],
-        shouldAppear,
-    );
+    checkCurrentOpMemoryTracking("group", conn, db, coll, [{$group: {_id: {$mod: ["$_id", 3]}, count: {$sum: 1}}}]);
 }
 
-function assertCurrentOpOutput(shouldAppear, curOpDoc) {
-    if (shouldAppear) {
+function assertCurrentOpOutput(memoryTrackingEnabled, curOpDoc) {
+    if (memoryTrackingEnabled) {
         assert(curOpDoc.hasOwnProperty("inUseTrackedMemBytes"), tojson(curOpDoc));
         assert.gt(curOpDoc.inUseTrackedMemBytes, 0);
         assert(curOpDoc.hasOwnProperty("peakTrackedMemBytes"), tojson(curOpDoc));
@@ -89,10 +80,11 @@ function assertCurrentOpOutput(shouldAppear, curOpDoc) {
     }
 }
 
-export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline, shouldAppear) {
-    jsTest.log.info(
-        `Checking $currentOp for stage ${stageName}. Memory tracking metrics should ` +
-            (shouldAppear ? "appear" : "not appear"),
+function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
+    const memoryTrackingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
+    jsTestLog(
+        `Checking $currentOp for stage ${stageName} with memory tracking ` +
+            (memoryTrackingEnabled ? "enabled" : "disabled"),
     );
 
     // Run a pipeline with a small batch size, to ensure that a cursor is created and we can call
@@ -100,12 +92,7 @@ export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline
     const session = db.getMongo().startSession();
     const sessionDb = session.getDatabase(db.getName());
     let cursorId = assert.commandWorked(
-        sessionDb.runCommand({
-            aggregate: coll.getName(),
-            pipeline,
-            allowDiskUse: false,
-            cursor: {batchSize: 1},
-        }),
+        sessionDb.runCommand({aggregate: coll.getName(), pipeline, cursor: {batchSize: 1}}),
     ).cursor.id;
     assert.neq(cursorId, NumberLong(0));
 
@@ -130,7 +117,7 @@ export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline
         conn.port,
     );
 
-    // Wait for the getMore to be blocked on the failpoint.
+    // Wait for the getMore to be blocked on the failpoint
     failPoint.wait();
 
     // Find the current operation for the getMore blocked command. We need to specify "localOps" to
@@ -141,7 +128,7 @@ export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline
         .toArray();
     assert.eq(curOpDocs.length, 1, "Expected one current operation for the getMore command");
 
-    assertCurrentOpOutput(shouldAppear, curOpDocs[0]);
+    assertCurrentOpOutput(memoryTrackingEnabled, curOpDocs[0]);
 
     // Unblock the getMore command and wait for it to finish.
     failPoint.off();
@@ -156,7 +143,7 @@ export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline
         ])
         .toArray();
     assert.eq(curOpDocs.length, 1, "Expected one idle cursor for unfinished query");
-    assertCurrentOpOutput(shouldAppear, curOpDocs[0]);
+    assertCurrentOpOutput(memoryTrackingEnabled, curOpDocs[0]);
 
     session.endSession();
 }
