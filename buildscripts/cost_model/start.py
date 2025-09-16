@@ -113,7 +113,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
     field = [f for f in collection.fields if f.name == "int_uniform"][0]
     requests = []
-    cards = [25, 50, 100, 200, 300]
+    cards = [25, 50, 100, 200, 300, 400, 500]
     # For every query, we run it as both a forward and backward scan.
     for direction, note in [(1, "FORWARD"), (-1, "BACKWARD")]:
         for card in cards:
@@ -157,7 +157,7 @@ async def execute_collection_scans(
     collections = [c for c in collections if c.name.startswith("coll_scan")]
     # Even though these numbers are not representative of the way COLLSCANs are usually used,
     # we can use them for calibration based on the assumption that the cost scales linearly.
-    limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
+    limits = [1, 5, 25, 50, 100, 1000, 2000, 3000, 4000, 5000]
     requests = []
     for direction in [1, -1]:
         note = f"COLLSCAN_{'FORWARD' if direction == 1 else 'BACKWARD'}"
@@ -170,7 +170,7 @@ async def execute_collection_scans(
 
 async def execute_limits(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
-    limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500, 1000]
+    limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500] + list(range(1000, 10001, 1000))
 
     requests = [Query({"limit": limit}, note="LIMIT") for limit in limits]
     await workload_execution.execute(
@@ -180,8 +180,8 @@ async def execute_limits(database: DatabaseInstance, collections: Sequence[Colle
 
 async def execute_skips(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
-    skips = [5, 10, 15, 20, 25, 50, 75, 100, 500, 1000]
-    limits = [5, 10, 15, 20, 50, 75, 100]
+    skips = [5, 10, 15, 20, 25, 50, 75, 100, 500, 1000, 2500, 5000]
+    limits = [5, 10, 15, 20, 50, 75, 100, 250, 500, 1000]
     requests = []
     # We add a LIMIT on top of the SKIP in order to easily vary the number of processed documents.
     for limit in limits:
@@ -193,8 +193,9 @@ async def execute_skips(database: DatabaseInstance, collections: Sequence[Collec
 
 
 async def execute_projections(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [c for c in collections if c.name.startswith("c_int_05_30")][0]
-    limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
+    collection = [c for c in collections if c.name == "c_int_05_30000"][0]
+    limits = [5, 10, 50, 75, 100, 150, 300, 500] + list(range(1000, 10001, 1000))
+
     # We calibrate using projections on the last field since this means the node does a nontrivial amount of work.
     # This is because non-covered projections iterate over the fields in a given document as part of its work.
     field = collection.fields[-1]

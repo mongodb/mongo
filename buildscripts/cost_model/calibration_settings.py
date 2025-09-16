@@ -292,7 +292,7 @@ def create_merge_sort_collection_template(
     )
 
 
-collection_caridinalities = list(range(10000, 50001, 10000))
+collection_cardinalities = list(range(10000, 50001, 10000))
 
 c_int_05 = config.CollectionTemplate(
     name="c_int_05",
@@ -329,7 +329,7 @@ c_int_05 = config.CollectionTemplate(
         ),
     ],
     compound_indexes=[],
-    cardinalities=collection_caridinalities,
+    cardinalities=collection_cardinalities,
 )
 
 c_arr_01 = config.CollectionTemplate(
@@ -343,12 +343,12 @@ c_arr_01 = config.CollectionTemplate(
         )
     ],
     compound_indexes=[],
-    cardinalities=collection_caridinalities,
+    cardinalities=collection_cardinalities,
 )
 
-index_scan = create_index_scan_collection_template("index_scan", 1000000)
+index_scan = create_index_scan_collection_template("index_scan", 1_000_000)
 coll_scan = create_coll_scan_collection_template(
-    "coll_scan", cardinalities=[1000, 5000, 10000], payload_size=2000
+    "coll_scan", cardinalities=[100_000], payload_size=2000
 )
 sort_collections = create_coll_scan_collection_template(
     "sort",
