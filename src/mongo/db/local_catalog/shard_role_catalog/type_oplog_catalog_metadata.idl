@@ -44,6 +44,9 @@ structs:
             db:
                 type: DatabaseType
                 description: "Database metadata entry"
+            fromClone:
+                type: bool
+                description: "Indicates whether the database metadata was created as part of a cloneAuthoritativeMetadata DDL"
 
     DropDatabaseMetadataOplogEntry:
         description: "Oplog entry format for a dropDatabase metadata operation"

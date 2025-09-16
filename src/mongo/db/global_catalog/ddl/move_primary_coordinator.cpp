@@ -99,6 +99,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
 MONGO_FAIL_POINT_DEFINE(hangBeforeMovePrimaryCriticalSection);
+MONGO_FAIL_POINT_DEFINE(hangAfterMovePrimaryCriticalSection);
 MONGO_FAIL_POINT_DEFINE(movePrimaryFailIfNeedToCloneMovableCollections);
 
 /**
@@ -284,27 +285,32 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         .then(_buildPhaseHandler(
             Phase::kCatchup,
             [this, anchor = shared_from_this()](auto* opCtx) { blockWrites(opCtx); }))
-        .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
-                                     if (!_firstExecution) {
-                                         // Perform a noop write on the recipient in order to
-                                         // advance the txnNumber for this coordinator's logical
-                                         // session. This prevents requests with older txnNumbers
-                                         // from being processed.
-                                         _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                                             opCtx, getNewSession(opCtx), **executor);
-                                     }
+        .then(_buildPhaseHandler(
+            Phase::kEnterCriticalSection,
+            [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
+                if (!_firstExecution) {
+                    // Perform a noop write on the recipient in order to
+                    // advance the txnNumber for this coordinator's logical
+                    // session. This prevents requests with older txnNumbers
+                    // from being processed.
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, getNewSession(opCtx), **executor);
+                }
 
 
-                                     if (MONGO_unlikely(
-                                             hangBeforeMovePrimaryCriticalSection.shouldFail())) {
-                                         LOGV2(9031700, "Hit hangBeforeMovePrimaryCriticalSection");
-                                         hangBeforeMovePrimaryCriticalSection.pauseWhileSet(opCtx);
-                                     }
+                if (MONGO_unlikely(hangBeforeMovePrimaryCriticalSection.shouldFail())) {
+                    LOGV2(9031700, "Hit hangBeforeMovePrimaryCriticalSection");
+                    hangBeforeMovePrimaryCriticalSection.pauseWhileSet(opCtx);
+                }
 
-                                     blockReads(opCtx);
-                                     enterCriticalSectionOnRecipient(opCtx, executor, token);
-                                 }))
+                blockReads(opCtx);
+                enterCriticalSectionOnRecipient(opCtx, executor, token);
+
+                if (MONGO_unlikely(hangAfterMovePrimaryCriticalSection.shouldFail())) {
+                    LOGV2(10971600, "Hit hangAfterMovePrimaryCriticalSection");
+                    hangAfterMovePrimaryCriticalSection.pauseWhileSet(opCtx);
+                }
+            }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {

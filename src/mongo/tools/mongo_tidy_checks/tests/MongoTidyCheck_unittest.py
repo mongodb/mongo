@@ -58,6 +58,16 @@ class MongoTidyTests(unittest.TestCase):
             sys.stderr.write(msg)
             self.fail()
 
+    def test_MongoBypassDatabaseMetadataAccessCheck(self):
+        self.expected_output = (
+            "Potentially incorrect use of BypassDatabaseMetadataAccessCheck: operations that modify "
+            "the database metadata must acquire the critical section, and operations that read the "
+            "database metadata must ensure that no one else is holding the critical section. "
+            "Review carefully, and if the use is warranted, add NOLINT with a comment explaining why."
+        )
+
+        self.run_clang_tidy()
+
     def test_MongoHeaderBracketCheck(self):
         self.expected_output = [
             "error: non-mongo include 'cctype' should use angle brackets",

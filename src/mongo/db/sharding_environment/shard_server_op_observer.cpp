@@ -850,6 +850,16 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
 
+    // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata.
+    // On the secondary path, this operation may be represented by only a 'c' oplog entry that
+    // commits the database metadata with the "fromClone" option. Once this occurs, the secondary
+    // path must bypass metadata access checks, because CloneAuthoritativeMetadata is allowed to
+    // modify database metadata without holding the critical section.
+    boost::optional<BypassDatabaseMetadataAccess> bypassDbMetadataAccess;
+    if (entry.getFromClone()) {
+        bypassDbMetadataAccess.emplace(opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);
+    }
+
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
     scopedDsr->setDbMetadata(opCtx, dbMetadata);
 }
@@ -867,7 +877,7 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
     auto dbName = entry.getDbName();
 
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbMetadata();
+    scopedDsr->clearDbMetadata(opCtx);
 }
 
 }  // namespace mongo

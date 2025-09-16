@@ -601,24 +601,18 @@ void ShardingRecoveryService::_recoverDatabaseShardingState(OperationContext* op
     Lock::DBLockSkipOptions dbLockOptions{.explicitIntent =
                                               rss::consensus::IntentRegistry::Intent::Read};
 
+    // ShardingRecoveryService can bypass the critical section to recover database metadata as there
+    // is no need to serialize with CRUD operations because they are not allowed in this state.
+    BypassDatabaseMetadataAccess bypassDbMetadataAccess(
+        opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+
     PersistentTaskStore<DatabaseType> store(NamespaceString::kConfigShardCatalogDatabasesNamespace);
     store.forEach(opCtx, BSONObj{}, [&opCtx, &dbLockOptions](const DatabaseType& dbMetadata) {
         const auto dbName = dbMetadata.getDbName();
         Lock::DBLock dbLock{opCtx, dbName, MODE_X, Date_t::max(), dbLockOptions};
+
         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-
-        auto reason = BSON(
-            "shardingRecoveryService"
-            << "setDbMetadata"
-            << "dbName"
-            << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest()));
-
-        scopedDsr->enterCriticalSectionCatchUpPhase(reason);
-        scopedDsr->enterCriticalSectionCommitPhase(reason);
-
         scopedDsr->setDbMetadata(opCtx, dbMetadata);
-
-        scopedDsr->exitCriticalSection(reason);
 
         return true;
     });
@@ -641,24 +635,16 @@ void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
         scopedCsr->exitCriticalSectionNoChecks();
     }
 
+    // ShardingRecoveryService can bypass the critical section to recover database metadata as there
+    // is no need to serialize with CRUD operations because they are not allowed in this state.
+    BypassDatabaseMetadataAccess bypassDbMetadataAccess(
+        opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
         Lock::DBLock dbLock{opCtx, dbName, MODE_X, Date_t::max(), dbLockOptions};
-
         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
         scopedDsr->exitCriticalSectionNoChecks();
-
-        auto reason = BSON(
-            "shardingRecoveryService"
-            << "clearDbMetadata"
-            << "dbName"
-            << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest()));
-
-        scopedDsr->enterCriticalSectionCatchUpPhase(reason);
-        scopedDsr->enterCriticalSectionCommitPhase(reason);
-
-        scopedDsr->clearDbMetadata();
-
-        scopedDsr->exitCriticalSection(reason);
+        scopedDsr->clearDbMetadata(opCtx);
     }
 
     LOGV2_DEBUG(10371109, 2, "Reset all in-memory sharding states");

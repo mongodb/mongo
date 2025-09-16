@@ -775,7 +775,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             // refresh is in progress or can start (would require to exclusive lock the DSS).
             // Therefore, the database version can be accessed safely.
 
-            const auto dbVersion = (*scopedDsr)->getDbVersion();
+            const auto dbVersion = (*scopedDsr)->getDbVersion(opCtx);
             if (dbVersion && receivedDbVersion <= *dbVersion) {
                 // No need to refresh the database metadata as the wanted version is newer than the
                 // one received.
@@ -867,7 +867,7 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
         // it (would require to exclusive lock the DSS). Therefore, the database version can be
         // accessed safely.
 
-        const auto dbVersion = (*scopedDsr)->getDbVersion();
+        const auto dbVersion = (*scopedDsr)->getDbVersion(opCtx);
 
         // If shards are the authoritative source for database metadata, at this stage this node
         // has waited until the received version's optime and that any necessary critical section

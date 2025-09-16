@@ -63,7 +63,7 @@ function prepareCompressedBucket() {
 
     // Check the buckets to make sure it generated what we expect.
     const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
-    if (!TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (!TestData.runningWithBalancer) {
         assert.eq(2, bucketDocs.length, tojson(bucketDocs));
         assert.eq(0, bucketDocs[0].control.min.f, "Expected first bucket to start at 0. " + tojson(bucketDocs));
         assert.eq(
@@ -85,10 +85,10 @@ function prepareCompressedBucket() {
             `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`,
         );
     } else {
-        // If we are running with moveCollection or FCV upgrade in the background, we may run into
-        // the issue described by SERVER-89349 which can result in more bucket documents than
-        // needed. However, we still want to check that the number of documents is within the
-        // acceptable range.
+        // If we are running with moveCollection in the background, we may run into the issue
+        // described by SERVER-89349 which can result in more bucket documents than needed.
+        // However, we still want to check that the number of documents is within the acceptable
+        // range.
         assert.lte(2, bucketDocs.length, tojson(bucketDocs));
         let currMin = 0;
         bucketDocs.forEach((doc) => {

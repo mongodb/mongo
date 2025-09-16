@@ -14,8 +14,6 @@
  *   multi_clients_incompatible,
  *   # The metrics checked in the test may be spoiled by data movement.
  *   assumes_balancer_off,
- *   # The metrics checked in the test may be spoiled by cloneAuthoritativeMetadata hook.
- *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());

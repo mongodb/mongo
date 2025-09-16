@@ -152,7 +152,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, OnDbVersionMismatch) {
 
         auto dbVersion = [&] {
             const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kDbName);
-            return scopedDsr->getDbVersion();
+            return scopedDsr->getDbVersion(opCtx);
         }();
 
         ASSERT_TRUE(dbVersion);
@@ -182,7 +182,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
 
         auto dbVersion = [&] {
             const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, kDbName);
-            return scopedDsr->getDbVersion();
+            return scopedDsr->getDbVersion(opCtx);
         }();
 
         ASSERT_TRUE(dbVersion);
@@ -322,6 +322,65 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
                        ErrorCodes::StaleDbVersion);
 
     ASSERT_DOES_NOT_THROW(dsr->exitCriticalSection(BSONObj()));
+}
+
+class BypassDatabaseMetadataAccessTest : public ServiceContextMongoDTest {};
+
+TEST_F(BypassDatabaseMetadataAccessTest, BypassRead) {
+    auto opCtxPtr = makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+    auto& opDbMetadata = OperationDatabaseMetadata::get(opCtx);
+
+    ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+    ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
+
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
+        ASSERT_TRUE(opDbMetadata.getBypassReadDbMetadataAccess());
+        ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
+    }
+
+    ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+    ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
+}
+
+TEST_F(BypassDatabaseMetadataAccessTest, BypassWrite) {
+    auto opCtxPtr = makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+    auto& opDbMetadata = OperationDatabaseMetadata::get(opCtx);
+
+    ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+    ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
+
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+        ASSERT_TRUE(opDbMetadata.getBypassWriteDbMetadataAccess());
+    }
+
+    ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+    ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
+}
+
+TEST_F(BypassDatabaseMetadataAccessTest, BypassReadAndWrite) {
+    auto opCtxPtr = makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+    auto& opDbMetadata = OperationDatabaseMetadata::get(opCtx);
+
+    ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+    ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
+
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kReadAndWrite);  // NOLINT
+        ASSERT_TRUE(opDbMetadata.getBypassReadDbMetadataAccess());
+        ASSERT_TRUE(opDbMetadata.getBypassWriteDbMetadataAccess());
+    }
+
+    ASSERT_FALSE(opDbMetadata.getBypassReadDbMetadataAccess());
+    ASSERT_FALSE(opDbMetadata.getBypassWriteDbMetadataAccess());
 }
 
 }  // namespace

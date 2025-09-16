@@ -45,11 +45,11 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        // In suites running moveCollection or FCV upgrade in the background, it is possible to hit
-        // the issue described by SERVER-89349 which will result in more bucket documents being
-        // created. Creating an index on the time field allows the buckets to be reopened, allowing
-        // the counts in this test to be accurate.
+    if (TestData.runningWithBalancer) {
+        // In suites running moveCollection in the background, it is possible to hit the issue
+        // described by SERVER-89349 which will result in more bucket documents being created.
+        // Creating an index on the time field allows the buckets to be reopened, allowing the
+        // counts in this test to be accurate.
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
@@ -72,7 +72,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
@@ -95,7 +95,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "hours"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
@@ -118,7 +118,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
     assertBucketMaxSpanSecondsEquals(coll, 60 * 60);
@@ -148,7 +148,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:22:02.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:59:59.999Z")}));
     let bucketCount = getTimeseriesCollForRawOps(coll).find().rawData().itcount();
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.lte(2, bucketCount);
     } else {
         assert.eq(2, bucketCount);
@@ -170,7 +170,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
     assertBucketMaxSpanSecondsEquals(coll, 60 * 60);
@@ -196,7 +196,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T20:59:59.999Z")}));
     let bucketCount = getTimeseriesCollForRawOps(coll).find().rawData().itcount();
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.lte(2, bucketCount);
     } else {
         assert.eq(2, bucketCount);
@@ -217,7 +217,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
     assertBucketMaxSpanSecondsEquals(coll, 24 * 60 * 60);
@@ -243,7 +243,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T19:59:59.999Z")}));
     let bucketCount = getTimeseriesCollForRawOps(coll).find().rawData().itcount();
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.lte(2, bucketCount);
     } else {
         assert.eq(2, bucketCount);
@@ -264,7 +264,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     coll.drop();
 
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (TestData.runningWithBalancer) {
         assert.commandWorked(coll.createIndex({"t": 1}));
     }
 

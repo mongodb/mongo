@@ -618,7 +618,7 @@ TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) 
     // Introduce an inconsistency in the shard catalog cache.
     {
         auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
-        scopedDsr->clearDbMetadata();
+        scopedDsr->clearDbMetadata(operationContext());
     }
 
     // Validate that we can find the inconsistency.

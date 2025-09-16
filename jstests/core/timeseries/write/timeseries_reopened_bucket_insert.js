@@ -44,9 +44,9 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
     assert.eq(stats.timeseries["bucketCount"], expectedBucketCount);
-    if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        // When resharding or FCV upgrade is happening in the background, it can cause errors that
-        // result in operations being retried and the bucket reopening count being too high.
+    if (TestData.runningWithBalancer) {
+        // When resharding is happening in the background, it can cause errors that result in
+        // operations being retried and the bucket reopening count being too high.
         assert.gte(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
     } else {
         assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
@@ -653,7 +653,7 @@ const checkIfBucketReopened = function (measurement, willCreateBucket = false, w
     // If the collection is sharded, there will be an index on control.min.time that can satisfy the
     // reopening query, otherwise we can do some further tests. With moveCollection running in the
     // background, when buckets are closed and reopened may change.
-    if (!isShardedTimeseries(coll) && !TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (!isShardedTimeseries(coll) && !TestData.runningWithBalancer) {
         // Create a partial index on time.
         assert.commandWorked(
             coll.createIndex({[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}),

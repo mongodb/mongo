@@ -41,6 +41,7 @@ tests = [
     "test_MongoStringDataStringViewApiCheck",
     "test_MongoInvariantStatusIsOKCheck",
     "test_MongoInvariantDDLCoordinatorCheck",
+    "test_MongoBypassDatabaseMetadataAccessCheck",
 ]
 
 [

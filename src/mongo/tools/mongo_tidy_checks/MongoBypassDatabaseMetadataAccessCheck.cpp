@@ -27,16 +27,36 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/global_catalog/type_database_gen.h"
-#include "mongo/db/operation_context.h"
+#include "MongoBypassDatabaseMetadataAccessCheck.h"
 
 namespace mongo {
+namespace tidy {
 
-// TODO (SERVER-98118): add this function to the unnamed namespace once 9.0 becomes last LTS.
-void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
-                                         const DatabaseType& dbMetadata,
-                                         bool fromClone = false);
+using namespace clang;
+using namespace clang::ast_matchers;
 
+MongoBypassDatabaseMetadataAccessCheck::MongoBypassDatabaseMetadataAccessCheck(
+    StringRef Name, clang::tidy::ClangTidyContext* Context)
+    : ClangTidyCheck(Name, Context) {}
+
+void MongoBypassDatabaseMetadataAccessCheck::registerMatchers(MatchFinder* Finder) {
+    Finder->addMatcher(varDecl(hasType(cxxRecordDecl(hasName("BypassDatabaseMetadataAccessCheck"))))
+                           .bind("BypassDatabaseMetadataAccessCheckDec"),
+                       this);
+}
+
+void MongoBypassDatabaseMetadataAccessCheck::check(const MatchFinder::MatchResult& Result) {
+    if (const auto matchedVar =
+            Result.Nodes.getNodeAs<VarDecl>("BypassDatabaseMetadataAccessCheckDec")) {
+        diag(matchedVar->getBeginLoc(),
+             "Potentially incorrect use of BypassDatabaseMetadataAccessCheck: operations that "
+             "modify the database metadata must acquire the critical section, and operations that "
+             "read the database metadata must ensure that no one else is holding the critical "
+             "section. Review carefully, and if the use is warranted, add NOLINT with a comment "
+             "explaining why.");
+        return;
+    }
+}
+
+}  // namespace tidy
 }  // namespace mongo

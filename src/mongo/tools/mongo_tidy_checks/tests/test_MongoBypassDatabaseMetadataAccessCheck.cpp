@@ -26,17 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#pragma once
-
-#include "mongo/db/global_catalog/type_database_gen.h"
-#include "mongo/db/operation_context.h"
-
 namespace mongo {
+class BypassDatabaseMetadataAccessCheck {
+public:
+    BypassDatabaseMetadataAccessCheck(int test) {
+        m_test = test;
+    }
 
-// TODO (SERVER-98118): add this function to the unnamed namespace once 9.0 becomes last LTS.
-void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
-                                         const DatabaseType& dbMetadata,
-                                         bool fromClone = false);
+private:
+    int m_test;
+};
+
+BypassDatabaseMetadataAccessCheck bypass(2);
 
 }  // namespace mongo

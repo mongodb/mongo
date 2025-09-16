@@ -101,7 +101,7 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
 
     // Update DSR in primary node.
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbMetadata();
+    scopedDsr->clearDbMetadata(opCtx);
 }
 
 class ShardsvrCommitDropDatabaseMetadataCommand final

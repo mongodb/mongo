@@ -130,12 +130,12 @@ public:
         return _dbMetadataAccessor.isMovePrimaryInProgress();
     }
 
-    boost::optional<DatabaseVersion> getDbVersion() const {
-        return _dbMetadataAccessor.getDbVersion();
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const {
+        return _dbMetadataAccessor.getDbVersion(opCtx);
     }
 
-    boost::optional<ShardId> getDbPrimaryShard() const {
-        return _dbMetadataAccessor.getDbPrimaryShard();
+    boost::optional<ShardId> getDbPrimaryShard(OperationContext* opCtx) const {
+        return _dbMetadataAccessor.getDbPrimaryShard(opCtx);
     }
 
     /**
@@ -146,7 +146,7 @@ public:
     /**
      * Resets this node's cached database info.
      */
-    void clearDbMetadata();
+    void clearDbMetadata(OperationContext* opCtx);
 
     /**
      * Methods to control the databases's critical section. Must be called with the database X lock
@@ -255,6 +255,58 @@ private:
     // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads
     // to wait on it, and a cancellation source to cancel the ongoing database metadata refresh.
     boost::optional<DbMetadataRefresh> _dbMetadataRefresh;
+};
+
+/**
+ * NOTE: DO NOT ADD any new usages of this class without including someone from the Catalog and
+ * Routing team on the code review.
+ *
+ * RAII class that allows an opCtx to access authoritative database metadata without checking the
+ * critical section. Normally, it is necessary to hold the critical section to write authoritative
+ * metadata, or not hold the critical section to read it. Usages of this class should be minimal and
+ * properly justified.
+ */
+class [[nodiscard]] BypassDatabaseMetadataAccess {
+public:
+    enum class Type { kReadOnly, kWriteOnly, kReadAndWrite };
+
+    explicit BypassDatabaseMetadataAccess(OperationContext* opCtx, Type type) : _opCtx(opCtx) {
+        auto& operationDatabaseMetadata = OperationDatabaseMetadata::get(opCtx);
+
+        _previousBypassReadAccess = operationDatabaseMetadata.getBypassReadDbMetadataAccess();
+        _previousBypassWriteAccess = operationDatabaseMetadata.getBypassWriteDbMetadataAccess();
+
+        switch (type) {
+            case Type::kReadOnly:
+                operationDatabaseMetadata.setBypassReadDbMetadataAccess(true);
+                operationDatabaseMetadata.setBypassWriteDbMetadataAccess(false);
+                break;
+            case Type::kWriteOnly:
+                operationDatabaseMetadata.setBypassReadDbMetadataAccess(false);
+                operationDatabaseMetadata.setBypassWriteDbMetadataAccess(true);
+                break;
+            case Type::kReadAndWrite:
+                operationDatabaseMetadata.setBypassReadDbMetadataAccess(true);
+                operationDatabaseMetadata.setBypassWriteDbMetadataAccess(true);
+                break;
+        }
+    }
+
+    ~BypassDatabaseMetadataAccess() {
+        auto& operationDatabaseMetadata = OperationDatabaseMetadata::get(_opCtx);
+        operationDatabaseMetadata.setBypassReadDbMetadataAccess(_previousBypassReadAccess);
+        operationDatabaseMetadata.setBypassWriteDbMetadataAccess(_previousBypassWriteAccess);
+    }
+
+    BypassDatabaseMetadataAccess(const BypassDatabaseMetadataAccess&) = delete;
+    BypassDatabaseMetadataAccess(BypassDatabaseMetadataAccess&&) = delete;
+    BypassDatabaseMetadataAccess& operator=(const BypassDatabaseMetadataAccess&) = delete;
+    BypassDatabaseMetadataAccess& operator=(BypassDatabaseMetadataAccess&&) = delete;
+
+private:
+    OperationContext* const _opCtx;
+    bool _previousBypassReadAccess{};
+    bool _previousBypassWriteAccess{};
 };
 
 }  // namespace mongo

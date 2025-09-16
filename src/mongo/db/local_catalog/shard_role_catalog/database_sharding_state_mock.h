@@ -100,7 +100,7 @@ public:
     /**
      * Resets this node's cached database metadata without critical section checks.
      */
-    void clearDbMetadata();
+    void clearDbMetadata(OperationContext* opCtx);
 
     /**
      * Configures the mock to simulate a failure in db version check due to unknown metadata.

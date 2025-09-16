@@ -29,6 +29,7 @@
 
 #include "MongoAssertCheck.h"
 #include "MongoBannedNamesCheck.h"
+#include "MongoBypassDatabaseMetadataAccessCheck.h"
 #include "MongoCctypeCheck.h"
 #include "MongoConfigHeaderCheck.h"
 #include "MongoCxx20BannedIncludesCheck.h"
@@ -86,6 +87,8 @@ public:
             "mongo-invariant-status-is-ok-check");
         CheckFactories.registerCheck<InvariantDDLCoordinatorCheck>(
             "mongo-invariant-ddl-coordinator-check");
+        CheckFactories.registerCheck<MongoBypassDatabaseMetadataAccessCheck>(
+            "mongo-bypass-database-metadata-access-check");
     }
 };
 

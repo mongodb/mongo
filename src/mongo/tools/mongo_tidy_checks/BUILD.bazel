@@ -12,6 +12,7 @@ cc_library(
     srcs = [
         "MongoAssertCheck.cpp",
         "MongoBannedNamesCheck.cpp",
+        "MongoBypassDatabaseMetadataAccessCheck.cpp",
         "MongoCctypeCheck.cpp",
         "MongoConfigHeaderCheck.cpp",
         "MongoCxx20BannedIncludesCheck.cpp",
@@ -35,6 +36,7 @@ cc_library(
     hdrs = [
         "MongoAssertCheck.h",
         "MongoBannedNamesCheck.h",
+        "MongoBypassDatabaseMetadataAccessCheck.h",
         "MongoCctypeCheck.h",
         "MongoConfigHeaderCheck.h",
         "MongoCxx20BannedIncludesCheck.h",

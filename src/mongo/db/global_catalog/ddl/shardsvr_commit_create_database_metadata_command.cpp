@@ -51,7 +51,9 @@
 
 namespace mongo {
 
-void commitCreateDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseType& dbMetadata) {
+void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
+                                         const DatabaseType& dbMetadata,
+                                         bool fromClone) {
     auto dbName = dbMetadata.getDbName();
     auto dbNameStr = DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
@@ -84,7 +86,8 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx, const Database
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
         oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
-        oplogEntry.setObject(CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata}.toBSON());
+        oplogEntry.setObject(
+            CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata, fromClone}.toBSON());
         oplogEntry.setOpTime(OplogSlot());
         oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 

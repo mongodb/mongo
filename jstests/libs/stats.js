@@ -27,20 +27,15 @@ export function diffHistogram(thisHistogram, lastHistogram) {
 export function assertHistogramDiffEq(db, coll, lastHistogram, readDiff, writeDiff, commandDiff) {
     let thisHistogram = getHistogramStats(coll);
     let diff = diffHistogram(thisHistogram, lastHistogram);
-    let allowedDiff = 0;
-
-    if (FixtureHelpers.isMongos(db) && TestData.isRunningFCVUpgradeDowngradeSuite) {
-        // The FCV upgrade hook enters in DB critical section, altering stats.
-        allowedDiff = 3;
-    }
 
     // Running the $collStats aggregation itself will increment read stats by one.
-    assert.lte(Math.abs(diff.reads - readDiff), allowedDiff + 1, "miscounted histogram reads:\n" + tojson(diff));
-    assert.lte(Math.abs(diff.writes - writeDiff), allowedDiff, "miscounted histogram writes:\n" + tojson(diff));
+    assert.eq(diff.reads, readDiff + 1, "miscounted histogram reads");
+    assert.eq(diff.writes, writeDiff, "miscounted histogram writes");
 
     // In some cases, the actual result could contain more results than expected because some
     // background commands could sneak in. For instance, a checkDB command run against a replica set
     // runs an extra "listIndex" command.
+    let allowedDiff = 0;
     if (FixtureHelpers.isReplSet(db)) {
         // The checkDB command could be run multiple times in a short period of time.
         allowedDiff = 3;

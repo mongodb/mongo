@@ -26,17 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-#include "mongo/db/global_catalog/type_database_gen.h"
-#include "mongo/db/operation_context.h"
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
 
 namespace mongo {
+namespace tidy {
 
-// TODO (SERVER-98118): add this function to the unnamed namespace once 9.0 becomes last LTS.
-void commitCreateDatabaseMetadataLocally(OperationContext* opCtx,
-                                         const DatabaseType& dbMetadata,
-                                         bool fromClone = false);
+/**
+ * MongoBypassDatabaseMetadataAccessCheck is a custom clang-tidy check for detecting the usage of
+ * BypassDatabaseMetadataAccess class in the source code.
+ */
+class MongoBypassDatabaseMetadataAccessCheck : public clang::tidy::ClangTidyCheck {
+public:
+    MongoBypassDatabaseMetadataAccessCheck(clang::StringRef Name,
+                                           clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+};
 
+}  // namespace tidy
 }  // namespace mongo

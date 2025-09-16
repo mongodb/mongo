@@ -62,12 +62,12 @@ public:
     /**
      * Gets the database version if available. Otherwise, boost::none.
      */
-    boost::optional<DatabaseVersion> getDbVersion() const;
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const;
 
     /**
      * Gets the database's primary shard if available. Otherwise, boost::none.
      */
-    boost::optional<ShardId> getDbPrimaryShard() const;
+    boost::optional<ShardId> getDbPrimaryShard(OperationContext* opCtx) const;
 
     /**
      * Checks if a movePrimary operation is in progress.
@@ -81,12 +81,14 @@ public:
     /**
      * Sets the database metadata (primary shard and database version). Requires `kWriteAccess`.
      */
-    void setDbMetadata(const ShardId& dbPrimaryShard, const DatabaseVersion& dbVersion);
+    void setDbMetadata(OperationContext* opCtx,
+                       const ShardId& dbPrimaryShard,
+                       const DatabaseVersion& dbVersion);
 
     /**
      * Clears the database metadata. Requires `kWriteAccess`.
      */
-    void clearDbMetadata();
+    void clearDbMetadata(OperationContext* opCtx);
 
     /**
      * Sets the movePrimary operation flag to indicate it is in progress.
@@ -122,6 +124,47 @@ private:
     boost::optional<ShardId> _dbPrimaryShard;
     boost::optional<DatabaseVersion> _dbVersion;
     bool _movePrimaryInProgress{false};
+};
+
+/**
+ * This is a decoration of the OperationContext. If getBypassReadDbMetadataAccess() returns true,
+ * read accesses to authoritative database metadata are allowed while holding the critical section.
+ * Likewise, if getBypassWriteDbMetadataAccess() returns true, writes to authoritative database
+ * metadata are allowed without holding the critical section.
+ *
+ * Use BypassDatabaseMetadataAccess (with justification) to temporarily modify those values.
+ */
+class OperationDatabaseMetadata {
+    OperationDatabaseMetadata(const OperationDatabaseMetadata&) = delete;
+    OperationDatabaseMetadata& operator=(const OperationDatabaseMetadata&) = delete;
+
+public:
+    OperationDatabaseMetadata() = default;
+    ~OperationDatabaseMetadata() = default;
+
+    static OperationDatabaseMetadata& get(OperationContext* opCtx);
+
+    bool getBypassReadDbMetadataAccess() const {
+        return _bypassReadDbMetadataAccess;
+    }
+
+    bool getBypassWriteDbMetadataAccess() const {
+        return _bypassWriteDbMetadataAccess;
+    }
+
+private:
+    friend class BypassDatabaseMetadataAccess;
+
+    void setBypassReadDbMetadataAccess(bool set) {
+        _bypassReadDbMetadataAccess = set;
+    }
+
+    void setBypassWriteDbMetadataAccess(bool set) {
+        _bypassWriteDbMetadataAccess = set;
+    }
+
+    bool _bypassReadDbMetadataAccess{false};
+    bool _bypassWriteDbMetadataAccess{false};
 };
 
 }  // namespace mongo

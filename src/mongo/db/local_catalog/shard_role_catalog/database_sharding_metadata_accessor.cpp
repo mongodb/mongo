@@ -29,6 +29,7 @@
 
 #include "mongo/db/local_catalog/shard_role_catalog/database_sharding_metadata_accessor.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 
 #include <boost/none.hpp>
@@ -39,23 +40,35 @@
 
 namespace mongo {
 
+namespace {
+
+const auto getOpCtxDecoration = OperationContext::declareDecoration<OperationDatabaseMetadata>();
+
+}
+
 DatabaseShardingMetadataAccessor::DatabaseShardingMetadataAccessor(DatabaseName dbName)
     : _dbName(dbName), _accessType(AccessType::kReadAccess) {}
 
-boost::optional<DatabaseVersion> DatabaseShardingMetadataAccessor::getDbVersion() const {
-    tassert(10371101,
-            fmt::format("Expected read access to retrieve database version for database: {}",
-                        _dbName.toStringForErrorMsg()),
-            _accessType == AccessType::kReadAccess);
+boost::optional<DatabaseVersion> DatabaseShardingMetadataAccessor::getDbVersion(
+    OperationContext* opCtx) const {
+    if (!OperationDatabaseMetadata::get(opCtx).getBypassReadDbMetadataAccess()) {
+        tassert(10371101,
+                fmt::format("Expected read access to retrieve database version for database: {}",
+                            _dbName.toStringForErrorMsg()),
+                _accessType == AccessType::kReadAccess);
+    }
 
     return _dbVersion;
 }
 
-boost::optional<ShardId> DatabaseShardingMetadataAccessor::getDbPrimaryShard() const {
-    tassert(10371102,
-            fmt::format("Expected read access to retrieve primary shard for database: {}",
-                        _dbName.toStringForErrorMsg()),
-            _accessType == AccessType::kReadAccess);
+boost::optional<ShardId> DatabaseShardingMetadataAccessor::getDbPrimaryShard(
+    OperationContext* opCtx) const {
+    if (!OperationDatabaseMetadata::get(opCtx).getBypassReadDbMetadataAccess()) {
+        tassert(10371102,
+                fmt::format("Expected read access to retrieve primary shard for database: {}",
+                            _dbName.toStringForErrorMsg()),
+                _accessType == AccessType::kReadAccess);
+    }
 
     return _dbPrimaryShard;
 }
@@ -64,29 +77,34 @@ bool DatabaseShardingMetadataAccessor::isMovePrimaryInProgress() const {
     return _movePrimaryInProgress;
 }
 
-void DatabaseShardingMetadataAccessor::setDbMetadata(const ShardId& dbPrimaryShard,
+void DatabaseShardingMetadataAccessor::setDbMetadata(OperationContext* opCtx,
+                                                     const ShardId& dbPrimaryShard,
                                                      const DatabaseVersion& dbVersion) {
     LOGV2(10371103,
           "Setting this node's cached database metadata",
           logAttrs(_dbName),
           "dbVersion"_attr = dbVersion);
 
-    tassert(10371104,
-            fmt::format("Expected write access to set metadata for database: {}",
-                        _dbName.toStringForErrorMsg()),
-            _accessType == AccessType::kWriteAccess);
+    if (!OperationDatabaseMetadata::get(opCtx).getBypassWriteDbMetadataAccess()) {
+        tassert(10371104,
+                fmt::format("Expected write access to set metadata for database: {}",
+                            _dbName.toStringForErrorMsg()),
+                _accessType == AccessType::kWriteAccess);
+    }
 
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
 }
 
-void DatabaseShardingMetadataAccessor::clearDbMetadata() {
+void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) {
     LOGV2(10371105, "Clearing this node's cached database metadata", logAttrs(_dbName));
 
-    tassert(10371106,
-            fmt::format("Expected write access to clear metadata for database: {}",
-                        _dbName.toStringForErrorMsg()),
-            _accessType == AccessType::kWriteAccess);
+    if (!OperationDatabaseMetadata::get(opCtx).getBypassWriteDbMetadataAccess()) {
+        tassert(10371106,
+                fmt::format("Expected write access to clear metadata for database: {}",
+                            _dbName.toStringForErrorMsg()),
+                _accessType == AccessType::kWriteAccess);
+    }
 
     _dbPrimaryShard = boost::none;
     _dbVersion = boost::none;
@@ -113,6 +131,10 @@ void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(const ShardId& dbPri
 
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
+}
+
+OperationDatabaseMetadata& OperationDatabaseMetadata::get(OperationContext* opCtx) {
+    return getOpCtxDecoration(opCtx);
 }
 
 }  // namespace mongo

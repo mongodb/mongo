@@ -67,11 +67,11 @@ TimeseriesTest.run((insert) => {
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
     assert.eq(stats.timeseries["bucketCount"], 2);
-    if (!TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (!TestData.runningWithBalancer) {
         assert.eq(stats.timeseries["numBucketsReopened"], expectedNumBucketsReopened);
     } else {
-        // Retries of ShardCannotRefreshDueToLocksHeld during resharding or FCV upgrade can cause
-        // the number of buckets that are reopened to be higher when the balancer is enabled.
+        // Retries of ShardCannotRefreshDueToLocksHeld during resharding can cause the number of
+        // buckets that are reopened to be higher when the balancer is enabled.
         assert.gte(stats.timeseries["numBucketsReopened"], expectedNumBucketsReopened);
     }
 });

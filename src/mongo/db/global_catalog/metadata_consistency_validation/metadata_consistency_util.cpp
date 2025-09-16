@@ -666,7 +666,7 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
 
     const auto dbVersion = [&]() {
         const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
-        return scopedDsr->getDbVersion();
+        return scopedDsr->getDbVersion(opCtx);
     }();
 
     if (!dbVersion) {

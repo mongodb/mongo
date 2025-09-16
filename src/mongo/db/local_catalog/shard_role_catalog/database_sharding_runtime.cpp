@@ -172,9 +172,9 @@ void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx,
 
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none),
             str::stream() << "No cached info for the database " << _dbName.toStringForErrorMsg(),
-            _dbMetadataAccessor.getDbVersion());
+            _dbMetadataAccessor.getDbVersion(opCtx));
 
-    const auto wantedVersion = *(_dbMetadataAccessor.getDbVersion());
+    const auto wantedVersion = *(_dbMetadataAccessor.getDbVersion(opCtx));
 
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, wantedVersion),
             str::stream() << "Version mismatch for the database " << _dbName.toStringForErrorMsg(),
@@ -210,10 +210,10 @@ void DatabaseShardingRuntime::assertIsPrimaryShardForDb(OperationContext* opCtx)
                         "the database version: expected: {} for database: {} and dbVersion: {}.",
                         thisShardId.toString(),
                         _dbName.toStringForErrorMsg(),
-                        _dbMetadataAccessor.getDbVersion()->toString()),
-            _dbMetadataAccessor.getDbPrimaryShard());
+                        _dbMetadataAccessor.getDbVersion(opCtx)->toString()),
+            _dbMetadataAccessor.getDbPrimaryShard(opCtx));
 
-    const auto primaryShardId = *(_dbMetadataAccessor.getDbPrimaryShard());
+    const auto primaryShardId = *(_dbMetadataAccessor.getDbPrimaryShard(opCtx));
 
     uassert(
         ErrorCodes::IllegalOperation,
@@ -245,11 +245,11 @@ void DatabaseShardingRuntime::setDbMetadata(OperationContext* opCtx,
             dbMetadata.getPrimary() == thisShardId);
     }
 
-    _dbMetadataAccessor.setDbMetadata(dbMetadata.getPrimary(), dbMetadata.getVersion());
+    _dbMetadataAccessor.setDbMetadata(opCtx, dbMetadata.getPrimary(), dbMetadata.getVersion());
 }
 
-void DatabaseShardingRuntime::clearDbMetadata() {
-    _dbMetadataAccessor.clearDbMetadata();
+void DatabaseShardingRuntime::clearDbMetadata(OperationContext* opCtx) {
+    _dbMetadataAccessor.clearDbMetadata(opCtx);
 }
 
 void DatabaseShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
@@ -288,7 +288,6 @@ void DatabaseShardingRuntime::unsetMovePrimaryInProgress(OperationContext* opCtx
     _dbMetadataAccessor.unsetMovePrimaryInProgress();
 }
 
-
 // DEPRECATED methods
 
 void DatabaseShardingRuntime::setDbInfo_DEPRECATED(OperationContext* opCtx,
@@ -306,7 +305,7 @@ void DatabaseShardingRuntime::clearDbInfo_DEPRECATED(OperationContext* opCtx,
         _cancelDbMetadataRefresh_DEPRECATED();
     }
 
-    _dbMetadataAccessor.clearDbMetadata();
+    _dbMetadataAccessor.clearDbMetadata(opCtx);
 }
 
 void DatabaseShardingRuntime::setDbMetadataRefreshFuture_DEPRECATED(

@@ -29,11 +29,7 @@ TimeseriesTest.run((insert) => {
         coll.drop();
 
         assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-        if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-            // In suites running moveCollection or FCV upgrade in the background, it is possible to
-            // hit the issue described by SERVER-89349 which will result in more bucket documents
-            // being created. Creating an index on the time field allows the buckets to be reopened,
-            // allowing the counts in this test to be accurate.
+        if (TestData.runningWithBalancer) {
             assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
         }
 
@@ -63,7 +59,7 @@ TimeseriesTest.run((insert) => {
 
         jsTestLog("Collection stats for " + coll.getFullName() + ": " + tojson(coll.stats()));
 
-        if (!TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
+        if (!TestData.runningWithBalancer) {
             assert.eq(2, bucketDocs.length, tojson(bucketDocs));
 
             // Check both buckets.

@@ -100,7 +100,15 @@ public:
 
             auto [dbPrimaryShard, dbVersion] = [&] {
                 const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, _targetDb());
-                return std::make_pair(scopedDsr->getDbPrimaryShard(), scopedDsr->getDbVersion());
+
+                // GetDatabaseVersion command can bypass the critical section to read database
+                // metadata as it is a command used for troubleshooting and inspect the insights of
+                // the DatabaseShardingRuntime.
+                BypassDatabaseMetadataAccess bypassDbMetadataAccess(
+                    opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
+
+                return std::make_pair(scopedDsr->getDbPrimaryShard(opCtx),
+                                      scopedDsr->getDbVersion(opCtx));
             }();
 
             if (!dbVersion) {
