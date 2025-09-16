@@ -219,6 +219,9 @@ StatusWith<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
             // If this is the first op and it's kNonTargetedWrite, then consume the op and put it in
             // a NonTargetedWriteBatch by itself and return the batch.
             return WriteBatch{NonTargetedWriteBatch{*writeOp}};
+        } else if (analysis.type == kInternalTransaction) {
+            // For ops needing an internal transaction they are placed in their own batch.
+            return WriteBatch{InternalTransactionBatch{*writeOp}};
         } else {
             MONGO_UNREACHABLE_TASSERT(10346701);
         }
@@ -290,6 +293,10 @@ StatusWith<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
             if (analysis.type == kNonTargetedWrite) {
                 _producer.advance();
                 return WriteBatch{NonTargetedWriteBatch{writeOp}};
+            }
+            if (analysis.type == kInternalTransaction) {
+                _producer.advance();
+                return WriteBatch{InternalTransactionBatch{writeOp}};
             }
             // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep
             // looping to see if more ops can be added to the batch.

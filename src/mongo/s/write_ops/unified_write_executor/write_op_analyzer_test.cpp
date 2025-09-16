@@ -52,7 +52,10 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
         NamespaceString::createNamespaceString_forTest("test", "untracked");
     const NamespaceString kUnsplittableNss =
         NamespaceString::createNamespaceString_forTest("test", "unsplittable");
-    ChunkManager createChunkManager(const UUID& uuid, const NamespaceString& nss) {
+    ChunkManager createChunkManager(
+        const UUID& uuid,
+        const NamespaceString& nss,
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none) {
         ShardKeyPattern sk{fromjson("{x: 1, _id: 1}")};
         std::deque<DocumentSource::GetNextResult> configData{
             Document(fromjson("{_id: {x: {$minKey: 1}, _id: {$minKey: 1}}, max: {x: 0.0, _id: "
@@ -80,7 +83,7 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                                                false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
+                                               timeseriesFields,
                                                boost::none /* reshardingFields */,
                                                false,
                                                chunks);
@@ -98,6 +101,24 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                 nss,
                 CollectionRoutingInfo(
                     createChunkManager(uuid, nss),
+                    DatabaseTypeValueHandle(DatabaseType{
+                        nss.dbName(), kShard1Name, DatabaseVersion(uuid, Timestamp{1, 1})})));
+        }
+        return RoutingContext::createSynthetic(criMap);
+    }
+
+    std::unique_ptr<RoutingContext> createRoutingContextShardedTimeseries(
+        std::vector<std::pair<UUID, NamespaceString>> uuidNssList) {
+        stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
+        TypeCollectionTimeseriesFields tsFields;
+        tsFields.setTimeField(std::string("ts"));
+        tsFields.setMetaField(std::string("x"));
+
+        for (auto [uuid, nss] : uuidNssList) {
+            criMap.emplace(
+                nss,
+                CollectionRoutingInfo(
+                    createChunkManager(uuid, nss, tsFields),
                     DatabaseTypeValueHandle(DatabaseType{
                         nss.dbName(), kShard1Name, DatabaseVersion(uuid, Timestamp{1, 1})})));
         }
@@ -606,6 +627,33 @@ TEST_F(WriteOpAnalyzerTestImpl, Unsplittable) {
 
     rtx->onRequestSentForNss(kUntrackedNss);
     rtx->onRequestSentForNss(kUnsplittableNss);
+}
+
+TEST_F(WriteOpAnalyzerTestImpl, TimeSeriesRetryable) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(TxnNumber(1));
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}});
+
+    BulkWriteCommandRequest request(
+        {
+            []() {
+                auto op = BulkWriteUpdateOp(
+                    0,
+                    BSON("x" << -1),
+                    write_ops::UpdateModification(BSON("$set" << BSON("x" << -10))));
+                op.setMulti(true);
+                return op;
+            }(),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    ASSERT_EQ(BatchType::kInternalTransaction, analysis.type);
+
+    rtx->onRequestSentForNss(nss);
 }
 
 }  // namespace

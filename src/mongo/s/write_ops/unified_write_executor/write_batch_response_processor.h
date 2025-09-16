@@ -130,7 +130,7 @@ private:
                                  const SimpleWriteBatchResponse& response);
     Result _onWriteBatchResponse(OperationContext* opCtx,
                                  RoutingContext& routingCtx,
-                                 const NonTargetedWriteBatchResponse& response);
+                                 const NoRetryWriteBatchResponse& response);
 
     /**
      * Process a response from a shard, handle errors, and collect statistics. Returns an array

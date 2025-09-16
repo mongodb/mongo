@@ -13,6 +13,7 @@ selector:
     - jstests/core/query/update/*.js
     - jstests/core/query/delete/*.js
     - jstests/core/query/bulk/bulk_write.js
+    - jstests/core/timeseries/write/*.js
     - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js
     - jstests/core/write/empty_ts/empty_ts_bulk_write.js
     # - jstests/core/query/bulk/bulk_write_delete_cursor.js
@@ -24,6 +25,12 @@ selector:
     # - jstests/core/write/bulk/bulk_write_non_transaction.js
     # TODO: SERVER-104139 timeseries support.
     # - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+  exclude_files:
+    # TODO 110636: add more failpoints to UWE and re-enable this test.
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/timeseries/write/timeseries_update_concurrent.js
+    - jstests/core/timeseries/write/timeseries_update_hint.js
+    - jstests/core/timeseries/write/timeseries_delete_with_meta_concurrent.js
 
 executor:
   archive:

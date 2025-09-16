@@ -51,14 +51,15 @@ struct EmptyBatchResponse {};
 
 using SimpleWriteBatchResponse = std::map<ShardId, ShardResponse>;
 
-struct NonTargetedWriteBatchResponse {
-    StatusWith<ClusterWriteWithoutShardKeyResponse> swResponse;
+struct NoRetryWriteBatchResponse {
+    StatusWith<BulkWriteCommandReply> swResponse;
     boost::optional<WriteConcernErrorDetail> wce;
     WriteOp op;
+    boost::optional<ShardId> shardId;
 };
 
 using WriteBatchResponse =
-    std::variant<EmptyBatchResponse, SimpleWriteBatchResponse, NonTargetedWriteBatchResponse>;
+    std::variant<EmptyBatchResponse, SimpleWriteBatchResponse, NoRetryWriteBatchResponse>;
 
 class WriteBatchExecutor {
 public:
@@ -86,6 +87,15 @@ private:
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
                                 const NonTargetedWriteBatch& batch);
+    WriteBatchResponse _execute(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const InternalTransactionBatch& batch);
+
+    BulkWriteCommandRequest buildBulkWriteRequestWithoutTxnInfo(
+        OperationContext* opCtx,
+        const std::vector<WriteOp>& ops,
+        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) const;
 
     BSONObj buildBulkWriteRequest(
         OperationContext* opCtx,

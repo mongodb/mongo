@@ -91,7 +91,7 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(OperationContext* opCt
 Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx,
     RoutingContext& routingCtx,
-    const NonTargetedWriteBatchResponse& response) {
+    const NoRetryWriteBatchResponse& response) {
     // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
     // TODO SERVER-105762 Add support for errorsOnly: true.
@@ -104,10 +104,8 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     // Extract the reply item from the ClusterWriteWithoutShardKeyResponse if possible, otherwise
     // create a reply item.
     BulkWriteReplyItem replyItem = [&] {
-        if (swRes.isOK() && !swRes.getValue().getResponse().isEmpty()) {
-            auto parsedReply = BulkWriteCommandReply::parse(
-                swRes.getValue().getResponse(),
-                IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
+        if (swRes.isOK()) {
+            auto parsedReply = swRes.getValue();
 
             // Update the counters.
             _nInserted += parsedReply.getNInserted();
@@ -302,7 +300,9 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
     CollectionsToCreate collectionsToCreate;
     ErrorType errorType = ErrorType::kNone;
     for (const auto& item : replyItems) {
-        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
+        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes. if in transaction, return
+        // an insert+delete to retry. if not in a transaction, return update to retry in
+        // transaction.
         tassert(10347004,
                 fmt::format("shard replied with invalid opId {} when it was only sent {} ops",
                             item.getIdx(),

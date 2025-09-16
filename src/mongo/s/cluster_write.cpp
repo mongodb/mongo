@@ -80,7 +80,7 @@ void write(OperationContext* opCtx,
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");
 
     // TODO SERVER-104145: Enable insert/update/delete commands from internal clients.
-    if (internalQueryUnifiedWriteExecutor.load()) {
+    if (unified_write_executor::isEnabled(opCtx)) {
         *response = unified_write_executor::write(opCtx, request);
         // SERVER-109104 This can be removed once we delete BatchWriteExec.
         stats->markIgnore();

@@ -56,5 +56,11 @@ BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandReques
  */
 BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request);
 
+/**
+ * Unified write executor feature flag check. Also ensures we only have viewless timeseries
+ * collections.
+ */
+bool isEnabled(OperationContext* opCtx);
+
 }  // namespace unified_write_executor
 }  // namespace mongo

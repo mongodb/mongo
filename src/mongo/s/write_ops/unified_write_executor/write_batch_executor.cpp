@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
@@ -48,17 +49,14 @@ WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx,
                       batch.data);
 }
 
-BSONObj WriteBatchExecutor::buildBulkWriteRequest(
+BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
-    bool shouldAppendLsidAndTxnNumber,
-    bool shouldAppendWriteConcern,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
     std::vector<BulkWriteOpVariant> bulkOps;
     std::vector<NamespaceInfoEntry> nsInfos;
     std::map<NamespaceString, int> nsIndexMap;
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     const bool isRetryableWrite = opCtx->isRetryableWrite();
     std::vector<int> stmtIds;
     if (isRetryableWrite) {
@@ -116,6 +114,19 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     if (isRetryableWrite) {
         bulkRequest.setStmtIds(stmtIds);
     }
+    return bulkRequest;
+}
+
+BSONObj WriteBatchExecutor::buildBulkWriteRequest(
+    OperationContext* opCtx,
+    const std::vector<WriteOp>& ops,
+    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    bool shouldAppendLsidAndTxnNumber,
+    bool shouldAppendWriteConcern,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
+    auto bulkRequest = buildBulkWriteRequestWithoutTxnInfo(
+        opCtx, ops, versionByNss, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     BSONObjBuilder builder;
     bulkRequest.serialize(&builder);
 
@@ -206,10 +217,69 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     boost::optional<WriteConcernErrorDetail> wce;
-    auto swRes =
-        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, std::move(cmdObj), wce);
+    auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
+        opCtx, writeOp.getNss(), std::move(cmdObj), wce);
+    StatusWith<BulkWriteCommandReply> swBulkWriteResponse = [&]() {
+        if (swRes.isOK() && !swRes.getValue().getResponse().isEmpty()) {
+            return StatusWith(BulkWriteCommandReply::parse(
+                swRes.getValue().getResponse(),
+                IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec")));
+        } else {
+            return StatusWith<BulkWriteCommandReply>(swRes.getStatus());
+        }
+    }();
 
-    return NonTargetedWriteBatchResponse{std::move(swRes), std::move(wce), writeOp};
+    return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), writeOp};
+}
+
+WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
+                                                const InternalTransactionBatch& batch) {
+    // TODO SERVER-108144 maybe we shouldn't call release here or maybe we should acknowledge a
+    // write based on the swRes.
+    routingCtx.release(batch.op.getNss());
+    bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+    auto singleUpdateRequest =
+        buildBulkWriteRequestWithoutTxnInfo(opCtx,
+                                            {batch.op},
+                                            {}, /* versionByNss*/
+                                            allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+    BulkWriteCommandReply bulkWriteResponse;
+
+    // Execute the singleUpdateRequest (a bulkWrite command) in an internal transaction to
+    // perform the retryable timeseries update operation. This separate bulkWrite command will
+    // get executed on its own via unified_write_executor::bulkWrite() logic again as a transaction,
+    // which handles retries of all kinds. This function is just a client of the internal
+    // transaction spawned. As a result, we must only receive a single final (non-retryable)
+    // response for the timeseries update operation.
+    auto swResult = txn.runNoThrow(
+        opCtx, [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            auto updateResponse = txnClient.runCRUDOpSync(singleUpdateRequest);
+            bulkWriteResponse = std::move(updateResponse);
+
+            return SemiFuture<void>::makeReady();
+        });
+
+    Status responseStatus = swResult.getStatus();
+    WriteConcernErrorDetail wce;
+    if (responseStatus.isOK()) {
+        wce = swResult.getValue().wcError;
+        if (!swResult.getValue().cmdStatus.isOK()) {
+            responseStatus = swResult.getValue().cmdStatus;
+        }
+    }
+
+    auto swBulkWriteResponse = responseStatus.isOK()
+        ? StatusWith(std::move(bulkWriteResponse))
+        : StatusWith<BulkWriteCommandReply>(responseStatus);
+
+    return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), batch.op};
 }
 
 }  // namespace unified_write_executor

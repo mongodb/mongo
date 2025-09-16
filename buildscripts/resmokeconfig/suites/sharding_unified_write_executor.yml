@@ -21,8 +21,8 @@ selector:
     # TODO SERVER-104134 add support for max replies size
     # - jstests/sharding/bulk_write_max_replies_size.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
-    # TODO SERVER-104139: Timeseries collection support
-    # - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
+    - jstests/sharding/timeseries/**/*.js
+    - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     # TODO: SERVER-103781 try enabling when write without shard key with id supported.
@@ -43,9 +43,14 @@ selector:
     - jstests/sharding/retryable_writes.js
     - jstests/sharding/retryable_writes_nested_shard_key.js
     - jstests/sharding/retryable_upsert_single_write_shard.js
-    - jstests/sharding/retryable_write_error_labels.js
+    # TODO SERVER-105303 handle interruption/shutown
+    # - jstests/sharding/retryable_write_error_labels.js
 
     # No passthrough tests.
+    - jstests/noPassthrough/timeseries/**/*.js
+    # - jstests/noPassthrough/crud/bulk_write_currentop.js
+    - jstests/noPassthrough/crud/bulk_write_metrics.js
+    - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
     - jstests/noPassthrough/crud/bulk_write_currentop.js
 
     # - jstests/noPassthrough/query/command_diagnostics_sharded.js
@@ -63,6 +68,8 @@ selector:
   exclude_files:
     # TODO: SERVER-104535 support cursor with bulk write.
     - jstests/sharding/internal_txns/transaction_api_distributed_from_shard.js
+    # TODO SERVER-110635: enable
+    - jstests/sharding/timeseries/timeseries_retry_delete_and_update_unsharded.js
 
 executor:
   config:

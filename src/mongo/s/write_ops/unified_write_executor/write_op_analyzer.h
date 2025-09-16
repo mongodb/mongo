@@ -45,6 +45,7 @@ enum BatchType {
     kSingleShard,
     kMultiShard,
     kNonTargetedWrite,
+    kInternalTransaction,
 };
 
 struct Analysis {

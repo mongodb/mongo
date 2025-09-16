@@ -102,8 +102,21 @@ struct NonTargetedWriteBatch {
     }
 };
 
+struct InternalTransactionBatch {
+    WriteOp op;
+    std::set<NamespaceString> getInvolvedNamespaces() const {
+        return {op.getNss()};
+    }
+    std::vector<WriteOp> getWriteOps() const {
+        std::vector<WriteOp> result;
+        result.emplace_back(op);
+        return result;
+    }
+};
+
 struct WriteBatch {
-    std::variant<EmptyBatch, SimpleWriteBatch, NonTargetedWriteBatch> data;
+    std::variant<EmptyBatch, SimpleWriteBatch, NonTargetedWriteBatch, InternalTransactionBatch>
+        data;
 
     explicit operator bool() const {
         return !isEmptyBatch();
@@ -125,6 +138,7 @@ struct WriteBatch {
         return std::visit([](const auto& inner) { return inner.getInvolvedNamespaces(); }, data);
     }
 };
+
 
 /**
  * Based on the analysis of the write ops, this class bundles multiple write ops into batches to be

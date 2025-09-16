@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
 #include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
+#include "mongo/db/raw_data_operation.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -73,9 +74,28 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                                 op.getType());
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
+    const auto& cm = cri.getChunkManager();
+    const bool isShardedTimeseries = cm.isSharded() && cm.isTimeseriesCollection();
+    const bool isUpdate = op.getType() == WriteType::kUpdate;
+    const bool isRetryableWrite = opCtx->isRetryableWrite();
+    const bool inTxn = opCtx->inMultiDocumentTransaction();
+    const bool isRawData = isRawDataOperation(opCtx);
+    const bool isTimeseriesRetryableUpdateOp =
+        isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
         return Analysis{BatchType::kNonTargetedWrite, std::move(tr.endpoints)};
+    } else if (isTimeseriesRetryableUpdateOp) {
+        // Special case for time series since an update could affect two documents in the underlying
+        // buckets collection.
+        tassert(10413901,
+                "Unified Write Executor does not support viewful timeseries collections",
+                cm.isNewTimeseriesWithoutView());
+        // Targetting code in this path can only handle writes with the full shardKey in the query.
+        tassert(10413902,
+                "Writes without shard key must go through non-targeted path",
+                !(tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId));
+        return Analysis{BatchType::kInternalTransaction, std::move(tr.endpoints)};
     } else if (tr.endpoints.size() == 1) {
         return Analysis{BatchType::kSingleShard, std::move(tr.endpoints)};
     } else {

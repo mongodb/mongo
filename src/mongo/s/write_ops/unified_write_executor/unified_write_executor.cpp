@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
@@ -114,6 +115,17 @@ BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandR
     }
 
     return std::get<BulkWriteCommandReply>(executeWriteCommand(opCtx, WriteCommandRef{request}));
+}
+
+bool isEnabled(OperationContext* opCtx) {
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    // (Generic FCV reference): isUpgradingOrDowngrading() must be false since during upgrades the
+    // viewless featureflag could be on but there are still viewful collections being converted and
+    // UWE doesn't support viewful collections.
+    return internalQueryUnifiedWriteExecutor.load() &&
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot) &&
+        !fcvSnapshot.isUpgradingOrDowngrading();
 }
 
 }  // namespace unified_write_executor

@@ -389,7 +389,7 @@ public:
                 bulkRequest.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *let));
             }
 
-            if (internalQueryUnifiedWriteExecutor.load()) {
+            if (unified_write_executor::isEnabled(opCtx)) {
                 response = unified_write_executor::bulkWrite(opCtx, bulkRequest);
             } else {
                 // Dispatch the bulk write through the cluster.
