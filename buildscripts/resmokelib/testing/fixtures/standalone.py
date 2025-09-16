@@ -154,7 +154,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongot = mongot
         self.mongot.await_ready()
 
-    def setup(self):
+    def setup(self, temporary_flags={}):
         """Set up the mongod."""
         if not self.preserve_dbpath and os.path.lexists(self._dbpath):
             shutil.rmtree(self._dbpath, ignore_errors=False)
@@ -162,6 +162,10 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         os.makedirs(self._dbpath, exist_ok=True)
 
         launcher = MongodLauncher(self.fixturelib)
+
+        mongod_options = self.mongod_options.copy()
+        mongod_options.update(temporary_flags)
+
         # Second return val is the port, which we ignore because we explicitly created the port above.
         # The port is used to set other mongod_option's here:
         # https://github.com/mongodb/mongo/blob/532a6a8ae7b8e7ab5939e900759c00794862963d/buildscripts/resmokelib/testing/fixtures/replicaset.py#L136
@@ -169,7 +173,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger,
             self.job_num,
             executable=self.mongod_executable,
-            mongod_options=self.mongod_options,
+            mongod_options = mongod_options,
         )
 
         try:
