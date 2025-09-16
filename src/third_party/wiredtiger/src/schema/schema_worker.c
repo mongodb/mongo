@@ -128,15 +128,15 @@ __schema_layered_worker_verify(WT_SESSION_IMPL *session, const char *uri,
           ingest_ret =
             __wt_schema_worker(session, ingest_uri, file_func, name_func, cfg, open_flags));
 
-        /*
-         * FIXME-WT-15433 Add an assertion that verifying the ingest table of the leader never
-         * returns EBUSY.
-         */
-        if (ingest_ret != 0)
-            WT_ERR_MSG(session, ingest_ret,
-              "Verify (layered): %s ingest table verification failed. Ingest must always be empty "
-              "on leader.",
-              ingest_uri);
+        WT_ASSERT_ALWAYS(session, ingest_ret != EBUSY,
+          "Verify: %s ingest table on leader cannot be verified. "
+          "Ingest contains dirty content or open cursors, which is an invalid "
+          "state.",
+          ingest_uri);
+
+        WT_ERR_MSG_CHK(session, ingest_ret,
+          "Verify (layered): %s ingest table verification failed. Ingest on leader must be empty.",
+          ingest_uri);
     }
 
 err:

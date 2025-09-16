@@ -566,7 +566,10 @@ __curhs_prev_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
          */
         WT_ASSERT(session, F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
-        if (__wt_txn_tw_stop_visible(session, &cbt->upd_value->tw)) {
+        WT_VISIBLE_TYPE visible_type = __wt_txn_tw_stop_visible(session, &cbt->upd_value->tw);
+        /* There is no prepared update in the history store. */
+        WT_ASSERT(session, visible_type != WT_VISIBLE_PREPARE);
+        if (visible_type == WT_VISIBLE_TRUE) {
             /*
              * If the stop time point of a record is visible to us, we won't be able to see anything
              * for this entire key.
@@ -579,7 +582,10 @@ __curhs_prev_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
         }
 
         /* If the start time point is visible to us, let's return that record. */
-        if (__wt_txn_tw_start_visible(session, &cbt->upd_value->tw))
+        visible_type = __wt_txn_tw_start_visible(session, &cbt->upd_value->tw);
+        /* There is no prepared update in the history store. */
+        WT_ASSERT(session, visible_type != WT_VISIBLE_PREPARE);
+        if (visible_type == WT_VISIBLE_TRUE)
             break;
     }
 

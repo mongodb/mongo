@@ -105,6 +105,14 @@ static int recover_and_verify(uint32_t backup_index, uint32_t workload_iteration
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+static struct {
+    uint32_t workload_progress;
+    bool timer_ready_to_go;
+    WT_CONDVAR *timer_cond;
+    bool ckpt_ready_to_go;
+    WT_CONDVAR *ckpt_cond;
+} thread_sync_conds = {0, false, NULL, false, NULL};
+
 /*
  * Print that we are doing backup verification.
  */
@@ -340,9 +348,18 @@ thread_ts_run(void *arg)
 
     td = (THREAD_DATA *)arg;
     conn = td->conn;
-
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
+    /*
+     * Wait for all working threads to complete as there will be a stable timestamp available to
+     * work with.
+     */
+    while (!thread_sync_conds.timer_ready_to_go) {
+        bool cv_signalled;
+        /* Under a high workload, there is no need to check very often, check every second. */
+        __wt_cond_wait_signal((WT_SESSION_IMPL *)session, thread_sync_conds.timer_cond, WT_MILLION,
+          NULL, &cv_signalled);
+    }
+    printf("Timestamp thread started...\n");
     __wt_seconds((WT_SESSION_IMPL *)session, &last_reconfig);
     /* Update the oldest/stable timestamps every 1 millisecond. */
     for (last_ts = 0;; __wt_sleep(0, WT_THOUSAND)) {
@@ -361,7 +378,8 @@ thread_ts_run(void *arg)
             testutil_snprintf(tscfg, sizeof(tscfg),
               "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, ts, ts);
         testutil_check(conn->set_timestamp(conn, tscfg));
-
+        thread_sync_conds.ckpt_ready_to_go = true;
+        __wt_cond_signal((WT_SESSION_IMPL *)session, thread_sync_conds.ckpt_cond);
         /*
          * Only perform the reconfigure test after statistics have a chance to run. If we do it too
          * frequently then internal servers like the statistics server get destroyed and restarted
@@ -478,6 +496,18 @@ thread_ckpt_run(void *arg)
      */
     (void)unlink(ckpt_file);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+    /*
+     * Wait for the stable timestamp to be configured before starting the checkpoint thread. If
+     * there is no stable timestamp, we won't create the sentinel file and we will have to
+     * checkpoint again which will delay the test.
+     */
+    while (!thread_sync_conds.ckpt_ready_to_go) {
+        bool cv_signalled;
+        /* Under a high workload, there is no need to check very often, check every second. */
+        __wt_cond_wait_signal(
+          (WT_SESSION_IMPL *)session, thread_sync_conds.ckpt_cond, WT_MILLION, NULL, &cv_signalled);
+    }
+    printf("Checkpoint thread started...\n");
     first_ckpt = true;
     for (i = 1;; ++i) {
         sleep_time = __wt_random(&td->extra_rnd) % MAX_CKPT_INVL;
@@ -817,8 +847,32 @@ rollback:
         }
 
         /* We're done with the timestamps, allow oldest and stable to move forward. */
-        if (use_ts)
+        if (use_ts) {
+            if (WT_TS_NONE == active_timestamps[td->threadnum]) {
+                uint32_t current_progress =
+                  __wt_atomic_add32(&thread_sync_conds.workload_progress, 1);
+                printf("Thread %" PRIu32 " reach syncing point, overall progress: %u/%u. \n",
+                  td->threadnum, current_progress, nth);
+                if (current_progress == nth) {
+                    /* All threads are done working and should have updated the active timestamps
+                     * array with a non-zero timestamp. It's time for the timer thread to get
+                     * started. */
+                    thread_sync_conds.timer_ready_to_go = true;
+                    __wt_cond_signal((WT_SESSION_IMPL *)session, thread_sync_conds.timer_cond);
+                }
+            }
             WT_RELEASE_WRITE_WITH_BARRIER(active_timestamps[td->threadnum], active_ts);
+        } else {
+            uint32_t current_progress = __wt_atomic_add32(&thread_sync_conds.workload_progress, 1);
+            /* When timestamps are not in use, we don't need to sync all threads before starting the
+             * checkpoint thread. Use the first thread to notify the checkpoint thread to start. */
+            if (current_progress == 1) {
+                printf(
+                  "Thread %" PRIu32 " reach syncing point, trigger checkpoint.\n", td->threadnum);
+                thread_sync_conds.ckpt_ready_to_go = true;
+                __wt_cond_signal((WT_SESSION_IMPL *)session, thread_sync_conds.ckpt_cond);
+            }
+        }
     }
     /* NOTREACHED */
 }
@@ -851,6 +905,7 @@ run_workload(uint32_t workload_iteration)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
+    WT_SESSION_IMPL *opt_session;
     THREAD_DATA *td;
     wt_thread_t *thr;
     uint32_t backup_id, cache_mb, ckpt_id, i, ts_id;
@@ -936,7 +991,13 @@ run_workload(uint32_t workload_iteration)
     }
 
     opts->running = true;
-
+    /* Initialize cond variables. */
+    opt_session = (WT_SESSION_IMPL *)opts->session;
+    thread_sync_conds.workload_progress = 0;
+    thread_sync_conds.timer_ready_to_go = false;
+    testutil_check(__wt_cond_alloc(opt_session, "timer thread cv", &thread_sync_conds.timer_cond));
+    thread_sync_conds.ckpt_ready_to_go = false;
+    testutil_check(__wt_cond_alloc(opt_session, "ckpt thread cv", &thread_sync_conds.ckpt_cond));
     /* The backup, checkpoint, timestamp, and worker threads are added at the end. */
     backup_id = nth;
     if (use_backups) {
@@ -989,6 +1050,9 @@ run_workload(uint32_t workload_iteration)
     /*
      * NOTREACHED
      */
+    __wt_cond_destroy(opt_session, &thread_sync_conds.timer_cond);
+    __wt_cond_destroy(opt_session, &thread_sync_conds.ckpt_cond);
+
     free(thr);
     free(td);
     _exit(EXIT_SUCCESS);

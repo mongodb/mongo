@@ -114,8 +114,10 @@ def copy_wiredtiger_home(testcase, olddir, newdir, aligned=True):
         raise AssertionError(
             'copy_wiredtiger_home: unaligned copy impossible on Windows')
     shutil.rmtree(newdir, ignore_errors=True)
+    # Get the list of files first to avoid recursion.
+    files = list(os.listdir(olddir))
     os.mkdir(newdir)
-    for fname in os.listdir(olddir):
+    for fname in files:
         fullname = os.path.join(olddir, fname)
         # Skip lock file, on Windows it is locked.
         # Skip temporary log files.
@@ -144,6 +146,8 @@ def copy_wiredtiger_home(testcase, olddir, newdir, aligned=True):
                 cmd_list = ['dd', inpf, outf, 'bs=300']
                 a = subprocess.Popen(cmd_list)
                 a.wait()
+        elif os.path.isdir(fullname):
+            shutil.copytree(fullname, os.path.join(newdir, fname))
 
 # Simulate a crash from olddir and restart in newdir.
 def simulate_crash_restart(testcase, olddir, newdir):

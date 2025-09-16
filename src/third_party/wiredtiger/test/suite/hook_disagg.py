@@ -227,9 +227,9 @@ def session_create_replace(orig_session_create, session_self, uri, config):
             uri = replace_uri(uri)
             WiredTigerTestCase.verbose(None, 1, f'    Replacing, new uri = "{uri}"')
         else:
-            WiredTigerTestCase.verbose(None, 1, f'    Replacing, old config = "\{config}"')
+            WiredTigerTestCase.verbose(None, 1, f'    Replacing, old config = "{config}"')
             config += ',block_manager=disagg,type=layered'
-            WiredTigerTestCase.verbose(None, 1, f'    Replacing, new config = "\{config}"')
+            WiredTigerTestCase.verbose(None, 1, f'    Replacing, new config = "{config}"')
 
     # If this is an index create and the main table was already tagged to be layered,
     # there's nothing we can do to "fix" it.  Currently "index:foo" is hardwired to

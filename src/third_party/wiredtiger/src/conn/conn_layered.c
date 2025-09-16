@@ -1582,7 +1582,11 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
         WT_ERR(version_cursor->get_key(version_cursor, tmp_key));
         WT_ERR(__wt_compare(session, CUR2BT(cbt)->collator, key, tmp_key, &cmp));
         if (cmp != 0) {
-            WT_ASSERT(session, cmp <= 0);
+            /*
+             * Ensure keys returned are in correctly sorted order. Only perform this check when key
+             * has been initialized.
+             */
+            WT_ASSERT(session, key->size == 0 || cmp <= 0);
 
             if (upds != NULL) {
                 WT_WITH_DHANDLE(
