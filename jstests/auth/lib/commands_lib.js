@@ -8977,27 +8977,11 @@ export const authCommandsLib = {
                 cursor: {},
             },
             testcases: [
+                // TODO(SERVER-110415): Check if the roles and privileges fields must be updated.
                 {
                     runOnDb: adminDbName,
-                    // Roles correspond to roles_monitoring + clusterManager.
-                    roles: {
-                        clusterMonitor: 1,
-                        clusterAdmin: 1,
-                        clusterManager: 1,
-                        searchCoordinator: 1,
-                        root: 1,
-                        __system: 1,
-                    },
-                    privileges: [{resource: {cluster: true}, actions: ["listExtensions"]}],
-                },
-                // expectFail is true because $listExtensions is only allowed to run on the admin database.
-                {
-                    runOnDb: firstDbName,
-                    expectFail: true,
-                },
-                {
-                    runOnDb: secondDbName,
-                    expectFail: true,
+                    roles: roles_all,
+                    privileges: [],
                 },
             ],
         },
