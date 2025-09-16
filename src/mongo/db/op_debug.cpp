@@ -688,11 +688,13 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     if (storageStats) {
-        b.append("storage", storageStats->toBSON());
+        BSONObjBuilder storageBuilder(b.subobjStart("storage"));
+        storageStats->appendToBsonObjBuilder(storageBuilder);
     }
 
     if (spillStorageStats) {
-        b.append("spillStorage", spillStorageStats->toBSON());
+        BSONObjBuilder spillStorageBuilder(b.subobjStart("spillStorage"));
+        spillStorageStats->appendToBsonObjBuilder(spillStorageBuilder);
     }
 
     if (!errInfo.isOK()) {

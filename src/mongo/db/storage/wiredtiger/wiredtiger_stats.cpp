@@ -121,10 +121,7 @@ void WiredTigerStats::updateCounter(int32_t key_id, uint64_t value) {
     }
 }
 
-BSONObj WiredTigerStats::toBSON() const {
-
-    BSONObjBuilder builder;
-
+void WiredTigerStats::appendToBsonObjBuilder(BSONObjBuilder& builder) const {
     // Only output metrics for non-zero values
     if (_bytesRead != 0 || _bytesWrite != 0 || _readTime.count() != 0 || _writeTime.count() != 0 ||
         _txnBytesDirty != 0 || _txnNumUpdates != 0) {
@@ -154,7 +151,12 @@ BSONObj WiredTigerStats::toBSON() const {
                         durationCount<Microseconds>(_storageExecutionTime),
                         &waitingSection);
     }
+}
 
+
+BSONObj WiredTigerStats::toBSON() const {
+    BSONObjBuilder builder;
+    appendToBsonObjBuilder(builder);
     return builder.obj();
 }
 

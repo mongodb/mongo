@@ -41,6 +41,7 @@ class StorageStats {
 public:
     virtual ~StorageStats() = default;
 
+    virtual void appendToBsonObjBuilder(BSONObjBuilder& builder) const = 0;
     virtual BSONObj toBSON() const = 0;
 
     virtual uint64_t bytesRead() const = 0;

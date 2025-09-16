@@ -429,6 +429,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateStorageStats) {
     public:
         StorageStatsForTest(uint64_t bytesRead, Microseconds readingTime)
             : _bytesRead(bytesRead), _readingTime(readingTime) {}
+        void appendToBsonObjBuilder(BSONObjBuilder& builder) const final {}
         BSONObj toBSON() const final {
             return {};
         }

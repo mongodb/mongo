@@ -49,6 +49,8 @@ public:
 
     WiredTigerStats() = default;
 
+    void appendToBsonObjBuilder(BSONObjBuilder& builder) const final;
+
     BSONObj toBSON() const final;
 
     uint64_t bytesRead() const final;
