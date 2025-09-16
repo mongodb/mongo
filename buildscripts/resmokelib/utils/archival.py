@@ -10,9 +10,11 @@ import tarfile
 import tempfile
 import threading
 import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import List
 
 from buildscripts.resmokelib import config
-from buildscripts.util.download_utils import get_s3_client
 
 _IS_WINDOWS = sys.platform in ("win32", "cygwin")
 
@@ -94,29 +96,70 @@ def remove_file(file_name):
     return status, message
 
 
-class Archival(object):
-    """Class to support file archival to S3."""
+def get_archive_path(path: str) -> str:
+    """Shortens paths that are relative to DBPATH_PREFIX"""
+    if config.DBPATH_PREFIX:
+        base = Path(config.DBPATH_PREFIX)
+        if Path(path).is_relative_to(base):
+            return Path(path).relative_to(base)
+    return path
 
+
+class ArchiveStrategy(ABC):
+    @abstractmethod
+    def archive_files(self, files: List[str], archive_name: str, display_name: str):
+        pass
+
+    def exit(self):
+        pass
+
+    def create_tar_archive(self, files: List[str], archive: Path, display_name: str):
+        status = 0
+        size_mb = 0
+        message = "Tar/gzip {} files: {}".format(display_name, files)
+
+        # Check if there is sufficient space for the tgz file.
+        if file_list_size(files) > free_space(archive):
+            status, message = remove_file(archive)
+            if status:
+                self.logger.warning("Removing tarfile due to insufficient space - %s", message)
+            return 1, "Insufficient space for {}".format(message), 0
+
+        try:
+            with tarfile.open(archive, "w:gz") as tar_handle:
+                for input_file in files:
+                    try:
+                        tar_handle.add(input_file, get_archive_path(input_file))
+                    except (IOError, OSError, tarfile.TarError) as err:
+                        message = "{}; Unable to add {} to archive file: {}".format(
+                            message, input_file, err
+                        )
+        except (IOError, OSError, tarfile.TarError) as err:
+            status, message = remove_file(archive)
+            if status:
+                self.logger.warning("Removing tarfile due to creation failure - %s", message)
+            return 1, str(err), 0
+
+        # Round up the size of the archive.
+        size_mb = int(math.ceil(float(file_list_size(archive)) / (1024 * 1024)))
+
+        return status, message, size_mb
+
+
+class ArchiveToS3(ArchiveStrategy):
     def __init__(
         self,
+        bucket: str,
+        s3_base_path: str,
+        client,
         logger,
         archival_json_file="archive.json",
-        limit_size_mb=0,
-        limit_files=0,
-        s3_client=None,
     ):
-        """Initialize Archival."""
-
-        self.archival_json_file = archival_json_file
-        self.limit_size_mb = limit_size_mb
-        self.limit_files = limit_files
-        self.size_mb = 0
-        self.num_files = 0
-        self.archive_time = 0
+        self.bucket = bucket
+        self.s3_base_path = s3_base_path
+        self.s3_client = client
         self.logger = logger
-
-        # Lock to control access from multiple threads.
-        self._lock = threading.Lock()
+        self.archival_json_file = archival_json_file
 
         # Start the worker thread to update the 'archival_json_file'.
         self._archive_file_queue = queue.Queue()
@@ -125,12 +168,8 @@ class Archival(object):
             args=(self._archive_file_queue, logger),
             name="archive_file_worker",
         )
-        self._archive_file_worker.setDaemon(True)
+        self._archive_file_worker.daemon = True
         self._archive_file_worker.start()
-        if not s3_client:
-            self.s3_client = get_s3_client()
-        else:
-            self.s3_client = s3_client
 
         # Start the worker thread which uploads the archive.
         self._upload_queue = queue.Queue()
@@ -139,41 +178,8 @@ class Archival(object):
             args=(self._upload_queue, self._archive_file_queue, logger, self.s3_client),
             name="upload_worker",
         )
-        self._upload_worker.setDaemon(True)
+        self._upload_worker.daemon = True
         self._upload_worker.start()
-
-    def archive_files_to_s3(self, display_name, input_files, s3_bucket, s3_path):
-        """Archive 'input_files' to 's3_bucket' and 's3_path'.
-
-        Archive is not done if user specified limits are reached. The size limit is
-        enforced after it has been exceeded, since it can only be calculated after the
-        tar/gzip has been done.
-
-        Return status and message, where message contains information if status is non-0.
-        """
-
-        start_time = time.time()
-        with self._lock:
-            if not input_files:
-                status = 1
-                message = "No input_files specified"
-            elif self.limit_size_mb and self.size_mb >= self.limit_size_mb:
-                status = 1
-                message = "Files not archived, {}MB size limit reached".format(self.limit_size_mb)
-            elif self.limit_files and self.num_files >= self.limit_files:
-                status = 1
-                message = "Files not archived, {} file limit reached".format(self.limit_files)
-            else:
-                status, message, file_size_mb = self._archive_files(
-                    display_name, input_files, s3_bucket, s3_path
-                )
-
-                if status == 0:
-                    self.num_files += 1
-                self.size_mb += file_size_mb
-                self.archive_time += time.time() - start_time
-
-        return status, message
 
     @staticmethod
     def _update_archive_file_wkr(work_queue, logger):
@@ -248,82 +254,6 @@ class Archival(object):
 
             work_queue.task_done()
 
-    def _archive_files(self, display_name, input_files, s3_bucket, s3_path):
-        """
-        Gather 'input_files' into a single tar/gzip and archive to 's3_path'.
-
-        The caller waits until the list of files has been tar/gzipped to a temporary file.
-        The S3 upload and subsequent update to 'archival_json_file' will be done asynchronosly.
-
-        Returns status, message and size_mb of archive.
-        """
-
-        # Parameter 'input_files' can either be a string or list of strings.
-        if isinstance(input_files, str):
-            input_files = [input_files]
-
-        status = 0
-        size_mb = 0
-
-        if "test_archival" in config.INTERNAL_PARAMS:
-            message = "'test_archival' specified. Skipping tar/gzip."
-            with open(os.path.join(config.DBPATH_PREFIX, "test_archival.txt"), "a") as test_file:
-                for input_file in input_files:
-                    # If a resmoke fixture is used, the input_file will be the source of the data
-                    # files. If mongorunner is used, input_file/mongorunner will be the source
-                    # of the data files.
-                    if os.path.isdir(os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)):
-                        input_file = os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)
-
-                    # Each node contains one directory for its data files. Here we write out
-                    # the names of those directories. In the unit test for archival, we will
-                    # check that the directories are those we expect.
-                    test_file.write("\n".join(os.listdir(input_file)) + "\n")
-            return status, message, size_mb
-
-        message = "Tar/gzip {} files: {}".format(display_name, input_files)
-
-        # Tar/gzip to a temporary file.
-        _, temp_file = tempfile.mkstemp(suffix=".tgz")
-
-        # Check if there is sufficient space for the temporary tgz file.
-        if file_list_size(input_files) > free_space(temp_file):
-            status, message = remove_file(temp_file)
-            if status:
-                self.logger.warning("Removing tarfile due to insufficient space - %s", message)
-            return 1, "Insufficient space for {}".format(message), 0
-
-        try:
-            with tarfile.open(temp_file, "w:gz") as tar_handle:
-                for input_file in input_files:
-                    try:
-                        tar_handle.add(input_file)
-                    except (IOError, OSError, tarfile.TarError) as err:
-                        message = "{}; Unable to add {} to archive file: {}".format(
-                            message, input_file, err
-                        )
-        except (IOError, OSError, tarfile.TarError) as err:
-            status, message = remove_file(temp_file)
-            if status:
-                self.logger.warning("Removing tarfile due to creation failure - %s", message)
-            return 1, str(err), 0
-
-        # Round up the size of the archive.
-        size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))
-        self._upload_queue.put(
-            UploadArgs(
-                self.archival_json_file,
-                display_name,
-                temp_file,
-                "application/x-gzip",
-                s3_bucket,
-                s3_path,
-                True,
-            )
-        )
-
-        return status, message, size_mb
-
     def check_thread(self, thread, expected_alive):
         """Check if the thread is still active."""
         if thread.is_alive() and not expected_alive:
@@ -354,17 +284,114 @@ class Archival(object):
         self._archive_file_worker.join(timeout=timeout)
         self.check_thread(self._archive_file_worker, False)
 
+    def archive_files(self, files: List[str], archive_name: str, display_name: str):
+        _, temp_file = tempfile.mkstemp(suffix=".tgz")
+        status, message, size_mb = self.create_tar_archive(files, temp_file, display_name)
+        self._upload_queue.put(
+            UploadArgs(
+                self.archival_json_file,
+                display_name,
+                temp_file,
+                "application/x-gzip",
+                self.bucket,
+                f"{self.s3_base_path}{archive_name}",
+                True,
+            )
+        )
+        return status, message, size_mb
+
+
+class ArchiveToDirectory(ArchiveStrategy):
+    def __init__(self, directory: Path, logger):
+        self.directory = directory
+        self.logger = logger
+        os.makedirs(self.directory, exist_ok=True)
+
+    def archive_files(self, files: List[str], archive_name: str, display_name: str):
+        archive = os.path.join(self.directory, archive_name)
+        with open(archive, "w") as _:
+            pass  # Touch create the archive file, so we can check the size of the disk it is on before adding to it.
+        return self.create_tar_archive(files, archive, display_name)
+
+
+class TestArchival(ArchiveStrategy):
+    def __init__(self):
+        self.archive_file = os.path.join(config.DBPATH_PREFIX, "test_archival.txt")
+
+    def archive_files(self, files: List[str], archive_name: str, display_name: str):
+        with open(self.archive_file, "a") as f:
+            for file in files:
+                # If a resmoke fixture is used, the input_file will be the source of the data
+                # files. If mongorunner is used, input_file/mongorunner will be the source
+                # of the data files.
+                if os.path.isdir(os.path.join(file, config.MONGO_RUNNER_SUBDIR)):
+                    file = os.path.join(file, config.MONGO_RUNNER_SUBDIR)
+
+                # Each node contains one directory for its data files. Here we write out
+                # the names of those directories. In the unit test for archival, we will
+                # check that the directories are those we expect.
+                f.write("\n".join(os.listdir(file)) + "\n")
+        message = "'test_archival' specified. Skipping tar/gzip."
+        return 0, message, 0
+
+
+class Archival(object):
+    """Class to support file archival to S3."""
+
+    def __init__(
+        self,
+        archive_strategy: ArchiveStrategy,
+        logger,
+        archival_json_file="archive.json",
+        limit_size_mb=0,
+        limit_files=0,
+        s3_client=None,
+    ):
+        """Initialize Archival."""
+
+        self.archival_json_file = archival_json_file
+        self.limit_size_mb = limit_size_mb
+        self.limit_files = limit_files
+        self.size_mb = 0
+        self.num_files = 0
+        self.archive_time = 0
+        self.logger = logger
+        self.archive_strategy = archive_strategy
+
+        # Lock to control access from multiple threads.
+        self._lock = threading.Lock()
+
+    def archive_files(self, input_files: str | List[str], archive_name: str, display_name: str):
+        if isinstance(input_files, str):
+            input_files = [input_files]
+
+        start_time = time.time()
+        with self._lock:
+            if not input_files:
+                status = 1
+                message = "No input_files specified"
+            elif self.limit_size_mb and self.size_mb >= self.limit_size_mb:
+                status = 1
+                message = "Files not archived, {}MB size limit reached".format(self.limit_size_mb)
+            elif self.limit_files and self.num_files >= self.limit_files:
+                status = 1
+                message = "Files not archived, {} file limit reached".format(self.limit_files)
+            else:
+                status, message, file_size_mb = self.archive_strategy.archive_files(
+                    input_files, archive_name, display_name
+                )
+                if status == 0:
+                    self.num_files += 1
+                self.size_mb += file_size_mb
+                self.archive_time += time.time() - start_time
+
+        return status, message
+
+    def exit(self):
+        self.archive_strategy.exit()
         self.logger.info(
             "Total tar/gzip archive time is %0.2f seconds, for %d file(s) %d MB",
             self.archive_time,
             self.num_files,
             self.size_mb,
         )
-
-    def files_archived_num(self):
-        """Return the number of the archived files."""
-        return self.num_files
-
-    def files_archived_size_mb(self):
-        """Return the size of the archived files."""
-        return self.size_mb

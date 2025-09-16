@@ -120,6 +120,8 @@ if __name__ == "__main__":
     lock, base_port = acquire_local_resource("port_block")
     resmoke_args.append(f"--basePort={base_port}")
 
+    resmoke_args.append(f"--archiveDirectory={os.path.join(os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'), 'data_archives')}")
+
     if (
         os.path.isfile("bazel/resmoke/test_runtimes.json")
         and os.path.getsize("bazel/resmoke/test_runtimes.json") != 0

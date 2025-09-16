@@ -182,6 +182,8 @@ def _validate_options(parser: argparse.ArgumentParser, args: dict):
     if (args["shard_count"] is not None) and (args["shard_index"] is not None) and args["jobs"]:
         parser.error("Cannot specify --shardCount and --shardIndex in combination with --jobs.")
 
+    if (args["archive_mode"] != "directory") ^ (args["archive_directory"] is None):
+        parser.error("--archiveMode=directory must be used in combination with --archiveDirectory=DIR")
 
 def _validate_config(parser: argparse.ArgumentParser):
     from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
@@ -865,6 +867,8 @@ flags in common: {common_set}
 
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
     _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")
+    _config.ARCHIVE_MODE = config.pop("archive_mode")
+    _config.ARCHIVE_DIRECTORY = config.pop("archive_directory")
 
     # Wiredtiger options. Prevent fuzzed wt configs from being overwritten unless user specifies it.
     wt_engine_config = config.pop("wt_engine_config")

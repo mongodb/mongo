@@ -56,6 +56,8 @@ DEFAULTS = {
     "always_use_log_files": False,
     "archive_limit_mb": 5000,
     "archive_limit_tests": 10,
+    "archive_directory": None,
+    "archive_mode": "s3",
     "base_port": 20000,
     "backup_on_restart_dir": None,
     "config_shard": None,
@@ -339,6 +341,9 @@ ARCHIVE_LIMIT_MB = None
 
 # The limit number of tests to archive for an Evergreen task.
 ARCHIVE_LIMIT_TESTS = None
+
+# Mechanism to use for storing archived data files on failures.
+ARCHIVE_MODE = None
 
 # Whether to back up data when restarting a process.
 BACKUP_ON_RESTART_DIR = None
@@ -725,6 +730,9 @@ ARCHIVE_FILE = "archive.json"
 
 # S3 Bucket to upload archive files.
 ARCHIVE_BUCKET = "mongodatafiles"
+
+# Directory to store archive files.
+ARCHIVE_DIRECTORY = None
 
 # Force archive all files where appropriate. Eventually we want this to be the default option.
 # For now, only the mainline required builders have this option enabled.

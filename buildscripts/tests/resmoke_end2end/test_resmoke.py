@@ -85,7 +85,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure.yml",
             "--originSuite=resmoke_end2end_tests",
             "--taskId=123",
-            "--internalParam=test_archival",
+            "--archiveMode=test_archival",
             "--repeatTests=2",
             "--jobs=2",
         ]
@@ -105,7 +105,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
             "--taskId=123",
             "--originSuite=resmoke_end2end_tests",
-            "--internalParam=test_archival",
+            "--archiveMode=test_archival",
             "--repeatTests=2",
             "--jobs=2",
         ]
@@ -120,7 +120,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         # archival should not happen if --taskId is not set.
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
-            "--internalParam=test_archival",
+            "--archiveMode=test_archival",
             "--repeatTests=2",
             "--jobs=2",
         ]
@@ -196,7 +196,7 @@ class TestTimeout(_ResmokeSelftest):
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout.yml",
             "--taskId=123",
             "--originSuite=resmoke_end2end_tests",
-            "--internalParam=test_archival",
+            "--archiveMode=test_archival",
             "--internalParam=test_analysis",
         ]
         self.execute_resmoke(resmoke_args, sentinel_file="timeout0")
@@ -216,7 +216,7 @@ class TestTimeout(_ResmokeSelftest):
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout_no_passthrough.yml",
             "--taskId=123",
             "--originSuite=resmoke_end2end_tests",
-            "--internalParam=test_archival",
+            "--archiveMode=test_archival",
             "--internalParam=test_analysis",
         ]
         self.execute_resmoke(resmoke_args, sentinel_file="timeout1")
@@ -237,7 +237,7 @@ class TestTimeout(_ResmokeSelftest):
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_nested_timeout.yml",
             "--taskId=123",
             "--originSuite=resmoke_end2end_tests",
-            "--internalParam=test_archival",
+            "--archiveMode=test_archival",
             "--internalParam=test_analysis",
             "jstests/resmoke_selftest/end2end/timeout/nested/top_level_timeout.js",
         ]

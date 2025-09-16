@@ -14,7 +14,7 @@ function start() {
         getPython3Binary() +
         " buildscripts/resmoke.py run " +
         "--storageEngineCacheSizeGB=1 --dbpathPrefix=/data/db/selftest_inner " +
-        "--internalParam=test_archival --taskId=123 " +
+        "--archiveMode=test_archival --taskId=123 " +
         "--originSuite=resmoke_end2end_tests " +
         "--internalParam=is_inner_level " +
         "--basePort=20020 " +

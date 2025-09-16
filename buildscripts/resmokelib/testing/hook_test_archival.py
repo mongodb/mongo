@@ -113,28 +113,18 @@ class HookTestArchival(object):
         test_path = (
             test_name.replace("/", "_").replace("\\", "_").replace(".", "_").replace(":", "_")
         )
-        file_name = "mongo-data-{}-{}-{}-{}.tgz".format(
-            config.EVERGREEN_TASK_ID,
+        archive_name = "{}-execution_{}-repetition_{}.tgz".format(
             test_path,
             config.EVERGREEN_EXECUTION,
             self._tests_repeat[test_name],
         )
         # Retrieve root directory for all dbPaths from fixture.
         input_files = test.fixture.get_path_for_archival()
-        s3_bucket = config.ARCHIVE_BUCKET
-        s3_path = "{}/{}/{}/datafiles/{}".format(
-            config.EVERGREEN_PROJECT_NAME,
-            config.EVERGREEN_VARIANT_NAME,
-            config.EVERGREEN_REVISION,
-            file_name,
-        )
         display_name = "Data files {} - Execution {} Repetition {}".format(
             test_name, config.EVERGREEN_EXECUTION, self._tests_repeat[test_name]
         )
         logger.info("Archiving data files for test %s from %s", test_name, input_files)
-        status, message = self.archive_instance.archive_files_to_s3(
-            display_name, input_files, s3_bucket, s3_path
-        )
+        status, message = self.archive_instance.archive_files(input_files, archive_name, display_name)
         if status:
             logger.warning("Archive failed for %s: %s", test_name, message)
         else:

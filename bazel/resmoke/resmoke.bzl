@@ -135,6 +135,8 @@ def resmoke_suite_test(
             "--multiversionDir=multiversion_binaries",
             "--continueOnFailure",
             "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
+            "--archiveMode=directory",
+            "--archiveLimitMb=500",
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "local", "resources:port_block:1"],
         timeout = timeout,

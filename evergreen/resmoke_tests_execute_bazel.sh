@@ -33,17 +33,6 @@ ci_flags="\
 --noincompatible_enable_cc_toolchain_resolution \
 --repo_env=no_c++_toolchain=1"
 
-# Absolute paths to AWS credential/configs are used here, allowing the test
-# action to escape the local sandboxing of bazel. This is done rather than
-# set the credentials in the environment themselves so that they will not get
-# added to the bazel invocation sent to EngFlow. This is incompatible
-# with remote execution since these are files only on the Evergreen host.
-ci_flags+=" \
---test_env AWS_PROFILE=${aws_profile_remote} \
---test_env AWS_CONFIG_FILE=$(realpath ~/.aws/config) \
---test_env AWS_SHARED_CREDENTIALS_FILE=$(realpath ~/.aws/credentials) \
---test_env BOTO_CONFIG=$(realpath ~/.boto)"
-
 if [ ${should_shuffle} = true ]; then
     ci_flags+=" --test_arg=--shuffle"
 elif [ ${should_shuffle} = false ]; then
@@ -124,8 +113,17 @@ find bazel-testlogs/ -type f -path "*TestLogs/*" -print0 |
         ln -sf $source $target
     done
 
-# Combine archive.json from potentially multiple tests/shards.
-find bazel-testlogs/ -name archive.json -exec cat {} + | jq -s 'add' >"archive.json"
+# Symlinks archived data directories from multiple tests/shards to a single folder. Evergreen needs a
+# single folder it can glob for s3.put. See the Evergreen function "upload mongodatafiles".
+find bazel-testlogs/ -path '*data_archives/*.tgz' -print0 |
+    while IFS= read -r -d '' archive; do
+        source=${workdir}/src/$archive
+        target=${workdir}/$(sed 's/.*\.outputs\///' <<<$archive)
+        echo $source
+        echo $target
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
 
 # Combine reports from potentially multiple tests/shards.
 find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json

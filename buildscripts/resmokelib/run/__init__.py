@@ -44,6 +44,7 @@ from buildscripts.resmokelib.testing.docker_cluster_image_builder import build_i
 from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import runtime_recorder
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
+from buildscripts.util.download_utils import get_s3_client
 from buildscripts.util.teststats import HistoricTaskData
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
@@ -1053,11 +1054,25 @@ class TestRunner(Subcommand):
     def _setup_archival(self):
         """Set up the archival feature if enabled in the cli options."""
         if config.ARCHIVE_FILE:
+            match config.ARCHIVE_MODE:
+                case "s3":
+                    base_path = "{}/{}/{}/datafiles/{}-".format(
+                        config.EVERGREEN_PROJECT_NAME,
+                        config.EVERGREEN_VARIANT_NAME,
+                        config.EVERGREEN_REVISION,
+                        config.EVERGREEN_TASK_ID,
+                    )
+                    archive_strategy = utils.archival.ArchiveToS3(config.ARCHIVE_BUCKET, base_path, get_s3_client(), self._exec_logger)
+                case "directory":
+                    archive_strategy = utils.archival.ArchiveToDirectory(config.ARCHIVE_DIRECTORY, self._exec_logger)
+                case "test_archival":
+                    archive_strategy = utils.archival.TestArchival()
             self._archive = utils.archival.Archival(
                 archival_json_file=config.ARCHIVE_FILE,
                 limit_size_mb=config.ARCHIVE_LIMIT_MB,
                 limit_files=config.ARCHIVE_LIMIT_TESTS,
                 logger=self._exec_logger,
+                archive_strategy=archive_strategy,
             )
 
     def _exit_archival(self):
@@ -2110,11 +2125,6 @@ class RunPlugin(PluginInterface):
         #     it was started by a shell process which itself was started by a top-level"
         #     resmoke process. This is used to ensure the hang-analyzer is called properly."
         #
-        # `test_archival`:
-        #     Allows unit testing of resmoke's archival feature where we write out the names
-        #     of the files to be archived, instead of doing the actual archival, which can
-        #     be time and resource intensive.
-        #
         # `test_analysis`:
         #     When specified, the hang-analyzer writes out the pids it will analyze without
         #     actually running analysis, which can be time and resource intensive.
@@ -2199,7 +2209,7 @@ class RunPlugin(PluginInterface):
             dest="archive_limit_mb",
             metavar="ARCHIVE_LIMIT_MB",
             help=(
-                "Sets the limit (in MB) for archived files to S3. A value of 0"
+                "Sets the limit (in MB) for archived files. A value of 0"
                 " indicates there is no limit."
             ),
         )
@@ -2210,9 +2220,25 @@ class RunPlugin(PluginInterface):
             dest="archive_limit_tests",
             metavar="ARCHIVE_LIMIT_TESTS",
             help=(
-                "Sets the maximum number of tests to archive to S3. A value"
+                "Sets the maximum number of tests to archive. A value"
                 " of 0 indicates there is no limit."
             ),
+        )
+
+        evergreen_options.add_argument(
+            "--archiveMode",
+            dest="archive_mode",
+            choices=("s3", "directory", "test_archival"),
+            metavar="MODE",
+            help=("Where to store archived data files on failures - uploaded to s3 during execution, "
+                  "to a directory, or write the names of the files to archive for testing archival behavior."),
+        )
+
+        evergreen_options.add_argument(
+            "--archiveDirectory",
+            dest="archive_directory",
+            metavar="DIR",
+            help=("Directory where to store archives when a test/hook fails."),
         )
 
         evergreen_options.add_argument(

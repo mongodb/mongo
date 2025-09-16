@@ -2,13 +2,12 @@
 
 import logging
 import os
-import random
 import shutil
 import tempfile
 import unittest
+from unittest.mock import ANY, MagicMock
 
 from buildscripts.resmokelib.utils import archival
-from buildscripts.util.download_utils import get_s3_client
 
 _BUCKET = "mongodatafiles"
 
@@ -16,244 +15,233 @@ _BUCKET = "mongodatafiles"
 def create_random_file(file_name, num_chars_mb):
     """Creates file with random characters, which will have minimal compression."""
     with open(file_name, "wb") as fileh:
-        for _ in range(num_chars_mb * 1024 * 1024):
-            fileh.write(chr(random.randint(0, 255)))
+        fileh.write(os.urandom(num_chars_mb * 1024 * 1024))
 
 
-class MockS3Client(object):
-    """Class to mock the S3 client."""
-
-    def __init__(self, logger):
-        self.logger = logger
-        self.logger.info("MockS3Client init")
-
-    def upload_file(self, *args, **kwargs):
-        self.logger.info("MockS3Client upload_file %s %s", args, kwargs)
-
-    def delete_object(self, *args, **kwargs):
-        self.logger.info("MockS3Client delete_object %s %s", args, kwargs)
-
-
-class ArchivalTestCase(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
+class S3ArchivalTestCase(unittest.TestCase):
+    def setUp(self):
         logging.basicConfig()
-        cls.logger = logging.getLogger()
-        cls.logger.setLevel(logging.INFO)
-        cls.bucket = _BUCKET
-        cls.temp_dir = tempfile.mkdtemp()
-        cls.remote_paths = []
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.INFO)
+        self.bucket = _BUCKET
+        self.temp_dir = tempfile.mkdtemp()
+        self.remote_paths = []
+        self.s3_client = MagicMock()
+        self.base_path = "project/variant/revision/datafiles/taskid-"
+        self.archive = self.create_archival()
 
-        # We can use the AWS S3 calls by setting the environment variable MOCK_CLIENT to 0.
-        mock_client = os.environ.get("MOCK_CLIENT", "1") != "0"
-        if mock_client:
-            cls.s3_client = MockS3Client(cls.logger)
-        else:
-            cls.s3_client = get_s3_client()
-        cls.archive = cls.create_archival()
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.archive.exit()
-        cls.logger.info("Cleaning temp directory %s", cls.temp_dir)
-        shutil.rmtree(cls.temp_dir, ignore_errors=True)
-        for path in cls.remote_paths:
-            cls.delete_s3_file(path)
-
-    @classmethod
-    def create_archival(cls):
-        return archival.Archival(cls.logger, s3_client=cls.s3_client)
-
-    @classmethod
-    def delete_s3_file(cls, path):
-        cls.logger.info("Cleaning S3 bucket %s path %s", cls.bucket, path)
-        cls.s3_client.delete_object(Bucket=cls.bucket, Key=path)
-
-    def s3_path(self, path, add_remote_path=True):
-        if add_remote_path:
-            self.remote_paths.append(path)
-        return path
-
-
-class ArchivalFileTests(ArchivalTestCase):
-    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
-    def test_nofile(self):
-        # Invalid input_files
-        display_name = "Unittest invalid file"
-        input_files = "no_file"
-        s3_path = self.s3_path("unittest/no_file.tgz", False)
-        self.assertRaises(
-            OSError,
-            lambda: self.archive.archive_files_to_s3(
-                display_name, input_files, self.bucket, s3_path
-            ),
+    def create_archival(self):
+        return archival.Archival(
+            archival.ArchiveToS3(self.bucket, self.base_path, self.s3_client, self.logger),
+            self.logger,
+            s3_client=self.s3_client,
         )
 
-        # Invalid input_files in a list
-        input_files = ["no_file", "no_file2"]
-        s3_path = self.s3_path("unittest/no_files.tgz", False)
-        self.assertRaises(
-            OSError,
-            lambda: self.archive.archive_files_to_s3(
-                display_name, input_files, self.bucket, s3_path
-            ),
-        )
 
-        # No files
-        display_name = "Unittest no files"
-        s3_path = self.s3_path("unittest/no_files.tgz")
-        status, message = self.archive.archive_files_to_s3(display_name, [], self.bucket, s3_path)
-        self.assertEqual(1, status, message)
+class ArchivalFileTests(S3ArchivalTestCase):
+    def test_file(self):
+        # Archive a single data file
+        data_files = tempfile.mkstemp(dir=self.temp_dir)[1]
+        archive_name = "archive.tgz"
+        display_name = "Single-file archive"
+
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
+        )
+        self.archive.exit()
+
+        self.assertEqual(0, status, message)
+        self.s3_client.upload_file.assert_called_with(
+            ANY, self.bucket, f"{self.base_path}{archive_name}", ExtraArgs=ANY
+        )
 
     def test_files(self):
-        # Valid files
-        display_name = "Unittest valid file"
-        temp_file = tempfile.mkstemp(dir=self.temp_dir)[1]
-        s3_path = self.s3_path("unittest/valid_file.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
+        # Archive multiple data files in one upload
+        data_files = [
+            tempfile.mkstemp(dir=self.temp_dir)[1],
+            tempfile.mkstemp(dir=self.temp_dir)[1],
+        ]
+        archive_name = "archive.tgz"
+        display_name = "Multi-file archive"
 
-        # 2 valid files
-        display_name = "Unittest 2 valid files"
-        temp_file2 = tempfile.mkstemp(dir=self.temp_dir)[1]
-        s3_path = self.s3_path("unittest/2valid_files.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, [temp_file, temp_file2], self.bucket, s3_path
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
         )
+        self.archive.exit()
+
         self.assertEqual(0, status, message)
+        self.s3_client.upload_file.assert_called_with(
+            ANY, self.bucket, f"{self.base_path}{archive_name}", ExtraArgs=ANY
+        )
 
     def test_empty_directory(self):
-        # Valid directory
-        display_name = "Unittest valid directory no files"
-        temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
-        s3_path = self.s3_path("unittest/valid_directory.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_dir, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
+        data_files = tempfile.mkdtemp(dir=self.temp_dir)
+        archive_name = "archive.tgz"
+        display_name = "Archive"
 
-        display_name = "Unittest valid directories no files"
-        temp_dir2 = tempfile.mkdtemp(dir=self.temp_dir)
-        s3_path = self.s3_path("unittest/valid_directories.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, [temp_dir, temp_dir2], self.bucket, s3_path
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
         )
+        self.archive.exit()
+
         self.assertEqual(0, status, message)
+        self.s3_client.upload_file.assert_called_with(
+            ANY, self.bucket, f"{self.base_path}{archive_name}", ExtraArgs=ANY
+        )
+
+    def test_empty_directories(self):
+        data_files = [tempfile.mkdtemp(dir=self.temp_dir), tempfile.mkdtemp(dir=self.temp_dir)]
+        archive_name = "archive.tgz"
+        display_name = "Archive"
+
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
+        )
+        self.archive.exit()
+
+        self.assertEqual(0, status, message)
+        self.s3_client.upload_file.assert_called_with(
+            ANY, self.bucket, f"{self.base_path}{archive_name}", ExtraArgs=ANY
+        )
 
     def test_directory(self):
-        display_name = "Unittest directory with files"
-        temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
-        s3_path = self.s3_path("unittest/directory_with_files.tgz")
-        # Create 10 empty files
+        data_files = tempfile.mkdtemp(dir=self.temp_dir)
         for _ in range(10):
-            tempfile.mkstemp(dir=temp_dir)
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_dir, self.bucket, s3_path
+            tempfile.mkstemp(dir=data_files)
+        archive_name = "archive.tgz"
+        display_name = "Archive"
+
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
         )
-        self.assertEqual(0, status, message)
+        self.archive.exit()
 
-        display_name = "Unittest 2 valid directory files"
-        temp_dir2 = tempfile.mkdtemp(dir=self.temp_dir)
-        s3_path = self.s3_path("unittest/directories_with_files.tgz")
-        # Create 10 empty files
-        for _ in range(10):
-            tempfile.mkstemp(dir=temp_dir2)
-        status, message = self.archive.archive_files_to_s3(
-            display_name, [temp_dir, temp_dir2], self.bucket, s3_path
+        self.assertEqual(0, status, message)
+        self.s3_client.upload_file.assert_called_with(
+            ANY, self.bucket, f"{self.base_path}{archive_name}", ExtraArgs=ANY
         )
+
+    def test_directories(self):
+        data_files = []
+        for _ in range(2):
+            dir = tempfile.mkdtemp(dir=self.temp_dir)
+            data_files.append(dir)
+            for _ in range(10):
+                tempfile.mkstemp(dir=dir)
+        archive_name = "archive.tgz"
+        display_name = "Archive"
+
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
+        )
+        self.archive.exit()
+
         self.assertEqual(0, status, message)
+        self.s3_client.upload_file.assert_called_with(
+            ANY, self.bucket, f"{self.base_path}{archive_name}", ExtraArgs=ANY
+        )
 
 
-class ArchivalLimitSizeTests(ArchivalTestCase):
-    @classmethod
-    def create_archival(cls):
-        return archival.Archival(cls.logger, limit_size_mb=5, s3_client=cls.s3_client)
+class ArchivalLimitSizeTests(S3ArchivalTestCase):
+    def create_archival(self):
+        return archival.Archival(
+            archival.ArchiveToS3(self.bucket, self.base_path, self.s3_client, self.logger),
+            self.logger,
+            limit_size_mb=3,
+            s3_client=self.s3_client,
+        )
 
-    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def test_limit_size(self):
         # Files within limit size
-        display_name = "Unittest under limit size"
-        temp_file = tempfile.mkstemp(dir=self.temp_dir)[1]
-        create_random_file(temp_file, 3)
-        s3_path = self.s3_path("unittest/valid_limit_size.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
-        # Note the size limit is enforced after the file uploaded. Subsequent
-        # uploads will not be permitted, once the limit has been reached.
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
+        data_files = tempfile.mkstemp(dir=self.temp_dir)[1]
+        create_random_file(data_files, 2)
+        archive_name = "archive.tgz"
+        display_name = "Archive"
 
-        # Files beyond limit size
-        display_name = "Unittest over limit size"
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
+        # First should upload successfully, the second should not result in an s3 upload_file call.
+        for i in range(2):
+            archive_name = f"archive_{i}.tgz"
+            display_name = f"Archive {i}"
+            status, message = self.archive.archive_files(
+                data_files,
+                archive_name,
+                display_name,
+            )
+        self.archive.exit()
+
+        self.assertEqual(self.s3_client.upload_file.call_count, 1)
         self.assertEqual(1, status, message)
 
 
-class ArchivalLimitFileTests(ArchivalTestCase):
-    @classmethod
-    def create_archival(cls):
-        return archival.Archival(cls.logger, limit_files=3, s3_client=cls.s3_client)
+class ArchivalLimitFileTests(S3ArchivalTestCase):
+    def create_archival(self):
+        return archival.Archival(
+            archival.ArchiveToS3(self.bucket, self.base_path, self.s3_client, self.logger),
+            self.logger,
+            limit_files=3,
+            s3_client=self.s3_client,
+        )
 
     def test_limit_file(self):
-        # Files within limit number
-        display_name = "Unittest under limit number"
-        temp_file = tempfile.mkstemp(dir=self.temp_dir)[1]
-        s3_path = self.s3_path("unittest/valid_limit_number.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
+        data_files = tempfile.mkstemp(dir=self.temp_dir)[1]
 
-        # Files beyond limit number
-        display_name = "Unittest over limit number"
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
+        # First 3 should upload successfully, the fourth should not result in an s3 upload_file call.
+        for i in range(4):
+            archive_name = f"archive_{i}.tgz"
+            display_name = f"Archive {i}"
+            status, message = self.archive.archive_files(
+                data_files,
+                archive_name,
+                display_name,
+            )
+
+        self.archive.exit()
         self.assertEqual(1, status, message)
+        self.assertEqual(self.s3_client.upload_file.call_count, 3)
 
 
-class ArchivalLimitTests(ArchivalTestCase):
-    @classmethod
-    def create_archival(cls):
-        return archival.Archival(
-            cls.logger, limit_size_mb=3, limit_files=3, s3_client=cls.s3_client
+class DirectoryArchivalTests(unittest.TestCase):
+    def setUp(self):
+        logging.basicConfig()
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.INFO)
+        self.temp_dir = tempfile.mkdtemp()
+        self.s3_client = MagicMock()
+        self.archive = archival.Archival(
+            archival.ArchiveToDirectory(self.temp_dir, self.logger),
+            self.logger,
         )
 
-    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
-    def test_limits(self):
-        # Files within limits
-        display_name = "Unittest under limits"
-        temp_file = tempfile.mkstemp(dir=self.temp_dir)[1]
-        create_random_file(temp_file, 1)
-        s3_path = self.s3_path("unittest/valid_limits.tgz")
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_file(self):
+        data_files = tempfile.mkstemp(dir=self.temp_dir)[1]
+        archive_name = "archive.tgz"
+        display_name = "Single-file archive"
+
+        status, message = self.archive.archive_files(
+            data_files,
+            archive_name,
+            display_name,
         )
+        self.archive.exit()
+
+        expected = os.path.join(self.temp_dir, archive_name)
+        self.assertTrue(os.path.exists(expected), f"Expected archive does not exist: {expected}")
         self.assertEqual(0, status, message)
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(0, status, message)
-
-        # Files beyond limits
-        display_name = "Unittest over limits"
-        status, message = self.archive.archive_files_to_s3(
-            display_name, temp_file, self.bucket, s3_path
-        )
-        self.assertEqual(1, status, message)

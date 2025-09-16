@@ -1809,19 +1809,7 @@ functions:
           - key: targets
             value: ${suite}
     - *f_expansions_write
-    - command: expansions.update
-      params:
-        updates:
-          - key: aws_key_remote
-            value: ${mongodatafiles_aws_key}
-          - key: aws_profile_remote
-            value: mongodata_aws
-          - key: aws_secret_remote
-            value: ${mongodatafiles_aws_secret}
-    - *f_expansions_write
     - *set_code_coverage_expansion
-    - *f_expansions_write
-    - *set_up_remote_credentials
     - *f_expansions_write
     - *configure_evergreen_api_credentials
     - *determine_task_timeout
@@ -1837,19 +1825,7 @@ functions:
     - *retrieve_generated_test_configuration
     - *extract_generated_test_configuration
     - *f_expansions_write
-    - command: expansions.update
-      params:
-        updates:
-          - key: aws_key_remote
-            value: ${mongodatafiles_aws_key}
-          - key: aws_profile_remote
-            value: mongodata_aws
-          - key: aws_secret_remote
-            value: ${mongodatafiles_aws_secret}
-    - *f_expansions_write
     - *set_code_coverage_expansion
-    - *f_expansions_write
-    - *set_up_remote_credentials
     - *f_expansions_write
     - *configure_evergreen_api_credentials
     - *determine_task_timeout
@@ -3057,6 +3033,20 @@ functions:
       ignore_artifacts_for_spawn: false
       files:
         - ${archive_file|src/archive.json}
+
+  "upload mongodatafiles":
+    command: s3.put
+    params:
+      aws_key: ${mongodatafiles_aws_key}
+      aws_secret: ${mongodatafiles_aws_secret}
+      bucket: mongodatafiles
+      permissions: private
+      visibility: signed
+      content_type: application/gzip
+      local_files_include_filter:
+        - data_archives/*.tgz
+      remote_file: ${project}/${build_variant}/${revision}/datafiles/${task_id}-
+      display_name: "Data files "
 
   "attach wiki page":
     - *f_expansions_write
