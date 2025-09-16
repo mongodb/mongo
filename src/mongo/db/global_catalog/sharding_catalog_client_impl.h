@@ -283,13 +283,6 @@ private:
         repl::ReadConcernLevel readConcernLevel);
 
     /**
-     * Queries the config server to retrieve placement data based on the Request object.
-     */
-    HistoricalPlacement _fetchPlacementMetadata(OperationContext* opCtx,
-                                                ConfigsvrGetHistoricalPlacement&& request);
-
-
-    /**
      * Returns the Shard type that should be used to access the config server. Unless an instance
      * was provided at construction, which may be done e.g. to force using local operations, falls
      * back to using the config shard from the ShardRegistry.

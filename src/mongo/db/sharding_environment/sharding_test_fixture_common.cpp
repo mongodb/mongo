@@ -49,6 +49,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
+#include <chrono>
 #include <cstddef>
 
 #include <boost/move/utility_core.hpp>
@@ -131,5 +132,31 @@ void ShardingTestFixtureCommon::onFindWithMetadataCommand(
     NetworkTestEnv::OnFindCommandWithMetadataFunction func) {
     _networkTestEnv->onFindWithMetadataCommand(func);
 }
+
+
+ClockSourceMock* ShardingTestFixtureCommon::clockSource() const {
+    const auto clockSource =
+        dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
+    ASSERT_NE(clockSource, nullptr);
+    return clockSource;
+}
+
+Milliseconds ShardingTestFixtureCommon::advanceUntilReadyRequest() const {
+    using namespace std::literals;
+    const auto opCtx = operationContext();
+
+    stdx::this_thread::sleep_for(1ms);
+    auto totalWaited = Milliseconds{0};
+    auto _ = executor::NetworkInterfaceMock::InNetworkGuard{_mockNetwork};
+    while (!_mockNetwork->hasReadyRequests()) {
+        opCtx->checkForInterrupt();
+        auto advance = Milliseconds{10};
+        clockSource()->advance(advance);
+        totalWaited += advance;
+        stdx::this_thread::sleep_for(100us);
+    }
+    return totalWaited;
+}
+
 
 }  // namespace mongo

@@ -81,6 +81,14 @@ protected:
      */
     void shutdownExecutorPool();
 
+    /**
+     * Waits until there's a ready request in the mock network. While waiting, advances the mock
+     * clock.
+     */
+    Milliseconds advanceUntilReadyRequest() const;
+
+    ClockSourceMock* clockSource() const;
+
     OperationContext* operationContext() const;
 
     /**

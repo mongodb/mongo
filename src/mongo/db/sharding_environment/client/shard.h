@@ -130,6 +130,9 @@ public:
     class RetryStrategy : public mongo::RetryStrategy {
     public:
         RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy);
+        RetryStrategy(const Shard& shard,
+                      Shard::RetryPolicy retryPolicy,
+                      std::int32_t maxRetryAttempts);
 
         bool recordFailureAndEvaluateShouldRetry(
             Status s,
@@ -151,6 +154,10 @@ public:
         }
 
     private:
+        RetryStrategy(const Shard& shard,
+                      Shard::RetryPolicy retryPolicy,
+                      AdaptiveRetryStrategy::BackoffParameters backoff);
+
         AdaptiveRetryStrategy _underlyingStrategy;
     };
 
@@ -305,6 +312,15 @@ public:
                            const boost::optional<BSONObj>& postBatchResumeToken)> callback);
 
     /**
+     * Synchronously run an aggregation request like runAggregation, but return a vector containing
+     * every BSON object from every batch processed during aggregation.
+     */
+    StatusWith<std::vector<BSONObj>> runAggregationWithResult(
+        OperationContext* opCtx,
+        const AggregateCommandRequest& aggRequest,
+        Shard::RetryPolicy retryPolicy);
+
+    /**
      * Runs a write command against a shard. This is separate from runCommand, because write
      * commands return errors in a different format than regular commands do, so checking for
      * retriable errors must be done differently.
@@ -373,6 +389,13 @@ protected:
                                                     RetryPolicy retryPolicy);
 
 private:
+    StatusWith<CommandResponse> _runCommandImpl(OperationContext* opCtx,
+                                                const ReadPreferenceSetting& readPref,
+                                                const DatabaseName& dbName,
+                                                const BSONObj& cmdObj,
+                                                Milliseconds maxTimeMSOverride,
+                                                RetryPolicy retryPolicy,
+                                                std::int32_t maxRetryAttempt);
     /**
      * Runs the specified command against the shard backed by this object with a timeout set to
      * the minimum of maxTimeMSOverride or the timeout of the OperationContext.
@@ -404,6 +427,7 @@ private:
         boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none) = 0;
 
+    // TODO(SERVER-104141): Change return type to Status
     virtual RetryStrategy::Result<std::monostate> _runAggregation(
         OperationContext* opCtx,
         const AggregateCommandRequest& aggRequest,

@@ -88,6 +88,10 @@ bool RemoteCommandResponse::isOK() const {
 }
 
 std::vector<std::string> RemoteCommandResponse::getErrorLabels() const {
+    if (!status.isOK()) {
+        return {};
+    }
+
     if (BSONElement errorLabelsElement = data["errorLabels"]; !errorLabelsElement.eoo()) {
         auto errorLabelsArray = errorLabelsElement.Array();
 

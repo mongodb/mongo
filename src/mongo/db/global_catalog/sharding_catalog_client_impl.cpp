@@ -551,24 +551,6 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     }
 }
 
-HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
-    OperationContext* opCtx, ConfigsvrGetHistoricalPlacement&& request) {
-    auto remoteResponse = uassertStatusOK(
-        _getConfigShard(opCtx)->runCommand(opCtx,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           DatabaseName::kAdmin,
-                                           request.toBSON(),
-                                           Milliseconds(defaultConfigCommandTimeoutMS.load()),
-                                           Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
-
-    uassertStatusOK(remoteResponse.commandStatus);
-
-    auto placementDetails = ConfigsvrGetHistoricalPlacementResponse::parse(
-        remoteResponse.response, IDLParserContext("ShardingCatalogClient"));
-
-    return placementDetails.getHistoricalPlacement();
-}
-
 std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     OperationContext* opCtx,
     AggregateCommandRequest& aggRequest,
@@ -603,29 +585,9 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     }
 
     // Run the aggregation
-    std::vector<BSONObj> aggResult;
-    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
-                                 const boost::optional<BSONObj>& postBatchResumeToken) {
-        aggResult.insert(aggResult.end(),
-                         std::make_move_iterator(batch.begin()),
-                         std::make_move_iterator(batch.end()));
-        return true;
-    };
-
     const auto configShard = _getConfigShard(opCtx);
-    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
-        if (retry < kMaxWriteRetry &&
-            configShard->isRetriableError(status.code(), {}, Shard::RetryPolicy::kIdempotent)) {
-            aggResult.clear();
-            continue;
-        }
-        uassertStatusOK(status);
-        break;
-    }
-
-    return aggResult;
+    return uassertStatusOK(
+        configShard->runAggregationWithResult(opCtx, aggRequest, Shard::RetryPolicy::kIdempotent));
 }
 
 CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
@@ -1264,6 +1226,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     }());
 
     const auto configShard = _getConfigShard(opCtx);
+    // TODO(SERVER-108323): Use retry strategy or let runBatchWriteCommand retry.
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         auto response =
             configShard->runBatchWriteCommand(opCtx,
@@ -1274,9 +1237,9 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
         Status status = response.toStatus();
 
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
         if (retry < kMaxWriteRetry &&
-            configShard->isRetriableError(status.code(), {}, Shard::RetryPolicy::kIdempotent)) {
+            configShard->isRetriableError(
+                status.code(), response.getErrorLabels(), Shard::RetryPolicy::kIdempotent)) {
             // Pretend like the operation is idempotent because we're handling DuplicateKey errors
             // specially
             continue;

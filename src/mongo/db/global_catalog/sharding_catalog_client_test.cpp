@@ -39,7 +39,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/backoff_with_jitter.h"
+#include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -85,11 +88,13 @@ using rpc::ReplSetMetadata;
 using std::vector;
 using unittest::assertGet;
 
-const int kMaxCommandRetry = 3;
-const NamespaceString kNamespace =
-    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
-
-using ShardingCatalogClientTest = ShardingTestFixture;
+struct ShardingCatalogClientTest : ShardingTestFixture {
+    static constexpr auto kSystemOverloadedErrorCode = ErrorCodes::IngressRequestRateLimitExceeded;
+    static constexpr std::uint32_t kKnownGoodSeed = 0xc0ffee;
+    static constexpr int kMaxCommandExecutions = kDefaultClientMaxRetryAttemptsDefault + 1;
+    inline static const NamespaceString kNamespace =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+};
 
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
@@ -734,7 +739,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
         ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder responseBuilder;
             CommandHelpers::appendCommandStatusNoThrow(
@@ -1196,10 +1201,100 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry)
                            ErrorCodes::HostUnreachable);
     });
 
-    for (int i = 0; i < kMaxCommandRetry; ++i) {
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
         onFindCommand([](const RemoteCommandRequest&) {
             return Status{ErrorCodes::HostUnreachable, "bad host"};
         });
+    }
+
+    future.default_timed_get();
+}
+
+TEST_F(ShardingCatalogClientTest, RetryOnFindCommandSystemOverloadedAtMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = launchAsync([this] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        ASSERT_THROWS_CODE(catalogClient()->getDatabase(
+                               operationContext(),
+                               DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"),
+                               repl::ReadConcernLevel::kMajorityReadConcern),
+                           DBException,
+                           kSystemOverloadedErrorCode);
+    });
+
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
+        onCommand([](const RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+        });
+
+        if (i < kMaxCommandExecutions - 1) {
+            ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+        }
+    }
+
+    future.default_timed_get();
+}
+
+TEST_F(ShardingCatalogClientTest, RetryOnFindCommandSystemOverloadedWithDeadline) {
+    auto _ = Interruptible::DeadlineGuard{*operationContext(),
+                                          clockSource()->now() + Milliseconds{200},
+                                          ErrorCodes::ExceededTimeLimit};
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = launchAsync([this] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        ASSERT_THROWS_CODE(catalogClient()->getDatabase(
+                               operationContext(),
+                               DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"),
+                               repl::ReadConcernLevel::kMajorityReadConcern),
+                           DBException,
+                           ErrorCodes::ExceededTimeLimit);
+    });
+
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
+        onCommand([](const RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+        });
+
+        try {
+            ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+        } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+            break;
+        }
+    }
+
+    future.default_timed_get();
+}
+
+TEST_F(ShardingCatalogClientTest, RetryOnUserManagementReadCommandSystemOverloadedAtMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        bool ok = catalogClient()->runUserManagementReadCommand(
+            operationContext(),
+            DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+            BSON("usersInfo" << 1),
+            &responseBuilder);
+        ASSERT_FALSE(ok);
+
+        BSONObj response = responseBuilder.obj();
+        ASSERT_FALSE(response["ok"].trueValue());
+        auto errorCode = response["code"].numberInt();
+        ASSERT_EQ(errorCode, kSystemOverloadedErrorCode);
+    });
+
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
+        onCommand([](const RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+        });
+
+        if (i < kMaxCommandExecutions - 1) {
+            ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+        }
     }
 
     future.default_timed_get();
@@ -1215,7 +1310,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
             repl::ReadConcernLevel::kMajorityReadConcern);
     });
 
-    for (int i = 0; i < kMaxCommandRetry - 1; ++i) {
+    for (int i = 0; i < kMaxCommandExecutions - 1; ++i) {
         onFindCommand([](const RemoteCommandRequest&) {
             return Status{ErrorCodes::HostUnreachable, "bad host"};
         });

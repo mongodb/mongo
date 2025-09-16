@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache_mock.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -154,6 +155,25 @@ protected:
         result.appendBool("ok", false);
         return result.obj();
     }
+
+    /**
+     * Mocks an error response from a remote that includes the error labels 'SystemOverloadError'
+     * and 'RetryableError'
+     */
+    static BSONObj createErrorSystemOverloaded(ErrorCodes::Error errorCode) {
+        BSONObjBuilder bob;
+        bob.append("ok", 0.0);
+        bob.append("code", errorCode);
+        bob.append("errmsg", "overloaded");
+        bob.append("codeName", ErrorCodes::errorString(errorCode));
+        {
+            BSONArrayBuilder arrayBuilder = bob.subarrayStart(kErrorLabelsFieldName);
+            arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
+            arrayBuilder.append(ErrorLabel::kRetryableError);
+        }
+        return bob.obj();
+    }
+
 
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;

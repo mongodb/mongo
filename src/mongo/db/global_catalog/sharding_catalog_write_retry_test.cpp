@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -87,6 +88,10 @@ const NamespaceString kTestNamespace =
     NamespaceString::createNamespaceString_forTest("config.TestColl");
 const HostAndPort kTestHosts[] = {
     HostAndPort("TestHost1:12345"), HostAndPort("TestHost2:12345"), HostAndPort("TestHost3:12345")};
+
+constexpr int kMaxRetryAmount = kDefaultClientMaxRetryAttemptsDefault;
+constexpr int kMaxCommandExecutions = kMaxRetryAmount + 1;
+constexpr std::uint32_t kKnownGoodSeed = 0xc0ffee;
 
 Status getMockDuplicateKeyError() {
     return {DuplicateKeyErrorInfo(
@@ -360,13 +365,44 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryErrorReturnedPersistently) {
         ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder bb;
             CommandHelpers::appendCommandStatusNoThrow(
                 bb, {ErrorCodes::NotWritablePrimary, "not primary"});
             return bb.obj();
         });
+    }
+
+    future.default_timed_get();
+}
+
+TEST_F(UpdateRetryTest, SystemOverloadedErrorReturnedPersistently) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    BSONObj objToUpdate = BSON("_id" << 1 << "Value"
+                                     << "TestValue");
+    BSONObj updateExpr = BSON("$set" << BSON("Value" << "NewTestValue"));
+
+    auto future = launchAsync([&] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        auto status = catalogClient()->updateConfigDocument(operationContext(),
+                                                            kTestNamespace,
+                                                            objToUpdate,
+                                                            updateExpr,
+                                                            false,
+                                                            defaultMajorityWriteConcernDoNotUse());
+        ASSERT_EQUALS(ErrorCodes::IngressRequestRateLimitExceeded, status);
+    });
+
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
+        onCommand([](const RemoteCommandRequest& request) {
+            return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
+        });
+
+        if (i < kMaxRetryAmount) {
+            ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+        }
     }
 
     future.default_timed_get();

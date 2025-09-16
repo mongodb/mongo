@@ -37,6 +37,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -57,6 +58,7 @@
 namespace mongo {
 namespace {
 
+constexpr StringData kNamespaceName = "unittests.shard_remote_test";
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
 const std::vector<ShardId> kTestShardIds = {
@@ -92,29 +94,53 @@ protected:
         setupShards(shards);
     }
 
-    void runDummyCommandOnShard(ShardId shardId) {
+    void runDummyCommandOnShard(ShardId shardId,
+                                Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kNoRetry) {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
-        uassertStatusOK(shard->runCommandWithIndefiniteRetries(
-            operationContext(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
-            BSON("unused" << "cmd"),
-            Shard::RetryPolicy::kNoRetry));
+        auto result = uassertStatusOK(
+            shard->runCommand(operationContext(),
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+                              BSON("unused" << "cmd"),
+                              retryPolicy));
+        uassertStatusOK(result.commandStatus);
     }
 
-    void runDummyCommandOnShardWithMaxTimeMS(ShardId shardId, Milliseconds maxTimeMS) {
+    void runDummyCommandOnShardWithMaxTimeMS(
+        ShardId shardId,
+        Milliseconds maxTimeMS,
+        Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kNoRetry) {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
-        uassertStatusOK(shard->runCommandWithIndefiniteRetries(
-            operationContext(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
-            BSON("unused" << "cmd"),
-            maxTimeMS,
-            Shard::RetryPolicy::kNoRetry));
+        auto result = uassertStatusOK(
+            shard->runCommand(operationContext(),
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+                              BSON("unused" << "cmd"),
+                              maxTimeMS,
+                              retryPolicy));
+        uassertStatusOK(result.commandStatus);
+    }
+
+    void runExhaustiveRetryBackoffTest(auto networkCommand) {
+        for (int i = 0; i < kMaxCommandExecutions; ++i) {
+            onCommand(networkCommand);
+
+            if (i < kDefaultClientMaxRetryAttemptsDefault) {
+                ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+            }
+        }
     }
 
     inline static auto errorLabelsSystemOverloaded =
         std::vector{std::string{ErrorLabel::kSystemOverloadedError}};
+
+    static constexpr auto kSystemOverloadedErrorCode = ErrorCodes::IngressRequestRateLimitExceeded;
+    static constexpr int kMaxCommandExecutions = kDefaultClientMaxRetryAttemptsDefault + 1;
+    static constexpr std::uint32_t kKnownGoodSeed = 0xc0ffee;
+
+    inline static auto kConfigShard = ShardId("config");
 };
 
 class ShardRetryabilityTest : public ShardRemoteTest {
@@ -137,10 +163,8 @@ protected:
 };
 
 TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
-    auto targetedNode = ShardId("config");
-
     ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
-    auto future = launchAsync([&] { runDummyCommandOnShard(targetedNode); });
+    auto future = launchAsync([&] { runDummyCommandOnShard(kConfigShard); });
 
     auto error = Status(ErrorCodes::PrimarySteppedDown, "Config stepped down");
     onCommand([&](const executor::RemoteCommandRequest& request) { return error; });
@@ -150,8 +174,6 @@ TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
 }
 
 TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
-    auto targetedNode = ShardId("config");
-
     auto firstShard = kTestShardIds.front();
     auto firstShardHostAndPort = kTestShardHosts.front();
 
@@ -170,8 +192,6 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
 }
 
 TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
-    auto targetedNode = ShardId("config");
-
     auto firstShard = kTestShardIds.front();
     auto firstShardHostAndPort = kTestShardHosts.front();
 
@@ -200,8 +220,6 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
 }
 
 TEST_F(ShardRemoteTest, ShardRetryStrategy) {
-    auto targetedNode = ShardId("config");
-
     auto firstShard = kTestShardIds.front();
     auto firstShardHostAndPort = kTestShardHosts.front();
 
@@ -219,11 +237,132 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
         retryStrategy.getTargetingMetadata().deprioritizedServers.contains(firstShardHostAndPort));
 }
 
-TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigShuttingDown) {
-    auto targetedNode = ShardId("config");
+TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloaded) {
+    auto future =
+        launchAsync([&] { runDummyCommandOnShard(kConfigShard, Shard::RetryPolicy::kIdempotent); });
 
+    runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
+        return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloadedWithDeadline) {
+    auto _ = Interruptible::DeadlineGuard{*operationContext(),
+                                          clockSource()->now() + Milliseconds{200},
+                                          ErrorCodes::ExceededTimeLimit};
+
+    auto future =
+        launchAsync([&] { runDummyCommandOnShard(kConfigShard, Shard::RetryPolicy::kIdempotent); });
+
+    ASSERT_THROWS_CODE((runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
+                           return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+                       })),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::ExceededTimeLimit);
+}
+
+TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetry) {
+    auto future = launchAsync([&] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runExhaustiveCursorCommand(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Minutes{1}));
+    });
+
+    runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
+        return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunAggregationWithResultErrorOverloadedRetry) {
+    auto future = launchAsync([&] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runAggregationWithResult(
+            operationContext(),
+            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(kNamespaceName),
+                                    std::vector<mongo::BSONObj>()),
+            Shard::RetryPolicy::kIdempotent));
+    });
+
+    runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
+        return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetryTimeLimited) {
+    constexpr auto shortButSignificantDeadline = Milliseconds{200};
+    auto _ = Interruptible::DeadlineGuard{*operationContext(),
+                                          clockSource()->now() + shortButSignificantDeadline,
+                                          ErrorCodes::ExceededTimeLimit};
+
+    auto future = launchAsync([&] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runExhaustiveCursorCommand(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Minutes{1}));
+    });
+
+    ASSERT_THROWS_CODE((runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
+                           return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+                       })),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::ExceededTimeLimit);
+}
+
+TEST_F(ShardRemoteTest, RunCommandResponseIndefiniteErrorOverloaded) {
+    auto future = launchAsync([&] {
+        BackoffWithJitter::initRandomEngineWithSeed_forTest(kKnownGoodSeed);
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runCommandWithIndefiniteRetries(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(result.commandStatus);
+    });
+
+    for (int i = 0; i < kMaxCommandExecutions * 4; ++i) {
+        onCommand([](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
+        });
+
+        ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+    }
+
+    onCommand([](const executor::RemoteCommandRequest&) {
+        return Status{ErrorCodes::CommandFailed, "command failed"};
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigShuttingDown) {
     ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
-    auto future = launchAsync([&] { runDummyCommandOnShard(targetedNode); });
+    auto future = launchAsync([&] { runDummyCommandOnShard(kConfigShard); });
 
     auto error = Status(ErrorCodes::InterruptedAtShutdown, "Interrupted at shutdown");
     onCommand([&](const executor::RemoteCommandRequest& request) { return error; });
@@ -238,8 +377,8 @@ TEST_F(ShardRemoteTest, FindOnConfigRespectsDefaultConfigCommandTimeout) {
     RAIIServerParameterControllerForTest configCommandTimeout{"defaultConfigCommandTimeoutMS",
                                                               timeoutMs};
 
-    auto configShard = ShardId("config");
-    auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), configShard));
+    auto kConfigShard = ShardId("config");
+    auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
     auto future = launchAsync([&] {
         uassertStatusOK(shard->exhaustiveFindOnConfig(
             operationContext(),
@@ -264,12 +403,11 @@ TEST_F(ShardRemoteTest, FindOnConfigRespectsDefaultConfigCommandTimeout) {
 }
 
 TEST_F(ShardRemoteTest, TimeoutCodeSetToMaxTimeMSExpiredWhenMaxTimeMSSet) {
-    auto targetedNode = ShardId("config");
     auto timeoutMs = 100;
 
     ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
     auto future = launchAsync(
-        [&] { runDummyCommandOnShardWithMaxTimeMS(targetedNode, Milliseconds(timeoutMs)); });
+        [&] { runDummyCommandOnShardWithMaxTimeMS(kConfigShard, Milliseconds(timeoutMs)); });
 
     // Assert that the timeout on the request is set to timeoutMs and the timeoutCode on the request
     // is set to maxTimeMSExpired. We don't actually care about the response here, so use a dummy
@@ -286,10 +424,8 @@ TEST_F(ShardRemoteTest, TimeoutCodeSetToMaxTimeMSExpiredWhenMaxTimeMSSet) {
 }
 
 TEST_F(ShardRemoteTest, TimeoutCodeUnsetWhenMaxTimeMSNotSet) {
-    auto targetedNode = ShardId("config");
-
     ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
-    auto future = launchAsync([&] { runDummyCommandOnShard(targetedNode); });
+    auto future = launchAsync([&] { runDummyCommandOnShard(kConfigShard); });
 
     // Assert that the timeout on the request is set to kNoTimeout, and the timeoutCode on the
     // request is not set. We don't actually care about the response here, so use a dummy error.

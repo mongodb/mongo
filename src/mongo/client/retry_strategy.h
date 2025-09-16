@@ -522,6 +522,48 @@ private:
 };
 
 /**
+ * Wrapper class for a RetryStrategy that invokes a callback when a failure has occurred and we
+ * intend to retry.
+ */
+template <std::derived_from<RetryStrategy> UnderlyingStrategy,
+          std::invocable<Status> OnRetryFunction>
+struct RetryStrategyWithFailureRetryHook : RetryStrategy {
+    RetryStrategyWithFailureRetryHook(UnderlyingStrategy underlyingStrategy,
+                                      OnRetryFunction onRetry)
+        : _underlyingStrategy{std::move(underlyingStrategy)},
+          _onRetryFunction{std::move(onRetry)} {}
+
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels) override {
+        const bool shouldRetry =
+            _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+
+        if (shouldRetry) {
+            _onRetryFunction(s);
+        }
+
+        return shouldRetry;
+    }
+
+    void recordSuccess(const boost::optional<HostAndPort>& target) override {
+        _underlyingStrategy.recordSuccess(target);
+    }
+
+    Milliseconds getNextRetryDelay() const override {
+        return _underlyingStrategy.getNextRetryDelay();
+    }
+
+    const TargetingMetadata& getTargetingMetadata() const override {
+        return _underlyingStrategy.getTargetingMetadata();
+    }
+
+private:
+    UnderlyingStrategy _underlyingStrategy;
+    OnRetryFunction _onRetryFunction;
+};
+
+/**
  * A reference implementation for running a function with a retry strategy. It calls
  * 'runOperation' in a loop until one of the following conditions is met:
  *  - The operation succeeds.

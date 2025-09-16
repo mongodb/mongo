@@ -31,12 +31,15 @@
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/retry_strategy.h"
+#include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <limits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -47,8 +50,6 @@
 namespace mongo {
 namespace {
 
-const int kOnErrorNumRetries = 3;
-
 Atomic<double>* gRetryBudgetReturnRateServerParameter;
 Atomic<std::int32_t>* gRetryBudgetCapacityServerParameter;
 
@@ -58,10 +59,70 @@ auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolic
     };
 }
 
+auto backoffFromMaxRetryAttempts(std::int32_t maxRetryAttempts) {
+    const auto backoff = DefaultRetryStrategy::backoffFromServerParameters();
+    return DefaultRetryStrategy::BackoffParameters{
+        .maxRetryAttempts = maxRetryAttempts,
+        .baseBackoff = backoff.baseBackoff,
+        .maxBackoff = backoff.maxBackoff,
+    };
+}
+
+struct RunCommandResult {
+    StatusWith<Shard::CommandResponse> swResponse;
+
+    // The effective status represents the combined status of three possible failure sources:
+    // - A local error,
+    // - An error code in the command response,
+    // - A write concern error code.
+    Status effectiveStatus;
+};
+
+template <std::invocable<const TargetingMetadata&> F>
+requires(std::same_as<std::invoke_result_t<F, const TargetingMetadata&>, RunCommandResult>)
+StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* interruptible,
+                                                               RetryStrategy& strategy,
+                                                               F runOperation) {
+    boost::optional<RunCommandResult> lastResult;
+
+    auto effectiveStatus = runWithRetryStrategy(
+        interruptible, strategy, [&](const TargetingMetadata& targetingMetadata) {
+            lastResult.reset();
+
+            auto [swResponse, status] = runOperation(targetingMetadata);
+
+            lastResult.emplace(swResponse, status);
+
+            if (!status.isOK()) {
+                return RetryStrategy::Result<Shard::CommandResponse>{
+                    status,
+                    Shard::CommandResponse::getErrorLabels(swResponse),
+                    swResponse.isOK() ? swResponse.getValue().hostAndPort : boost::none};
+            }
+
+            const auto& response = swResponse.getValue();
+            return RetryStrategy::Result{response, response.hostAndPort};
+        });
+
+    bool exceptionThrownDuringRetry = !lastResult || effectiveStatus != lastResult->effectiveStatus;
+    return exceptionThrownDuringRetry ? effectiveStatus : StatusWith{lastResult->swResponse};
+}
+
 }  // namespace
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy)
-    : _underlyingStrategy{shard._retryBudget, makeRetryCriteriaForShard(shard, retryPolicy)} {}
+    : RetryStrategy{shard, retryPolicy, DefaultRetryStrategy::backoffFromServerParameters()} {}
+
+Shard::RetryStrategy::RetryStrategy(const Shard& shard,
+                                    Shard::RetryPolicy retryPolicy,
+                                    std::int32_t maxRetryAttempts)
+    : RetryStrategy{shard, retryPolicy, backoffFromMaxRetryAttempts(maxRetryAttempts)} {}
+
+Shard::RetryStrategy::RetryStrategy(const Shard& shard,
+                                    Shard::RetryPolicy retryPolicy,
+                                    AdaptiveRetryStrategy::BackoffParameters backoff)
+    : _underlyingStrategy{
+          shard._retryBudget, makeRetryCriteriaForShard(shard, retryPolicy), backoff} {}
 
 void Shard::initServerParameterPointersToAvoidLinking(Atomic<double>* returnRate,
                                                       Atomic<std::int32_t>* capacity) {
@@ -101,6 +162,10 @@ std::vector<std::string> Shard::CommandResponse::getErrorLabels(
     }
 
     auto& response = swResponse.getValue();
+
+    if (response.commandStatus.isOK()) {
+        return {};
+    }
 
     if (BSONElement errorLabelsElement = response.response[kErrorLabelsFieldName];
         !errorLabelsElement.eoo()) {
@@ -235,28 +300,13 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithIndefiniteRetries(
     const BSONObj& cmdObj,
     Milliseconds maxTimeMSOverride,
     RetryPolicy retryPolicy) {
-    while (true) {
-        auto interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (!interruptStatus.isOK()) {
-            return interruptStatus;
-        }
-
-        auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto status = CommandResponse::getEffectiveStatus(swResponse);
-
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
-        if (isRetriableError(status.code(), {}, retryPolicy)) {
-            LOGV2_DEBUG(22719,
-                        2,
-                        "Command failed with retryable error and will be retried",
-                        "command"_attr = redact(cmdObj),
-                        "error"_attr = redact(status));
-            continue;
-        }
-
-        return swResponse;
-    }
-    MONGO_UNREACHABLE;
+    return _runCommandImpl(opCtx,
+                           readPref,
+                           dbName,
+                           cmdObj,
+                           maxTimeMSOverride,
+                           retryPolicy,
+                           std::numeric_limits<std::int32_t>::max());
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
@@ -273,26 +323,34 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
                                                      const BSONObj& cmdObj,
                                                      Milliseconds maxTimeMSOverride,
                                                      RetryPolicy retryPolicy) {
-    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (!interruptStatus.isOK()) {
-            return interruptStatus;
-        }
+    return _runCommandImpl(opCtx,
+                           readPref,
+                           dbName,
+                           cmdObj,
+                           maxTimeMSOverride,
+                           retryPolicy,
+                           gDefaultClientMaxRetryAttempts.load());
+}
 
-        auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto status = CommandResponse::getEffectiveStatus(swResponse);
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
-        if (retry < kOnErrorNumRetries && isRetriableError(status.code(), {}, retryPolicy)) {
+StatusWith<Shard::CommandResponse> Shard::_runCommandImpl(OperationContext* opCtx,
+                                                          const ReadPreferenceSetting& readPref,
+                                                          const DatabaseName& dbName,
+                                                          const BSONObj& cmdObj,
+                                                          Milliseconds maxTimeMSOverride,
+                                                          RetryPolicy retryPolicy,
+                                                          std::int32_t maxRetryAttempt) {
+    auto retryStrategy = RetryStrategyWithFailureRetryHook{
+        RetryStrategy{*this, retryPolicy, maxRetryAttempt}, [&](Status status) {
             LOGV2(22720,
                   "Command failed with a retryable error and will be retried",
                   "command"_attr = redact(cmdObj),
                   "error"_attr = redact(status));
-            continue;
-        }
-
-        return swResponse;
-    }
-    MONGO_UNREACHABLE;
+        }};
+    return runCommandWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
+        auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+        auto effectiveStatus = CommandResponse::getEffectiveStatus(swResponse);
+        return RunCommandResult{swResponse, effectiveStatus};
+    });
 }
 
 StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
@@ -301,18 +359,11 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     Milliseconds maxTimeMSOverride) {
-    for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        auto result =
-            _runExhaustiveCursorCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+    RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent};
 
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
-        if (retry < kOnErrorNumRetries &&
-            isRetriableError(result.getStatus().code(), {}, RetryPolicy::kIdempotent)) {
-            continue;
-        }
-        return result;
-    }
-    MONGO_UNREACHABLE;
+    return runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
+        return _runExhaustiveCursorCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+    });
 }
 
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
@@ -327,19 +378,11 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     // Do not allow exhaustive finds to be run against regular shards.
     invariant(isConfig());
 
-    for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        auto result = _exhaustiveFindOnConfig(
+    RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent};
+    return runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
+        return _exhaustiveFindOnConfig(
             opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint);
-
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
-        if (retry < kOnErrorNumRetries &&
-            isRetriableError(result.getStatus().code(), {}, RetryPolicy::kIdempotent)) {
-            continue;
-        }
-
-        return result;
-    }
-    MONGO_UNREACHABLE;
+    });
 }
 
 Status Shard::runAggregation(
@@ -355,29 +398,40 @@ BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
                                                        const DatabaseName& dbName,
                                                        Milliseconds maxTimeMS,
                                                        RetryPolicy retryPolicy) {
-    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        // Note: write commands can only be issued against a primary.
-        auto swResponse = _runCommand(opCtx,
-                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                      dbName,
-                                      maxTimeMS,
-                                      serialisedBatchRequest);
-
-        BatchedCommandResponse batchResponse;
-        auto writeStatus = CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
-        // TODO: SERVER-108322 Send error labels to isRetriableError.
-        if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), {}, retryPolicy)) {
+    auto retryStrategy = RetryStrategyWithFailureRetryHook{
+        RetryStrategy{*this, retryPolicy}, [&](Status status) {
             LOGV2_DEBUG(22721,
                         2,
                         "Batch write command failed with retryable error and will be retried",
                         "shardId"_attr = getId(),
-                        "error"_attr = redact(writeStatus));
-            continue;
-        }
+                        "error"_attr = redact(status));
+        }};
+    BatchedCommandResponse batchResponse;
+    Status lastWriteStatus = Status::OK();
 
-        return batchResponse;
+    auto status = runCommandWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
+                      auto swResponse =
+                          _runCommand(opCtx,
+                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                      dbName,
+                                      maxTimeMS,
+                                      serialisedBatchRequest);
+                      auto writeStatus =
+                          CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
+                      lastWriteStatus = writeStatus;
+                      return RunCommandResult{
+                          .swResponse = swResponse,
+                          .effectiveStatus = writeStatus,
+                      };
+                  }).getStatus();
+
+    // The last status will be different than the status of runCommandWithRetryStrategy if the
+    // operation was interrupted.
+    if (lastWriteStatus != status) {
+        uassertStatusOK(status);
     }
-    MONGO_UNREACHABLE;
+
+    return batchResponse;
 }
 
 Milliseconds Shard::getConfiguredTimeoutForOperationOnNamespace(const NamespaceString& nss) {
@@ -391,5 +445,34 @@ Milliseconds Shard::getConfiguredTimeoutForOperationOnNamespace(const NamespaceS
     return Milliseconds(defaultConfigCommandTimeoutMS.load());
 }
 
+
+StatusWith<std::vector<BSONObj>> Shard::runAggregationWithResult(
+    OperationContext* opCtx,
+    const AggregateCommandRequest& aggRequest,
+    Shard::RetryPolicy retryPolicy) {
+    std::vector<BSONObj> aggResult;
+    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
+                                 const boost::optional<BSONObj>& postBatchResumeToken) {
+        aggResult.insert(aggResult.end(),
+                         std::make_move_iterator(batch.begin()),
+                         std::make_move_iterator(batch.end()));
+        return true;
+    };
+
+    RetryStrategyWithFailureRetryHook retryStrategy{RetryStrategy{*this, retryPolicy},
+                                                    [&](Status s) {
+                                                        aggResult.clear();
+                                                    }};
+
+    auto status = runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata&) {
+        return _runAggregation(opCtx, aggRequest, callback);
+    });
+
+    if (status.isOK()) {
+        return aggResult;
+    }
+
+    return status.getStatus();
+}
 
 }  // namespace mongo

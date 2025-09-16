@@ -607,10 +607,12 @@ TEST_F(FetcherTest, FindCommandFailedWithErrorLabels) {
     }
 
     ASSERT_OK(fetcher->schedule());
-    processNetworkResponse(BSON("ok" << 0 << kErrorLabelsFieldName << labelArray.arr() << "code"
-                                     << int(ErrorCodes::AdmissionQueueOverflow)),
+    processNetworkResponse(BSON("ok" << 0 << "errmsg"
+                                     << "bad hint" << kErrorLabelsFieldName << labelArray.arr()
+                                     << "code" << int(ErrorCodes::AdmissionQueueOverflow)),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
+    ASSERT_EQUALS(ErrorCodes::AdmissionQueueOverflow, status.code());
     ASSERT_EQUALS(source, target);
     ASSERT(std::ranges::equal(responseErrorLabels, errorLabels));
 }
