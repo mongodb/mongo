@@ -504,6 +504,9 @@ __checkpoint_cleanup_walk_btree(WT_SESSION_IMPL *session, WT_ITEM *uri)
     if (btree->root.page == NULL)
         goto err;
 
+    /* Ignore tables that are empty or is currently in a bulk-load phase. */
+    if (btree->original)
+        goto err;
     /*
      * FLCS pages cannot be discarded and must be rewritten as implicitly filling in missing chunks
      * of FLCS namespace is problematic.

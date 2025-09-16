@@ -447,8 +447,8 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
           prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
             prev_upd->start_ts == prev_upd->durable_ts || prev_upd->durable_ts >= upd->durable_ts,
           "Durable timestamps cannot be out of order for prepared updates: prev_upd->start_ts=%s, "
-          "prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu16
-          ", upd->durable_ts=%s, upd->flags=%" PRIu16,
+          "prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu8
+          ", upd->durable_ts=%s, upd->flags=%" PRIu8,
           __wt_timestamp_to_string(prev_upd->start_ts, ts_string[0]),
           __wt_timestamp_to_string(prev_upd->durable_ts, ts_string[1]), prev_upd->flags,
           __wt_timestamp_to_string(upd->durable_ts, ts_string[2]), upd->flags);
@@ -495,7 +495,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
                 prev_upd->start_ts == prev_upd->durable_ts ||
                 prev_upd->durable_ts >= vpack->tw.durable_stop_ts,
               "Stop: Durable timestamps cannot be out of order for prepared updates: "
-              "prev_upd->start_ts=%s, prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu16
+              "prev_upd->start_ts=%s, prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu8
               ", vpack->tw.durable_stop_ts=%s",
               __wt_timestamp_to_string(prev_upd->start_ts, ts_string[0]),
               __wt_timestamp_to_string(prev_upd->durable_ts, ts_string[1]), prev_upd->flags,
@@ -506,7 +506,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
                 prev_upd->start_ts == prev_upd->durable_ts ||
                 prev_upd->durable_ts >= vpack->tw.durable_start_ts,
               "Start: Durable timestamps cannot be out of order for prepared updates: "
-              "prev_upd->start_ts=%s, prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu16
+              "prev_upd->start_ts=%s, prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu8
               ", vpack->tw.durable_start_ts=%s",
               __wt_timestamp_to_string(prev_upd->start_ts, ts_string[0]),
               __wt_timestamp_to_string(prev_upd->durable_ts, ts_string[1]), prev_upd->flags,
