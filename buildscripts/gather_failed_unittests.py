@@ -9,8 +9,9 @@ from typing import List
 import typer
 
 
-def _collect_failed_tests(testlog_dir: str) -> List[str]:
+def _collect_test_results(testlog_dir: str) -> List[str]:
     failed_tests = []
+    successful_tests = []
     for test_xml in glob(f"{testlog_dir}/**/test.xml", recursive=True):
         testsuite = ET.parse(test_xml).getroot().find("testsuite")
         testcase = testsuite.find("testcase")
@@ -18,7 +19,9 @@ def _collect_failed_tests(testlog_dir: str) -> List[str]:
 
         if testcase.find("error") is not None:
             failed_tests += [test_file]
-    return failed_tests
+        else:
+            successful_tests += [test_file]
+    return failed_tests, successful_tests
 
 
 def _relink_binaries_with_symbols(failed_tests: List[str]):
@@ -117,7 +120,11 @@ def main(testlog_dir: str = "bazel-testlogs"):
     upload_bin_dir.mkdir(parents=True, exist_ok=True)
     upload_lib_dir.mkdir(parents=True, exist_ok=True)
 
-    failed_tests = _collect_failed_tests(testlog_dir)
+    failed_tests, successful_tests = _collect_test_results(testlog_dir)
+    if len(failed_tests) == 0 and len(successful_tests) == 0:
+        print("Test results not found, aborting. Please check above for any build errors.")
+        exit(1)
+
     if not failed_tests:
         print("No failed tests found.")
         exit(0)
