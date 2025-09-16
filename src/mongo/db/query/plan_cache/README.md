@@ -2,15 +2,13 @@
 
 ## Overview
 
-Plan caching is a technique that stores the winning execution plan of a query and subsequently reuses it when an equivalent or similar query is issued. This is a performance optimization that avoids expensive and redundant query planning on subsequent queries with the same plan cache query shape.
+Plan caching is a technique that stores the winning execution plan of a query and subsequently
+reuses it when an equivalent or similar query is issued. This is a performance optimization that
+avoids expensive and redundant query planning on subsequent queries with the same plan cache query
+shape.
 
-> ### Aside: Query Shapes
->
-> A query shape is a combination of the `filter`, `sort`, `projection`, `collation`, and `distinct` portions of a `CanonicalQuery`. It is not a full representation of the query, for only the information regarding the query's _structure_ is used.
->
-> For example, these two query filters have the same query shape: `{field: "valueA"}` and `{field: "valueB"}`.
->
-> See the [Query Shapes README](../query_shape/README.md) and [docs](https://www.mongodb.com/docs/manual/core/query-shapes/) for more information.
+Please note that the plan cache query shape is a distinct concept from the overall query shape. See
+[README_query_shape_disambiguation.md](/src/mongo/db/query/README_query_shape_disambiguation.md)
 
 The query engine currently supports two plan cache implementations:
 
@@ -28,7 +26,7 @@ In both cases, logically, the plan cache is an in-memory `map<PlanCacheKey, Plan
 >
 > To view the current status of the plan cache, you can run either of these two commands:
 >
-> ```
+> ```js
 > db.coll.getPlanCache().list();
 >
 > db.coll.aggregate([{$planCacheStats: {}}]);
@@ -50,7 +48,7 @@ A `PlanCacheKey` is a hash value that encodes the [query shape](#aside-query-sha
 
 For example, given this query:
 
-```
+```js
 db.c.find({a: 1, b: 2}).sort({c: 1});
 ```
 

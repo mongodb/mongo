@@ -83,4 +83,4 @@ transformed from user input.
 
 <!-- Links -->
 
-[query-stats-disambiguation]: /src/mongo/db/query/query_stats/README.md#query-stats-vs-query-shape-which-options-go-where
+[query-stats-disambiguation]: /src/mongo/db/query/README_query_shape_disambiguation#query-stats-vs-query-shape-which-options-go-where
