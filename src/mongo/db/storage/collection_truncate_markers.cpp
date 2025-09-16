@@ -98,7 +98,8 @@ CollectionTruncateMarkers::Marker& CollectionTruncateMarkers::createNewMarker(
 }
 
 void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastRecord,
-                                                        Date_t wallTime) {
+                                                        Date_t wallTime,
+                                                        bool oplogSamplingAsyncEnabled) {
     auto logFailedLockAcquisition = [&](const std::string& lock) {
         LOGV2_DEBUG(7393214,
                     2,
@@ -115,7 +116,7 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastReco
         return;
     }
 
-    if (feature_flags::gOplogSamplingAsyncEnabled.isEnabled() && !_initialSamplingFinished) {
+    if (oplogSamplingAsyncEnabled && !_initialSamplingFinished) {
         // Must have finished creating initial markers first.
         return;
     }
@@ -149,24 +150,28 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
     int64_t bytesInserted,
     const RecordId& highestInsertedRecordId,
     Date_t wallTime,
-    int64_t countInserted) {
+    int64_t countInserted,
+    bool oplogSamplingAsyncEnabled) {
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [collectionMarkers = shared_from_this(),
          bytesInserted,
          recordId = highestInsertedRecordId,
          wallTime,
-         countInserted](OperationContext* opCtx, auto) {
+         countInserted,
+         oplogSamplingAsyncEnabled](OperationContext* opCtx, auto) {
             invariant(bytesInserted >= 0);
             invariant(recordId.isValid());
 
             collectionMarkers->_currentRecords.addAndFetch(countInserted);
             int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
+
             if (wallTime != Date_t() &&
                 newCurrentBytes >= collectionMarkers->_minBytesPerMarker.load()) {
                 // When other transactions commit concurrently, an uninitialized wallTime may delay
                 // the creation of a new marker. This delay is limited to the number of concurrently
                 // running transactions, so the size difference should be inconsequential.
-                collectionMarkers->createNewMarkerIfNeeded(recordId, wallTime);
+                collectionMarkers->createNewMarkerIfNeeded(
+                    recordId, wallTime, oplogSamplingAsyncEnabled);
             }
         });
 }
@@ -477,7 +482,8 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
     int64_t bytesInserted,
     const RecordId& highestInsertedRecordId,
     Date_t wallTime,
-    int64_t countInserted) {
+    int64_t countInserted,
+    bool oplogSamplingAsyncEnabled) {
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [collectionMarkers =
              std::static_pointer_cast<CollectionTruncateMarkersWithPartialExpiration>(
@@ -485,11 +491,12 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
          bytesInserted,
          recordId = highestInsertedRecordId,
          wallTime,
-         countInserted](OperationContext* opCtx, auto) {
+         countInserted,
+         oplogSamplingAsyncEnabled](OperationContext* opCtx, auto) {
             invariant(bytesInserted >= 0);
             invariant(recordId.isValid());
             collectionMarkers->updateCurrentMarker(
-                bytesInserted, recordId, wallTime, countInserted);
+                bytesInserted, recordId, wallTime, countInserted, oplogSamplingAsyncEnabled);
         });
 }
 
@@ -551,7 +558,8 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
     int64_t bytesAdded,
     const RecordId& highestRecordId,
     Date_t highestWallTime,
-    int64_t numRecordsAdded) {
+    int64_t numRecordsAdded,
+    bool oplogSamplingAsyncEnabled) {
     // By putting the highest marker modification first we can guarantee than in the
     // event of a race condition between expiring a partial marker the metrics increase
     // will happen after the marker has been created. This guarantees that the metrics
@@ -562,7 +570,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
     int64_t newCurrentBytes = _currentBytes.addAndFetch(bytesAdded);
     if (highestWallTime != Date_t() && highestRecordId.isValid() &&
         newCurrentBytes >= _minBytesPerMarker.load()) {
-        createNewMarkerIfNeeded(highestRecordId, highestWallTime);
+        createNewMarkerIfNeeded(highestRecordId, highestWallTime, oplogSamplingAsyncEnabled);
     }
 }
 

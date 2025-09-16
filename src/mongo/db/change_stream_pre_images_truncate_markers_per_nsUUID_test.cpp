@@ -785,6 +785,11 @@ public:
     // Tests a pre-image is tracked after 'refreshHighestTrackedRecord()' and the pre-image is
     // expirable.
     void testExpiryAfterrefreshHighestTrackedRecord() {
+
+        // Turn off async mode
+        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+            "oplogSamplingAsyncEnabled", false);
+
         const auto expireAfterSeconds = getExpireAfterSeconds();
         createPreImagesCollection(opCtx(), kTenantId);
 
@@ -820,6 +825,10 @@ public:
     }
 
     void testExpiryOneRecordOneWholeMarker() {
+        // Turn off async mode
+        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+            "oplogSamplingAsyncEnabled", false);
+
         const auto expireAfterSeconds = getExpireAfterSeconds();
 
         // A 'minBytesPerMarker' smaller than 'kPreImage1' so the insertion of 'kPreImage1'

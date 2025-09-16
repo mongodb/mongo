@@ -128,14 +128,17 @@ public:
 
     void popOldestMarker();
 
-    void createNewMarkerIfNeeded(const RecordId& lastRecord, Date_t wallTime);
+    void createNewMarkerIfNeeded(const RecordId& lastRecord,
+                                 Date_t wallTime,
+                                 bool oplogSamplingAsyncEnabled);
 
     // Updates the current marker with the inserted value if the operation commits the WUOW.
     virtual void updateCurrentMarkerAfterInsertOnCommit(OperationContext* opCtx,
                                                         int64_t bytesInserted,
                                                         const RecordId& highestInsertedRecordId,
                                                         Date_t wallTime,
-                                                        int64_t countInserted);
+                                                        int64_t countInserted,
+                                                        bool oplogSamplingAsyncEnabled);
 
     /**
      * Waits for expired markers. See _hasExcessMarkers().
@@ -417,7 +420,8 @@ public:
                                                 int64_t bytesInserted,
                                                 const RecordId& highestInsertedRecordId,
                                                 Date_t wallTime,
-                                                int64_t countInserted) final;
+                                                int64_t countInserted,
+                                                bool oplogSamplingAsyncEnabled) final;
 
     std::pair<const RecordId&, const Date_t&> getHighestRecordMetrics_forTest() const {
         return {_highestRecordId, _highestWallTime};
@@ -452,7 +456,8 @@ protected:
     void updateCurrentMarker(int64_t bytesAdded,
                              const RecordId& highestRecordId,
                              Date_t highestWallTime,
-                             int64_t numRecordsAdded);
+                             int64_t numRecordsAdded,
+                             bool oplogSamplingAsyncEnabled);
 };
 
 /**
