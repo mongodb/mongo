@@ -115,6 +115,7 @@
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -283,8 +284,13 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
                 return ele.Date();
             }
         }();
-        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
-            opCtx, totalLength, (*records)[nRecords - 1].id, wall, nRecords);
+
+        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(opCtx,
+                                                                totalLength,
+                                                                (*records)[nRecords - 1].id,
+                                                                wall,
+                                                                nRecords,
+                                                                gOplogSamplingAsyncEnabled);
     }
 
     // We do not need to notify capped waiters, as we have not yet updated oplog visibility, so

@@ -132,125 +132,123 @@ private:
     StorageInterfaceImpl _storage;
 };
 
-// TODO SERVER-101672 Re-enable these tests.
-
 // In async mode, sampleAndUpdate is called seperately from createOplogTruncateMarkers, and
 // creates the initial set of markers.
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampleAndUpdate) {
-    // // Turn off async mode
-    // RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-    //     "oplogSamplingAsyncEnabled", true);
-    // auto opCtx = getOperationContext();
-    // auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    // Turn on async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", true);
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
-    // // Populate oplog to force marker creation to occur
-    // int realNumRecords = 4;
-    // int realSizePerRecord = 1024 * 1024;
-    // for (int i = 1; i <= realNumRecords; i++) {
-    //     insertOplog(i, realSizePerRecord);
-    // }
+    // Populate oplog to force marker creation to occur
+    int realNumRecords = 4;
+    int realSizePerRecord = 1024 * 1024;
+    for (int i = 1; i <= realNumRecords; i++) {
+        insertOplog(i, realSizePerRecord);
+    }
 
-    // auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    // ASSERT(oplogTruncateMarkers);
+    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
+    ASSERT(oplogTruncateMarkers);
 
-    // ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
 
-    // // Continue finishing the initial scan / sample
-    // oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
+    // Continue finishing the initial scan / sample
+    oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
 
-    // // Confirm that some truncate markers were generated.
-    // ASSERT_LT(0U, oplogTruncateMarkers->numMarkers_forTest());
-    // }  // namespace repl
+    // Confirm that some truncate markers were generated.
+    ASSERT_LT(0U, oplogTruncateMarkers->numMarkers_forTest());
+}  // namespace repl
 
-    // In async mode, during startup but before sampling finishes, creation method is InProgress.
-    // This should then resolve to either the Scanning or Sampling method once initial marker
-    // creation has finished TEST_F(AsyncOplogTruncationTest,
-    // OplogTruncateMarkers_AsynchronousModeInProgressState) { Turn off async mode
-    //     RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-    //         "oplogSamplingAsyncEnabled", true);
-    //     auto opCtx = getOperationContext();
-    //     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+// In async mode, during startup but before sampling finishes,
+//  creation method is InProgress.This should then resolve to either the Scanning or
+// Sampling method once initial marker creation has finished
+TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeInProgressState) {
+    // Turn on async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", true);
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
-    //     // Populate oplog to so that initial marker creation method is not EmptyCollection
-    //     insertOplog(1, 100);
+    // Populate oplog to so that initial marker creation method is not EmptyCollection
+    insertOplog(1, 100);
 
-    //     // Note if in async mode, at this point we have not yet sampled.
-    //     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    //     ASSERT(oplogTruncateMarkers);
+    // Note if in async mode, at this point we have not yet sampled.
+    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
+    ASSERT(oplogTruncateMarkers);
 
-    //     // Confirm that we are in InProgress state since sampling/scanning has not begun.
-    //     ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
-    //               oplogTruncateMarkers->getMarkersCreationMethod());
+    // Confirm that we are in InProgress state since sampling/scanning has not begun.
+    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
+              oplogTruncateMarkers->getMarkersCreationMethod());
 
-    //     // Continue finishing the initial scan / sample
-    //     oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
+    // Continue finishing the initial scan / sample
+    oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
 
-    //     // Check that the InProgress state has now been resolved.
-    //     ASSERT(oplogTruncateMarkers->getMarkersCreationMethod() ==
-    //            CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    // Check that the InProgress state has now been resolved.
+    ASSERT(oplogTruncateMarkers->getMarkersCreationMethod() ==
+           CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 }
 
 // In async mode, we are still able to sample when expected, and some markers can be created.
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) {
-    // Turn off async mode
-    // RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-    //     "oplogSamplingAsyncEnabled", true);
-    // auto opCtx = getOperationContext();
-    // auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
-    // auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
+    // Turn on async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", true);
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs);
 
-    // {
-    //     // Before initializing the RecordStore, populate with a few records.
-    //     insertOplog(1, 100);
-    //     insertOplog(2, 100);
-    //     insertOplog(3, 100);
-    //     insertOplog(4, 100);
-    // }
+    {
+        // Before initializing the RecordStore, populate with a few records.
+        insertOplog(1, 100);
+        insertOplog(2, 100);
+        insertOplog(3, 100);
+        insertOplog(4, 100);
+    }
 
-    // {
-    //     // Force initialize the oplog truncate markers to use sampling by providing very
-    //     large,
-    //     // inaccurate sizes. This should cause us to over sample the records in the oplog.
-    //     ASSERT_OK(wtRS->updateSize(1024 * 1024 * 1024));
-    //     wtRS->setNumRecords(1024 * 1024);
-    //     wtRS->setDataSize(1024 * 1024 * 1024);
-    // }
+    {
+        // Force initialize the oplog truncate markers to use sampling by providing very large,
+        // inaccurate sizes. This should cause us to over sample the records in the oplog.
+        ASSERT_OK(wtRS->updateSize(1024 * 1024 * 1024));
+        wtRS->setNumRecords(1024 * 1024);
+        wtRS->setDataSize(1024 * 1024 * 1024);
+    }
 
-    // LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);
-    // // Note if in async mode, at this point we have not yet sampled.
-    // auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    // ASSERT(oplogTruncateMarkers);
+    LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);
+    // Note if in async mode, at this point we have not yet sampled.
+    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
+    ASSERT(oplogTruncateMarkers);
 
-    // // Continue finishing the initial scan / sample
-    // oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
-    // ASSERT(oplogTruncateMarkers);
+    // Continue finishing the initial scan / sample
+    oplogTruncateMarkers = OplogTruncateMarkers::sampleAndUpdate(opCtx, *rs);
+    ASSERT(oplogTruncateMarkers);
 
-    // // Confirm that we can in fact sample
-    // ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
-    //           oplogTruncateMarkers->getMarkersCreationMethod());
-    // // Confirm that some truncate markers were generated.
-    // ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
-    // auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
-    // ASSERT_GT(truncateMarkersBefore, 0U);
-    // ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
+    // Confirm that we can in fact sample
+    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
+              oplogTruncateMarkers->getMarkersCreationMethod());
+    // Confirm that some truncate markers were generated.
+    ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
+    auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
+    ASSERT_GT(truncateMarkersBefore, 0U);
+    ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
 }
 
 // In async mode, markers are not created during createOplogTruncateMarkers (which instead
 // returns empty OplogTruncateMarkers object)
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplogTruncateMarkers) {
-    // Turn off async mode
-    // RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-    //     "oplogSamplingAsyncEnabled", true);
-    // auto opCtx = getOperationContext();
-    // auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    // Turn on async mode
+    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        "oplogSamplingAsyncEnabled", true);
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
-    // // Note if in async mode, at this point we have not yet sampled.
-    // auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
-    // ASSERT(oplogTruncateMarkers);
+    // Note if in async mode, at this point we have not yet sampled.
+    auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
+    ASSERT(oplogTruncateMarkers);
 
-    // ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
-    // ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    // ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 }
 
 }  // namespace repl
