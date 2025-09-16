@@ -1576,15 +1576,8 @@ mongo_cc_unit_test(
         "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
     tags = [
-        # TODO(SERVER-109791): Remove this tag once compatible with remote execution
-        "incompatible_with_bazel_remote_test",
         "mongo_unittest_seventh_group",
     ],
-    # TODO(SERVER-109791): Remove this once compatible with remote execution
-    target_compatible_with = select({
-        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
     deps = [
         ":config_server_test_fixture",
         ":sharding_commands_d",
