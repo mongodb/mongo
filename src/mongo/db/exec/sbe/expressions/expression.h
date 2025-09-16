@@ -658,9 +658,9 @@ public:
     ENumericConvert(std::unique_ptr<EExpression> source, value::TypeTags target) : _target(target) {
         _nodes.emplace_back(std::move(source));
         validateNodes();
-        invariant(
-            target == value::TypeTags::NumberInt32 || target == value::TypeTags::NumberInt64 ||
-            target == value::TypeTags::NumberDouble || target == value::TypeTags::NumberDecimal);
+        tassert(11096700,
+                str::stream() << "expect numeric target type but the target is " << target,
+                value::isNumber(target));
     }
 
     std::unique_ptr<EExpression> clone() const override;

@@ -1185,7 +1185,11 @@ void generatorCommon(vm::CodeFragment& code,
                      const EExpression::Vector& nodes,
                      bool aggregate) {
 
-    invariant(nodes.size() == arity);
+    tassert(11096701,
+            str::stream()
+                << "Expect arity to match the number of nodes in expression but we have arity "
+                << arity << " and nodes " << nodes.size(),
+            nodes.size() == arity);
 
     if (aggregate) {
         code.appendAccessVal(ctx.accumulator);
