@@ -47,11 +47,13 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
                                               const BatchedOperation& operation) {
     invariant(_batchWrites);
 
-    // Current support is only limited to insert update and delete operations, no change stream
-    // pre-images, no multi-doc transactions.
+    // Current support is limited to only insert, update, delete, container insert, and container
+    // delete operations. No change stream pre-images, no multi-doc transactions.
     invariant(operation.getOpType() == repl::OpTypeEnum::kDelete ||
               operation.getOpType() == repl::OpTypeEnum::kInsert ||
-              operation.getOpType() == repl::OpTypeEnum::kUpdate);
+              operation.getOpType() == repl::OpTypeEnum::kUpdate ||
+              operation.getOpType() == repl::OpTypeEnum::kContainerInsert ||
+              operation.getOpType() == repl::OpTypeEnum::kContainerDelete);
     invariant(operation.getChangeStreamPreImageRecordingMode() ==
               repl::ReplOperation::ChangeStreamPreImageRecordingMode::kOff);
     invariant(!opCtx->inMultiDocumentTransaction());

@@ -1159,8 +1159,17 @@ void _onContainerInsert(OperationContext* opCtx,
             "Cannot insert into a container in a multi-document transaction",
             !inMultiDocumentTransaction);
 
-    // TODO (SERVER-109748): Handle batched writes.
-    uassert(10942701, "Cannot insert into a container in a batched write", !inBatchedWrite);
+    if (inBatchedWrite) {
+        BatchedWriteContext::BatchedOperation op;
+        op.setOpType(repl::OpTypeEnum::kContainerInsert);
+        op.setTid(ns.tenantId());
+        op.setNss(ns);
+        op.setUuid(collUUID);
+        op.setContainer(ident);
+        op.setObject(buildContainerOpObject(key, value));
+        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, op);
+        return;
+    }
 
     if (_skipOplogOps(oplogDisabled,
                       inBatchedWrite,
@@ -1215,8 +1224,17 @@ void _onContainerDelete(OperationContext* opCtx,
             "Cannot delete from a container in a multi-document transaction",
             !inMultiDocumentTransaction);
 
-    // TODO (SERVER-109748): Handle batched writes.
-    uassert(10942703, "Cannot delete from a container in a batched write", !inBatchedWrite);
+    if (inBatchedWrite) {
+        BatchedWriteContext::BatchedOperation op;
+        op.setOpType(repl::OpTypeEnum::kContainerDelete);
+        op.setTid(ns.tenantId());
+        op.setNss(ns);
+        op.setUuid(collUUID);
+        op.setContainer(ident);
+        op.setObject(buildContainerOpObject(key));
+        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, op);
+        return;
+    }
 
     if (_skipOplogOps(oplogDisabled,
                       inBatchedWrite,

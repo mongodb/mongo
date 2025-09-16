@@ -5647,10 +5647,10 @@ TEST_F(OpObserverTest, OnContainerDelete) {
     ASSERT_EQ(std::string(entry2KeyBinData, entry2KeyBinDataLength), key2);
 }
 
-TEST_F(OpObserverTest, OnContainerInsertBatched) {
+TEST_F(BatchedWriteOutputsTest, OnContainerInsertBatched) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
-    BatchedWriteContext::get(opCtx.get()).setWritesAreBatched(true);
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
 
     auto ident = "ident";
     int64_t key1 = 100;
@@ -5658,31 +5658,185 @@ TEST_F(OpObserverTest, OnContainerInsertBatched) {
     std::string value1 = "things";
     std::string value2 = "other things";
 
-    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
-    // TODO (SERVER-109748): Unit test batched writes.
-    ASSERT_THROWS_CODE(opObserver.onContainerInsert(opCtx.get(), nss, uuid, ident, key1, value1),
-                       DBException,
-                       10942701);
-    ASSERT_THROWS_CODE(opObserver.onContainerInsert(opCtx.get(), nss, uuid, ident, key2, value2),
-                       DBException,
-                       10942701);
+    opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
+        opCtx.get(), _nss, uuid, ident, key1, value1);
+    opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
+        opCtx.get(), _nss, uuid, ident, key2, value2);
+
+    wuow.commit();
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kCommand);
+    ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), 2);
+
+    ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+
+    auto entry1Object = innerEntries[0].getObject();
+    ASSERT_EQ(entry1Object.nFields(), 2);
+    auto entry1Key = entry1Object["k"];
+    ASSERT_EQ(entry1Key.type(), BSONType::numberLong);
+    ASSERT_EQ(entry1Key.numberLong(), key1);
+    auto entry1Value = entry1Object["v"];
+    ASSERT_EQ(entry1Value.type(), BSONType::binData);
+    ASSERT_EQ(entry1Value.binDataType(), BinDataType::BinDataGeneral);
+    int entry1ValueBinDataLength;
+    auto entry1ValueBinData = entry1Value.binData(entry1ValueBinDataLength);
+    ASSERT_EQ(std::string(entry1ValueBinData, entry1ValueBinDataLength), value1);
+
+    auto entry2Object = innerEntries[1].getObject();
+    ASSERT_EQ(entry2Object.nFields(), 2);
+    auto entry2Key = entry2Object["k"];
+    ASSERT_EQ(entry2Key.type(), BSONType::binData);
+    int entry2KeyBinDataLength;
+    auto entry2KeyBinData = entry2Key.binData(entry2KeyBinDataLength);
+    ASSERT_EQ(std::string(entry2KeyBinData, entry2KeyBinDataLength), key2);
+    auto entry2Value = entry2Object["v"];
+    ASSERT_EQ(entry2Value.type(), BSONType::binData);
+    ASSERT_EQ(entry2Value.binDataType(), BinDataType::BinDataGeneral);
+    int entry2ValueBinDataLength;
+    auto entry2ValueBinData = entry2Value.binData(entry2ValueBinDataLength);
+    ASSERT_EQ(std::string(entry2ValueBinData, entry2ValueBinDataLength), value2);
 }
 
-TEST_F(OpObserverTest, OnContainerDeleteBatched) {
+TEST_F(BatchedWriteOutputsTest, OnContainerDeleteBatched) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
-    BatchedWriteContext::get(opCtx.get()).setWritesAreBatched(true);
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
 
     auto ident = "ident";
     int64_t key1 = 100;
     std::string key2 = "stuff";
 
-    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
-    // TODO (SERVER-109748): Unit test batched writes.
-    ASSERT_THROWS_CODE(
-        opObserver.onContainerDelete(opCtx.get(), nss, uuid, ident, key1), DBException, 10942703);
-    ASSERT_THROWS_CODE(
-        opObserver.onContainerDelete(opCtx.get(), nss, uuid, ident, key2), DBException, 10942703);
+    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
+        opCtx.get(), _nss, uuid, ident, key1);
+    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
+        opCtx.get(), _nss, uuid, ident, key2);
+
+    wuow.commit();
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kCommand);
+    ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), 2);
+
+    ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerDelete);
+    ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerDelete);
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+
+    auto entry1Object = innerEntries[0].getObject();
+    ASSERT_EQ(entry1Object.nFields(), 1);
+    auto entry1Key = entry1Object["k"];
+    ASSERT_EQ(entry1Key.type(), BSONType::numberLong);
+    ASSERT_EQ(entry1Key.numberLong(), key1);
+
+    auto entry2Object = innerEntries[1].getObject();
+    ASSERT_EQ(entry2Object.nFields(), 1);
+    auto entry2Key = entry2Object["k"];
+    ASSERT_EQ(entry2Key.type(), BSONType::binData);
+    int entry2KeyBinDataLength;
+    auto entry2KeyBinData = entry2Key.binData(entry2KeyBinDataLength);
+    ASSERT_EQ(std::string(entry2KeyBinData, entry2KeyBinDataLength), key2);
+}
+
+TEST_F(BatchedWriteOutputsTest, OnContainerInsertDeleteBatchedWithInsertDeleteUpdate) {
+    auto opCtx = cc().makeOperationContext();
+    reset(opCtx.get(), _nss);
+    reset(opCtx.get(), NamespaceString::kRsOplogNamespace);
+    AutoGetCollection coll{opCtx.get(), _nss, LockMode::MODE_IX};
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
+
+    auto ident = "ident";
+    int64_t key1 = 100;
+    std::string key2 = "stuff";
+    std::string value1 = "things";
+    std::string value2 = "other things";
+
+    opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
+        opCtx.get(), _nss, uuid, ident, key1, value1);
+    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
+        opCtx.get(), _nss, uuid, ident, key2);
+    {
+        std::vector<InsertStatement> insert;
+        insert.emplace_back(BSON("_id" << 0));
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx.get(),
+            *coll,
+            insert.begin(),
+            insert.end(),
+            {},
+            std::vector<bool>(insert.size(), false),
+            false);
+    }
+    {
+        auto doc = BSON("_id" << 1);
+        opCtx->getServiceContext()->getOpObserver()->onDelete(opCtx.get(),
+                                                              *coll,
+                                                              kUninitializedStmtId,
+                                                              doc,
+                                                              getDocumentKey(*coll, doc),
+                                                              OplogDeleteEntryArgs{});
+    }
+    {
+        auto doc = BSON("_id" << 2);
+        CollectionUpdateArgs collUpdateArgs{doc};
+        collUpdateArgs.criteria = doc;
+        collUpdateArgs.update = BSON("a" << 2);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(
+            opCtx.get(), OplogUpdateEntryArgs{&collUpdateArgs, *coll});
+    }
+
+    wuow.commit();
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kCommand);
+    ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), 5);
+
+    ASSERT_EQ(innerEntries[0].getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(innerEntries[1].getOpType(), repl::OpTypeEnum::kContainerDelete);
+    ASSERT_EQ(innerEntries[0].getEntry().getContainer(), StringData{ident});
+    ASSERT_EQ(innerEntries[1].getEntry().getContainer(), StringData{ident});
+
+    auto entry1Object = innerEntries[0].getObject();
+    ASSERT_EQ(entry1Object.nFields(), 2);
+    auto entry1Key = entry1Object["k"];
+    ASSERT_EQ(entry1Key.type(), BSONType::numberLong);
+    ASSERT_EQ(entry1Key.numberLong(), key1);
+    auto entry1Value = entry1Object["v"];
+    ASSERT_EQ(entry1Value.type(), BSONType::binData);
+    ASSERT_EQ(entry1Value.binDataType(), BinDataType::BinDataGeneral);
+    int entry1ValueBinDataLength;
+    auto entry1ValueBinData = entry1Value.binData(entry1ValueBinDataLength);
+    ASSERT_EQ(std::string(entry1ValueBinData, entry1ValueBinDataLength), value1);
+
+    auto entry2Object = innerEntries[1].getObject();
+    ASSERT_EQ(entry2Object.nFields(), 1);
+    auto entry2Key = entry2Object["k"];
+    ASSERT_EQ(entry2Key.type(), BSONType::binData);
+    int entry2KeyBinDataLength;
+    auto entry2KeyBinData = entry2Key.binData(entry2KeyBinDataLength);
+    ASSERT_EQ(std::string(entry2KeyBinData, entry2KeyBinDataLength), key2);
+
+    ASSERT_EQ(innerEntries[2].getOpType(), repl::OpTypeEnum::kInsert);
+    ASSERT_BSONOBJ_EQ(innerEntries[2].getObject(), BSON("_id" << 0));
+    ASSERT_EQ(innerEntries[3].getOpType(), repl::OpTypeEnum::kDelete);
+    ASSERT_BSONOBJ_EQ(innerEntries[3].getObject(), BSON("_id" << 1));
+    ASSERT_EQ(innerEntries[4].getOpType(), repl::OpTypeEnum::kUpdate);
+    ASSERT_BSONOBJ_EQ(innerEntries[4].getObject(), BSON("a" << 2));
 }
 
 TEST_F(OpObserverTransactionTest, OnContainerInsert) {
