@@ -9070,15 +9070,19 @@ export const authCommandsLib = {
      *  An array of strings. Each string in the array reports
      *  a particular test error.
      */
-    runOneTest: function (conn, t, impls, options, sideChannelConn) {
+    runOneTest: function (conn, t, impls, options) {
         options = options || {};
+
+        // A test may provide a secondary connection to be intermittently authed
+        // with admin privileges for setup/teardown.
+        const setupConn = "getSideChannel" in impls ? impls.getSideChannel(conn) : conn;
 
         const isMongos = !!options.isMongos || this.isMongos(conn);
         if (options.shard0Name) {
             shard0name = options.shard0Name;
         }
 
-        if (t.skipTest && t.skipTest(sideChannelConn)) {
+        if (t.skipTest && t.skipTest(setupConn)) {
             jsTest.log("Skipping test: " + t.testname);
             return [];
         }
@@ -9156,7 +9160,7 @@ export const authCommandsLib = {
         let failures = [];
 
         for (let i = 0; i < this.tests.length; i++) {
-            const res = this.runOneTest(conn, this.tests[i], impls, options, setupConn);
+            const res = this.runOneTest(conn, this.tests[i], impls, options);
             failures = failures.concat(res);
         }
 
@@ -9176,10 +9180,12 @@ function isStandalone(conn) {
 
 function isFeatureEnabled(conn, ...features) {
     const adminDb = conn.getDB(adminDbName);
-    assert(adminDb.auth("admin", "password"));
+    const authed = adminDb.auth("admin", "password");
     const request = Object.fromEntries(features.map((k) => [k, 1]));
     const res = assert.commandWorked(adminDb.runCommand({getParameter: 1, ...request}));
-    adminDb.logout();
+    if (authed) {
+        adminDb.logout();
+    }
     return features.every((key) => res[key]?.value);
 }
 
