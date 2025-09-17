@@ -506,9 +506,10 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         //           }},
         //       collData);
         if (_cache && !_cache->isAbandoned()) {
+            // We do not validate the pipeline after adding the cache stage and optimizing the
+            // pipeline.
             addCacheStageAndOptimize(
                 DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache), *pipeline);
-            pipeline->validateCommon(true /* alreadyOptimized */);
         }
     };
 
