@@ -109,3 +109,5 @@ class test_layered34(wttest.WiredTigerTestCase, DisaggConfigMixin):
         cursor = self.session.open_cursor(self.uri, None, None)
         self.assertEqual(cursor['a'], last_value)
         cursor.close()
+
+        page_log.terminate(self.session) # dereference

@@ -39,6 +39,9 @@ from wiredtiger import stat
 # test_checkpoint_snapshot03.py
 #   This test is to check RTS skips the unnecessary pages when the table has more than the
 #   checkpoint snapshot.
+
+# FIXME-WT-15487
+@wttest.skip_for_hook("disagg", "very long eviction can cause tests to time out")
 class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
 
     # Create a table.
@@ -156,3 +159,5 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         if not self.runningHook('disagg'): # Disagg doesn't have inconsistent checkpoints or RTS.
             self.assertGreater(inconsistent_ckpt, 0)
             self.assertGreater(pages_skipped, 0)
+
+        self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute') # FIXME-WT-15478

@@ -517,14 +517,20 @@ wt_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, model::timestamp_t &che
 
     WT_SESSION *session;
     ret = conn->open_session(conn, nullptr, nullptr, &session);
-    if (ret != 0)
+    if (ret != 0) {
+        page_log->terminate(page_log, NULL); /* dereference */
         throw wiredtiger_exception("Failed to open a session", ret);
+    }
     wiredtiger_session_guard wiredtiger_session_guard(session);
 
     WT_ITEM metadata{};
     uint64_t timestamp;
     ret = page_log->pl_get_complete_checkpoint_ext(
       page_log, session, nullptr, nullptr, &timestamp, &metadata);
+
+    page_log->terminate(page_log, NULL); /* dereference */
+    page_log = NULL;
+
     if (ret == WT_NOTFOUND)
         return false;
     if (ret != 0)

@@ -3,8 +3,10 @@
 # they'll need to be triaged. When we know something about the failure, they are commented.
 test_autoclose.py
 test_base02.py
-test_base04.py
+test_base04.py  # FIXME: WT-15417
 test_bug003.py
+test_bug004.py  # page verify failed
+test_bug005.py
 test_bug006.py
 test_bug010.py
 test_bug027.py
@@ -16,13 +18,13 @@ test_config09.py
 test_config10.py
 test_config12.py
 test_cursor01.py
-test_cursor02.py
+test_cursor02.py  # FIXME: WT-15291
 test_cursor03.py
-test_cursor05.py
-test_cursor06.py
-test_cursor13.py
-test_cursor17.py
-test_cursor21.py
+test_cursor05.py  # FIXME: WT-15291
+test_cursor06.py  # FIXME: WT-15417
+test_cursor13.py  # FIXME: WT-15369
+test_cursor17.py  # FIXME: WT-15418
+test_cursor21.py  # FIXME: WT-15369
 test_debug_mode08.py
 test_drop.py
 test_drop03.py
@@ -35,7 +37,7 @@ test_dump04.py
 test_dump05.py
 test_dupc.py
 test_durability01.py
-test_durable_ts01.py
+test_durable_ts01.py  # FIXME: WT-15370
 test_durable_ts03.py
 test_empty.py
 test_encrypt06.py
@@ -45,7 +47,7 @@ test_error_info02.py
 test_error_info03.py
 test_eviction02.py
 test_eviction03.py
-test_hs01.py
+test_hs01.py  # FIXME: WT-15371
 test_hs06.py
 test_hs09.py
 test_hs11.py
@@ -55,16 +57,23 @@ test_hs24.py
 test_hs30.py
 test_hs32.py
 test_hs_evict_race01.py
+test_import01.py
 test_import02.py
+test_import03.py
+test_import04.py
+test_import05.py
+test_import06.py
 test_import07.py
 test_import08.py
+test_import09.py
 test_import10.py
+test_import11.py
+test_import12.py
 test_log03.py
 test_metadata_cursor01.py
 test_metadata_cursor02.py
 test_metadata_cursor03.py
 test_metadata_cursor04.py
-test_overwrite.py
 test_prefetch01.py
 test_prefetch02.py
 test_prepare03.py
@@ -81,21 +90,16 @@ test_prepare_hs03.py
 test_prepare_hs04.py
 test_readonly01.py
 test_readonly03.py  # WT-14582
-test_reserve.py
-test_scrub_eviction_prepare.py
 test_shared_cache01.py
 test_stat01.py
 test_stat02.py
 test_stat03.py
 test_stat04.py
 test_stat05.py
-test_stat06.py
 test_stat13.py
 test_stat_log01.py
 test_stat_log02.py
-test_sweep03.py
-test_sweep06.py
-test_timestamp06.py
+test_sweep03.py  # FIXME: WT-15417
 test_timestamp20.py
 test_txn02.py
 test_txn04.py
@@ -104,10 +108,8 @@ test_txn08.py
 test_txn09.py
 test_txn10.py
 test_txn14.py
-test_txn15.py
 test_txn16.py
 test_txn18.py
-test_txn19.py
 test_txn22.py
 test_util01.py
 test_util02.py
@@ -122,7 +124,8 @@ test_util15.py
 test_util17.py
 test_util18.py
 test_util22.py
-test_verbose01.py
+test_verbose01.py  # FIXME: WT-15372
 test_verbose02.py
 test_verbose03.py
 test_verbose04.py
+test_verify.py    # FIXME: WT-15488

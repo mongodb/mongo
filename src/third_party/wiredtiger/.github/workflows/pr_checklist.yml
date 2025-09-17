@@ -14,7 +14,18 @@ jobs:
         with:
           script: |
             const comment = `
-            Thanks for creating a pull request! Please answer the questions below by editing this comment.
+            Thanks for creating a pull request! Please answer the questions below by editing this comment — completing this upfront typically speeds up the review process.
+
+            ## Checklist before requesting a review
+            - [ ] I have performed a self-review of my code.
+            - [ ] I can point to specific tests that would catch regressions of this change, or I've documented why existing test coverage is sufficient.
+            - [ ] I have made corresponding changes to the documentation, or no documentation change is needed.
+
+            ## What makes this change safe?
+            Help reviewers focus their attention by answering these questions:
+            - **Test coverage**: Which specific tests validate your change? (Name the test files/functions that would fail if your change were reverted)
+            - **Risk assessment**: What functionality could break if this change has bugs? How thoroughly have you tested edge cases?
+            - **Review focus**: What aspects would you want a teammate to double-check?
 
             ## Type of change made in this PR
             - [ ] Functional change
@@ -22,20 +33,9 @@ jobs:
             - [ ] Refactor-only change
             - [ ] Other non-functional change
 
-            ## What makes this change safe?
-            Answering this question helps the reviewers understand where they should focus their attention. Please consider these prompts:
-            - How risky is this change? Why?
-            - What tests are you adding, changing or relying on? Why?
-            - What, if anything, are you concerned about that you'd like the reviewer to focus on?
-
             References:
             - [Risk level guide](https://github.com/wiredtiger/wiredtiger/blob/develop/.github/risk_level_guide.md)
             - [Testing frameworks](https://github.com/wiredtiger/wiredtiger/blob/develop/test/testing_frameworks.md)
-
-            ## Checklist before requesting a review
-            - [ ] I have performed a self-review of my code.
-            - [ ] I have made corresponding changes to the documentation, or no documentation change is needed.
-            - [ ] I have tests that show my change is correct, or have described above why functional test changes are not required.
             `;
 
             github.rest.issues.createComment({

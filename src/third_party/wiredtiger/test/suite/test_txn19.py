@@ -57,6 +57,7 @@ def corrupt(fname, truncate, offset, writeit):
         if writeit:
             log.write(writeit)
 
+@wttest.skip_for_hook("disagg", "corrupts log files, which are not relevant for disagg")
 class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'log=(enabled,file_max=100K,remove=false),' + \
                   'transaction_sync=(enabled,method=none),cache_size=1GB,' + \

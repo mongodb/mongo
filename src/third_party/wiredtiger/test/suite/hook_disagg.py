@@ -175,6 +175,8 @@ def is_layered(uri):
 
 # If the uri has been marked as layered, then transform to a layered uri
 def replace_uri(uri):
+    if uri == None:
+        return None
     testcase = WiredTigerTestCase.getCurrentTestCase()
     disagg_parameters = testcase.platform_api.getDisaggParameters()
     # Handle statistics: or statistics:<uri>
@@ -213,28 +215,31 @@ def session_create_replace(orig_session_create, session_self, uri, config):
     testcase = WiredTigerTestCase.getCurrentTestCase()
     disagg_parameters = testcase.platform_api.getDisaggParameters()
 
+    # This makes the logic easier.
+    config_str = '' if config == None else config
+
     # If the test isn't creating a table (i.e., it's a column store or lsm) create it as a
     # regular (not layered) object.  Otherwise we get disagg storage from the connection defaults.
     if uri.startswith("table:") \
-       and not 'colgroups=' in config \
-       and not 'import=' in config \
-       and not 'key_format=r' in config \
-       and not 'type=lsm' in config \
+       and not 'colgroups=' in config_str \
+       and not 'import=' in config_str \
+       and not 'key_format=r' in config_str \
+       and not 'type=lsm' in config_str \
        and not marked_as_non_layered(uri):
         mark_as_layered(uri)
         if (disagg_parameters.table_prefix == "layered"):
-            WiredTigerTestCase.verbose(None, 1, f'    Replacing, old uri = "{uri}"')
+            WiredTigerTestCase.verbose(None, 2, f'    Replacing, old uri = "{uri}"')
             uri = replace_uri(uri)
-            WiredTigerTestCase.verbose(None, 1, f'    Replacing, new uri = "{uri}"')
+            WiredTigerTestCase.verbose(None, 2, f'    Replacing, new uri = "{uri}"')
         else:
-            WiredTigerTestCase.verbose(None, 1, f'    Replacing, old config = "{config}"')
-            config += ',block_manager=disagg,type=layered'
-            WiredTigerTestCase.verbose(None, 1, f'    Replacing, new config = "{config}"')
+            WiredTigerTestCase.verbose(None, 2, f'    Replacing, old config = "{config_str}"')
+            config_str += ',block_manager=disagg,type=layered'
+            WiredTigerTestCase.verbose(None, 2, f'    Replacing, new config = "{config_str}"')
 
     # If this is an index create and the main table was already tagged to be layered,
     # there's nothing we can do to "fix" it.  Currently "index:foo" is hardwired to
     # link up with "table:foo", and there is not a "table:foo", only a "layered:foo".
-    WiredTigerTestCase.verbose(None, 1, f'    Creating "{uri}" with config = "{config}"')
+    WiredTigerTestCase.verbose(None, 3, f'    Creating "{uri}" with config = "{config_str}"')
 
     # Check if log table is enabled at connection level. If it is, by default session will create a log table unless explicitly disabled in session config.
     # Skip test if it is enabled
@@ -250,24 +255,31 @@ def session_create_replace(orig_session_create, session_self, uri, config):
         # URI is index:base_name:index_name
         last_colon = uri.rfind(':')
         base_uri = 'table:' + uri[6:last_colon]
-        WiredTigerTestCase.verbose(None, 1, f'    BaseURI "{base_uri}", {last_colon}')
+        WiredTigerTestCase.verbose(None, 3, f'    BaseURI "{base_uri}", {last_colon}')
 
         testcase = WiredTigerTestCase.getCurrentTestCase()
         WiredTigerTestCase.verbose(None, 1, f'    Layered URIS: "{testcase.layered_uris}"')
 
         if is_layered(base_uri):
-            WiredTigerTestCase.verbose(None, 1, f'    SKIPPING "{base_uri}"')
+            WiredTigerTestCase.verbose(None, 3, f'    SKIPPING "{base_uri}"')
             skip_test('indices do not work in disagg storage')
 
-    WiredTigerTestCase.verbose(None, 3, f'    Creating "{uri}" with config = "{config}"')
-    ret = orig_session_create(session_self, uri, config)
+    ret = orig_session_create(session_self, uri, config_str)
     return ret
 
 # Called to replace Session.open_cursor.  We skip calls that do backup
 # as that is not yet supported in disaggregated storage.
 def session_open_cursor_replace(orig_session_open_cursor, session_self, uri, dupcursor, config):
-    if uri != None and uri.startswith("backup:"):
-        skip_test("backup on disagg tables not yet implemented")
+    if uri != None:
+        if uri.startswith("backup:"):
+            skip_test("backup on disagg tables not yet implemented")
+        elif uri.startswith("log:"):
+            skip_test("log cursors not implemented in disagg")
+        if is_layered(uri) and config != None:
+            if 'bulk' in config:
+                skip_test("bulk on layered tables not implemented")
+            elif 'checkpoint=' in config:
+                skip_test("checkpoint cursors on layered tables not implemented")
     uri = replace_uri(uri)
     return orig_session_open_cursor(session_self, uri, dupcursor, config)
 

@@ -4165,7 +4165,7 @@ mdb_env_set_mapsize(MDB_env *env, size_t size)
 	env->me_mapsize = size;
 	if (env->me_psize)
 		env->me_maxpg = env->me_mapsize / env->me_psize;
-	MDB_TRACE(("%p, %"Yu"", env, size));
+	MDB_TRACE(("%p, %u", env, (unsigned)size));
 	return MDB_SUCCESS;
 }
 

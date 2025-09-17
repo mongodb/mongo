@@ -179,6 +179,7 @@ class DisaggConfigMixin:
 
         session = conn.open_session('')
         r = page_log.pl_get_complete_checkpoint_ext(session)
+        page_log.terminate(session) # dereference
         session.close()
         return r
 

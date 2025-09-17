@@ -182,7 +182,12 @@ class test_reserve(wttest.WiredTigerTestCase):
         s = self.conn.open_session()
         s.create(uri, 'key_format=' + self.keyfmt + ",value_format=" + self.valfmt)
 
-        list = [ "bulk", "dump=json" ]
+        # In disagg, we can't open a bulk cursor yet.
+        if self.runningHook('disagg'):
+            list = [ "dump=json" ]
+        else:
+            list = [ "bulk", "dump=json" ]
+
         for l in list:
                 c = s.open_cursor(uri, None, l)
                 msg = "/Operation not supported/"

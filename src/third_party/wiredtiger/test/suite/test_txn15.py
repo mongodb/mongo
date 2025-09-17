@@ -35,6 +35,7 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 import wttest
 
+@wttest.skip_for_hook("disagg", "this test checks logging stats, which are not relevant for disagg tables")
 class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_txn15_1'
     entries = 100

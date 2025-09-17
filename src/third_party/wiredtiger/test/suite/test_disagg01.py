@@ -107,4 +107,4 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertEquals(page20_results, [page20_full, page20_delta1, page20_delta2])
         self.assertEquals(page21_results, [page21_full, page21_delta1])
 
-        page_log.terminate(session)
+        page_log.terminate(session) # dereference

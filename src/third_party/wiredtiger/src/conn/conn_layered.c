@@ -27,7 +27,7 @@ __layered_get_disagg_checkpoint(WT_SESSION_IMPL *session, const char **cfg,
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_PAGE_LOG *page_log;
+    WT_PAGE_LOG *page_log = NULL;
     char *page_log_name;
 
     conn = S2C(session);
@@ -52,6 +52,8 @@ __layered_get_disagg_checkpoint(WT_SESSION_IMPL *session, const char **cfg,
       complete_checkpoint_lsn, NULL, complete_checkpoint_timestamp, complete_checkpoint_metadata));
 
 err:
+    if (page_log != NULL)
+        WT_TRET(page_log->terminate(page_log, &session->iface)); /* dereference */
     __wt_free(session, page_log_name);
     return (ret);
 }

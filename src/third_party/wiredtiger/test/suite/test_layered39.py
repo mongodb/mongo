@@ -88,6 +88,7 @@ class test_layered39(wttest.WiredTigerTestCase, DisaggConfigMixin):
                 else:
                     self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN,
                                                last_lsn)
+        page_log.terminate(self.session) # dereference
         cursor.close()
 
         self.pr(f'cache_scrub_restore = {self.get_stat(wiredtiger.stat.conn.cache_scrub_restore)}')

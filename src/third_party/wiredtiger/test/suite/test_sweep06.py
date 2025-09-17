@@ -35,6 +35,7 @@ import wttest, threading
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
+@wttest.skip_for_hook("disagg", "This test uses multiple threads, which is incompatible with the disagg hook")
 class test_sweep06(wttest.WiredTigerTestCase, suite_subprocess):
     dhandles = 200
     format='key_format=i,value_format=S'
