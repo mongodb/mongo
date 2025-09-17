@@ -6,47 +6,13 @@
  *
  * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
-
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
-    getMovieData,
-    getMoviePlotEmbeddingById,
-    getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec,
+    createMoviesCollWithSearchAndVectorIndex,
+    dropDefaultMovieSearchAndOrVectorIndexes,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {searchStageWithDetails, vectorStage} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
-const coll = db[jsTestName()];
-coll.drop();
-
-assert.commandWorked(coll.insertMany(getMovieData()));
-// Index is blocking by default so that the query is only run after index has been made.
-createSearchIndex(coll, getMovieSearchIndexSpec());
-
-// Create vector search index on movie plot embeddings.
-createSearchIndex(coll, getMovieVectorSearchIndexSpec());
-
-const limit = 20;
-// Multiplication factor of limit for numCandidates in $vectorSearch.
-const vectorSearchOverrequestFactor = 10;
-
-const searchStage = {
-    $search: {
-        index: getMovieSearchIndexSpec().name,
-        text: {query: "ape", path: ["fullplot", "title"]},
-        scoreDetails: true,
-    },
-};
-
-const vectorSearchStage = {
-    $vectorSearch: {
-        // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
-        queryVector: getMoviePlotEmbeddingById(6),
-        path: "plot_embedding",
-        numCandidates: limit * vectorSearchOverrequestFactor,
-        index: getMovieVectorSearchIndexSpec().name,
-        limit: limit,
-    },
-};
+const coll = createMoviesCollWithSearchAndVectorIndex();
 
 const simpleMatchStage = {
     $match: {
@@ -191,8 +157,8 @@ const runMultipleScoreTest = (
 
 runMultipleScoreTest(
     {
-        a: [searchStage, scoreSigmoidNormalizationStage],
-        b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage],
+        a: [searchStageWithDetails, scoreSigmoidNormalizationStage],
+        b: [vectorStage, scoreMinMaxScalerNormalizationStage],
     },
     "sigmoid",
     "minMaxScaler",
@@ -202,8 +168,8 @@ runMultipleScoreTest(
 
 runMultipleScoreTest(
     {
-        a: [searchStage, scoreSigmoidNormalizationStage, scoreMinMaxScalerNormalizationStage],
-        b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage, scoreSigmoidNormalizationStage],
+        a: [searchStageWithDetails, scoreSigmoidNormalizationStage, scoreMinMaxScalerNormalizationStage],
+        b: [vectorStage, scoreMinMaxScalerNormalizationStage, scoreSigmoidNormalizationStage],
     },
     "minMaxScaler",
     "sigmoid",
@@ -234,8 +200,8 @@ runMultipleScoreTest(
 
 runMultipleScoreTest(
     {
-        a: [searchStage, scoreSigmoidNormalizationStage, recursiveScoreStage],
-        b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage, recursiveScoreStage],
+        a: [searchStageWithDetails, scoreSigmoidNormalizationStage, recursiveScoreStage],
+        b: [vectorStage, scoreMinMaxScalerNormalizationStage, recursiveScoreStage],
     },
     "none",
     "none",
@@ -243,5 +209,4 @@ runMultipleScoreTest(
     buildRecursiveScore(buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5), 10.0, 0.9),
 );
 
-dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
-dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
+dropDefaultMovieSearchAndOrVectorIndexes();

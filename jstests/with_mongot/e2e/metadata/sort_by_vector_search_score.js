@@ -9,7 +9,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec,
-    makeMovieVectorQuery,
+    makeMovieVectorExactQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {waitUntilDocIsVisibleByQuery} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
@@ -28,7 +28,7 @@ function runTest(metadataSortFieldName) {
     // Our main use case of interest: using the score to compute a rank, with no 'partitionBy'.
     const testRankingPipeline = [
         // Get the embedding for 'Beauty and the Beast', which has _id = 14.
-        makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
+        makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
         {
             $setWindowFields: {sortBy: {score: {$meta: metadataSortFieldName}}, output: {rank: {$rank: {}}}},
         },
@@ -53,7 +53,7 @@ function runTest(metadataSortFieldName) {
         // should create two streams of ranks of approximately equal size.
         const results = coll
             .aggregate([
-                makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 20}),
+                makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 20}),
                 {
                     $setWindowFields: {
                         sortBy: {score: {$meta: metadataSortFieldName}},
@@ -89,7 +89,7 @@ function runTest(metadataSortFieldName) {
         waitUntilDocIsVisibleByQuery({
             docId: "duplicate",
             coll: coll,
-            queryPipeline: [makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})],
+            queryPipeline: [makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})],
         });
 
         const results = coll.aggregate(testRankingPipeline).toArray();

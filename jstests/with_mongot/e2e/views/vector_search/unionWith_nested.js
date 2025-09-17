@@ -10,11 +10,11 @@
  */
 import {
     actionMoviesViewPipeline,
-    createMoviesCollAndIndex,
+    createMoviesCollAndVectorIndex,
     createMoviesViewAndIndex,
     enrichedTitleViewPipeline,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery,
+    makeMovieVectorExactQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {assertUnionWithSearchSubPipelineAppliedViews} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 import {
@@ -26,17 +26,17 @@ import {
 
 const moviesWithEnrichedTitle = createMoviesViewAndIndex(datasets.MOVIES_WITH_ENRICHED_TITLE);
 const actionMovies = createMoviesViewAndIndex(datasets.ACTION_MOVIES);
-const moviesWithEnrichedTitleQuery = makeMovieVectorQuery({
+const moviesWithEnrichedTitleQuery = makeMovieVectorExactQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
     indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName,
 });
-const actionMoviesQuery = makeMovieVectorQuery({
+const actionMoviesQuery = makeMovieVectorExactQuery({
     queryVector: getMoviePlotEmbeddingById(11),
     limit: 2,
     indexName: datasets.ACTION_MOVIES.indexName,
 });
-const moviesColl = createMoviesCollAndIndex();
+const moviesColl = createMoviesCollAndVectorIndex();
 
 const pipeline = [
     // Match the top level view upon a few documents to ensure that the subsequent $unionWith stages

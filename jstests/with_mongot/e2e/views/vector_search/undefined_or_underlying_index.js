@@ -10,15 +10,15 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
-    createMoviesCollAndIndex,
+    createMoviesCollAndVectorIndex,
     createMoviesView,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery,
+    makeMovieVectorExactQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {datasets} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const moviesWithEnrichedTitle = createMoviesView(datasets.MOVIES_WITH_ENRICHED_TITLE);
-createMoviesCollAndIndex();
+createMoviesCollAndVectorIndex();
 
 const tvShowColl = db.getSiblingDB("vector_search_shared_db").tvShowColl;
 tvShowColl.drop();
@@ -26,7 +26,9 @@ tvShowColl.insertOne({title: "Breaking Bad"});
 
 const basicQueryResult = (indexName) => {
     return moviesWithEnrichedTitle
-        .aggregate(makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: indexName}))
+        .aggregate(
+            makeMovieVectorExactQuery({queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: indexName}),
+        )
         .toArray();
 };
 
@@ -38,7 +40,7 @@ const unionWithQueryResult = (indexName) => {
                 $unionWith: {
                     coll: moviesWithEnrichedTitle.getName(),
                     pipeline: [
-                        makeMovieVectorQuery({
+                        makeMovieVectorExactQuery({
                             queryVector: getMoviePlotEmbeddingById(11),
                             limit: 3,
                             indexName: indexName,

@@ -1,4 +1,4 @@
-import {createSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {checkForExistingIndex, datasets} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 // Plot embeddings for 17 movies where array index corresponds to the _id of the movie, or null if
@@ -3137,6 +3137,9 @@ const plotEmbeddings = [
     ],
 ];
 
+const defaultVectorIndexName = "vector_search_movie";
+const defaultSearchIndexName = "search_movie";
+
 /**
  * @returns An array of movie documents with vector embeddings for plot where $search on "ape" in
  *     "fullplot" and "title" has no ties.
@@ -3354,9 +3357,9 @@ export function createMoviesView(viewType) {
 }
 
 /**
- * @returns The movies collection with a vector search index on the plot_embedding field.
+ * @returns The movies collection.
  */
-export function createMoviesCollAndIndex() {
+export function createMoviesColl() {
     const testDb = db.getSiblingDB("vector_search_shared_db");
     const coll = testDb.moviesColl;
 
@@ -3365,9 +3368,38 @@ export function createMoviesCollAndIndex() {
         assert.commandWorked(coll.insertMany(getMovieData()));
     }
 
+    return coll;
+}
+
+/**
+ * @returns The movies collection with a vector search index on the plot_embedding field.
+ */
+export function createMoviesCollAndVectorIndex() {
+    const coll = createMoviesColl();
+
     // Create an index if it doesn't already exist.
     if (!checkForExistingIndex(coll, datasets.MOVIES.indexName)) {
         createSearchIndex(coll, getMovieVectorSearchIndexSpec({indexName: datasets.MOVIES.indexName}));
+    }
+
+    return coll;
+}
+
+/**
+ * @returns The movies collection with a vector search index on the plot_embedding field and a
+ * search index.
+ */
+export function createMoviesCollWithSearchAndVectorIndex() {
+    const coll = createMoviesColl();
+
+    // Create a vector index if it doesn't already exist.
+    if (!checkForExistingIndex(coll, defaultVectorIndexName)) {
+        createSearchIndex(coll, getMovieVectorSearchIndexSpec());
+    }
+
+    // Create a search index if it doesn't already exist.
+    if (!checkForExistingIndex(coll, defaultSearchIndexName)) {
+        createSearchIndex(coll, getMovieSearchIndexSpec());
     }
 
     return coll;
@@ -3392,16 +3424,56 @@ export function createMoviesViewAndIndex(viewType) {
  * @param {Array} queryVector - A plot embedding to vector search upon
  * @param {number} limit - The maximum number of results to return.
  * @param {string} indexName - The name of the vector search index to use.
- * @returns A vector search query on the index specified.
+ * @returns A vector search query on the index specified with exact: true.
  */
-export function makeMovieVectorQuery({queryVector, limit, indexName = "vector_search_movie"}) {
+export function makeMovieVectorExactQuery({queryVector, limit, indexName = defaultVectorIndexName}) {
     return {
         $vectorSearch: {
             queryVector: queryVector,
             path: "plot_embedding",
             exact: true,
-            index: getMovieVectorSearchIndexSpec({indexName}).name,
+            index: indexName,
             limit: limit,
+        },
+    };
+}
+
+/**
+ * @param {Array} queryVector - A plot embedding to vector search upon
+ * @param {number} limit - The maximum number of results to return.
+ * @param {string} indexName - The name of the vector search index to use.
+ * @param {number} numCandidates - The number of nearest neighbors to consider.
+ * @returns A vector search query on the index specified with the specified numCandidates.
+ */
+export function makeMovieVectorCandidatesQuery({
+    queryVector,
+    limit,
+    numCandidates,
+    indexName = defaultVectorIndexName,
+}) {
+    return {
+        $vectorSearch: {
+            queryVector: queryVector,
+            path: "plot_embedding",
+            numCandidates: numCandidates,
+            index: indexName,
+            limit: limit,
+        },
+    };
+}
+
+/**
+ * @param {string} queryString - The search query string to use.
+ * @param {boolean} scoreDetails - Whether to include score details in the results.
+ * @param {string} indexName - The name of the search index to use.
+ * @returns A search query on the specified index.
+ */
+export function makeMovieSearchQuery({queryString, scoreDetails, indexName = defaultSearchIndexName}) {
+    return {
+        $search: {
+            index: indexName,
+            text: {query: queryString, path: ["fullplot", "title"]},
+            scoreDetails: scoreDetails,
         },
     };
 }
@@ -3412,7 +3484,7 @@ export function makeMovieVectorQuery({queryVector, limit, indexName = "vector_se
  *     pre-filtering.
  * @returns A vector search index spec on the plot_embedding field.
  */
-export function getMovieVectorSearchIndexSpec({indexName = "vector_search_movie", filterFields = []} = {}) {
+export function getMovieVectorSearchIndexSpec({indexName = defaultVectorIndexName, filterFields = []} = {}) {
     const fields = [
         {
             "type": "vector",
@@ -3426,7 +3498,7 @@ export function getMovieVectorSearchIndexSpec({indexName = "vector_search_movie"
 }
 
 export function getMovieSearchIndexSpec() {
-    return {name: "search_movie", definition: {"mappings": {"dynamic": true}}};
+    return {name: defaultSearchIndexName, definition: {"mappings": {"dynamic": true}}};
 }
 
 /**
@@ -3435,4 +3507,22 @@ export function getMovieSearchIndexSpec() {
  */
 export function getMoviePlotEmbeddingById(id) {
     return plotEmbeddings[id];
+}
+
+/**
+ * Drops the default vector search and search indexes on the movies collection.
+ */
+export function dropDefaultMovieSearchAndOrVectorIndexes() {
+    const testDb = db.getSiblingDB("vector_search_shared_db");
+    const coll = testDb.moviesColl;
+
+    // Drop the vector index if it exists.
+    if (checkForExistingIndex(coll, defaultVectorIndexName)) {
+        dropSearchIndex(coll, {name: defaultVectorIndexName});
+    }
+
+    // Drop the search index if it exists.
+    if (checkForExistingIndex(coll, defaultSearchIndexName)) {
+        dropSearchIndex(coll, {name: defaultSearchIndexName});
+    }
 }

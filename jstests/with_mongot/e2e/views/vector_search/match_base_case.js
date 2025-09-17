@@ -10,7 +10,7 @@ import {
     actionMoviesViewPipeline,
     createMoviesViewAndIndex,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery,
+    makeMovieVectorExactQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
@@ -20,7 +20,7 @@ import {
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const view = createMoviesViewAndIndex(datasets.ACTION_MOVIES);
-const vectorSearchQuery = makeMovieVectorQuery({
+const vectorSearchQuery = makeMovieVectorExactQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
     indexName: datasets.ACTION_MOVIES.indexName,

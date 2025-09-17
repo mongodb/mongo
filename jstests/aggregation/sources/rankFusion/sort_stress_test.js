@@ -4,14 +4,11 @@
  * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, requires_fcv_82 ]
  */
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+import {rankFusionScoreDetailsDescription} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
-
-const scoreDetailsDescription =
-    "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 " +
-    "+ rank))) across input pipelines from which this document is output, from:";
 
 const allDocs = [
     {
@@ -121,7 +118,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.01639344262295082,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [{inputPipelineName: "tasty", rank: 1, weight: 1, details: []}],
                 },
             },
@@ -131,7 +128,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.016129032258064516,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [{inputPipelineName: "tasty", rank: 2, weight: 1, details: []}],
                 },
             },
@@ -168,7 +165,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.01639344262295082,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [{inputPipelineName: "tasty", rank: 1, weight: 1, details: []}],
                 },
             },
@@ -178,7 +175,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.016129032258064516,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [{inputPipelineName: "tasty", rank: 2, weight: 1, details: []}],
                 },
             },
@@ -284,7 +281,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.048915917503966164,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
                         {inputPipelineName: "has_a_but", rank: 2, weight: 1, details: []},
@@ -299,7 +296,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.04865990111891751,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
                         {inputPipelineName: "has_a_but", rank: 1, weight: 1, details: []},
@@ -314,7 +311,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 tasty: true,
                 details: {
                     value: 0.03252247488101534,
-                    description: scoreDetailsDescription,
+                    description: rankFusionScoreDetailsDescription,
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
                         {inputPipelineName: "has_a_but", rank: "NA"},

@@ -4,6 +4,11 @@
  *
  * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
+import {
+    // fieldPresent,
+    checkScoreScoreDetails,
+    scoreDetailsDescription,
+} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -18,13 +23,6 @@ for (let i = 1; i <= nDocs; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-function fieldPresent(field, containingObj) {
-    return containingObj.hasOwnProperty(field);
-}
-
-const scoreDetailsDescription =
-    "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:";
-
 // Test Explanation: Verify that the set scoreDetails for $score contains the correct fields and
 // values when the normalize function is one of the following: "none", "sigmoid", or "minMaxScaler"
 // The weight can be specified (must be between [0, 1]) or unspecified (defaults to 1.0).
@@ -33,13 +31,13 @@ const scoreDetailsDescription =
  * Example of the expected score and scoreDetails metadata structure for a given results document:
  * "score": 0.05555555555555555,
  * "details": {
-        "value": 0.05555555555555555,
-        "description": "the score calculated from...",
-        "rawScore": 6,
-        "normalization": "minMaxScaler", // ["none", "sigmoid", "minMaxScaler"]
-        "weight": 0.5, // between [0,1]
-        "details": []
-    }
+ *      "value": 0.05555555555555555,
+ *      "description": "the score calculated from...",
+ *      "rawScore": 6,
+ *      "normalization": "minMaxScaler", // ["none", "sigmoid", "minMaxScaler"]
+ *      "weight": 0.5, // between [0,1]
+ *      "details": []
+ *  }
  */
 function testScoreDetails(normalization, weight, expectedScoreResults) {
     let score = {
@@ -68,29 +66,14 @@ function testScoreDetails(normalization, weight, expectedScoreResults) {
 
     for (let i = 0; i < results.length; i++) {
         const foundDoc = results[i];
-        // Assert that the score metadata has been set.
-        assert(fieldPresent("score", foundDoc), foundDoc);
-        const score = foundDoc["score"];
-        assert.eq(score, expectedScoreResults[i]["expectedScore"] * weight);
-        assert(fieldPresent("details", foundDoc), foundDoc);
-        const details = foundDoc["details"];
-        assert(fieldPresent("value", details), details);
-        // We don't care about the actual score, just assert that it's been calculated.
-        assert.gte(details["value"], 0, details);
-        // Assert that the score metadata is the same value as what scoreDetails set.
-        assert.eq(details["value"], score);
-        assert(fieldPresent("description", details), details);
-        assert.eq(details["description"], scoreDetailsDescription);
-        assert(fieldPresent("rawScore", details), details);
-        assert.eq(details["rawScore"], foundDoc["single"] + foundDoc["double"]);
-        assert((fieldPresent["normalization"], details), details);
-        assert.eq(details["normalization"], normalization);
-        assert(fieldPresent("weight", details), details);
-        assert.eq(details["weight"], weight);
-        assert(fieldPresent("expression", details), details);
-        assert.eq(details["expression"], "{ string: { $add: [ '$single', '$double' ] } }");
-        assert(fieldPresent("details", details), details);
-        assert.eq(details["details"], []);
+        checkScoreScoreDetails(foundDoc, {
+            value: expectedScoreResults[i]["expectedScore"] * weight,
+            rawScore: foundDoc["single"] + foundDoc["double"],
+            normalization: normalization,
+            weight: weight,
+            description: scoreDetailsDescription,
+            expression: "{ string: { \$add: [ '$single', '$double' ] } }",
+        });
     }
 }
 
@@ -234,19 +217,10 @@ testScoreDetails("minMaxScaler", "unspecified", expectedScoreResults);
 
             for (let i = 0; i < results.length; i++) {
                 const foundDoc = results[i];
-                jsTestLog("actual", foundDoc);
-                jsTestLog("expected", expectedScoreResults[i]);
-                // Assert that the score metadata has been set.
-                assert(fieldPresent("score", foundDoc), foundDoc);
-                const score = foundDoc["score"];
-                assert.eq(score, expectedScoreResults[i]["expectedScore"]);
-                assert(fieldPresent("details", foundDoc), foundDoc);
-                const details = foundDoc["details"];
-                assert(fieldPresent("value", details), details);
-                // Assert that the score metadata is the same value as what scoreDetails set.
-                assert.eq(details["value"], score, details);
-                assert(fieldPresent("rawScore", details), details);
-                assert.eq(details["rawScore"], expectedScoreResults[i]["rawScore"]);
+                checkScoreScoreDetails(foundDoc, {
+                    value: expectedScoreResults[i]["expectedScore"],
+                    rawScore: expectedScoreResults[i]["rawScore"],
+                });
             }
         }
     }
