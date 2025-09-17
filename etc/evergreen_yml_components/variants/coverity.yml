@@ -2,7 +2,7 @@ buildvariants:
   - name: bv_coverity_analysis
     display_name: Coverity Analysis
     # Don't run Coverity analysis as part of patch builds
-    patchable: true
+    patchable: false
     allow_for_git_tag: false
     # Run at 4 am UTC everyday
     cron: "0 4 * * *"
@@ -72,12 +72,12 @@ tasks:
           module_name: devprod_coverity
       - func: f_coverity_build
         timeout_secs: 10800 # Idle timeout of 3 hours
-      # - func: f_analyze
-      #   vars:
-      #     module_prefix: ${workdir}/devprodCoveritySrc
-      #     module_name: devprod_coverity
-      #   timeout_secs: 10800 # Idle timeout of 3 hours
-      # - func: f_commit
-      #   vars:
-      #     module_prefix: ${workdir}/devprodCoveritySrc
-      #     module_name: devprod_coverity
+      - func: f_analyze
+        vars:
+          module_prefix: ${workdir}/devprodCoveritySrc
+          module_name: devprod_coverity
+        timeout_secs: 10800 # Idle timeout of 3 hours
+      - func: f_commit
+        vars:
+          module_prefix: ${workdir}/devprodCoveritySrc
+          module_name: devprod_coverity
