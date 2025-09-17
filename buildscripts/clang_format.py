@@ -289,7 +289,7 @@ class ClangFormat(object):
         return formatted
 
 
-FILES_RE = re.compile("\\.(h|hpp|ipp|cpp|js)$")
+FILES_RE = re.compile("\\.(h|hpp|ipp|cpp)$")
 TPL_FILES_RE = re.compile("\\.tpl\\.")
 
 
@@ -297,8 +297,7 @@ def is_interesting_file(file_name):
     """Return true if this file should be checked."""
     return (
         (
-            file_name.startswith("jstests")
-            or file_name.startswith("src")
+            file_name.startswith("src")
             and not file_name.startswith("src/third_party/")
             and not file_name.startswith("src/mongo/gotools/")
             and not file_name.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
