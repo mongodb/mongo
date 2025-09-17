@@ -445,9 +445,8 @@ buildvariants:
   - name: &upload-sbom-if-changed upload-sbom-if-changed
     display_name: "Upload SBOM if changed"
     allowed_requesters: ["commit"]
+    # TODO (RNDSEC-1453): Add paths: - "sbom.json" when the  DEVPROD-22112 ticket is fixed
     tags: []
-    paths:
-      - "sbom.json"
     run_on:
       - rhel8.8-small
     stepback: false

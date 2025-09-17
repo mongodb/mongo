@@ -1800,6 +1800,7 @@ tasks:
             - "./src/evergreen/run_python_script.sh"
             - "evergreen/functions/upload_sbom_via_silkbomb.py"
             - "--run"
+            - "--check-sbom-file-change"
           env:
             REQUESTER: ${requester}
             BRANCH_NAME: ${branch_name}
