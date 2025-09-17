@@ -94,11 +94,16 @@ assert.soon(() => {
     assert.eq(multiPlannerMetricsFtdc.classicCount, 1);
     assert.gt(multiPlannerMetricsFtdc.classicMicros, 0);
     assert.gt(multiPlannerMetricsFtdc.classicWorks, 0);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros), 1);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans), 1);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), 1);
+
     assert.eq(multiPlannerMetricsFtdc.sbeCount, 1);
     assert.gt(multiPlannerMetricsFtdc.sbeMicros, 0);
     assert.gt(multiPlannerMetricsFtdc.sbeNumReads, 0);
-    // Verify FTDC omits detailed histograms.
-    assert(!multiPlannerMetricsFtdc.hasOwnProperty("histograms"));
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros), 1);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads), 1);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans), 1);
     return true;
 }, "FTDC output should eventually reflect observed serverStatus metrics.");
 
