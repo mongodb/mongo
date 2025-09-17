@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/host_portal.h"
+#include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
 
 #include <memory>
@@ -86,7 +87,13 @@ public:
 
 private:
     static ::MongoExtensionStatus* _extInitialize(
-        const ::MongoExtension* extensionPtr, const ::MongoExtensionHostPortal* portal) noexcept {
+        const ::MongoExtension* extensionPtr,
+        const ::MongoExtensionHostPortal* portal,
+        const ::MongoExtensionHostServices* hostServices) noexcept {
+        // Immediately set the static HostServices instance so that the extension can access it
+        // during initialization if needed.
+        HostServicesHandle::setHostServices(hostServices);
+
         return enterCXX([&]() {
             // The host portal will go out of scope on the host side after initialization, so we
             // should not retain it to avoid a dangling pointer

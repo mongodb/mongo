@@ -53,6 +53,7 @@ mongo_cc_extension_shared_library(
     )
     for extension_name in [
         "hostVersionSucceeds",
+        "invoke_host_services_asap",
         "loadTwoStages",
         "loadHighestCompatibleVersion",
     ]

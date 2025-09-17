@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host/load_extension.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/extension/host/host_services.h"
 #include "mongo/db/extension/host_adapter/extension_handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
@@ -232,7 +233,7 @@ void ExtensionLoader::load(const ExtensionConfig& config) {
                .maxWireVersion);
 
     HostPortal portal{extHandle.getVersion(), maxWireVersion, YAML::Dump(config.extOptions)};
-    extHandle.initialize(portal);
+    extHandle.initialize(portal, HostServices::get());
 }
 
 std::vector<std::string> ExtensionLoader::getLoadedExtensions() {

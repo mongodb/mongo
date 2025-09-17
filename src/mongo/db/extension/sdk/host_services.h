@@ -28,51 +28,50 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host/host_portal.h"
-#include "mongo/db/extension/host/host_services.h"
-#include "mongo/db/extension/host_adapter/extension_status.h"
-#include "mongo/db/extension/host_adapter/handle.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/handle.h"
 
-namespace mongo::extension::host_adapter {
-
+namespace mongo::extension::sdk {
 /**
- * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
- * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
- * is never transferred to the host.
+ * Wrapper for ::MongoExtensionHostServices, providing safe access to its public API through the
+ * underlying vtable.
+ *
+ * The host services pointer is expected to be valid for the lifetime of the extension and is
+ * statically accessible via HostServicesHandle::getHostServices().
+ *
+ * This is an unowned handle, meaning the host services remain fully owned by the host, and
+ * ownership is never transferred to the extension.
  */
-class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
-
+class HostServicesHandle : public sdk::UnownedHandle<const ::MongoExtensionHostServices> {
 public:
-    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
-        _assertValidVTable();
+    HostServicesHandle(const ::MongoExtensionHostServices* services)
+        : sdk::UnownedHandle<const ::MongoExtensionHostServices>(services) {}
+
+    bool alwaysTrue_TEMPORARY() const {
+        assertValid();
+        return vtable().alwaysTrue_TEMPORARY();
+    }
+
+    static HostServicesHandle* getHostServices() {
+        return &_hostServices;
     }
 
     /**
-     * Initialize the extension by providing it with a HostPortal and HostServices.
-     *
-     * Note that the HostServices is passed as a pointer since its lifetime extends beyond
-     * the call to initialize() and will be saved by the extension. The HostPortal, on the other
-     * hand, will go out of scope immediately after the call to initialize() so it is passed by
-     * reference.
+     * setHostServices() should be called only once during initialization of the extension. The host
+     * guarantees that the pointer remains valid during the lifetime of the extension.
      */
-    void initialize(const extension::host::HostPortal& portal,
-                    const extension::host::HostServices* hostServices) const {
-        sdk::enterC([&] {
-            assertValid();
-            return vtable().initialize(get(), &portal, hostServices);
-        });
+    static void setHostServices(const ::MongoExtensionHostServices* services) {
+        _hostServices = HostServicesHandle(services);
     }
 
-    ::MongoExtensionAPIVersion getVersion() const {
-        assertValid();
-        return get()->version;
-    }
+private:
+    static HostServicesHandle _hostServices;
 
-protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
+        tassert(11097600,
+                "Host services' 'alwaysTrue_TEMPORARY' is null",
+                vtable.alwaysTrue_TEMPORARY != nullptr);
     };
 };
 
-}  // namespace mongo::extension::host_adapter
+}  // namespace mongo::extension::sdk

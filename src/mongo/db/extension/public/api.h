@@ -257,11 +257,30 @@ typedef struct MongoExtensionHostPortalVTable {
 } MongoExtensionHostPortalVTable;
 
 /**
+ * MongoExtensionHostServices exposes services provided by the host to the extension.
+ *
+ * Currently, the VTable struct is a placeholder for future services.
+ * TODO SERVER-110982 (or whichever ticket adds the first function to this struct): Remove
+ * alwaysTrue_TEMPORARY().
+ */
+typedef struct MongoExtensionHostServices {
+    const struct MongoExtensionHostServicesVTable* vtable;
+} MongoExtensionHostServices;
+typedef struct MongoExtensionHostServicesVTable {
+    bool (*alwaysTrue_TEMPORARY)();
+} MongoExtensionHostServicesVTable;
+
+/**
  * MongoExtension is the top-level struct that must be defined by any MongoDB extension. It contains
  * the API version and an initialization function.
  *
  * At extension loading time, the MongoDB server will check compatibility of the extension's API
- * version with the server's API version then invoke the initializer.
+ * version with the server's API version then invoke the initializer. We also provide a pointer to
+ * the host services for the extension to invoke provided host functionality at any point.
+ *
+ * The host _portal_ pointer is only valid during initialization and should not be retained by the
+ * extension. The host _services_ pointer, on the other hand, is valid for the lifetime of the
+ * extension and should be saved by the extension.
  */
 typedef struct MongoExtension {
     const struct MongoExtensionVTable* const vtable;
@@ -276,7 +295,8 @@ typedef struct MongoExtensionVTable {
      * extension to avoid a dangling pointer.
      */
     MongoExtensionStatus* (*initialize)(const MongoExtension* extension,
-                                        const MongoExtensionHostPortal* portal);
+                                        const MongoExtensionHostPortal* portal,
+                                        const MongoExtensionHostServices* services);
 } MongoExtensionVTable;
 
 /**
