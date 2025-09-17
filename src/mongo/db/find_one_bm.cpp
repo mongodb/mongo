@@ -181,8 +181,7 @@ public:
     }
 
     static auto makeFindOneById() {
-        return BSON("find" << kCollection << "$db" << kDatabase << "filter" << BSON("_id" << 1)
-                           << "batchSize" << 1 << "limit" << 1 << "singleBatch" << true);
+        return BSON("find" << kCollection << "$db" << kDatabase << "filter" << BSON("_id" << 1));
     }
 
 private:
