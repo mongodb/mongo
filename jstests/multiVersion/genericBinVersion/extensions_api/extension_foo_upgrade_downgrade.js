@@ -40,9 +40,10 @@ import {
     assertFooStageAcceptedV1AndV2,
     assertFooStageAcceptedV1Only,
     assertFooStageAcceptedV1OnlyPlusV2ViewCreation,
-    fooV1Options,
-    fooV2Options,
+    extensionNodeOptions,
     setupCollection,
+    generateMultiversionExtensionConfigs,
+    deleteMultiversionExtensionConfigs,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
 import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
@@ -52,46 +53,55 @@ if (!isLinux()) {
     quit();
 }
 
-// Test upgrading foo extension in a replica set.
-testPerformReplSetRollingRestart({
-    startingNodeOptions: fooV1Options,
-    restartNodeOptions: fooV2Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1Only,
-    afterSecondariesHaveRestarted: assertFooStageAcceptedV1Only,
-    afterPrimariesHaveRestarted: assertFooStageAcceptedV1AndV2,
-});
+const extensionPaths = generateMultiversionExtensionConfigs();
 
-// Test upgrading foo extension in a sharded cluster.
-testPerformShardedClusterRollingRestart({
-    startingNodeOptions: fooV1Options,
-    restartNodeOptions: fooV2Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1Only,
-    afterConfigHasRestarted: assertFooStageAcceptedV1Only,
-    afterSecondaryShardHasRestarted: assertFooStageAcceptedV1OnlyPlusV2ViewCreation,
-    afterPrimaryShardHasRestarted: assertFooStageAcceptedV1OnlyPlusV2ViewCreation,
-    afterMongosHasRestarted: assertFooStageAcceptedV1AndV2,
-});
+try {
+    const fooV1Options = extensionNodeOptions(extensionPaths[0]);
+    const fooV2Options = extensionNodeOptions(extensionPaths[1]);
 
-// Test downgrading foo extension in a replica set.
-testPerformReplSetRollingRestart({
-    startingNodeOptions: fooV2Options,
-    restartNodeOptions: fooV1Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1AndV2,
-    afterSecondariesHaveRestarted: assertFooStageAcceptedV1AndV2,
-    afterPrimariesHaveRestarted: assertFooStageAcceptedV1Only,
-});
+    // Test upgrading foo extension in a replica set.
+    testPerformReplSetRollingRestart({
+        startingNodeOptions: fooV1Options,
+        restartNodeOptions: fooV2Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1Only,
+        afterSecondariesHaveRestarted: assertFooStageAcceptedV1Only,
+        afterPrimariesHaveRestarted: assertFooStageAcceptedV1AndV2,
+    });
 
-// Test downgrading foo extension in a sharded cluster.
-testPerformShardedClusterRollingRestart({
-    startingNodeOptions: fooV2Options,
-    restartNodeOptions: fooV1Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1AndV2,
-    afterConfigHasRestarted: assertFooStageAcceptedV1AndV2,
-    afterSecondaryShardHasRestarted: assertFooStageAcceptedV1Only,
-    afterPrimaryShardHasRestarted: assertFooStageAcceptedV1Only,
-    afterMongosHasRestarted: assertFooStageAcceptedV1Only,
-});
+    // Test upgrading foo extension in a sharded cluster.
+    testPerformShardedClusterRollingRestart({
+        startingNodeOptions: fooV1Options,
+        restartNodeOptions: fooV2Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1Only,
+        afterConfigHasRestarted: assertFooStageAcceptedV1Only,
+        afterSecondaryShardHasRestarted: assertFooStageAcceptedV1OnlyPlusV2ViewCreation,
+        afterPrimaryShardHasRestarted: assertFooStageAcceptedV1OnlyPlusV2ViewCreation,
+        afterMongosHasRestarted: assertFooStageAcceptedV1AndV2,
+    });
+
+    // Test downgrading foo extension in a replica set.
+    testPerformReplSetRollingRestart({
+        startingNodeOptions: fooV2Options,
+        restartNodeOptions: fooV1Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1AndV2,
+        afterSecondariesHaveRestarted: assertFooStageAcceptedV1AndV2,
+        afterPrimariesHaveRestarted: assertFooStageAcceptedV1Only,
+    });
+
+    // Test downgrading foo extension in a sharded cluster.
+    testPerformShardedClusterRollingRestart({
+        startingNodeOptions: fooV2Options,
+        restartNodeOptions: fooV1Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1AndV2,
+        afterConfigHasRestarted: assertFooStageAcceptedV1AndV2,
+        afterSecondaryShardHasRestarted: assertFooStageAcceptedV1Only,
+        afterPrimaryShardHasRestarted: assertFooStageAcceptedV1Only,
+        afterMongosHasRestarted: assertFooStageAcceptedV1Only,
+    });
+} finally {
+    deleteMultiversionExtensionConfigs(extensionPaths);
+}

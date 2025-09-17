@@ -55,8 +55,9 @@ namespace {
 
 const std::filesystem::path& getExtensionConfDir() {
     // Use /tmp/mongo/extensions in test environments, otherwise use /etc/mongo/extensions.
-    static const std::filesystem::path kExtensionConfDir =
-        getTestCommandsEnabled() ? "/tmp/mongo/extensions" : "/etc/mongo/extensions";
+    static const std::filesystem::path kExtensionConfDir = getTestCommandsEnabled()
+        ? std::filesystem::temp_directory_path() / "mongo" / "extensions"
+        : std::filesystem::path{"/etc/mongo/extensions"};
 
     return kExtensionConfDir;
 }

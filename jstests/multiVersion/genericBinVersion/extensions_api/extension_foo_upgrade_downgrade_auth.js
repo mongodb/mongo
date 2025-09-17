@@ -15,9 +15,10 @@ import {isLinux} from "jstests/libs/os_helpers.js";
 import {
     assertFooStageAcceptedV1AndV2,
     assertFooStageAcceptedV1Only,
-    fooV1Options,
-    fooV2Options,
     setupCollection,
+    extensionNodeOptions,
+    generateMultiversionExtensionConfigs,
+    deleteMultiversionExtensionConfigs,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
 import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
@@ -27,42 +28,51 @@ if (!isLinux()) {
     quit();
 }
 
-testPerformReplSetRollingRestart({
-    startingNodeOptions: fooV1Options,
-    restartNodeOptions: fooV2Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1Only,
-    afterSecondariesHaveRestarted: assertFooStageAcceptedV1Only,
-    afterPrimariesHaveRestarted: assertFooStageAcceptedV1AndV2,
-});
+const extensionPaths = generateMultiversionExtensionConfigs();
 
-testPerformShardedClusterRollingRestart({
-    startingNodeOptions: fooV1Options,
-    restartNodeOptions: fooV2Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1Only,
-    afterConfigHasRestarted: assertFooStageAcceptedV1Only,
-    afterSecondaryShardHasRestarted: assertFooStageAcceptedV1Only,
-    afterPrimaryShardHasRestarted: assertFooStageAcceptedV1Only,
-    afterMongosHasRestarted: assertFooStageAcceptedV1AndV2,
-});
+try {
+    const fooV1Options = extensionNodeOptions(extensionPaths[0]);
+    const fooV2Options = extensionNodeOptions(extensionPaths[1]);
 
-testPerformReplSetRollingRestart({
-    startingNodeOptions: fooV2Options,
-    restartNodeOptions: fooV1Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1AndV2,
-    afterSecondariesHaveRestarted: assertFooStageAcceptedV1AndV2,
-    afterPrimariesHaveRestarted: assertFooStageAcceptedV1Only,
-});
+    testPerformReplSetRollingRestart({
+        startingNodeOptions: fooV1Options,
+        restartNodeOptions: fooV2Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1Only,
+        afterSecondariesHaveRestarted: assertFooStageAcceptedV1Only,
+        afterPrimariesHaveRestarted: assertFooStageAcceptedV1AndV2,
+    });
 
-testPerformShardedClusterRollingRestart({
-    startingNodeOptions: fooV2Options,
-    restartNodeOptions: fooV1Options,
-    setupFn: setupCollection,
-    beforeRestart: assertFooStageAcceptedV1AndV2,
-    afterConfigHasRestarted: assertFooStageAcceptedV1AndV2,
-    afterSecondaryShardHasRestarted: assertFooStageAcceptedV1Only,
-    afterPrimaryShardHasRestarted: assertFooStageAcceptedV1Only,
-    afterMongosHasRestarted: assertFooStageAcceptedV1Only,
-});
+    testPerformShardedClusterRollingRestart({
+        startingNodeOptions: fooV1Options,
+        restartNodeOptions: fooV2Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1Only,
+        afterConfigHasRestarted: assertFooStageAcceptedV1Only,
+        afterSecondaryShardHasRestarted: assertFooStageAcceptedV1Only,
+        afterPrimaryShardHasRestarted: assertFooStageAcceptedV1Only,
+        afterMongosHasRestarted: assertFooStageAcceptedV1AndV2,
+    });
+
+    testPerformReplSetRollingRestart({
+        startingNodeOptions: fooV2Options,
+        restartNodeOptions: fooV1Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1AndV2,
+        afterSecondariesHaveRestarted: assertFooStageAcceptedV1AndV2,
+        afterPrimariesHaveRestarted: assertFooStageAcceptedV1Only,
+    });
+
+    testPerformShardedClusterRollingRestart({
+        startingNodeOptions: fooV2Options,
+        restartNodeOptions: fooV1Options,
+        setupFn: setupCollection,
+        beforeRestart: assertFooStageAcceptedV1AndV2,
+        afterConfigHasRestarted: assertFooStageAcceptedV1AndV2,
+        afterSecondaryShardHasRestarted: assertFooStageAcceptedV1Only,
+        afterPrimaryShardHasRestarted: assertFooStageAcceptedV1Only,
+        afterMongosHasRestarted: assertFooStageAcceptedV1Only,
+    });
+} finally {
+    deleteMultiversionExtensionConfigs(extensionPaths);
+}

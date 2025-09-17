@@ -15,3 +15,6 @@ filters:
   - "write_concern*":
     approvers:
       - 10gen/server-rw-concerns
+  - "*extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api

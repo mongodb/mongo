@@ -6,6 +6,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
 const pathToExtensionFooV2 = MongoRunner.getExtensionPath("libfoo_extension_v2.so");
@@ -21,14 +22,20 @@ const data = [
 
 const fooParseErrorCodes = [10624200, 10624201];
 
-export const fooV1Options = {
-    loadExtensions: [pathToExtensionFoo],
-    setParameter: {featureFlagExtensionsAPI: true},
-};
-export const fooV2Options = {
-    loadExtensions: [pathToExtensionFooV2],
-    setParameter: {featureFlagExtensionsAPI: true},
-};
+export function generateMultiversionExtensionConfigs() {
+    return generateExtensionConfigs([pathToExtensionFoo, pathToExtensionFooV2]);
+}
+
+export function deleteMultiversionExtensionConfigs(extensionPaths) {
+    deleteExtensionConfigs(extensionPaths);
+}
+
+export function extensionNodeOptions(extensionPath) {
+    return {
+        loadExtensions: [extensionPath],
+        setParameter: {featureFlagExtensionsAPI: true},
+    };
+}
 
 export function setupCollection(primaryConn, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(getDB(primaryConn), collName);

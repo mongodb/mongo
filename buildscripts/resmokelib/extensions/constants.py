@@ -1,11 +1,14 @@
 """Constants for testing extensions locally and in Evergreen."""
 
 import os
+import tempfile
+
+temp_dir = tempfile.gettempdir()
 
 cwd = os.getcwd()
 
 # Directory for generated extension .conf files.
-CONF_OUT_DIR = os.path.join(os.path.abspath(os.sep), "tmp", "mongo", "extensions")
+CONF_OUT_DIR = os.path.join(temp_dir, "mongo", "extensions")
 
 # Path to the source YAML with extension options.
 CONF_IN_PATH = os.path.join(

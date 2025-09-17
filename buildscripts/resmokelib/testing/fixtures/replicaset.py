@@ -2,6 +2,7 @@
 
 import os.path
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import Optional
@@ -97,6 +98,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
                 logger=self.logger,
                 mongod_options=self.mongod_options,
+                with_suffix=uuid.uuid4().hex,
             )
 
         self.preserve_dbpath = preserve_dbpath

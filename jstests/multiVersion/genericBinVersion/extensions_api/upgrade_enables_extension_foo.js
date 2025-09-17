@@ -31,9 +31,13 @@ import {
     assertFooStageAccepted,
     assertFooStageRejected,
     assertFooViewCreationAllowedButQueriesRejected,
-    fooExtensionNodeOptions,
     setupCollection,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/upgrade_enables_extension_foo_utils.js";
+import {
+    extensionNodeOptions,
+    generateMultiversionExtensionConfigs,
+    deleteMultiversionExtensionConfigs,
+} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
@@ -42,22 +46,30 @@ if (!isLinux()) {
     quit();
 }
 
-testPerformUpgradeReplSet({
-    upgradeNodeOptions: fooExtensionNodeOptions,
-    setupFn: setupCollection,
-    whenFullyDowngraded: assertFooStageRejected,
-    whenSecondariesAreLatestBinary: assertFooStageRejected,
-    whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
-    whenFullyUpgraded: assertFooStageAccepted,
-});
+const extensionPaths = generateMultiversionExtensionConfigs();
 
-testPerformUpgradeSharded({
-    upgradeNodeOptions: fooExtensionNodeOptions,
-    setupFn: setupCollection,
-    whenFullyDowngraded: assertFooStageRejected,
-    whenOnlyConfigIsLatestBinary: assertFooStageRejected,
-    whenSecondariesAndConfigAreLatestBinary: assertFooViewCreationAllowedButQueriesRejected,
-    whenMongosBinaryIsLastLTS: assertFooViewCreationAllowedButQueriesRejected,
-    whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
-    whenFullyUpgraded: assertFooStageAccepted,
-});
+try {
+    const fooOptions = extensionNodeOptions(extensionPaths[0]);
+
+    testPerformUpgradeReplSet({
+        upgradeNodeOptions: fooOptions,
+        setupFn: setupCollection,
+        whenFullyDowngraded: assertFooStageRejected,
+        whenSecondariesAreLatestBinary: assertFooStageRejected,
+        whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
+        whenFullyUpgraded: assertFooStageAccepted,
+    });
+
+    testPerformUpgradeSharded({
+        upgradeNodeOptions: fooOptions,
+        setupFn: setupCollection,
+        whenFullyDowngraded: assertFooStageRejected,
+        whenOnlyConfigIsLatestBinary: assertFooStageRejected,
+        whenSecondariesAndConfigAreLatestBinary: assertFooViewCreationAllowedButQueriesRejected,
+        whenMongosBinaryIsLastLTS: assertFooViewCreationAllowedButQueriesRejected,
+        whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
+        whenFullyUpgraded: assertFooStageAccepted,
+    });
+} finally {
+    deleteMultiversionExtensionConfigs(extensionPaths);
+}

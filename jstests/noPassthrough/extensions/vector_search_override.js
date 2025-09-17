@@ -7,6 +7,7 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 if (!isLinux()) {
     jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
@@ -14,8 +15,11 @@ if (!isLinux()) {
 }
 
 const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
+
+const extensionPaths = generateExtensionConfigs(pathToExtensionVectorSearch);
+
 const options = {
-    loadExtensions: pathToExtensionVectorSearch,
+    loadExtensions: extensionPaths[0],
 };
 
 function runVectorSearchOverrideTest(conn, shardingTest = null) {
@@ -56,20 +60,24 @@ function runVectorSearchOverrideTest(conn, shardingTest = null) {
     }
 }
 
-// Test $vectorSearch override on a standalone mongod.
-const mongodConn = MongoRunner.runMongod(options);
-runVectorSearchOverrideTest(mongodConn);
-MongoRunner.stopMongod(mongodConn);
+try {
+    // Test $vectorSearch override on a standalone mongod.
+    const mongodConn = MongoRunner.runMongod(options);
+    runVectorSearchOverrideTest(mongodConn);
+    MongoRunner.stopMongod(mongodConn);
 
-// Test $vectorSearch override in a sharded cluster.
-const shardingTest = new ShardingTest({
-    shards: 2,
-    rs: {nodes: 2},
-    mongos: 1,
-    config: 1,
-    mongosOptions: options,
-    configOptions: options,
-    rsOptions: options,
-});
-runVectorSearchOverrideTest(shardingTest.s, shardingTest);
-shardingTest.stop();
+    // Test $vectorSearch override in a sharded cluster.
+    const shardingTest = new ShardingTest({
+        shards: 2,
+        rs: {nodes: 2},
+        mongos: 1,
+        config: 1,
+        mongosOptions: options,
+        configOptions: options,
+        rsOptions: options,
+    });
+    runVectorSearchOverrideTest(shardingTest.s, shardingTest);
+    shardingTest.stop();
+} finally {
+    deleteExtensionConfigs(extensionPaths);
+}

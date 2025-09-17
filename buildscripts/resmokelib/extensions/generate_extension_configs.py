@@ -13,7 +13,9 @@ from buildscripts.resmokelib.extensions.constants import (
 )
 
 
-def generate_extension_configs(so_files: list[str], logger: logging.Logger) -> list[str]:
+def generate_extension_configs(
+    so_files: list[str], logger: logging.Logger, with_suffix: str
+) -> list[str]:
     """Generate a .conf file for each extension .so file specified."""
     try:
         with open(CONF_IN_PATH, "r") as fstream:
@@ -32,13 +34,14 @@ def generate_extension_configs(so_files: list[str], logger: logging.Logger) -> l
         # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
         file_name = os.path.basename(so_file)
         extension_name = os.path.splitext(file_name)[0]
+        extension_name_with_suffix = f"{extension_name}_{with_suffix}"
 
         # TODO SERVER-110317: Remove 'lib' prefix and '_mongo_extension' suffix from extension names.
 
         # Add the parsed extension name to the list.
-        extension_names.append(extension_name)
+        extension_names.append(extension_name_with_suffix)
 
-        conf_file_path = os.path.join(CONF_OUT_DIR, f"{extension_name}.conf")
+        conf_file_path = os.path.join(CONF_OUT_DIR, f"{extension_name_with_suffix}.conf")
         try:
             # Create the .conf file for the extension.
             with open(conf_file_path, "w+") as conf_file:
@@ -75,6 +78,12 @@ def main():
         required=True,
         help="A comma-separated list of .so file paths for the extensions.",
     )
+    parser.add_argument(
+        "--with-suffix",
+        type=str,
+        required=True,
+        help="A string to add to the end of every generated .conf file.",
+    )
 
     args = parser.parse_args()
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -83,7 +92,9 @@ def main():
     so_files_list = [item.strip() for item in args.so_files.split(",")]
 
     try:
-        extension_names = generate_extension_configs(so_files=so_files_list, logger=logger)
+        extension_names = generate_extension_configs(
+            so_files=so_files_list, logger=logger, with_suffix=args.with_suffix
+        )
         logger.info(f"Successfully generated configuration for extensions: {extension_names}")
     except RuntimeError as e:
         logger.error(f"An error occurred: {e}")

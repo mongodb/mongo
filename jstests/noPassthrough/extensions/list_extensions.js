@@ -9,6 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 // Extensions are only supported on Linux platforms, so skip this test on other operating systems.
 if (!isLinux()) {
@@ -77,13 +78,20 @@ describe("$listExtensions with no extensions loaded", function () {
 });
 
 describe("$listExtensions with some extensions loaded", function () {
+    // TODO(SERVER-110317): Remove getExtensionPath and pass only the extension name to loadExtensions.
+    const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
+    const pathToExtensionBar = MongoRunner.getExtensionPath("libbar_mongo_extension.so");
+    const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
+
+    const extensionPaths = generateExtensionConfigs([
+        pathToExtensionFoo,
+        pathToExtensionBar,
+        pathToExtensionVectorSearch,
+    ]);
+
     before(function () {
-        // TODO(SERVER-110317): Remove getExtensionPath and pass only the extension name to loadExtensions.
-        const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-        const pathToExtensionBar = MongoRunner.getExtensionPath("libbar_mongo_extension.so");
-        const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
         const extOpts = {
-            loadExtensions: [pathToExtensionFoo, pathToExtensionBar, pathToExtensionVectorSearch],
+            loadExtensions: extensionPaths,
         };
         this.standalone = MongoRunner.runMongod(extOpts);
         this.sharded = new ShardingTest({
@@ -118,5 +126,6 @@ describe("$listExtensions with some extensions loaded", function () {
         MongoRunner.stopMongod(this.standalone);
         this.sharded.stop();
         this.rst.stopSet();
+        deleteExtensionConfigs(extensionPaths);
     });
 });

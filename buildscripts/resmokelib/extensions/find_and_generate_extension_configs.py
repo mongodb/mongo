@@ -4,6 +4,7 @@ import glob
 import logging
 import os
 import sys
+import uuid
 from typing import Dict, Optional
 
 from buildscripts.resmokelib.extensions.constants import (
@@ -16,6 +17,7 @@ from buildscripts.resmokelib.extensions.generate_extension_configs import genera
 def find_and_generate_extension_configs(
     is_evergreen: bool,
     logger: logging.Logger,
+    with_suffix: str,
     mongod_options: Optional[Dict] = None,
     mongos_options: Optional[Dict] = None,
 ) -> str:
@@ -33,21 +35,26 @@ def find_and_generate_extension_configs(
     pattern = "*_mongo_extension.so"
     so_files = sorted(glob.glob(os.path.join(ext_dir, pattern)))
 
-    if so_files:
-        logger.info("Found extension files: %s", so_files)
-        # TODO SERVER-110317: Pass through extension names instead of paths to mongod/mongos.
-        generate_extension_configs(so_files, logger)
-
-        joined_files = ",".join(so_files)
-        if mongod_options is not None:
-            mongod_options["loadExtensions"] = joined_files
-        if mongos_options is not None:
-            mongos_options["loadExtensions"] = joined_files
-        return joined_files
-    else:
+    if not so_files:
         error_msg = f"No extension files matching {pattern} found under {ext_dir}"
         logger.error(error_msg)
         raise RuntimeError(error_msg)
+
+    logger.info("Found extension files: %s", so_files)
+    # TODO SERVER-110317: Pass through extension names instead of paths to mongod/mongos.
+    generate_extension_configs(so_files, logger, with_suffix)
+
+    so_files = [
+        f"{root}_{with_suffix}{ext}"
+        for so_file in so_files
+        for root, ext in [os.path.splitext(so_file)]
+    ]
+    joined_files = ",".join(so_files)
+    if mongod_options is not None:
+        mongod_options["loadExtensions"] = joined_files
+    if mongos_options is not None:
+        mongos_options["loadExtensions"] = joined_files
+    return joined_files
 
 
 def main():
@@ -81,7 +88,9 @@ def main():
         sys.exit(0)
 
     try:
-        joined_files = find_and_generate_extension_configs(is_evergreen=True, logger=logger)
+        joined_files = find_and_generate_extension_configs(
+            is_evergreen=True, logger=logger, with_suffix=uuid.uuid4().hex
+        )
         with open(args.expansions_file, "w+") as outfile:
             outfile.write(f"extension_paths: {joined_files}\n")
             logger.info("Wrote extension paths to expansions file %s", args.expansions_file)

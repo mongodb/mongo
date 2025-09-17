@@ -10,6 +10,7 @@
 
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 // Extensions are only supported on Linux platforms, so skip this test on other operating systems
 if (!isLinux()) {
@@ -17,8 +18,11 @@ if (!isLinux()) {
 }
 
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
+
+const extensionPaths = generateExtensionConfigs(pathToExtensionFoo);
+
 const extOpts = {
-    loadExtensions: pathToExtensionFoo,
+    loadExtensions: extensionPaths[0],
     setParameter: {featureFlagExtensionsAPI: true},
 };
 
@@ -37,30 +41,34 @@ function assertExtensionsLoaded(conn) {
     assert.eq(errors.length, 0, 'Saw "Error loading extension" lines:\n' + errors.join("\n"));
 }
 
-// 1) Standalone mongod
-const conn = MongoRunner.runMongod(extOpts);
-let coll = conn.getCollection("test.foo");
-assert.commandWorked(coll.insert({ok: 1}));
-assert.eq(1, coll.countDocuments({ok: 1}));
-assertExtensionsLoaded(conn);
-MongoRunner.stopMongod(conn);
+try {
+    // 1) Standalone mongod
+    const conn = MongoRunner.runMongod(extOpts);
+    let coll = conn.getCollection("test.foo");
+    assert.commandWorked(coll.insert({ok: 1}));
+    assert.eq(1, coll.countDocuments({ok: 1}));
+    assertExtensionsLoaded(conn);
+    MongoRunner.stopMongod(conn);
 
-// 2) Sharded cluster’s mongos
-const st = new ShardingTest({
-    shards: 2,
-    rs: {nodes: 2},
-    mongos: 1,
-    config: 1,
-    mongosOptions: extOpts,
-    configOptions: extOpts,
-    rsOptions: extOpts,
-});
+    // 2) Sharded cluster’s mongos
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: 2},
+        mongos: 1,
+        config: 1,
+        mongosOptions: extOpts,
+        configOptions: extOpts,
+        rsOptions: extOpts,
+    });
 
-coll = st.s0.getCollection("test.foo");
-assert.commandWorked(coll.insert({ok: 1}));
-assert.eq(1, coll.countDocuments({ok: 1}));
-assertExtensionsLoaded(st.s0);
+    coll = st.s0.getCollection("test.foo");
+    assert.commandWorked(coll.insert({ok: 1}));
+    assert.eq(1, coll.countDocuments({ok: 1}));
+    assertExtensionsLoaded(st.s0);
 
-st.stop();
+    st.stop();
 
-print("Both mongod and mongos loaded extensions successfully.");
+    print("Both mongod and mongos loaded extensions successfully.");
+} finally {
+    deleteExtensionConfigs(extensionPaths);
+}
