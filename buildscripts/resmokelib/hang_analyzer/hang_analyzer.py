@@ -281,13 +281,18 @@ class HangAnalyzer(Subcommand):
             self.root_logger.warning("Cannot determine Linux distro since Python is too old")
 
         try:
-            current_login = getpass.getuser()
-            self.root_logger.info("Current Login: %s", current_login)
             uid = os.getuid()
             self.root_logger.info("Current UID: %s", uid)
+            current_login = getpass.getuser()
+            self.root_logger.info("Current Login: %s", current_login)
         except AttributeError:
             self.root_logger.warning(
                 "Cannot determine Unix Current Login, not supported on Windows"
+            )
+        except (KeyError, OSError):
+            # The error from getpass.getuser() when there is no username for a UID.
+            self.root_logger.warning(
+                "No username set for the current UID."
             )
 
     def _check_enough_free_space(self):
