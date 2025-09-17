@@ -1,0 +1,119 @@
+/* General formatting */
+
+body                  { font-family: sans-serif;
+                        font-weight: bold;
+                      }
+
+.copyright            { color: #7F7F7F;
+                      }
+
+/* Title page formatting */
+
+
+.slidesinfo           { text-align: center; 
+                        font-size: 16pt;
+                      }
+
+.slidesinfo h1.title  { color: blue;
+                      }
+.slidesinfo h2.subtitle  { color: blue; 
+                      }
+.slidesinfo h1.author { color: green;
+                      }
+
+.slidesinfo .copyright { color: black;
+                      }
+
+
+/* ToC page formatting */
+
+.tocpage h1.title     { color: blue;
+                        text-align: center;
+                      }
+
+.tocpage a            { text-decoration: none; }
+.tocpage a:link       { color: blue; }
+.tocpage a:visited    { color: blue; }
+
+.toc-body             { margin-left: 0.5in;
+                        margin-right: 0.5in;
+                      }
+
+/* Foil page formatting */
+
+.foil                 { font-size: 16pt;
+                      }
+.foil h1.title        { text-align: center;
+                        color: blue;
+                        padding-top: 0pt;
+                        margin-top: 0pt;
+                      }
+.foil h2.subtitle     { text-align: center;
+                        color: blue;
+                        padding-top: 0pt;
+                        margin-top: 0pt;
+                      }
+
+.foil pre             { font-size: 16pt;
+                      }
+
+.foil-body            { margin-left: 0.5in;
+                        margin-right: 0.5in;
+                      }
+
+/* Foilgroup page formatting */
+
+.foilgroup            { font-size: 16pt;
+                      }
+.foilgroup h1.title   { text-align: center;
+                        color: red;
+                        padding-top: 0pt;
+                        margin-top: 0pt;
+                      }
+.foilgroup h2.subtitle { text-align: center;
+                        color: blue;
+                        padding-top: 0pt;
+                        margin-top: 0pt;
+                      }
+
+.foilgroup-body       { margin-left: 0.5in;
+                        margin-right: 0.5in;
+                      }
+
+/* Navigation header formatting */
+
+.navhead              { border-bottom: 1px solid black;
+                        margin-bottom: 10px;
+                        padding-bottom: 4px;
+                      }
+
+.navhead hr.top-nav-sep { display: none; }
+
+.navhead .slidestitle { font-weight: normal;
+                        font-size: 10pt;
+                        font-style: italic;
+                      }
+
+/* Navigation footer formatting */
+
+.navfoot              { border-top: 1px solid black;
+                        margin-top: 10px;
+                        padding-top: 4px;
+                      }
+
+.navfoot hr.bottom-nav-sep { display: none; }
+
+/* General navigation formatting */
+
+.link-text            { font-weight: bold;
+                        font-size: 10pt;
+                      }
+
+
+.link-text a          { text-decoration: none; }
+.link-text a:link     { color: blue; }
+.link-text a:visited  { color: blue; }
+
+.no-link-text         { color: #7F7F7F; }
+
+/* EOF */

@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-License-Identifier: MIT
+
+Copyright The SCons Foundation
+-->
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd">
+<article>
+  <title>The SCons Docbook tool</title>
+  <articleinfo>
+    <author>
+      <surname>Dirk Baechle</surname>
+    </author>
+    <pubdate>2010-12-30</pubdate>
+  </articleinfo>
+<section id="basics"><title>Basics</title>
+<para>This tool tries to make working with Docbook in SCons a little easier.
+It provides several toolchains for creating different output formats,
+like HTML or PDF. Contained in the package is
+a distribution of the Docbook XSL stylesheets as of version 1.76.1.
+As long as you don't specify your own stylesheets for customization (see <link linkend="stylesheet">Selecting stylesheet</link>),
+these official versions are picked as default...which should reduce
+the inevitable setup hassles for you.
+</para>
+<para>Implicit dependencies to images and XIncludes are detected automatically
+if you meet the HTML requirements (see <link linkend="requirements">Requirements</link>). The additional
+stylesheet <literal>utils/xmldepend.xsl</literal> by Paul DuBois is used for this purpose.
+</para>
+<para>Note, that there is no support for XML catalog resolving offered! This tool calls
+the XSLT processors and PDF renderers with the stylesheets you specified, that's it.
+The rest lies in your hands and you still have to know what you're doing when
+resolving names via a catalog.
+</para>
+<section id="install"><title>Install</title>
+<para>Installing it, requires you to copy (or, even better: checkout) the contents of the
+package's <literal>docbook</literal> folder to
+</para>
+<orderedlist><listitem><para><quote><literal>/path_to_your_project/site_scons/site_tools/docbook</literal></quote>, if you need the Docbook Tool in one project only, or
+</para>
+</listitem>
+<listitem><para><quote><literal>~/.scons/site_scons/site_tools/docbook</literal></quote>, for a system-wide installation under your current login.
+</para>
+</listitem>
+</orderedlist>
+<para>For more infos about this, please refer to
+</para>
+<itemizedlist><listitem><para>the SCons User's Guide, chap. 19.7 "Where to put your custom Builders and Tools" and
+</para>
+</listitem>
+<listitem><para>the SCons Tools Wiki page at <ulink url="https://github.com/SCons/scons/wiki/ToolsIndex">http://github.com/SCons/scons/wiki/ToolsIndex</ulink>.
+</para>
+</listitem>
+</itemizedlist>
+</section>
+<section id="activation"><title>How to activate</title>
+<para>For activating the tool "docbook", you have to add its name to the Environment constructor,
+like this
+</para>
+<screen>env = Environment(tools=['docbook'])
+</screen>
+<para>On its startup, the Docbook tool tries to find a required <literal>xsltproc</literal> processor, and
+a PDF renderer, e.g. <literal>fop</literal>. So make sure that these are added to your system's environment
+<literal>PATH</literal> and can be called directly, without specifying their full path.
+</para>
+</section>
+<section id="requirements"><title>Requirements</title>
+<para>For the most basic processing of Docbook to HTML, you need to have installed
+</para>
+<itemizedlist><listitem><para>the Python <literal>lxml</literal> binding to <literal>libxml2</literal>, or
+</para>
+</listitem>
+<listitem><para>the direct Python bindings for <literal>libxml2/libxslt</literal>, or
+</para>
+</listitem>
+<listitem><para>a standalone XSLT processor, currently detected are <literal>xsltproc</literal>, <literal>saxon</literal>, <literal>saxon-xslt</literal>
+and <literal>xalan</literal>.
+</para>
+</listitem>
+</itemizedlist>
+<para>Rendering to PDF requires you to have one of the applications <literal>fop</literal>, <literal>xep</literal> or <literal>jw</literal>
+installed.
+</para>
+</section>
+</section>
+<section id="process"><title>Processing documents</title>
+<para>Creating a HTML or PDF document is very simple and straightforward. Say
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtml('manual.html', 'manual.xml')
+env.DocbookPdf('manual.pdf', 'manual.xml')
+</screen>
+<para>to get both outputs from your XML source <literal>manual.xml</literal>. As a shortcut, you can
+give the stem of the filenames alone, like this:
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtml('manual')
+env.DocbookPdf('manual')
+</screen>
+<para>and get the same result. Target and source lists are also supported:
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtml(['manual.html','reference.html'], ['manual.xml','reference.xml'])
+</screen>
+<para>or even
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtml(['manual','reference'])
+</screen>
+<important><para>Whenever you leave out the list of sources, you may not specify a file extension! The
+Tool uses the given names as file stems, and adds the suffixes for target and source files
+accordingly.
+</para>
+</important>
+<para>The rules given above are valid for the Builders <literal>DocbookHtml</literal>, <literal>DocbookPdf</literal>,
+<literal>DocbookSlidePdf</literal> and <literal>DocbookXInclude</literal>. For the <literal>DocbookMan</literal> transformation you
+can specify a target name, but the actual output names are automatically set from
+the <literal>refname</literal> entries in your XML source.
+</para>
+<para>Please refer to <link linkend="chunked">the section Chunked output</link> for more infos about the other Builders.
+</para>
+</section>
+<section id="stylesheet"><title>Selecting your own stylesheet</title>
+<para>If you want to use a specific XSL file, you can set the additional <literal>xsl</literal> parameter to your
+Builder call as follows:
+</para>
+<screen>env.DocbookHtml('other.html', 'manual.xml', xsl='html.xsl')
+</screen>
+<para>Since this may get tedious if you always use the same local naming for your customized XSL files,
+e.g. <literal>html.xsl</literal> for HTML and <literal>pdf.xsl</literal> for PDF output, a set of variables for setting the
+default XSL name is provided. These are:
+</para>
+<screen>DOCBOOK_DEFAULT_XSL_HTML
+DOCBOOK_DEFAULT_XSL_HTMLCHUNKED
+DOCBOOK_DEFAULT_XSL_HTMLHELP
+DOCBOOK_DEFAULT_XSL_PDF
+DOCBOOK_DEFAULT_XSL_MAN
+DOCBOOK_DEFAULT_XSL_SLIDESPDF
+DOCBOOK_DEFAULT_XSL_SLIDESHTML
+</screen>
+<para>and you can set them when constructing your environment:
+</para>
+<screen>env = Environment(tools=['docbook'],
+                  DOCBOOK_DEFAULT_XSL_HTML='html.xsl',
+                  DOCBOOK_DEFAULT_XSL_PDF='pdf.xsl')
+env.DocbookHtml('manual') # now uses html.xsl
+</screen>
+</section>
+<section id="chunked"><title>Chunked output</title>
+<para>The Builders <literal>DocbookHtmlChunked</literal>, <literal>DocbookHtmlhelp</literal> and <literal>DocbookSlidesHtml</literal>
+are special, in that:
+</para>
+<orderedlist><listitem><para>they create a large set of files, where the exact names and their number depend
+on the content of the source file, and
+</para>
+</listitem>
+<listitem><para>the main target is always named <literal>index.html</literal>, i.e. the output name for the
+XSL transformation is not picked up by the stylesheets.
+</para>
+</listitem>
+</orderedlist>
+<para>As a result, there is simply no use in specifying a target HTML name.
+So the basic syntax for these builders is:
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtmlhelp('manual')
+</screen>
+<para>Only if you use the <literal>root.filename</literal> (<literal>titlefoil.html</literal> for slides) parameter in
+your own stylesheets you have to give the new target name. This ensures that the
+dependencies get correct, especially for the cleanup via <quote><literal>scons -c</literal></quote>:
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtmlhelp('mymanual.html','manual', xsl='htmlhelp.xsl')
+</screen>
+<para>Some basic support for the <literal>base.dir</literal> is added (this has not been properly tested
+with variant dirs, yet!). You can add the <literal>base_dir</literal> keyword to your Builder
+call, and the given prefix gets prepended to all the created filenames:
+</para>
+<screen>env = Environment(tools=['docbook'])
+env.DocbookHtmlhelp('manual', xsl='htmlhelp.xsl', base_dir='output/')
+</screen>
+<para>Make sure that you don't forget the trailing slash for the base folder, else
+your files get renamed only!
+</para>
+</section>
+<section id="builders"><title>All builders</title>
+<para>A simple list of all builders currently available:
+</para>
+<variablelist><varlistentry><term>DocbookHtml
+</term>
+<listitem><para>Single HTML file.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookHtmlChunked
+</term>
+<listitem><para>Chunked HTML files, with support for the <literal>base.dir</literal> parameter. The <literal>chunkfast.xsl</literal>
+file (requires "EXSLT") is used as the default stylesheet.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookHtmlhelp
+</term>
+<listitem><para>Htmlhelp files, with support for <literal>base.dir</literal>.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookPdf
+</term>
+<listitem><para>PDF output.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookMan
+</term>
+<listitem><para>Man pages.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookSlidesPdf
+</term>
+<listitem><para>Slides in PDF format.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookSlidesHtml
+</term>
+<listitem><para>Slides in HTML format, with support for <literal>base.dir</literal>.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry><term>DocbookXInclude
+</term>
+<listitem><para>Can be used to resolve XIncludes in a preprocessing step.
+</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</section>
+<section id="more"><title>Need more?</title>
+<para>This work is still in a very basic state and hasn't been tested well
+with things like variant dirs, yet. Unicode problems and poor performance
+with large input files may occur. There will definitely arise the need for
+adding features, or a variable. Let us know if you can think of a nice
+improvement or have worked on a bugfix/patch with success. Enter your issues at the
+Launchpad bug tracker for the Docbook Tool, or write to the User General Discussion
+list of SCons at <literal>scons-users@scons.org</literal>.
+</para>
+</section>
+
+</article>

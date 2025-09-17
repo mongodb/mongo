@@ -1,0 +1,10 @@
+fil = new Array();
+fil["0"]= "ch01.html@@@Chapter 1. Introduction@@@Overview of the package.";
+fil["1"]= "ch02.html@@@Chapter 2. Using the package@@@The following sections describe how to install and use the package on Windows.";
+fil["2"]= "ch02s01.html@@@Generating webhelp output@@@Installation instructions";
+fil["3"]= "ch02s02.html@@@Using and customizing the output@@@null";
+fil["4"]= "ch02s03.html@@@Building the indexer@@@To build the indexer, you must have installed the JDK version 1.5 or higher and set the ANT_HOME environment variable. Run ant build-indexer to recompile nw-cms.jar";
+fil["5"]= "ch02s04.html@@@Adding support for other (non-CJKV) languages@@@null";
+fil["6"]= "ch03.html@@@Chapter 3. Developer Docs@@@This chapter provides an overview of how webhelp is implemented.";
+fil["7"]= "ch03s01.html@@@Design@@@An overview of webhelp page structure.";
+fil["8"]= "ch03s02.html@@@Search@@@Adding new Stemmers is very simple.";

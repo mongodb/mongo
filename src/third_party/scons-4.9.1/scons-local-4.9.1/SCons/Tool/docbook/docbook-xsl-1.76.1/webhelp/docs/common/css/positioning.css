@@ -1,0 +1,109 @@
+body { font: 12px Verdana, Geneva, sans-serif; }
+p, ul, ol, li { font: 10pt Verdana, Geneva, sans-serif; }
+h1 { font: bold 15pt Arial, Helvetica, geneva; }
+h2 { font: bold 14pt Arial, Helvetica, geneva; }
+
+#header {
+    background: white url(../images/header-bg.gif) repeat-x;
+    position: fixed;
+    width: 100%;
+    height: 95px;
+    top: 0;
+    right: 0;
+    bottom: auto;
+    left: 0;
+    border-bottom: 2px solid #cccccc;
+    z-index: 2000;
+}
+
+#leftnavigation {
+/* background-color:#91e7b3;*/
+    overflow: auto;
+    position: fixed;
+    height: auto;
+    top: 90px;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    z-index: 1500;
+    border-right:2px solid #CCCCCC;
+}
+
+#content {
+    position: relative;
+    top: 90px; /* left: 240px;*/
+    right: auto; /*  bottom: 20px;  */
+    margin: 0px 0px 0px 280px;
+    width: auto;
+    height: inherit;
+    padding-left: 5px;
+    padding-right: 30px;
+    color: #000000;
+    /*border-left: 2px solid #cccccc; overflow :scroll;*/
+    z-index: 1000;
+
+    max-width: 70em;
+    min-width:800px;
+}
+
+#navheader {
+    position: fixed;
+    top: 65px;
+    right:4px;
+}
+
+#content h1, #content h2 { color: #cc0000; }
+.navfooter { bottom: 2%; }
+.highlight { background-color: #c5d3c3; }
+.highlightButton{ font-size: 0; }
+
+/*  Show Hide TOC tree */
+.pointLeft {
+    background: url("../images/showHideTreeIcons.png") 0 0 no-repeat;
+    height: 28px;
+    width: 15px;
+    display: block;
+    font-size: 0;
+    cursor: pointer;
+}
+.pointRight {
+    background: url("../images/showHideTreeIcons.png") -15px 0 no-repeat;
+    height: 28px;
+    display: block;
+    font-size: 0;
+    cursor: pointer;
+}
+
+/* Search results Styling */
+.searchExpression {
+    color: #0050A0;
+    background-color: #EBEFF8;
+    font-size: 12pt;
+}
+.searchresult li a {
+    text-decoration: none;
+    color: #0050A0;
+}
+.searchresult li {
+    color: #0050A0;
+}
+.shortdesclink {
+    color: gray;
+    font-size: 9pt;
+}
+.searchText {
+    border: #BFCEE9 solid 1pt;
+    width: 11em
+}
+.searchButton {
+	margin-left: 3px;
+    background: #EBEFF8;
+    color: #0050A0;
+    border: #BFCEE9 solid 1pt;
+    font-weight: bold;
+    font-size: 10pt
+}
+
+.title, div.toc>p{
+	font-weight: bold;
+	}	

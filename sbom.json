@@ -1779,8 +1779,7 @@
       "author": "SCons Developers",
       "group": "scons",
       "name": "SCons - a Software Construction tool",
-      "version": "3.1.2",
-      "description": "SCons is an Open Source software construction tool. Think of SCons as an improved, cross-platform substitute for the classic Make utility with integrated functionality similar to autoconf/automake and compiler caches such as ccache.",
+      "version": "4.9.1",
       "licenses": [
         {
           "license": {
@@ -1788,8 +1787,7 @@
           }
         }
       ],
-      "copyright": "Copyright (c) 2001 - 2021 The SCons Foundation",
-      "purl": "pkg:github/scons/scons@3.1.2",
+      "purl": "pkg:github/SCons/scons@4.9.1",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1807,7 +1805,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/scons-3.1.2"
+            "location": "src/third_party/scons-4.9.1"
           }
         ]
       },

@@ -17,5 +17,3 @@
 
 -r components/build_metrics.req
 -r components/libdeps.req
-
--r components/tooling_metrics.req

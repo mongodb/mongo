@@ -476,24 +476,6 @@ buildvariants:
   - name: powercycle_sentinel
   - name: powercycle_smoke_skip_compile_gen
 
-- name: tooling-metrics-x86
-  display_name: "* Tooling Metrics x86"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2204-small
-  stepback: false
-  tasks:
-  - name: tooling_metrics_test
-
-- name: tooling-metrics-arm64
-  display_name: "* Tooling Metrics ARM64"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2204-arm64-small
-  stepback: false
-  tasks:
-  - name: tooling_metrics_test
-
 ###########################################
 #         Windows buildvariants           #
 ###########################################

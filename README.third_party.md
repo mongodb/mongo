@@ -62,7 +62,7 @@ a notice will be included in
 | [re2]                                                | BSD-3-Clause                      | 2021-09-01                               |                      |                                 |
 | [S2 Geometry Library]                                | Apache-2.0                        | c872048da5d1                             | ✗                    | ✗                               |
 | [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
-| [SCons - a Software Construction tool]               | MIT                               | 3.1.2                                    |                      |                                 |
+| [SCons - a Software Construction tool]               | MIT                               | 4.9.1                                    |                      |                                 |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.7                                    | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 7b264ffa0f767c579d052fd8142558dc8264d795 | ✗                    | ✗                               |
 | [timelib]                                            | MIT                               | 2022.10                                  |                      | ✗                               |
