@@ -188,7 +188,7 @@ async def main():
                         Run the 'analyze' command against each field of the collection.
                         Analyze is not preserved across restarts, or when dumping or restoring.
                         """)
-    parser.add_argument("--indices", action="append", help="An index set to load.")
+    parser.add_argument("--indexes", action="append", help="An index set to load.")
     parser.add_argument("--restore-args", type=str, help="Parameters to pass to mongorestore.")
     parser.add_argument(
         "--out",
@@ -252,20 +252,20 @@ async def main():
             await upstream(database_instance, collection_name, generator, args.size, context_manager)
             generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
 
-        # 3. Create indices after documents.
-        indices = args.indices if args.indices else ()
-        for index_set_name in indices:
+        # 3. Create indexes after documents.
+        indexes = args.indexes if args.indexes else ()
+        for index_set_name in indexes:
             if hasattr(module, index_set_name):
                 index_set = getattr(module, index_set_name)
-                indices = index_set() if callable(index_set) else index_set
+                indexes = index_set() if callable(index_set) else index_set
                 await database_instance.database.get_collection(collection_name).create_indexes(
-                    indices
+                    indexes
                 )
             else:
                 raise RuntimeError(f"Module {module} does not define index set {index_set_name}.")
 
         # 4. Only record things if the dataset is somehow actually changed.
-        if any((args.size, args.indices, args.drop, args.restore)):
+        if any((args.size, args.indexes, args.drop, args.restore)):
             # Only record the seed additionally if it wasn't already passed in.
             record_metadata(
                 module if args.size else None,

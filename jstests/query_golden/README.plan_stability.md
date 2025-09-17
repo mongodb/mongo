@@ -22,7 +22,7 @@ To obtain a diff that contains an individual diff fragment for each changed plan
 1. Put the following line in `$HOME/.config/git/attributes`:
 
 ```
-**/plan_stability diff=plan_stability
+**/plan_stability* diff=plan_stability
 ```
 
 2. Edit the `~/.golden_test_config.yml` to use a customized diff command:
@@ -63,12 +63,12 @@ in that repository for more information.
 
 ## Running the offending pipelines manually
 
-1. Populate the data and the indexes:
+1. Populate just the data and the indexes without executing the pipelines:
 
 ```bash
 buildscripts/resmoke.py run \
   --suites=query_golden_classic \
-  --mongodSetParameters='{internalQueryFrameworkControl: forceClassicEngine, ...}' \
+  --mongodSetParameters='{internalQueryFrameworkControl: forceClassicEngine, planRankerMode: samplingCE, internalQuerySamplingBySequentialScan: True}' \
    jstests/query_golden/plan_stability.js \
    --pauseAfterPopulate
 ```
@@ -113,6 +113,18 @@ db.plan_stability.aggregate(pipeline).explain('executionStats').executionStats.e
 
 You can also modify `collSize` in `plan_stability.js` to temporarily use a larger scale factor.
 
+# Running comparisons across CE estimation methods
+
+If you want to run a comparison between estimation methods `X` and `Y`:
+
+1. If method `X` is not multi-planning, place the `jstests/query_golden/expected_files/X` for estimation method `X` in the root of `expected_files`, so that they are used as the base for the comparison;
+
+2. Temporary remove the expected files for method `Y` from `expected_files/query_golden/expected_files/Y` so that they are not considered;
+
+3. Run the test as described above, specifying `planRankerMode: X`;
+
+4. Use the summarization script as described above to produce a report.
+
 # Modifying the test
 
 ## Accepting the modified query plans
@@ -122,5 +134,5 @@ To accept the new plans, use `buildscripts/query_golden.py accept`, as with any 
 ## Removing individual pipelines
 
 If a given pipeline proves flaky, that is, is flipping between one plan and another for no reason,
-you can comment it out from the test with a note. Rerurn the test and then run `buildscripts/golden_test.py accept`
+you can comment it out from the test with a note. Re-run the test and then run `buildscripts/golden_test.py accept`
 to persist the change.

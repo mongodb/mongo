@@ -53,14 +53,14 @@ python3 driver.py specs.employee Employee --size 10
 
 will generate 10 `Employee` objects.
 
-The `--indices` switch can be used to create indices from index sets defined in the specification.
+The `--indexes` switch can be used to create indexes from index sets defined in the specification.
 Thus,
 
 ```
-python3 driver.py specs.employee Employee --size 10 --indices index_set_1 --indices index_set_2
+python3 driver.py specs.employee Employee --size 10 --indexes index_set_1 --indexes index_set_2
 ```
 
-will generate 10 `Employee` objects _and_ create the indices listed in `index_set_1` and
+will generate 10 `Employee` objects _and_ create the indexes listed in `index_set_1` and
 `index_set_2`.
 
 # Dropping, dumping, and restoring
@@ -104,7 +104,7 @@ If any flags are set, the order in which they operate is:
 1. The collection is dropped (`--drop`);
 2. The collection is restored (`--restore`);
 3. New data are generated into the collection (controlled by `-n`);
-4. Indices are created (controlled by `--indices`);
+4. Indexes are created (controlled by `--indexes`);
 5. Specifications and commands are snapshotted (if any of the above steps changed any data); and
 6. The collection is dumped (`--dump`).
 
@@ -128,7 +128,7 @@ file.
 Commands that are considered to change the dataset are ones that:
 
 - Contains either `--drop` or `--restore`, or
-- Adds an index set with `--indices`, or
+- Adds an index set with `--indexes`, or
 - Generates at least one document with positive `--size`.
 
 In theory, this means that someone else can analyze the dumped `commands.sh` file and the copied

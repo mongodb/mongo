@@ -29,3 +29,8 @@ py_library(
     name = "partially_correlated",
     srcs = ["partially_correlated.py"],
 )
+
+py_library(
+    name = "plan_stability2",
+    srcs = ["plan_stability2.py"],
+)

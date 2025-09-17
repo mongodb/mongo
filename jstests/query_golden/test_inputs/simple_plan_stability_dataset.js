@@ -76,10 +76,10 @@ export function populateSimplePlanStabilityDataset(collName, collSize) {
 
     coll.drop();
 
-    jsTestLog("Generating " + collSize + " values with Zipfian distribution");
+    jsTest.log.info("Generating " + collSize + " values with Zipfian distribution");
     const zipfianValues = generateZipfianList(collSize, 1.5);
 
-    jsTestLog("Generated " + collSize + " documents");
+    jsTest.log.info("Generated " + collSize + " documents");
     const documents = [];
     for (let i = 0; i < collSize; i++) {
         documents.push({
@@ -107,10 +107,10 @@ export function populateSimplePlanStabilityDataset(collName, collSize) {
         });
     }
 
-    jsTestLog("Inserting " + collSize + " documents into collection " + collName);
+    jsTest.log.info("Inserting " + collSize + " documents into collection " + collName);
     coll.insertMany(documents);
 
-    jsTestLog("Creating indexes on collection " + collName);
+    jsTest.log.info("Creating indexes on collection " + collName);
     const fields = ["i", "z", "c", "d", "h", "k", "a"];
     for (const field of fields) {
         assert.commandWorked(coll.createIndex({[field + "_idx"]: 1}));
@@ -132,7 +132,7 @@ export function populateSimplePlanStabilityDataset(collName, collSize) {
         assert.commandWorked(coll.createIndex(compoundIndex));
     });
 
-    jsTestLog("Done creating indexes.");
+    jsTest.log.info("Done creating indexes.");
 
     checkPauseAfterPopulate();
 }

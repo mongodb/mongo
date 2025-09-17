@@ -130,7 +130,7 @@ class FieldStatisticByScalarType:
                 self.unique.add(field_value)
 
 
-SAMPLE_LIMIT = 1000
+SAMPLE_LIMIT = 100
 
 SUPPORTED_SCALAR_TYPES = {
     float.__name__: "dbl",

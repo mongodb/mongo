@@ -19,7 +19,9 @@ export class DataGenerator {
             throw new Error("A db object must be provided to the DataGenerator constructor.");
         } else {
             this.dbName = db.getName();
-            this.uri = "mongodb://" + db.getMongo().host;
+            // The data_generator opens a connection to the database first and then
+            // begins to generate data. So it will time out if the dataset is large.
+            this.uri = "mongodb://" + db.getMongo().host + "/?socketTimeoutMS=1000000";
         }
 
         const tmpDir = _getEnv("TMPDIR") || _getEnv("TMP_DIR") || "/tmp";
@@ -35,7 +37,7 @@ export class DataGenerator {
         this.seed = seed;
     }
 
-    execute({spec = null, size = null, indices = null, analyze = false, serial_inserts = true} = {}) {
+    execute({spec = null, size = null, indexes = null, drop = true, analyze = false, serial_inserts = true} = {}) {
         let args = [
             getPython3Binary(),
             DataGenerator.PROGRAM_PATH,
@@ -53,8 +55,8 @@ export class DataGenerator {
 
         args.push("--size", size);
 
-        if (indices !== null) {
-            args.push("--indices", indices);
+        if (indexes !== null) {
+            args.push("--indexes", indexes);
         }
 
         if (this.seed !== null) {
@@ -65,7 +67,11 @@ export class DataGenerator {
             args.push("--serial-inserts");
         }
 
-        if (this.analyze) {
+        if (drop) {
+            args.push("--drop");
+        }
+
+        if (analyze) {
             args.push("--analyze");
         }
 

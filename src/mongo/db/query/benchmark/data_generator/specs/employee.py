@@ -149,7 +149,7 @@ class Employee:
         return today - ago
 
 
-# Using a function to return some indices.
+# Using a function to return some indexes.
 def index_set_1() -> list[pymongo.IndexModel]:
     return [
         pymongo.IndexModel(keys="title.level", name="title_level"),
@@ -160,7 +160,7 @@ def index_set_1() -> list[pymongo.IndexModel]:
     ]
 
 
-# Using a global to define some indices.
+# Using a global to define some indexes.
 index_set_2 = [
     pymongo.IndexModel(
         keys=[("title.level", pymongo.ASCENDING), ("start_date", pymongo.DESCENDING)],
