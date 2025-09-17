@@ -88,7 +88,9 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
       _seekKeysSlots(std::move(seekKeysSlots)),
       _optimizedClose(optimizedClose) {
     _children.emplace_back(std::move(input));
-    invariant(_seekKeysSlots.empty() || _seekKeysSlots.size() == _gbs.size());
+    tassert(11094726,
+            "Expecting seekKeySlots to be either empty or of the same size as gbs array",
+            _seekKeysSlots.empty() || _seekKeysSlots.size() == _gbs.size());
     tassert(5843100,
             "HashAgg stage was given optimizedClose=false and seek keys",
             _seekKeysSlots.empty() || _optimizedClose);

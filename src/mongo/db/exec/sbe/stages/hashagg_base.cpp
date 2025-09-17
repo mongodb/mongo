@@ -272,7 +272,8 @@ void HashAggBaseStage<Derived>::doForceSpill() {
 // spilling.
 template <class Derived>
 void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd) {
-    invariant(!_ht->empty());
+    // TODO: SERVER-110515 Maybe replace tassert with early exit.
+    tassert(11094725, "Hash table must be non-empty before spill", !_ht->empty());
 
     mcd.memoryCheckpointCounter++;
     if (mcd.memoryCheckpointCounter < mcd.nextMemoryCheckpoint) {

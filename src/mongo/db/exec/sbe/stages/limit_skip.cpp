@@ -55,7 +55,8 @@ LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
       _skipExpr(std::move(skip)),
       _current(0),
       _isEOF(false) {
-    invariant(_limitExpr || _skipExpr);
+    tassert(
+        11094721, "Expecting either limit or skip expression specified", _limitExpr || _skipExpr);
     _children.emplace_back(std::move(input));
 }
 

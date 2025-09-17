@@ -43,7 +43,7 @@ VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
       _outField(out),
       _arrTag(arrTag),
       _arrVal(arrVal) {
-    invariant(value::isArray(arrTag));
+    tassert(11094700, "expect arr parameter to be an array", value::isArray(arrTag));
 }
 
 VirtualScanStage::~VirtualScanStage() {

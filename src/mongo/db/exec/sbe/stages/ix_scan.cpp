@@ -89,7 +89,9 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
       _indexIdentSlot(indexIdentSlot),
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)) {
-    invariant(_indexKeysToInclude.count() == _vars.size());
+    tassert(11094724,
+            "Expecting the number of index keys to include to match the number of slots",
+            _indexKeysToInclude.count() == _vars.size());
 }
 
 void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
@@ -477,8 +479,11 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
       _seekKeyLow(std::move(seekKeyLow)),
       _seekKeyHigh(std::move(seekKeyHigh)) {
     // The valid state is when both boundaries, or none is set, or only low key is set.
-    invariant((_seekKeyLow && _seekKeyHigh) || (!_seekKeyLow && !_seekKeyHigh) ||
-              (_seekKeyLow && !_seekKeyHigh));
+    tassert(11094723,
+            "Expecting neither boundary keys, only low boundary key, or both low and high boundary "
+            "key to be set",
+            (_seekKeyLow && _seekKeyHigh) || (!_seekKeyLow && !_seekKeyHigh) ||
+                (_seekKeyLow && !_seekKeyHigh));
 }
 
 std::unique_ptr<PlanStage> SimpleIndexScanStage::clone() const {
@@ -719,8 +724,9 @@ void GenericIndexScanStage::open(bool reOpen) {
         return;
     }
 
-    invariant(!ownedBound && tagBound == value::TypeTags::indexBounds,
-              "indexBounds should be unowned and IndexBounds type");
+    tassert(11094722,
+            "indexBounds should be unowned and IndexBounds type",
+            !ownedBound && tagBound == value::TypeTags::indexBounds);
     _checker.emplace(value::getIndexBoundsView(valBound), _params.keyPattern, _params.direction);
 
     if (!_checker->getStartSeekPoint(&_seekPoint)) {

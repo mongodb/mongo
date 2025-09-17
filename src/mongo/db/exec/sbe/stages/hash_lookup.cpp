@@ -256,7 +256,7 @@ void HashLookupStage::close() {
 
 std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    invariant(ret);
+
     ret->children.emplace_back(outerChild()->getStats(includeDebugInfo));
     ret->children.emplace_back(innerChild()->getStats(includeDebugInfo));
 

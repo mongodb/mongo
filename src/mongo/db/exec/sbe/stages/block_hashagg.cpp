@@ -358,7 +358,9 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 
     for (size_t blockIndex = 0; blockIndex < _currentBlockSize; ++blockIndex) {
         auto [bitTag, bitVal] = extractedBitmap[blockIndex];
-        invariant(bitTag == value::TypeTags::Boolean);
+        tassert(11094732,
+                "Expect bit from extractedBitmap to be of Boolean type",
+                bitTag == value::TypeTags::Boolean);
 
         if (!value::bitcastTo<bool>(bitVal)) {
             continue;
@@ -489,7 +491,7 @@ void BlockHashAggStage::runAccumulatorsElementWise(const value::DeblockedTagVals
 
 boost::optional<std::vector<size_t>> BlockHashAggStage::tokenizeTokenInfos(
     const std::vector<value::TokenizedBlock>& tokenInfos) {
-    invariant(!tokenInfos.empty());
+    tassert(11094731, "Expect non-empty vector of tokenInfos", !tokenInfos.empty());
 
     // If any individual ID block is high enough partition, we know the combined output will also be
     // high partition. We can return early in this case.
@@ -680,7 +682,9 @@ void BlockHashAggStage::open(bool reOpen) {
     while (PlanState::ADVANCED == _children[0]->getNext()) {
         // Update '_bitmapBlock' and '_currentBlockSize'.
         auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
-        invariant(bitmapInTag == value::TypeTags::valueBlock);
+        tassert(11094730,
+                "Expecting bitmapIn to be of type valueBlock",
+                bitmapInTag == value::TypeTags::valueBlock);
 
         _bitmapBlock = value::bitcastTo<value::ValueBlock*>(bitmapInVal);
         _currentBlockSize = _bitmapBlock->count();

@@ -80,7 +80,9 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
     _children.emplace_back(std::move(outer));
     _children.emplace_back(std::move(inner));
 
-    invariant(_joinType == JoinType::Inner || _joinType == JoinType::Left);
+    tassert(11094719,
+            "Expecting either inner or left join in loop join stage",
+            _joinType == JoinType::Inner || _joinType == JoinType::Left);
 }
 
 
@@ -226,7 +228,7 @@ void LoopJoinStage::doSaveState() {
 
 std::unique_ptr<PlanStageStats> LoopJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    invariant(ret);
+
     ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     ret->specific = std::make_unique<LoopJoinStats>(_specificStats);

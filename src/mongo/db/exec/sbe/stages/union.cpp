@@ -55,12 +55,16 @@ UnionStage::UnionStage(PlanStage::Vector inputStages,
       _outputVals{std::move(outputVals)} {
     _children = std::move(inputStages);
 
-    invariant(_children.size() > 0);
-    invariant(_children.size() == _inputVals.size());
-    invariant(std::all_of(
-        _inputVals.begin(), _inputVals.end(), [size = _outputVals.size()](const auto& slots) {
-            return slots.size() == size;
-        }));
+    tassert(11094703, "Expecting non-empty list of input stages", _children.size() > 0);
+    tassert(11094702,
+            "Expecting number of input values to match the number of input stages",
+            _children.size() == _inputVals.size());
+    tassert(11094701,
+            "Expect the length of all input slot vectors to match the length of output slot vector",
+            std::all_of(
+                _inputVals.begin(),
+                _inputVals.end(),
+                [size = _outputVals.size()](const auto& slots) { return slots.size() == size; }));
 }
 
 std::unique_ptr<PlanStage> UnionStage::clone() const {

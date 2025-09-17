@@ -72,8 +72,12 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
       _forceNewObject(forceNewObject),
       _returnOldObject(returnOldObject) {
     _children.emplace_back(std::move(input));
-    invariant(_projectVars.size() == _projectFields.size());
-    invariant(static_cast<bool>(rootSlot) == static_cast<bool>(fieldBehavior));
+    tassert(11094718,
+            "Expecting number of project variables to match the number of project fields",
+            _projectVars.size() == _projectFields.size());
+    tassert(11094717,
+            "Expecting 'fieldBehavior' field specified when 'rootSlot' is also specified",
+            static_cast<bool>(rootSlot) == static_cast<bool>(fieldBehavior));
 }
 
 template <typename O>

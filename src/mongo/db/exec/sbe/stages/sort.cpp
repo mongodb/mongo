@@ -66,7 +66,9 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
       _limitExpr(std::move(limit)) {
     _children.emplace_back(std::move(input));
 
-    invariant(_obs.size() == _dirs.size());
+    tassert(11094711,
+            "Expect the number of order-by slots to match the number of sort directions",
+            _obs.size() == _dirs.size());
 
     _specificStats.maxMemoryUsageBytes = memoryLimit;
 }

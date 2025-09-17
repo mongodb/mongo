@@ -121,7 +121,9 @@ public:
           forward(inForward),
           scanCallbacks(inScanCallbacks),
           useRandomCursor(inUseRandomCursor) {
-        invariant(scanFieldNames.size() == scanFieldSlots.size());
+        tassert(11094712,
+                "Expecting number of scan fields to match the number of scan slots",
+                scanFieldNames.size() == scanFieldSlots.size());
     }
 
     inline size_t getNumScanFields() {

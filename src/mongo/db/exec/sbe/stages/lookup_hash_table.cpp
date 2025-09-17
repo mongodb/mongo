@@ -212,7 +212,9 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
             key.reset(0, true, tagKey, valKey);
 
             auto [it, inserted] = _memoryHt->try_emplace(std::move(key));
-            invariant(inserted);
+            tassert(11094720,
+                    "Failed to emplace materialized key into the hash table (key already exists)",
+                    inserted);
             htIt = it;
             htIt->second.push_back(valueIndex);
             _computedTotalMemUsage = newMemUsage;

@@ -50,7 +50,9 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
       _valsOutSlotIds(std::move(valsOut)),
       _bitmapSlotId(bitmapSlotId) {
     _children.emplace_back(std::move(input));
-    invariant(_blockSlotIds.size() == _valsOutSlotIds.size());
+    tassert(11094729,
+            "Expecting number of input block slots to match the number of output slots",
+            _blockSlotIds.size() == _valsOutSlotIds.size());
 }
 
 void BlockToRowStage::freeDeblockedValueRuns() {

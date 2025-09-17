@@ -59,18 +59,25 @@ SortedMergeStage::SortedMergeStage(PlanStage::Vector inputStages,
       _outputVals(std::move(outputVals)) {
     _children = std::move(inputStages);
 
-    invariant(_inputKeys.size() == _children.size());
-    invariant(_inputVals.size() == _children.size());
+    tassert(11094710,
+            "Expect the number of input keys to match the number of input stages",
+            _inputKeys.size() == _children.size());
+    tassert(11094709,
+            "Expect the number of input values to match the number of input stages",
+            _inputVals.size() == _children.size());
 
-    invariant(std::all_of(
-        _inputVals.begin(), _inputVals.end(), [size = _outputVals.size()](const auto& slots) {
-            return slots.size() == size;
-        }));
+    tassert(11094708,
+            "Expect the length of all input slot vectors to match the length of output slot vector",
+            std::all_of(
+                _inputVals.begin(),
+                _inputVals.end(),
+                [size = _outputVals.size()](const auto& slots) { return slots.size() == size; }));
 
-    invariant(
-        std::all_of(_inputKeys.begin(), _inputKeys.end(), [size = _dirs.size()](const auto& slots) {
-            return slots.size() == size;
-        }));
+    tassert(11094707,
+            "Expect the length of all input slot vectors to match the number of sort directions",
+            std::all_of(_inputKeys.begin(),
+                        _inputKeys.end(),
+                        [size = _dirs.size()](const auto& slots) { return slots.size() == size; }));
 }
 
 std::unique_ptr<PlanStage> SortedMergeStage::clone() const {

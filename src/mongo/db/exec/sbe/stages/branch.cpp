@@ -61,8 +61,12 @@ BranchStage::BranchStage(std::unique_ptr<PlanStage> inputThen,
       _inputThenVals(std::move(inputThenVals)),
       _inputElseVals(std::move(inputElseVals)),
       _outputVals(std::move(outputVals)) {
-    invariant(_inputThenVals.size() == _outputVals.size());
-    invariant(_inputElseVals.size() == _outputVals.size());
+    tassert(11094728,
+            "Expect the number of 'then' slots to match the number of output slots",
+            _inputThenVals.size() == _outputVals.size());
+    tassert(11094727,
+            "Expect the number of 'else' slots to match the number of output slots",
+            _inputElseVals.size() == _outputVals.size());
     _children.emplace_back(std::move(inputThen));
     _children.emplace_back(std::move(inputElse));
 }

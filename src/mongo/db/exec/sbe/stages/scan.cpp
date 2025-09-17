@@ -116,9 +116,12 @@ ScanStage::ScanStage(UUID collUuid,
                                               useRandomCursor)),
       _includeScanStartRecordId(includeScanStartRecordId),
       _includeScanEndRecordId(includeScanEndRecordId) {
-    invariant(!seekRecordIdSlot || forward);
-    // We cannot use a random cursor if we are seeking or requesting a reverse scan.
-    invariant(!useRandomCursor || (!seekRecordIdSlot && forward));
+    tassert(11094716,
+            "seekRecordIdSlot field may only be used with forward scan",
+            !seekRecordIdSlot || forward);
+    tassert(11094715,
+            "Cannot use a random cursor if we are seeking or requesting a reverse scan",
+            !useRandomCursor || (!seekRecordIdSlot && forward));
 }  // ScanStage regular constructor
 
 /**
@@ -766,7 +769,9 @@ ParallelScanStage::ParallelScanStage(UUID collUuid,
       _scanFieldNames(scanFieldNames),
       _scanFieldSlots(scanFieldSlots),
       _scanCallbacks(callbacks) {
-    invariant(_scanFieldNames.size() == _scanFieldSlots.size());
+    tassert(11094714,
+            "Expecting number of scan fields to match the number of scan slots",
+            _scanFieldNames.size() == _scanFieldSlots.size());
 }
 
 ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state,
@@ -797,7 +802,9 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
       _scanFieldNames(scanFieldNames),
       _scanFieldSlots(scanFieldSlots),
       _scanCallbacks(callbacks) {
-    invariant(_scanFieldNames.size() == _scanFieldSlots.size());
+    tassert(11094713,
+            "Expecting number of scan fields to match the number of scan slots",
+            _scanFieldNames.size() == _scanFieldSlots.size());
 }
 
 std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
