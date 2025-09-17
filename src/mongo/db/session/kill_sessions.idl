@@ -36,6 +36,16 @@ imports:
   - "mongo/db/session/logical_session_id.idl"
   - "mongo/db/basic_types.idl"
 
+server_parameters:
+    AbortExpiredTransactionsSessionCheckoutTimeout:
+        description: >-
+            The maximum number of milliseconds for a session to checkout when aborting expired transactions.
+        set_at: [ startup, runtime ]
+        cpp_vartype: int
+        cpp_varname: gAbortExpiredTransactionsSessionCheckoutTimeout
+        default: 100
+        redact: false
+
 structs:
 
   KillSessionsCmdFromClient:

@@ -66,6 +66,11 @@ Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
 // Tracks the number of passes the "abortExpiredTransactions" thread makes to abort expired
 // transactions.
 CounterMetric abortExpiredTransactionsPasses("abortExpiredTransactions.passes");
+// Tracks the number of transactions the "abortExpiredTransactions" thread successfully killed.
+CounterMetric abortExpiredTransactionsSuccessfulKills("abortExpiredTransactions.successfulKills");
+// Tracks the number of transactions unsuccessfully killed by the "abortExpiredTransactions" thread
+// due to timing out trying to checkout a sessions.
+CounterMetric abortExpiredTransactionsTimedOutKills("abortExpiredTransactions.timedOutKills");
 
 auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
     -> PeriodicThreadToAbortExpiredTransactions& {
@@ -114,8 +119,16 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
             opCtx->recoveryUnit()->setNoEvictionAfterRollback();
 
             try {
-                killAllExpiredTransactions(opCtx.get());
+                int64_t numKills = 0;
+                int64_t numTimeOuts = 0;
+                killAllExpiredTransactions(
+                    opCtx.get(),
+                    Milliseconds(gAbortExpiredTransactionsSessionCheckoutTimeout),
+                    &numKills,
+                    &numTimeOuts);
                 abortExpiredTransactionsPasses.increment(1);
+                abortExpiredTransactionsSuccessfulKills.increment(numKills);
+                abortExpiredTransactionsTimedOutKills.increment(numTimeOuts);
             } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }

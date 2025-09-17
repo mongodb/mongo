@@ -40,6 +40,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -61,7 +62,9 @@ void killSessionsAction(
     const SessionKiller::Matcher& matcher,
     const std::function<bool(const ObservableSession&)>& filterFn,
     const std::function<void(OperationContext*, const SessionToKill&)>& killSessionFn,
-    ErrorCodes::Error reason = ErrorCodes::Interrupted) {
+    ErrorCodes::Error reason = ErrorCodes::Interrupted,
+    Milliseconds* timeout = nullptr,
+    int64_t* numTimeOuts = nullptr) {
     const auto catalog = SessionCatalog::get(opCtx);
 
     std::vector<SessionCatalog::KillToken> sessionKillTokens;
@@ -71,15 +74,23 @@ void killSessionsAction(
     });
 
     for (auto& sessionKillToken : sessionKillTokens) {
-        auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
+        try {
+            auto session =
+                catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken), timeout);
 
-        // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
-        // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
-        const KillAllSessionsByPattern* pattern = matcher.match(session.getSessionId());
-        invariant(pattern);
+            // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
+            // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
+            const KillAllSessionsByPattern* pattern = matcher.match(session.getSessionId());
+            invariant(pattern);
 
-        ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
-        killSessionFn(opCtx, session);
+            ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
+            killSessionFn(opCtx, session);
+        } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+            // Failed to check out the session for kill, continue killing the rest of the sessions.
+            if (numTimeOuts)
+                (*numTimeOuts)++;
+            continue;
+        }
     }
 }
 
@@ -118,7 +129,10 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
     return {std::vector<HostAndPort>{}};
 }
 
-void killAllExpiredTransactions(OperationContext* opCtx) {
+void killAllExpiredTransactions(OperationContext* opCtx,
+                                Milliseconds timeout,
+                                int64_t* numKills,
+                                int64_t* numTimeOuts) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     killSessionsAction(
@@ -128,7 +142,7 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
             const ObservableSession& session) {
             return TransactionParticipant::get(session).expiredAsOf(when);
         },
-        [](OperationContext* opCtx, const SessionToKill& session) {
+        [&numKills](OperationContext* opCtx, const SessionToKill& session) {
             auto txnParticipant = TransactionParticipant::get(session);
             // If the transaction is aborted here, it means it was aborted after
             // the filter.  The most likely reason for this is that the transaction
@@ -148,9 +162,12 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
                 if (txnParticipant.transactionIsInProgress()) {
                     txnParticipant.abortTransaction(opCtx);
                 }
+                (*numKills)++;
             }
         },
-        ErrorCodes::TransactionExceededLifetimeLimitSeconds);
+        ErrorCodes::TransactionExceededLifetimeLimitSeconds,
+        &timeout,
+        numTimeOuts);
 }
 
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
