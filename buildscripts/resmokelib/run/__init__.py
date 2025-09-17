@@ -186,7 +186,7 @@ class TestRunner(Subcommand):
                 memberships[test] = test_membership[test]
         return memberships
 
-    def dry_run(self,  only_included=False):
+    def dry_run(self, only_included=False):
         """List which tests would run and which tests would be excluded in a resmoke invocation."""
         suites = self._get_suites()
         for suite in suites:
@@ -194,7 +194,9 @@ class TestRunner(Subcommand):
             sb = ["Tests that would be run in suite {}".format(suite.get_display_name())]
             sb.extend(suite.tests or ["(no tests)"])
             if not only_included:
-                sb.append("Tests that would be excluded from suite {}".format(suite.get_display_name()))
+                sb.append(
+                    "Tests that would be excluded from suite {}".format(suite.get_display_name())
+                )
                 sb.extend(suite.excluded or ["(no tests)"])
             self._exec_logger.info("\n".join(sb))
 
@@ -2096,7 +2098,7 @@ class RunPlugin(PluginInterface):
             "--loadExtensions",
             dest="extensions",
             metavar="EXTENSION1,EXTENSION2",
-            help="Comma separated list of extensions to load into the server upon startup.",
+            help="Comma-separated list of extension names to load into the server upon startup.",
         )
 
         internal_options = parser.add_argument_group(
@@ -2178,7 +2180,7 @@ class RunPlugin(PluginInterface):
                 " to allow for easier debugging"
             ),
         )
-        
+
         internal_options.add_argument(
             "--resmokeModulesPath",
             dest="resmoke_modules_path",

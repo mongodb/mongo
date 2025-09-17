@@ -30,10 +30,10 @@ if (!isLinux()) {
     quit();
 }
 
-const extensionPaths = generateMultiversionExtensionConfigs();
+const extensionNames = generateMultiversionExtensionConfigs();
 
 try {
-    const fooOptions = extensionNodeOptions(extensionPaths[0]);
+    const fooOptions = extensionNodeOptions(extensionNames[0]);
 
     testPerformUpgradeReplSet({
         upgradeNodeOptions: fooOptions,
@@ -55,5 +55,5 @@ try {
         whenFullyUpgraded: assertFooStageAccepted,
     });
 } finally {
-    deleteMultiversionExtensionConfigs(extensionPaths);
+    deleteMultiversionExtensionConfigs(extensionNames);
 }

@@ -34,9 +34,10 @@ def generate_extension_configs(
         # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
         file_name = os.path.basename(so_file)
         extension_name = os.path.splitext(file_name)[0]
-        extension_name_with_suffix = f"{extension_name}_{with_suffix}"
 
-        # TODO SERVER-110317: Remove 'lib' prefix and '_mongo_extension' suffix from extension names.
+        # libfoo_mongo_extension -> foo
+        extension_name = extension_name.removeprefix("lib").removesuffix("_mongo_extension")
+        extension_name_with_suffix = f"{extension_name}_{with_suffix}"
 
         # Add the parsed extension name to the list.
         extension_names.append(extension_name_with_suffix)

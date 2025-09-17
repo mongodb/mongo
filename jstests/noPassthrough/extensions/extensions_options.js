@@ -20,45 +20,45 @@ if (!isLinux()) {
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
 const pathToExtensionBar = MongoRunner.getExtensionPath("libbar_mongo_extension.so");
 
-const extensionPaths = generateExtensionConfigs([pathToExtensionFoo, pathToExtensionBar]);
+const extensionNames = generateExtensionConfigs([pathToExtensionFoo, pathToExtensionBar]);
 
 try {
     // Test loading a single extension in mongod and mongos.
-    let expectedResult = {"parsed": {"processManagement": {"loadExtensions": [extensionPaths[0]]}}};
-    testGetCmdLineOptsMongod({loadExtensions: extensionPaths[0]}, expectedResult);
-    testGetCmdLineOptsMongos({loadExtensions: extensionPaths[0]}, expectedResult);
+    let expectedResult = {"parsed": {"processManagement": {"loadExtensions": [extensionNames[0]]}}};
+    testGetCmdLineOptsMongod({loadExtensions: extensionNames[0]}, expectedResult);
+    testGetCmdLineOptsMongos({loadExtensions: extensionNames[0]}, expectedResult);
 
     // Test loading multiple extensions in mongod and mongos.
     // NOTE: The shell helper passes the commandline string array as an array with a single string (all
     // extensions concatenated with commas), so that is the expected result. The options are parsed
     // correctly internally, and this is tested more in extensions_parameter.js.
     expectedResult = {
-        "parsed": {"processManagement": {"loadExtensions": [extensionPaths[0] + "," + extensionPaths[1]]}},
+        "parsed": {"processManagement": {"loadExtensions": [extensionNames[0] + "," + extensionNames[1]]}},
     };
     // Test passing multiple extensions as array.
-    testGetCmdLineOptsMongod({loadExtensions: [extensionPaths[0], extensionPaths[1]]}, expectedResult);
-    testGetCmdLineOptsMongos({loadExtensions: [extensionPaths[0], extensionPaths[1]]}, expectedResult);
+    testGetCmdLineOptsMongod({loadExtensions: [extensionNames[0], extensionNames[1]]}, expectedResult);
+    testGetCmdLineOptsMongos({loadExtensions: [extensionNames[0], extensionNames[1]]}, expectedResult);
 
     // Test loading via config file.
     const extensionFooConfig = writeJSONConfigFile("enables_single_extension", {
-        processManagement: {loadExtensions: [extensionPaths[0]]},
+        processManagement: {loadExtensions: [extensionNames[0]]},
     });
     expectedResult = {
         "parsed": {
             "config": extensionFooConfig,
-            "processManagement": {"loadExtensions": [extensionPaths[0]]},
+            "processManagement": {"loadExtensions": [extensionNames[0]]},
         },
     };
     testGetCmdLineOptsMongod({config: extensionFooConfig}, expectedResult);
     testGetCmdLineOptsMongos({config: extensionFooConfig}, expectedResult);
 
     const extensionsFooAndBarConfig = writeJSONConfigFile("enables_multiple_extensions", {
-        processManagement: {loadExtensions: [extensionPaths[0], extensionPaths[1]]},
+        processManagement: {loadExtensions: [extensionNames[0], extensionNames[1]]},
     });
     expectedResult = {
         "parsed": {
             "config": extensionsFooAndBarConfig,
-            "processManagement": {"loadExtensions": [extensionPaths[0], extensionPaths[1]]},
+            "processManagement": {"loadExtensions": [extensionNames[0], extensionNames[1]]},
         },
     };
     testGetCmdLineOptsMongod({config: extensionsFooAndBarConfig}, expectedResult);
@@ -68,11 +68,11 @@ try {
     expectedResult = {
         "parsed": {
             "config": extensionFooConfig,
-            "processManagement": {"loadExtensions": [extensionPaths[0], extensionPaths[1]]},
+            "processManagement": {"loadExtensions": [extensionNames[0], extensionNames[1]]},
         },
     };
-    testGetCmdLineOptsMongod({config: extensionFooConfig, loadExtensions: extensionPaths[1]}, expectedResult);
-    testGetCmdLineOptsMongos({config: extensionFooConfig, loadExtensions: extensionPaths[1]}, expectedResult);
+    testGetCmdLineOptsMongod({config: extensionFooConfig, loadExtensions: extensionNames[1]}, expectedResult);
+    testGetCmdLineOptsMongos({config: extensionFooConfig, loadExtensions: extensionNames[1]}, expectedResult);
 } finally {
-    deleteExtensionConfigs(extensionPaths);
+    deleteExtensionConfigs(extensionNames);
 }

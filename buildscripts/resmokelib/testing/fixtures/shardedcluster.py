@@ -2,7 +2,6 @@
 
 import os.path
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pymongo
@@ -81,7 +80,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 logger=self.logger,
                 mongod_options=self.mongod_options,
                 mongos_options=self.mongos_options,
-                with_suffix=uuid.uuid4().hex,
             )
 
         self.mongod_executable = mongod_executable

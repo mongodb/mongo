@@ -390,7 +390,7 @@ functions:
       args:
         - "src/evergreen/run_python_script.sh"
         - "buildscripts/resmokelib/extensions/find_and_generate_extension_configs.py"
-        - "--expansions-file=../extension_paths.yml"
+        - "--expansions-file=../extension_names.yml"
         - "--skip=${skip_extensions|false}"
 
   "apply extensions expansions": &apply_extensions_expansions
@@ -398,7 +398,7 @@ functions:
     display_name: "apply extensions expansions"
     params:
       ignore_missing_file: false
-      file: extension_paths.yml
+      file: extension_names.yml
 
   "get version expansions": &get_version_expansions
     command: s3.get

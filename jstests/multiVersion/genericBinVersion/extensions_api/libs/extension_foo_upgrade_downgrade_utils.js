@@ -26,13 +26,13 @@ export function generateMultiversionExtensionConfigs() {
     return generateExtensionConfigs([pathToExtensionFoo, pathToExtensionFooV2]);
 }
 
-export function deleteMultiversionExtensionConfigs(extensionPaths) {
-    deleteExtensionConfigs(extensionPaths);
+export function deleteMultiversionExtensionConfigs(extensionNames) {
+    deleteExtensionConfigs(extensionNames);
 }
 
-export function extensionNodeOptions(extensionPath) {
+export function extensionNodeOptions(extensionName) {
     return {
-        loadExtensions: [extensionPath],
+        loadExtensions: [extensionName],
         setParameter: {featureFlagExtensionsAPI: true},
     };
 }

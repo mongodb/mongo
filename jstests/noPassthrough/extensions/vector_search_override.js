@@ -16,10 +16,10 @@ if (!isLinux()) {
 
 const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
 
-const extensionPaths = generateExtensionConfigs(pathToExtensionVectorSearch);
+const extensionNames = generateExtensionConfigs(pathToExtensionVectorSearch);
 
 const options = {
-    loadExtensions: extensionPaths[0],
+    loadExtensions: extensionNames[0],
 };
 
 function runVectorSearchOverrideTest(conn, shardingTest = null) {
@@ -79,5 +79,5 @@ try {
     runVectorSearchOverrideTest(shardingTest.s, shardingTest);
     shardingTest.stop();
 } finally {
-    deleteExtensionConfigs(extensionPaths);
+    deleteExtensionConfigs(extensionNames);
 }

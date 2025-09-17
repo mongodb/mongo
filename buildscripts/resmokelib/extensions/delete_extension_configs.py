@@ -9,13 +9,11 @@ from buildscripts.resmokelib.extensions.constants import (
 )
 
 
-def delete_extension_configs(extension_paths: str, logger: logging.Logger):
+def delete_extension_configs(extension_names: str, logger: logging.Logger):
     """Delete extension .conf files."""
-    # TODO SERVER-110317: Change extension paths to extension names.
-    extension_paths = [item.strip() for item in extension_paths.split(",")]
-    for path in extension_paths:
-        basename = os.path.splitext(os.path.basename(path))[0]
-        file_name = f"{basename}.conf"
+    extension_names = [item.strip() for item in extension_names.split(",")]
+    for name in extension_names:
+        file_name = f"{name}.conf"
         file_path = os.path.join(CONF_OUT_DIR, file_name)
         try:
             os.remove(file_path)
@@ -31,12 +29,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Delete MongoDB test extension configuration files."
     )
-    # TODO SERVER-110317: Change extension paths to extension names.
+
     parser.add_argument(
-        "--extension-paths",
+        "--extension-names",
         type=str,
         required=True,
-        help="A comma-separated list of extension paths.",
+        help="A comma-separated list of extension names with .conf files to delete.",
     )
 
     args = parser.parse_args()
@@ -44,7 +42,7 @@ def main():
     logger = logging.getLogger(__name__)
 
     try:
-        delete_extension_configs(logger=logger, extension_paths=args.extension_paths)
+        delete_extension_configs(logger=logger, extension_names=args.extension_names)
     except RuntimeError as e:
         logger.error(f"An error occurred: {e}")
         sys.exit(1)

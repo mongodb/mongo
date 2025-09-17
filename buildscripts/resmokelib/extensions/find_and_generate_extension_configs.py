@@ -17,7 +17,6 @@ from buildscripts.resmokelib.extensions.generate_extension_configs import genera
 def find_and_generate_extension_configs(
     is_evergreen: bool,
     logger: logging.Logger,
-    with_suffix: str,
     mongod_options: Optional[Dict] = None,
     mongos_options: Optional[Dict] = None,
 ) -> str:
@@ -41,20 +40,14 @@ def find_and_generate_extension_configs(
         raise RuntimeError(error_msg)
 
     logger.info("Found extension files: %s", so_files)
-    # TODO SERVER-110317: Pass through extension names instead of paths to mongod/mongos.
-    generate_extension_configs(so_files, logger, with_suffix)
+    extension_names = generate_extension_configs(so_files, logger, uuid.uuid4().hex)
+    joined_names = ",".join(extension_names)
 
-    so_files = [
-        f"{root}_{with_suffix}{ext}"
-        for so_file in so_files
-        for root, ext in [os.path.splitext(so_file)]
-    ]
-    joined_files = ",".join(so_files)
     if mongod_options is not None:
-        mongod_options["loadExtensions"] = joined_files
+        mongod_options["loadExtensions"] = joined_names
     if mongos_options is not None:
-        mongos_options["loadExtensions"] = joined_files
-    return joined_files
+        mongos_options["loadExtensions"] = joined_names
+    return joined_names
 
 
 def main():
@@ -65,7 +58,7 @@ def main():
     parser.add_argument(
         "--expansions-file",
         type=str,
-        help="File to output extension paths as a comma separated list.",
+        help="File to output extension names as a comma-separated list.",
         default="../expansions.yml",
     )
     parser.add_argument(
@@ -88,12 +81,10 @@ def main():
         sys.exit(0)
 
     try:
-        joined_files = find_and_generate_extension_configs(
-            is_evergreen=True, logger=logger, with_suffix=uuid.uuid4().hex
-        )
+        joined_names = find_and_generate_extension_configs(is_evergreen=True, logger=logger)
         with open(args.expansions_file, "w+") as outfile:
-            outfile.write(f"extension_paths: {joined_files}\n")
-            logger.info("Wrote extension paths to expansions file %s", args.expansions_file)
+            outfile.write(f"extension_names: {joined_names}\n")
+            logger.info("Wrote extension names to expansions file %s", args.expansions_file)
     except RuntimeError:
         sys.exit(1)
 

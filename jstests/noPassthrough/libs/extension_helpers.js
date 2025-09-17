@@ -26,23 +26,28 @@ export function generateExtensionConfigs(paths) {
     );
     assert.eq(ret, 0, "Failed to generate extension .conf files");
 
+    let names = [];
     for (let i = 0; i < paths.length; i++) {
-        const lastDot = paths[i].lastIndexOf(".");
-        const basePath = paths[i].substring(0, lastDot);
-        const fileExtension = paths[i].substring(lastDot);
-        paths[i] = `${basePath}_${hash}${fileExtension}`;
+        // path/to/libfoo_mongo_extension.so -> foo_{hash}
+        const fileName = paths[i].substring(paths[i].lastIndexOf("/") + 1);
+        const extensionName = fileName.substring(0, fileName.lastIndexOf("."));
+
+        names.push(extensionName.replace(/^lib/, "").replace(/_mongo_extension$/, "") + `_${hash}`);
     }
 
-    return paths;
+    return names;
 }
 
-export function deleteExtensionConfigs(paths) {
+/**
+ * @param {string[]} names A list of extension names to delete .conf files for.
+ */
+export function deleteExtensionConfigs(names) {
     const ret = runNonMongoProgram(
         getPython3Binary(),
         "-m",
         "buildscripts.resmokelib.extensions.delete_extension_configs",
-        "--extension-paths",
-        paths.join(","),
+        "--extension-names",
+        names.join(","),
     );
     assert.eq(ret, 0, "Failed to delete extension .conf files");
 }

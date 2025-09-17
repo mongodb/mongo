@@ -19,10 +19,10 @@ if (!isLinux()) {
 
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
 
-const extensionPaths = generateExtensionConfigs(pathToExtensionFoo);
+const extensionNames = generateExtensionConfigs(pathToExtensionFoo);
 
 const extOpts = {
-    loadExtensions: extensionPaths[0],
+    loadExtensions: extensionNames[0],
     setParameter: {featureFlagExtensionsAPI: true},
 };
 
@@ -70,5 +70,5 @@ try {
 
     print("Both mongod and mongos loaded extensions successfully.");
 } finally {
-    deleteExtensionConfigs(extensionPaths);
+    deleteExtensionConfigs(extensionNames);
 }

@@ -85,9 +85,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListExtensions::createFromBso
         const auto loadedExtensions = extension::host::ExtensionLoader::getLoadedExtensions();
         std::deque<DocumentSource::GetNextResult> queue;
 
-        for (const auto& path : loadedExtensions) {
-            // TODO(SERVER-110317): Remove path truncation.
-            const auto extensionName = std::filesystem::path(path).stem().string();
+        for (const auto& extensionName : loadedExtensions) {
             queue.push_back(Document(BSON("extensionName" << extensionName)));
         }
 

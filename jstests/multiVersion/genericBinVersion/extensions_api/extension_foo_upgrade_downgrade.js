@@ -53,11 +53,11 @@ if (!isLinux()) {
     quit();
 }
 
-const extensionPaths = generateMultiversionExtensionConfigs();
+const extensionNames = generateMultiversionExtensionConfigs();
 
 try {
-    const fooV1Options = extensionNodeOptions(extensionPaths[0]);
-    const fooV2Options = extensionNodeOptions(extensionPaths[1]);
+    const fooV1Options = extensionNodeOptions(extensionNames[0]);
+    const fooV2Options = extensionNodeOptions(extensionNames[1]);
 
     // Test upgrading foo extension in a replica set.
     testPerformReplSetRollingRestart({
@@ -103,5 +103,5 @@ try {
         afterMongosHasRestarted: assertFooStageAcceptedV1Only,
     });
 } finally {
-    deleteMultiversionExtensionConfigs(extensionPaths);
+    deleteMultiversionExtensionConfigs(extensionNames);
 }

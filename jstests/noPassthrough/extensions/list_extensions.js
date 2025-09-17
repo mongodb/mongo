@@ -78,12 +78,11 @@ describe("$listExtensions with no extensions loaded", function () {
 });
 
 describe("$listExtensions with some extensions loaded", function () {
-    // TODO(SERVER-110317): Remove getExtensionPath and pass only the extension name to loadExtensions.
     const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
     const pathToExtensionBar = MongoRunner.getExtensionPath("libbar_mongo_extension.so");
     const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
 
-    const extensionPaths = generateExtensionConfigs([
+    const extensionNames = generateExtensionConfigs([
         pathToExtensionFoo,
         pathToExtensionBar,
         pathToExtensionVectorSearch,
@@ -91,7 +90,7 @@ describe("$listExtensions with some extensions loaded", function () {
 
     before(function () {
         const extOpts = {
-            loadExtensions: extensionPaths,
+            loadExtensions: extensionNames,
         };
         this.standalone = MongoRunner.runMongod(extOpts);
         this.sharded = new ShardingTest({
@@ -114,9 +113,9 @@ describe("$listExtensions with some extensions loaded", function () {
                 .aggregate([{$listExtensions: {}}])
                 .toArray();
             const expected = [
-                {"extensionName": "libbar_mongo_extension"},
-                {"extensionName": "libfoo_mongo_extension"},
-                {"extensionName": "libvector_search_extension"},
+                {"extensionName": extensionNames[1]},
+                {"extensionName": extensionNames[0]},
+                {"extensionName": extensionNames[2]},
             ];
             assert.eq(actual, expected);
         });
@@ -126,6 +125,7 @@ describe("$listExtensions with some extensions loaded", function () {
         MongoRunner.stopMongod(this.standalone);
         this.sharded.stop();
         this.rst.stopSet();
-        deleteExtensionConfigs(extensionPaths);
+
+        deleteExtensionConfigs(extensionNames);
     });
 });

@@ -54,7 +54,7 @@ static const ::MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPO
  * Load all extensions in the provided array. Returns true if loading is successful, otherwise
  * false.
  */
-bool loadExtensions(const std::vector<std::string>& extensionPaths);
+bool loadExtensions(const std::vector<std::string>& extensionNames);
 
 class ExtensionLoader {
 public:
@@ -62,17 +62,17 @@ public:
      * Loads the corresponding configuration file for the given extension and returns it as an
      * ExtensionConfig.
      */
-    static ExtensionConfig loadExtensionConfig(const std::string& extensionPath);
+    static ExtensionConfig loadExtensionConfig(const std::string& extensionName);
+
     /**
-     * Given a path to an extension shared library, loads the extension, checks for API version
+     * Given an extension name and configuration struct, loads the extension, checks for API version
      * compatibility, and calls the extension initialization function.
      */
-    static void load(const ExtensionConfig& config);
+    static void load(const std::string& name, const ExtensionConfig& config);
 
 
     /**
-     * TODO(SERVER-110317): Change "paths" to "names."
-     * Returns the paths of the currently registered extensions.
+     * Returns the names of the currently registered extensions.
      */
     static std::vector<std::string> getLoadedExtensions();
 

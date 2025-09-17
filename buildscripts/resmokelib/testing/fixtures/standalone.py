@@ -67,7 +67,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
                 logger=self.logger,
                 mongod_options=self.mongod_options,
-                with_suffix=uuid.uuid4().hex,
             )
 
         if "set_parameters" not in self.mongod_options:

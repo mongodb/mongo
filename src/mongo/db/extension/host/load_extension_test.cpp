@@ -49,8 +49,8 @@ static std::filesystem::path getExtensionPath(const std::string& extensionName) 
     return runFilesDir / kExtensionDirectory / extensionName;
 }
 
-static ExtensionConfig makeEmptyExtensionConfig(const std::string& extensionName) {
-    return ExtensionConfig{.sharedLibraryPath = getExtensionPath(extensionName).string(),
+static ExtensionConfig makeEmptyExtensionConfig(const std::string& extensionFileName) {
+    return ExtensionConfig{.sharedLibraryPath = getExtensionPath(extensionFileName).string(),
                            .extOptions = YAML::Node(YAML::NodeType::Map)};
 }
 
@@ -73,70 +73,83 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
     ASSERT(!runFilesDir.empty());
 
     // Test that various non-existent extension cases fail with the proper error code.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(ExtensionConfig{.sharedLibraryPath = "src/"}),
+    ASSERT_THROWS_CODE(ExtensionLoader::load("src", ExtensionConfig{.sharedLibraryPath = "src/"}),
                        AssertionException,
                        10615500);
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(ExtensionConfig{.sharedLibraryPath = "notanextension"}),
+        ExtensionLoader::load("notanextension",
+                              ExtensionConfig{.sharedLibraryPath = "notanextension"}),
         AssertionException,
         10615500);
-    ASSERT_THROWS_CODE(ExtensionLoader::load(ExtensionConfig{
-                           .sharedLibraryPath = "path/to/nonexistent/extension.so"}),
-                       AssertionException,
-                       10615500);
-    ASSERT_THROWS_CODE(ExtensionLoader::load(makeEmptyExtensionConfig("libnotanextension.so")),
-                       AssertionException,
-                       10615500);
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(
+            "extension", ExtensionConfig{.sharedLibraryPath = "path/to/nonexistent/extension.so"}),
+        AssertionException,
+        10615500);
+
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load("notanextension", makeEmptyExtensionConfig("libnotanextension.so")),
+        AssertionException,
+        10615500);
 
     // no_symbol_bad_extension is missing the get_mongodb_extension symbol definition.
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(makeEmptyExtensionConfig("libno_symbol_bad_extension.so")),
+        ExtensionLoader::load("no_symbol_bad_extension",
+                              makeEmptyExtensionConfig("libno_symbol_bad_extension.so")),
         AssertionException,
         10615501);
 
     // null_mongo_extension_bad_extension returns null from get_mongodb_extension.
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(makeEmptyExtensionConfig("libnull_mongo_extension_bad_extension.so")),
+        ExtensionLoader::load("null_mongo_extension_bad_extension",
+                              makeEmptyExtensionConfig("libnull_mongo_extension_bad_extension.so")),
         AssertionException,
         10615503);
 
     // major_version_too_high_bad_extension has an incompatible major version (plus 1).
     ASSERT_THROWS_CODE(ExtensionLoader::load(
+                           "major_version_too_high_bad_extension",
                            makeEmptyExtensionConfig("libmajor_version_too_high_bad_extension.so")),
                        AssertionException,
                        10615504);
 
     // major_version_too_low_bad_extension has an incompatible major version (minus 1).
     ASSERT_THROWS_CODE(ExtensionLoader::load(
+                           "major_version_too_low_bad_extension",
                            makeEmptyExtensionConfig("libmajor_version_too_low_bad_extension.so")),
                        AssertionException,
                        10615504);
 
     // minor_version_too_high_bad_extension has an incompatible minor version.
     ASSERT_THROWS_CODE(ExtensionLoader::load(
+                           "minor_version_too_high_bad_extension",
                            makeEmptyExtensionConfig("libminor_version_too_high_bad_extension.so")),
                        AssertionException,
                        10615505);
 
     // major_version_max_int_bad_extension has the maximum uint32_t value as its major version.
     ASSERT_THROWS_CODE(ExtensionLoader::load(
+                           "major_version_max_int_bad_extension",
                            makeEmptyExtensionConfig("libmajor_version_max_int_bad_extension.so")),
                        AssertionException,
                        10615504);
 
     // duplicate_stage_descriptor_bad_extension attempts to register the same stage descriptor
     // multiple times.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(makeEmptyExtensionConfig(
-                           "libduplicate_stage_descriptor_bad_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load("duplicate_stage_descriptor_bad_extension",
+                                             makeEmptyExtensionConfig(
+                                                 "libduplicate_stage_descriptor_bad_extension.so")),
                        AssertionException,
                        10696402);
 
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(makeEmptyExtensionConfig("libduplicate_version_bad_extension.so")),
+        ExtensionLoader::load("duplicate_version_bad_extension",
+                              makeEmptyExtensionConfig("libduplicate_version_bad_extension.so")),
         AssertionException,
         10930201);
 
     ASSERT_THROWS_CODE(ExtensionLoader::load(
+                           "no_compatible_version_bad_extension",
                            makeEmptyExtensionConfig("libno_compatible_version_bad_extension.so")),
                        AssertionException,
                        10930202);
@@ -144,7 +157,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
 
 // null_initialize_function_bad_extension has a null initialization function.
 DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullInitialize, "10930101") {
-    ExtensionLoader::load(makeEmptyExtensionConfig("libnull_initialize_function_bad_extension.so"));
+    ExtensionLoader::load("null_initialize_function_bad_extension",
+                          makeEmptyExtensionConfig("libnull_initialize_function_bad_extension.so"));
 }
 
 // TODO SERVER-109108: Switch this to use the foo extension once we can reset state in between
@@ -152,17 +166,17 @@ DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullInitialize, "10930101") {
 TEST_F(LoadExtensionsTest, RepetitivelyLoadingTheSameExtensionFails) {
     // We should be able to load the extension once.
     const auto config = makeEmptyExtensionConfig(kTestBuzzLibExtensionPath);
-    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(config));
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("buzz", config));
 
     // We should not be able to load the extension twice.
-    ASSERT_THROWS_CODE(ExtensionLoader::load(config), AssertionException, 10845400);
+    ASSERT_THROWS_CODE(ExtensionLoader::load("buzz", config), AssertionException, 10845400);
 }
 
 // Tests successful extension loading and verifies stage registration works in pipelines.
 // The libfoo_mongo_extension.so adds a "$testFoo" stage for testing.
 TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
     ASSERT_DOES_NOT_THROW(
-        ExtensionLoader::load(makeEmptyExtensionConfig(kTestFooLibExtensionPath)));
+        ExtensionLoader::load("foo", makeEmptyExtensionConfig(kTestFooLibExtensionPath)));
 
     // Verify the initialization function registered a stage.
     BSONObj stageSpec = BSON(kTestFooStageName << BSONObj());
@@ -206,30 +220,34 @@ TEST_F(LoadExtensionsTest, InitializationFunctionPopulatesParserMap) {
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
+        "hostVersionSucceeds",
         makeEmptyExtensionConfig("libhostVersionSucceeds_mongo_extension.so")));
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
     ASSERT_THROWS_CODE(
-        ExtensionLoader::load(makeEmptyExtensionConfig("libhost_version_fails_bad_extension.so")),
+        ExtensionLoader::load("host_version_fails_bad_extension",
+                              makeEmptyExtensionConfig("libhost_version_fails_bad_extension.so")),
         AssertionException,
         10615503);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensioninitialize_version_fails) {
-    ASSERT_THROWS_CODE(ExtensionLoader::load(makeEmptyExtensionConfig(
-                           "libinitialize_version_fails_bad_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load("initialize_version_fails_bad_extension",
+                                             makeEmptyExtensionConfig(
+                                                 "libinitialize_version_fails_bad_extension.so")),
                        AssertionException,
                        10726600);
 }
 
 DEATH_TEST_F(LoadExtensionsTest, LoadExtensionnull_stage_descriptor, "10596400") {
-    ExtensionLoader::load(makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));
+    ExtensionLoader::load("null_stage_descriptor_bad_extension",
+                          makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));
 }
 
 TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {
-    ASSERT_DOES_NOT_THROW(
-        ExtensionLoader::load(makeEmptyExtensionConfig("libloadTwoStages_mongo_extension.so")));
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
+        "loadTwoStages", makeEmptyExtensionConfig("libloadTwoStages_mongo_extension.so")));
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     std::vector<BSONObj> pipeline = {BSON("$foo" << BSONObj()), BSON("$bar" << BSONObj())};
@@ -249,11 +267,13 @@ TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {
 
 TEST_F(LoadExtensionsTest, LoadExtensionInvokeHostServicesAsapSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
+        "invoke_host_services_asap",
         makeEmptyExtensionConfig("libinvoke_host_services_asap_mongo_extension.so")));
 }
 
 TEST(LoadExtensionTest, LoadHighestCompatibleVersionSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
+        "loadHighestCompatibleVersion",
         makeEmptyExtensionConfig("libloadHighestCompatibleVersion_mongo_extension.so")));
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
@@ -283,7 +303,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
         const ExtensionConfig config = {
             .sharedLibraryPath = getExtensionPath("libtest_options_mongo_extension.so").string(),
             .extOptions = extOptions};
-        ASSERT_DOES_NOT_THROW(ExtensionLoader::load(config));
+        ASSERT_DOES_NOT_THROW(ExtensionLoader::load("test_options", config));
         auto expCtx = make_intrusive<ExpressionContextForTest>();
 
         std::vector<BSONObj> pipeline = {BSON("$optionA" << BSONObj())};
@@ -308,7 +328,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
         const ExtensionConfig config = {
             .sharedLibraryPath = getExtensionPath("libparse_options_mongo_extension.so").string(),
             .extOptions = extOptions};
-        ASSERT_DOES_NOT_THROW(ExtensionLoader::load(config));
+        ASSERT_DOES_NOT_THROW(ExtensionLoader::load("parse_options", config));
         auto expCtx = make_intrusive<ExpressionContextForTest>();
 
         std::vector<BSONObj> pipeline = {BSON("$checkNum" << BSON("num" << 9))};
@@ -325,5 +345,20 @@ TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
         pipeline = {BSON("$checkNum" << BSON("num" << 11))};
         ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10999106);
     }
+}
+
+TEST_F(LoadExtensionsTest, LoadExtensionConfigErrors) {
+    ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig(""), AssertionException, 11031700);
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::loadExtensionConfig("path/with/separators"), AssertionException, 11031700);
+    ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig("path\\with\\separators"),
+                       AssertionException,
+                       11031700);
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::loadExtensionConfig("/beginning"), AssertionException, 11031700);
+    ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig("end/"), AssertionException, 11031700);
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::loadExtensionConfig("\\beginning"), AssertionException, 11031700);
+    ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig("end\\"), AssertionException, 11031700);
 }
 }  // namespace mongo::extension::host

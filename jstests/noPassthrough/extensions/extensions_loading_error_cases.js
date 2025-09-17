@@ -16,7 +16,7 @@ const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.
 const pathToMissingSymbolExtension = MongoRunner.getExtensionPath("libno_symbol_bad_extension.so");
 const pathToDuplicateStageExtension = MongoRunner.getExtensionPath("libduplicate_stage_descriptor_bad_extension.so");
 
-const extensionPaths = generateExtensionConfigs([
+const extensionNames = generateExtensionConfigs([
     pathToExtensionFoo,
     pathToMissingSymbolExtension,
     pathToDuplicateStageExtension,
@@ -59,22 +59,22 @@ try {
         runTest({options: {loadExtensions: ""}, validateExitCode: false});
         // Extensions parameter is not allowed when the feature flag is disabled.
         runTest({
-            options: {loadExtensions: extensionPaths[0], setParameter: {featureFlagExtensionsAPI: false}},
+            options: {loadExtensions: extensionNames[0], setParameter: {featureFlagExtensionsAPI: false}},
         });
         // Extensions is a scalar, non-string.
         runTest({options: {loadExtensions: 12345}});
         // Path to extension does not exist.
         runTest({options: {loadExtensions: "path/does/not/exist.so"}});
         // Path to extension with an .so that is missing the get_mongodb_extension symbol.
-        runTest({options: {loadExtensions: extensionPaths[1]}});
+        runTest({options: {loadExtensions: extensionNames[1]}});
         // Path to extension that attempts to register duplicate stage descriptors.
-        runTest({options: {loadExtensions: extensionPaths[2]}});
+        runTest({options: {loadExtensions: extensionNames[2]}});
     } else {
         // Startup should fail because we are attempting to load an extension on a platform that is not
         // linux.
-        runTest({options: {loadExtensions: extensionPaths[0]}});
+        runTest({options: {loadExtensions: extensionNames[0]}});
     }
 } finally {
     st.stop();
-    deleteExtensionConfigs(extensionPaths);
+    deleteExtensionConfigs(extensionNames);
 }
