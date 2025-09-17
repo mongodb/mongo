@@ -4,7 +4,7 @@
 # "sharedLibraryPath" should _not_ be included in this file. load_all_extensions() will generate correct configuration
 # files for all loadable test extensions, including "sharedLibraryPath"s for both local and Evergreen runs.
 extensions:
-  # TODO SERVER-110634: Change extension names to test_options and parse_options, respectively.
+  # TODO SERVER-110317: Change extension names to test_options and parse_options, respectively.
   libtest_options_mongo_extension:
     extensionOptions:
       optionA: true

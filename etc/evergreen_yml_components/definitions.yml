@@ -382,13 +382,16 @@ functions:
         - "--change-dir=${extraction_change_dir}"
         - "--move-output=dist-test/:bazel-bin/install"
 
-  "find all extensions": &find_all_extensions
+  "find and generate extension configs": &find_and_generate_extension_configs
     command: subprocess.exec
-    display_name: "find all extensions"
+    display_name: "find and generate extension configs"
     params:
       binary: bash
       args:
-        - "src/evergreen/functions/find_extensions.sh"
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/resmokelib/extensions/find_and_generate_extension_configs.py"
+        - "--expansions-file=../extension_paths.yml"
+        - "--skip=${skip_extensions|false}"
 
   "apply extensions expansions": &apply_extensions_expansions
     command: expansions.update
@@ -813,7 +816,7 @@ functions:
     - *verify_jstestshell_sha
     - *extract_binaries
     - *extract_jstestshell
-    - *find_all_extensions
+    - *find_and_generate_extension_configs
     - *apply_extensions_expansions
     - *f_expansions_write
     - *get_buildnumber

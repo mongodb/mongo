@@ -159,15 +159,6 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
     const auto confPath = getExtensionConfDir() /
         std::filesystem::path(extensionPath).filename().replace_extension(".conf");
 
-    // TODO SERVER-110634: Remove this once we have proper loading for tests in Evergreen.
-    if (!std::filesystem::exists(confPath)) {
-        LOGV2(11032600,
-              "Could not find configuration file for extension, using default configuration",
-              "confPath"_attr = confPath.string());
-        return ExtensionConfig{.sharedLibraryPath = extensionPath,
-                               .extOptions = YAML::Node(YAML::NodeType::Map)};
-    }
-
     uassert(11042900,
             str::stream() << "Loading extension '" << extensionPath
                           << "' failed: Expected configuration file not found at '"

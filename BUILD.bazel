@@ -432,8 +432,8 @@ extensions_with_config(
     name = "dist_test_extensions",
     srcs = [
         # Any extension that we intend to load in extensions passthrough tests and in the
-        # extension-enabled variant MUST have the "_mongo_extension" suffix for the
-        # find_extensions.sh script to recognize it.
+        # extension-enabled variant MUST have the "_mongo_extension" suffix for the resmoke
+        # scripts to recognize it.
 
         # TODO SERVER-109838: Remove the comment below once extension stages are no longer
         # listed by $listMqlEntities.
