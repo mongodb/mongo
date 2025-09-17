@@ -438,6 +438,12 @@ bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
     return comparator.compare(index, MongoDSessionCatalog::getConfigTxnPartialIndexSpec()) == 0;
 }
 
+IndexBuildProtocol determineProtocol(OperationContext* opCtx, const NamespaceString& ns) {
+    return !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)
+        ? IndexBuildProtocol::kTwoPhase
+        : IndexBuildProtocol::kSinglePhase;
+}
+
 CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                    const CreateIndexesCommand& cmd) {
     const auto ns = cmd.getNamespace();
@@ -461,9 +467,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    // Two phase index builds are designed to improve the availability of indexes in a replica set.
-    auto protocol = !replCoord->isOplogDisabledFor(opCtx, ns) ? IndexBuildProtocol::kTwoPhase
-                                                              : IndexBuildProtocol::kSinglePhase;
+    auto protocol = determineProtocol(opCtx, ns);
     auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmd);
     if (commitQuorum) {
         uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum.value()));
@@ -575,6 +579,15 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                               buildUUID,
                                                               protocol,
                                                               indexBuildOptions));
+
+        if (cmd.getReturnOnStart()) {
+            LOGV2(8903900,
+                  "Index build: command returning upon index build start; build will continue in "
+                  "background",
+                  "buildUUID"_attr = buildUUID);
+
+            return reply;
+        }
 
         auto deadline = opCtx->getDeadline();
         LOGV2(20440,
@@ -777,6 +790,33 @@ public:
                         opCtx->inMultiDocumentTransaction()) {
                         throw;
                     }
+
+                    if (cmd->getReturnOnStart()) {
+                        AutoGetCollectionForReadLockFree coll{opCtx, cmd->getNamespace()};
+                        if (coll) {
+                            if (!coll->getIndexCatalog()
+                                     ->removeExistingIndexes(opCtx,
+                                                             *coll,
+                                                             parseAndValidateIndexSpecs(
+                                                                 opCtx, *cmd, cmd->getNamespace()),
+                                                             true)
+                                     .empty()) {
+                                // A strict subset of the requested indexes are already in the
+                                // process of being built. In the spirit of returnOnStart, we simply
+                                // return the error to the user. This way the command still returns
+                                // without blocking on an index build completing.
+                                throw;
+                            }
+
+                            CreateIndexesReply reply;
+                            if (auto commitQuorum = parseAndGetCommitQuorum(
+                                    opCtx, determineProtocol(opCtx, cmd->getNamespace()), *cmd)) {
+                                reply.setCommitQuorum(*commitQuorum);
+                            }
+                            return reply;
+                        }
+                    }
+
                     if (shouldLogMessageOnAlreadyBuildingError) {
                         LOGV2(
                             20450,
