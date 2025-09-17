@@ -1644,6 +1644,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
                 WriteUnitOfWork wuow(opCtx);
+
+                // This satisfies an assertion within insertDocuments that we are holding this lock
+                // when writing to a capped collection and have reserved oplog slots. However, in
+                // practice there shouldn't be any concurrency here, since all inserts to a
+                // non-clustered capped collection should belong to the same batch. TODO
+                // SERVER-106004: Revisit this acquisition.
+                if (collection->needsCappedLock()) {
+                    Lock::ResourceLock heldUntilEndOfWUOW{
+                        opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
+                }
                 if (!opCtx->writesAreReplicated()) {
                     for (const auto& iOp : insertOps) {
                         invariant(iOp->getTerm());
@@ -1735,6 +1745,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // Do not use supplied timestamps if running through applyOps, as that would
                     // allow a user to dictate what timestamps appear in the oplog.
                     InsertStatement insertStmt(o);
+                    if (collection->needsCappedLock()) {
+                        Lock::ResourceLock heldUntilEndOfWUOW{
+                            opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
+                    }
                     if (assignOperationTimestamp) {
                         invariant(op.getTerm());
                         insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().value());

@@ -62,6 +62,9 @@ namespace mongo {
 namespace {
 
 constexpr char SKIP_TEMP_COLLECTION[] = "skipTempCollections";
+// TODO SERVER-106005: Remove this option once all versions tested in multiversion suites can scan
+// in natural order for capped collections.
+constexpr char USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS[] = "useIndexScanForCappedCollections";
 
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
     // Loop until we get a consistent catalog and snapshot. This is only used for the lock-free
@@ -156,6 +159,15 @@ public:
             cmdObj.hasField(SKIP_TEMP_COLLECTION) && cmdObj[SKIP_TEMP_COLLECTION].trueValue();
         if (skipTempCollections) {
             LOGV2(6859700, "Skipping hash computation for temporary collections");
+        }
+
+        const bool useIndexScanForCappedCollections =
+            cmdObj.hasField(USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS) &&
+            cmdObj[USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS].trueValue();
+        if (useIndexScanForCappedCollections) {
+            LOGV2(8218000,
+                  "Performing index scan on the _id index instead of using natural order for "
+                  "capped collections");
         }
 
         uassert(ErrorCodes::InvalidNamespace,
@@ -308,7 +320,8 @@ public:
             collectionToUUIDMap.emplace(collNss.coll().toString(), collection->uuid());
 
             // Compute the hash for this collection.
-            std::string hash = _hashCollection(opCtx, CollectionPtr(collection));
+            std::string hash =
+                _hashCollection(opCtx, CollectionPtr(collection), useIndexScanForCappedCollections);
 
             collectionToHashMap[collNss.coll().toString()] = hash;
 
@@ -405,7 +418,9 @@ public:
     }
 
 private:
-    std::string _hashCollection(OperationContext* opCtx, const CollectionPtr& collection) {
+    std::string _hashCollection(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                bool useIndexScanForCappedCollections) {
         boost::optional<Lock::CollectionLock> collLock;
         if (opCtx->recoveryUnit()->getTimestampReadSource() ==
             RecoveryUnit::ReadSource::kProvided) {
@@ -433,7 +448,7 @@ private:
         auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-        if (desc) {
+        if (desc && !(collection->isCapped() && !useIndexScanForCappedCollections)) {
             exec = InternalPlanner::indexScan(opCtx,
                                               &collection,
                                               desc,
@@ -443,7 +458,8 @@ private:
                                               PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
-        } else if (collection->isCapped() || collection->isClustered()) {
+        } else if ((collection->isCapped() && !useIndexScanForCappedCollections) ||
+                   collection->isClustered()) {
             exec = InternalPlanner::collectionScan(
                 opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         } else {

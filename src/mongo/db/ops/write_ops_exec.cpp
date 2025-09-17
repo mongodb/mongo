@@ -274,6 +274,12 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto inTransaction = opCtx->inMultiDocumentTransaction();
 
+    // We take an exclusive lock on the metadata resource before reserving the timestamp.
+    if (collection->needsCappedLock()) {
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
+    }
+
     if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
         // Populate 'slots' with new optimes for each insert.
         // This also notifies the storage engine of each new timestamp.

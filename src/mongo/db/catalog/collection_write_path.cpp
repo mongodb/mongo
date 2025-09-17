@@ -177,16 +177,28 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     }
 
     if (collection->needsCappedLock()) {
-        // X-lock the metadata resource for this replicated, non-clustered capped collection until
-        // the end of the WUOW. Non-clustered capped collections require writes to be serialized on
+        // Ensure that we have X-locked the metadata resource for this replicated, non-clustered
+        // capped collection. Non-clustered capped collections require writes to be serialized on
         // the secondary in order to guarantee insertion order (SERVER-21483); this exclusive access
         // to the metadata resource prevents the primary from executing with more concurrency than
         // secondaries - thus helping secondaries keep up - and protects '_cappedFirstRecord'. See
         // SERVER-21646. On the other hand, capped clustered collections with a monotonically
         // increasing cluster key natively guarantee preservation of the insertion order, and don't
         // need serialisation. We allow concurrent inserts for clustered capped collections.
-        Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx, ResourceId(RESOURCE_METADATA, nss.ns()), MODE_X};
+        bool oplogSlotsReserved = std::any_of(
+            begin, end, [](InsertStatement statement) { return !statement.oplogSlot.isNull(); });
+        if (oplogSlotsReserved) {
+            tassert(8218001,
+                    "Operation on non-clustered capped collection had reserved an oplog time but "
+                    "did not have an exclusive lock on "
+                    "the metadata resource",
+                    opCtx->lockState()->isLockHeldForMode(
+                        ResourceId(ResourceType::RESOURCE_METADATA, collection->ns()), MODE_X));
+        } else if (!opCtx->lockState()->isLockHeldForMode(
+                       ResourceId(ResourceType::RESOURCE_METADATA, collection->ns()), MODE_X)) {
+            Lock::ResourceLock heldUntilEndOfWUOW{
+                opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
+        }
     }
 
     std::vector<Record> records;
