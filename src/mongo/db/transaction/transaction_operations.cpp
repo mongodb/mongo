@@ -96,6 +96,7 @@ std::vector<BSONObj> packOperationsIntoApplyOps(
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangAfterLoggingApplyOpsForTransaction);
+MONGO_FAIL_POINT_DEFINE(skipLoggingLastOpForTransaction);
 
 // static
 void TransactionOperations::packTransactionStatementsForApplyOps(
@@ -318,6 +319,13 @@ std::size_t TransactionOperations::logOplogEntries(
         // commit or implicit prepare, i.e. we omit the 'partialTxn' field.
         auto firstOp = stmtsIter == _transactionOperations.begin();
         auto lastOp = nextStmt == _transactionOperations.end();
+
+        // Skip logging the last oplog entry if this failpoint is enabled.
+        if (MONGO_unlikely(skipLoggingLastOpForTransaction.shouldFail()) && lastOp) {
+            // This will cause the loop to exit.
+            stmtsIter = nextStmt;
+            continue;
+        }
 
         auto implicitPrepare = lastOp && prepare;
         auto isPartialTxn = !lastOp && !applyOpsAppliedSeparately;
