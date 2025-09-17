@@ -228,18 +228,31 @@ typedef struct MongoExtensionLogicalAggregationStageVTable {
  */
 typedef struct MongoExtensionHostPortal {
     const struct MongoExtensionHostPortalVTable* vtable;
+
+    /**
+     * The version of the Extensions API that the host and extension agreed upon when creating
+     * the MongoExtension.
+     */
     MongoExtensionAPIVersion hostExtensionsAPIVersion;
-    // Wire versions in MongoDB are stored in an enum. Each service context will have both a min and
-    // a max wire version; the extension should only need the max wire version in order to determine
-    // if new server features have been added.
+
+    /**
+     * Wire versions in MongoDB are stored in an enum. Each service context will have both a min and
+     * a max wire version; the extension should only need the max wire version in order to determine
+     * if new server features have been added.
+     */
     int32_t hostMongoDBMaxWireVersion;
 } MongoExtensionHostPortal;
-
 typedef struct MongoExtensionHostPortalVTable {
+    /**
+     * Register an aggregation stage descriptor with the host.
+     */
     MongoExtensionStatus* (*registerStageDescriptor)(
         const MongoExtensionAggregationStageDescriptor* descriptor);
-    // Returns a MongoExtensionByteView containing the raw extension options associated with this
-    // extension.
+
+    /**
+     * Returns a MongoExtensionByteView containing the raw extension options associated with this
+     * extension.
+     */
     MongoExtensionByteView (*getExtensionOptions)(const MongoExtensionHostPortal* portal);
 } MongoExtensionHostPortalVTable;
 
@@ -256,6 +269,12 @@ typedef struct MongoExtension {
 } MongoExtension;
 
 typedef struct MongoExtensionVTable {
+    /**
+     * Initialize the extension, passing in a pointer to the host portal.
+     *
+     * The host portal pointer is only valid during initialization and should not be retained by the
+     * extension to avoid a dangling pointer.
+     */
     MongoExtensionStatus* (*initialize)(const MongoExtension* extension,
                                         const MongoExtensionHostPortal* portal);
 } MongoExtensionVTable;

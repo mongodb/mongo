@@ -307,7 +307,7 @@ TEST_F(DocumentSourceExtensionTest, parseNoOpSuccess) {
     std::vector<BSONObj> testPipeline{kValidSpec};
     ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 16436);
     // Register the extension stage and try to reparse.
-    mongo::extension::host::registerStageDescriptor(
+    mongo::extension::host::HostPortal::registerStageDescriptor(
         reinterpret_cast<const ::MongoExtensionAggregationStageDescriptor*>(
             &_noOpStaticDescriptor));
     auto parsedPipeline = buildTestPipeline(testPipeline);

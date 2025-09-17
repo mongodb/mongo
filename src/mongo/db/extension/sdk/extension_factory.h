@@ -88,6 +88,8 @@ private:
     static ::MongoExtensionStatus* _extInitialize(
         const ::MongoExtension* extensionPtr, const ::MongoExtensionHostPortal* portal) noexcept {
         return enterCXX([&]() {
+            // The host portal will go out of scope on the host side after initialization, so we
+            // should not retain it to avoid a dangling pointer
             auto hostPortal = HostPortalHandle(portal);
             static_cast<const sdk::ExtensionAdapter*>(extensionPtr)
                 ->_extensionPointer->initialize(hostPortal);

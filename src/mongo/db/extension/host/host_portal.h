@@ -34,8 +34,6 @@
 
 namespace mongo::extension::host {
 
-void registerStageDescriptor(const ::MongoExtensionAggregationStageDescriptor* descriptor);
-
 class HostPortal final : public ::MongoExtensionHostPortal {
 public:
     HostPortal(::MongoExtensionAPIVersion apiVersion,
@@ -43,6 +41,9 @@ public:
                std::string extensionOptions)
         : ::MongoExtensionHostPortal{&VTABLE, apiVersion, maxWireVersion},
           _extensionOpts(std::move(extensionOptions)) {}
+
+    static void registerStageDescriptor(
+        const ::MongoExtensionAggregationStageDescriptor* descriptor);
 
 private:
     static ::MongoExtensionStatus* _extRegisterStageDescriptor(

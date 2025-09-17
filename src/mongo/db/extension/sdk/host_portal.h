@@ -38,8 +38,12 @@ namespace mongo::extension::sdk {
 
 /**
  * Wrapper for ::MongoExtensionHostPortal providing safe access to its public API via the vtable.
- * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
- * is never transferred to the host.
+ *
+ * This is an unowned handle, meaning the host portal remains fully owned by the host, and ownership
+ * is never transferred to the extension.
+ *
+ * Note that the host portal pointer is only valid during initialization and should not be retained
+ * by the extension.
  */
 class HostPortalHandle : public sdk::UnownedHandle<const ::MongoExtensionHostPortal> {
 public:
