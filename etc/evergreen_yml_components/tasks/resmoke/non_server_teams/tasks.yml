@@ -383,7 +383,6 @@ tasks:
       [
         "assigned_to_jira_team_devprod_correctness",
         "development_critical_single_variant",
-        "requires_large_host",
       ]
     depends_on:
       - name: archive_dist_test

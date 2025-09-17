@@ -33,6 +33,10 @@ ci_flags="\
 --noincompatible_enable_cc_toolchain_resolution \
 --repo_env=no_c++_toolchain=1"
 
+if [[ "${evergreen_remote_exec}" == "on" ]]; then
+    ci_flags="--config=remote_test ${ci_flags}"
+fi
+
 if [ ${should_shuffle} = true ]; then
     ci_flags+=" --test_arg=--shuffle"
 elif [ ${should_shuffle} = false ]; then
