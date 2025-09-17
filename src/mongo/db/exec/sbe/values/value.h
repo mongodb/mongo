@@ -1538,20 +1538,20 @@ inline StringData getStringOrSymbolView(TypeTags tag, const Value& val) noexcept
 }
 
 inline size_t getBSONBinDataSize(TypeTags tag, Value val) {
-    tassert(11089606, "Unexpected value type", tag == TypeTags::bsonBinData);
+    invariant(tag == TypeTags::bsonBinData);
     return static_cast<size_t>(
         ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>());
 }
 
 inline BinDataType getBSONBinDataSubtype(TypeTags tag, Value val) {
-    tassert(11089605, "Unexpected value type", tag == TypeTags::bsonBinData);
+    invariant(tag == TypeTags::bsonBinData);
     uint8_t subtype =
         ConstDataView(getRawPointerView(val) + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
     return static_cast<BinDataType>(subtype);
 }
 
 inline uint8_t* getBSONBinData(TypeTags tag, Value val) {
-    tassert(11089604, "Unexpected value type", tag == TypeTags::bsonBinData);
+    invariant(tag == TypeTags::bsonBinData);
     return reinterpret_cast<uint8_t*>(getRawPointerView(val) + sizeof(uint32_t) + 1);
 }
 
@@ -1637,9 +1637,7 @@ inline std::pair<TypeTags, Value> makeBigString(StringData input) {
     auto len = input.size();
     auto ptr = input.data();
 
-    tassert(11089603,
-            "Input string is too long",
-            len < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
+    invariant(len < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
 
     auto length = static_cast<uint32_t>(len);
     auto buf = new char[length + 5];

@@ -194,7 +194,7 @@ protected:
     static constexpr int kInlinedVectorSize = 16;
 
     std::pair<TypeTags, Value> getValue(size_t index, int bufferLen) {
-        tassert(11089602, "Out of bounds read", index < _tagList.size());
+        invariant(index < _tagList.size());
         auto tag = _tagList[index];
         auto val = _valList[index];
 
@@ -214,7 +214,7 @@ protected:
             case TypeTags::bsonDBPointer:
             case TypeTags::bsonCodeWScope: {
                 auto offset = bitcastTo<decltype(bufferLen)>(val);
-                tassert(11089601, "Out of bounds read", offset < bufferLen);
+                invariant(offset < bufferLen);
                 val = bitcastFrom<const char*>(_valueBufferBuilder->buf() + offset);
                 break;
             }
@@ -286,7 +286,7 @@ public:
         auto bufferLen = _valueBufferBuilder->len();
         for (size_t i = 0; i < _tagList.size(); ++i) {
             auto [tag, val] = getValue(i, bufferLen);
-            tassert(11089600, "Out of bounds read", i < accessors->size());
+            invariant(i < accessors->size());
             (*accessors)[i].reset(false, tag, val);
         }
     }
@@ -327,6 +327,7 @@ public:
         // builder. Be careful to only read as many values into 'row' as this output 'row' has space
         // for.
         while (rowIdx < row.size()) {
+            invariant(rowIdx < row.size());
             auto [_, tagNothing, valNothing] = getValue(bufIdx++, bufferLen);
             tassert(6136200, "sbe tag must be 'Boolean'", tagNothing == TypeTags::Boolean);
             if (!bitcastTo<bool>(valNothing)) {

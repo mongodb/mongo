@@ -476,7 +476,7 @@ public:
     }
 
     std::pair<value::TypeTags, value::Value> at(size_t idx) override {
-        tassert(11089617, "Out of bounds read in MonoBlock", idx < _count);
+        invariant(idx < _count);
         return {_tag, _val};
     }
 

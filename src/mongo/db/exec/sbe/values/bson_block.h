@@ -223,7 +223,7 @@ void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
             std::pair(get.field, std::make_unique<BsonWalkNode<ProjectionRecorder>>()));
         it->second->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
     } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
-        tassert(11089614, "Unexpected pathIdx", pathIdx != 0);
+        invariant(pathIdx != 0);
         if (!traverseChild) {
             traverseChild = std::make_unique<BsonWalkNode<ProjectionRecorder>>();
         }
@@ -235,6 +235,7 @@ void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
 
         traverseChild->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
     } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
+        invariant(pathIdx != 0);
 
         if (outFilterRecorder) {
             filterRecorder = outFilterRecorder;
@@ -242,7 +243,7 @@ void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
         if (outProjRecorder) {
             projRecorder = outProjRecorder;
         }
-        tassert(11089612, "Unexpected pathIdx", pathIdx == path.size() - 1);
+        invariant(pathIdx == path.size() - 1);
     }
 }
 
@@ -278,16 +279,14 @@ void walkField(BsonWalkNode<ProjectionRecorder>* node,
                const char* bsonPtr,
                const Cb& cb) {
     if (value::isObject(eltTag)) {
-        tassert(11089611,
-                "Unexpected object type",
-                eltTag == TypeTags::bsonObject);  // Only BSON is supported for now.
+        invariant(eltTag == TypeTags::bsonObject);  // Only BSON is supported for now.
 
         walkObj<ProjectionRecorder>(node, value::bitcastTo<const char*>(eltVal), cb);
         if (node->traverseChild) {
             walkField<ProjectionRecorder>(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
         }
     } else if (value::isArray(eltTag)) {
-        tassert(11089610, "Unexpected Array type", eltTag == TypeTags::bsonArray);
+        invariant(eltTag == TypeTags::bsonArray);
         if (node->traverseChild) {
             // The projection traversal semantics are "special" in that the leaf must know
             // when there is an array higher up in the tree.
