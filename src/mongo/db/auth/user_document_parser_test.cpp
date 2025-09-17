@@ -445,6 +445,7 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival
         {"169.254.16.0", "fe80::1", false},
         {"169.254.16.0", "fec0::1", false},
         {"127.0.0.1", "::1", false},
+        {"169.254.15.255", "fe80:0000:0000:0000:ffff:ffff:ffff:ffff", true},
     };
     for (const auto& p : tests) {
         auto session =

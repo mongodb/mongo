@@ -114,6 +114,14 @@ public:
         builder.append(fieldName, value.toString());
     }
 
+    bool getLinkLocal() const {
+        return _isLinkLocal;
+    }
+
+    std::string getScopeStr() const {
+        return _scopeStr;
+    }
+
 private:
 #ifdef _WIN32
     using sa_family_t = int;
@@ -121,17 +129,29 @@ private:
 
     CIDR();
 
-    auto equalityLens() const {
+    typedef struct {
+        std::string ip;
+        std::string zone;
+    } ipv6WithZone_t;
+
+    auto _equalityLens() const {
         return std::tie(_ip, _family, _len);
     }
+
+    ipv6WithZone_t _splitIPv6String(const std::string& ipv6);
+    bool _ipv6LinkLocalAddress(const std::string& ipv6string);
+    std::string _toLower(std::string s);
+    std::vector<std::string> _splitString(const std::string& s, char delimiter);
 
     std::array<std::uint8_t, 16> _ip;
     sa_family_t _family;
     std::uint8_t _len;
+    bool _isLinkLocal{false};
+    std::string _scopeStr;
 };
 
 inline bool operator==(const CIDR& lhs, const CIDR& rhs) {
-    return lhs.equalityLens() == rhs.equalityLens();
+    return lhs._equalityLens() == rhs._equalityLens();
 }
 
 std::ostream& operator<<(std::ostream& s, const CIDR& cidr);

@@ -33,11 +33,55 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"
 
+#if !defined(_WIN32) && !defined(_WIN64)
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <unistd.h>
+
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#endif
+
 #include <memory>
 
 namespace mongo {
 namespace {
 
+std::string getLinkLocalIPv6Address(bool scopeOnly = false) {
+#if !defined(_WIN32) && !defined(_WIN64)
+    struct ifaddrs *ifaddr, *ifa;
+    char addr_str[INET6_ADDRSTRLEN];
+    std::string linkLocalWithScope;
+    std::string scopeOnlyStr;
+
+    if (getifaddrs(&ifaddr) == -1) {
+        return std::string();
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
+            continue;  // Skip non-IPv6 addresses
+        }
+
+        struct sockaddr_in6* sa = (struct sockaddr_in6*)ifa->ifa_addr;
+
+        // Check if the address is link-local
+        if (IN6_IS_ADDR_LINKLOCAL(&(sa->sin6_addr))) {
+            inet_ntop(AF_INET6, &(sa->sin6_addr), addr_str, INET6_ADDRSTRLEN);
+            linkLocalWithScope = std::string(addr_str) + "%" + ifa->ifa_name;
+            linkLocalWithScope = scopeOnly ? ifa->ifa_name : linkLocalWithScope;
+            break;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+    return linkLocalWithScope;
+#else
+    return std::string();
+#endif
+}
 
 TEST(AddressRestrictionTest, toAndFromStringSingle) {
     const struct {
@@ -49,7 +93,8 @@ TEST(AddressRestrictionTest, toAndFromStringSingle) {
         {"::1", "::1/128"},
         {"169.254.0.0/16", "169.254.0.0/16"},
         {"fe80::/10", "fe80::/10"},
-    };
+        {.input = "fe80::1%eth0/10", .output = "fe80::1/10"},
+        {.input = "fe80::8ff:ecff:fee6:fd4d%ens5/64", .output = "fe80::8ff:ecff:fee6:fd4d/64"}};
     for (const auto& p : strings) {
         {
             const ClientSourceRestriction csr(p.input);
@@ -76,8 +121,9 @@ TEST(AddressRestrictionTest, toAndFromStringVector) {
         std::vector<std::string> input;
         std::string output;
     } tests[] = {
-        {{"127.0.0.1", "169.254.0.0/16", "::1"},
-         "[\"127.0.0.1/32\", \"169.254.0.0/16\", \"::1/128\"]"},
+        {{"127.0.0.1", "169.254.0.0/16", "::1", "fe80::8ff:ecff:fee6:fd4d%ens5/64"},
+         "[\"127.0.0.1/32\", \"169.254.0.0/16\", \"::1/128\", "
+         "\"fe80::8ff:ecff:fee6:fd4d/64\"]"},
     };
     for (const auto& p : tests) {
         {
@@ -210,6 +256,8 @@ TEST(AddressRestrictionTest, contains) {
         {{}, "::", false},
         {{}, "255.255.255.255", false},
         {{}, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false},
+
+        {{"fe80::1/64"}, "fe80::8ff:ecff:fee6:fd4d", true},
     };
     for (const auto& p : contains) {
         const auto dummy = SockAddr();
@@ -228,6 +276,7 @@ TEST(AddressRestrictionTest, contains) {
 }
 
 TEST(AddressRestrictionTest, parseFail) {
+    // Need IPv6 test?
     const BSONObj tests[] = {
         BSON("unknownField" << ""),
         BSON("clientSource" << "1.2.3.4.5"),
@@ -320,5 +369,79 @@ TEST(AddressRestrictionTest, parseAndMatch) {
     }
 }
 
+TEST(AddressRestrictionTest, parseAndMatchLinkLocalSuccess) {
+    // The IPv6 link-local address to use in the test is different for every OS, as well as every
+    // instance of the OS. This will include the scope ID. We need to get this at runtime.
+    std::string llAddr = getLinkLocalIPv6Address(false);
+    if (llAddr.empty()) {
+        // No link-local address found. Skip the test.
+        return;
+    }
+
+    // Use the link-local address as the clientSource restriction
+    std::vector<std::string> clientSourceVector = {llAddr};
+    BSONObjBuilder b;
+    b.append("clientSource", clientSourceVector);
+    const auto doc = b.obj();
+    const auto setwith = parseAddressRestrictionSet(doc);
+    ASSERT_OK(setwith);
+
+    const RestrictionEnvironment env(SockAddr::create(llAddr, 1024, AF_UNSPEC),
+                                     SockAddr::create("fe80::1", 1025, AF_UNSPEC));
+    ASSERT_TRUE(setwith.getValue().validate(env).isOK());
+}
+
+TEST(AddressRestrictionTest, parseAndMatchLinkLocalFail) {
+    // The IPv6 link-local address to use in the test is different for every OS, as well as every
+    // instance of the OS. This will include the scope ID. We need to get this at runtime.
+    // For this test, we just need the scope ID.
+    std::string llScope = getLinkLocalIPv6Address(true);
+    if (llScope.empty()) {
+        // No link-local address found. Skip the test.
+        return;
+    }
+    // Client source will look like fe80::%ens5/10, where ens5 is the scope ID
+    std::string clientSource = "fe80::";
+    clientSource += "%" + llScope + "/10";
+    std::vector<std::string> clientSourceVector = {clientSource};
+    BSONObjBuilder b;
+    b.append("clientSource", clientSourceVector);
+    const auto doc = b.obj();
+    const auto setwith = parseAddressRestrictionSet(doc);
+    ASSERT_OK(setwith);
+
+    const RestrictionEnvironment env(SockAddr::create("fec0::dead:beef", 1024, AF_UNSPEC),
+                                     SockAddr::create("fe80::1", 1025, AF_UNSPEC));
+    ASSERT_EQ(setwith.getValue().validate(env).isOK(), false);
+}
+
+TEST(AddressRestrictionTest, parseAndMatchLinkLocalFail2) {
+    // The IPv6 link-local address to use in the test is different for every OS, as well as every
+    // instance of the OS. This will include the scope ID. We need to get this at runtime.
+    std::string llAddr = getLinkLocalIPv6Address(false);
+    if (llAddr.empty()) {
+        // No link-local address found. Skip the test.
+        return;
+    }
+
+    std::string clientSource = llAddr;
+    // Change the scope ID to an invalid interface name. This should cause the validation to fail.
+    size_t percent = clientSource.find('%');
+    if (percent != std::string::npos) {
+        clientSource.replace(percent, clientSource.length() - percent, "%xxx");
+    }
+
+    // Use the link-local address as the clientSource restriction
+    std::vector<std::string> clientSourceVector = {clientSource};
+    BSONObjBuilder b;
+    b.append("clientSource", clientSourceVector);
+    const auto doc = b.obj();
+    const auto setwith = parseAddressRestrictionSet(doc);
+    ASSERT_OK(setwith);
+
+    const RestrictionEnvironment env(SockAddr::create(llAddr, 1024, AF_UNSPEC),
+                                     SockAddr::create("fe80::1", 1025, AF_UNSPEC));
+    ASSERT_EQ(setwith.getValue().validate(env).isOK(), false);
+}
 }  // namespace
 }  // namespace mongo

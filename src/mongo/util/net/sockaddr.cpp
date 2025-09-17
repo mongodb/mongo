@@ -93,6 +93,10 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
         hints.ai_family = familyHint;
 
         addrinfo* addrs = nullptr;
+        // For IPv6 link-local addresses, the scope id will be specified as part of the address,
+        // e.g. fe80::1%en0. getaddrinfo() will parse the scope id from the address string and set
+        // it in the resulting sockaddr_in6 struct in the sin6_scope_id field. We don't need to do
+        // anything special here
         result.err = getaddrinfo(hostString.c_str(), portString.c_str(), &hints, &addrs);
         result.addr = AddrInfoPtr(addrs);
         return result;

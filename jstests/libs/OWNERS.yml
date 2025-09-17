@@ -93,3 +93,6 @@ filters:
   - "replicated_record_ids_utils.js":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "host_ipaddr.js":
+    approvers:
+      - 10gen/server-networking-and-observability

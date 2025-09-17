@@ -901,6 +901,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/json_utils.js @10gen/query-integration-extensions @svc-auto-approve-bot
 /jstests/libs/**/replicated_ident_utils.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /jstests/libs/**/replicated_record_ids_utils.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/jstests/libs/**/host_ipaddr.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/clustered_collections/OWNERS.yml
 /jstests/libs/clustered_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

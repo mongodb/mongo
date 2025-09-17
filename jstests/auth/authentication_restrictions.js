@@ -2,7 +2,7 @@
  * This test checks that authentication restrictions can be set and respected.
  * @tags: [requires_sharding, requires_replication]
  */
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr, getIpv6addr} from "jstests/libs/host_ipaddr.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -22,6 +22,7 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
 
     // Create a strongly consistent session for consuming user data
     const db = conn.getDB("admin");
+    let ipv6addr = getIpv6addr(true, false);
 
     // Create a strongly consistent session for consuming user data, with a non-localhost
     // source IP.
@@ -121,6 +122,50 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
             authenticationRestrictions: [{invalidRestriction: ["127.0.0.1"]}],
         }),
     );
+    if (ipv6addr != "" && ipv6addr != null) {
+        assert.commandWorked(
+            adminDB.runCommand({
+                createUser: "ipv6user1",
+                pwd: "user",
+                roles: [],
+                authenticationRestrictions: [{clientSource: [ipv6addr]}],
+            }),
+        );
+        print(
+            'When a client on a link-local IPv6 address authenticates to a user with {clientSource: "' +
+                ipv6addr +
+                '"}, it will succeed',
+        );
+
+        clearRawMongoProgramOutput();
+        const ipv6Command = [
+            "mongo",
+            "--ipv6",
+            "--host",
+            "[" + ipv6addr + "]",
+            "--port",
+            conn.port,
+            "-u",
+            "ipv6user1",
+            "-p",
+            "user",
+            "--authenticationDatabase",
+            "admin",
+        ];
+        let clientPID = _startMongoProgram({args: ipv6Command});
+        assert.soon(() => {
+            const output = rawMongoProgramOutput(".*");
+            if (output.includes("Successfully authenticated")) {
+                stopMongoProgramByPid(clientPID);
+                return true;
+            }
+            if (output.includes("Error:")) {
+                print("ipv6 auth attempt failed with output: " + output);
+                return false;
+            }
+            return false;
+        });
+    }
 
     print("=== Localhost access tests");
 
@@ -193,7 +238,7 @@ function testConnection(conn, eventuallyConsistentConn, sleepUntilUserDataPropag
 }
 
 print("Testing standalone");
-const conn = MongoRunner.runMongod({bind_ip_all: "", auth: ""});
+const conn = MongoRunner.runMongod({bind_ip_all: "", ipv6: "", auth: ""});
 testConnection(
     conn,
     conn,
@@ -205,7 +250,12 @@ MongoRunner.stopMongod(conn);
 const keyfile = "jstests/libs/key1";
 
 print("Testing replicaset");
-const rst = new ReplSetTest({name: "testset", nodes: 2, nodeOptions: {bind_ip_all: "", auth: ""}, keyFile: keyfile});
+const rst = new ReplSetTest({
+    name: "testset",
+    nodes: 2,
+    nodeOptions: {bind_ip_all: "", ipv6: "", auth: ""},
+    keyFile: keyfile,
+});
 const nodes = rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();

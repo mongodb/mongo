@@ -216,15 +216,16 @@ TEST(CIDRTest, containsBits) {
     }
 }
 
-const auto kBadIp = "Invalid IP address in CIDR string";
+const auto kBadIp = "Invalid IP address format";
+const auto kBadIpInCIDR = "Invalid IP address in CIDR string";
 const auto kLenOOB = "Invalid length in CIDR string";
 const auto kBadLen = "Non-numeric length in CIDR string";
 
 TEST(CIDRTest, doesNotParse) {
     string_pair bad_addrs[] = {
-        {"1.2.3.4.5", kBadIp},
-        {"1.2.3", kBadIp},
-        {"1::2::3", kBadIp},
+        {"1.2.3.4.5", kBadIpInCIDR},
+        {"1.2.3", kBadIpInCIDR},
+        {"1::2::3", kBadIpInCIDR},
         {"127.0.0.1/33", kLenOOB},
         {"::1/129", kLenOOB},
         {"1.2.3.4/-1", kLenOOB},
@@ -235,9 +236,10 @@ TEST(CIDRTest, doesNotParse) {
         {"/", kBadIp},
         {"1.2.3.4//", kBadLen},
         {"::/", kBadLen},
-        {"candygram", kBadIp},
+        {"candygram", kBadIpInCIDR},
     };
     for (auto&& p : bad_addrs) {
+        std::cout << "Parsing '" << p.first << "' should fail: " << p.second << std::endl;
         ASSERT_THROWS_WHAT(CIDR(p.first), DBException, p.second);
     }
 }
