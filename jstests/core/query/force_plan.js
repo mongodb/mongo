@@ -19,6 +19,14 @@
  * ]
  */
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+
+// Enabling SBE affects plan enumeration under CBR.
+if (checkSbeFullyEnabled(db) && getPlanRankerMode(db) != "multiPlanning") {
+    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    quit();
+}
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -72,7 +80,7 @@ function testQueryWithThreeEnumeratedPlans() {
     });
 
     // We should see a plan with a bounds on index a:1 and a plan with a sort on b:1.
-    assert.eq(3, allPlans.length);
+    assert.eq(3, allPlans.length, tojson(allPlans));
 }
 
 function testNonMatchingHash() {
