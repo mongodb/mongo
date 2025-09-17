@@ -2,7 +2,7 @@
  * Test the automatic dry-run behavior during setFeatureCompatibilityVersion command,
  * along with the skipDryRun parameter and failpoints for dry-run failures.
  *
- * @tags: [featureFlagSetFcvDryRunMode]
+ * @tags: [requires_fcv_83]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

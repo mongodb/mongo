@@ -2,7 +2,7 @@
  * Test for both downgrading and upgrading FCV cases using the `dryRun` option of
  * the setFeatureCompatibilityVersion command.
  *
- * @tags: [featureFlagSetFcvDryRunMode]
+ * @tags: [requires_fcv_83]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
