@@ -67,3 +67,6 @@ filters:
   - "balancer_feature_flag*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "sharding_task_executor_pool*":
+    approvers:
+      - 10gen/server-networking-and-observability

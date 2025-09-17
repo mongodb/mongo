@@ -49,7 +49,7 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/client/shard_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"

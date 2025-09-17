@@ -97,6 +97,14 @@ public:
         return _maxLoader();
     }
 
+    Milliseconds baseEstablishmentBackoffMS() const override {
+        return getPoolOptions().baseEstablishmentBackoffMS;
+    }
+
+    Milliseconds maxEstablishmentBackoffMS() const override {
+        return getPoolOptions().maxEstablishmentBackoffMS;
+    }
+
     StringData name() const override {
         return _name;
     }

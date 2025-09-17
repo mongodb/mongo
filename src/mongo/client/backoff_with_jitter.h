@@ -51,18 +51,7 @@ struct BackoffWithJitter {
         invariant(_baseBackoff <= _maxBackoff);
     }
 
-    Milliseconds getBackoffDelay() const {
-        if (_attemptCount == 0) {
-            return Milliseconds{0};
-        }
-
-        const std::int64_t minDelay = 0;
-        const auto maxDelay =
-            static_cast<std::int64_t>(std::min(static_cast<double>(_maxBackoff.count()),
-                                               _baseBackoff.count() * std::exp2(_attemptCount)));
-
-        return Milliseconds{std::uniform_int_distribution{minDelay, maxDelay}(_randomEngine())};
-    }
+    Milliseconds getBackoffDelay() const;
 
     Milliseconds getBackoffDelayAndIncrementAttemptCount() {
         const auto delay = getBackoffDelay();
@@ -72,6 +61,10 @@ struct BackoffWithJitter {
 
     void incrementAttemptCount() {
         ++_attemptCount;
+    }
+
+    void reset() {
+        _attemptCount = 0;
     }
 
     void setAttemptCount_forTest(std::uint32_t value) {

@@ -365,6 +365,14 @@ size_t ShardingTaskExecutorPoolController::maxConnections() const {
     return gParameters.maxConnections.load();
 }
 
+Milliseconds ShardingTaskExecutorPoolController::baseEstablishmentBackoffMS() const {
+    return Milliseconds{gParameters.baseEstablishmentBackoffMS.load()};
+}
+
+Milliseconds ShardingTaskExecutorPoolController::maxEstablishmentBackoffMS() const {
+    return Milliseconds{gParameters.maxEstablishmentBackoffMS.load()};
+}
+
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
     executor::ConnectionPoolStats* cps) const {
     cps->matchingStrategy =

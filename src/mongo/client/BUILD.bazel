@@ -608,7 +608,6 @@ mongo_cc_unit_test(
     }),
     deps = [
         ":authentication",
-        ":backoff_with_jitter",
         ":clientdriver_minimal",
         ":clientdriver_network",
         ":connection_string",
@@ -754,7 +753,7 @@ mongo_cc_library(
         "backoff_with_jitter.h",
     ],
     deps = [
-        "//src/mongo:base",
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -770,7 +769,6 @@ mongo_cc_library(
     ],
     deps = [
         ":backoff_with_jitter",
-        "//src/mongo:base",
         "//src/mongo:core_headers_library",
         "//src/mongo/db:error_labels",
         "//src/third_party/folly:folly_token_bucket",

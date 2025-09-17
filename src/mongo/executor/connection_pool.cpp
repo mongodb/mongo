@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/backoff_with_jitter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
@@ -237,6 +238,14 @@ public:
     }
     size_t maxConnections() const override {
         return getPool()->_options.maxConnections;
+    }
+
+    Milliseconds baseEstablishmentBackoffMS() const override {
+        return getPool()->_options.baseEstablishmentBackoffMS;
+    }
+
+    Milliseconds maxEstablishmentBackoffMS() const override {
+        return getPool()->_options.maxEstablishmentBackoffMS;
     }
 
     StringData name() const override {
@@ -528,7 +537,8 @@ private:
 
     void finishRefresh(stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
                        ConnectionInterface* connPtr,
-                       Status status);
+                       Status status,
+                       bool onSetup);
 
     void addToReady(WithLock, OwnedConnection conn);
 
@@ -584,6 +594,7 @@ private:
     std::shared_ptr<TimerInterface> _eventTimer;
     Date_t _eventTimerExpiration;
     Date_t _hostExpiration;
+    Date_t _backoffPeriodEnd;
 
     // The _generation is the set of connection objects we believe are healthy.
     // It increases when we process a failure. If a connection is from a previous generation,
@@ -599,6 +610,10 @@ private:
     size_t _created = 0;
 
     size_t _refreshed = 0;
+
+    bool _needsRefresh = false;
+
+    Status _lastStatusInThrottleMode = Status::OK();
 
     AtomicWord<size_t> _neverUsed{0};
 
@@ -622,6 +637,8 @@ private:
 
     // The next id to be used when creating a new conneciton, is incremented each time
     ConnectionInterface::PoolConnectionId _nextConnectionId{0u};
+
+    BackoffWithJitter _backoffWithJitter;
 };
 
 auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
@@ -891,9 +908,13 @@ ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> paren
       _sslMode(sslMode),
       _hostAndPort(hostAndPort),
       _id(_parent->_nextPoolId++),
-      _readyPool(std::numeric_limits<size_t>::max()) {
+      _readyPool(std::numeric_limits<size_t>::max()),
+      _backoffWithJitter(_parent->_controller->baseEstablishmentBackoffMS(),
+                         _parent->_controller->maxEstablishmentBackoffMS()) {
     invariant(_parent);
     _eventTimer = _parent->_factory->makeTimer();
+    // TODO (SERVER-110963) Remove this increment once this task is completed.
+    _backoffWithJitter.incrementAttemptCount();
 }
 
 ConnectionPool::SpecificPool::~SpecificPool() {
@@ -1137,7 +1158,8 @@ ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection(
 void ConnectionPool::SpecificPool::finishRefresh(
     stdx::unique_lock<ObservableMutex<stdx::mutex>>& lk,
     ConnectionInterface* connPtr,
-    Status status) {
+    Status status,
+    bool onSetup) {
     auto conn = takeFromProcessingPool(lk, connPtr);
 
     // We increment the total number of refreshed connections right upfront to track all completed
@@ -1169,6 +1191,32 @@ void ConnectionPool::SpecificPool::finishRefresh(
         return;
     }
 
+    // If a new connection is being setup and we get a 'HostUnreachable' or a 'SocketException'
+    // error, we'll assume the host is overloaded. Therefore, we won't drop any open connection and
+    // will force a refresh when the next connection gets returned.
+    if (onSetup &&
+        (status.code() == ErrorCodes::HostUnreachable ||
+         status.code() == ErrorCodes::SocketException) &&
+        openConnections(lk) != 0 &&
+        (_health == HostHealth::kHealthy || _health == HostHealth::kThrottle)) {
+        _needsRefresh = true;
+        _lastStatusInThrottleMode = status;
+
+        if (_health != HostHealth::kThrottle) {
+            _health = HostHealth::kThrottle;
+            _backoffPeriodEnd = _parent->_factory->now() +
+                _backoffWithJitter.getBackoffDelayAndIncrementAttemptCount();
+        }
+
+        LOGV2_DEBUG(10864501,
+                    kDiagnosticLogLevel,
+                    "Unable to establish a new connection.",
+                    "hostAndPort"_attr = _hostAndPort,
+                    "error"_attr = redact(status),
+                    "numOpenConns"_attr = openConnections(lk));
+        return;
+    }
+
     // Pass a failure on through
     if (!status.isOK()) {
         LOGV2_DEBUG(22563,
@@ -1184,6 +1232,13 @@ void ConnectionPool::SpecificPool::finishRefresh(
                 kDiagnosticLogLevel,
                 "Finishing connection refresh",
                 "hostAndPort"_attr = _hostAndPort);
+
+    if (_health == HostHealth::kThrottle) {
+        _health = HostHealth::kHealthy;
+        _backoffWithJitter.reset();
+        // TODO (SERVER-110963) Remove this increment once this task is completed.
+        _backoffWithJitter.incrementAttemptCount();
+    }
 
     // If the connection refreshed successfully, throw it back in the ready pool
     addToReady(lk, std::move(conn));
@@ -1242,7 +1297,7 @@ void ConnectionPool::SpecificPool::returnConnection(
     }
 
     // If we need to refresh this connection
-    bool shouldRefreshConnection = needsRefreshTP <= _parent->_factory->now();
+    bool shouldRefreshConnection = _needsRefresh || needsRefreshTP <= _parent->_factory->now();
 
     if (MONGO_unlikely(refreshConnectionAfterEveryCommand.shouldFail())) {
         LOGV2(5505501, "refresh connection after every command is on");
@@ -1250,6 +1305,8 @@ void ConnectionPool::SpecificPool::returnConnection(
     }
 
     if (shouldRefreshConnection) {
+        _needsRefresh = false;
+
         auto controls = _parent->_controller->getControls(_id);
         if (openConnections(lk) >= controls.targetConnections) {
             // If we already have minConnections, just let the connection lapse
@@ -1266,7 +1323,8 @@ void ConnectionPool::SpecificPool::returnConnection(
             22568, kDiagnosticLogLevel, "Refreshing connection", "hostAndPort"_attr = _hostAndPort);
         connPtr->refresh(_parent->_controller->pendingTimeout(),
                          guardCallback([this](auto& lk, auto conn, auto status) {
-                             finishRefresh(lk, std::move(conn), std::move(status));
+                             finishRefresh(
+                                 lk, std::move(conn), std::move(status), false /* onSetup */);
                          }));
 
         return;
@@ -1476,6 +1534,8 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::setGetCon
 
 // spawn enough connections to satisfy open requests and minpool, while honoring maxpool
 void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
+    const auto now = _parent->_factory->now();
+
     if (_health == HostHealth::kShutdown) {
         // Dead pools spawn no conns
         return;
@@ -1489,6 +1549,19 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
         return;
     }
 
+    if (_health == HostHealth::kThrottle) {
+        if (_backoffPeriodEnd > now) {
+            LOGV2_DEBUG(10864502,
+                        kDiagnosticLogLevel,
+                        "Pool is in throttling mode, postponing any attempts to spawn connections"
+                        "connections",
+                        "hostAndPort"_attr = _hostAndPort);
+            return;
+        }
+
+        _backoffPeriodEnd = now + _backoffWithJitter.getBackoffDelayAndIncrementAttemptCount();
+    }
+
     auto controls = _parent->_controller->getControls(_id);
     LOGV2_DEBUG(22575,
                 kDiagnosticLogLevel,
@@ -1496,8 +1569,11 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
                 "hostAndPort"_attr = _hostAndPort,
                 "poolControls"_attr = controls);
 
+    const auto maxPendingConnections =
+        (_health == HostHealth::kThrottle ? 1 : controls.maxPendingConnections);
+
     auto pendingConnections = refreshingConnections(lk);
-    if (pendingConnections >= controls.maxPendingConnections) {
+    if (pendingConnections >= maxPendingConnections) {
         return;
     }
 
@@ -1513,7 +1589,7 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
                 "hostAndPort"_attr = _hostAndPort);
 
     auto allowance = std::min(controls.targetConnections - totalConnections,
-                              controls.maxPendingConnections - pendingConnections);
+                              maxPendingConnections - pendingConnections);
     LOGV2_DEBUG(22577,
                 kDiagnosticLogLevel,
                 "Spawning connections",
@@ -1540,7 +1616,7 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
         // Run the setup callback
         handle->setup(_parent->_controller->pendingTimeout(),
                       guardCallback([this](auto& lk, auto conn, auto status) {
-                          finishRefresh(lk, std::move(conn), std::move(status));
+                          finishRefresh(lk, std::move(conn), std::move(status), true /* onSetup */);
                       }),
                       _parent->getName());
     }
@@ -1612,6 +1688,11 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
         nextEventTime = _requests.begin()->first;
     }
 
+    // If the backoff period is going to end before the next event, then it is the next event
+    if (_health == HostHealth::kThrottle && _backoffPeriodEnd < nextEventTime) {
+        nextEventTime = _backoffPeriodEnd;
+    }
+
     // Clamp next event time to be either now or in the future. Next event time
     // can be in the past anytime we wait a long time between invocations of
     // updateState; in these cases, we want to set our event timer to expire
@@ -1647,10 +1728,14 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
             _lastActiveTime = now;
         }
 
+        const Status error = (_health == HostHealth::kThrottle
+                                  ? _lastStatusInThrottleMode
+                                  : Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
+                                           "Couldn't get a connection within the time limit"));
+
         ScopedUnlock guard(lk);
         for (auto& promise : toError) {
-            promise.setError(Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
-                                    "Couldn't get a connection within the time limit"));
+            promise.setError(error);
         }
     });
     _eventTimer->setTimeout(timeout, std::move(deferredStateUpdateFunc));

@@ -141,3 +141,24 @@ server_parameters:
                 expr: "mongo::executor::ConnectionPool::kDefaultConnectionRequestsMaxQueueDepth",
             }
         redact: false
+
+    ShadingTaskExecutorPoolBaseEstablishmentBackoffMS:
+        description: <-
+            The base backoff delay for connection establishment retries for each executor in the sharding pool.
+            Actual retry delays are computed as an exponential backoff with jitter based on this value.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.baseEstablishmentBackoffMS"
+        validator:
+            gte: 0
+        default: 50 # 50 ms
+        redact: false
+
+    ShardingTaskExecutorPoolMaxEstablishmentBackoffMS:
+        description: <-
+            The maximum backoff delay for connection establishment retries for each executor in the sharding pool.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxEstablishmentBackoffMS"
+        validator:
+            gte: 0
+        default: 10000 # 10 secs
+        redact: false

@@ -459,6 +459,7 @@ mongo_cc_library(
         ":connection_pool_stats",
         ":egress_connection_closer_manager",
         ":remote_command",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/client:backoff_with_jitter",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:observable_mutex_registry",
@@ -496,6 +497,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:kill_common",
         "//src/mongo/rpc:command_status",
+        "//src/mongo/s/client:shard_interface",
     ],
 )
 
