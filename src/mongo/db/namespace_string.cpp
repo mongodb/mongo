@@ -52,7 +52,6 @@ static const absl::flat_hash_set<NamespaceString> globallyUniqueConfigDbCollecti
     NamespaceString::kConfigsvrChunksNamespace,
     NamespaceString::kConfigDatabasesNamespace,
     NamespaceString::kConfigsvrShardsNamespace,
-    NamespaceString::kConfigsvrIndexCatalogNamespace,
     NamespaceString::kConfigsvrPlacementHistoryNamespace,
     NamespaceString::kConfigChangelogNamespace,
     NamespaceString::kConfigsvrTagsNamespace,

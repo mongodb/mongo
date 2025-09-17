@@ -825,7 +825,6 @@ public:
     void setUp() override {
         CollectionShardingRuntimeWithRangeDeleterTest::setUp();
         DBDirectClient client(operationContext());
-        client.createCollection(NamespaceString::kShardIndexCatalogNamespace);
         client.createCollection(NamespaceString::kShardCollectionCatalogNamespace);
     }
 
