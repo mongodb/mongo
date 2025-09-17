@@ -126,6 +126,7 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "//src/mongo/crypto:jwt",
         "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/net:openssl_init",
     ],
 )
@@ -208,6 +209,7 @@ mongo_cc_library(
         ]
     }),
     deps = [
+        ":jwt_parameters_idl",
         ":jwt_types_idl",
         "//src/mongo:base",
         "//src/mongo/client:native_sasl_client",
@@ -286,6 +288,17 @@ mongo_cc_unit_test(
 mongo_idl_library(
     name = "jwt_types_idl",
     src = "jwt_types.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_idl_library(
+    name = "jwt_parameters_idl",
+    src = "jwt_parameters.idl",
     idl_deps = [
         "//src/mongo/db:basic_types_idl_gen",
     ],

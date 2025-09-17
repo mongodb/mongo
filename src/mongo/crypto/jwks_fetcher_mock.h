@@ -29,27 +29,41 @@
 
 #pragma once
 
-#include "mongo/crypto/jwks_fetcher.h"
+#include "mongo/base/string_data.h"
+#include "mongo/crypto/jwks_fetcher_impl.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo::crypto {
 
-/** Mock JWKS fetcher.
- *  Returns JWKSes which are pre-set at construction.
+/**
+ * Mock JWKS fetcher.
+ * Returns JWKSes which are pre-set at construction.
+ * Replies on JWKSFetcherImpl for other implementation details like quiesce mode.
  */
-class MockJWKSFetcher : public JWKSFetcher {
+class MockJWKSFetcher : public JWKSFetcherImpl {
 public:
-    MockJWKSFetcher(BSONObj keys) : _keys(std::move(keys)) {}
+    static constexpr StringData kMockIssuer = "https://localhost/issuer/mock"_sd;
+
+    MockJWKSFetcher(ClockSource* clock, BSONObj keys)
+        : JWKSFetcherImpl(clock, kMockIssuer), _keys(std::move(keys)) {}
 
     JWKSet fetch() override {
         if (_shouldFail) {
             uasserted(ErrorCodes::NetworkTimeout,
                       "Mock JWKS fetcher configured to simulate timeout");
         }
-        return JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+
+        auto jwkSet = JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+        _lastFetchQuiesceTime = _clock->now();
+        return jwkSet;
     }
 
     void setShouldFail(bool shouldFail) {
         _shouldFail = shouldFail;
+    }
+
+    void setKeys(BSONObj keys) {
+        _keys = keys;
     }
 
 private:

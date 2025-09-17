@@ -168,6 +168,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/shell/kms_idl',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/http_client_impl',
         '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else [],
         '$BUILD_DIR/mongo/util/testing_options',
@@ -194,6 +195,7 @@ env.Library(
         'jwk_manager.cpp',
         'jws_validated_token.cpp',
         'jws_validator_{}.cpp'.format(ssl_provider),
+        'jwt_parameters.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -217,6 +219,8 @@ if ssl_provider == 'openssl':
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+            '$BUILD_DIR/mongo/db/server_base',
+            '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/net/openssl_init',
             'jwt',
         ],
