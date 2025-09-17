@@ -146,6 +146,14 @@ try {
     pipeline = [{$project: {_id: 0, a: "$b.c", z: 1}}, {$match: {$expr: {$eq: ["$a", 42]}}}];
     runPipeline(testCaseName, pipeline);
 
+    testCaseName = "$match can be pushed beneath $replaceRoot";
+    pipeline = [{$replaceRoot: {newRoot: "$b"}}, {$match: {c: {$eq: 42}}}];
+    runPipeline(testCaseName, pipeline);
+
+    testCaseName = "$match can be pushed beneath $replaceWith";
+    pipeline = [{$replaceWith: "$b"}, {$match: {c: {$eq: 42}}}];
+    runPipeline(testCaseName, pipeline);
+
     //
     // The remaining test cases are negative tests, meaning that we do not expect the $match to be
     // pushed down.
@@ -199,14 +207,6 @@ try {
 
     testCaseName = "Negative case: field path of length 4";
     pipeline = [{$project: {a: "$b.c.f.g", z: 1}}, {$match: {a: {$eq: 9}}}];
-    runPipeline(testCaseName, pipeline);
-
-    testCaseName = "Negative case: $match cannot be pushed beneath $replaceRoot";
-    pipeline = [{$replaceRoot: {newRoot: "$b"}}, {$match: {c: {$eq: 42}}}];
-    runPipeline(testCaseName, pipeline);
-
-    testCaseName = "Negative case: $match cannot be pushed beneath $replaceWith";
-    pipeline = [{$replaceWith: "$b"}, {$match: {c: {$eq: 42}}}];
     runPipeline(testCaseName, pipeline);
 
     testCaseName = "Negative case: $match cannot swap past complex rename when matching on subfield of $group key";

@@ -731,387 +731,7 @@
 ]
 ```
 
-## 21. Negative case: Dotted path on the left and the right
-### Pipeline
-```json
-[ { "$project" : { "_id" : 0, "x.y" : "$b.c", "z" : 1 } }, { "$match" : { "x.y" : { "$lte" : 42 } } } ]
-```
-### Results
-```json
-{  "x" : {  "y" : 42 },  "z" : 11 }
-{  "x" : {  "y" : 42 },  "z" : 14 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"z" : true,
-			"x" : {
-				"y" : "$b.c"
-			},
-			"_id" : false
-		}
-	},
-	{
-		"$match" : {
-			"x.y" : {
-				"$lte" : 42
-			}
-		}
-	}
-]
-```
-
-## 22. Negative case: Dotted path on the left and the right with match on a subpath of the renamed path
-### Pipeline
-```json
-[ { "$project" : { "_id" : 0, "x.y" : "$b.c", "z" : 1 } }, { "$match" : { "x.y.e" : { "$lte" : 42 } } } ]
-```
-### Results
-```json
-{  "x" : {  "y" : {  "e" : 42,  "f" : "bar" } },  "z" : 15 }
-{  "x" : {  "y" : {  "e" : 42,  "f" : {  "g" : 9 } } },  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"z" : true,
-			"x" : {
-				"y" : "$b.c"
-			},
-			"_id" : false
-		}
-	},
-	{
-		"$match" : {
-			"x.y.e" : {
-				"$lte" : 42
-			}
-		}
-	}
-]
-```
-
-## 23. Negative case: Dotted path of length 3 on the left
-### Pipeline
-```json
-[ { "$project" : { "_id" : 0, "n.q.r" : "$b.c", "z" : 1 } }, { "$match" : { "n.q.r.e" : { "$lte" : 42 } } } ]
-```
-### Results
-```json
-{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : "bar" } } },  "z" : 15 }
-{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : {  "g" : 9 } } } },  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"z" : true,
-			"n" : {
-				"q" : {
-					"r" : "$b.c"
-				}
-			},
-			"_id" : false
-		}
-	},
-	{
-		"$match" : {
-			"n.q.r.e" : {
-				"$lte" : 42
-			}
-		}
-	}
-]
-```
-
-## 24. Negative case: Dotted path of length 3 on the left, expressed with nested objects
-### Pipeline
-```json
-[ { "$project" : { "_id" : 0, "n" : { "q" : { "r" : "$b.c" } }, "z" : 1 } }, { "$match" : { "n.q.r.e" : { "$lte" : 42 } } } ]
-```
-### Results
-```json
-{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : "bar" } } },  "z" : 15 }
-{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : {  "g" : 9 } } } },  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"z" : true,
-			"n" : {
-				"q" : {
-					"r" : "$b.c"
-				}
-			},
-			"_id" : false
-		}
-	},
-	{
-		"$match" : {
-			"n.q.r.e" : {
-				"$lte" : 42
-			}
-		}
-	}
-]
-```
-
-## 25. Negative case: Dotted path of length 3 on the left, expressed with nested objects and $addFields
-### Pipeline
-```json
-[ { "$addFields" : { "n" : { "q" : { "r" : "$b.c" } } } }, { "$match" : { "n.q.r.e" : { "$lte" : 42 } } } ]
-```
-### Results
-```json
-{  "_id" : 5,  "b" : {  "c" : {  "e" : 42,  "f" : "bar" } },  "h" : {  "i" : 15 },  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : "bar" } } },  "z" : 15 }
-{  "_id" : 6,  "b" : {  "c" : {  "e" : 42,  "f" : {  "g" : 9 } },  "d" : "foo" },  "h" : {  "i" : 16 },  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : {  "g" : 9 } } } },  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$addFields" : {
-			"n" : {
-				"q" : {
-					"r" : "$b.c"
-				}
-			}
-		}
-	},
-	{
-		"$match" : {
-			"n.q.r.e" : {
-				"$lte" : 42
-			}
-		}
-	}
-]
-```
-
-## 26. Negative case: conditional projection
-### Pipeline
-```json
-[ { "$project" : { "a" : { "$cond" : { "if" : { "$eq" : [ null, "$b.c" ] }, "then" : "$$REMOVE", "else" : "$b.c" } } } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
-```
-### Results
-```json
-{  "_id" : 1,  "a" : 42 }
-{  "_id" : 4,  "a" : 42 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"_id" : true,
-			"a" : {
-				"$cond" : [
-					{
-						"$eq" : [
-							{
-								"$const" : null
-							},
-							"$b.c"
-						]
-					},
-					"$$REMOVE",
-					"$b.c"
-				]
-			}
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 42
-			}
-		}
-	}
-]
-```
-
-## 27. Negative case: field path of length 3
-### Pipeline
-```json
-[ { "$project" : { "_id" : 1, "a" : "$b.c.e", "z" : 1 } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
-```
-### Results
-```json
-{  "_id" : 5,  "a" : 42,  "z" : 15 }
-{  "_id" : 6,  "a" : 42,  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"_id" : true,
-			"z" : true,
-			"a" : "$b.c.e"
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 42
-			}
-		}
-	}
-]
-```
-
-## 28. Negative case: field path of length 3 with _id excluded (variation 1)
-### Pipeline
-```json
-[ { "$project" : { "_id" : 0, "a" : "$b.c.e", "z" : 1 } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
-```
-### Results
-```json
-{  "a" : 42,  "z" : 15 }
-{  "a" : 42,  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"z" : true,
-			"a" : "$b.c.e",
-			"_id" : false
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 42
-			}
-		}
-	}
-]
-```
-
-## 29. Negative case: field path of length 3 with _id excluded (variation 2)
-### Pipeline
-```json
-[ { "$project" : { "_id" : 0, "a" : "$b.c.e" } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
-```
-### Results
-```json
-{  "a" : 42 }
-{  "a" : 42 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"a" : "$b.c.e",
-			"_id" : false
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 42
-			}
-		}
-	}
-]
-```
-
-## 30. Negative case: $addFields with field path of length 3
-### Pipeline
-```json
-[ { "$addFields" : { "a" : "$b.c.e" } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
-```
-### Results
-```json
-{  "_id" : 5,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : "bar" } },  "h" : {  "i" : 15 },  "z" : 15 }
-{  "_id" : 6,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : {  "g" : 9 } },  "d" : "foo" },  "h" : {  "i" : 16 },  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$addFields" : {
-			"a" : "$b.c.e"
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 42
-			}
-		}
-	}
-]
-```
-
-## 31. Negative case: $set with field path of length 3
-### Pipeline
-```json
-[ { "$set" : { "a" : "$b.c.e" } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
-```
-### Results
-```json
-{  "_id" : 5,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : "bar" } },  "h" : {  "i" : 15 },  "z" : 15 }
-{  "_id" : 6,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : {  "g" : 9 } },  "d" : "foo" },  "h" : {  "i" : 16 },  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$set" : {
-			"a" : "$b.c.e"
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 42
-			}
-		}
-	}
-]
-```
-
-## 32. Negative case: field path of length 4
-### Pipeline
-```json
-[ { "$project" : { "a" : "$b.c.f.g", "z" : 1 } }, { "$match" : { "a" : { "$eq" : 9 } } } ]
-```
-### Results
-```json
-{  "_id" : 6,  "a" : 9,  "z" : 16 }
-```
-### Explain
-```json
-[
-	{
-		"$project" : {
-			"_id" : true,
-			"z" : true,
-			"a" : "$b.c.f.g"
-		}
-	},
-	{
-		"$match" : {
-			"a" : {
-				"$eq" : 9
-			}
-		}
-	}
-]
-```
-
-## 33. Negative case: $match cannot be pushed beneath $replaceRoot
+## 21. $match can be pushed beneath $replaceRoot
 ### Pipeline
 ```json
 [ { "$replaceRoot" : { "newRoot" : "$b" } }, { "$match" : { "c" : { "$eq" : 42 } } } ]
@@ -1159,7 +779,7 @@
 ]
 ```
 
-## 34. Negative case: $match cannot be pushed beneath $replaceWith
+## 22. $match can be pushed beneath $replaceWith
 ### Pipeline
 ```json
 [ { "$replaceWith" : "$b" }, { "$match" : { "c" : { "$eq" : 42 } } } ]
@@ -1202,6 +822,386 @@
 	{
 		"$replaceRoot" : {
 			"newRoot" : "$b"
+		}
+	}
+]
+```
+
+## 23. Negative case: Dotted path on the left and the right
+### Pipeline
+```json
+[ { "$project" : { "_id" : 0, "x.y" : "$b.c", "z" : 1 } }, { "$match" : { "x.y" : { "$lte" : 42 } } } ]
+```
+### Results
+```json
+{  "x" : {  "y" : 42 },  "z" : 11 }
+{  "x" : {  "y" : 42 },  "z" : 14 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"z" : true,
+			"x" : {
+				"y" : "$b.c"
+			},
+			"_id" : false
+		}
+	},
+	{
+		"$match" : {
+			"x.y" : {
+				"$lte" : 42
+			}
+		}
+	}
+]
+```
+
+## 24. Negative case: Dotted path on the left and the right with match on a subpath of the renamed path
+### Pipeline
+```json
+[ { "$project" : { "_id" : 0, "x.y" : "$b.c", "z" : 1 } }, { "$match" : { "x.y.e" : { "$lte" : 42 } } } ]
+```
+### Results
+```json
+{  "x" : {  "y" : {  "e" : 42,  "f" : "bar" } },  "z" : 15 }
+{  "x" : {  "y" : {  "e" : 42,  "f" : {  "g" : 9 } } },  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"z" : true,
+			"x" : {
+				"y" : "$b.c"
+			},
+			"_id" : false
+		}
+	},
+	{
+		"$match" : {
+			"x.y.e" : {
+				"$lte" : 42
+			}
+		}
+	}
+]
+```
+
+## 25. Negative case: Dotted path of length 3 on the left
+### Pipeline
+```json
+[ { "$project" : { "_id" : 0, "n.q.r" : "$b.c", "z" : 1 } }, { "$match" : { "n.q.r.e" : { "$lte" : 42 } } } ]
+```
+### Results
+```json
+{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : "bar" } } },  "z" : 15 }
+{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : {  "g" : 9 } } } },  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"z" : true,
+			"n" : {
+				"q" : {
+					"r" : "$b.c"
+				}
+			},
+			"_id" : false
+		}
+	},
+	{
+		"$match" : {
+			"n.q.r.e" : {
+				"$lte" : 42
+			}
+		}
+	}
+]
+```
+
+## 26. Negative case: Dotted path of length 3 on the left, expressed with nested objects
+### Pipeline
+```json
+[ { "$project" : { "_id" : 0, "n" : { "q" : { "r" : "$b.c" } }, "z" : 1 } }, { "$match" : { "n.q.r.e" : { "$lte" : 42 } } } ]
+```
+### Results
+```json
+{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : "bar" } } },  "z" : 15 }
+{  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : {  "g" : 9 } } } },  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"z" : true,
+			"n" : {
+				"q" : {
+					"r" : "$b.c"
+				}
+			},
+			"_id" : false
+		}
+	},
+	{
+		"$match" : {
+			"n.q.r.e" : {
+				"$lte" : 42
+			}
+		}
+	}
+]
+```
+
+## 27. Negative case: Dotted path of length 3 on the left, expressed with nested objects and $addFields
+### Pipeline
+```json
+[ { "$addFields" : { "n" : { "q" : { "r" : "$b.c" } } } }, { "$match" : { "n.q.r.e" : { "$lte" : 42 } } } ]
+```
+### Results
+```json
+{  "_id" : 5,  "b" : {  "c" : {  "e" : 42,  "f" : "bar" } },  "h" : {  "i" : 15 },  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : "bar" } } },  "z" : 15 }
+{  "_id" : 6,  "b" : {  "c" : {  "e" : 42,  "f" : {  "g" : 9 } },  "d" : "foo" },  "h" : {  "i" : 16 },  "n" : {  "q" : {  "r" : {  "e" : 42,  "f" : {  "g" : 9 } } } },  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$addFields" : {
+			"n" : {
+				"q" : {
+					"r" : "$b.c"
+				}
+			}
+		}
+	},
+	{
+		"$match" : {
+			"n.q.r.e" : {
+				"$lte" : 42
+			}
+		}
+	}
+]
+```
+
+## 28. Negative case: conditional projection
+### Pipeline
+```json
+[ { "$project" : { "a" : { "$cond" : { "if" : { "$eq" : [ null, "$b.c" ] }, "then" : "$$REMOVE", "else" : "$b.c" } } } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
+```
+### Results
+```json
+{  "_id" : 1,  "a" : 42 }
+{  "_id" : 4,  "a" : 42 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"_id" : true,
+			"a" : {
+				"$cond" : [
+					{
+						"$eq" : [
+							{
+								"$const" : null
+							},
+							"$b.c"
+						]
+					},
+					"$$REMOVE",
+					"$b.c"
+				]
+			}
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 42
+			}
+		}
+	}
+]
+```
+
+## 29. Negative case: field path of length 3
+### Pipeline
+```json
+[ { "$project" : { "_id" : 1, "a" : "$b.c.e", "z" : 1 } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
+```
+### Results
+```json
+{  "_id" : 5,  "a" : 42,  "z" : 15 }
+{  "_id" : 6,  "a" : 42,  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"_id" : true,
+			"z" : true,
+			"a" : "$b.c.e"
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 42
+			}
+		}
+	}
+]
+```
+
+## 30. Negative case: field path of length 3 with _id excluded (variation 1)
+### Pipeline
+```json
+[ { "$project" : { "_id" : 0, "a" : "$b.c.e", "z" : 1 } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
+```
+### Results
+```json
+{  "a" : 42,  "z" : 15 }
+{  "a" : 42,  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"z" : true,
+			"a" : "$b.c.e",
+			"_id" : false
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 42
+			}
+		}
+	}
+]
+```
+
+## 31. Negative case: field path of length 3 with _id excluded (variation 2)
+### Pipeline
+```json
+[ { "$project" : { "_id" : 0, "a" : "$b.c.e" } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
+```
+### Results
+```json
+{  "a" : 42 }
+{  "a" : 42 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"a" : "$b.c.e",
+			"_id" : false
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 42
+			}
+		}
+	}
+]
+```
+
+## 32. Negative case: $addFields with field path of length 3
+### Pipeline
+```json
+[ { "$addFields" : { "a" : "$b.c.e" } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
+```
+### Results
+```json
+{  "_id" : 5,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : "bar" } },  "h" : {  "i" : 15 },  "z" : 15 }
+{  "_id" : 6,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : {  "g" : 9 } },  "d" : "foo" },  "h" : {  "i" : 16 },  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$addFields" : {
+			"a" : "$b.c.e"
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 42
+			}
+		}
+	}
+]
+```
+
+## 33. Negative case: $set with field path of length 3
+### Pipeline
+```json
+[ { "$set" : { "a" : "$b.c.e" } }, { "$match" : { "a" : { "$eq" : 42 } } } ]
+```
+### Results
+```json
+{  "_id" : 5,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : "bar" } },  "h" : {  "i" : 15 },  "z" : 15 }
+{  "_id" : 6,  "a" : 42,  "b" : {  "c" : {  "e" : 42,  "f" : {  "g" : 9 } },  "d" : "foo" },  "h" : {  "i" : 16 },  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$set" : {
+			"a" : "$b.c.e"
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 42
+			}
+		}
+	}
+]
+```
+
+## 34. Negative case: field path of length 4
+### Pipeline
+```json
+[ { "$project" : { "a" : "$b.c.f.g", "z" : 1 } }, { "$match" : { "a" : { "$eq" : 9 } } } ]
+```
+### Results
+```json
+{  "_id" : 6,  "a" : 9,  "z" : 16 }
+```
+### Explain
+```json
+[
+	{
+		"$project" : {
+			"_id" : true,
+			"z" : true,
+			"a" : "$b.c.f.g"
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$eq" : 9
+			}
 		}
 	}
 ]
