@@ -447,6 +447,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/values:ts_block_test.cpp",
         "//src/mongo/db/exec/sbe/values:value_serialization_test.cpp",
         "//src/mongo/db/exec/sbe/values:value_test.cpp",
+        "//src/mongo/db/exec/sbe/vm:code_fragment_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.h",
     ],
     data = [
