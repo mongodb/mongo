@@ -315,9 +315,9 @@ T SBEColumnMaterializer::get(const Element& elem) {
         return value::bitcastTo<int64_t>(elem.second);
     } else if constexpr (std::is_same_v<T, Decimal128>) {
         return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Decimal();
+    } else {
+        static_assert(false);
     }
-    invariant(false);
-    return T{};
 }
 
 /**

@@ -307,7 +307,7 @@ public:
     }
 
     void setIndex(size_t index) {
-        invariant(index < _accessors.size());
+        tassert(11089608, "Setting index value past the last accessor", index < _accessors.size());
         _index = index;
     }
 

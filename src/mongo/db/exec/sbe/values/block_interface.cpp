@@ -543,13 +543,13 @@ template boost::optional<size_t> BoolBlock::argMax();
 
 std::pair<value::TypeTags, value::Value> ValueBlock::at(size_t idx) {
     auto deblocked = extract();
-    invariant(idx < deblocked.count());
+    tassert(11089619, "Out of bounds read in ValueBlock", idx < deblocked.count());
     return deblocked[idx];
 }
 
 template <typename T, value::TypeTags TypeTag>
 std::pair<value::TypeTags, value::Value> HomogeneousBlock<T, TypeTag>::at(size_t idx) {
-    invariant(idx < count());
+    tassert(11089618, "Out of bounds read in HomogeneousBlock", idx < count());
     // Avoid extracting if possible.
     if (*tryDense()) {
         return {TypeTag, _vals[idx]};

@@ -171,14 +171,15 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
     StringData topLevelField,
     const std::span<const TypeTags>& tags,
     const std::span<const Value>& vals) {
-    invariant(tags.size() == vals.size());
+    tassert(
+        11089616, "Number of Tags doesn't match the number of Values", tags.size() == vals.size());
 
     auto node = _root.getChildren.find(topLevelField);
 
     // Caller should always ask us to extract a top level field that's in the reqs.  We could
     // relax this if needed, and return a bunch of Nothing CellBlocks, but it's a non-use case
     // for now.
-    invariant(node != _root.getChildren.end());
+    tassert(11089615, "Can't find top level field by name", node != _root.getChildren.end());
 
     for (size_t i = 0; i < tags.size(); ++i) {
         for (auto& rec : _filterPositionInfoRecorders) {

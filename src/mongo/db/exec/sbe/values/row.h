@@ -288,7 +288,7 @@ class FixedSizeRow : public RowBase<FixedSizeRow<N>> {
 
 public:
     FixedSizeRow(size_t size = N) {
-        invariant(size == N);
+        tassert(11089609, "Passing wrong size to the FixedSizeRow", size == N);
     }
 
     FixedSizeRow(const FixedSizeRow<N>& other) {
