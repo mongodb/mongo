@@ -79,6 +79,46 @@ server_parameters:
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
 
+    initialSyncIndexBuildMemoryPercentage:
+        description:
+            The amount of memory, as a percentage of system memory, to allocate for index builds
+            during initial sync. Bounded by initialSyncIndexBuildMemoryMinMB and
+            initialSyncIndexBuildMemoryMaxMB.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: initialSyncIndexBuildMemoryPercentage
+        default: 10
+        validator:
+            gte: 0
+            lte: 80
+        redact: false
+
+    initialSyncIndexBuildMemoryMinMB:
+        description:
+            The minimum memory usage for index builds during initial sync. Bounds
+            initialSyncIndexBuildMemoryPercentage.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: initialSyncIndexBuildMemoryMinMB
+        default: 200
+        validator:
+            gte: 50
+            lte: 10000000 # 10TB
+        redact: false
+
+    initialSyncIndexBuildMemoryMaxMB:
+        description:
+            The maximum memory usage allowed for index builds during initial sync.
+            Bounds initialSyncIndexBuildMemoryPercentage.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: initialSyncIndexBuildMemoryMaxMB
+        default: 16384
+        validator:
+            gte: 50
+            lte: 10000000 # 10TB
+        redact: false
+
     # From oplog_fetcher.cpp
     oplogInitialFindMaxSeconds:
         description: >-
