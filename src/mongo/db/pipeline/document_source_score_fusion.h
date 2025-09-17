@@ -32,8 +32,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_score_fusion_gen.h"
-#include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -64,16 +62,6 @@ namespace mongo {
 class DocumentSourceScoreFusion final {
 public:
     static constexpr StringData kStageName = "$scoreFusion"_sd;
-
-    // Name of single top-level field object used to track all internal fields we need
-    // intermediate to the desugar.
-    // One field object that holds all internal intermediate variables during desugar,
-    // like each input pipeline's individual score or scoreDetails.
-    static constexpr StringData kScoreFusionInternalFieldsName =
-        "_internal_scoreFusion_internal_fields"_sd;
-
-    // One field object to encapsulate the unmodified user's doc from the queried collection.
-    static constexpr StringData kScoreFusionDocsFieldName = "_internal_scoreFusion_docs"_sd;
 
     /**
      * Returns a list of stages to execute hybrid scoring with score fusion.
@@ -116,5 +104,4 @@ private:
     // instead.
     DocumentSourceScoreFusion() = delete;
 };
-
 }  // namespace mongo

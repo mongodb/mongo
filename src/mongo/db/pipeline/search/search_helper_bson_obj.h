@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_rank_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
+#include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"

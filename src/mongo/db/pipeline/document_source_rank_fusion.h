@@ -32,8 +32,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_rank_fusion_gen.h"
-#include "mongo/db/pipeline/document_source_rank_fusion_inputs_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -67,16 +65,6 @@ namespace mongo {
 class DocumentSourceRankFusion final {
 public:
     static constexpr StringData kStageName = "$rankFusion"_sd;
-
-    // Name of single top-level field object used to track all internal fields we need
-    // intermediate to the desugar.
-    // One field object that holds all internal intermediate variables during desugar,
-    // like each input pipeline's individual score or scoreDetails.
-    static constexpr StringData kRankFusionInternalFieldsName =
-        "_internal_rankFusion_internal_fields"_sd;
-
-    // One field object to encapsulate the unmodified user's doc from the queried collection.
-    static constexpr StringData kRankFusionDocsFieldName = "_internal_rankFusion_docs"_sd;
 
     /**
      * Returns a list of stages to execute hybrid scoring with rank fusion.
@@ -117,7 +105,6 @@ public:
 
 private:
     // It is illegal to construct a DocumentSourceRankFusion directly, use createFromBson() instead.
-    DocumentSourceRankFusion() = default;
+    DocumentSourceRankFusion() = delete;
 };
-
 }  // namespace mongo
