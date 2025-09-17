@@ -30,16 +30,19 @@
 #include "mongo/db/exec/agg/exec_pipeline.h"
 
 #include "mongo/db/query/plan_summary_stats_visitor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo::exec::agg {
 
 Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> pCtx)
-    : _stages(std::move(stages)), expCtx(std::move(pCtx)) {
+    : _stages(std::move(stages)), _expCtx(std::move(pCtx)) {
     tassert(10549300, "Cannot create an empty execution pipeline", !_stages.empty());
-    tassert(10537101, "Aggregation pipeline missing ExpressionContext", expCtx != nullptr);
+    tassert(10537101, "Aggregation pipeline missing ExpressionContext", _expCtx != nullptr);
     for (const auto& stage : _stages) {
         tassert(10617300, "stage must not be null", stage != nullptr);
     }
@@ -77,7 +80,7 @@ void Pipeline::accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) co
 }
 
 void Pipeline::detachFromOperationContext() {
-    expCtx->setOperationContext(nullptr);
+    _expCtx->setOperationContext(nullptr);
 
     for (auto&& source : _stages) {
         source->detachFromOperationContext();
@@ -88,7 +91,7 @@ void Pipeline::detachFromOperationContext() {
 }
 
 void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
-    expCtx->setOperationContext(opCtx);
+    _expCtx->setOperationContext(opCtx);
 
     for (auto&& source : _stages) {
         source->reattachToOperationContext(opCtx);
@@ -144,8 +147,15 @@ void Pipeline::dispose() {
     try {
         _stages.back()->dispose();
         _disposed = true;
-    } catch (...) {
-        std::terminate();
+    } catch (const std::exception& ex) {
+        // When we catch an exception during disposal, some resources may have been leaked.
+        // Log an error about this and rethrow the error, so the caller can either handle
+        // it or crash the server (in case the call came from a destructor).
+        LOGV2_ERROR(10532600,
+                    "Caught an unexpected exception while disposing query execution pipeline, "
+                    "which could have leaked some of the pipeline's resources",
+                    "error"_attr = ex.what());
+        throw;
     }
 }
 

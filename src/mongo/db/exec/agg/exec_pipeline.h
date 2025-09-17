@@ -75,13 +75,13 @@ public:
     void accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) const;
 
     /**
-     * Sets the OperationContext of 'expCtx' to nullptr and calls 'detachFromOperationContext()' on
+     * Sets the OperationContext of '_expCtx' to nullptr and calls 'detachFromOperationContext()' on
      * all underlying DocumentSources.
      */
     void detachFromOperationContext();
 
     /**
-     * Sets the OperationContext of 'expCtx' to 'opCtx', and reattaches all underlying
+     * Sets the OperationContext of '_expCtx' to 'opCtx', and reattaches all underlying
      * DocumentSources to 'opCtx'.
      */
     void reattachToOperationContext(OperationContext* opCtx);
@@ -99,7 +99,7 @@ public:
     void checkValidOperationContext() const;
 
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
-        return expCtx;
+        return _expCtx;
     }
 
     /**
@@ -144,7 +144,7 @@ private:
     // executed.
     StageContainer _stages;
 
-    boost::intrusive_ptr<ExpressionContext> expCtx;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
     bool _disposed{false};
 
     // Call 'dispose()' in destructor.
