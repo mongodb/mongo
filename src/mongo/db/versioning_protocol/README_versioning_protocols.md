@@ -57,32 +57,32 @@ A database version is represented as DBV<U, T, Mod> and consists of three elemen
 
 ## Shard Version
 
-The shard version is represented as SV<E, T, M, m, I> and consists of five elements:
+The shard version is represented as SV<E, T, M, m> and consists of four elements:
 
 1. **E** (the epoch) : a unique identifier that distinguishes an instance of the collection.
 2. **T** (the timestamp) : a new unique identifier introduced in version 5.0. The difference between the epoch and timestamp is that timestamps are comparable, allowing for ordering shard versions in which the epoch/timestamp do not match.
 3. **M** (major version) : an integer used to indicate a change in data placement, as from a migration.
 4. **m** (minor version) : an integer used to indicate a change to data boundaries within a shard such as from a split or merge.
-5. **I** (index version) : a timestamp representing the time of the last modification to a global index in the collection.
 
-The epoch and timestamp serve the same functionality, that of uniquely identifying an instance of the collection. For this reason, we group them together and call them the [**collection generation**](https://github.com/mongodb/mongo/blob/10fd84b6850ef672ff6ed367ca9292ad8db262d2/src/mongo/s/chunk_version.h#L38-L80). Likewise, the major and minor versions work together to describe the layout of data on the shards. Together, they are called the [**collection placement**](https://github.com/mongodb/mongo/blob/10fd84b6850ef672ff6ed367ca9292ad8db262d2/src/mongo/s/chunk_version.h#L82-L113) (or placement version). The [index version](https://github.com/mongodb/mongo/blob/r6.2.1/src/mongo/s/index_version.h) (or collection indexes) stands alone, describing the global indexes present in a collection. The relationship between these components can be visualized as the following.
+The epoch and timestamp serve the same functionality, that of uniquely identifying an instance of the collection. For this reason, we group them together and call them the [**collection generation**](https://github.com/mongodb/mongo/blob/10fd84b6850ef672ff6ed367ca9292ad8db262d2/src/mongo/s/chunk_version.h#L38-L80). Likewise, the major and minor versions work together to describe the layout of data on the shards. Together, they are called the [**collection placement**](https://github.com/mongodb/mongo/blob/10fd84b6850ef672ff6ed367ca9292ad8db262d2/src/mongo/s/chunk_version.h#L82-L113) (or placement version).
 
 ```mermaid
 classDiagram
-    ShardVersion--IndexVersion
     ShardVersion--CollectionGeneration
     CollectionGeneration--CollectionPlacement
 
     link ShardVersion "https://github.com/mongodb/mongo/blob/r6.2.1/src/mongo/s/shard_version.h"
-    link IndexVersion "https://github.com/mongodb/mongo/blob/r6.2.1/src/mongo/s/index_version.h"
     link CollectionGeneration "https://github.com/mongodb/mongo/blob/10fd84b6850ef672ff6ed367ca9292ad8db262d2/src/mongo/s/chunk_version.h#L38-L80"
     link CollectionPlacement "https://github.com/mongodb/mongo/blob/10fd84b6850ef672ff6ed367ca9292ad8db262d2/src/mongo/s/chunk_version.h#L82-L113"
 end
 ```
 
-A change in the CollectionGeneration implies that the CollectionPlacement must have changed as well, since the collection itself has changed. The index version is independent of this hierarchy.
+A change in the CollectionGeneration implies that the CollectionPlacement must have changed as well, since the collection itself has changed.
 
-Each shard has its own shard version, which consists of the collection generation, the index version, and the maximum placement version of the ranges located on the shard. Similarly, the overall collection version consists of the collection generation, index version, and the maximum placement version of any range in the collection.
+Each shard has its own shard version, which consists of the collection generation and the maximum placement version of the ranges located on the shard. Similarly, the overall collection version consists of the collection generation and the maximum placement version of any range in the collection.
+
+> [!NOTE]
+> Both mongod and mongos processes log Shard Version values [using](https://github.com/mongodb/mongo/blob/6dfd42e971cb39367418203ed8137d423e28df3d/src/mongo/db/versioning_protocol/chunk_version.cpp#L75-L77) the `M|m||E||T` format.
 
 ### Operations that change the shard versions
 
@@ -96,17 +96,9 @@ A change in the collection generation indicates that the collection has changed 
 
 A placement version change indicates that something has changed about what data is placed on what shard. The most important operation that changes the placement version is migration, however split, merge and even some other operations change it as well, even though they don't actually move any data around. These changes are more targeted than generation changes, and will only cause the router to refresh if it is targeting a shard that was affected by the operation.
 
-#### Index Version Changes
+## Routing (a.k.a. Placement) Information Refreshes
 
-An index version change indicates that there has been some change in the global index information of the collection, such as from adding or removing a global index.
-
-## Routing Information Refreshes
-
-For sharded collections, there are two sets of information that compose the routing information - the chunk placement information and the collection index information. The config server is [authoritative](../local_catalog/README_sharding_catalog.md#authoritative-containers) for the placement information, while both the shards and the config server are authoritative for the index information.
-
-When a router receives a stale config error, it will refresh whichever component is stale. If the router has an older CollectionGeneration or CollectionPlacement, it will refresh the placement information, whereas if it has an older IndexVersion, it will refresh the index information.
-
-### Placement Information Refreshes
+For sharded collections, routing is driven by the chunk placement information, for which the config server represents the [authoritative source](../local_catalog/README_sharding_catalog.md#authoritative-containers).
 
 MongoS and shard primaries refresh their placement information from the config server. Shard secondaries, however, refresh from the shard primaries through a component called the Shard Server Catalog Cache Loader. When a shard primary refreshes from a config server, it persists the refreshed information to disk. This information is then replicated to secondaries who will refresh their cache from this on-disk information.
 
@@ -115,7 +107,3 @@ MongoS and shard primaries refresh their placement information from the config s
 A full refresh clears all cached information, and replaces the cache with the information that exists on the node’s source whereas an incremental refresh only replaces modified routing information from the node’s source.
 
 Incremental refreshes will happen whenever there has been a [placement version change](#placement-version-changes), while [collection generation changes](#generation-changes) will cause a full refresh.
-
-### Index Information Refreshes
-
-Index information refreshes are always done from the config server. The router will fetch the whole index information from the config server and replace what it has in its cache with the new information.

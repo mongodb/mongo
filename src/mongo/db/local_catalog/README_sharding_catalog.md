@@ -36,7 +36,7 @@ classDiagram
 
 ### Authoritative containers
 
-Put in a naive way, a container is said to be "authoritative" if it can be "frozen in time" and its data can be trusted to be definitive for the respective catalog object. For example, if the CSRS is "frozen", we can safely trust the _config.chunks_ collection to know where data is located; however, currently it is not possible to "freeze" a shard and trust it to know what set of chunks it owns. On the other hand, if a shard is "frozen" we can safely trust it about what global indexes are under any collections that it owns.
+Put in a naive way, a container is said to be "authoritative" if it can be "frozen in time" and its data can be trusted to be definitive for the respective catalog object. For example, if the CSRS is "frozen", we can safely trust the _config.chunks_ collection to know where data is located; however, currently it is not possible to "freeze" a shard and trust it to know what set of chunks it owns. On the other hand, if a shard is "frozen" we can safely trust the metadata in its _config.shard.catalog.databases_ to know the set of owned databases.
 
 Based on the above, as it stands, different containers on different nodes are authoritative for different parts of the catalog. Most authoritative containers are on the CSRS. In the future we would like the shards to be authoritative for everything they own and the CSRS just acting as a materialised view (i.e., cache) of all shards' catalogs.
 
