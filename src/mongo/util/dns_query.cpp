@@ -66,8 +66,8 @@ namespace mongo {
  * Returns a string with the IP address or domain name listed...
  */
 std::vector<std::pair<std::string, Seconds>> dns::lookupARecords(const std::string& service) {
-    DNSQueryState dnsQuery;
-    auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
+    auto response =
+        DNSQueryState().lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
 
     std::vector<std::pair<std::string, Seconds>> res;
 
