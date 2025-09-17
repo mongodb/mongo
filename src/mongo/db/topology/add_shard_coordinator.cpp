@@ -35,6 +35,7 @@
 #include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/local_catalog/shard_role_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_api_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
@@ -144,16 +145,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 _blockFCVChangesOnReplicaSet(opCtx, **executor);
 
-                // If it's not the first shard, we always expect the replicaset to be clean.
-                if (!_isFirstShard(opCtx)) {
-                    if (!_doc.getIsConfigShard()) {
-                        _blockUserWrites(opCtx);
-                    }
-                    uassert(ErrorCodes::IllegalOperation,
-                            fmt::format("can't add shard '{}' because it's not empty.",
-                                        _doc.getConnectionString().toString()),
-                            _isPristineReplicaset(opCtx, targeter));
-                }
+                auto isWriteBlockedNewReplicaSet = _tryBlockNewReplicaSet(opCtx, targeter);
 
                 hangAfterLockingNewShard.pauseWhileSet(opCtx);
 
@@ -167,7 +159,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                             currentFCV == multiversion::GenericFCV::kLastContinuous ||
                             currentFCV == multiversion::GenericFCV::kLastLTS);
 
-                _setFCVOnReplicaSet(opCtx, currentFCV);
+                _setFCVOnReplicaSet(opCtx, currentFCV, isWriteBlockedNewReplicaSet);
 
                 const auto host = uassertStatusOK(
                     Grid::get(opCtx)->shardRegistry()->getConfigShard()->getTargeter()->findHost(
@@ -674,12 +666,60 @@ bool AddShardCoordinator::_isFirstShard(OperationContext* opCtx) {
     return shardRegistry->getNumShards(opCtx) == 0;
 }
 
+mongo::ServerGlobalParams::FCVSnapshot::FCV AddShardCoordinator::_getFCVOnReplicaSet(
+    OperationContext* opCtx) {
+    BSONObj fcvDoc;
+    auto& targeter = _getTargeter(opCtx);
+    auto fetcherStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    auto fetcher = topology_change_helpers::createFindFetcher(
+        opCtx,
+        targeter,
+        NamespaceString::kServerConfigurationNamespace,
+        BSON("_id" << multiversion::kParameterName),
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            const auto numDocs = docs.size();
+            tassert(10947401,
+                    "Didn't find a FCV document on the replica set being added",
+                    numDocs == 1);
+            fcvDoc = docs[0];
+            return false;
+        },
+        [&](const Status& status) { fetcherStatus = status; },
+        _executorWithoutGossip);
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetcherStatus);
+    return uassertStatusOK(FeatureCompatibilityVersionParser::parse(fcvDoc));
+}
+
 void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
-                                              mongo::ServerGlobalParams::FCVSnapshot::FCV fcv) {
+                                              mongo::ServerGlobalParams::FCVSnapshot::FCV fcv,
+                                              bool isWriteBlockedNewReplicaSet) {
     if (_doc.getIsConfigShard()) {
         return;
     }
     auto const sessionInfo = getNewSession(opCtx);
+
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    if (multiversion::GenericFCV::kLastLTS != multiversion::GenericFCV::kLastContinuous &&
+        fcv == multiversion::GenericFCV::kLastContinuous && !isWriteBlockedNewReplicaSet &&
+        disableTransitionFromLastLTSToLastContinuousWithUserData.load()) {
+        // setFCV has an upgrade path from lastLTS to lastContinuous, which is purpose-built for
+        // adding new, empty shards to an existing sharded cluster. It must not be used during
+        // promotion of a replica set to a sharded cluster, as it is not tested with user data,
+        // and doesn't allow roll back if the upgrade fails (see SERVER-107829, SERVER-109474).
+        auto originalFcv = _getFCVOnReplicaSet(opCtx);
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+        uassert(ErrorCodes::IllegalOperation,
+                fmt::format("Can't add shard '{}' because it is not empty and it has FCV '{}', "
+                            "and the config server doesn't support upgrading its FCV to '{}'. ",
+                            _doc.getConnectionString().toString(),
+                            multiversion::toString(originalFcv),
+                            multiversion::toString(fcv)),
+                originalFcv != multiversion::GenericFCV::kLastLTS);
+    }
 
     SetFeatureCompatibilityVersion setFcvCmd(fcv);
     setFcvCmd.setDbName(DatabaseName::kAdmin);
@@ -799,6 +839,50 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(OperationContext* opCtx) 
     uassertStatusOK(fetcherStatus);
 
     return topology_change_helpers::UserWriteBlockingLevel(level);
+}
+
+bool AddShardCoordinator::_tryBlockNewReplicaSet(OperationContext* opCtx,
+                                                 RemoteCommandTargeter& targeter) {
+    auto assertPristineReplicaSet = [&] {
+        uassert(ErrorCodes::IllegalOperation,
+                fmt::format("can't add shard '{}' because it's not empty.",
+                            _doc.getConnectionString().toString()),
+                _isPristineReplicaset(opCtx, targeter));
+    };
+
+    // If converting to a config shard, treat this as a promotion and never block writes.
+    if (_doc.getIsConfigShard()) {
+        if (!_isFirstShard(opCtx)) {
+            assertPristineReplicaSet();
+        }
+        return false;
+    }
+
+    // If it's not the first shard, we always expect the replicaset to be clean.
+    if (!_isFirstShard(opCtx)) {
+        _blockUserWrites(opCtx);
+        assertPristineReplicaSet();
+        return true;
+    }
+
+    // For the first shard, we have two scenarios:
+    // (1) adding an empty shard when initializing a new sharded cluster
+    // (2) promoting a replica set, possibly containing user data, to a sharded cluster
+    // If we're adding a first empty shard, block user writes:
+    // This allows us to safely upgrade the FCV, is only supported for empty shards in some cases.
+    if (_isPristineReplicaset(opCtx, targeter)) {
+        _blockUserWrites(opCtx);
+        if (_isPristineReplicaset(opCtx, targeter)) {
+            return true;
+        }
+    }
+
+    if (_doc.getOriginalUserWriteBlockingLevel().has_value()) {
+        // We raced with the first user write. Undo the write block and continue as a promotion.
+        _restoreUserWrites(opCtx);
+    }
+
+    return false;
 }
 
 void AddShardCoordinator::_dropSessionsCollection(OperationContext* opCtx) {

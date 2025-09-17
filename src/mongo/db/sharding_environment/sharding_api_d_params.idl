@@ -63,3 +63,13 @@ server_parameters:
         cpp_varname: disableDirectShardDDLOperations
         default: false
         redact: false
+
+    disableTransitionFromLastLTSToLastContinuousWithUserData:
+        description: >-
+            Prohibits upgrading from last LTS FCV to last continuous FCV if the replica set contains
+            user data during addShard. **Not a supported feature**. For emergency use only.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: disableTransitionFromLastLTSToLastContinuousWithUserData
+        default: true
+        redact: false

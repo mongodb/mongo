@@ -97,8 +97,11 @@ private:
 
     bool _isFirstShard(OperationContext* opCtx);
 
+    mongo::ServerGlobalParams::FCVSnapshot::FCV _getFCVOnReplicaSet(OperationContext* opCtx);
+
     void _setFCVOnReplicaSet(OperationContext* opCtx,
-                             mongo::ServerGlobalParams::FCVSnapshot::FCV fcv);
+                             mongo::ServerGlobalParams::FCVSnapshot::FCV fcv,
+                             bool isWriteBlockedNewReplicaSet);
 
     void _blockUserWrites(OperationContext* opCtx);
 
@@ -112,6 +115,13 @@ private:
 
     topology_change_helpers::UserWriteBlockingLevel _getUserWritesBlockFromReplicaSet(
         OperationContext* opCtx);
+
+    /**
+     * Checks if we are adding a new replica set to the cluster; in this case we ensure it's
+     * pristine (empty), block user writes to ensure it remains so, and return true.
+     * Returns false otherwise (in this case, user writes won't have been blocked).
+     */
+    bool _tryBlockNewReplicaSet(OperationContext* opCtx, RemoteCommandTargeter& targeter);
 
     void _dropSessionsCollection(OperationContext* opCtx);
 
