@@ -108,129 +108,127 @@ template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggStdD
     ArityType arity);
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::concatArraysAccumImpl(
-    value::TypeTags newElemTag,
-    value::Value newElemVal,
-    int32_t sizeCap,
-    bool arrOwned,
-    value::TypeTags arrTag,
-    value::Value arrVal,
-    int64_t sizeOfNewElems) {
-    // Create a new array to hold size and added elements, if it does not exist yet.
-    if (arrTag == value::TypeTags::Nothing) {
-        arrOwned = true;
-        std::tie(arrTag, arrVal) = value::makeNewArray();
-        auto arr = value::getArrayView(arrVal);
+    value::TypeTags tagAccumulatorState,
+    value::Value valAccumulatorState,  // Owned
+    value::TypeTags tagNewArrayElements,
+    value::Value valNewArrayElements,  // Owned
+    int64_t newArrayElementsSize,
+    int32_t sizeCap) {
+    value::ValueGuard guardNewArrayElements{tagNewArrayElements, valNewArrayElements};
 
-        auto [accArrTag, accArrVal] = value::makeNewArray();
+    // The capped push accumulator holds a value of Nothing at first and gets initialized on
+    // demand when the first value gets added. Once initialized, the state is a two-element array
+    // containing the array and its size in bytes, which is necessary to enforce the memory cap.
+    if (tagAccumulatorState == value::TypeTags::Nothing) {
+        std::tie(tagAccumulatorState, valAccumulatorState) = value::makeNewArray();
+        value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+        auto accumulatorState = value::getArrayView(valAccumulatorState);
+
+        auto [tagAccArray, valAccArray] = value::makeNewArray();
 
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        arr->push_back(accArrTag, accArrVal);
-        arr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
-    } else {
-        // Take ownership of the accumulator.
-        topStack(false, value::TypeTags::Nothing, 0);
+        accumulatorState->push_back(tagAccArray, valAccArray);
+        accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+
+        // Transfer ownership to the 'ValueGuard' in the enclosing scope.
+        guardAccumulatorState.reset();
     }
+    value::ValueGuard guardAccumulatorState{tagAccumulatorState, valAccumulatorState};
+    tassert(7039514,
+            "Expected array for set accumulator state",
+            tagAccumulatorState == value::TypeTags::Array);
 
-    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
-    // leave the accumulator as is.
-    if (newElemTag == value::TypeTags::Nothing) {
-        return {arrOwned, arrTag, arrVal};
-    }
-
-    tassert(7039513, "expected array to be owned", arrOwned);
-    value::ValueGuard accumulatorGuard{arrTag, arrVal};
-
-    // We expect the field to be an array. Thus, we return Nothing on an unexpected input type.
-    if (!value::isArray(newElemTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    tassert(7039514, "expected accumulator to have type 'Array'", arrTag == value::TypeTags::Array);
-    auto arr = value::getArrayView(arrVal);
+    auto accumulatorState = value::getArrayView(valAccumulatorState);
     tassert(7039515,
-            "accumulator was array of unexpected size",
-            arr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+            "Array accumulator with invalid length",
+            accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
-    auto newArr = value::getArrayView(newElemVal);
+    auto [tagAccArray, valAccArray] =
+        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(7039518, "Expected array in accumulator state", tagAccArray == value::TypeTags::Array);
+    auto accArray = value::getArrayView(valAccArray);
 
-    // Check that the accumulated size after concatentation won't exceed the limit.
-    {
-        auto [accSizeTag, accSizeVal] =
-            arr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+    auto [tagAccSize, valAccSize] =
+        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+    tassert(7039516, "expected 64-bit int", tagAccSize == value::TypeTags::NumberInt64);
+    const int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
+    const int64_t updatedSize = currentSize + newArrayElementsSize;
 
-        tassert(7039516, "expected 64-bit int", accSizeTag == value::TypeTags::NumberInt64);
-        const int64_t currentSize = value::bitcastTo<int64_t>(accSizeVal);
-        const int64_t totalSize = currentSize + sizeOfNewElems;
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << "Used too much memory for a single array. Memory limit: " << sizeCap
+                          << ". Concatentating array of " << accArray->size() << " elements and "
+                          << currentSize << " bytes with array of "
+                          << (tagNewArrayElements != value::TypeTags::Nothing
+                                  ? value::getArraySize(tagNewArrayElements, valNewArrayElements)
+                                  : 0)
+                          << " elements and " << newArrayElementsSize << " bytes.",
+            updatedSize < sizeCap);
 
-        if (totalSize >= static_cast<int64_t>(sizeCap)) {
-            uasserted(ErrorCodes::ExceededMemoryLimit,
-                      str::stream()
-                          << "Used too much memory for a single array. Memory limit: " << sizeCap
-                          << ". Concatentating array of " << arr->size() << " elements and "
-                          << currentSize << " bytes with array of " << newArr->size()
-                          << " elements and " << sizeOfNewElems << " bytes.");
-        }
+    // We are still under the size limit. Set the new total size in the accumulator.
+    accumulatorState->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                            value::TypeTags::NumberInt64,
+                            value::bitcastFrom<int64_t>(updatedSize));
 
-        // We are still under the size limit. Set the new total size in the accumulator.
-        arr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
-                   value::TypeTags::NumberInt64,
-                   value::bitcastFrom<int64_t>(totalSize));
+    // Move each element from the 'newArrayElements' array to the accumulator array.
+    if (tagNewArrayElements != value::TypeTags::Nothing) {
+        value::arrayForEach<true>(tagNewArrayElements,
+                                  valNewArrayElements,
+                                  [&](value::TypeTags tagNewElem, value::Value valNewElem) {
+                                      accArray->push_back(tagNewElem, valNewElem);
+                                  });
     }
 
-    auto [accArrTag, accArrVal] = arr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(7039518, "expected value of type 'Array'", accArrTag == value::TypeTags::Array);
-    auto accArr = value::getArrayView(accArrVal);
-
-    value::arrayForEach<true>(
-        newElemTag, newElemVal, [&](value::TypeTags elTag, value::Value elVal) {
-            accArr->push_back(elTag, elVal);
-        });
-
-
-    accumulatorGuard.reset();
-    return {arrOwned, arrTag, arrVal};
+    guardAccumulatorState.reset();
+    return {true, tagAccumulatorState, valAccumulatorState};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysCapped(
     ArityType arity) {
-    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
-    auto [newElemTag, newElemVal] = moveOwnedFromStack(1);
+    auto [tagLhsAccumulatorState, valLhsAccumulatorState] = moveOwnedFromStack(0);
+    value::ValueGuard guardLhsAccumulatorState{tagLhsAccumulatorState, valLhsAccumulatorState};
 
-    // Note that we do not call 'reset()' on the guard below, as 'concatArraysAccumImpl' assumes
-    // that callers will manage the memory associated with 'tag/valNewElem'. See the comment on
-    // 'concatArraysAccumImpl' for more details.
-    value::ValueGuard newElemGuard{newElemTag, newElemVal};
+    auto [tagRhsAccumulatorState, valRhsAccumulatorState] = moveOwnedFromStack(1);
+    value::ValueGuard guardRhsAccumulatorState{tagRhsAccumulatorState, valRhsAccumulatorState};
 
-    auto [_, sizeCapTag, sizeCapVal] = getFromStack(2);
+    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
     tassert(7039508,
             "'cap' parameter must be a 32-bit int",
-            sizeCapTag == value::TypeTags::NumberInt32);
-    const int32_t sizeCap = value::bitcastTo<int32_t>(sizeCapVal);
+            tagSizeCap == value::TypeTags::NumberInt32);
 
-    // We expect the new value we are adding to the accumulator to be a two-element array where
-    // the first element is the array to concatenate and the second value is the corresponding size.
-    tassert(7039512, "expected value of type 'Array'", newElemTag == value::TypeTags::Array);
-    auto newArr = value::getArrayView(newElemVal);
+    // Each accumulator should be a two-element array with the array value and the array value's
+    // size as its elements. We pass the full LHS accumulator to 'concatArraysAccumImpl' as is, but
+    // we need to destructure the RHS accumulator.
+    tassert(7039512,
+            "expected value of type 'Array'",
+            tagRhsAccumulatorState == value::TypeTags::Array);
+    auto rhsAccumulatorState = value::getArrayView(valRhsAccumulatorState);
+
     tassert(7039527,
-            "array had unexpected size",
-            newArr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+            "Capped array concatenation accumulator with invalid length",
+            rhsAccumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
-    auto [newArrayTag, newArrayVal] = newArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(7039519, "expected value of type 'Array'", newArrayTag == value::TypeTags::Array);
+    // Move ownership of the RHS array from the RHS accumulator to the local scope.
+    auto [tagNewArrayElements, valNewArrayElements] = rhsAccumulatorState->swapAt(
+        static_cast<size_t>(AggArrayWithSize::kValues), value::TypeTags::Null, 0);
+    value::ValueGuard guardNewArrayElements{tagNewArrayElements, valNewArrayElements};
+    tassert(
+        7039519, "expected value of type 'Array'", tagNewArrayElements == value::TypeTags::Array);
 
-    auto [newSizeTag, newSizeVal] =
-        newArr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
-    tassert(7039517, "expected 64-bit int", newSizeTag == value::TypeTags::NumberInt64);
+    auto [tagNewArrayElementsSize, valNewArrayElementsSize] =
+        rhsAccumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+    tassert(
+        7039517, "expected 64-bit int", tagNewArrayElementsSize == value::TypeTags::NumberInt64);
 
-    return concatArraysAccumImpl(newArrayTag,
-                                 newArrayVal,
-                                 sizeCap,
-                                 arrOwned,
-                                 arrTag,
-                                 arrVal,
-                                 value::bitcastTo<int64_t>(newSizeVal));
+    guardLhsAccumulatorState.reset();
+    guardNewArrayElements.reset();
+    return concatArraysAccumImpl(tagLhsAccumulatorState,
+                                 valLhsAccumulatorState,
+                                 tagNewArrayElements,
+                                 valNewArrayElements,
+                                 value::bitcastTo<int64_t>(valNewArrayElementsSize),
+                                 value::bitcastTo<int32_t>(valSizeCap));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnion(ArityType arity) {

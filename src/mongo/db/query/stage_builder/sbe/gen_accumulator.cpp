@@ -1853,7 +1853,11 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // Count
     {kAccumulatorCountName,
-     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsNoInputs),
+     AccumOpInfo{.buildSinglePurposeAccum =
+                     makeBuildFn(&buildSinglePurposeAccum<sbe::CountHashAggAccumulatorTerminal>),
+                 .buildSinglePurposeAccumForMerge =
+                     makeBuildFn(&buildSinglePurposeAccum<sbe::CountHashAggAccumulatorPartial>),
+                 .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsNoInputs),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsCount),
                  .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsCount),
                  .buildFinalize = makeBuildFn(&buildFinalizeCount),
@@ -1891,7 +1895,9 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // First
     {AccumulatorFirst::kName,
-     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsFirstLast),
+     AccumOpInfo{.buildSinglePurposeAccum =
+                     makeBuildFn(&buildSinglePurposeAccum<sbe::FirstHashAggAccumulator>),
+                 .buildAddExprs = makeBuildFn(&buildAccumExprsFirstLast),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsFirst),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsFirst)}},
 
@@ -1974,7 +1980,9 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // Push
     {AccumulatorPush::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsPush),
+     AccumOpInfo{.buildSinglePurposeAccum =
+                     makeBuildFn(&buildSinglePurposeAccum<sbe::PushHashAggAccumulator>),
+                 .buildAddAggs = makeBuildFn(&buildAccumAggsPush),
                  .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsPush)}},
 

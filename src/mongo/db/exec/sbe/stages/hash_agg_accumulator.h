@@ -43,6 +43,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -453,6 +454,150 @@ private:
     value::SlotAccessor* _collatorAccessor = nullptr;
 
     int64_t _sizeCap;
+};
+
+class PushHashAggAccumulator : public SinglePurposeHashAggAccumulator {
+public:
+    PushHashAggAccumulator(value::SlotId outSlot,
+                           value::SlotId spillSlot,
+                           std::unique_ptr<EExpression> transformExpr,
+                           boost::optional<value::SlotId> collatorSlot)
+        : SinglePurposeHashAggAccumulator(
+              outSlot, spillSlot, std::move(transformExpr), collatorSlot) {
+        _sizeCap = internalQueryMaxPushBytes.load();
+    }
+
+    PushHashAggAccumulator(value::SlotId outSlot,
+                           value::SlotId spillSlot,
+                           std::unique_ptr<EExpression> transformExpr,
+                           int64_t sizeCap)
+        : SinglePurposeHashAggAccumulator(
+              outSlot, spillSlot, std::move(transformExpr), boost::none),
+          _sizeCap(sizeCap) {}
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<PushHashAggAccumulator>(
+            _outSlot, _spillSlot, _transformExpr->clone(), _sizeCap);
+    }
+
+    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+
+protected:
+    void accumulateTransformedValue(bool ownedField,
+                                    value::TypeTags tagField,
+                                    value::Value valField,
+                                    HashAggAccessor& accumulatorState) const final;
+
+    void mergeRecoveredState(bool ownedRecoveredState,
+                             value::TypeTags tagRecoveredState,
+                             value::Value valRecoveredState,
+                             value::MaterializedSingleRowAccessor& accumulatorState) const final;
+
+    void finalizePartialAggregate(value::TypeTags tagPartialAggregate,
+                                  value::Value valPartialAggregate,  // Owned
+                                  value::AssignableSlotAccessor& result) const final;
+
+    std::string getDebugName() const final {
+        return "_internalPush";
+    }
+
+private:
+    int64_t _sizeCap;
+};
+
+class FirstHashAggAccumulator : public SinglePurposeHashAggAccumulator {
+public:
+    using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
+
+    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<FirstHashAggAccumulator>(
+            _outSlot, _spillSlot, _transformExpr->clone(), boost::none);
+    }
+
+protected:
+    void accumulateTransformedValue(bool ownedField,
+                                    value::TypeTags tagField,
+                                    value::Value valField,
+                                    HashAggAccessor& accumulatorState) const final;
+
+    void mergeRecoveredState(bool ownedRecoveredState,
+                             value::TypeTags tagRecoveredState,
+                             value::Value valRecoveredState,
+                             value::MaterializedSingleRowAccessor& accumulatorState) const final;
+
+    void finalizePartialAggregate(value::TypeTags tagPartialAggregate,
+                                  value::Value valPartialAggregate,  // Owned
+                                  value::AssignableSlotAccessor& result) const final;
+
+    std::string getDebugName() const final {
+        return "_internalFirst";
+    }
+};
+
+/**
+ * Base class for the single-purpose implementation of the $count accumulator.
+ */
+class CountHashAggAccumulatorBase : public SinglePurposeHashAggAccumulator {
+public:
+    using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
+
+    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+
+protected:
+    void accumulateTransformedValue(bool ownedField,
+                                    value::TypeTags tagField,
+                                    value::Value valField,
+                                    HashAggAccessor& accumulatorState) const final;
+
+    void mergeRecoveredState(bool ownedRecoveredState,
+                             value::TypeTags tagRecoveredState,
+                             value::Value valRecoveredState,
+                             value::MaterializedSingleRowAccessor& accumulatorState) const final;
+
+    std::string getDebugName() const final {
+        return "_internalArithmeticAverage";
+    }
+};
+
+/**
+ * Single-purpose implementation of the $count accumulator for when the desired output is the final
+ * result of the $count expression.
+ */
+class CountHashAggAccumulatorTerminal : public CountHashAggAccumulatorBase {
+public:
+    using CountHashAggAccumulatorBase::CountHashAggAccumulatorBase;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<CountHashAggAccumulatorTerminal>(
+            _outSlot, _spillSlot, _transformExpr->clone(), boost::none);
+    }
+
+protected:
+    void finalizePartialAggregate(value::TypeTags tagPartialAggregate,
+                                  value::Value valPartialAggregate,  // Owned
+                                  value::AssignableSlotAccessor& result) const final;
+};
+
+/**
+ * Single-purpose implementation of the $count accumulator for use by shards producing results for a
+ * merge operation, in which case the desired output is not the final result but instead an array
+ * containing a serialized DoubleDoubleSum (i.e., the partial aggregate).
+ */
+class CountHashAggAccumulatorPartial : public CountHashAggAccumulatorBase {
+public:
+    using CountHashAggAccumulatorBase::CountHashAggAccumulatorBase;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<CountHashAggAccumulatorTerminal>(
+            _outSlot, _spillSlot, _transformExpr->clone(), boost::none);
+    }
+
+protected:
+    void finalizePartialAggregate(value::TypeTags tagPartialAggregate,
+                                  value::Value valPartialAggregate,  // Owned
+                                  value::AssignableSlotAccessor& result) const final;
 };
 
 namespace size_estimator {

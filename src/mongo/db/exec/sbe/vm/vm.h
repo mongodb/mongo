@@ -384,6 +384,14 @@ public:
                                                                      value::TypeTags rhsTag,
                                                                      value::Value rhsValue);
 
+    static FastTuple<bool, value::TypeTags, value::Value> builtinAddToArrayCappedImpl(
+        value::TypeTags tagAccumulatorState,
+        value::Value valAccumulatorState,  // Owned
+        bool ownedNewElem,
+        value::TypeTags tagNewElem,
+        value::Value valNewElem,
+        int32_t sizeCap);
+
     static FastTuple<bool, value::TypeTags, value::Value> addToSetCappedImpl(
         value::TypeTags tagAccumulatorState,
         value::Value valAccumulatorState,  // Owned
@@ -392,6 +400,29 @@ public:
         value::Value valNewElem,
         int32_t sizeCap,
         CollatorInterface* collator);
+
+    /**
+     * Moves the elements from the (tagNewArrayElements, valNewArrayElements) array onto the end of
+     * the (tagAccumulatorState, valAccumulatorState) capped array accumulator, enforcing the cap by
+     * throwing an exception if the operation would result in an accumulator state that exceeds it.
+     *
+     * Either the accumulator state or new members array may be Nothing, which gets treated as an
+     * empty array.
+     *
+     * The capped accumulator state is a two-element array, where the first element is the array
+     * value and the second element is the array value's pre-computed size. The return value is also
+     * an array with the same structure.
+     *
+     * Takes ownership of both the accumulator state and the new elements array. The caller takes
+     * ownership of the returned value iff the 'bool' component is true.
+     */
+    static FastTuple<bool, value::TypeTags, value::Value> concatArraysAccumImpl(
+        value::TypeTags tagAccumulatorState,
+        value::Value valAccumulatorState,  // Owned
+        value::TypeTags tagNewArrayElements,
+        value::Value valNewArrayElements,  // Owned
+        int64_t newArrayElementsSize,
+        int32_t sizeCap);
 
     /**
      * Moves the elements from the (tagNewSetMembers, valNewSetMembers) array into the
@@ -899,24 +930,6 @@ private:
                                                                bool trimRight);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcatArraysCapped(ArityType arity);
-
-    /**
-     * Given an array of new values via 'newElemVal' and an array accumulator via 'arrVal', add the
-     * new values into the array accumulator. Note that the accumulator is an array of two elements
-     * where the first element is the array of values in the accumulator and the second element is
-     * the size of the current accumulated values.
-     * IMPORTANT: this function does NOT create a ValueGuard over 'newElemTag' and 'newElemVal'. It
-     * is the responsibility of callers of this function to manage the memory associated with
-     * 'newElemTag/Val.
-     */
-    FastTuple<bool, value::TypeTags, value::Value> concatArraysAccumImpl(value::TypeTags newElemTag,
-                                                                         value::Value newElemVal,
-                                                                         int32_t sizeCap,
-                                                                         bool arrOwned,
-                                                                         value::TypeTags arrTag,
-                                                                         value::Value arrVal,
-                                                                         int64_t sizeOfNewElems);
-
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);

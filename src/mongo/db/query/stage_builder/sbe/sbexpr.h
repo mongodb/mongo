@@ -700,9 +700,13 @@ struct SbHashAggAccumulator {
      */
     std::variant<
         SbHashAggCompiledAccumulator,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorTerminal>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::ArithmeticAverageHashAggAccumulatorPartial>,
-        SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>>
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorTerminal>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorPartial>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::FirstHashAggAccumulator>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>>
         implementation;
 };
 using SbHashAggAccumulatorVector = std::vector<SbHashAggAccumulator>;
