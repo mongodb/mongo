@@ -3147,6 +3147,9 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
         return request.getDocuments().size();
     }
 
+    // The atomic commit failed and might have populated 'errors'. To retry inserting each
+    // measurement one by one, first clear 'errors' so the retry starts with a clean state.
+    errors->clear();
     for (size_t i = 0; i < request.getDocuments().size(); ++i) {
         performUnorderedTimeseriesWritesWithRetries(
             opCtx, i, 1, errors, opTime, electionId, containsRetry, request);
