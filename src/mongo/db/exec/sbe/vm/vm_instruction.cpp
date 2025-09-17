@@ -49,7 +49,7 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
     using namespace std::literals;
 
     // This function should only be called if 'collator' is non-null and 'tag' is a collatable type.
-    invariant(collator);
+    tassert(11054001, "Missing collator argument in collComparisonKey", collator);
     tassert(11086802, "Unexpected value of non-collatable type", value::isCollatableType(tag));
 
     // For strings, call CollatorInterface::getComparisonKey() to obtain the comparison key.
