@@ -444,7 +444,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // the shard role.
     if (request.getIsHybridSearch() && cri && cri->hasRoutingTable()) {
         uassert(10557300,
-                "$rankFusion is unsupported on timeseries collections",
+                "$rankFusion and $scoreFusion are unsupported on timeseries collections",
                 !(cri->getChunkManager().isTimeseriesCollection()));
     }
 
@@ -1152,7 +1152,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     nsStruct.executionNss = resolvedView.getNamespace();
 
     uassert(ErrorCodes::OptionNotSupportedOnView,
-            "$rankFusion is unsupported on timeseries collections",
+            "$rankFusion and $scoreFusion are unsupported on timeseries collections",
             !(resolvedView.timeseries() && request.getIsHybridSearch()));
 
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), nsStruct.executionNss);

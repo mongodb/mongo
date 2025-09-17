@@ -43,7 +43,7 @@ Status validatePipelinesObject(const BSONObj& pipelines) {
 
     for (auto&& elem : pipelines) {
         if (auto status = attemptToParsePipelineFromBSON(elem).getStatus(); !status.isOK()) {
-            return status.withContext("Error parsing $rankFusion.input.pipelines");
+            return status.withContext("Error parsing $rankFusion/$scoreFusion.input.pipelines");
         }
     }
 
