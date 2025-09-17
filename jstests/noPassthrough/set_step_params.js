@@ -1,4 +1,5 @@
 load("jstests/libs/conn_pool_helpers.js");
+load("jstests/libs/fail_point_util.js");
 
 /**
  * @tags: [requires_replication, requires_sharding, sets_replica_set_matching_strategy]
@@ -37,6 +38,9 @@ const primaryOnly = [primary.name];
 
 var threads = [];
 var currentCheckNum = 0;
+
+const numPools = assert.commandWorked(
+    mongos.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}))["taskExecutorPoolSize"];
 
 function updateSetParameters(params) {
     var cmd = Object.assign({"setParameter": 1}, params);
@@ -114,6 +118,13 @@ runSubTest("MaxSize", function() {
 
 // Test maxConnecting
 runSubTest("MaxConnecting", function() {
+    if (numPools > 1) {
+        // We can't easily control what pool each query uses, which makes it difficult to test
+        // MaxConnecting in the presence of multiple pools.
+        jsTestLog("Skipping test for MaxConnecting since there are multiple pools");
+        return;
+    }
+
     const maxPending1 = 2;
     const maxPending2 = 4;
     const conns = 6;
@@ -163,6 +174,12 @@ runSubTest("MaxConnecting", function() {
 });
 
 runSubTest("Timeouts", function() {
+    if (numPools > 1) {
+        // With multiple pools, this test would depend on how connection requests are distributed
+        // to pools, so we'll skip it in that case.
+        jsTestLog("Skipping test for Timeouts since there are multiple pools");
+        return;
+    }
     const conns = minConns;
     const pendingTimeoutMS = 5000;
     const toRefreshTimeoutMS = 1000;

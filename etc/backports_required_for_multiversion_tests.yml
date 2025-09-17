@@ -617,6 +617,12 @@ last-continuous:
     ticket: SERVER-94731
   - test_file: jstests/sharding/sharded_data_distribution.js
     ticket: SERVER-92419
+  - test_file: jstests/sharding/conn_pool_stats.js
+    ticket: SERVER-102477
+  - test_file: jstests/noPassthrough/ftdc/ftdc_connection_reuse.js
+    ticket: SERVER-102477
+  - test_file: jstests/noPassthrough/network/set_step_params.js
+    ticket: SERVER-102477
   - test_file: jstests/sharding/query/union_with_doubly_nested_lookup.js
     ticket: SERVER-108341
   - test_file: jstests/core/txns/multi_statement_transaction_abort.js
@@ -1290,6 +1296,12 @@ last-lts:
     ticket: SERVER-92419
   - test_file: jstests/replsets/initial_sync_source_has_capped_ttl.js
     ticket: SERVER-104771
+  - test_file: jstests/sharding/conn_pool_stats.js
+    ticket: SERVER-102477
+  - test_file: jstests/noPassthrough/ftdc/ftdc_connection_reuse.js
+    ticket: SERVER-102477
+  - test_file: jstests/noPassthrough/network/set_step_params.js
+    ticket: SERVER-102477
   - test_file: jstests/sharding/query/union_with_doubly_nested_lookup.js
     ticket: SERVER-108341
   - test_file: jstests/core/txns/multi_statement_transaction_abort.js

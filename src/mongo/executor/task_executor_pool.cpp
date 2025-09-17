@@ -34,28 +34,39 @@
 #include <algorithm>
 
 #include "mongo/executor/task_executor_pool_parameters_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 
 namespace mongo {
 namespace executor {
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
-#if (defined __linux__)
-    // Always use a pool of size 1 on Linux machines running mongo v4.2 and higher.
-    // Changing it past the default value can cause performance regressions.
-    return 1;
-#else
-    auto poolSize = taskExecutorPoolSize.load();
-    if (poolSize > 0) {
-        return poolSize;
+    // TODO SERVER-103733 Consider if we can fix the pool size to 1 once getMores from router
+    // to shards happen on the baton.
+    size_t numPools = []() -> size_t {
+        if (gTaskExecutorPoolSize > 0) {
+            return gTaskExecutorPoolSize;
+        }
+
+        ProcessInfo p;
+        auto numCores = p.getNumAvailableCores();
+
+        // Never suggest a number outside the range [4, 64].
+        return std::max<size_t>(4U, std::min<size_t>(64U, numCores));
+    }();
+
+    if (numPools > 1) {
+        LOGV2_WARNING(
+            10247700,
+            "The sharding task executor pool size is greater than one. This can have "
+            "adverse effects on performance. To avoid this, set taskExecutorPoolSize to 1.",
+            "taskExecutorPoolSize"_attr = gTaskExecutorPoolSize,
+            "numPools"_attr = numPools);
     }
 
-    ProcessInfo p;
-    auto numCores = p.getNumAvailableCores();
-
-    // Never suggest a number outside the range [4, 64].
-    return std::max<size_t>(4U, std::min<size_t>(64U, numCores));
-#endif  //__linux__
+    return numPools;
 }
 
 void TaskExecutorPool::startup() {

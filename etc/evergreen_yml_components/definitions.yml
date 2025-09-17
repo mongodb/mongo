@@ -6299,6 +6299,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: sharding_task_executor_pool_size_8_gen
+  tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: sharding_config_shard_gen
   tags: ["sharding", "common"]
   commands:
