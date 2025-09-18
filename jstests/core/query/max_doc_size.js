@@ -18,15 +18,18 @@ const maxBsonObjectSize = db.hello().maxBsonObjectSize;
 const docOverhead = Object.bsonsize({_id: new ObjectId(), x: ""});
 const maxStrSize = maxBsonObjectSize - docOverhead;
 const maxStr = "a".repeat(maxStrSize);
-const coll = db.max_doc_size;
+const collNamePrefix = "jstests_max_doc_size_";
+let coll;
 
 //
 // Test that documents at the size limit can be written and read back.
 //
+coll = db.getCollection(collNamePrefix + "insert_at_size_limit");
 coll.drop();
 assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: maxStr}]}));
 assert.eq(coll.find({}).itcount(), 1);
 
+coll = db.getCollection(collNamePrefix + "upsert_at_size_limit");
 coll.drop();
 const objectId = new ObjectId();
 assert.commandWorked(
@@ -38,6 +41,7 @@ assert.commandWorked(
 );
 assert.eq(coll.find({}).itcount(), 1);
 
+coll = db.getCollection(collNamePrefix + "update_at_size_limit");
 coll.drop();
 
 assert.commandWorked(coll.insert({_id: objectId}));
@@ -55,12 +59,14 @@ assert.eq(coll.find({}).itcount(), 1);
 //
 const largerThanMaxString = maxStr + "a";
 
+coll = db.getCollection(collNamePrefix + "insert_over_size_limit");
 coll.drop();
 assert.commandFailedWithCode(
     db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: largerThanMaxString}]}),
     ErrorCodes.BSONObjectTooLarge,
 );
 
+coll = db.getCollection(collNamePrefix + "upsert_over_size_limit");
 coll.drop();
 assert.commandFailedWithCode(
     db.runCommand({
@@ -71,6 +77,7 @@ assert.commandFailedWithCode(
     17420,
 );
 
+coll = db.getCollection(collNamePrefix + "update_over_size_limit");
 coll.drop();
 assert.commandWorked(coll.insert({_id: objectId}));
 assert.commandFailedWithCode(
