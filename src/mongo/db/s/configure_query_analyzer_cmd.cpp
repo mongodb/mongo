@@ -113,7 +113,7 @@ public:
             _autoColl.emplace(opCtx,
                               nss,
                               MODE_IX,
-                              AutoGetCollection::Options{}.viewMode(
+                              auto_get_collection::Options{}.viewMode(
                                   auto_get_collection::ViewMode::kViewsPermitted));
         }
     }

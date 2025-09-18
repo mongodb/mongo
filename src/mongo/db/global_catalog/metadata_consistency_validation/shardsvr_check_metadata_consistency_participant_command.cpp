@@ -309,7 +309,7 @@ public:
                                 opCtx,
                                 nss,
                                 MODE_IS,
-                                AutoGetCollection::Options{}.viewMode(
+                                auto_get_collection::Options{}.viewMode(
                                     auto_get_collection::ViewMode::kViewsPermitted));
                             return CollectionCatalog::get(opCtx);
                         }();

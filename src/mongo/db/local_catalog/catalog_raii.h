@@ -61,26 +61,25 @@ class CollectionCatalog;
 namespace auto_get_collection {
 enum class ViewMode { kViewsPermitted, kViewsForbidden };
 
-template <typename T>
-struct OptionsBase {
-    T viewMode(ViewMode viewMode) {
+struct Options {
+    Options viewMode(ViewMode viewMode) {
         _viewMode = viewMode;
-        return std::move(*static_cast<T*>(this));
+        return std::move(*static_cast<Options*>(this));
     }
 
-    T deadline(Date_t deadline) {
+    Options deadline(Date_t deadline) {
         _deadline = std::move(deadline);
-        return std::move(*static_cast<T*>(this));
+        return std::move(*static_cast<Options*>(this));
     }
 
-    T expectedUUID(boost::optional<UUID> expectedUUID) {
+    Options expectedUUID(boost::optional<UUID> expectedUUID) {
         _expectedUUID = expectedUUID;
-        return std::move(*static_cast<T*>(this));
+        return std::move(*static_cast<Options*>(this));
     }
 
-    T globalLockOptions(boost::optional<Lock::GlobalLockOptions> globalLockOptions) {
+    Options globalLockOptions(boost::optional<Lock::GlobalLockOptions> globalLockOptions) {
         _globalLockOptions = globalLockOptions;
-        return std::move(*static_cast<T*>(this));
+        return std::move(*static_cast<Options*>(this));
     }
 
     ViewMode _viewMode = ViewMode::kViewsForbidden;
@@ -89,19 +88,6 @@ struct OptionsBase {
     boost::optional<Lock::GlobalLockOptions> _globalLockOptions;
 };
 
-struct Options : OptionsBase<Options> {};
-struct OptionsWithSecondaryCollections : OptionsBase<OptionsWithSecondaryCollections> {
-    OptionsWithSecondaryCollections secondaryNssOrUUIDs(
-        std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
-        std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd) {
-        _secondaryNssOrUUIDsBegin = secondaryNssOrUUIDsBegin;
-        _secondaryNssOrUUIDsEnd = secondaryNssOrUUIDsEnd;
-        return std::move(*this);
-    }
-
-    std::vector<NamespaceStringOrUUID>::const_iterator _secondaryNssOrUUIDsBegin;
-    std::vector<NamespaceStringOrUUID>::const_iterator _secondaryNssOrUUIDsEnd;
-};
 }  // namespace auto_get_collection
 
 /**
@@ -160,11 +146,10 @@ public:
     static bool canSkipRSTLLock(const NamespaceStringOrUUID& nsOrUUID);
     static bool canSkipFlowControlTicket(const NamespaceStringOrUUID& nsOrUUID);
 
-    static AutoGetDb createForAutoGetCollection(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        LockMode modeColl,
-        const auto_get_collection::OptionsWithSecondaryCollections& options);
+    static AutoGetDb createForAutoGetCollection(OperationContext* opCtx,
+                                                const NamespaceStringOrUUID& nsOrUUID,
+                                                LockMode modeColl,
+                                                const auto_get_collection::Options& options);
 
     /**
      * Returns the database, or nullptr if it didn't exist.
@@ -247,22 +232,10 @@ class AutoGetCollection {
     AutoGetCollection& operator=(const AutoGetCollection&) = delete;
 
 public:
-    using Options = auto_get_collection::OptionsWithSecondaryCollections;
-
-    /**
-     * Collection locks are also acquired for any 'secondaryNssOrUUIDs' namespaces provided.
-     * Collection locks are acquired in ascending ResourceId(RESOURCE_COLLECTION, nss) order to
-     * avoid deadlocks, consistent with other locations in the code wherein we take multiple
-     * collection locks.
-     *
-     * Only MODE_IS is supported when 'secondaryNssOrUUIDs' namespaces are provided. It is safe for
-     * 'nsOrUUID' to be duplicated in 'secondaryNssOrUUIDs', or 'secondaryNssOrUUIDs' to contain
-     * duplicates.
-     */
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeColl,
-                      const Options& options = {});
+                      const auto_get_collection::Options& options = {});
 
     AutoGetCollection(AutoGetCollection&&) = default;
 
@@ -324,7 +297,7 @@ protected:
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeColl,
-                      const Options& options,
+                      const auto_get_collection::Options& options,
                       bool verifyWriteEligible);
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.

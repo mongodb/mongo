@@ -313,7 +313,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 AutoGetCollection coll{opCtx,
                                        originalNss(),
                                        MODE_IS,
-                                       AutoGetCollection::Options{}
+                                       auto_get_collection::Options{}
                                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                            .expectedUUID(_request.getCollectionUUID())};
             }

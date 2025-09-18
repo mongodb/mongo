@@ -119,11 +119,11 @@ public:
             "configServer",
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
 
-        AutoGetCollection autoColl(
-            opCtx,
-            nss,
-            MODE_IS,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        AutoGetCollection autoColl(opCtx,
+                                   nss,
+                                   MODE_IS,
+                                   auto_get_collection::Options{}.viewMode(
+                                       auto_get_collection::ViewMode::kViewsPermitted));
         const auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 

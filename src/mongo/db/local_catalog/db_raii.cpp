@@ -515,7 +515,7 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
                              const std::shared_ptr<const CollectionCatalog>& catalog,
                              boost::optional<Timestamp> readTimestamp,
                              const NamespaceStringOrUUID& nsOrUUID,
-                             const AutoGetCollection::Options& options) {
+                             const auto_get_collection::Options& options) {
     // Returns a collection reference compatible with the specified 'readTimestamp'. Creates and
     // places a compatible PIT collection reference in the 'catalog' if needed and the collection
     // exists at that PIT.

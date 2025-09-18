@@ -305,7 +305,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
-    auto options = AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+    auto options = auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
         .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection autoColl(
         opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX, options);

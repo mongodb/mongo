@@ -359,7 +359,7 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
         opCtx,
         nss,
         MODE_IS,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        auto_get_collection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     if (!collection || collection.getView()) {
         return;
     }

@@ -188,7 +188,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         opCtx,
                         nss(),
                         MODE_IS,
-                        AutoGetCollection::Options{}
+                        auto_get_collection::Options{}
                             .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                             .expectedUUID(_request.getCollectionUUID())};
 

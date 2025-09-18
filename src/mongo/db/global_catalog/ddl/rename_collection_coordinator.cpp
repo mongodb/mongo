@@ -721,7 +721,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             opCtx,
                             fromNss,
                             MODE_IS,
-                            AutoGetCollection::Options{}
+                            auto_get_collection::Options{}
                                 .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                 .expectedUUID(_doc.getExpectedSourceUUID())};
 
@@ -845,7 +845,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             opCtx,
                             toNss,
                             MODE_IS,
-                            AutoGetCollection::Options{}
+                            auto_get_collection::Options{}
                                 .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                 .expectedUUID(_doc.getExpectedTargetUUID())};
 

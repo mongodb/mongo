@@ -187,11 +187,11 @@ void _checkBucketCollectionInconsistencies(
     // format. Check if there is a valid view, otherwise return current view/collection options (if
     // present).
     const auto [hasValidView, invalidOptions] = [&] {
-        AutoGetCollection ac(
-            opCtx,
-            nss.getTimeseriesViewNamespace(),
-            MODE_IS,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        AutoGetCollection ac(opCtx,
+                             nss.getTimeseriesViewNamespace(),
+                             MODE_IS,
+                             auto_get_collection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
 
         if (auto view = ac.getView()) {
             if (view->viewOn() == nss && view->pipeline().size() == 1) {

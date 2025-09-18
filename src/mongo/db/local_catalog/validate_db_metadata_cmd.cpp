@@ -215,7 +215,7 @@ public:
             AutoGetCollection collection(opCtx,
                                          coll,
                                          LockMode::MODE_IS,
-                                         AutoGetCollection::Options{}.viewMode(
+                                         auto_get_collection::Options{}.viewMode(
                                              auto_get_collection::ViewMode::kViewsPermitted));
 
             // If it view, just do the validations for view.

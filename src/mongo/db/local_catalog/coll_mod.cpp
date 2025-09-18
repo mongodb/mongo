@@ -829,11 +829,11 @@ Status _collModInternal(OperationContext* opCtx,
 
     boost::optional<AutoGetCollection> autoget;
     if (!acquisition) {
-        autoget.emplace(
-            opCtx,
-            nsOrUUID,
-            MODE_X,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        autoget.emplace(opCtx,
+                        nsOrUUID,
+                        MODE_X,
+                        auto_get_collection::Options{}.viewMode(
+                            auto_get_collection::ViewMode::kViewsPermitted));
     }
     auto nss = acquisition ? acquisition->nss() : autoget->getNss();
     auto& coll = acquisition ? acquisition->getCollectionPtr() : autoget->getCollection();

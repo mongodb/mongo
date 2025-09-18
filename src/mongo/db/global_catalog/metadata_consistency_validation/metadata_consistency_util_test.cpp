@@ -111,11 +111,11 @@ std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     std::vector<CollectionPtr> localCatalogCollections;
     auto collCatalogSnapshot = [&] {
-        AutoGetCollection coll(
-            opCtx,
-            nss,
-            MODE_IS,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        AutoGetCollection coll(opCtx,
+                               nss,
+                               MODE_IS,
+                               auto_get_collection::Options{}.viewMode(
+                                   auto_get_collection::ViewMode::kViewsPermitted));
         return CollectionCatalog::get(opCtx);
     }();
 

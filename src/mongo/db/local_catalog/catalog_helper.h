@@ -41,25 +41,6 @@
 
 namespace mongo::catalog_helper {
 
-/**
- * Fills the input 'collLocks' with CollectionLocks, acquiring locks on namespaces 'nsOrUUID' and
- * 'secondaryNssOrUUIDs' in ResourceId(RESOURCE_COLLECTION, nss) order.
- *
- * The namespaces will be resolved, the locks acquired, and then the namespaces will be checked for
- * changes in case there is a race with rename and a UUID no longer matches the locked namespace.
- *
- * Handles duplicate namespaces across 'nsOrUUID' and 'secondaryNssOrUUIDs'. Only one lock will be
- * taken on each namespace.
- */
-void acquireCollectionLocksInResourceIdOrder(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    LockMode modeColl,
-    Date_t deadline,
-    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
-    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
-    std::vector<CollectionNamespaceOrUUIDLock>* collLocks);
-
 extern FailPoint setAutoGetCollectionWait;
 
 extern StorageEngine::TimestampMonitor::TimestampListener

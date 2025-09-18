@@ -550,7 +550,7 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx,
                                nss,
                                MODE_IS,
-                               AutoGetCollection::Options{}.viewMode(
+                               auto_get_collection::Options{}.viewMode(
                                    allowViews ? auto_get_collection::ViewMode::kViewsPermitted
                                               : auto_get_collection::ViewMode::kViewsForbidden));
     return autoColl ? boost::make_optional(autoColl->uuid()) : boost::none;

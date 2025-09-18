@@ -653,7 +653,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_S,
-                               AutoGetCollection::Options{}.deadline(
+                               auto_get_collection::Options{}.deadline(
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
     auto scopedCsr =
@@ -668,7 +668,7 @@ CollectionCriticalSection::~CollectionCriticalSection() {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
     UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
     auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+        auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
             .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, autoGetCollOptions);
     auto scopedCsr =
@@ -680,7 +680,7 @@ void CollectionCriticalSection::enterCommitPhase() {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_X,
-                               AutoGetCollection::Options{}.deadline(
+                               auto_get_collection::Options{}.deadline(
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
     auto scopedCsr =

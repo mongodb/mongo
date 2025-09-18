@@ -180,11 +180,10 @@ bool AutoGetDb::canSkipFlowControlTicket(const NamespaceStringOrUUID& nsOrUUID) 
     return false;
 }
 
-AutoGetDb AutoGetDb::createForAutoGetCollection(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    LockMode modeColl,
-    const auto_get_collection::OptionsWithSecondaryCollections& options) {
+AutoGetDb AutoGetDb::createForAutoGetCollection(OperationContext* opCtx,
+                                                const NamespaceStringOrUUID& nsOrUUID,
+                                                LockMode modeColl,
+                                                const auto_get_collection::Options& options) {
     auto& deadline = options._deadline;
 
     invariant(!opCtx->isLockFreeReadsOp());
@@ -281,7 +280,7 @@ Lock::CollectionLock CollectionNamespaceOrUUIDLock::resolveAndLockCollectionByNs
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      LockMode modeColl,
-                                     const Options& options)
+                                     const auto_get_collection::Options& options)
     : AutoGetCollection(opCtx,
                         nsOrUUID,
                         modeColl,
@@ -291,14 +290,12 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      LockMode modeColl,
-                                     const Options& options,
+                                     const auto_get_collection::Options& options,
                                      bool verifyWriteEligible)
     : _autoDb(AutoGetDb::createForAutoGetCollection(opCtx, nsOrUUID, modeColl, options)) {
 
     auto& viewMode = options._viewMode;
     auto& deadline = options._deadline;
-    auto& secondaryNssOrUUIDsBegin = options._secondaryNssOrUUIDsBegin;
-    auto& secondaryNssOrUUIDsEnd = options._secondaryNssOrUUIDsEnd;
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
@@ -318,20 +315,14 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         fmt::format("Namespace {} is not a valid collection name", nsOrUUID.toStringForErrorMsg()),
         nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
 
-    catalog_helper::acquireCollectionLocksInResourceIdOrder(opCtx,
-                                                            nsOrUUID,
-                                                            modeColl,
-                                                            deadline,
-                                                            secondaryNssOrUUIDsBegin,
-                                                            secondaryNssOrUUIDsEnd,
-                                                            &_collLocks);
+    _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
+
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     catalog_helper::setAutoGetCollectionWaitFailpointExecute(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
     auto catalog = CollectionCatalog::get(opCtx);
-    auto databaseHolder = DatabaseHolder::get(opCtx);
 
     // Check that the collections are all safe to use.
     //
@@ -359,20 +350,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     verifyDbAndCollection(
         opCtx, modeColl, nsOrUUID, _resolvedNss, _coll.get(), _autoDb.getDb(), verifyWriteEligible);
-    for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
-        const auto& secondaryNssOrUUID = *iter;
-        auto secondaryResolvedNss =
-            catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
-        auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
-        auto secondaryDbName = secondaryNssOrUUID.dbName();
-        verifyDbAndCollection(opCtx,
-                              MODE_IS,
-                              secondaryNssOrUUID,
-                              secondaryResolvedNss,
-                              secondaryColl,
-                              databaseHolder->getDb(opCtx, secondaryDbName),
-                              verifyWriteEligible);
-    }
 
     const auto receivedShardVersion{
         OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
@@ -695,7 +672,7 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
     const auto changeCollectionNamespaceString = NamespaceString::makeChangeCollectionNSS(tenantId);
     if (AccessMode::kRead == mode || AccessMode::kWrite == mode ||
         AccessMode::kUnreplicatedWrite == mode) {
-        auto options = AutoGetCollection::Options{}.deadline(deadline);
+        auto options = auto_get_collection::Options{}.deadline(deadline);
         if (AccessMode::kUnreplicatedWrite == mode) {
             options.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});

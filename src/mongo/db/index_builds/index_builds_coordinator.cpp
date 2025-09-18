@@ -512,12 +512,12 @@ RecoveryUnit::ReadSource getReadSourceForDrainBeforeCommitQuorum(
 }
 
 /**
- * Returns an AutoGetCollection::Options configured to skip the RSTL if 'skipRSTL' is true.
+ * Returns an auto_get_collection::Options configured to skip the RSTL if 'skipRSTL' is true.
  */
-AutoGetCollection::Options makeAutoGetCollectionOptions(
+auto_get_collection::Options makeAutoGetCollectionOptions(
     bool skipRSTL,
     boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none) {
-    return AutoGetCollection::Options{}.globalLockOptions(
+    return auto_get_collection::Options{}.globalLockOptions(
         Lock::GlobalLockOptions{.skipRSTLLock = skipRSTL, .explicitIntent = explicitIntent});
 }
 
@@ -2442,7 +2442,7 @@ StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiv
     while (true) {
         try {
             auto autoGetCollOptions =
-                AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+                auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                     .explicitIntent = rss::consensus::IntentRegistry::Intent::BlockingWrite});
             autoGetCollOptions.deadline(Date_t::now() + kStateTransitionBlockedMaxMs);
             return AutoGetCollection(
@@ -3378,7 +3378,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
         auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+            auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
 
@@ -3425,7 +3425,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     }
 
     auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+        auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
             .explicitIntent =
                 rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
                     .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)

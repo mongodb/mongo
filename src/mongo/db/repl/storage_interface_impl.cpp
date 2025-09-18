@@ -617,7 +617,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                 opCtx,
                 nsOrUUID,
                 MODE_IX,
-                AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+                auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                     .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite}));
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             return ex.toStatus();
@@ -1399,7 +1399,7 @@ Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
                                                 const NamespaceStringOrUUID& nsOrUUID,
                                                 long long newCount) {
     auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+        auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
             .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection autoColl(opCtx, nsOrUUID, LockMode::MODE_X, autoGetCollOptions);
 

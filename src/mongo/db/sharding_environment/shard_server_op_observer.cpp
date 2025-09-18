@@ -154,7 +154,7 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
         opCtx,
         deletedNss,
         MODE_IX,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        auto_get_collection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
     tassert(7751400,
             str::stream() << "Untimestamped writes to "
@@ -303,7 +303,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                 opCtx,
                                 insertedNss,
                                 fixLockModeForSystemDotViewsChanges(insertedNss, MODE_IX),
-                                AutoGetCollection::Options{}.viewMode(
+                                auto_get_collection::Options{}.viewMode(
                                     auto_get_collection::ViewMode::kViewsPermitted));
                         }
 
@@ -383,11 +383,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         // preimages one will take the inverse order, that is they have a lock
         // on a user database and then take a lock on the config database.
         DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        AutoGetCollection autoColl(
-            opCtx,
-            updatedNss,
-            MODE_IX,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        AutoGetCollection autoColl(opCtx,
+                                   updatedNss,
+                                   MODE_IX,
+                                   auto_get_collection::Options{}.viewMode(
+                                       auto_get_collection::ViewMode::kViewsPermitted));
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
             tassert(7751401,
                     str::stream()
@@ -457,7 +457,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                             opCtx,
                             updatedNss,
                             fixLockModeForSystemDotViewsChanges(updatedNss, MODE_IX),
-                            AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::Options{}.viewMode(
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
@@ -626,7 +626,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                             opCtx,
                             deletedNss,
                             fixLockModeForSystemDotViewsChanges(deletedNss, MODE_IX),
-                            AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::Options{}.viewMode(
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
