@@ -201,6 +201,8 @@ struct AcquiredCollection : AcquiredBase {
                        AcquisitionLocks locksRequirements,
                        boost::optional<ScopedCollectionDescription> collectionDescription,
                        boost::optional<ScopedCollectionFilter> ownershipFilter,
+                       boost::optional<DatabaseVersion> dbVersion,
+                       boost::optional<ShardVersion> shardVersion,
                        CollectionPtr collectionPtr)
         : AcquiredBase(acquireCollectionCallNum,
                        std::move(prerequisites),
@@ -211,6 +213,8 @@ struct AcquiredCollection : AcquiredBase {
                        std::move(locksRequirements)),
           collectionDescription(std::move(collectionDescription)),
           ownershipFilter(std::move(ownershipFilter)),
+          dbVersion(dbVersion),
+          shardVersion(shardVersion),
           collectionPtr(std::move(collectionPtr)),
           invalidated(false) {}
 
@@ -229,10 +233,14 @@ struct AcquiredCollection : AcquiredBase {
                              std::move(locksRequirements),
                              boost::none,
                              boost::none,
+                             boost::none,
+                             boost::none,
                              std::move(collectionPtr)) {};
 
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
+    boost::optional<DatabaseVersion> dbVersion;
+    boost::optional<ShardVersion> shardVersion;
 
     CollectionPtr collectionPtr;
 

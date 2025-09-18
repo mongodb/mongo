@@ -199,8 +199,7 @@ mongo_cc_library(
         "//src/mongo/db:collection_index_usage_tracker",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        # TODO SERVER-77571 this should only depend on the shard_role_api library.
-        "//src/mongo/db:shard_role",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/plan_cache:query_plan_cache",

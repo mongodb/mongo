@@ -499,6 +499,10 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
             ? get<PlacementConcern>(prerequisites.placementConcern).getShardVersion()
             : boost::none;
 
+        const boost::optional<DatabaseVersion> placementConcernDbVersion =
+            holds_alternative<PlacementConcern>(prerequisites.placementConcern)
+            ? get<PlacementConcern>(prerequisites.placementConcern).getDbVersion()
+            : boost::none;
         if (placementConcernShardVersion == ShardVersion::UNSHARDED()) {
             shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
                 opCtx,
@@ -549,6 +553,8 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                      std::move(acquisitionRequest.acquisitionLocks),
                      std::move(snapshotedServices.collectionDescription),
                      std::move(snapshotedServices.ownershipFilter),
+                     std::move(placementConcernDbVersion),
+                     std::move(placementConcernShardVersion),
                      std::move(get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
 
             CollectionAcquisition acquisition(txnResources, acquiredCollection);
@@ -976,6 +982,14 @@ const boost::optional<ScopedCollectionFilter>& CollectionAcquisition::getShardin
             _acquiredCollection->collectionDescription &&
                 _acquiredCollection->collectionDescription->isSharded());
     return _acquiredCollection->ownershipFilter;
+}
+
+const boost::optional<DatabaseVersion>& CollectionAcquisition::getDatabaseVersion() const {
+    return _acquiredCollection->dbVersion;
+}
+
+const boost::optional<ShardVersion>& CollectionAcquisition::getShardVersion() const {
+    return _acquiredCollection->shardVersion;
 }
 
 const CollectionPtr& CollectionAcquisition::getCollectionPtr() const {

@@ -74,7 +74,11 @@ public:
     }
 
     std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
-        return _getSecondaryAcquisitions();
+        return _getSecondaryCollections();
+    }
+
+    const CollectionOrViewAcquisitionMap& getSecondaryCollectionAcquisitions() const {
+        return _secondaryAcq;
     }
 
     bool isAnySecondaryNamespaceAViewOrNotFullyLocal() const {
@@ -114,7 +118,7 @@ public:
     }
 
 private:
-    inline std::map<NamespaceString, CollectionPtr> _getSecondaryAcquisitions() const {
+    inline std::map<NamespaceString, CollectionPtr> _getSecondaryCollections() const {
         std::map<NamespaceString, CollectionPtr> collMap;
         for (const auto& [nss, acq] : _secondaryAcq) {
             // TODO(SERVER-103403): Investigate usage validity of

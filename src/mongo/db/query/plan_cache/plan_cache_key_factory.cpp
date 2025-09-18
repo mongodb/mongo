@@ -194,26 +194,25 @@ PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeSt
 }
 
 namespace {
-// TODO: SERVER-77571 use acquisitions APIs for retrieving the shardVersion.
 sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
-                                                        const CollectionPtr& collection,
+                                                        const CollectionAcquisition& collection,
                                                         bool isSecondaryColl) {
     boost::optional<sbe::PlanCacheKeyShardingEpoch> keyShardingEpoch;
     // We don't version secondary collections in the current shard versioning protocol. Also, since
     // currently we only push down $lookup to SBE when secondary collections (and main collection)
     // are unsharded, it's OK to not encode the sharding information here.
     if (!isSecondaryColl) {
-        const auto shardVersion{
-            OperationShardingState::get(opCtx).getShardVersion(collection->ns())};
+        const auto& shardVersion = collection.getShardVersion();
         if (shardVersion) {
             keyShardingEpoch =
                 sbe::PlanCacheKeyShardingEpoch{shardVersion->placementVersion().epoch(),
                                                shardVersion->placementVersion().getTimestamp()};
         }
     }
-    return {collection->uuid(),
-            CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion(),
-            keyShardingEpoch};
+    return {
+        collection.uuid(),
+        CollectionQueryInfo::get(collection.getCollectionPtr()).getPlanCacheInvalidatorVersion(),
+        keyShardingEpoch};
 }
 }  // namespace
 
@@ -241,15 +240,15 @@ namespace plan_cache_key_factory {
 std::tuple<sbe::PlanCacheKeyCollectionState, std::vector<sbe::PlanCacheKeyCollectionState>>
 getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& collections) {
     auto mainCollectionState = plan_cache_detail::computeCollectionState(
-        opCtx, collections.getMainCollection(), false /* isSecondaryColl */);
+        opCtx, collections.getMainCollectionAcquisition(), false /* isSecondaryColl */);
     std::vector<sbe::PlanCacheKeyCollectionState> secondaryCollectionStates;
-    secondaryCollectionStates.reserve(collections.getSecondaryCollections().size());
+    secondaryCollectionStates.reserve(collections.getSecondaryCollectionAcquisitions().size());
     // We always use the collection order saved in MultipleCollectionAccessor to populate the plan
     // cache key, which is ordered by the secondary collection namespaces.
-    for (auto& [_, collection] : collections.getSecondaryCollections()) {
-        if (collection) {
+    for (auto& [_, collectionOrView] : collections.getSecondaryCollectionAcquisitions()) {
+        if (collectionOrView.collectionExists()) {
             secondaryCollectionStates.emplace_back(plan_cache_detail::computeCollectionState(
-                opCtx, collection, true /* isSecondaryColl */));
+                opCtx, collectionOrView.getCollection(), true /* isSecondaryColl */));
         }
     }
     secondaryCollectionStates.shrink_to_fit();

@@ -232,6 +232,8 @@ public:
     // Sharding catalog services
     const ScopedCollectionDescription& getShardingDescription() const;
     const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
+    const boost::optional<DatabaseVersion>& getDatabaseVersion() const;
+    const boost::optional<ShardVersion>& getShardVersion() const;
 
     // Local catalog services
     const CollectionPtr& getCollectionPtr() const;
