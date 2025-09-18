@@ -69,15 +69,17 @@
               palm_kv_err(palm, session, _ret, "%s:%d: \"%s\": failed", __FILE__, __LINE__, #r)); \
     }
 
-#define PALM_KV_ERR(palm, session, r)                                                           \
+#define PALM_KV_ERR_GOTO(palm, session, r, label)                                               \
     {                                                                                           \
         ret = (r);                                                                              \
         if (ret != 0) {                                                                         \
             ret =                                                                               \
               palm_kv_err(palm, session, ret, "%s:%d: \"%s\": failed", __FILE__, __LINE__, #r); \
-            goto err;                                                                           \
+            goto label;                                                                         \
         }                                                                                       \
     }
+
+#define PALM_KV_ERR(palm, session, r) PALM_KV_ERR_GOTO(palm, session, r, err)
 
 #define PALM_ENCRYPTION_EQUAL(e1, e2) (memcmp((e1).dek, (e2).dek, sizeof((e1).dek)) == 0)
 /*
@@ -830,12 +832,13 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
 
     /* Verify the delta chain. */
     if (palm->verify)
-        PALM_KV_ERR(palm, session, palm_handle_verify_page(plh, session, page_id, lsn));
+        PALM_KV_ERR_GOTO(
+          palm, session, palm_handle_verify_page(plh, session, page_id, lsn), err_no_rollback);
 
     if (0) {
 err:
         palm_kv_rollback_transaction(&context);
-
+err_no_rollback:
         PALM_VERBOSE_PRINT(palm_handle->palm, session,
           "palm_handle_discard(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
           ", is_delta=%d) returned %d\n",

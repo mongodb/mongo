@@ -101,13 +101,18 @@ The \c "file:" entry represents the btree stored on disk, as well as parts
 cached in memory.  The data structure implied by this entry is a \c
 WT_BTREE.
 
+The \c "layered:" entry represents the layered table, which is a table that persists data in shared
+storage. Every layered table also has two \c "file:" prefixed metadata entries for its constituents.
+See @ref arch-disagg-layered for more information about layered tables.
+
 In summary, the relationship between prefixes and data structures is as follows:
 
-URI prefix    | struct type    | has dhandle?  | notes
-------------- | -------------- | ------------- | --------------------------------------
-\c table:     | WT_TABLE       | yes           | the dhandle is cast to (WT_TABLE *)
-\c file:      | WT_BTREE       | yes           | dhandle->handle is a (WT_BTREE *)
-\c colgroup:  |                | no            | stored in an array in the WT_TABLE
+URI prefix    | struct type      | has dhandle?  | notes
+------------- | --------------   | ------------- | --------------------------------------
+\c table:     | WT_TABLE         | yes           | the dhandle is cast to (WT_TABLE *)
+\c file:      | WT_BTREE         | yes           | dhandle->handle is a (WT_BTREE *)
+\c colgroup:  |                  | no            | stored in an array in the WT_TABLE
+\c layered:   | WT_LAYERED_TABLE | yes           | the dhandle is cast to (WT_LAYERED_TABLE *)
 
 See @ref arch-dhandle for more information about data handles (dhandles).
 */

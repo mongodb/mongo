@@ -305,6 +305,8 @@ static const char *const __stats_dsrc_desc[] = {
   "layered: Layered table cursor upgrade state for stable table",
   "layered: checkpoints performed on this table by the layered table manager",
   "layered: checkpoints refreshed on shared layered constituents",
+  "layered: disagg pick up checkpoints failed",
+  "layered: disagg pick up checkpoints succeeded",
   "layered: how many log applications the layered table manager applied on this tree",
   "layered: how many log applications the layered table manager skipped on this tree",
   "layered: how many previously-applied LSNs the layered table manager skipped on this tree",
@@ -721,6 +723,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->layered_curs_upgrade_stable = 0;
     stats->layered_table_manager_checkpoints = 0;
     stats->layered_table_manager_checkpoints_refreshed = 0;
+    stats->layered_table_manager_checkpoints_disagg_pick_up_failed = 0;
+    stats->layered_table_manager_checkpoints_disagg_pick_up_succeed = 0;
     stats->layered_table_manager_logops_applied = 0;
     stats->layered_table_manager_logops_skipped = 0;
     stats->layered_table_manager_skip_lsn = 0;
@@ -1137,6 +1141,10 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->layered_table_manager_checkpoints += from->layered_table_manager_checkpoints;
     to->layered_table_manager_checkpoints_refreshed +=
       from->layered_table_manager_checkpoints_refreshed;
+    to->layered_table_manager_checkpoints_disagg_pick_up_failed +=
+      from->layered_table_manager_checkpoints_disagg_pick_up_failed;
+    to->layered_table_manager_checkpoints_disagg_pick_up_succeed +=
+      from->layered_table_manager_checkpoints_disagg_pick_up_succeed;
     to->layered_table_manager_logops_applied += from->layered_table_manager_logops_applied;
     to->layered_table_manager_logops_skipped += from->layered_table_manager_logops_skipped;
     to->layered_table_manager_skip_lsn += from->layered_table_manager_skip_lsn;
@@ -1586,6 +1594,10 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, layered_table_manager_checkpoints);
     to->layered_table_manager_checkpoints_refreshed +=
       WT_STAT_DSRC_READ(from, layered_table_manager_checkpoints_refreshed);
+    to->layered_table_manager_checkpoints_disagg_pick_up_failed +=
+      WT_STAT_DSRC_READ(from, layered_table_manager_checkpoints_disagg_pick_up_failed);
+    to->layered_table_manager_checkpoints_disagg_pick_up_succeed +=
+      WT_STAT_DSRC_READ(from, layered_table_manager_checkpoints_disagg_pick_up_succeed);
     to->layered_table_manager_logops_applied +=
       WT_STAT_DSRC_READ(from, layered_table_manager_logops_applied);
     to->layered_table_manager_logops_skipped +=
@@ -2247,6 +2259,8 @@ static const char *const __stats_connection_desc[] = {
   "layered: Layered table cursor upgrade state for stable table",
   "layered: checkpoints performed on this table by the layered table manager",
   "layered: checkpoints refreshed on shared layered constituents",
+  "layered: disagg pick up checkpoints failed",
+  "layered: disagg pick up checkpoints succeeded",
   "layered: how many log applications the layered table manager applied on this tree",
   "layered: how many log applications the layered table manager skipped on this tree",
   "layered: how many previously-applied LSNs the layered table manager skipped on this tree",
@@ -3203,6 +3217,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->layered_curs_upgrade_stable = 0;
     stats->layered_table_manager_checkpoints = 0;
     stats->layered_table_manager_checkpoints_refreshed = 0;
+    stats->layered_table_manager_checkpoints_disagg_pick_up_failed = 0;
+    stats->layered_table_manager_checkpoints_disagg_pick_up_succeed = 0;
     stats->layered_table_manager_logops_applied = 0;
     stats->layered_table_manager_logops_skipped = 0;
     stats->layered_table_manager_skip_lsn = 0;
@@ -4240,6 +4256,10 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, layered_table_manager_checkpoints);
     to->layered_table_manager_checkpoints_refreshed +=
       WT_STAT_CONN_READ(from, layered_table_manager_checkpoints_refreshed);
+    to->layered_table_manager_checkpoints_disagg_pick_up_failed +=
+      WT_STAT_CONN_READ(from, layered_table_manager_checkpoints_disagg_pick_up_failed);
+    to->layered_table_manager_checkpoints_disagg_pick_up_succeed +=
+      WT_STAT_CONN_READ(from, layered_table_manager_checkpoints_disagg_pick_up_succeed);
     to->layered_table_manager_logops_applied +=
       WT_STAT_CONN_READ(from, layered_table_manager_logops_applied);
     to->layered_table_manager_logops_skipped +=

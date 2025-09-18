@@ -859,11 +859,7 @@ WARN_IF_UNDOCUMENTED   = YES
 # a documented function twice, or documenting parameters that don't exist or
 # using markup commands wrongly.
 # The default value is: YES.
-
-# FIXME-WT-15445: Temporarily setting WARN_IF_DOC_ERROR to NO to bypass the issue
-# introduced in Doxygen 1.11.  
-# This workaround should be removed once the root cause is identified and fixed.  
-WARN_IF_DOC_ERROR = NO  
+WARN_IF_DOC_ERROR = YES  
 
 # This WARN_NO_PARAMDOC option can be enabled to get warnings for functions that
 # are documented, but have no documentation for their parameters or return
@@ -2271,7 +2267,8 @@ PREDEFINED             = DOXYGEN \
                          __wt_modify:=WT_MODIFY \
                          __wt_session:=WT_SESSION \
                          __wt_storage_source:=WT_STORAGE_SOURCE \
-                         __wt_txn_notify:=WT_TXN_NOTIFY
+                         __wt_txn_notify:=WT_TXN_NOTIFY \
+                         __F(x)=(*x)
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The

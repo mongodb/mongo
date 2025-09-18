@@ -51,6 +51,7 @@ they are used in other settings.
 <tr><td>extent list<td>block manager<td>a list of contiguous sets of blocks in a file.  Extent lists are used to track available blocks and/or used blocks.
 <tr><td>fast truncate<td>btree<td>a truncate that spans a key range over more than one leaf page may be performed quickly by deleting entire data pages at a time.
 <tr><td>FLCS<td>general<td>fixed-length column store.
+<tr><td>follower<td>disaggregated storage<td>a node in the disaggregated storage cluster that is responsible for backing up the leader.
 <tr><td>frag<td>verify<td>in verify, a part of a file that is the minimum allocation size and aligned the same.  The smallest blocks may be the same as a frag, other blocks may be composed of multiple contiguous frags.
 <tr><td>hazard pointer<td>general<td>a data structure that assists in lock free algorithms, used by WiredTiger Btrees
 <tr><td>history store<td>durable history<td>storage in WiredTiger (currently implemented as a Btree) that keeps previous values associated with a key.
@@ -58,11 +59,14 @@ they are used in other settings.
 <tr><td>home directory<td>general<td>the directory containing all the data for a WiredTiger connection.  The connection is attached to this directory via a call to ::wiredtiger_open.
 <tr><td>HS<td>durable history<td>see "history store".
 <tr><td>index<td>schema<td>a Btree with records having values that are keys to another Btree. An index (or set of indices) become associated with a primary Btree via the table construct.
+<tr><td>ingest table<td>disaggregated storage<td>  a constituent of a layered table that is a regular table and is responsible for storing non-checkpointed content.
 <tr><td>insert<td>btree<td>an in-memory structure holding a key and a set of updates for a Btree.
 <tr><td>internal page<td>btree<td>either in-memory or on disk, a page in a Btree that has a set of keys that reference pages beneath it.
 <tr><td>isolation<td>transactions<td>determines which versions of data are visible to a running transaction, and whether it can see changes made by concurrently running transactions.
 <tr><td>key prefix compression<td>btree<td>a technique to store identical key prefixes only once per page.  See @ref file_formats_compression
 <tr><td>kv or k/v<td>btree<td>a key/value pair in a Btree.
+<tr><td>layered table<td>disaggregated storage<td> a table that separates the storage of non-checkpointed and checkpointed content between two constituents: stable and ingest tables.
+<tr><td>leader<td>disaggregated storage<td>a single node in the disaggregated storage cluster responsible for writing new incoming data to shared tables.
 <tr><td>leaf page<td>btree<td>either in-memory or on disk, a page in a Btree that has a pairs of keys and values, and no pages beneath it.
 <tr><td>merge<td>btree<td>the process of making a single page out of two adjacent smaller pages in a Btree.  This can occur with leaf pages or internal pages.
 <tr><td>metadata<td>general<td>a set of data that is used to help manage files, tables, indices and column groups in WiredTiger.
@@ -92,9 +96,11 @@ they are used in other settings.
 <tr><td>schema<td>schema<td>the algorithms that use metadata to map the raw keys and values in Btrees to higher level abstractions like tables with typed columns.
 <tr><td>scratch buffer<td>general<td>a temporary buffer used to hold memory relevant to the session, also referred to as "scr".
 <tr><td>session<td>general<td>an encapsulation of information stored for single thread of control in the application. This encapsulation is kept in a handle that is used in the API.  Sessions manage transactions and performs the transactional operations.
+<tr><td>shared table<td>disaggregated storage<td> a table whose data is stored in a shared storage back-end.
 <tr><td>skip list<td>general<td>a variation of a sorted linked list that allows for faster (O(log(N))) searching. It is used in WiredTiger as a lock-free data structure for keys inserted on a page.
 <tr><td>spin lock<td>general<td>a simple locking algorithm that continually attempts to acquire a lock, appropriate for resources that are likely to be available and may be held for a short time.  This lock is CPU intensive while it is waiting.  Contrast with mutex
 <tr><td>split<td>btree<td>see page split
+<tr><td>stable table<td>disaggregated storage<td> a constituent of a layered table that is a shared table and is responsible for storing checkpointed content.
 <tr><td>stable timestamp<td>transactions<td>a connection-wide value. Checkpoints will not include commits newer than this value.
 <tr><td>table<td>schema<td>an abstraction that allows one or more btrees to be used in a coordinated way, which is specified by the schema.  The table coordinates indices and column groups.
 <tr><td>thread<td>general<td>a thread of control.  WiredTiger uses pthreads for POSIX systems.

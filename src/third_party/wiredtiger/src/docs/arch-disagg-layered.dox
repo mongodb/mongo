@@ -1,0 +1,107 @@
+/*! @arch_page arch-disagg-layered Layered Tables
+
+Layered tables are an access method designed to support distributed systems that
+leverage shared storage for the majority of a table's data. Generally speaking, a layered table is
+not a table in the traditional sense, but rather an adapter that splits data access between two
+layers.
+
+This mechanism enables a single leader node to perform writes to the stable table, while other follower
+nodes maintain a consistent view by tracking recent changes. Having followers track recent changes allows
+for two key features:
+- Follower nodes can serve read operations on recent data without needing to access the shared
+storage directly.
+- Follower nodes can quickly transition to take over write responsibilities if the current leader
+(writer) becomes unavailable.
+
+@section shared-tables Shared vs local tables
+
+Tables can be distinguished by the backing storage mechanism. A shared table is a table whose data
+is stored in a shared storage back-end. Whereas a local or regular table is a table whose data is
+locally, either in-memory or on disk. In a layered table, the stable table is shared, and the ingest
+table is local.
+
+There are also shared tables that are not part of any layered table (e.g., a shared history store
+table or a shared metadata table). The key difference between a regular table and a shared table is
+that the shared one uses the disaggregated block manager.
+
+The following diagram is not meant to strictly represent entities relationships, but rather to aid
+in understanding the high-level design.
+
+\image html shared_table_oop_view.png
+
+@section layered-arch High-level architecture
+
+These semantics are achieved by using two underlying constituents: a shared stable table and an
+ingest table. The node responsible for writing to shared storage operates directly on a single
+shared table and has the guarantee that no other node will perform writes to that table.
+All other nodes will also have an ingest table, which holds a short-term view of recent changes.
+
+The ingest table's view is layered over the shared stable table, so any read operations on a node with
+both an ingest and stable table will first look for a result in the ingest table, and if no result
+is found, fall back on the shared table.
+
+Layered tables are primarily for Disaggregated Storage Clusters (DSC) but can also be used outside
+of DSC for testing purposes, in particular, via local Page and Log Mock (PALM) infrastructure.
+
+\image html shared_cluster.png
+
+Stable Table:
+- A table shared across nodes in the cluster
+- Backed by the disaggregated block manager that uses shared storage and supports having multiple different
+WiredTiger nodes share the same underlying data structure
+
+Ingest Table:
+- An in-memory table that stores data that has been changed more recently than what is in the stable table
+- Doesn't contain checkpoints
+- Supersedes checkpointed content in the stable table
+- This table is specific to a particular node
+
+@section layered-api-restrictions API restrictions
+
+Layered tables support all the regular tables operations, with exceptions listed here:
+
+- All writes, from all nodes, must be timestamped
+- All nodes must use the same URI for the same table
+- All nodes must use byte-wise identical keys, values, and timestamps for the same records.
+- Table compaction is not supported on layered tables
+- Backup cursors will not return information about layered tables
+- Bulk cursors are not supported on layered tables
+
+@section layered-implementation Implementation aspects
+
+__Note:__ This section is closely tied to the source code and may become outdated if not
+maintained in sync with implementation changes.
+
+@subsection layered-leader-follower Leader vs Follower
+- Leader (Primary):
+    - All operations (including writes) go directly to the stable table
+    - The ingest table remains empty
+    - Can create new checkpoints
+- Follower (Standby):
+    - The stable table contains read-only checkpointed data from the leader
+    - The ingest table holds changes applied since the last checkpoint
+    - When a new checkpoint is fetched, the ingest table is cleaned up
+
+@subsection layered-metadata Layered tables metadata representation and related files
+
+Each layered table contains three related entries in metadata:
+
+```
+layered:foo.wt
+    disaggregated=(page_log=palm),ingest="file:foo.wt_ingest",log=(enabled=false),stable="file:foo.wt_stable"
+file:foo.wt_ingest
+file:foo.wt_stable
+```
+
+The ingest and stable table could also have table: prefixed metadata entries if the table was created
+with the `block_manager=disagg,type=layered` config.
+
+Since shared metadata and history store tables are shared but not layered tables, they both have
+`.wt_stable` suffixed metadata entries but no associated `layered:` ones:
+
+```
+file:WiredTigerShared.wt_stable
+file:WiredTigerSharedHS.wt_stable
+```
+
+*/

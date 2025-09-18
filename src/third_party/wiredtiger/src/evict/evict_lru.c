@@ -678,7 +678,7 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
     evict = conn->evict;
 
     dirty_target = __wti_evict_dirty_target(evict);
-    dirty_trigger = evict->eviction_dirty_trigger;
+    dirty_trigger = __wt_atomic_load_double(&evict->eviction_dirty_trigger);
     target = evict->eviction_target;
     trigger = evict->eviction_trigger;
     updates_target = evict->eviction_updates_target;

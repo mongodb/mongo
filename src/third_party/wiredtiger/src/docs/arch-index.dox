@@ -198,6 +198,9 @@ of the documentation.
 - @subpage arch-toc-platform
     - @ref arch-fs-os
 
+- @subpage arch-toc-disaggregated-storage
+    - @ref arch-disagg-layered
+
 - @subpage arch-glossary
 
 </div>
@@ -374,5 +377,15 @@ of the WiredTiger functionality.
 A layer of abstraction is above all operating system calls and
 a set of functions can be registered to be called for each file system
 operation.
+
+*/
+
+/*! @page arch-toc-disaggregated-storage Disaggregated Storage
+
+@subpage arch-disagg-layered
+
+WiredTiger includes support for a disaggregated storage layer, allowing persisted data
+to be stored and retrieved using network services. This work is in active development, so
+documentation found here may not be synchronized with the code.
 
 */

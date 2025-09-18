@@ -505,7 +505,7 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 static WT_INLINE void
 __checkpoint_set_scrub_target(WT_SESSION_IMPL *session, double target)
 {
-    __wt_set_shared_double(&S2C(session)->evict->eviction_scrub_target, target);
+    __wt_atomic_store_double(&S2C(session)->evict->eviction_scrub_target, target);
     WT_STAT_CONN_SET(session, checkpoint_scrub_target, (int64_t)target);
 }
 

@@ -164,6 +164,33 @@ __wt_atomic_storevbool(volatile bool *vp, bool v)
 }
 
 /*
+ * We can't use the WT_ATOMIC_FUNC or __wt_atomic_load/store_generic macros for doubles, since these
+ * interfaces support only integers and pointers on some compilers. Define them individually.
+ */
+
+/*
+ * __wt_atomic_load_double --
+ *     Atomically read a double variable.
+ */
+static inline double
+__wt_atomic_load_double(double *vp)
+{
+    double value;
+    __atomic_load(vp, &value, __ATOMIC_RELAXED);
+    return (value);
+}
+
+/*
+ * __wt_atomic_store_double --
+ *     Atomically set a double variable.
+ */
+static inline void
+__wt_atomic_store_double(double *vp, double v)
+{
+    __atomic_store(vp, &v, __ATOMIC_RELAXED);
+}
+
+/*
  * Generic atomic functions that accept any type. The typed macros above should be preferred since
  * they provide better type checking.
  */
