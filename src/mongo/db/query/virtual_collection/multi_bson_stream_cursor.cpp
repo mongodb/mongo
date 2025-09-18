@@ -95,6 +95,8 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
             // Cases 3: get the rest of size. This collapses case 3 into case 2.
             if (availBytes < kSizeSize) {
                 remBytes = kSizeSize - availBytes;
+                // TODO SERVER-111117 It seems like we should check that we have enough room in the
+                // buffer to accomodate the rest of the size.
                 readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
                 if (MONGO_unlikely(readBytes < remBytes)) {
                     uasserted(

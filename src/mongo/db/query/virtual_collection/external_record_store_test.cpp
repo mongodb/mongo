@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -61,6 +62,7 @@
 #include <vector>
 
 namespace mongo {
+namespace {
 
 static const std::string nonExistingPath = "non-existing";
 static constexpr int kNumPipes = 2;
@@ -112,7 +114,21 @@ public:
                                 const std::string& pipePath,
                                 long numToWrite,
                                 const std::vector<BSONObj>& bsonObjs);
+
+    static std::string createPipeFilename(const std::string& name) {
+        // The NamedPipe API in MongoDB allows the caller to specify a directory, but only for POSIX
+        // systems, and not on Windows. To ensure that we avoid naming conflicts, we just choose a
+        // unique name for the pipe.
+        return uniqueTestPrefix + name;
+    }
+
+private:
+    static const std::string uniqueTestPrefix;
 };
+
+// Introduce randomness into the pipe name, to avoid conflicts.
+const std::string ExternalRecordStoreTest::uniqueTestPrefix =
+    boost::filesystem::unique_path("ERSTest-%%%%-%%%%-%%%%-%%%%-").string();
 
 // Creates a named pipe of BSON objects.
 //   pipeWaiter - synchronization for pipe creation
@@ -124,6 +140,7 @@ void ExternalRecordStoreTest::createNamedPipe(PipeWaiter* pw,
                                               long numToWrite,
                                               const std::vector<BSONObj>& bsonObjs) {
     NamedPipeOutput pipeWriter(pipePath);
+    // We need to notify before opening, since the writer expects the reader to open first.
     pw->notify();
     pipeWriter.open();
 
@@ -141,7 +158,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeBasicRead) {
     auto srcBsonObj = BSON("a" << 1);
     auto count = srcBsonObj.objsize();
     PipeWaiter pw;
-    const auto pipePath = "ERSTest_NamedPipeBasicReadPipe";
+    const auto pipePath = createPipeFilename("NamedPipeBasicReadPipe");
     stdx::thread producer([&] {
         NamedPipeOutput pipeWriter(pipePath);
         pw.notify();
@@ -171,7 +188,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadPartialData) {
     auto srcBsonObj = BSON("a" << 1);
     auto count = srcBsonObj.objsize();
     PipeWaiter pw;
-    const auto pipePath = "ERSTest_NamedPipeReadPartialDataPipe";
+    const auto pipePath = createPipeFilename("NamedPipeReadPartialDataPipe");
     stdx::thread producer([&] {
         NamedPipeOutput pipeWriter(pipePath);
         pw.notify();
@@ -197,7 +214,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
     auto count = srcBsonObj.objsize();
     const auto nSent = _random.nextInt32(100);
     PipeWaiter pw;
-    const auto pipePath = "ERSTest_NamedPipeReadUntilProducerDonePipe";
+    const auto pipePath = createPipeFilename("NamedPipeReadUntilProducerDonePipe");
     stdx::thread producer([&] {
         NamedPipeOutput pipeWriter(pipePath);
         pw.notify();
@@ -250,8 +267,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
     // Create two pipes. The first has only "a" objects and the second has only "zed" objects.
     stdx::thread pipeThreads[kNumPipes];
     PipeWaiter pw[kNumPipes];
-    const std::string pipePaths[] = {"ERSTest_NamedPipeMultiplePipes1Pipe1",
-                                     "ERSTest_NamedPipeMultiplePipes1Pipe2"};
+    const std::string pipePaths[] = {createPipeFilename("NamedPipeMultiplePipes1Pipe1"),
+                                     createPipeFilename("NamedPipeMultiplePipes1Pipe2")};
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         pipeThreads[pipeIdx] = stdx::thread(
             createNamedPipe, &pw[pipeIdx], pipePaths[pipeIdx], kObjsPerPipe, bsonObjs[pipeIdx]);
@@ -343,8 +360,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
     long numToWrites[] = {(3 * groupsIn32Mb * numObjs), (5 * groupsIn32Mb * numObjs)};
     long numToWrite = 0;
 
-    const std::string pipePaths[] = {"ERSTest_NamedPipeMultiplePipes2Pipe1",
-                                     "ERSTest_NamedPipeMultiplePipes2Pipe2"};
+    const std::string pipePaths[] = {createPipeFilename("NamedPipeMultiplePipes2Pipe1"),
+                                     createPipeFilename("NamedPipeMultiplePipes2Pipe2")};
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         pipeThreads[pipeIdx] = stdx::thread(
             createNamedPipe, &pw[pipeIdx], pipePaths[pipeIdx], numToWrites[pipeIdx], bsonObjs);
@@ -385,14 +402,15 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
             ASSERT_EQ(recIdExpected, recId)
                 << fmt::format("Expected record->id {} but got {}", recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[objIdx].objsize())
-                << fmt::format("record->data.size() {} != original size {}",
+                << fmt::format("recId {}: record->data.size() {} != original size {}",
+                               recId,
                                record->data.size(),
                                bsonObjs[objIdx].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   bsonObjs[objIdx].objdata(),
                                   bsonObjs[objIdx].objsize()),
                       0)
-                << "Read data is not same as the source data";
+                << fmt::format("recId {}: Read data is not same as the source data", recId);
 
             ++recIdExpected;
             objIdx = (objIdx + 1) % numObjs;
@@ -430,8 +448,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
     long numToWrites[] = {19, 17};
     long numToWrite = 0;
 
-    const std::string pipePaths[] = {"ERSTest_NamedPipeMultiplePipes3Pipe1",
-                                     "ERSTest_NamedPipeMultiplePipes3Pipe2"};
+    const std::string pipePaths[] = {createPipeFilename("NamedPipeMultiplePipes3Pipe1"),
+                                     createPipeFilename("NamedPipeMultiplePipes3Pipe2")};
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         pipeThreads[pipeIdx] = stdx::thread(
             createNamedPipe, &pw[pipeIdx], pipePaths[pipeIdx], numToWrites[pipeIdx], bsonObjs);
@@ -512,7 +530,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
 
     // Create the pipes.
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
-        pipePaths[pipeIdx] = fmt::format("ERSTest_NamedPipeMultiplePipes4Pipe1{}", pipeIdx);
+        pipePaths[pipeIdx] =
+            createPipeFilename(fmt::format("NamedPipeMultiplePipes4Pipe1{}", pipeIdx));
         pipeThreads[pipeIdx] = stdx::thread(createNamedPipe,
                                             &pw[pipeIdx],
                                             pipePaths[pipeIdx],
@@ -576,4 +595,5 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
     ASSERT_EQ(objsRead, objsWritten)
         << fmt::format("Expected objsRead == {} but got {}", objsWritten, objsRead);
 }
+}  // namespace
 }  // namespace mongo
