@@ -31,6 +31,7 @@ krb5-devel
 libcurl-devel
 openldap-devel
 openssl-devel
+procps-ng
 systemtap-sdt-devel
 "
 

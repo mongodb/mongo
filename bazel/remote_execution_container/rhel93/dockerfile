@@ -8,6 +8,9 @@
 #   bazel run \
 #       //bazel/remote_execution_container:repin_dockerfiles \
 #       --config=local
+#
+# To update the docker images, follow the instructions in the
+# confluence page: go/devprod-build-update-rbe-containers.
 
 FROM redhat/ubi9:9.3@sha256:66233eebd72bb5baa25190d4f55e1dc3fff3a9b77186c1f91a0abdb274452072
 
@@ -15,12 +18,13 @@ RUN yum check-update || true && \
     yum install -y \
         cyrus-sasl-devel-2.1.27-21.el9 \
         cyrus-sasl-gssapi-2.1.27-21.el9 \
-        glibc-devel-2.34-100.el9_4.2 \
-        krb5-devel-1.21.1-1.el9 \
-        libcurl-devel-7.76.1-29.el9_4 \
-        openldap-devel-2.6.6-3.el9 \
-        openssl-devel-3.0.7-27.el9 \
-        systemtap-sdt-devel-5.0-4.el9 \
+        glibc-devel-2.34-168.el9_6.23 \
+        krb5-devel-1.21.1-8.el9_6 \
+        libcurl-devel-7.76.1-31.el9_6.1 \
+        openldap-devel-2.6.8-4.el9 \
+        openssl-devel-3.2.2-6.el9_5.1 \
+        procps-ng-3.3.17-14.el9 \
+        systemtap-sdt-devel-5.2-2.el9 \
     && yum clean all && rm -rf /var/cache/yum/*
 
 CMD ["/bin/bash"]
