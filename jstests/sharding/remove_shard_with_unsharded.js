@@ -3,6 +3,8 @@
  * shown in the remaining.collectionsToMove counter.
  */
 
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+
 var st = new ShardingTest({shards: 2});
 var config = st.s.getDB('config');
 const adminDB = st.s.getDB("admin");
@@ -82,8 +84,7 @@ adminDB.adminCommand({
 adminDB.adminCommand({movePrimary: "db1", to: st.shard0.shardName});
 
 // Finalize removing the shard
-removeResult = assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
-assert.eq('completed', removeResult.state, 'Shard was not removed: ' + tojson(removeResult));
+removeShard(st, st.shard1.shardName);
 
 var existingShards = config.shards.find({}).toArray();
 assert.eq(
