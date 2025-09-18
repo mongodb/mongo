@@ -1199,7 +1199,7 @@ Status WiredTigerKVEngine::beginBackup() {
 
 void WiredTigerKVEngine::endBackup() {
     // There could be a race with clean shutdown which unconditionally closes all the sessions.
-    WiredTigerConnection::BlockShutdown block(_connection.get());
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
     if (_connection->isShuttingDown()) {
         _backupSession->dropSessionBeforeDeleting();
     }
@@ -1506,6 +1506,11 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
 
 void WiredTigerKVEngine::endNonBlockingBackup() {
     stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
+    // There could be a race with clean shutdown which unconditionally closes all the sessions.
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection.get());
+    if (_connection->isShuttingDown()) {
+        _backupSession->dropSessionBeforeDeleting();
+    }
     _backupSession.reset();
     {
         // Oplog truncation thread can now remove the pinned oplog.
