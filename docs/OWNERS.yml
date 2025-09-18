@@ -6,6 +6,9 @@ filters:
   - "cpp_style.md":
     approvers:
       - 10gen/server-programmability
+  - "devcontainer-setup.md":
+    approvers:
+      - 10gen/devprod-correctness
   - "exception_architecture.md":
     approvers:
       - 10gen/server-programmability

@@ -11,6 +11,7 @@ OWNERS.yml @10gen/server-root-ownership @svc-auto-approve-bot
 .clang-format @10gen/server-programmability @svc-auto-approve-bot
 .clang-tidy.in @10gen/server-programmability @svc-auto-approve-bot
 **/.clang-tidy @10gen/server-programmability @svc-auto-approve-bot
+.dockerignore @10gen/devprod-correctness @svc-auto-approve-bot
 /.editorconfig @10gen/devprod-build @svc-auto-approve-bot
 .git* @10gen/devprod-build @svc-auto-approve-bot
 .mypy.ini @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
@@ -28,6 +29,9 @@ poetry_requirements.txt @10gen/devprod-build @10gen/devprod-correctness @svc-aut
 sbom.json @10gen/server-security @svc-auto-approve-bot
 MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
+
+# The following patterns are parsed from ./.devcontainer/OWNERS.yml
+/.devcontainer/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./.github/OWNERS.yml
 /.github/ @10gen/server-root-ownership @svc-auto-approve-bot
@@ -292,6 +296,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./docs/OWNERS.yml
 /docs/**/building.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/cpp_style.md @10gen/server-programmability @svc-auto-approve-bot
+/docs/**/devcontainer-setup.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/exception_architecture.md @10gen/server-programmability @svc-auto-approve-bot
 /docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
 /docs/**/idl.md @10gen/server-programmability @svc-auto-approve-bot

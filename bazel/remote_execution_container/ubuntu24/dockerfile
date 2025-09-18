@@ -8,8 +8,11 @@
 #   bazel run \
 #       //bazel/remote_execution_container:repin_dockerfiles \
 #       --config=local
+#
+# To update the docker images, follow the instructions in the
+# confluence page: go/devprod-build-update-rbe-containers.
 
-FROM ubuntu:24.04@sha256:a08e551cb33850e4740772b38217fc1796a66da2506d312abe51acda354ff061
+FROM ubuntu:24.04@sha256:9cbed754112939e914291337b5e554b07ad7c392491dba6daf25eef1332a22e8
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -21,7 +24,7 @@ RUN apt-get update && \
         libncurses-dev=6.4+20240113-1ubuntu2 \
         libsasl2-dev=2.1.28+dfsg1-5ubuntu3.1 \
         libssl-dev=3.0.13-0ubuntu3.5 \
-        libxml2-dev=2.9.14+dfsg-1.3ubuntu3.3 \
+        libxml2-dev=2.9.14+dfsg-1.3ubuntu3.5 \
         systemtap-sdt-dev=5.0-2ubuntu1 \
     && rm -rf /var/lib/apt/lists/*
 
