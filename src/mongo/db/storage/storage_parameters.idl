@@ -306,7 +306,7 @@ feature_flags:
             _mdb_catalog and its associated storage table 'ident' mappings remain consistent.
         cpp_varname: feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers
         default: false
-        fcv_gated: true
+        fcv_gated: false
     featureFlagPrimaryDrivenIndexBuilds:
         description: "Enable primary-driven index builds."
         cpp_varname: feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds

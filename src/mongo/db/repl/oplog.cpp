@@ -217,9 +217,8 @@ boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
     OperationContext* opCtx, const OplogEntry& oplogEntry) {
     auto& o2 = oplogEntry.getObject2();
     if (!o2 ||
-        !shouldReplicateLocalCatalogIdentifers(
-            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-            VersionContext::getDecoration(opCtx))) {
+        !shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
         // Either no catalog identifier information was provided, or replicated local catalog
         // identifiers are not supported.
         return boost::none;
@@ -380,9 +379,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     IndexBuildInfo indexBuildInfo = [&] {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         if (!indexMetadata ||
-            !shouldReplicateLocalCatalogIdentifers(
-                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-                VersionContext::getDecoration(opCtx))) {
+            !shouldReplicateLocalCatalogIdentifiers(
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
             return IndexBuildInfo(indexSpec,
                                   *storageEngine,
                                   indexCollection->ns().dbName(),
@@ -982,9 +980,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           auto swOplogEntry = IndexBuildOplogEntry::parse(
               opCtx,
               entry,
-              shouldReplicateLocalCatalogIdentifers(
-                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-                  VersionContext::getDecoration(opCtx)));
+              shouldReplicateLocalCatalogIdentifiers(
+                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider()));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'startIndexBuild' oplog entry");

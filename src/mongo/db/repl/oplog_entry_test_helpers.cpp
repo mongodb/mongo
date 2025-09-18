@@ -180,7 +180,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     spec.appendElementsUnique(options);
 
     boost::optional<BSONObj> o2;
-    if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
+    if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled()) {
         o2 = BSON("indexIdent" << ident::generateNewIndexIdent(
                       nss.dbName(), /*directoryPerDB=*/false, /*directoryForIndexes=*/false));
     }

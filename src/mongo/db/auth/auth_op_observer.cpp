@@ -124,9 +124,8 @@ void AuthOpObserver::onCreateCollection(
 
     BSONObj o2;
     if (createCollCatalogIdentifier.has_value() &&
-        shouldReplicateLocalCatalogIdentifers(
-            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-            VersionContext::getDecoration(opCtx))) {
+        shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
             createCollCatalogIdentifier->ident, collectionName.dbName());

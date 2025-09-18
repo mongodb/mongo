@@ -56,8 +56,7 @@ extern FailPoint sleepBetweenInsertOpTimeGenerationAndLogOp;
 /**
  * Returns true when local catalog identifiers should be replicated through the oplog.
  */
-bool shouldReplicateLocalCatalogIdentifers(const rss::PersistenceProvider&,
-                                           const VersionContext& vCtx);
+bool shouldReplicateLocalCatalogIdentifiers(const rss::PersistenceProvider&);
 
 /**
  * Returns true when ranged truncates should be replicated through the oplog.

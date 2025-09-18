@@ -336,9 +336,8 @@ Status createIndex(OperationContext* opCtx,
 
     invariant(collectionOptions.uuid);
 
-    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(
-        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-        VersionContext::getDecoration(opCtx));
+    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifiers(
+        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider());
     if (replicateLocalCatalogIdentifiers) {
         // If a previous attempt at creating this index was rolled back, the ident may still be drop
         // pending. Complete that drop before creating the index if so.

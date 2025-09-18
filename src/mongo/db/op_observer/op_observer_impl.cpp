@@ -332,9 +332,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
         return;
     }
 
-    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(
-        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-        VersionContext::getDecoration(opCtx));
+    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifiers(
+        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider());
 
     BSONObjBuilder builder;
     // Note that despite using this constant, we are not building a CreateIndexCommand here
@@ -420,9 +419,8 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
-    if (shouldReplicateLocalCatalogIdentifers(
-            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-            VersionContext::getDecoration(opCtx))) {
+    if (shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
         oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr()));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
@@ -1342,9 +1340,8 @@ void OpObserverImpl::onCreateCollection(
     oplogEntry.setNss(collectionName.getCommandNS());
     oplogEntry.setUuid(options.uuid);
     oplogEntry.setObject(MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex));
-    if (shouldReplicateLocalCatalogIdentifers(
-            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider(),
-            VersionContext::getDecoration(opCtx))) {
+    if (shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
         invariant(createCollCatalogIdentifier.has_value(),
                   "Missing catalog identifier required to log replicated "
                   "collection");
