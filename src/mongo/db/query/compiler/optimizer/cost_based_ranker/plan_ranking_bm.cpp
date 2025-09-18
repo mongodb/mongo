@@ -40,7 +40,6 @@
 using namespace mongo::ce;
 using namespace mongo;
 
-using std::chrono::duration;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
@@ -655,6 +654,30 @@ BSONObj printPerformanceResults(size_t dataSize,
         totalBuilder << CBRExecConfigName << cbrExecTimesBuilder.obj();
     }
 
+    for (const auto& specificSamplingStyleCBR : executionStats.cbrGenerateSampleTimes) {
+        BSONObjBuilder cbrBreakdownTimesBuilder;
+        for (const auto& samplingAlgoAndRuntimes : specificSamplingStyleCBR.second) {
+            cbrBreakdownTimesBuilder
+                << std::to_string(static_cast<int>(samplingAlgoAndRuntimes.first))
+                << samplingAlgoAndRuntimes.second;
+        }
+        std::string CBRExecConfigName =
+            "CBRGenerateSampleTimes_" + std::to_string(specificSamplingStyleCBR.first);
+        totalBuilder << CBRExecConfigName << cbrBreakdownTimesBuilder.obj();
+    }
+
+    for (const auto& specificSamplingStyleCBR : executionStats.cbrPlanningTimes) {
+        BSONObjBuilder cbrPlanningTimesBuilder;
+        for (const auto& samplingAlgoAndRuntimes : specificSamplingStyleCBR.second) {
+            cbrPlanningTimesBuilder
+                << std::to_string(static_cast<int>(samplingAlgoAndRuntimes.first))
+                << samplingAlgoAndRuntimes.second;
+        }
+        std::string CBRExecConfigName =
+            "CBRPlanningTimes_" + std::to_string(specificSamplingStyleCBR.first);
+        totalBuilder << CBRExecConfigName << cbrPlanningTimesBuilder.obj();
+    }
+
     BSONObjBuilder builderBare;
     for (const auto& samplingAlgoAndRuntimes : executionStats.bareCQEvalExecTimes) {
         builderBare << std::to_string(static_cast<int>(samplingAlgoAndRuntimes.first))
@@ -681,14 +704,13 @@ BSONObj printPerformanceResults(size_t dataSize,
 void BM_RunAllConfigs(benchmark::State& state) {
     // Define all the settings to run.
     std::vector<size_t> dataSizes = {
-        10000,  //  100000, 500000
+        10000,  // 100000, 500000
     };
     std::vector<size_t> dataFieldsConfigurations = {
-        1,  //  2, 3, 4, 5, 6
+        1,  // 2, 3, 4, 5, 6
     };
     std::vector<size_t> queryFieldConfigs = {
-        1,
-        //  2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+        1,  // 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
     };
     std::vector<SampleSizeDef> errorConfigs = {
         SampleSizeDef::ErrorSetting1,
@@ -767,16 +789,13 @@ void BM_RunAllConfigs(benchmark::State& state) {
 
                         // Measure the time to pick best plan using the MultiPlanner.
                         std::unique_ptr<MultiPlanStage> _mps;
-                        auto multiplanner_start = high_resolution_clock::now();
+                        Timer multiplannerMS;
                         plan_ranking_tests::pickBestPlan(cq.get(),
                                                          *(planRankingTest.getOperationContext()),
                                                          cq->getExpCtx(),
                                                          _mps,
                                                          planRankingTest._kTestNss);
-                        auto multiplanner_end = high_resolution_clock::now();
-                        duration<double, std::milli> multiPlanner_ms =
-                            multiplanner_end - multiplanner_start;
-                        execStats.multiplannerExecTimes.push_back(multiPlanner_ms.count());
+                        execStats.multiplannerExecTimes.push_back(multiplannerMS.millis());
 
                         // Iterate over various error configurations.
                         for (size_t errorConfigs_idx = 0; errorConfigs_idx < errorConfigs.size();
@@ -790,15 +809,13 @@ void BM_RunAllConfigs(benchmark::State& state) {
 
                             // Measure the bare time to evaluate the MatchExpression against a
                             // sample-sized portion of the collection.
-                            auto bare_start = high_resolution_clock::now();
+                            Timer bareExecMS;
                             evaluateMatchExpressionAgainstDataWithLimit(
                                 allMatchExpressionQueries[iteration]->clone(),
                                 dataBSON,
                                 sampleSize);
-                            auto bare_end = high_resolution_clock::now();
-                            duration<double, std::milli> bare_ms = bare_end - bare_start;
                             execStats.bareCQEvalExecTimes[errorConfigs[errorConfigs_idx]].push_back(
-                                bare_ms.count());
+                                bareExecMS.millis());
 
                             // Iterate over sampling style configurations (i.e., Random/Chunk)
                             for (size_t samplingStyleConfig_idx = 0;
@@ -811,8 +828,9 @@ void BM_RunAllConfigs(benchmark::State& state) {
                                 auto samplingStyle = iniitalizeSamplingAlgoBasedOnChunks(
                                     /*samplingAlgo*/ samplingStyleConfig[samplingStyleConfig_idx]);
 
+                                plan_ranking_tests::PlanningTimeProfile sampleAndPlanningTime;
                                 std::vector<std::unique_ptr<QuerySolution>> bestCBRPlan;
-                                auto cbr_start = high_resolution_clock::now();
+                                Timer cbrExecMS;
                                 plan_ranking_tests::bestCBRPlan(
                                     cq.get(),
                                     dataConfig.size,
@@ -821,15 +839,23 @@ void BM_RunAllConfigs(benchmark::State& state) {
                                     bestCBRPlan,
                                     planRankingTest._kTestNss,
                                     samplingStyle.first,
-                                    samplingStyle.second);
-                                auto cbr_end = high_resolution_clock::now();
-
-                                duration<double, std::milli> ms_doubleCBR = cbr_end - cbr_start;
+                                    samplingStyle.second,
+                                    sampleAndPlanningTime);
                                 execStats
                                     .cbrExecTimes[static_cast<int>(
                                         samplingStyleConfig[samplingStyleConfig_idx])]
                                                  [errorConfigs[errorConfigs_idx]]
-                                    .push_back(ms_doubleCBR.count());
+                                    .push_back(cbrExecMS.millis());
+                                execStats
+                                    .cbrGenerateSampleTimes[static_cast<int>(
+                                        samplingStyleConfig[samplingStyleConfig_idx])]
+                                                           [errorConfigs[errorConfigs_idx]]
+                                    .push_back(sampleAndPlanningTime.sampleGenerationTimeMS);
+                                execStats
+                                    .cbrPlanningTimes[static_cast<int>(
+                                        samplingStyleConfig[samplingStyleConfig_idx])]
+                                                     [errorConfigs[errorConfigs_idx]]
+                                    .push_back(sampleAndPlanningTime.planRankingTimeMS);
                             }
                         }
                     }

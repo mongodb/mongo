@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/service_context.h"
@@ -49,6 +50,11 @@
 namespace mongo {
 
 namespace plan_ranking_tests {
+
+struct PlanningTimeProfile {
+    double sampleGenerationTimeMS;
+    double planRankingTimeMS;
+};
 
 /**
  * Use the MultiPlanRunner to pick the best plan for the query 'cq'.  Goes through
@@ -76,7 +82,8 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                  NamespaceString nss,
                                  ce::SamplingEstimatorImpl::SamplingStyle samplingStyle =
                                      ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
-                                 boost::optional<int> numChunks = boost::none);
+                                 boost::optional<int> numChunks = boost::none,
+                                 boost::optional<PlanningTimeProfile&> times = boost::none);
 
 }  // namespace plan_ranking_tests
 }  // namespace mongo

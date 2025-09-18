@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/plan_ranking_utils.h"
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/client.h"
@@ -121,7 +123,8 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                  std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
                                  NamespaceString nss,
                                  ce::SamplingEstimatorImpl::SamplingStyle samplingStyle,
-                                 boost::optional<int> numChunks) {
+                                 boost::optional<int> numChunks,
+                                 boost::optional<PlanningTimeProfile&> timeProfile) {
     const auto collection = acquireCollection(
         &opCtx,
         CollectionAcquisitionRequest(nss,
@@ -157,13 +160,24 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
         ce::extractTopLevelFieldsFromMatchExpression(cq->getPrimaryMatchExpression());
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames);
+
+    Timer generateSampleTimer;
     samplingEstimator->generateSample(
         topLevelSampleFieldNames.empty()
             ? ce::ProjectionParams{ce::NoProjection{}}
             : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+    double generateSampleTimeMS = generateSampleTimer.elapsed().count() / 1000.0;
 
+    Timer planningTimer;
     auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
         *cq, plannerParams, samplingEstimator.get(), nullptr, std::move(statusWithMultiPlanSolns));
+    double planTimeMS = planningTimer.elapsed().count() / 1000.0;
+
+    if (timeProfile.has_value()) {
+        timeProfile->sampleGenerationTimeMS = generateSampleTimeMS;
+        timeProfile->planRankingTimeMS = planTimeMS;
+    }
+
     ASSERT(statusWithCBRSolns.isOK());
     auto solutions = std::move(statusWithCBRSolns.getValue().solutions);
     ASSERT(solutions.size() == 1);

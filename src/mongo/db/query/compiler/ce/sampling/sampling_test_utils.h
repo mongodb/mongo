@@ -184,6 +184,8 @@ struct PlanRankingExecutionStatistics {
     std::map<int, std::map<SampleSizeDef, std::vector<double>>> cbrExecTimes;
     std::map<SampleSizeDef, std::vector<double>> bareCQEvalExecTimes;
     std::map<SampleSizeDef, int> cbrSampleSizes;
+    std::map<int, std::map<SampleSizeDef, std::vector<double>>> cbrGenerateSampleTimes;
+    std::map<int, std::map<SampleSizeDef, std::vector<double>>> cbrPlanningTimes;
     std::vector<double> selectivities;
 };
 
