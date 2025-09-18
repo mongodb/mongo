@@ -1,6 +1,13 @@
 .TH mongoldap 1
 .SH MONGOLDAP
 \fIMongoDB Enterprise\f1
+.PP
+Starting in MongoDB 8.0, LDAP authentication and authorization is
+deprecated. LDAP is available and will continue to operate without
+changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
+future major release.
+.PP
+For details, see \fBLDAP Deprecation\f1\&.
 .SH SYNOPSIS
 .PP
 MongoDB Enterprise provides
@@ -196,11 +203,11 @@ If your connection string specifies \fB"srv_raw:<DNS_NAME>"\f1,
 .PP
 Specifies a configuration file for runtime configuration options.
 The options are equivalent to the command\-line
-configuration options. See \fBConfiguration File Options\f1 for
+configuration options. See \fBSelf\-Managed Configuration File Options\f1 for
 more information.
 .PP
-\fBmongoldap\f1\f1 uses any configuration options related to \fBLDAP Proxy Authentication\f1
-or \fBLDAP Authorization\f1 for testing LDAP authentication or
+\fBmongoldap\f1\f1 uses any configuration options related to \fBSelf\-Managed LDAP Proxy Authentication\f1
+or \fBLDAP Authorization on Self\-Managed Deployments\f1 for testing LDAP authentication or
 authorization.
 .PP
 Requires specifying \fB\-\-user\f1\f1\&. May accept \fB\-\-password\f1\f1 for
@@ -377,7 +384,7 @@ libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
-\fBKerberos Authentication\f1, verify the following for the
+\fBKerberos Authentication on Self\-Managed Deployments\f1, verify the following for the
 \fBmongoldap\f1\f1 host machine:
 .PP
 \fBLinux\f1\f1
@@ -492,7 +499,7 @@ authenticate to MongoDB with usernames that are not full LDAP DNs.
 Using an \fBLDAP authorization query template\f1\f1 that requires a DN.
 .IP \(bu 2
 Transforming the usernames of clients authenticating to Mongo DB using
-different authentication mechanisms (e.g. x.509, kerberos) to a full LDAP
+different authentication mechanisms (e.g. X.509, kerberos) to a full LDAP
 DN for authorization.
 .RE
 .PP
