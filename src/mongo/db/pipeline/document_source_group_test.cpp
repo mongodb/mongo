@@ -568,30 +568,35 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
         auto groupStage = exec::agg::buildStage(group);
         groupStage->dispose();
 
+        auto expectedGroupSerializeOutput = fromjson(R"({$group: {
+            _id: {$const: null},
+            count: {$sum: {$const: 1}},
+            $willBeMerged: false
+        }})");
+
         SerializationOptions explainOpts;
         explainOpts.verbosity = expCtx->getExplain();
+        ASSERT_DOCUMENT_EQ(Document(expectedGroupSerializeOutput),
+                           group->serialize(explainOpts).getDocument());
 
-        BSONObjBuilder bob;
-        bob.appendElements(fromjson(R"({
-            $group: {
-                _id: {$const: null},
-                count: {$sum: {$const: 1}},
-                $willBeMerged: false
-            },
-            maxAccumulatorMemoryUsageBytes: {count: 0},
-            totalOutputDataSizeBytes: 0,
-            usedDisk: false,
-            spills: 0,
-            spilledDataStorageSize: 0,
-            spilledBytes: 0,
-            spilledRecords: 0
-        })"));
+        BSONObjBuilder expectedGroupStageExplainOutput;
+        expectedGroupStageExplainOutput.appendElements(fromjson(R"({
+                nReturned: 0,
+                executionTimeMillisEstimate: 0,
+                maxAccumulatorMemoryUsageBytes: {count: 0},
+                totalOutputDataSizeBytes: 0,
+                usedDisk: false,
+                spills: 0,
+                spilledDataStorageSize: 0,
+                spilledBytes: 0,
+                spilledRecords: 0
+                })"));
 
         if (flagStatus) {
-            bob.append("peakTrackedMemBytes", 0);
+            expectedGroupStageExplainOutput.append("peakTrackedMemBytes", 0);
         }
-
-        ASSERT_DOCUMENT_EQ(Document(bob.obj()), group->serialize(explainOpts).getDocument());
+        ASSERT_DOCUMENT_EQ(Document(expectedGroupStageExplainOutput.obj()),
+                           groupStage->getExplainOutput());
     }
 }
 

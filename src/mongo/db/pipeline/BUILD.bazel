@@ -516,6 +516,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:facet_stage.cpp",
         "//src/mongo/db/exec/agg:find_and_modify_image_lookup_stage.cpp",
         "//src/mongo/db/exec/agg:graph_lookup_stage.cpp",
+        "//src/mongo/db/exec/agg:group_base_stage.cpp",
         "//src/mongo/db/exec/agg:group_stage.cpp",
         "//src/mongo/db/exec/agg:internal_all_collection_stats_stage.cpp",
         "//src/mongo/db/exec/agg:internal_compute_geo_near_distance_stage.cpp",

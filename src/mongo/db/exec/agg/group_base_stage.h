@@ -32,9 +32,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/group_processor.h"
 
-namespace mongo {
-namespace exec {
-namespace agg {
+namespace mongo::exec::agg {
 
 class GroupBaseStage : public Stage {
 public:
@@ -48,6 +46,9 @@ public:
     bool usedDisk() const final {
         return _groupProcessor->usedDisk();
     }
+
+    Document getExplainOutput(
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
 protected:
     GroupBaseStage(StringData stageName,
@@ -67,6 +68,4 @@ private:
     }
 };
 
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+}  // namespace mongo::exec::agg

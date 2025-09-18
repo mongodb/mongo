@@ -111,37 +111,6 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     MutableDocument out;
     out[getSourceName()] = insides.freezeToValue();
 
-    if (opts.isSerializingForExplain() &&
-        *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        MutableDocument md;
-
-        const auto& memoryTracker = _groupProcessor->getMemoryTracker();
-        for (size_t i = 0; i < accumulatedFields.size(); i++) {
-            md[opts.serializeFieldPathFromString(accumulatedFields[i].fieldName)] =
-                opts.serializeLiteral(static_cast<long long>(
-                    memoryTracker.peakTrackedMemoryBytes(accumulatedFields[i].fieldName)));
-        }
-
-        out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
-
-        const auto& stats = _groupProcessor->getStats();
-        out["totalOutputDataSizeBytes"] =
-            opts.serializeLiteral(static_cast<long long>(stats.totalOutputDataSizeBytes));
-        out["usedDisk"] = opts.serializeLiteral(stats.spillingStats.getSpills() > 0);
-        out["spills"] =
-            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
-        out["spilledDataStorageSize"] = opts.serializeLiteral(
-            static_cast<long long>(stats.spillingStats.getSpilledDataStorageSize()));
-        out["spilledBytes"] =
-            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledBytes()));
-        out["spilledRecords"] =
-            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
-        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            out["peakTrackedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(stats.peakTrackedMemBytes));
-        }
-    }
-
     return out.freezeToValue();
 }
 
