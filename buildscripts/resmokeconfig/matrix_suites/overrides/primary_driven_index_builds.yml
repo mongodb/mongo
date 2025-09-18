@@ -82,3 +82,11 @@
       roots:
         - jstests/concurrency/fsm_workloads/index_builds/*.js
         - jstests/concurrency/fsm_workloads/ddl/create_index_background/*.js
+- name: all_auth_commands_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        # We are primarily concerned with coverage of the containerInsert and containerDelete
+        # action type, so this selector is sufficient.
+        - jstests/auth/commands_*.js

@@ -178,6 +178,16 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
+    } else if (opType == "ci"_sd) {
+        if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerInsert)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        return Status::OK();
+    } else if (opType == "cd"_sd) {
+        if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::containerDelete)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        return Status::OK();
     }
 
     return Status(ErrorCodes::FailedToParse, "Unrecognized opType");

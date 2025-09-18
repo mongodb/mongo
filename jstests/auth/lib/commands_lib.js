@@ -93,6 +93,7 @@ one argument, the connection object.
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine/storage_engine_utils.js";
+import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
 
 // constants
 
@@ -246,6 +247,90 @@ export const authCommandsLib = {
     /************* TEST CASES ****************/
 
     tests: [
+        {
+            testname: "applyOps_container_insert",
+            skipSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds"),
+            setup: function (db) {
+                const coll = "containerOpsColl";
+                db[coll].drop();
+                assert.commandWorked(db.createCollection(coll));
+                const uri = getUriForColl(db[coll]);
+                return {nss: db.getName() + "." + coll, coll, uri};
+            },
+
+            command: function (state) {
+                return {
+                    applyOps: [
+                        {
+                            op: "ci",
+                            ns: state.nss,
+                            container: state.uri,
+                            o: {k: BinData(0, "QQ=="), v: BinData(0, "Qg==")},
+                        },
+                    ],
+                };
+            },
+
+            teardown: function (db, state) {
+                if (state && state.coll) db[state.coll].drop();
+            },
+
+            testcases: [
+                {runOnDb: firstDbName, roles: {__system: 1, root: 1, restore: 1}},
+                {runOnDb: "local", roles: {__system: 1, root: 1, restore: 1}},
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {resource: {db: firstDbName, collection: ""}, actions: ["containerInsert"]},
+                        {resource: {cluster: true}, actions: ["applyOps"]},
+                    ],
+                },
+            ],
+        },
+        {
+            testname: "applyOps_container_delete",
+            skipSharded: true,
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds"),
+            setup: function (db) {
+                const coll = "containerOpsColl";
+                db[coll].drop();
+                assert.commandWorked(db.createCollection(coll));
+                const uri = getUriForColl(db[coll]);
+                return {nss: db.getName() + "." + coll, coll, uri};
+            },
+
+            command: function (state) {
+                return {
+                    applyOps: [
+                        {
+                            op: "cd",
+                            ns: state.nss,
+                            container: state.uri,
+                            o: {k: BinData(0, "QQ==")},
+                        },
+                    ],
+                };
+            },
+
+            teardown: function (db, state) {
+                if (state && state.coll) db[state.coll].drop();
+            },
+
+            testcases: [
+                // Attempting to delete a nonexistent key from a container fails.
+                {runOnDb: firstDbName, roles: {__system: 1, root: 1, restore: 1}, expectFail: true},
+                {runOnDb: "local", roles: {__system: 1, root: 1, restore: 1}, expectFail: true},
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {resource: {db: firstDbName, collection: ""}, actions: ["containerDelete"]},
+                        {resource: {cluster: true}, actions: ["applyOps"]},
+                    ],
+                    expectFail: true,
+                },
+            ],
+        },
         {
             testname: "abortMoveCollection",
             command: {abortMoveCollection: "test.x"},

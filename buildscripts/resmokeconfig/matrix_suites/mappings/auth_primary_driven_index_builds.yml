@@ -1,0 +1,9 @@
+# Temporary suites to assists the development of new primary-driven index builds.
+# Run all tests in the noPassthrough suite with PrimaryDrivenIndexBuilds feature flag enabled.
+#
+# TODO(SERVER-108818): remove this temporary suite and all its usages.
+base_suite: auth
+overrides:
+  - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod"
+  - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos"
+  - "primary_driven_index_builds.all_auth_commands_tests_selector"

@@ -1480,6 +1480,21 @@ tasks:
         vars:
           suite: replica_sets_primary_driven_index_builds
 
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: auth_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "auth",
+        "primary_driven_index_builds",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: auth_primary_driven_index_builds
+
   ## rollback generational fuzzer with clean shutdowns ##
   - <<: *jstestfuzz_template
     name: rollback_fuzzer_clean_shutdowns_gen
