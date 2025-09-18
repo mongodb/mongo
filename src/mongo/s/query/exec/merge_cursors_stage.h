@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
+#include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/stdx/unordered_set.h"
 
 #include <cstddef>
@@ -69,9 +70,10 @@ public:
         return _stats.planSummaryStats;
     }
 
-    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors);
+    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
+                            const ShardTag& tag = ShardTag::kDefault);
 
-    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds);
+    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds, const ShardTag& tag);
 
     void setInitialHighWaterMark(const BSONObj& highWaterMark);
 

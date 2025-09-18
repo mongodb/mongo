@@ -775,6 +775,7 @@ mongo_cc_library(
         "//src/mongo/s/query/exec:document_source_merge_cursors.h",
         "//src/mongo/s/query/exec:next_high_watermark_determining_strategy.h",
         "//src/mongo/s/query/exec:router_stage_merge.h",
+        "//src/mongo/s/query/exec:shard_tag.h",
     ],
     deps = [
         ":accumulator",

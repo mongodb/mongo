@@ -129,23 +129,6 @@ public:
     }
 
     /**
-     * Adds the specified shard cursors to the set of cursors to be merged. The results from the
-     * new cursors will be returned as normal through getNext().
-     */
-    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors);
-
-    /**
-     * Closes and removes all cursors belonging to any of the specified shardIds. All in-flight
-     * requests to any of these remote cursors will be canceled and discarded.
-     * All results from the to-be closed remotes that have already been received but have not been
-     * consumed will be kept. They can be consumed normally.
-     * Closing remote cursors is only supported for tailable, awaitData cursors.
-     * TODO(SERVER-30784): call this method from change streams when cluster topology changes and
-     * shards are removed.
-     */
-    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds);
-
-    /**
      * Marks the remote cursors as unowned, meaning that they won't be killed upon disposing of this
      * DocumentSource.
      */

@@ -128,13 +128,15 @@ Status MergeCursorsStage::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _blockingResultsMerger->setAwaitDataTimeout(awaitDataTimeout);
 }
 
-void MergeCursorsStage::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
+void MergeCursorsStage::addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
+                                           const ShardTag& tag) {
     recordRemoteCursorShardIds(newCursors);
-    _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
+    _blockingResultsMerger->addNewShardCursors(std::move(newCursors), tag);
 }
 
-void MergeCursorsStage::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
-    _blockingResultsMerger->closeShardCursors(shardIds);
+void MergeCursorsStage::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds,
+                                          const ShardTag& tag) {
+    _blockingResultsMerger->closeShardCursors(shardIds, tag);
 }
 
 void MergeCursorsStage::setInitialHighWaterMark(const BSONObj& highWaterMark) {

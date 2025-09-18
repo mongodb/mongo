@@ -43,6 +43,7 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
+#include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
@@ -113,8 +114,9 @@ public:
      * */
     void setInitialHighWaterMark(const BSONObj& highWaterMark);
 
-    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
-        _arm->addNewShardCursors(std::move(newCursors));
+    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
+                            const ShardTag& tag = ShardTag::kDefault) {
+        _arm->addNewShardCursors(std::move(newCursors), tag);
     }
 
     /**
@@ -123,11 +125,9 @@ public:
      * All results from the to-be closed remotes that have already been received but have not been
      * consumed will be kept. They can be consumed normally.
      * Closing remote cursors is only supported for tailable, awaitData cursors.
-     * TODO(SERVER-30784): call this method from change streams when cluster topology changes and
-     * shards are removed.
      */
-    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
-        _arm->closeShardCursors(shardIds);
+    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds, const ShardTag& tag) {
+        _arm->closeShardCursors(shardIds, tag);
     }
 
     /**

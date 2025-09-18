@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/s/query/exec/shard_tag.h"
 
 namespace mongo {
 
@@ -154,7 +155,11 @@ GetNextResult ChangeStreamHandleTopologyChangeStage::doGetNext() {
 
 void ChangeStreamHandleTopologyChangeStage::addNewShardCursors(
     const Document& newShardDetectedObj) {
-    _mergeCursors->addNewShardCursors(establishShardCursorsOnNewShards(newShardDetectedObj));
+    // This stage is only used by v1 change stream readers, which does not close any existing remote
+    // cursors. Because cursors are never closed, we can always go with the default shard tag for
+    // all cursors.
+    _mergeCursors->addNewShardCursors(establishShardCursorsOnNewShards(newShardDetectedObj),
+                                      ShardTag::kDefault);
 }
 
 std::vector<RemoteCursor> ChangeStreamHandleTopologyChangeStage::establishShardCursorsOnNewShards(

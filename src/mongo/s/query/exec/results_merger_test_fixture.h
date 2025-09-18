@@ -55,6 +55,7 @@
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
+#include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -231,7 +232,7 @@ protected:
         cursors.push_back(makeRemoteCursor(kTestShardIds[0],
                                            kTestShardHosts[0],
                                            CursorResponse(kTestNss, 1, {}, boost::none, pbrt)));
-        arm->addNewShardCursors(std::move(cursors));
+        arm->addNewShardCursors(std::move(cursors), ShardTag::kDefault);
 
         // Expect PBRT from the first batch, and not the original high water mark.
         ASSERT_BSONOBJ_EQ(pbrt, arm->getHighWaterMark());
@@ -297,7 +298,7 @@ protected:
         ASSERT_FALSE(arm->ready());
 
         // Close the cursor. Now the ARM manages no open cursors.
-        arm->closeShardCursors({kTestShardIds[0]});
+        arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
         ASSERT_EQ(0, arm->getNumRemotes());
 
         // Still expect the same high water mark as before.

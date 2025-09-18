@@ -56,6 +56,7 @@
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
+#include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
@@ -437,7 +438,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseAfterReceivingAllResults)
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
     auto arm = makeARMFromExistingCursors(std::move(cursors));
     ASSERT_EQ(1, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
     ASSERT_FALSE(arm->ready());
 
     // Schedule requests.
@@ -462,14 +463,14 @@ TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseAfterReceivingAllResults)
     ASSERT_FALSE(networkHasReadyRequests());
 
     // Remove the only shard.
-    arm->closeShardCursors({kTestShardIds[0]});
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
 
     // No killCursors command is supposed to be executed here, as the remote cursor was already
     // closed before.
     ASSERT_FALSE(networkHasReadyRequests());
 
     ASSERT_EQ(0, arm->getNumRemotes());
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
     ASSERT_TRUE(arm->remotesExhausted());
 }
 
@@ -522,7 +523,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseWithMoreResultsPending) {
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
     auto arm = makeARMFromExistingCursors(std::move(cursors));
     ASSERT_EQ(1, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
     ASSERT_FALSE(arm->ready());
 
     // Schedule requests.
@@ -544,7 +545,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseWithMoreResultsPending) {
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_FALSE(arm->ready());
 
-    arm->closeShardCursors({kTestShardIds[0]});
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
 
     // We expect to see one killCursors command call for the remote cursor.
     ASSERT_TRUE(networkHasReadyRequests());
@@ -553,7 +554,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseWithMoreResultsPending) {
     blackHoleNextRequest();
 
     ASSERT_EQ(0, arm->getNumRemotes());
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
     ASSERT_TRUE(arm->remotesExhausted());
 }
 
@@ -566,8 +567,8 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
         makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 6, {})));
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
     ASSERT_EQ(2, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
     ASSERT_FALSE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
@@ -611,15 +612,15 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
     ASSERT_FALSE(arm->ready());
 
     // Close shard 1. This drops the document '{$sortKey: [9]}' from the result.
-    arm->closeShardCursors({kTestShardIds[1]});
+    arm->closeShardCursors({kTestShardIds[1]}, ShardTag::kDefault);
 
     // No killCursors command is supposed to be executed here, as the remote cursor was already
     // closed.
     ASSERT_FALSE(networkHasReadyRequests());
 
     ASSERT_EQ(1, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
 
     readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -643,7 +644,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
                       *unittest::assertGet(arm->nextReady()).getResult());
 
     // Close shard 0.
-    arm->closeShardCursors({kTestShardIds[0]});
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
 
     // We expect to see one killCursors command call for the remote cursor.
     ASSERT_TRUE(networkHasReadyRequests());
@@ -651,7 +652,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
     blackHoleNextRequest();
 
     ASSERT_EQ(0, arm->getNumRemotes());
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
 
     // Now everything is fully consumed.
     ASSERT_TRUE(arm->ready());
@@ -667,8 +668,8 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
         makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 6, {})));
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
     ASSERT_EQ(2, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
     ASSERT_FALSE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
@@ -694,7 +695,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
                       *unittest::assertGet(arm->nextReady()).getResult());
 
     // Close shard 1. This removes the document '{$sortKey: [2]}' from the result.
-    arm->closeShardCursors({kTestShardIds[1]});
+    arm->closeShardCursors({kTestShardIds[1]}, ShardTag::kDefault);
 
     // We expect to see one killCursors command call for the remote cursor.
     ASSERT_TRUE(networkHasReadyRequests());
@@ -703,8 +704,8 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     blackHoleNextRequest();
 
     ASSERT_EQ(1, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
 
     ASSERT_FALSE(arm->ready());
 
@@ -726,11 +727,11 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     cursors.clear();
     cursors.push_back(
         makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 7, {})));
-    arm->addNewShardCursors(std::move(cursors));
+    arm->addNewShardCursors(std::move(cursors), ShardTag::kDefault);
 
     ASSERT_EQ(2, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
 
     // After returning all the buffered results, the ARM returns EOF immediately because both shards
     // cursors were exhausted.
@@ -759,7 +760,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [6]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
 
-    arm->closeShardCursors({kTestShardIds[0], kTestShardIds[1]});
+    arm->closeShardCursors({kTestShardIds[0], kTestShardIds[1]}, ShardTag::kDefault);
 
     // We expect to see two killCursors command calls for the remote cursors.
     ASSERT_EQ(2, getNumPendingRequests());
@@ -769,8 +770,70 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     blackHoleNextRequest();
 
     ASSERT_EQ(0, arm->getNumRemotes());
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
+}
+
+TEST_F(AsyncResultsMergerTest, ShardTags) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<RemoteCursor> cursors;
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+    ASSERT_EQ(0, arm->getNumRemotes());
+
+    // Add shard 0 with data shard shard tag.
+    cursors.clear();
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    arm->addNewShardCursors(std::move(cursors), ShardTag::kDataShard);
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDataShard));
+
+    // Add shard 0, but with config shard tag.
+    cursors.clear();
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    arm->addNewShardCursors(std::move(cursors), ShardTag::kConfigServer);
+    ASSERT_EQ(2, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDataShard));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kConfigServer));
+
+    // Close the cursor on the data shard.
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDataShard);
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDataShard));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kConfigServer));
+
+    // Try to close the only remaining cursor, but using a wrong shard tag. The cursor must remain
+    // open.
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag{.tag = "does-not-exist"});
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kConfigServer));
+
+    // Close the cursor on the config shard.
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kConfigServer);
+    ASSERT_EQ(0, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDataShard));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kConfigServer));
+
+    // Add shard 1, but without specifying a shard tag. The cursor must be associated with the
+    // default shard tag.
+    cursors.clear();
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 1, {})));
+    arm->addNewShardCursors(std::move(cursors));
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
+
+    // Try to close the only remaining cursor, but using a wrong shard tag. The cursor must remain
+    // open.
+    arm->closeShardCursors({kTestShardIds[1]}, ShardTag{.tag = "does-not-exist"});
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
+
+    // Close it using the correct shard tag.
+    arm->closeShardCursors({kTestShardIds[1]}, ShardTag::kDefault);
+    ASSERT_EQ(0, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
 }
 
 TEST_F(AsyncResultsMergerTest, CloseCursorWithUnconsumedInitialBatch) {
@@ -783,14 +846,14 @@ TEST_F(AsyncResultsMergerTest, CloseCursorWithUnconsumedInitialBatch) {
         kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 42, batch)));
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
     ASSERT_EQ(1, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
 
     ASSERT_TRUE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
     // Close cursor immediately, without consuming any results. This drops the documents '{$sortKey:
     // [23]}' and '{$sortKey: [42]}' from the result.
-    arm->closeShardCursors({kTestShardIds[0]});
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
     ASSERT_EQ(0, arm->getNumRemotes());
 
     // We expect to see one killCursors command call for the remote cursor.
@@ -807,7 +870,7 @@ TEST_F(AsyncResultsMergerTest, CloseCursorWithUnconsumedInitialBatch) {
     cursors.clear();
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 99, batch)));
-    arm->addNewShardCursors(std::move(cursors));
+    arm->addNewShardCursors(std::move(cursors), ShardTag::kDefault);
 
     ASSERT_TRUE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
@@ -817,7 +880,7 @@ TEST_F(AsyncResultsMergerTest, CloseCursorWithUnconsumedInitialBatch) {
                       *unittest::assertGet(arm->nextReady()).getResult());
 
     // Close cursor again.
-    arm->closeShardCursors({kTestShardIds[0]});
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
     ASSERT_EQ(0, arm->getNumRemotes());
 
     // We expect to see one killCursors command call for the remote cursor.
@@ -839,8 +902,8 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseWhileWaitingForShardResult) 
 
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
     ASSERT_EQ(2, arm->getNumRemotes());
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
     ASSERT_FALSE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
@@ -860,13 +923,13 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseWhileWaitingForShardResult) 
 
     // Close the cursor for the shard for which we have not scheduled a response yet. That
     // immediately makes results available.
-    arm->closeShardCursors({kTestShardIds[1]});
+    arm->closeShardCursors({kTestShardIds[1]}, ShardTag::kDefault);
 
     ASSERT_TRUE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0], ShardTag::kDefault));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1], ShardTag::kDefault));
     ASSERT_EQ(1, arm->getNumRemotes());
 
     // We expect to see one killCursors command call for the remote cursor.
@@ -2509,7 +2572,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
         makeRemoteCursor(kTestShardIds[1],
                          kTestShardHosts[1],
                          CursorResponse(kTestNss, 456, {}, boost::none, tooLowPBRT)));
-    arm->addNewShardCursors(std::move(newCursors));
+    arm->addNewShardCursors(std::move(newCursors), ShardTag::kDefault);
 
     // Now shouldn't be ready, our guarantee from the new shard isn't sufficiently advanced.
     ASSERT_FALSE(arm->ready());
@@ -2586,7 +2649,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
         makeRemoteCursor(kTestShardIds[1],
                          kTestShardHosts[1],
                          CursorResponse(kTestNss, 456, {}, boost::none, tooLowPBRT)));
-    arm->addNewShardCursors(std::move(newCursors));
+    arm->addNewShardCursors(std::move(newCursors), ShardTag::kDefault);
 
     // Now shouldn't be ready, our guarantee from the new shard isn't sufficiently advanced.
     ASSERT_FALSE(arm->ready());

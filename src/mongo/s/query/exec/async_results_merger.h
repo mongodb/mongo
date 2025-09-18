@@ -46,6 +46,7 @@
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
+#include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
@@ -264,7 +265,8 @@ public:
      * Adds the specified shard cursors to the set of cursors to be merged.  The results from the
      * new cursors will be returned as normal through nextReady().
      */
-    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors);
+    void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
+                            const ShardTag& tag = ShardTag::kDefault);
 
     /**
      * Closes and removes all cursors belonging to any of the specified shardIds. All in-flight
@@ -273,10 +275,8 @@ public:
      * 'AsyncResultsMerger' but have not been consumed will be kept. They can be consumed normally
      * via the 'nextReady()' method.
      * Closing remote cursors is only supported for tailable, awaitData cursors.
-     * TODO(SERVER-30784): call this method from change streams when cluster topology changes and
-     * shards are removed.
      */
-    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds);
+    void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds, const ShardTag& tag);
 
     /**
      * Returns true if the cursor was opened with 'allowPartialResults:true' and results are not
@@ -290,9 +290,11 @@ public:
     std::size_t getNumRemotes() const;
 
     /**
-     * Returns true if we have a cursor established for the specified shard, false otherwise.
+     * Returns true if we have a cursor established for the specified shard and shard tag, false
+     * otherwise.
      */
-    bool hasCursorForShard_forTest(const ShardId& shardId) const;
+    bool hasCursorForShard_forTest(const ShardId& shardId,
+                                   const ShardTag& tag = ShardTag::kDefault) const;
 
     /**
      * Returns the number of buffered remote responses.
@@ -394,6 +396,7 @@ private:
                          NamespaceString cursorNss,
                          CursorId establishedCursorId,
                          std::string shardId,
+                         const ShardTag& tag,
                          bool partialResultsReturned);
 
         /**
@@ -446,6 +449,9 @@ private:
 
         // The identity of the shard which the cursor belongs to.
         const ShardId shardId;
+
+        // The shard tag associated with this cursor.
+        const ShardTag tag;
 
         // True if this remote is eligible to provide a high water mark sort key; false otherwise.
         bool eligibleForHighWaterMark = false;
@@ -561,9 +567,9 @@ private:
     using CbResponse = executor::TaskExecutor::ResponseStatus;
 
     /**
-     * Build a remote object from the 'RemoteCursor' object.
+     * Build a remote cursor object from the 'RemoteCursor' and 'ShardTag' objects.
      */
-    RemoteCursorPtr _buildRemote(WithLock lk, const RemoteCursor& rc);
+    RemoteCursorPtr _buildRemote(WithLock lk, const RemoteCursor& rc, const ShardTag& tag);
 
     /**
      * When nextEvent() schedules remote work, the callback uses this function to process

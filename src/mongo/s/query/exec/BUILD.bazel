@@ -27,6 +27,7 @@ mongo_cc_library(
         "blocking_results_merger.cpp",
         "establish_cursors.cpp",
         "next_high_watermark_determining_strategy.cpp",
+        "shard_tag.cpp",
         ":async_results_merger_params_gen",
     ],
     hdrs = [
@@ -34,6 +35,7 @@ mongo_cc_library(
         "blocking_results_merger.h",
         "establish_cursors.h",
         "next_high_watermark_determining_strategy.h",
+        "shard_tag.h",
     ],
     deps = [
         "//src/mongo/db:server_feature_flags",
@@ -174,6 +176,7 @@ mongo_cc_unit_test(
         "router_stage_limit_test.cpp",
         "router_stage_remove_metadata_fields_test.cpp",
         "router_stage_skip_test.cpp",
+        "shard_tag_test.cpp",
         "sharded_agg_test_fixture.h",
         "store_possible_cursor_test.cpp",
         "//src/mongo/db/session:logical_session_cache_noop.h",

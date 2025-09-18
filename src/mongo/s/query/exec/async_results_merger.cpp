@@ -163,7 +163,11 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
 
     // Build a list of remote cursors from the parameters we got, and store them in '_remotes'.
     for (const auto& remoteCursor : _params.getRemotes()) {
-        auto remote = _buildRemote(WithLock::withoutLock(), remoteCursor);
+        // We assume the default 'ShardTag' here, because in non-change stream queries there is no
+        // need to distinguish between the different roles of shards. The same is true for cursors
+        // used by V1 change stream readers. And V2 change stream readers will not open any cursors
+        // in the constructor of the 'AsyncResultsMerger'.
+        auto remote = _buildRemote(WithLock::withoutLock(), remoteCursor, ShardTag::kDefault);
 
         // A remote cannot be flagged as 'partialResultsReturned' if 'allowPartialResults' is false.
         invariant(!(remote->partialResultsReturned && !_params.getAllowPartialResults()));
@@ -282,17 +286,29 @@ bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyIncreasing(
     return compareSortKeys(current, proposed, sortKeyPattern) <= 0;
 }
 
-void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
+void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
+                                            const ShardTag& tag) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    // Create a new entry in the '_remotes' list for each new shard, and add the first cursor batch
-    // to its buffer. This ensures the shard's initial high water mark is respected, if it exists.
+    // Create a new remote cursor entry in the '_remotes' list for each new shard, and add the first
+    // cursor batch to its buffer. This ensures the shard's initial high water mark is respected, if
+    // it exists. Every created remote cursor entry is associated with the specified shard tag.
     for (auto&& remoteCursor : newCursors) {
-        _remotes.push_back(_buildRemote(lk, remoteCursor));
+        auto remote = _buildRemote(lk, remoteCursor, tag);
+
+        LOGV2_DEBUG(11003801,
+                    2,
+                    "Adding cursor for shard",
+                    "remoteHost"_attr = remote->getTargetHost(),
+                    "shardId"_attr = remote->shardId.toString(),
+                    "tag"_attr = remote->tag);
+
+        _remotes.push_back(std::move(remote));
     }
 }
 
-void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
+void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds,
+                                           const ShardTag& tag) {
     // Closing remote cursors is not supported in tailable mode.
     tassert(8456101,
             "closeShardCursors() cannot be used for tailable cursors.",
@@ -310,15 +326,16 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
         }
     });
 
-    // Erase-remove all remotes from the '_remotes' vector for any of the passed shardIds.
-    // We cannot use 'std::erase_if(container, predicate)' here because it is not defined for the
-    // 'absl::InlinedVector' type.
+    // Erase-remove all remotes from the '_remotes' vector for any of the passed shardIds if the
+    // shard tags also match. We cannot use 'std::erase_if(container, predicate)' here because it is
+    // not defined for the 'absl::InlinedVector' type.
     _remotes.erase(std::remove_if(_remotes.begin(),
                                   _remotes.end(),
                                   [&](const RemoteCursorPtr& remote) {
-                                      if (!shardIds.contains(remote->shardId)) {
-                                          // This is a remote for a different shardId than what we
-                                          // are looking for.
+                                      if (!shardIds.contains(remote->shardId) ||
+                                          remote->tag != tag) {
+                                          // This is a remote for a different shardId or different
+                                          // 'ShardTag' than what we are looking for.
                                           return false;
                                       }
 
@@ -326,10 +343,12 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
                                                   2,
                                                   "closing cursor for shard",
                                                   "remoteHost"_attr = remote->getTargetHost(),
-                                                  "shardId"_attr = remote->shardId.toString());
+                                                  "shardId"_attr = remote->shardId.toString(),
+                                                  "tag"_attr = remote->tag);
 
-                                      // Found a remote with one of the shardIds that we are looking
-                                      // for. Now perform the following cleanup steps:
+                                      // Found a remote with one of the shardIds and the specified
+                                      // shard tag that we are looking for. Now perform the
+                                      // following cleanup steps:
                                       // - Cancel any potential in-flight callbacks for the remote.
                                       // - Close the remote cursor if available.
                                       // - Remove the remote from the vector of promised minimum
@@ -383,11 +402,12 @@ std::size_t AsyncResultsMerger::getNumRemotes() const {
     });
 }
 
-bool AsyncResultsMerger::hasCursorForShard_forTest(const ShardId& shardId) const {
+bool AsyncResultsMerger::hasCursorForShard_forTest(const ShardId& shardId,
+                                                   const ShardTag& tag) const {
     // Take the lock to guard against shard additions or disconnections.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return std::any_of(_remotes.begin(), _remotes.end(), [&shardId](const auto& remote) {
-        return shardId == remote->shardId;
+    return std::any_of(_remotes.begin(), _remotes.end(), [&](const auto& remote) {
+        return shardId == remote->shardId && tag == remote->tag;
     });
 }
 
@@ -441,7 +461,8 @@ AsyncResultsMerger::_getMinPromisedSortKey(WithLock) const {
 }
 
 AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk,
-                                                                     const RemoteCursor& rc) {
+                                                                     const RemoteCursor& rc,
+                                                                     const ShardTag& tag) {
     RemoteCursorData::IdType id = ++_nextId;
 
     auto remote =
@@ -450,6 +471,7 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
                                          rc.getCursorResponse().getNSS(),
                                          rc.getCursorResponse().getCursorId(),
                                          std::string{rc.getShardId()},
+                                         tag,
                                          rc.getCursorResponse().getPartialResultsReturned());
 
     // We don't check the return value of _addBatchToBuffer here; if there was an error, it will be
@@ -1395,15 +1417,19 @@ AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
     NamespaceString cursorNss,
     CursorId establishedCursorId,
     std::string shardId,
+    const ShardTag& tag,
     bool partialResultsReturned)
     : id(id),
       cursorId(establishedCursorId),
       cursorNss(std::move(cursorNss)),
       shardHostAndPort(std::move(hostAndPort)),
       shardId(std::move(shardId)),
+      tag(tag),
       partialResultsReturned(partialResultsReturned) {
     // If the 'partialResultsReturned' flag is set, the cursorId must be zero (closed).
-    invariant(!(partialResultsReturned && cursorId != 0));
+    tassert(11103800,
+            "expecting partialResultsFlag to be set only for cursorId == 0",
+            !(partialResultsReturned && cursorId != 0));
 }
 
 const HostAndPort& AsyncResultsMerger::RemoteCursorData::getTargetHost() const {
