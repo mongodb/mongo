@@ -171,6 +171,15 @@ public:
         }
     }
 
+    /**
+     * Returns the smallest offset 'i' such that (*this)[i] is in '_cache'.
+     *
+     * This value is negative or zero, because the current document is always in '_cache'.
+     */
+    auto getMinCachedOffset() const {
+        return -_indexOfCurrentInPartition + _cache.getLowestIndex();
+    }
+
 private:
     friend class PartitionAccessor;
 
@@ -203,15 +212,6 @@ private:
      */
     boost::optional<std::pair<int, int>> getEndpoints(
         const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
-
-    /**
-     * Returns the smallest offset 'i' such that (*this)[i] is in '_cache'.
-     *
-     * This value is negative or zero, because the current document is always in '_cache'.
-     */
-    auto getMinCachedOffset() const {
-        return -_indexOfCurrentInPartition + _cache.getLowestIndex();
-    }
 
     /**
      * Returns the largest offset 'i' such that (*this)[i] is in '_cache'.

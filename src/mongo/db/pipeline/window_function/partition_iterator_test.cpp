@@ -326,20 +326,20 @@ TEST_F(PartitionIteratorTest, OutsideOfPartitionAccessShouldNotTassert) {
     ASSERT_FALSE(accessor[2]);
 }
 
-DEATH_TEST_F(PartitionIteratorTest, SingleConsumerDefaultPolicy, "Requested expired document") {
+DEATH_TEST_F(PartitionIteratorTest, RequestExpiredDocument, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());
     auto accessor = makeDefaultAccessor(mock, boost::none);
     // Access the first document, which marks it as expired.
-    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *accessor[0]);
+    *accessor[0];
     // Advance the iterator which frees the first expired document.
     advance();
     // Attempting to access the first doc results in a tripwire assertion.
-    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5643005);
+    accessor[-1];
 }
 
-DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerDefaultPolicy, "Requested expired document") {
+TEST_F(PartitionIteratorTest, MultipleConsumerDefaultPolicy) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());
@@ -361,11 +361,10 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerDefaultPolicy, "Requested ex
     ASSERT_FALSE(leadingAccessor[1]);
 
     // The first document should now be expired.
-    ASSERT_THROWS_CODE(laggingAccessor[-2], AssertionException, 5643005);
-    ASSERT_THROWS_CODE(leadingAccessor[-2], AssertionException, 5643005);
+    ASSERT_EQ(-1, _iter->getMinCachedOffset());
 }
 
-DEATH_TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy, "Requested expired document") {
+TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());
@@ -388,11 +387,10 @@ DEATH_TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy, "Requested exp
     endpoints = accessor.getEndpoints(bounds);
     // Now the second document, currently at index 0 in the cache, will be released.
     advance();
-    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5371202);
-    ASSERT_THROWS_CODE(accessor[-2], AssertionException, 5371202);
+    ASSERT_EQ(0, _iter->getMinCachedOffset());
 }
 
-DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested expired document") {
+TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());
@@ -438,12 +436,10 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested e
     // the other docs.
     advance();
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[-2]);
-    ASSERT_THROWS_CODE(lookBehindAccessor[-3], AssertionException, 5643005);
+    ASSERT_EQ(-2, _iter->getMinCachedOffset());
 }
 
-DEATH_TEST_F(PartitionIteratorTest,
-             SingleConsumerRightEndpointPolicy,
-             "Requested expired document") {
+TEST_F(PartitionIteratorTest, SingleConsumerRightEndpointPolicy) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());
@@ -475,10 +471,10 @@ DEATH_TEST_F(PartitionIteratorTest,
     ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *accessor[0]);
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *accessor[-1]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *accessor[-2]);
-    ASSERT_THROWS_CODE(accessor[-3], AssertionException, 5643005);
+    ASSERT_EQ(-2, partIter.getMinCachedOffset());
 }
 
-DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
+TEST_F(PartitionIteratorTest, MixedPolicy) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = exec::agg::MockStage::createForTest(docs, getExpCtx());
@@ -513,7 +509,7 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *defaultAccessor[-1]);
 
     // The iterator is currently at {a: 4}, with {a: 1} and {a: 2} both being released.
-    ASSERT_THROWS_CODE(defaultAccessor[-2], AssertionException, 5643005);
+    ASSERT_EQ(-1, _iter->getMinCachedOffset());
 }
 
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {

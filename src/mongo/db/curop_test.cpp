@@ -527,7 +527,7 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
 }
 
-DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
+TEST(CurOpTest, CanReadMemoryStatsWithoutFeatureFlag) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);
@@ -536,6 +536,14 @@ DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
 
     ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
+}
+
+DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               false);
     curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
 }
 

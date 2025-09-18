@@ -117,69 +117,57 @@ bool isOnStepRelativeTo(DensifyValue testVal, DensifyValue base, RangeStatement 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
     Document doc{{"a", 1}};
     size_t counter = 0;
-    ASSERT_THROWS_CODE(
-        GenClass(Value(1),
-                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(0)), boost::none),
-                 "path",
-                 doc,
-                 doc,
-                 boost::none,
-                 ValueComparator(),
-                 &counter,
-                 false),
-        AssertionException,
-        5733303);
+    GenClass(Value(1),
+             RangeStatement(Value(1), ExplicitBounds(Value(1), Value(0)), boost::none),
+             "path",
+             doc,
+             doc,
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfStepIsZero, "be positive") {
     Document doc{{"a", 1}};
     size_t counter = 0;
-    ASSERT_THROWS_CODE(
-        GenClass(Value(0),
-                 RangeStatement(Value(0), ExplicitBounds(Value(0), Value(1)), boost::none),
-                 "path",
-                 doc,
-                 doc,
-                 boost::none,
-                 ValueComparator(),
-                 &counter,
-                 false),
-        AssertionException,
-        5733305);
+    GenClass(Value(0),
+             RangeStatement(Value(0), ExplicitBounds(Value(0), Value(1)), boost::none),
+             "path",
+             doc,
+             doc,
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsOnMixedValues, "same type") {
     Document doc{{"a", 1}};
     size_t counter = 0;
-    ASSERT_THROWS_CODE(
-        GenClass(Date_t::max(),
-                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
-                 "path",
-                 doc,
-                 doc,
-                 boost::none,
-                 ValueComparator(),
-                 &counter,
-                 false),
-        AssertionException,
-        5733300);
+    GenClass(Date_t::max(),
+             RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
+             "path",
+             doc,
+             doc,
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsInDocument, "cannot include field") {
     Document doc{{"path", 1}};
     size_t counter = 0;
-    ASSERT_THROWS_CODE(
-        GenClass(Value(0),
-                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
-                 "path",
-                 doc,
-                 doc,
-                 boost::none,
-                 ValueComparator(),
-                 &counter,
-                 false),
-        AssertionException,
-        5733306);
+    GenClass(Value(0),
+             RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
+             "path",
+             doc,
+             doc,
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsButIsArray, "cannot include field") {
@@ -189,18 +177,15 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsButIsArray, "cannot include 
     docArray.push_back(doc);
     Document preservedFields{{"arr", Value(docArray)}};
     size_t counter = 0;
-    ASSERT_THROWS_CODE(
-        GenClass(Value(0),
-                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
-                 "arr",
-                 preservedFields,
-                 doc,
-                 boost::none,
-                 ValueComparator(),
-                 &counter,
-                 false),
-        AssertionException,
-        5733306);
+    GenClass(Value(0),
+             RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
+             "arr",
+             preservedFields,
+             doc,
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 TEST(DensifyGeneratorTest, ErrorsIfFieldIsInArray) {
@@ -418,72 +403,63 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
 
 DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
     size_t counter = 0;
-    ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
-                                RangeStatement(Value(1),
-                                               ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
-                                                              makeDate("2021-01-01T00:00:02.000Z")),
-                                               boost::none),
-                                "a",
-                                Document(),
-                                Document(),
-                                boost::none,
-                                ValueComparator(),
-                                &counter,
-                                false),
-                       AssertionException,
-                       5733501);
+    GenClass(makeDate("2021-01-01T00:00:00.000Z"),
+             RangeStatement(Value(1),
+                            ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
+                                           makeDate("2021-01-01T00:00:02.000Z")),
+                            boost::none),
+             "a",
+             Document(),
+             Document(),
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, FailsIfNumberAndUnitProvided, "non-date") {
     size_t counter = 0;
-    ASSERT_THROWS_CODE(
-        GenClass(Value(1),
-                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(10)), TimeUnit::second),
-                 "a",
-                 Document(),
-                 Document(),
-                 boost::none,
-                 ValueComparator(),
-                 &counter,
-                 false),
-        AssertionException,
-        5733506);
+    GenClass(Value(1),
+             RangeStatement(Value(1), ExplicitBounds(Value(1), Value(10)), TimeUnit::second),
+             "a",
+             Document(),
+             Document(),
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") {
     size_t counter = 0;
-    ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:02.000Z"),
-                                RangeStatement(Value(1),
-                                               ExplicitBounds(makeDate("2021-01-01T00:00:02.000Z"),
-                                                              makeDate("2021-01-01T00:00:01.000Z")),
-                                               TimeUnit::second),
-                                "a",
-                                Document(),
-                                Document(),
-                                boost::none,
-                                ValueComparator(),
-                                &counter,
-                                false),
-                       AssertionException,
-                       5733502);
+    GenClass(makeDate("2021-01-01T00:00:02.000Z"),
+             RangeStatement(Value(1),
+                            ExplicitBounds(makeDate("2021-01-01T00:00:02.000Z"),
+                                           makeDate("2021-01-01T00:00:01.000Z")),
+                            TimeUnit::second),
+             "a",
+             Document(),
+             Document(),
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "whole number") {
     size_t counter = 0;
-    ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
-                                RangeStatement(Value(1.5),
-                                               ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
-                                                              makeDate("2021-01-01T00:00:01.000Z")),
-                                               TimeUnit::second),
-                                "a",
-                                Document(),
-                                Document(),
-                                boost::none,
-                                ValueComparator(),
-                                &counter,
-                                false),
-                       AssertionException,
-                       5733505);
+    GenClass(makeDate("2021-01-01T00:00:00.000Z"),
+             RangeStatement(Value(1.5),
+                            ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
+                                           makeDate("2021-01-01T00:00:01.000Z")),
+                            TimeUnit::second),
+             "a",
+             Document(),
+             Document(),
+             boost::none,
+             ValueComparator(),
+             &counter,
+             false);
 }
 
 TEST(DensifyGeneratorTest, GeneratesDatesBySecondCorrectly) {

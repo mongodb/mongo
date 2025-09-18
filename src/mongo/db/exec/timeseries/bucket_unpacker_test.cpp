@@ -1040,13 +1040,10 @@ DEATH_TEST_REGEX_F(BucketUnpackerTest, GetNextBsonWhenExhausted, "Tripwire asser
 
     auto bson0 = fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}");
 
-    ASSERT_EQ(unpacker.numberOfMeasurements(), 1);
-
-    ASSERT_TRUE(unpacker.hasNext());
+    // Get the single measurement.
     assertGetNextBson(unpacker, bson0);
-
-    ASSERT_FALSE(unpacker.hasNext());
-    ASSERT_THROWS_CODE(unpacker.getNextBson(), AssertionException, 7026801);
+    // Expect this to tassert.
+    unpacker.getNextBson();
 }
 
 
@@ -1071,8 +1068,8 @@ DEATH_TEST_REGEX_F(BucketUnpackerTest,
 
     unpacker.setIncludeMinTimeAsMetadata();
 
-    ASSERT_TRUE(unpacker.hasNext());
-    ASSERT_THROWS_CODE(unpacker.getNextBson(), AssertionException, 7026802);
+    // Expect this to tassert.
+    unpacker.getNextBson();
 }
 
 DEATH_TEST_REGEX_F(BucketUnpackerTest,
@@ -1096,8 +1093,8 @@ DEATH_TEST_REGEX_F(BucketUnpackerTest,
 
     unpacker.setIncludeMaxTimeAsMetadata();
 
-    ASSERT_TRUE(unpacker.hasNext());
-    ASSERT_THROWS_CODE(unpacker.getNextBson(), AssertionException, 7026802);
+    // Expect this to tassert.
+    unpacker.getNextBson();
 }
 
 TEST_F(BucketUnpackerTest, ComputeMeasurementCountLowerBoundsAreCorrect) {

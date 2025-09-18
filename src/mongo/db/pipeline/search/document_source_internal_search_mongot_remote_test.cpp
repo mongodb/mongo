@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/search/mongot_options.h"
-#include "mongo/unittest/death_test.h"
 
 namespace mongo {
 namespace {

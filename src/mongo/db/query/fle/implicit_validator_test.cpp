@@ -229,26 +229,32 @@ TEST_F(GenerateFLE2MatchExpression, NormalInputWithNestedFields) {
     ASSERT_BSONOBJ_EQ(expectedBSON, outputBSON);
 }
 
-DEATH_TEST(GenerateFLE2MatchExpressionDeathTest, EncryptedFieldsConflict, "tripwire assertions") {
+DEATH_TEST(GenerateFLE2MatchExpressionDeathTest, EncryptedFieldsConflict_Nested1Level, "6364302") {
     EncryptedField a(UUID::gen(), "a");
     a.setBsonType("string"_sd);
+    EncryptedField ab(UUID::gen(), "a.b");
+    ab.setBsonType("int"_sd);
+
+    [[maybe_unused]] auto expr =
+        generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {a, ab});
+}
+
+DEATH_TEST(GenerateFLE2MatchExpressionDeathTest, EncryptedFieldsConflict_Nested2Levels, "6364302") {
     EncryptedField ab(UUID::gen(), "a.b");
     ab.setBsonType("int"_sd);
     EncryptedField abc(UUID::gen(), "a.b.c");
     abc.setBsonType("int"_sd);
 
-    auto swExpr =
-        generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {a, ab});
-    ASSERT(!swExpr.isOK());
-    ASSERT(swExpr.getStatus().code() == 6364302);
+    [[maybe_unused]] auto expr =
+        generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {abc, ab});
+}
 
-    swExpr = generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {abc, ab});
-    ASSERT(!swExpr.isOK());
-    ASSERT(swExpr.getStatus().code() == 6364302);
+DEATH_TEST(GenerateFLE2MatchExpressionDeathTest, EncryptedFieldsConflict_Nested3Levels, "6364302") {
+    EncryptedField abc(UUID::gen(), "a.b.c");
+    abc.setBsonType("int"_sd);
 
-    swExpr = generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {abc, abc});
-    ASSERT(!swExpr.isOK());
-    ASSERT(swExpr.getStatus().code() == 6364302);
+    [[maybe_unused]] auto expr =
+        generateMatchExpressionFromEncryptedFields(new ExpressionContextForTest(), {abc, abc});
 }
 
 class Fle2MatchTest : public GenerateFLE2MatchExpression {

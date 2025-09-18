@@ -99,17 +99,12 @@ DEATH_TEST_F(PartitionKeyComparatorTest,
              "Null expression context") {
     boost::intrusive_ptr<ExpressionFieldPath> expr =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    ASSERT_THROWS_CODE(_keyComparator =
-                           std::make_unique<PartitionKeyComparator>(nullptr, expr, Document{{}}),
-                       AssertionException,
-                       5733800);
+    _keyComparator = std::make_unique<PartitionKeyComparator>(nullptr, expr, Document{{}});
 }
 
 DEATH_TEST_F(PartitionKeyComparatorTest, FailsWithNullExpression, "Null expression passed") {
-    ASSERT_THROWS_CODE(_keyComparator = std::make_unique<PartitionKeyComparator>(
-                           getExpCtx().get(), nullptr, Document{{}}),
-                       AssertionException,
-                       5733801);
+    _keyComparator =
+        std::make_unique<PartitionKeyComparator>(getExpCtx().get(), nullptr, Document{{}});
 }
 }  // namespace
 
