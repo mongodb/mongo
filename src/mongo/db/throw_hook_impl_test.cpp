@@ -46,8 +46,8 @@ namespace {
 class HookTest : public unittest::Test {
 public:
     ~HookTest() override {
-        gThrowLoggingEnabled = true;
-        gThrowLoggingExceptionName.clear();
+        gThrowLoggingEnabled.storeRelaxed(false);
+        gThrowLoggingExceptionName->clear();
     }
 
     static void throwSystemError() {
@@ -77,40 +77,40 @@ private:
 };
 
 TEST_F(HookTest, HookDisabledSystemError) {
-    gThrowLoggingEnabled = false;
+    gThrowLoggingEnabled.storeRelaxed(false);
     throwSystemError();
     ASSERT(!didLog());
 }
 
 TEST_F(HookTest, HookEnabledSystemError) {
-    gThrowLoggingEnabled = true;
-    gThrowLoggingExceptionName.clear();
+    gThrowLoggingEnabled.storeRelaxed(true);
+    gThrowLoggingExceptionName->clear();
     throwSystemError();
     ASSERT(didLog());
 }
 
 TEST_F(HookTest, HookEnabledWithNameSystemError) {
-    gThrowLoggingEnabled = true;
+    gThrowLoggingEnabled.storeRelaxed(true);
     gThrowLoggingExceptionName = dbErrorName();
     throwSystemError();
     ASSERT(didLog());
 }
 
 TEST_F(HookTest, HookDisabledDBError) {
-    gThrowLoggingEnabled = false;
+    gThrowLoggingEnabled.storeRelaxed(false);
     throwDBError();
     ASSERT(!didLog());
 }
 
 TEST_F(HookTest, HookEnabledDBError) {
-    gThrowLoggingEnabled = true;
-    gThrowLoggingExceptionName.clear();
+    gThrowLoggingEnabled.storeRelaxed(true);
+    gThrowLoggingExceptionName->clear();
     throwDBError();
     ASSERT(!didLog());
 }
 
 TEST_F(HookTest, HookEnabledWithNameDBError) {
-    gThrowLoggingEnabled = true;
+    gThrowLoggingEnabled.storeRelaxed(true);
     gThrowLoggingExceptionName = dbErrorName();
     throwDBError();
     ASSERT(didLog());
