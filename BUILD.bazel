@@ -558,7 +558,7 @@ bolt_optimize(
 
 filegroup(
     name = "clang_tidy_config_files",
-    srcs = [],
+    srcs = ["//src/mongo/db/modules/enterprise/src/streams:clang_tidy_config"],
 )
 
 # This target only does anything meaningful if you pass pgo_profile_url and bolt_profile_url
