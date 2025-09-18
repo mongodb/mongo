@@ -306,6 +306,16 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "internal"
+            # OpenTelemetry trace context used for tracking this operation across a replica set or
+            # a sharded cluster for debugging purposes. The propagation of trace contexts is only
+            # supported on mongods, mongoses and legacy shell compiled with ENABLE_OTEL_BUILD set.
+            # Currently, this is only set for testing binaries.
+            $traceCtx:
+                type: object_owned
+                cpp_name: "traceCtx"
+                forward_to_shards: true
+                optional: true
+                stability: "internal"
             # Requires the action type performRawDataOperations. Specifies whether the operation
             # should be a "raw data" operation. For collections that store their information in
             # a different format than what users interact with, "raw data" operations will operate
