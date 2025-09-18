@@ -44,6 +44,8 @@
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
 namespace {
 
@@ -102,6 +104,11 @@ bool wasShardAlreadyTargetedWithDifferentShardVersion(
                 // And because we have targeted this shardId for this namespace before, this implies
                 // a shard is already targeted under a different endpoint/shardVersion, necessitates
                 // a new batch.
+                LOGV2_DEBUG(9986802,
+                            4,
+                            "New batch required as this shard was already targeted with a "
+                            "different shard version",
+                            "shard"_attr = write->endpoint.shardName);
                 return true;
             }
         }
@@ -121,6 +128,10 @@ bool isNewBatchRequiredOrdered(
     // If this write targets a different shard, it needs to go in a different batch.
     for (auto&& write : writes) {
         if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
+            LOGV2_DEBUG(9986803,
+                        5,
+                        "New batch required as this write targets a different shard",
+                        "shard"_attr = write->endpoint.shardName);
             return true;
         }
     }
@@ -236,6 +247,11 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
         return;
     }
 
+    LOGV2_DEBUG(9986812,
+                4,
+                "Encountered collection uuid mismatch when processing errors",
+                "error"_attr = error->getStatus());
+
     auto info = error->getStatus().extraInfo<CollectionUUIDMismatchInfo>();
     if (info->actualCollection()) {
         return;
@@ -342,6 +358,8 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
         if (!targetStatus.isOK()) {
             write_ops::WriteError targetError(0, targetStatus);
+            LOGV2_DEBUG(
+                9986811, 4, "Encountered targeting error", "error"_attr = targetError.getStatus());
 
             auto cancelBatches = [&](const write_ops::WriteError& why) {
                 for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end();) {
@@ -354,6 +372,10 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
                     it = batchMap.erase(it);
                 }
+                LOGV2_DEBUG(9986805,
+                            4,
+                            "Canceled batches due to targeting error",
+                            "error"_attr = targetError.getStatus());
                 dassert(batchMap.empty());
             };
 
@@ -403,6 +425,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
         if (wouldMakeBatchesTooBig(writes, estWriteSizeBytes, batchMap)) {
             invariant(!batchMap.empty());
+            LOGV2_DEBUG(9986804, 5, "Making a new batch to avoid making batch size too large");
             writeOp.cancelWrites(nullptr);
             break;
         }
@@ -473,6 +496,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
 
             batchIt->second->addWrite(std::move(write), estWriteSizeBytes);
         }
+        LOGV2_DEBUG(9986807, 5, "Targeting complete for child batch to shard");
 
         // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
         writes.clear();
