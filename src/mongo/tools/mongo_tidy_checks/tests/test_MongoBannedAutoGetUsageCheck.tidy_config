@@ -1,0 +1,2 @@
+Checks: '-*,mongo-banned-auto-get-usage-check'
+WarningsAsErrors: '*'

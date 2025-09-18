@@ -119,6 +119,28 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
     return {slots, std::move(stage), std::move(data), expCtx};
 }
 
+void SbeStageBuilderTestFixture::insertDocuments(const NamespaceString& nss,
+                                                 const std::vector<BSONObj>& docs) {
+    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
+
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(collection_internal::insertDocuments(operationContext(),
+                                                       coll.getCollectionPtr(),
+                                                       inserts.begin(),
+                                                       inserts.end(),
+                                                       nullptr /* opDebug */));
+        wuow.commit();
+    }
+}
+
 void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONObj>& docs,
                                                         boost::optional<BSONObj> indexKeyPattern,
                                                         CollectionOptions options) {
@@ -133,7 +155,7 @@ void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONOb
             {BSON("v" << 2 << "name" << DBClientBase::genIndexName(*indexKeyPattern) << "key"
                       << *indexKeyPattern)}));
     }
-    insertDocuments(docs);
+    insertDocuments(_nss, docs);
 }
 
 void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode> root,
@@ -194,18 +216,6 @@ std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUI
     }
 
     return input;
-}
-
-void GoldenSbeStageBuilderTestFixture::insertDocuments(const std::vector<BSONObj>& docs) {
-    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
-    AutoGetCollection agc(operationContext(), _nss, LockMode::MODE_IX);
-    {
-        WriteUnitOfWork wuow{operationContext()};
-        ASSERT_OK(collection_internal::insertDocuments(
-            operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
-        wuow.commit();
-    }
 }
 
 void GoldenSbeExprBuilderTestFixture::setUp() {

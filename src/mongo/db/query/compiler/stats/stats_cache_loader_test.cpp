@@ -67,10 +67,16 @@ protected:
 
 void StatsCacheLoaderTest::createStatsCollection(NamespaceString nss) {
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    auto db = autoColl.ensureDbExists(opCtx);
     WriteUnitOfWork wuow(opCtx);
-    ASSERT(db->createCollection(opCtx, nss));
+    AutoGetDb db(opCtx, nss.dbName(), MODE_IX);
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    ASSERT(db.ensureDbExists(opCtx)->createCollection(opCtx, nss));
     wuow.commit();
 }
 
@@ -116,12 +122,17 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
     createStatsCollection(statsNss);
 
     // Write serialized stats path to collection.
-    AutoGetCollection autoColl(operationContext(), statsNss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(statsNss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(serialized), nullptr));
+            operationContext(), coll.getCollectionPtr(), InsertStatement(serialized), nullptr));
         wuow.commit();
     }
 
@@ -186,12 +197,17 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
     createStatsCollection(statsNss);
 
     // Write serialized stats path to collection.
-    AutoGetCollection autoColl(operationContext(), statsNss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(statsNss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(serialized), nullptr));
+            operationContext(), coll.getCollectionPtr(), InsertStatement(serialized), nullptr));
         wuow.commit();
     }
 

@@ -152,8 +152,14 @@ void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
     ASSERT(!chunks.empty());
 
     const auto uuid = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        return autoColl.getCollection()->uuid();
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        return coll.uuid();
     }();
 
     const std::string shardKey("skey");
@@ -182,7 +188,13 @@ void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
     const auto collectionMetadata =
         CollectionMetadata(ChunkManager(rtHandle, boost::none), kMyShardName);
 
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
         ->setFilteringMetadata(opCtx, collectionMetadata);
 }

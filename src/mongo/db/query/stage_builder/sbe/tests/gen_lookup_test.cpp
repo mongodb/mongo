@@ -97,22 +97,10 @@ public:
         SbeStageBuilderTestFixture::tearDown();
     }
 
-    void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-        std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
-        AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
-        {
-            WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
-            wuow.commit();
-        }
-    }
-
     void insertDocuments(const std::vector<BSONObj>& localDocs,
                          const std::vector<BSONObj>& foreignDocs) {
-        insertDocuments(_nss, localDocs);
-        insertDocuments(_foreignNss, foreignDocs);
+        SbeStageBuilderTestFixture::insertDocuments(_nss, localDocs);
+        SbeStageBuilderTestFixture::insertDocuments(_foreignNss, foreignDocs);
     }
 
     struct CompiledTree {

@@ -76,7 +76,13 @@ void SamplingEstimatorTest::insertDocuments(const NamespaceString& nss,
                                             int batchSize) {
     std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
 
-    AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
+    const auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     {
         size_t currentInsertion = 0;
         while (currentInsertion < inserts.size()) {
@@ -84,8 +90,10 @@ void SamplingEstimatorTest::insertDocuments(const NamespaceString& nss,
 
             int insertionsBeforeCommit = 0;
             while (true) {
-                ASSERT_OK(collection_internal::insertDocument(
-                    operationContext(), *agc, inserts[currentInsertion], nullptr /* opDebug */));
+                ASSERT_OK(collection_internal::insertDocument(operationContext(),
+                                                              coll.getCollectionPtr(),
+                                                              inserts[currentInsertion],
+                                                              nullptr /* opDebug */));
                 insertionsBeforeCommit++;
                 currentInsertion++;
 
@@ -112,10 +120,16 @@ std::vector<BSONObj> SamplingEstimatorTest::createDocuments(int num) {
 
 void SamplingEstimatorTest::createIndex(const BSONObj& spec) {
     WriteUnitOfWork wuow(operationContext());
-    AutoGetCollection autoColl(operationContext(), _kTestNss, MODE_X);
-    CollectionWriter collection(operationContext(), _kTestNss);
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest(_kTestNss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(operationContext()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    CollectionWriter collectionWriter(operationContext(), &coll);
     IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-        operationContext(), collection, {spec}, /*fromMigrate=*/false);
+        operationContext(), collectionWriter, {spec}, /*fromMigrate=*/false);
     wuow.commit();
 }
 
@@ -189,20 +203,25 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         WriteUnitOfWork wunit(opCtx);
-        AutoGetCollection collRaii(opCtx, nss, MODE_X);
-
-        auto db = collRaii.ensureDbExists(opCtx);
-        invariant(db->createCollection(opCtx, nss, {}));
+        AutoGetDb db(opCtx, nss.dbName(), MODE_X);
+        db.ensureDbExists(opCtx);
+        invariant(db.getDb()->createCollection(opCtx, nss, {}));
         wunit.commit();
     });
 
     std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
 
-    AutoGetCollection agc(opCtx, nss, LockMode::MODE_IX);
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     {
         WriteUnitOfWork wuow{opCtx};
         ASSERT_OK(collection_internal::insertDocuments(
-            opCtx, *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+            opCtx, coll.getCollectionPtr(), inserts.begin(), inserts.end(), nullptr /* opDebug */));
         wuow.commit();
     }
 }

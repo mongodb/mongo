@@ -28,6 +28,7 @@
  */
 
 #include "MongoAssertCheck.h"
+#include "MongoBannedAutoGetUsageCheck.h"
 #include "MongoBannedNamesCheck.h"
 #include "MongoBypassDatabaseMetadataAccessCheck.h"
 #include "MongoCctypeCheck.h"
@@ -89,6 +90,8 @@ public:
             "mongo-invariant-ddl-coordinator-check");
         CheckFactories.registerCheck<MongoBypassDatabaseMetadataAccessCheck>(
             "mongo-bypass-database-metadata-access-check");
+        CheckFactories.registerCheck<MongoBannedAutoGetUsageCheck>(
+            "mongo-banned-auto-get-usage-check");
     }
 };
 

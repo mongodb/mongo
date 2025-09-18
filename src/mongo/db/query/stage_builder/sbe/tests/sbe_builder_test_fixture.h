@@ -131,6 +131,8 @@ public:
     }
 
 protected:
+    void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj>& docs);
+
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder");
 };
@@ -147,7 +149,6 @@ public:
 protected:
     // Random uuid will fail the golden data test, replace it to a constant string.
     std::string replaceUuid(std::string input, UUID uuid);
-    void insertDocuments(const std::vector<BSONObj>& docs);
     void createCollection(const std::vector<BSONObj>& docs,
                           boost::optional<BSONObj> indexKeyPattern,
                           CollectionOptions options = {});

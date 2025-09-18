@@ -33,6 +33,7 @@ tests = [
     "test_MongoMacroDefinitionLeaksCheck",
     "test_MongoRandCheck",
     "test_MongoRWMutexCheck",
+    "test_MongoBannedAutoGetUsageCheck",
     "test_MongoBannedNamesCheck",
     "test_MongoNoUniqueAddressCheck",
     "test_MongoStringDataConstRefCheck1",
