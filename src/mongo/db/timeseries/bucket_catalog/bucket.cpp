@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -122,7 +123,12 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
     for (const auto& elem : doc) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == metaField) {
-            // Ignore the metadata field since it will not be inserted.
+            // Only account for the meta field size once, on bucket insert, since it is stored
+            // uncompressed at the top-level of the bucket.
+            if (bucket.size == 0) {
+                sizesToBeAdded.uncommittedVerifiedSize +=
+                    kBucketMetaFieldName.size() + elem.size() - elem.fieldNameSize();
+            }
             continue;
         }
 

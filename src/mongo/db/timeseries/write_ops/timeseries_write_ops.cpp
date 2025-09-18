@@ -101,14 +101,16 @@ mongo::write_ops::InsertCommandReply performTimeseriesWrites(
         baseReply.setN(internal::performOrderedTimeseriesWrites(
             opCtx, request, &errors, &opTime, &electionId, &containsRetry));
     } else {
-        internal::performUnorderedTimeseriesWritesWithRetries(opCtx,
-                                                              request,
-                                                              0,
-                                                              request.getDocuments().size(),
-                                                              &errors,
-                                                              &opTime,
-                                                              &electionId,
-                                                              &containsRetry);
+        internal::performUnorderedTimeseriesWritesWithRetries(
+            opCtx,
+            request,
+            0,
+            request.getDocuments().size(),
+            bucket_catalog::AllowQueryBasedReopening::kAllow,
+            &errors,
+            &opTime,
+            &electionId,
+            &containsRetry);
         baseReply.setN(request.getDocuments().size() - errors.size());
     }
 

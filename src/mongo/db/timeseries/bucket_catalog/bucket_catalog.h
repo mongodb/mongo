@@ -281,6 +281,20 @@ void clear(BucketCatalog& catalog, const UUID& collectionUUID);
 void freeze(BucketCatalog&, const BucketId& bucketId);
 
 /**
+ * Increments an FTDC counter.
+ * Denotes an event where a generated time-series bucket document for insert exceeded the BSON
+ * size limit.
+ */
+void markBucketInsertTooLarge(BucketCatalog& catalog, const UUID& collectionUUID);
+
+/**
+ * Increments an FTDC counter.
+ * Denotes an event where a generated time-series bucket document for update exceeded the BSON
+ * size limit.
+ */
+void markBucketUpdateTooLarge(BucketCatalog& catalog, const UUID& collectionUUID);
+
+/**
  * Extracts the BucketId from a bucket document.
  */
 BucketId extractBucketId(BucketCatalog&,
@@ -455,6 +469,7 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           BucketStateRegistry::Era era,
                           uint64_t storageCacheSizeBytes,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                          AllowQueryBasedReopening allowQueryBasedReopening,
                           ExecutionStatsController& stats,
                           bool& bucketOpenedDueToMetadata);
 
@@ -541,6 +556,7 @@ TimeseriesWriteBatches stageInsertBatch(
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    AllowQueryBasedReopening allowQueryBasedReopening,
     BatchedInsertContext& batch);
 
 /**
@@ -565,6 +581,7 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     size_t startIndex,
     size_t numDocsToStage,
     const std::vector<size_t>& indices,
+    AllowQueryBasedReopening allowQueryBasedReopening,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
 /**

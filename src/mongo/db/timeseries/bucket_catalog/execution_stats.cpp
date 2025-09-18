@@ -265,6 +265,16 @@ void ExecutionStatsController::incNumDuplicateBucketsReopened(long long incremen
     _globalStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
 }
 
+void ExecutionStatsController::incNumBucketDocumentsTooLargeInsert(long long increment) {
+    _collectionStats->numBucketDocumentsTooLargeInsert.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketDocumentsTooLargeInsert.fetchAndAddRelaxed(increment);
+}
+
+void ExecutionStatsController::incNumBucketDocumentsTooLargeUpdate(long long increment) {
+    _collectionStats->numBucketDocumentsTooLargeUpdate.fetchAndAddRelaxed(increment);
+    _globalStats->numBucketDocumentsTooLargeUpdate.fetchAndAddRelaxed(increment);
+}
+
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder) {
     builder.appendNumber("numActiveBuckets", stats.numActiveBuckets.load());
     builder.appendNumber("numBucketInserts", stats.numBucketInserts.load());
@@ -330,6 +340,10 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketReopeningsFailedDueToWriteConflict",
                          stats.numBucketReopeningsFailedDueToWriteConflict.load());
     builder.appendNumber("numDuplicateBucketsReopened", stats.numDuplicateBucketsReopened.load());
+    builder.appendNumber("numBucketDocumentsTooLargeInsert",
+                         stats.numBucketDocumentsTooLargeInsert.load());
+    builder.appendNumber("numBucketDocumentsTooLargeUpdate",
+                         stats.numBucketDocumentsTooLargeUpdate.load());
 }
 
 void addCollectionExecutionCounters(ExecutionStatsController& stats,
@@ -386,6 +400,8 @@ void addCollectionExecutionCounters(ExecutionStatsController& stats,
     stats.incNumBucketReopeningsFailedDueToWriteConflict(
         collStats.numBucketReopeningsFailedDueToWriteConflict.load());
     stats.incNumDuplicateBucketsReopened(collStats.numDuplicateBucketsReopened.load());
+    stats.incNumBucketDocumentsTooLargeInsert(collStats.numBucketDocumentsTooLargeInsert.load());
+    stats.incNumBucketDocumentsTooLargeUpdate(collStats.numBucketDocumentsTooLargeUpdate.load());
 }
 
 void addCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats) {

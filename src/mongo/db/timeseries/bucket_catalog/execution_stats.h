@@ -85,6 +85,8 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketReopeningsFailedDueToCompressionFailure;
     AtomicWord<long long> numBucketReopeningsFailedDueToWriteConflict;
     AtomicWord<long long> numDuplicateBucketsReopened;
+    AtomicWord<long long> numBucketDocumentsTooLargeInsert;
+    AtomicWord<long long> numBucketDocumentsTooLargeUpdate;
 };
 
 class ExecutionStatsController {
@@ -134,6 +136,8 @@ public:
     void incNumBucketReopeningsFailedDueToCompressionFailure(long long increment = 1);
     void incNumBucketReopeningsFailedDueToWriteConflict(long long increment = 1);
     void incNumDuplicateBucketsReopened(long long increment = 1);
+    void incNumBucketDocumentsTooLargeInsert(long long increment = 1);
+    void incNumBucketDocumentsTooLargeUpdate(long long increment = 1);
 
 private:
     tracking::shared_ptr<ExecutionStats> _collectionStats;
