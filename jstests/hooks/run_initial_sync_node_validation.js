@@ -54,7 +54,7 @@ assert.soonRetryOnNetworkErrors(
 const excludedDBs = jsTest.options().excludedDBsFromDBHash;
 rst.checkReplicatedDataHashes(undefined, excludedDBs);
 
-await import("jstests/hooks/run_validate_collections_background.js");
+await import("jstests/hooks/run_validate_collections.js");
 
 let totalTime = Date.now() - startTime;
 print("Finished consistency checks of initial sync node in " + totalTime + " ms.");

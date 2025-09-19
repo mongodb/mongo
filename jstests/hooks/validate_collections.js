@@ -176,7 +176,10 @@ function validateCollectionsThread(newMongoWithRetry, validatorFunc, host) {
             try {
                 conn._setSecurityToken(token);
                 const validateRes = validatorFunc(conn.getDB(dbName), {
-                    full: true,
+                    // Run non-full validation because certain test fixtures run validate while
+                    // the oplog applier is still active, and full:true runs WT::verify which can
+                    // cause the oplog applier thread to encounter EBUSY errors during internal finds.
+                    full: false,
                     // TODO (SERVER-24266): Always enforce fast counts, once they are always
                     // accurate.
                     enforceFastCount: !TestData.skipEnforceFastCountOnValidate && !TestData.allowUncleanShutdowns,

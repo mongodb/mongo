@@ -1,4 +1,4 @@
-// Runner for validateCollections that runs full validation on all collections when loaded into
+// Runner for validateCollections that runs non-full validation on all collections when loaded into
 // the mongo shell.
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
