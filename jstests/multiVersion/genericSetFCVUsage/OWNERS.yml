@@ -11,7 +11,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "fcv_upgrade_removes_legacy_timeseries_bucketing_parameters_flag.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "view_definition_feature_compatibility_version.js":
     approvers:
       - 10gen/query-optimization
@@ -76,7 +76,7 @@ filters:
   - "set_feature_compatibility_version.js":
     approvers:
       - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "set_feature_compatibility_version_confirm.js":
     approvers:
       - 10gen/server-fcv
@@ -89,15 +89,15 @@ filters:
   - "set_fcv_dry_run_mode.js":
     approvers:
       - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "set_fcv_automatic_dryRun.js":
     approvers:
       - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "fcv_transition_fails_during_is_cleaning_server_metadata.js":
     approvers:
       - 10gen/server-fcv
   - "can_transition_to_originalFCV_after_failed_upgrade_or_downgrade.js":
     approvers:
       - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology

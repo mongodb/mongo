@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-ddl
   - "timeseries_index_build_failure.js":
     approvers:
       - 10gen/server-index-builds

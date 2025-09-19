@@ -49,10 +49,10 @@ filters:
       - 10gen/query-integration-observability
   - "*viewless_timeseries*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "*legacy_timeseries_no_rawdata*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "sharding_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
@@ -64,7 +64,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "*injected_catalog_metadata*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-ddl
   - "*ingress_request_rate_limiter*":
     approvers:
       - 10gen/server-workload-resilience

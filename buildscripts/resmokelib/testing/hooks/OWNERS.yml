@@ -59,4 +59,4 @@ filters:
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "drop_sessions_collection.py":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-ddl

@@ -35,4 +35,4 @@ filters:
       - 10gen/server-dbhash
   - "run_check_shard_filtering_metadata.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog

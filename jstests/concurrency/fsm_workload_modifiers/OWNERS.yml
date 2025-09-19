@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "drop_all_indexes.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "random_manual_migrations.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability

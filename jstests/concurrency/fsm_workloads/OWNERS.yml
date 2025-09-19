@@ -17,4 +17,4 @@ filters:
       - 10gen/server-collection-write-path
   - "cleanup_orphaned_with_balancer.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability

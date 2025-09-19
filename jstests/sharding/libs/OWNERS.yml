@@ -17,7 +17,7 @@ filters:
       - 10gen/query-optimization
   - "create_sharded_collection_util.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-ddl
   - "remove_shard_util.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology

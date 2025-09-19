@@ -17,4 +17,4 @@ filters:
       - 10gen/server-fcv
   - "remove_invalid_index_options.js":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-shard-catalog

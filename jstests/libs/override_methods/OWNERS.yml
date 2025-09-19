@@ -41,7 +41,7 @@ filters:
     approvers:
       - 10gen/query-execution-query-settings
       - 10gen/server-replication
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "implicit_identity_views.js":
     approvers:
       - 10gen/query-optimization

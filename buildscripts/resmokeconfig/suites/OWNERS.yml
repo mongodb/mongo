@@ -143,16 +143,16 @@ filters:
       - 10gen/query-execution-router
   - "sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "jstestfuzz_sharded_with_config_transitions*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard.yml":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "query_correctness_query_shape_hash_stability_generated_test.yml":
     approvers:
       - 10gen/query-execution-query-settings
@@ -170,7 +170,7 @@ filters:
       - 10gen/query-optimization
   - "replica_sets_transition_to_csrs_jscore_passthrough.yml":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "streams*":
     approvers:
       - 10gen/streams-engine
