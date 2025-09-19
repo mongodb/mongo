@@ -102,12 +102,6 @@ public:
         return getOrCreateFault();
     }
 
-    Fault& getFault() {
-        FaultPtr fault = FaultManager::getFault();
-        invariant(fault);
-        return *(static_cast<Fault*>(fault.get()));
-    }
-
     void progressMonitorCheckTest(std::function<void(std::string cause)> crashCb) {
         progressMonitorCheckForTests(crashCb);
     }
