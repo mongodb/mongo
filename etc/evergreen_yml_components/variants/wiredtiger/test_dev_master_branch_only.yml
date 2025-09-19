@@ -97,7 +97,7 @@ buildvariants:
       - name: sharding_auth_gen
       - name: .causally_consistent !.wo_snapshot
       - name: .change_streams !.multiversion
-      - name: .clustered_collections
+      - name: .clustered_collections !.requires_extra_system_deps
       - name: .misc_js
       - name: disk_wiredtiger
       - name: .jscore .common
