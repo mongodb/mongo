@@ -151,7 +151,8 @@ private:
     std::unique_ptr<SpillTable> _spillTable;
 
     std::unique_ptr<RecoveryUnit> _originalUnit;
-    WriteUnitOfWork::RecoveryUnitState _originalState;
+    WriteUnitOfWork::RecoveryUnitState _originalState =
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 
     std::unique_ptr<RecoveryUnit> _spillingUnit;
     WriteUnitOfWork::RecoveryUnitState _spillingState;
