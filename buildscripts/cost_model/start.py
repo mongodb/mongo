@@ -289,6 +289,23 @@ async def execute_merge_sorts(database: DatabaseInstance, collections: Sequence[
     )
 
 
+async def execute_ors(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    # Using collections of varying sizes instead of limits, as a limit would prevent subsequent
+    # OR branches from being executed if earlier branches already satisfy the limit requirement.
+    collections = [c for c in collections if c.name.startswith("or")]
+
+    requests = [
+        Query(
+            find_cmd={"filter": {"$or": [{"a": 1}, {"b": 1}]}},
+            note="OR",
+        )
+    ]
+
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests
+    )
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -310,6 +327,7 @@ async def main():
             execute_skips,
             execute_sorts,
             execute_merge_sorts,
+            execute_ors,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)

@@ -270,7 +270,7 @@ def create_merge_sort_collection_template(
             distribution=RandomDistribution.uniform(
                 RangeGenerator(DataType.INTEGER, 1, num_merge_fields + 1)
             ),
-            indexed=False,
+            indexed=True,
         )
         for field_name in field_names
     ]
@@ -360,6 +360,11 @@ merge_sort_collections = create_merge_sort_collection_template(
     cardinalities=[5, 10, 50, 75, 100, 150, 300, 400, 500, 750, 1000],
     num_merge_fields=10,
 )
+or_collections = create_merge_sort_collection_template(
+    "or",
+    cardinalities=[5, 10, 50, 75, 100, 150, 300, 400, 500, 750] + list(range(1000, 10001, 1000)),
+    num_merge_fields=2,
+)
 
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
@@ -371,6 +376,7 @@ data_generator = config.DataGeneratorConfig(
         coll_scan,
         sort_collections,
         merge_sort_collections,
+        or_collections,
         c_int_05,
         c_arr_01,
     ],

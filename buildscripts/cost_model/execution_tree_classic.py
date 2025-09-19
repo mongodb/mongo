@@ -123,7 +123,13 @@ def process_fetch(stage: dict[str, Any]) -> Node:
 
 def process_or(stage: dict[str, Any]) -> Node:
     children = [process_stage(child) for child in stage["inputStages"]]
-    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=children)
+    # The number of processed documents is not just `stage["nReturned"]`, because that does
+    # not include the potential duplicate documents which may had to be processed and dropped.
+    return Node(
+        **get_common_fields(stage),
+        n_processed=sum(child.n_returned for child in children),
+        children=children,
+    )
 
 
 def process_intersection(stage: dict[str, Any]) -> Node:
