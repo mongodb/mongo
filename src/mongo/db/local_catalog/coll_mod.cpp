@@ -718,10 +718,9 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     // We do not need write access in dry run mode.
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_IS);
     auto nss = coll.getNss();
-    const auto& collection = coll.getCollection();
 
     // Validate collMod request and look up index descriptor for checking duplicates.
-    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd, shardKeyPattern);
+    auto statusW = parseCollModRequest(opCtx, nss, *coll, cmd, shardKeyPattern);
 
     if (!statusW.isOK()) {
         return statusW.getStatus();
@@ -738,7 +737,7 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     // Throws exception if index contains duplicates.
     auto violatingRecords = scanIndexForDuplicates(opCtx, cmr.indexRequest.idx);
     if (!violatingRecords.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, collection.get(), violatingRecords));
+        uassertStatusOK(buildConvertUniqueErrorStatus(opCtx, (*coll).get(), violatingRecords));
     }
 
     return Status::OK();
@@ -755,7 +754,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_IX);
     auto nss = coll.getNss();
 
-    const auto& collection = coll.getCollection();
+    const auto& collection = *coll;
     if (!collection) {
         checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound,
@@ -836,7 +835,7 @@ Status _collModInternal(OperationContext* opCtx,
                             auto_get_collection::ViewMode::kViewsPermitted));
     }
     auto nss = acquisition ? acquisition->nss() : autoget->getNss();
-    auto& coll = acquisition ? acquisition->getCollectionPtr() : autoget->getCollection();
+    auto& coll = acquisition ? acquisition->getCollectionPtr() : *autoget.get();
     auto dbName = nss.dbName();
     Lock::CollectionLock systemViewsLock(
         opCtx, NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X);
@@ -958,7 +957,7 @@ Status _collModInternal(OperationContext* opCtx,
             if (acquisition) {
                 return CollectionWriter{opCtx, acquisition};
             } else {
-                return CollectionWriter{opCtx, *autoget};
+                return CollectionWriter{opCtx, autoget.get()};
             }
         }();
         Collection* writableColl = collWriter.getWritableCollection(opCtx);

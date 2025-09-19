@@ -719,7 +719,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithoutMetaField(
     const std::vector<size_t>& correctIndexOrder,
     stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
@@ -890,7 +890,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
                                               const std::vector<BSONObj>& batchOfMeasurements,
                                               const std::vector<size_t>& numWriteBatches) const {
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
     auto timeseriesOptions = _getTimeseriesOptions(ns);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
@@ -1021,7 +1021,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     // from the input measurements.
     ASSERT(curBatchedInsertContextsIndex.size() == numMeasurementsInWriteBatch.size());
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     auto timeseriesOptions = _getTimeseriesOptions(ns);
     std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
@@ -1811,7 +1811,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
-    ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
+    ASSERT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
 
     auto& registry = _bucketCatalog->bucketStateRegistry;
@@ -1829,25 +1829,25 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
     {
         // Missing _id field.
         BSONObj missingIdObj = compressedBucketDoc.removeField("_id");
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingIdObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, missingIdObj));
         ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
 
         // Bad _id type.
         BSONObj badIdObj = compressedBucketDoc.addFields(BSON("_id" << 123));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badIdObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badIdObj));
         ASSERT_EQ(2, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
     }
 
     {
         // Missing control field.
         BSONObj missingControlObj = compressedBucketDoc.removeField("control");
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingControlObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, missingControlObj));
         ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad control type.
         BSONObj badControlObj = compressedBucketDoc.addFields(BSON("control" << BSONArray()));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badControlObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badControlObj));
         ASSERT_EQ(2, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
@@ -1857,7 +1857,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                 "version" << BSONArray() << "min"
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z")) << "max"
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badVersionObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badVersionObj));
         ASSERT_EQ(3, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
@@ -1866,7 +1866,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
             "control" << BSON("version"
                               << 1 << "min" << 123 << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMinObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badMinObj));
         ASSERT_EQ(4, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
@@ -1876,7 +1876,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                                    << 1 << "min"
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << 123)));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMaxObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badMaxObj));
         ASSERT_EQ(5, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
@@ -1885,7 +1885,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
             "control" << BSON("version"
                               << 1 << "min" << BSON("abc" << 1) << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMinTimeObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, missingMinTimeObj));
         ASSERT_EQ(6, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
@@ -1895,7 +1895,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                                    << 1 << "min"
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << BSON("abc" << 1))));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMaxTimeObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, missingMaxTimeObj));
         ASSERT_EQ(7, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
     }
@@ -1903,20 +1903,20 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
     {
         // Missing data field.
         BSONObj missingDataObj = compressedBucketDoc.removeField("data");
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingDataObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, missingDataObj));
         ASSERT_EQ(8, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad time field in the data field.
         BSONObj badTimeFieldInDataFieldObj =
             compressedBucketDoc.addFields(BSON("data" << BSON("time" << BSON("0" << 123))));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badTimeFieldInDataFieldObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badTimeFieldInDataFieldObj));
         ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToUncompressedTimeColumn.load());
         unfreezeBucket();
 
         // Bad data type.
         BSONObj badDataObj = compressedBucketDoc.addFields(BSON("data" << 123));
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badDataObj));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, badDataObj));
         ASSERT_EQ(9, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
     }
@@ -1942,7 +1942,7 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
+    ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
@@ -1964,7 +1964,7 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedClosedBucketDoc));
+        ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedClosedBucketDoc));
         auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
         ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedClosed.load());
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
@@ -1988,7 +1988,7 @@ TEST_F(BucketCatalogTest, ReopenNotClosedBuckets) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
-        ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+        ASSERT_OK(_reopenBucket(*autoColl, compressedOpenBucketDoc));
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(std::holds_alternative<BucketState>(bucketStates.begin()->second));
@@ -2007,7 +2007,7 @@ TEST_F(BucketCatalogTest, ReopenNotClosedBuckets) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
-        ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+        ASSERT_OK(_reopenBucket(*autoColl, compressedOpenBucketDoc));
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(std::holds_alternative<BucketState>(bucketStates.begin()->second));
@@ -2029,7 +2029,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = getMemoryUsage(*_bucketCatalog);
-    Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);
+    Status status = _reopenBucket(*autoColl, compressedBucketDoc);
     auto memUsageAfter = getMemoryUsage(*_bucketCatalog);
     ASSERT_OK(status);
     ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumBucketsReopened));
@@ -2075,7 +2075,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = getMemoryUsage(*_bucketCatalog);
-    Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);
+    Status status = _reopenBucket(*autoColl, compressedBucketDoc);
     auto memUsageAfter = getMemoryUsage(*_bucketCatalog);
     ASSERT_OK(status);
     ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumBucketsReopened));
@@ -2114,26 +2114,26 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
-    ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedBucketDoc));
+    ASSERT_OK(_testRehydrateBucket(*autoColl, compressedBucketDoc));
 
     {
         // Missing _id field.
         BSONObj missingIdObj = compressedBucketDoc.removeField("_id");
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingIdObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, missingIdObj));
 
         // Bad _id type.
         BSONObj badIdObj = compressedBucketDoc.addFields(BSON("_id" << 123));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badIdObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badIdObj));
     }
 
     {
         // Missing control field.
         BSONObj missingControlObj = compressedBucketDoc.removeField("control");
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingControlObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, missingControlObj));
 
         // Bad control type.
         BSONObj badControlObj = compressedBucketDoc.addFields(BSON("control" << BSONArray()));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badControlObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badControlObj));
 
         // Bad control.version type.
         BSONObj badVersionObj = compressedBucketDoc.addFields(BSON(
@@ -2141,14 +2141,14 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
                 "version" << BSONArray() << "min"
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z")) << "max"
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badVersionObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badVersionObj));
 
         // Bad control.min type.
         BSONObj badMinObj = compressedBucketDoc.addFields(BSON(
             "control" << BSON("version"
                               << 1 << "min" << 123 << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badMinObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badMinObj));
 
         // Bad control.max type.
         BSONObj badMaxObj = compressedBucketDoc.addFields(
@@ -2156,14 +2156,14 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
                                    << 1 << "min"
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << 123)));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badMaxObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badMaxObj));
 
         // Missing control.min.time.
         BSONObj missingMinTimeObj = compressedBucketDoc.addFields(BSON(
             "control" << BSON("version"
                               << 1 << "min" << BSON("abc" << 1) << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingMinTimeObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, missingMinTimeObj));
 
         // Missing control.max.time.
         BSONObj missingMaxTimeObj = compressedBucketDoc.addFields(
@@ -2171,22 +2171,22 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
                                    << 1 << "min"
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << BSON("abc" << 1))));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingMaxTimeObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, missingMaxTimeObj));
     }
 
     {
         // Missing data field.
         BSONObj missingDataObj = compressedBucketDoc.removeField("data");
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingDataObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, missingDataObj));
 
         // Bad time field in the data field.
         BSONObj badTimeFieldInDataFieldObj =
             compressedBucketDoc.addFields(BSON("data" << BSON("time" << BSON("0" << 123))));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badTimeFieldInDataFieldObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badTimeFieldInDataFieldObj));
 
         // Bad data type.
         BSONObj badDataObj = compressedBucketDoc.addFields(BSON("data" << 123));
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badDataObj));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, badDataObj));
     }
 }
 
@@ -2210,7 +2210,7 @@ TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedBucketDoc));
+    ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
@@ -2232,7 +2232,7 @@ TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
-        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedClosedBucketDoc));
+        ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, compressedClosedBucketDoc));
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(isBucketStateFrozen(bucketStates.begin()->second));
@@ -2255,7 +2255,7 @@ TEST_F(BucketCatalogTest, RehydrateNotClosedBuckets) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
-        ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+        ASSERT_OK(_testRehydrateBucket(*autoColl, compressedOpenBucketDoc));
     }
 
     {
@@ -2270,7 +2270,7 @@ TEST_F(BucketCatalogTest, RehydrateNotClosedBuckets) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
-        ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+        ASSERT_OK(_testRehydrateBucket(*autoColl, compressedOpenBucketDoc));
     }
 }
 
@@ -2288,11 +2288,11 @@ TEST_F(BucketCatalogTest, ReopenBucketWithIncorrectEra) {
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
     _bucketCatalog->bucketStateRegistry.currentEra = 1ul;
-    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc, 0ul));
+    ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc, 0ul));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToEraMismatch.load());
 
-    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc, boost::none, 0ul));
+    ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc, boost::none, 0ul));
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToWriteConflict.load());
 }
 
@@ -2317,8 +2317,8 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToHashCollision) {
                                                incorrectMetadata.firstElement(),
                                                StringData("incorrect field")}};
 
-    ASSERT_NOT_OK(_reopenBucket(
-        autoColl.getCollection(), compressedBucketDoc, boost::none, boost::none, invalidKey));
+    ASSERT_NOT_OK(
+        _reopenBucket(*autoColl, compressedBucketDoc, boost::none, boost::none, invalidKey));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToHashCollision.load());
 }
@@ -2335,7 +2335,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMarkedFrozen) {
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
-    ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
+    ASSERT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
 
     auto& registry = _bucketCatalog->bucketStateRegistry;
@@ -2343,7 +2343,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMarkedFrozen) {
     const auto bucketId = registry.bucketStates.begin()->first;
     registry.bucketStates[bucketId] = {BucketState::kFrozen};
 
-    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc.copy()));
+    ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc.copy()));
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedFrozen.load());
 }
 
@@ -2365,7 +2365,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
         return {Collection::SchemaValidationResult::kPass, Status::OK()};
     };
     ASSERT_NOT_OK(
-        _reopenBucket(autoColl.getCollection(),
+        _reopenBucket(*autoColl,
                       compressedBucketDoc,
                       boost::none,
                       boost::none,
@@ -2387,7 +2387,7 @@ DEATH_TEST_F(BucketCatalogTest, ReopeningFailedDueToCompression, "invariant") {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
-    std::ignore = _reopenBucket(autoColl.getCollection(), bucketDoc);
+    std::ignore = _reopenBucket(*autoColl, bucketDoc);
 }
 
 TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressure) {
@@ -3405,7 +3405,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
 
 TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
     std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
@@ -3456,7 +3456,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
 
 TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
     std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
@@ -5367,7 +5367,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
@@ -5407,7 +5407,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
@@ -5450,7 +5450,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
@@ -5491,7 +5491,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
@@ -5526,7 +5526,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> userMeasurementsBatch{
         BSON(_metaField << _metaValue << "x" << 2),  // Malformed measurement, missing time field
@@ -5557,7 +5557,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> userMeasurementsBatch{
         BSON(_metaField << _metaValue << "x" << 2),  // Malformed measurement, missing time field
@@ -5597,7 +5597,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(2)),
@@ -5643,7 +5643,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(2)),
@@ -5692,7 +5692,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(2)),
@@ -5741,7 +5741,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(2)),

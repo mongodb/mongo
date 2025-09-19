@@ -142,7 +142,7 @@ SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const Collectio
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -175,7 +175,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -229,7 +229,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
 TEST_F(ThrottleCursorTestFastClock, TestSeekableRecordThrottleCursorOnLargeDocs1MBps) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf2MBForDataThrottle");
@@ -260,7 +260,7 @@ TEST_F(ThrottleCursorTestFastClock, TestSeekableRecordThrottleCursorOnLargeDocs1
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf2MBForDataThrottle");
@@ -293,7 +293,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -319,7 +319,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -370,7 +370,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -411,7 +411,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");

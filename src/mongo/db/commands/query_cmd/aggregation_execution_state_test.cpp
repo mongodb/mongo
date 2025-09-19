@@ -99,7 +99,7 @@ protected:
 
         const auto uuid = [&] {
             AutoGetCollection autoColl(opCtx, NamespaceStringOrUUID(nss), MODE_IX);
-            return autoColl.getCollection()->uuid();
+            return autoColl->uuid();
         }();
 
         const auto chunk = ChunkType(uuid,

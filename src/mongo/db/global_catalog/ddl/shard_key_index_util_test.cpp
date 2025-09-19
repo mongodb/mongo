@@ -76,7 +76,7 @@ public:
     }
 
     const CollectionPtr& coll() const {
-        return (*_coll).getCollection();
+        return *_coll.get();
     }
 
     OperationContext* opCtx() {

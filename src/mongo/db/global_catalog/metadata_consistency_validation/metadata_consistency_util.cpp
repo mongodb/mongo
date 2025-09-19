@@ -229,7 +229,7 @@ void _checkBucketCollectionInconsistencies(
 
                 return std::make_pair(false, currentViewOptions);
             }
-        } else if (ac.getCollection()) {
+        } else if (*ac) {
             // A collection is present rather than a view, return the current options for debugging
             return std::make_pair(false, ac->getCollectionOptions().toBSON());
         }

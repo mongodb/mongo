@@ -252,7 +252,7 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod =
         coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
@@ -290,7 +290,7 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
     ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod =
         coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
@@ -322,7 +322,7 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod =
         coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();

@@ -331,7 +331,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
 
     auto oldDoc = BSON("_id" << 1 << "a" << 1);
     {
@@ -387,7 +387,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
 
     auto oldDoc = BSON("_id" << 1 << "a" << 1 << "b"
                              << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
@@ -444,7 +444,7 @@ TEST_F(CollectionTest, SetIndexIsMultikey) {
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
     {
@@ -466,7 +466,7 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
 
@@ -491,7 +491,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
     {
@@ -569,7 +569,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
 
@@ -595,7 +595,7 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
 
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = autoColl.getCollection();
+    const auto& coll = *autoColl;
     ASSERT(coll);
     ASSERT(coll->getTimeseriesOptions());
 
@@ -796,7 +796,7 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     ASSERT_EQUALS(0, coll->numRecords(operationContext()));
 
@@ -848,7 +848,7 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     ASSERT_EQUALS(0, coll->numRecords(operationContext()));
 
@@ -898,7 +898,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
@@ -1015,7 +1015,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
@@ -1192,7 +1192,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
     RecordStore* rs = coll->getRecordStore();
 
     // First insert 3 documents.
@@ -1239,7 +1239,7 @@ TEST_F(CollectionTest, BoundedSeek) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, {}));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
@@ -1327,7 +1327,7 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
     RecordStore* rs = coll->getRecordStore();
 
     RecordId recordId;
@@ -1371,11 +1371,10 @@ TEST_F(CatalogTestFixture, TruncateRangeFailOnNonClusteredCollection) {
 
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
 
     // Should fail since collection is not clustered.
     ASSERT_THROWS_CODE(
-        collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1),
+        collection_internal::truncateRange(opCtx, *autoColl, minRecordId, maxRecordId, 1, 1),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -1391,7 +1390,7 @@ TEST_F(CatalogTestFixture, TruncateRangeOnClusteredCollection) {
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
     // Acquire exclusive access for index creation later.
     AutoGetCollection autoColl(opCtx, nss, MODE_X);
-    const CollectionPtr& coll = autoColl.getCollection();
+    const CollectionPtr& coll = *autoColl;
 
     // Should not throw on a clustered collection with no indexes.
     {
@@ -1434,11 +1433,10 @@ TEST_F(CatalogTestFixture, TruncateRangeOnPreimagesEnabledCollection) {
 
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
 
     // Should fail since change stream preimages is enabled.
     ASSERT_THROWS_CODE(
-        collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1),
+        collection_internal::truncateRange(opCtx, *autoColl, minRecordId, maxRecordId, 1, 1),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -1478,8 +1476,8 @@ protected:
 
         ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        const CollectionPtr& coll = autoColl.getCollection();
-        auto rs = coll->getRecordStore();
+        const CollectionPtr& coll = *autoColl;
+        auto rs = autoColl->getRecordStore();
 
         std::vector<RecordId> recordIds = sortedRecordIds;
         ASSERT_EQ(recordIds.size(), numToInsert);

@@ -478,7 +478,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                bucketsColl.getCollection(),
+                                *bucketsColl,
                                 recordId,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{op},
@@ -542,7 +542,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                bucketsColl.getCollection(),
+                                *bucketsColl,
                                 recordId,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{op},
@@ -617,7 +617,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                bucketsColl.getCollection(),
+                                *bucketsColl,
                                 recordId1,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{deleteOp},
@@ -720,7 +720,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                bucketsColl.getCollection(),
+                                *bucketsColl,
                                 recordId1,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{updateOp},
@@ -787,7 +787,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     {
         ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(
             _opCtx,
-            bucketsColl.getCollection(),
+            *bucketsColl,
             recordId,
             {::mongo::fromjson(R"({"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3})")},
             /*fromMigrate=*/false,
@@ -840,7 +840,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     // Deletes the last measurement from the bucket.
     {
         ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(_opCtx,
-                                                           bucketsColl.getCollection(),
+                                                           *bucketsColl,
                                                            recordId,
                                                            {},
                                                            /*fromMigrate=*/false,
@@ -889,7 +889,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
             1, getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes};
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            bucketsColl.getCollection(),
+            *bucketsColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})"),
@@ -960,7 +960,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
 
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            bucketsColl.getCollection(),
+            *bucketsColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})")},
@@ -979,7 +979,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
 
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            bucketsColl.getCollection(),
+            *bucketsColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":20,"b":20})")},
@@ -997,7 +997,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
 
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            bucketsColl.getCollection(),
+            *bucketsColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(

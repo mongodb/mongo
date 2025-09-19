@@ -648,7 +648,7 @@ public:
         createTestCollection(operationContext(), kTestNss);
 
         AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-        _uuid = autoColl.getCollection()->uuid();
+        _uuid = autoColl->uuid();
 
         auto opCtx = operationContext();
         RangeDeleterService::get(opCtx)->onStartup(opCtx);

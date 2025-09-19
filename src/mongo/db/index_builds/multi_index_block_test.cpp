@@ -365,10 +365,8 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(operationContext(),
-                                                      autoColl.getCollection(),
-                                                      InsertStatement(BSON("_id" << 0 << "a" << 1)),
-                                                      nullptr));
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), *autoColl, InsertStatement(BSON("_id" << 0 << "a" << 1)), nullptr));
         wuow.commit();
     }
 

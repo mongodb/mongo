@@ -320,7 +320,7 @@ template <typename AutoGetCollectionType>
 StatusWith<const CollectionPtr*> getCollection(const AutoGetCollectionType& autoGetCollection,
                                                const NamespaceStringOrUUID& nsOrUUID,
                                                const std::string& message) {
-    const auto& collection = autoGetCollection.getCollection();
+    const auto& collection = *autoGetCollection;
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection [" << nsOrUUID.toStringForErrorMsg() << "] not found. "
@@ -622,8 +622,10 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             return ex.toStatus();
         }
-        auto collectionResult = getCollection(
-            *autoColl, nsOrUUID, "The collection must exist before setting an index to multikey.");
+        auto collectionResult =
+            getCollection(autoColl.get(),
+                          nsOrUUID,
+                          "The collection must exist before setting an index to multikey.");
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }

@@ -74,7 +74,7 @@ public:
     StatusWith<const IndexCatalogEntry*> createIndex(BSONObj spec) {
         // Build the specified index on the collection.
         WriteUnitOfWork wuow(opCtx());
-        CollectionWriter writer{opCtx(), *_coll};
+        CollectionWriter writer{opCtx(), _coll.get()};
 
         // Get the index catalog associated with the test collection.
         auto* indexCatalog = writer.getWritableCollection(opCtx())->getIndexCatalog();
@@ -103,7 +103,7 @@ public:
     }
 
     const CollectionPtr& coll() const {
-        return (*_coll).getCollection();
+        return *_coll.get();
     }
 
     OperationContext* opCtx() {

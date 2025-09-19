@@ -351,7 +351,7 @@ void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationCont
 
     AutoGetCollection autoTruncateColl(opCtx, _oplogTruncateAfterPointNss, MODE_IX);
 
-    fassert(40512, _setOplogTruncateAfterPoint(autoTruncateColl.getCollection(), opCtx, timestamp));
+    fassert(40512, _setOplogTruncateAfterPoint(*autoTruncateColl, opCtx, timestamp));
 
     if (timestamp != Timestamp::min()) {
         // Update the oplog pin so we don't delete oplog history past the oplogTruncateAfterPoint.
@@ -481,8 +481,7 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     } else if (truncateTimestamp != Timestamp(StorageEngine::kMinimumTimestamp)) {
         // Throw write interruption errors up to the caller so that durability attempts can be
         // retried.
-        uassertStatusOK(_setOplogTruncateAfterPoint(
-            autoTruncateColl.getCollection(), opCtx, truncateTimestamp));
+        uassertStatusOK(_setOplogTruncateAfterPoint(*autoTruncateColl, opCtx, truncateTimestamp));
     } else {
         // The all_durable timestamp has not yet been set: there have been no oplog writes since
         // this server instance started up. In this case, we will return the current

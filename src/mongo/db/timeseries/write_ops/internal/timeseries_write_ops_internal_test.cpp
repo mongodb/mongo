@@ -161,8 +161,7 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
 TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    AutoGetCollection autoCollBucket(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(3)),
@@ -182,7 +181,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl.get(),
+                                                  (*autoCollBucket).get(),
                                                   tsOptions,
                                                   _opCtx->getOpID(),
                                                   _getCollator(_nsNoMeta),
@@ -218,7 +217,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(2)),
@@ -275,7 +274,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(2)),
@@ -327,7 +326,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(2)),

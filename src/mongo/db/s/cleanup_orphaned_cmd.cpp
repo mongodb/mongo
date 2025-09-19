@@ -87,14 +87,14 @@ Status cleanupOrphanedData(OperationContext* opCtx,
     boost::optional<UUID> collectionUuid;
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        if (!autoColl.getCollection()) {
+        if (!*autoColl) {
             LOGV2(4416000,
                   "cleanupOrphaned skipping waiting for orphaned data cleanup because "
                   "collection does not exist",
                   logAttrs(ns));
             return Status::OK();
         }
-        collectionUuid.emplace(autoColl.getCollection()->uuid());
+        collectionUuid.emplace(autoColl->uuid());
 
         const auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns);

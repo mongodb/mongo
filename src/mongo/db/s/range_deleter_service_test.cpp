@@ -85,13 +85,13 @@ void RangeDeleterServiceTest::setUp() {
 
     {
         AutoGetCollection autoColl(opCtx, nsCollA, MODE_X);
-        uuidCollA = autoColl.getCollection()->uuid();
+        uuidCollA = autoColl->uuid();
         nssWithUuid[uuidCollA] = nsCollA;
         _setFilteringMetadataByUUID(opCtx, uuidCollA);
     }
     {
         AutoGetCollection autoColl(opCtx, nsCollB, MODE_X);
-        uuidCollB = autoColl.getCollection()->uuid();
+        uuidCollB = autoColl->uuid();
         nssWithUuid[uuidCollB] = nsCollB;
         _setFilteringMetadataByUUID(opCtx, uuidCollB);
     }

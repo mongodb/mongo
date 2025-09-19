@@ -238,20 +238,20 @@ public:
                       const auto_get_collection::Options& options = {});
 
     AutoGetCollection(AutoGetCollection&&) = default;
-
+    AutoGetCollection() = default;
     explicit operator bool() const {
-        return static_cast<bool>(getCollection());
+        return static_cast<bool>(_coll);
     }
 
     /**
      * AutoGetCollection can be used as a pointer with the -> operator.
      */
     const Collection* operator->() const {
-        return getCollection().get();
+        return _coll.get();
     }
 
     const CollectionPtr& operator*() const {
-        return getCollection();
+        return _coll;
     }
 
     /**
@@ -266,15 +266,6 @@ public:
      */
     Database* ensureDbExists(OperationContext* opCtx) {
         return _autoDb.ensureDbExists(opCtx);
-    }
-
-    /**
-     * Returns nullptr if the collection didn't exist.
-     *
-     * Deprecated in favor of the new ->(), *() and bool() accessors above!
-     */
-    const CollectionPtr& getCollection() const {
-        return _coll;
     }
 
     /**

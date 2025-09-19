@@ -1549,7 +1549,6 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
     reset(opCtx, clusteredNss);
 
     AutoGetCollection autoColl(opCtx, clusteredNss, MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
 
     opObserverRegistry()->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
@@ -1562,12 +1561,14 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
         {
             RAIIServerParameterControllerForTest featureFlagScope{
                 "featureFlagUseReplicatedTruncatesForDeletions", true};
-            collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1);
+            collection_internal::truncateRange(
+                opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1);
         }
         {
             RAIIServerParameterControllerForTest featureFlagScope{
                 "featureFlagUseReplicatedTruncatesForDeletions", false};
-            collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1);
+            collection_internal::truncateRange(
+                opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1);
         }
         wuow.commit();
         // No oplog entry generated.
@@ -1579,10 +1580,10 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
         RAIIServerParameterControllerForTest featureFlagScope{
             "featureFlagUseReplicatedTruncatesForDeletions", false};
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_THROWS_CODE(
-            collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1),
-            DBException,
-            ErrorCodes::IllegalOperation);
+        ASSERT_THROWS_CODE(collection_internal::truncateRange(
+                               opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1),
+                           DBException,
+                           ErrorCodes::IllegalOperation);
         wuow.commit();
         // No oplog entry generated.
         getNOplogEntries(opCtx, 0);
@@ -1592,7 +1593,7 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
         RAIIServerParameterControllerForTest featureFlagScope{
             "featureFlagUseReplicatedTruncatesForDeletions", true};
         WriteUnitOfWork wuow(opCtx);
-        collection_internal::truncateRange(opCtx, coll, RecordId("a"), RecordId("b"), 1, 1);
+        collection_internal::truncateRange(opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1);
         wuow.commit();
     }
 
@@ -1602,11 +1603,11 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
     ASSERT(oplogEntry.isCommand());
     ASSERT_EQ(oplogEntry.getNss().db_forTest(), clusteredNss.db_forTest());
     ASSERT_EQ(oplogEntry.getNss().coll(), "$cmd");
-    ASSERT_EQ(oplogEntry.getUuid(), coll->uuid());
+    ASSERT_EQ(oplogEntry.getUuid(), autoColl->uuid());
 
     const auto& o = oplogEntry.getObject();
     TruncateRangeOplogEntry objectEntry(
-        std::string(coll->ns().coll()), RecordId("a"), RecordId("b"), 1, 1);
+        std::string(autoColl->ns().coll()), RecordId("a"), RecordId("b"), 1, 1);
     ASSERT_BSONOBJ_EQ(o, objectEntry.toBSON());
 }
 

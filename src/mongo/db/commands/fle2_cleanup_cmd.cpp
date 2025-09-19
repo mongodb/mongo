@@ -280,7 +280,7 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
                 str::stream() << "Renamed encrypted compaction collection "
                               << namespaces.ecocRenameNss.toStringForErrorMsg()
                               << " no longer exists prior to cleanup",
-                ecocCompact.getCollection());
+                *ecocCompact);
 
         auto pqMemLimit =
             ServerParameterSet::getClusterParameterSet()

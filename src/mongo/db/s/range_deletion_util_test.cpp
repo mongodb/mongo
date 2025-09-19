@@ -104,7 +104,7 @@ public:
         createTestCollection(_opCtx, kNss);
 
         AutoGetCollection autoColl(_opCtx, kNss, MODE_IX);
-        _uuid = autoColl.getCollection()->uuid();
+        _uuid = autoColl->uuid();
     }
 
     void tearDown() override {

@@ -124,7 +124,7 @@ public:
     }
 
     void dropCollection(void) {
-        if (AutoGetCollection(_opCtx.get(), kTestNamespace, MODE_IS).getCollection()) {
+        if (*AutoGetCollection(_opCtx.get(), kTestNamespace, MODE_IS)) {
             _client.dropCollection(kTestNamespace);
         }
     }
@@ -210,7 +210,7 @@ public:
             auto writer = gw.get();
             writer->insertDocument(getObj());
         }
-        ASSERT_TRUE(AutoGetCollection(_opCtx.get(), kTestNamespace, MODE_IS).getCollection());
+        ASSERT_TRUE(*AutoGetCollection(_opCtx.get(), kTestNamespace, MODE_IS));
         ASSERT_TRUE(readCollection().size() == 1);
     }
 };

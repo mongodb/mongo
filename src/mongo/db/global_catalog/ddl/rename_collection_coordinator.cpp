@@ -743,7 +743,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         uassert(ErrorCodes::NamespaceNotFound,
                                 str::stream() << "Collection " << fromNss.toStringForErrorMsg()
                                               << " doesn't exist.",
-                                coll.getCollection());
+                                *coll);
 
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename an encrypted collection",

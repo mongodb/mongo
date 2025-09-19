@@ -315,7 +315,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                 *autoColl,
                                                 *scopedCsr);
 
-        UUID collectionUUID = autoColl.getCollection()->uuid();
+        UUID collectionUUID = autoColl->uuid();
 
         // Atomically (still under the CSR lock held above) check whether migrations are allowed and
         // register the MigrationSourceManager on the CSR. This ensures that interruption due to the

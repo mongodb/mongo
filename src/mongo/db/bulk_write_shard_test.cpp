@@ -150,7 +150,7 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
 
     const auto uuid = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        return autoColl.getCollection()->uuid();
+        return autoColl->uuid();
     }();
 
     const std::string shardKey("skey");

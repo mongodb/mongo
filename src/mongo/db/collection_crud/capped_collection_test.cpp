@@ -131,12 +131,11 @@ void assertSwError(StatusWith<T> sw, ErrorCodes::Error code) {
 
 Status insertBSON(OperationContext* opCtx, const NamespaceString& nss, RecordId id) {
     AutoGetCollection ac(opCtx, nss, MODE_IX);
-    const CollectionPtr& coll = ac.getCollection();
     BSONObj obj = BSON("a" << 1);
     WriteUnitOfWork wuow(opCtx);
 
     auto status =
-        collection_internal::insertDocument(opCtx, coll, InsertStatement(obj, id), nullptr);
+        collection_internal::insertDocument(opCtx, *ac, InsertStatement(obj, id), nullptr);
     if (!status.isOK()) {
         return status;
     }
@@ -181,7 +180,7 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
         auto [c1, t1] = makeClientAndCtx("t1");
         WriteUnitOfWork wuow(t1.get());
         AutoGetCollection ac(t1.get(), nss, MODE_IX);
-        const CollectionPtr& oplog = ac.getCollection();
+        const CollectionPtr& oplog = *ac;
         ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 2)));
         ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 4)));
         ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 6)));

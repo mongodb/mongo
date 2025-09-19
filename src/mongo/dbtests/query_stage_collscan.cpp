@@ -208,7 +208,7 @@ public:
                 return;
 
             AutoGetCollection autoColl(_opCtx, _nss, MODE_X);
-            if (!autoColl.getCollection())
+            if (!*autoColl)
                 return;
 
             WriteUnitOfWork wuow(_opCtx);

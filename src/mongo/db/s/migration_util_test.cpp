@@ -60,9 +60,9 @@ using MigrationUtilsTest = ShardServerTestFixture;
 UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
-    ASSERT(autoColl.getCollection());
+    ASSERT(*autoColl);
 
-    return autoColl.getCollection()->uuid();
+    return autoColl->uuid();
 }
 
 template <typename ShardKey>

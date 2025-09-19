@@ -113,7 +113,7 @@ protected:
             preImageInsertStatements.push_back(InsertStatement{preImage.toBSON()});
         }
 
-        auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
+        auto& changeStreamPreImagesCollection = *preImagesCollectionRaii;
         ASSERT_OK(collection_internal::insertDocuments(opCtx,
                                                        changeStreamPreImagesCollection,
                                                        preImageInsertStatements.begin(),

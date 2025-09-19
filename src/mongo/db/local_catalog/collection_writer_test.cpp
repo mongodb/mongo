@@ -321,7 +321,7 @@ void runAutoGetOplogFastPathObjectStabilityConcurrentDDL(ServiceContext* svcCtx,
                 opCtx.get(), "dummy oplog DDL", NamespaceString::kRsOplogNamespace, [&] {
                     AutoGetCollection autoColl(
                         opCtx.get(), NamespaceString::kRsOplogNamespace, MODE_X);
-                    ASSERT(autoColl.getCollection());
+                    ASSERT(*autoColl);
                     WriteUnitOfWork wunit(opCtx.get());
                     CollectionWriter writer{opCtx.get(), autoColl};
 

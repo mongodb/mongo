@@ -687,8 +687,7 @@ public:
         // getAllIdents() actually looks in the RecordStore for a list of all idents, and is thus
         // versioned by timestamp. We can expect a namespace to have a consistent ident across
         // timestamps, provided the collection does not get renamed.
-        auto expectedIdent =
-            MDBCatalog::get(_opCtx)->getEntry(autoColl.getCollection()->getCatalogId()).ident;
+        auto expectedIdent = MDBCatalog::get(_opCtx)->getEntry(autoColl->getCatalogId()).ident;
         auto idents = MDBCatalog::get(_opCtx)->getAllIdents(_opCtx);
         auto found = std::find(idents.begin(), idents.end(), expectedIdent);
 
@@ -2039,7 +2038,7 @@ public:
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
         CollectionWriter coll(_opCtx, autoColl);
 
-        RecordId catalogId = autoColl.getCollection()->getCatalogId();
+        RecordId catalogId = autoColl->getCatalogId();
 
         const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
         {
@@ -2049,7 +2048,7 @@ public:
                                            insertTimestamp.asTimestamp(),
                                            _presentTerm));
             wuow.commit();
-            ASSERT_EQ(1, itCount(autoColl.getCollection()));
+            ASSERT_EQ(1, itCount(*autoColl));
         }
 
         const std::string indexIdent = "index-ident";
@@ -2078,11 +2077,11 @@ public:
                                                           << "key" << BSON("a" << 1)),
                                                  indexIdent);
             indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
-            auto swIndexInfoObj = indexer.init(
-                _opCtx,
-                coll,
-                {indexBuildInfo},
-                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
+            auto swIndexInfoObj =
+                indexer.init(_opCtx,
+                             coll,
+                             {indexBuildInfo},
+                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, *autoColl));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2092,7 +2091,7 @@ public:
         // Inserting all the documents has the side-effect of setting internal state on the index
         // builder that the index is multikey.
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, nss));
-        ASSERT_OK(indexer.checkConstraints(_opCtx, autoColl.getCollection()));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, *autoColl));
 
         {
             WriteUnitOfWork wuow(_opCtx);

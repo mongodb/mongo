@@ -238,7 +238,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -251,7 +251,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPattern, {{0U}, {0U}});
+    assertMultikeyPaths(*collection, keyPattern, {{0U}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
@@ -270,8 +270,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(
-        collection.getCollection(), keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -297,7 +296,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         }
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
@@ -317,8 +316,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(
-        collection.getCollection(), keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -350,7 +348,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
         }
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
@@ -372,7 +370,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -388,7 +386,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         }
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
@@ -417,8 +415,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection.getCollection(), keyPatternAB, {{0U}, MultikeyComponents{}});
-    assertMultikeyPaths(collection.getCollection(), keyPatternAC, {{0U}, MultikeyComponents{}});
+    assertMultikeyPaths(*collection, keyPatternAB, {{0U}, MultikeyComponents{}});
+    assertMultikeyPaths(*collection, keyPatternAC, {{0U}, MultikeyComponents{}});
 }
 
 }  // namespace

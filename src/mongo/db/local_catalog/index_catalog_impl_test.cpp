@@ -81,13 +81,13 @@ TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
         // We have a spec that's fixed according to what listIndexes would output and the on-disk
         // one. These two are different, so we expect them to cause a conflict and mismatch.
         auto indexes = autoColl->getIndexCatalog()->removeExistingIndexesNoChecks(
-            operationContext(), autoColl.getCollection(), {fixedSpec});
+            operationContext(), *autoColl, {fixedSpec});
         ASSERT_FALSE(indexes.empty());
         // However, if we specify to the index catalog that we must repair the spec before
         // comparison with the given allowed fields then we should have no conflict.
         indexes = autoColl->getIndexCatalog()->removeExistingIndexesNoChecks(
             operationContext(),
-            autoColl.getCollection(),
+            *autoColl,
             {fixedSpec},
             IndexCatalog::RemoveExistingIndexesFlags{true, &kAllowedListIndexesFieldNames});
         ASSERT_TRUE(indexes.empty());

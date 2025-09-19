@@ -1527,7 +1527,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         }
 
         // At this point we must continue aborting the index build.
-        _completeExternalAbort(opCtx, replState, **indexBuildEntryColl, signalAction);
+        _completeExternalAbort(opCtx, replState, *indexBuildEntryColl.get(), signalAction);
         break;
     }
 
@@ -1839,7 +1839,7 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
             uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
                 opCtx,
                 replState->buildUUID,
-                autoColl.getCollection(),
+                *autoColl,
                 IndexBuildsManager::RetrySkippedRecordMode::kKeyGeneration));
         } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
             throw;

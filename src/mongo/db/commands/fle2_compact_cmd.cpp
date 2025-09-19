@@ -223,7 +223,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                 str::stream() << "Renamed encrypted compaction collection "
                               << namespaces.ecocRenameNss.toStringForErrorMsg()
                               << " no longer exists prior to compaction",
-                tempEcocColl.getCollection());
+                *tempEcocColl);
 
         processFLECompactV2(opCtx,
                             request,

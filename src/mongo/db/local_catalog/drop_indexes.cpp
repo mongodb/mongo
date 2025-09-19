@@ -618,7 +618,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                             collectionUUID.toString()),
                 *collection);
 
-        const auto& collPtr = collection->getCollection();
+        const auto& collPtr = *collection.get();
         uassertStatusOK(checkReplState(opCtx, collPtr));
 
         // Check to see if a new index build was started that the caller requested to be aborted.

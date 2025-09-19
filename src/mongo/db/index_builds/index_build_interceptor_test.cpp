@@ -60,7 +60,7 @@ class IndexBuilderInterceptorTest : public CatalogTestFixture {
 protected:
     const IndexCatalogEntry* createIndex(BSONObj spec) {
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), *_coll};
+        CollectionWriter writer{operationContext(), _coll.get()};
 
         auto* indexCatalog = writer.getWritableCollection(operationContext())->getIndexCatalog();
         uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(
@@ -172,8 +172,7 @@ protected:
     }
 
     const IndexDescriptor* getIndexDescriptor(const std::string& indexName) {
-        return _coll->getCollection()->getIndexCatalog()->findIndexByName(operationContext(),
-                                                                          indexName);
+        return _coll.get()->getIndexCatalog()->findIndexByName(operationContext(), indexName);
     }
 
     void setUp() override {
@@ -232,8 +231,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsIntRidTra
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(
-        operationContext(), _coll->getCollection(), recordId);
+    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -253,8 +251,7 @@ TEST_F(IndexBuilderInterceptorTest,
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(
-        operationContext(), _coll->getCollection(), recordId);
+    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -270,8 +267,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsTrackerTa
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(
-        operationContext(), _coll->getCollection(), recordId);
+    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -291,8 +287,7 @@ TEST_F(IndexBuilderInterceptorTest,
     recordId.serializeToken("recordId", &builder);
 
     WriteUnitOfWork wuow(operationContext());
-    interceptor->getSkippedRecordTracker()->record(
-        operationContext(), _coll->getCollection(), recordId);
+    interceptor->getSkippedRecordTracker()->record(operationContext(), *_coll.get(), recordId);
     wuow.commit();
 
     auto skippedRecordsTrackerTable = getSkippedRecordsTrackerTableContents(std::move(interceptor));
@@ -311,7 +306,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTable) {
 
     WriteUnitOfWork wuow(operationContext());
     ASSERT_OK(interceptor->recordDuplicateKey(
-        operationContext(), _coll->getCollection(), desc->getEntry(), keyString));
+        operationContext(), *_coll.get(), desc->getEntry(), keyString));
     wuow.commit();
 
     key_string::View keyStringView(keyString);
@@ -335,7 +330,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimar
 
     WriteUnitOfWork wuow(operationContext());
     ASSERT_OK(interceptor->recordDuplicateKey(
-        operationContext(), _coll->getCollection(), desc->getEntry(), keyString));
+        operationContext(), *_coll.get(), desc->getEntry(), keyString));
     wuow.commit();
 
     key_string::View keyStringView(keyString);

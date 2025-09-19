@@ -180,7 +180,7 @@ TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
     auto opCtx = operationContext();
     const AutoGetCollection coll(opCtx, kNss, MODE_IX);
     // The test fixture setUp() will make the collection a clustered collection.
-    const auto& collection = coll.getCollection();
+    const auto& collection = *coll;
     ASSERT_TRUE(collection->isClustered());
     auto doc = BSON("_id" << 1 << "a" << 1);
     auto docToGenerateWrongRecordId = BSON("_id" << 2);

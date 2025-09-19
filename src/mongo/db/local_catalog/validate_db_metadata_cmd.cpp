@@ -223,7 +223,7 @@ public:
                 return _validateView(opCtx, *viewDef);
             }
 
-            if (!collection.getCollection()) {
+            if (!*collection) {
                 return true;
             }
             const auto status = collection->checkValidatorAPIVersionCompatability(opCtx);

@@ -381,7 +381,7 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
     const auto actualCollator = [&]() -> const CollatorInterface* {
-        const auto& coll = autoColl.getCollection();
+        const auto& coll = *autoColl;
         if (coll) {
             return coll->getDefaultCollator();
         }

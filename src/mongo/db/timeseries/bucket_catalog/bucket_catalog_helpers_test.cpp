@@ -76,13 +76,12 @@ protected:
 void BucketCatalogHelpersTest::_insertIntoBucketColl(const NamespaceString& ns,
                                                      const BSONObj& bucketDoc) {
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IX);
-    const CollectionPtr& coll = autoColl.getCollection();
     OpDebug* const nullOpDebug = nullptr;
 
     {
         WriteUnitOfWork wuow(_opCtx);
         ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, coll, InsertStatement(bucketDoc), nullOpDebug));
+            _opCtx, *autoColl, InsertStatement(bucketDoc), nullOpDebug));
         wuow.commit();
     }
 }

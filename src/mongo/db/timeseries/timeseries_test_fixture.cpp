@@ -71,7 +71,7 @@ void TimeseriesTestFixture::setUpCollectionsHelper(
             ns->dbName(),
             BSON("create" << ns->coll() << "timeseries" << makeTimeseriesOptionsForCreateFn())));
         AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
-        *uuid = autoColl.getCollection()->uuid();
+        *uuid = autoColl->uuid();
     }
 }
 
@@ -487,7 +487,7 @@ void TimeseriesTestFixture::_stageInsertOneBatchIntoEligibleBucketHelper(
     bucket_catalog::Bucket* bucket) {
     auto options = _getTimeseriesOptions(ns);
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
-    const auto& bucketsColl = autoColl.getCollection();
+    const auto& bucketsColl = autoColl;
     // Ensure that we don't rollover before staging an insert into the bucket.
     _assertBatchDoesNotRollover(options, batch, bucket);
     size_t currentPosition = 0;

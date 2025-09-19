@@ -185,7 +185,7 @@ protected:
         AutoGetCollection preImagesCollectionRaii(opCtx, preImagesCollectionNss, MODE_IX);
         ASSERT(preImagesCollectionRaii);
         WriteUnitOfWork wuow(opCtx);
-        auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
+        auto& changeStreamPreImagesCollection = *preImagesCollectionRaii;
 
         auto status = collection_internal::insertDocuments(opCtx,
                                                            changeStreamPreImagesCollection,
