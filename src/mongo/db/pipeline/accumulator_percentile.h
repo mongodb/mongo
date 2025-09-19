@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

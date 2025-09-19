@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
