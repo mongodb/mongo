@@ -442,7 +442,7 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - name: &upload-sbom-if-changed upload-sbom-if-changed
+  - name: upload-sbom-if-changed
     display_name: "Upload SBOM if changed"
     allowed_requesters: ["commit"]
     # TODO (RNDSEC-1453): Add paths: - "sbom.json" when the  DEVPROD-22112 ticket is fixed
