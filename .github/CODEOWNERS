@@ -2593,7 +2593,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/util/**/spill_util* @10gen/query-execution-classic @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/virtual_collection/OWNERS.yml
-/src/mongo/db/query/virtual_collection/**/* @10gen/query-integration-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/virtual_collection/**/* @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/db/query/virtual_collection/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/write_ops/OWNERS.yml
