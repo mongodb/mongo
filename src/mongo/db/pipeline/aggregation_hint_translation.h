@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/timeseries/timeseries_translation.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

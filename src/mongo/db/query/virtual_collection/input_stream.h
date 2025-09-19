@@ -31,6 +31,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/transport/named_pipe/io_error_message.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

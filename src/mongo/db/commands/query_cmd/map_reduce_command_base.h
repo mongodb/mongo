@@ -33,6 +33,7 @@
 #include "mongo/db/commands/query_cmd/mr_common.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

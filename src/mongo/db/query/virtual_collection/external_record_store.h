@@ -42,6 +42,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/stub_container.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -52,9 +53,9 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
-class ExternalRecordStore : public RecordStore {
+class MONGO_MOD_PUB ExternalRecordStore : public RecordStore {
 public:
     ExternalRecordStore(boost::optional<UUID> uuid, const VirtualCollectionOptions& vopts);
 
@@ -251,4 +252,4 @@ private:
     VirtualCollectionOptions _vopts;
     std::variant<StubIntegerKeyedContainer, StubStringKeyedContainer> _container;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

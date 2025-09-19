@@ -36,6 +36,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -47,8 +48,8 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-namespace mongo {
-class MultiBsonStreamCursor : public SeekableRecordCursor {
+namespace MONGO_MOD_PUB mongo {
+class MONGO_MOD_NEEDS_REPLACEMENT MultiBsonStreamCursor : public SeekableRecordCursor {
 public:
     MultiBsonStreamCursor(const VirtualCollectionOptions& vopts)
         : _numStreams(vopts.dataSources.size()), _vopts(vopts) {
@@ -118,4 +119,4 @@ private:
 
     const VirtualCollectionOptions& _vopts;  // metadata containing the pipe URLs
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
