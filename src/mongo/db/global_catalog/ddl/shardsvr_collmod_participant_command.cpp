@@ -82,6 +82,9 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
                                           const BSONObj& reason) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant) {
+        // Use an AlternativeClientRegion because releasing a RecoverableCriticalSection
+        // triggers an update with `multi: true`, which cannot be executed inside a
+        // transaction.
         auto newClient = getGlobalServiceContext()
                              ->getService(ClusterRole::ShardServer)
                              ->makeClient("ShardsvrMovePrimaryExitCriticalSection");

@@ -105,6 +105,10 @@ public:
             bool commandSucceeded = false;
 
             {
+                // Use an AlternativeClientRegion because the dropIndexes command cannot run inside
+                // a transaction.
+                // To ensure this operation is properly recorded in the oplog, we will perform a
+                // dummy write later using the original opCtx.
                 auto alternativeClient = opCtx->getServiceContext()
                                              ->getService(ClusterRole::ShardServer)
                                              ->makeClient("DropIndexesParticipant");
