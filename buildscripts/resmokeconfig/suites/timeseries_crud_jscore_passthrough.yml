@@ -298,6 +298,8 @@ selector:
     - jstests/core/query/update/update_fail_halts_modifications.js
     # geoNear requires setup such as a optimizations to be enabled for TS. See timeseries_geonear.js
     - jstests/core/query/geo/geo_extra_fields.js
+    # Test relies on creating a collection without an index, so notablescan leads to a failure.
+    - jstests/core/query/notablescan_sbe_consistency.js
 
   exclude_with_any_tags:
     - requires_sharding

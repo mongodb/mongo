@@ -459,6 +459,13 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
             fillOutIndexEntries(opCtx, canonicalQuery, secondaryColl, secondaryInfo.indexes);
             fillOutPlannerCollectionInfo(
                 opCtx, secondaryColl, &secondaryInfo.stats, true /* include size stats */);
+            if (storageGlobalParams.noTableScan.load()) {
+                // There are certain cases where we ignore this restriction.
+                bool ignore = nss.isSystem() || nss.isOnInternalDb();
+                if (!ignore) {
+                    secondaryInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
+                }
+            }
         } else {
             secondaryInfo.exists = false;
         }
