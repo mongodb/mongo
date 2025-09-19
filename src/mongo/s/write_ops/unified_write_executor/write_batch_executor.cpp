@@ -42,11 +42,26 @@
 namespace mongo {
 namespace unified_write_executor {
 
+bool WriteBatchExecutor::usesProvidedRoutingContext(const WriteBatch& batch) const {
+    // For SimpleWriteBatches, the executor use the provided RoutingContext. For all other batch
+    // types, the executor does not use the provided RoutingContext.
+    return std::visit(OverloadedVisitor{[](const SimpleWriteBatch& data) { return true; },
+                                        [](const NonTargetedWriteBatch& data) { return false; },
+                                        [](const InternalTransactionBatch& data) { return false; },
+                                        [](const EmptyBatch& data) {
+                                            return false;
+                                        }},
+                      batch.data);
+}
+
 WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx,
                                                RoutingContext& routingCtx,
                                                const WriteBatch& batch) {
-    return std::visit([&](const auto& batchData) { return _execute(opCtx, routingCtx, batchData); },
-                      batch.data);
+    return std::visit(
+        [&](const auto& batchData) -> WriteBatchResponse {
+            return _execute(opCtx, routingCtx, batchData);
+        },
+        batch.data);
 }
 
 BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
@@ -193,21 +208,26 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
 
-    // Note that we sent a request for the involved namespaces after the requests get scheduled.
+    // For each namespace 'nss' that is used by the current 'batch', inform the RoutingContext
+    // that we are sending requests that involve 'nss'.
     for (const auto& nss : batch.getInvolvedNamespaces()) {
         routingCtx.onRequestSentForNss(nss);
     }
 
     SimpleWriteBatchResponse shardResponses;
+
     while (!sender.done()) {
         auto arsResponse = sender.next();
         ShardResponse shardResponse{std::move(arsResponse.swResponse),
-                                    batch.requestByShardId.at(arsResponse.shardId).ops};
+                                    batch.requestByShardId.at(arsResponse.shardId).ops,
+                                    std::move(arsResponse.shardHostAndPort)};
         shardResponses.emplace(std::move(arsResponse.shardId), std::move(shardResponse));
     }
+
     tassert(10346800,
             "There should same number of requests and responses from a simple write batch",
             shardResponses.size() == batch.requestByShardId.size());
+
     return shardResponses;
 }
 
@@ -215,17 +235,15 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const NonTargetedWriteBatch& batch) {
     const WriteOp& writeOp = batch.op;
-    const auto& nss = writeOp.getNss();
-    // TODO SERVER-108144 maybe we shouldn't call release here or maybe we should acknowledge a
-    // write based on the swRes.
-    routingCtx.release(nss);
 
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+        opCtx->isRetryableWrite() || TransactionRouter::get(opCtx);
+
     std::map<WriteOpId, UUID> sampleIds;
     if (batch.sampleId) {
         sampleIds.emplace(writeOp.getId(), *batch.sampleId);
     }
+
     auto cmdObj = buildBulkWriteRequest(opCtx,
                                         {writeOp},
                                         {},        /* versionByNss*/
@@ -253,19 +271,19 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const InternalTransactionBatch& batch) {
-    // TODO SERVER-108144 maybe we shouldn't call release here or maybe we should acknowledge a
-    // write based on the swRes.
     const WriteOp& writeOp = batch.op;
-    routingCtx.release(batch.op.getNss());
+
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
         opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+
     std::map<WriteOpId, UUID> sampleIds;
     if (batch.sampleId) {
         sampleIds.emplace(writeOp.getId(), *batch.sampleId);
     }
+
     auto singleUpdateRequest =
         buildBulkWriteRequestWithoutTxnInfo(opCtx,
-                                            {batch.op},
+                                            {writeOp},
                                             {}, /* versionByNss*/
                                             sampleIds,
                                             allowShardKeyUpdatesWithoutFullShardKeyInQuery);
@@ -303,7 +321,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         ? StatusWith(std::move(bulkWriteResponse))
         : StatusWith<BulkWriteCommandReply>(responseStatus);
 
-    return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), batch.op};
+    return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), writeOp};
 }
 
 }  // namespace unified_write_executor

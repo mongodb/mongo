@@ -48,11 +48,6 @@ selector:
     # TODO: SERVER-104123 Support for 'multi: true' writes in UWE.
     - jstests/core/query/batch_write/batch_write_command_delete.js
 
-    # TODO: SERVER-108965 Handle targeting errors in the UWE.
-    - jstests/core/query/delete/remove_undefined.js
-    - jstests/core/write/bulk/bulk_write_non_transaction.js
-    - jstests/core/query/expr/expr.js
-
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.

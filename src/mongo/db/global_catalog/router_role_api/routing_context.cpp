@@ -126,6 +126,17 @@ bool RoutingContext::hasNss(const NamespaceString& nss) const {
     return _nssRoutingInfoMap.find(nss) != _nssRoutingInfoMap.end();
 }
 
+std::vector<NamespaceString> RoutingContext::getNssList() const {
+    std::vector<NamespaceString> nssList;
+    nssList.reserve(_nssRoutingInfoMap.size());
+
+    for (const auto& [nss, _] : _nssRoutingInfoMap) {
+        nssList.emplace_back(nss);
+    }
+
+    return nssList;
+}
+
 StatusWith<CollectionRoutingInfo> RoutingContext::_getCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) const {
     if (auto atClusterTime = getEffectiveAtClusterTime(opCtx)) {
@@ -177,6 +188,11 @@ void RoutingContext::onStaleError(const Status& status,
             }
         }
     }
+}
+
+void RoutingContext::onStaleShardVersionError(const NamespaceString& nss,
+                                              const boost::optional<ShardVersion>& wantedVersion) {
+    _catalogCache->onStaleCollectionVersion(nss, wantedVersion);
 }
 
 void RoutingContext::skipValidation() {

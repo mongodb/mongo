@@ -30,130 +30,189 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
 #include "mongo/logv2/log.h"
+#include "mongo/s/transaction_router.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace unified_write_executor {
 
-void WriteOpBatcher::markBatchReprocess(WriteBatch batch) {
-    markOpReprocess(batch.getWriteOps());
-}
-
-void OrderedWriteOpBatcher::markUnrecoverableError() {
-    _producer.stopProducingOps();
-}
-
 namespace {
 bool writeTypeSupportsGrouping(BatchType writeType) {
     return writeType == kSingleShard || writeType == kMultiShard;
 }
+}  // namespace
 
-bool isCompatibleWithBatch(SimpleWriteBatch& writeBatch,
-                           NamespaceString nss,
-                           BatchType opType,
-                           std::vector<ShardEndpoint>& shardsAffected) {
-    if (!writeTypeSupportsGrouping(opType)) {
-        return false;
+template <bool Ordered>
+class SimpleBatchBuilderBase {
+public:
+    SimpleBatchBuilderBase(WriteOpBatcher& batcher) : _batcher(batcher) {}
+
+    /**
+     * If ops were added to '_batch' but done() was not called, mark all the ops in '_batch' for
+     * reprocessing.
+     */
+    ~SimpleBatchBuilderBase() {
+        if (_batch) {
+            _batcher.markOpReprocess(_batch->getWriteOps());
+        }
     }
 
-    // The new op cannot be included in the current batch if, for a given endpoint and namespace,
-    // it needs to target a different shard version vs. what the current batch is targeting for
-    // that endpoint and namespace.
-    // TODO SERVER-104264: Once we account for 'OnlyTargetDataOwningShardsForMultiWritesParam'
-    // cluster parameter, revisit this logic.
-    for (const auto& shard : shardsAffected) {
-        auto it = writeBatch.requestByShardId.find(shard.shardName);
-        if (it != writeBatch.requestByShardId.end()) {
-            auto versionFound = it->second.versionByNss.find(nss);
-            // If the namespace is already in the batch, the shard version must be the same. If it's
-            // not, we need a new batch.
-            if (versionFound != it->second.versionByNss.end() && versionFound->second != shard) {
-                LOGV2_DEBUG(10387002,
-                            4,
-                            "Cannot add op to batch because namespace was already targeted "
-                            "with a different shard version",
-                            "nss"_attr = nss);
+    operator bool() const {
+        return _batch.has_value();
+    }
 
-                return false;
+    bool operator!() const {
+        return !_batch;
+    }
+
+    bool isEmpty() const {
+        return !_batch;
+    }
+
+    /**
+     * Returns true if the specified op ('nss' / 'analysis') can be added to the current batch,
+     * otherwise returns false.
+     */
+    bool isCompatibleWithBatch(NamespaceString nss, Analysis& analysis) const {
+        const auto& endpoints = analysis.shardsAffected;
+        // If the op's type is not compatible with SimpleBatch, return false.
+        if (!writeTypeSupportsGrouping(analysis.type)) {
+            return false;
+        }
+        // Verify that there is at least one endpoint. Also, if this op is kSingleShard, verify
+        // that there's exactly one endpoint.
+        tassert(10896511, "Expected at least one affected shard", !endpoints.empty());
+        tassert(10896512,
+                "Single shard write type should only target a single shard",
+                analysis.type != kSingleShard || endpoints.size() == 1);
+        // If the current batch is empty, return true.
+        if (!_batch || _batch->requestByShardId.empty()) {
+            return true;
+        }
+        // If the write command is ordered -AND- if either the op targets multiple shards, the
+        // current batch targets multiple shards, or the op and the current batch target different
+        // shards, then return false.
+        if (Ordered &&
+            (analysis.type != kSingleShard || _batch->requestByShardId.size() > 1 ||
+             endpoints.front().shardName != _batch->requestByShardId.begin()->first)) {
+            return false;
+        }
+        // If, for some endpoint, the op needs to target a different shard version for namespace
+        // 'nss' vs. what the current batch is targeting for that endpoint and namespace, return
+        // false. Otherwise, return true.
+        return !wasShardAlreadyTargetedWithDifferentShardVersion(nss, analysis);
+    }
+
+    /**
+     * Adds 'writeOp' to the current batch. This method will fail with a tassert if writeOp's type
+     * is not compatible with SimpleWriteBatch.
+     */
+    void addOp(WriteOp& writeOp, Analysis& analysis) {
+        tassert(10896513,
+                "Expected op to be compatible with SimpleWriteBatch",
+                writeTypeSupportsGrouping(analysis.type));
+
+        if (!_batch) {
+            _batch.emplace();
+        }
+
+        for (const auto& shard : analysis.shardsAffected) {
+            auto it = _batch->requestByShardId.find(shard.shardName);
+            if (it != _batch->requestByShardId.end()) {
+                SimpleWriteBatch::ShardRequest& request = it->second;
+                request.ops.push_back(writeOp);
+
+                auto nss = writeOp.getNss();
+                auto versionFound = request.versionByNss.find(nss);
+                if (versionFound != request.versionByNss.end()) {
+                    tassert(10387001,
+                            "Shard version for the same namespace need to be the same",
+                            versionFound->second == shard);
+                }
+
+                request.versionByNss.emplace_hint(versionFound, nss, shard);
+            } else {
+                _batch->requestByShardId.emplace(
+                    shard.shardName,
+                    SimpleWriteBatch::ShardRequest{
+                        std::map<NamespaceString, ShardEndpoint>{{writeOp.getNss(), shard}},
+                        std::vector<WriteOp>{writeOp}});
+            }
+
+            const auto& targetedSampleId = analysis.targetedSampleId;
+            if (targetedSampleId && targetedSampleId->isFor(shard.shardName)) {
+                auto& request = _batch->requestByShardId[shard.shardName];
+                request.sampleIds.emplace(writeOp.getId(), targetedSampleId->getId());
             }
         }
     }
 
-    return true;
-}
+    /**
+     * Finish the current batch being built and return it.
+     */
+    WriteBatch done() {
+        WriteBatch result = _batch ? WriteBatch{std::move(*_batch)} : WriteBatch{};
+        _batch = boost::none;
+        return result;
+    }
 
-void addSingleShardWriteOpToBatch(
-    SimpleWriteBatch& writeBatch,
-    WriteOp& writeOp,
-    std::vector<ShardEndpoint>& shardsAffected,
-    boost::optional<analyze_shard_key::TargetedSampleId>& targetedSampleId) {
-    tassert(10387000,
-            "Single shard write type should only target a single shard",
-            shardsAffected.size() == 1);
+protected:
+    /**
+     * This helper method will return true if-and-only-if 'analysis', for some endpoint, needs to
+     * target a different shard version for namespace 'nss' vs. what the current batch is targeting
+     * for that endpoint and namespace.
+     */
+    bool wasShardAlreadyTargetedWithDifferentShardVersion(NamespaceString nss,
+                                                          Analysis& analysis) const {
+        // TODO SERVER-104264: Once we account for 'OnlyTargetDataOwningShardsForMultiWritesParam'
+        // cluster parameter, revisit this logic.
+        for (const auto& shard : analysis.shardsAffected) {
+            auto it = _batch->requestByShardId.find(shard.shardName);
+            if (it != _batch->requestByShardId.end()) {
+                auto versionFound = it->second.versionByNss.find(nss);
+                // If the namespace is already in the batch, the shard version must be the same.
+                // If it's not, we need a new batch.
+                if (versionFound != it->second.versionByNss.end() &&
+                    versionFound->second != shard) {
+                    LOGV2_DEBUG(10387002,
+                                4,
+                                "Cannot add op to batch because namespace was already targeted "
+                                "with a different shard version",
+                                "nss"_attr = nss);
 
-    const auto& shard = shardsAffected.front();
-    const auto& shardName = shard.shardName;
-
-    auto it = writeBatch.requestByShardId.find(shardName);
-    if (it != writeBatch.requestByShardId.end()) {
-        SimpleWriteBatch::ShardRequest& request = it->second;
-        request.ops.push_back(writeOp);
-
-        auto nss = writeOp.getNss();
-        auto versionFound = request.versionByNss.find(nss);
-        if (versionFound != request.versionByNss.end()) {
-            tassert(10387001,
-                    "Shard version for the same namespace need to be the same",
-                    versionFound->second == shardsAffected.front());
+                    return true;
+                }
+            }
         }
-        request.versionByNss.emplace_hint(versionFound, nss, shardsAffected.front());
-    } else {
-        writeBatch.requestByShardId.emplace(
-            shardName,
-            SimpleWriteBatch::ShardRequest{std::map<NamespaceString, ShardEndpoint>{
-                                               {writeOp.getNss(), shardsAffected.front()}},
-                                           std::vector<WriteOp>{writeOp}});
+
+        return false;
     }
 
-    if (targetedSampleId && targetedSampleId->isFor(shardName)) {
-        auto& request = writeBatch.requestByShardId[shardName];
-        request.sampleIds.emplace(writeOp.getId(), targetedSampleId->getId());
-    }
+    WriteOpBatcher& _batcher;
+    boost::optional<SimpleWriteBatch> _batch;
+};
+
+class OrderedSimpleBatchBuilder : public SimpleBatchBuilderBase<true> {
+public:
+    using SimpleBatchBuilderBase::SimpleBatchBuilderBase;
+};
+
+class UnorderedSimpleBatchBuilder : public SimpleBatchBuilderBase<false> {
+public:
+    using SimpleBatchBuilderBase::SimpleBatchBuilderBase;
+};
+
+void WriteOpBatcher::markBatchReprocess(WriteBatch batch) {
+    markOpReprocess(batch.getWriteOps());
 }
 
-void addMultiShardWriteOpToBatch(
-    SimpleWriteBatch& writeBatch,
-    WriteOp& writeOp,
-    std::vector<ShardEndpoint>& shardsAffected,
-    boost::optional<analyze_shard_key::TargetedSampleId>& targetedSampleId) {
-    for (const auto& shardEndpoint : shardsAffected) {
-        std::vector<ShardEndpoint> shardEndpoints{shardEndpoint};
-        addSingleShardWriteOpToBatch(writeBatch, writeOp, shardEndpoints, targetedSampleId);
-    }
-}
+WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
+                                                           RoutingContext& routingCtx) {
+    const bool inTransaction = opCtx && TransactionRouter::get(opCtx);
 
-void addWriteOpToBatch(SimpleWriteBatch& writeBatch, WriteOp& writeOp, Analysis& analysis) {
-    switch (analysis.type) {
-        case kSingleShard:
-            addSingleShardWriteOpToBatch(
-                writeBatch, writeOp, analysis.shardsAffected, analysis.targetedSampleId);
-            break;
-        case kMultiShard:
-            addMultiShardWriteOpToBatch(
-                writeBatch, writeOp, analysis.shardsAffected, analysis.targetedSampleId);
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-}  // namespace
-
-StatusWith<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
-                                                           RoutingContext& routingCtx,
-                                                           const ErrorHandlerFn& eh) {
-    boost::optional<SimpleWriteBatch> simpleBatch;
-    boost::optional<ShardId> shardId;
+    std::vector<std::pair<WriteOp, Status>> opsWithErrors;
+    OrderedSimpleBatchBuilder builder(*this);
 
     for (;;) {
         // Peek at the next op from the producer. If the producer has been exhausted, return the
@@ -166,100 +225,115 @@ StatusWith<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
         // Call analyze(). If an error occurs, handle it.
         auto swAnalysis = _analyzer.analyze(opCtx, routingCtx, *writeOp);
         if (!swAnalysis.isOK()) {
-            // If a target error occurred, call 'action = eh()'. If 'action' is kReturnError, then
-            // return the error to the caller.
-            const bool errorIsOutOfOrder = simpleBatch.has_value();
-            auto action =
-                eh ? eh(*writeOp, swAnalysis.getStatus(), errorIsOutOfOrder) : kReturnError;
-            if (action == kReturnError) {
-                if (simpleBatch) {
-                    markBatchReprocess(WriteBatch{std::move(*simpleBatch)});
-                    simpleBatch = boost::none;
-                }
-                return std::move(swAnalysis.getStatus());
-            }
-            // If 'action' is kConsumeErrorAndReturnEmptyBatch, consume the error and return an
-            // empty batch to the caller.
-            if (action == kConsumeErrorAndReturnEmptyBatch) {
+            // If the write command is running in a transaction, then discard the current batch,
+            // consume the op, record the error, and return an empty batch.
+            if (inTransaction) {
+                opsWithErrors.emplace_back(*writeOp, swAnalysis.getStatus());
                 _producer.advance();
-                if (simpleBatch) {
-                    markBatchReprocess(WriteBatch{std::move(*simpleBatch)});
-                    simpleBatch = boost::none;
-                }
-                return WriteBatch{};
+
+                LOGV2_DEBUG(10896514,
+                            2,
+                            "Aborting write command due to error in transaction",
+                            "error"_attr = redact(swAnalysis.getStatus()));
+
+                return {WriteBatch{}, std::move(opsWithErrors)};
             }
-            // Otherwise, consume the error and return the batch we've built so far.
-            _producer.advance();
+            // If the write command is not in a transaction and '_retryOnTargetError' is true, then
+            // discard the current batch, refresh the catalog cache, set '_retryOnTargetError' to
+            // false, and return an empty batch. For this case, we intentionally do not consume the
+            // op or record the error.
+            if (_retryOnTargetError) {
+                LOGV2_DEBUG(10896515,
+                            2,
+                            "Encountered a targeter error, will refresh RoutingContext",
+                            "error"_attr = redact(swAnalysis.getStatus()));
+
+                for (const auto& nss : routingCtx.getNssList()) {
+                    routingCtx.onStaleShardVersionError(nss, boost::none /*wantedVersion*/);
+                }
+
+                _retryOnTargetError = false;
+                return {WriteBatch{}, std::move(opsWithErrors)};
+            }
+            // When the write command is not in a transaction and '_retryOnTargetError' is false,
+            // if the current batch is empty, then we consume the op, record the error, and return
+            // an empty batch.
+            if (!builder) {
+                opsWithErrors.emplace_back(*writeOp, swAnalysis.getStatus());
+                _producer.advance();
+                return {WriteBatch{}, std::move(opsWithErrors)};
+            }
+            // When the write command is not in a transaction and '_retryOnTargetError' is false,
+            // if the current batch is _not_ empty, we choose to not record/consume the error and
+            // return the batch we've built so far.
             break;
         }
 
         // If analyze() was successful, see if 'writeOp' can be added to the current batch.
         auto& analysis = swAnalysis.getValue();
-        tassert(10346700, "Expected at least one affected shard", !analysis.shardsAffected.empty());
 
-        // If this is not the first op, see if it's compatible with the current batch.
-        if (simpleBatch) {
-            // If this op isn't compatible, stop and return the current batch.
-            if (analysis.type != kSingleShard ||
-                analysis.shardsAffected.front().shardName != *shardId) {
+        if (builder) {
+            // If this is not the first op, see if it's compatible with the current batch.
+            if (builder.isCompatibleWithBatch(writeOp->getNss(), analysis)) {
+                // If 'writeOp', consume it and add it to the current batch, and keep looping to see
+                // if more ops can be added to the batch.
+                _producer.advance();
+                builder.addOp(*writeOp, analysis);
+            } else {
+                // If this op isn't compatible, break out of the loop and return the current batch.
                 break;
             }
-            // Consume 'writeOp' and add it to the current batch and keep looping to see if more ops
-            // can be added to the batch.
-            addSingleShardWriteOpToBatch(
-                *simpleBatch, *writeOp, analysis.shardsAffected, analysis.targetedSampleId);
-            _producer.advance();
-            continue;
-        }
-
-        // Consume the first op.
-        _producer.advance();
-
-        if (analysis.type == kSingleShard) {
-            // If this is the first op and it's kSingleShard, then consume 'writeOp' and add it to
-            // a SimpleBatch and keep looping to see if more ops can be added to the batch.
-            simpleBatch.emplace();
-            shardId = analysis.shardsAffected.front().shardName;
-            addSingleShardWriteOpToBatch(
-                *simpleBatch, *writeOp, analysis.shardsAffected, analysis.targetedSampleId);
-        } else if (analysis.type == kMultiShard) {
-            // If this is the first op and it's kMultiShard, then consume the op and put it in a
-            // SimpleWriteBatch by itself and return the batch.
-            SimpleWriteBatch batch;
-            addMultiShardWriteOpToBatch(
-                batch, *writeOp, analysis.shardsAffected, analysis.targetedSampleId);
-            return WriteBatch{std::move(batch)};
-        } else if (analysis.type == kNonTargetedWrite) {
-            // If this is the first op and it's kNonTargetedWrite, then consume the op and put it in
-            // a NonTargetedWriteBatch by itself and return the batch.
-            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-            return WriteBatch{NonTargetedWriteBatch{*writeOp, std::move(sampleId)}};
-        } else if (analysis.type == kInternalTransaction) {
-            // For ops needing an internal transaction they are placed in their own batch.
-            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-            return WriteBatch{InternalTransactionBatch{*writeOp, std::move(sampleId)}};
         } else {
-            MONGO_UNREACHABLE_TASSERT(10346701);
+            // Consume the first op.
+            _producer.advance();
+            // If the first WriteOp is kNonTargetedWrite, then consume the op and put it in a
+            // NonTargetedWriteBatch by itself and return the batch.
+            if (analysis.type == kNonTargetedWrite) {
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return {WriteBatch{NonTargetedWriteBatch{*writeOp, std::move(sampleId)}},
+                        std::move(opsWithErrors)};
+            }
+            // If the first WriteOp is kInternalTransaction, put it in a InternalTransactionBatch
+            // by itself and return the batch.
+            if (analysis.type == kInternalTransaction) {
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return {WriteBatch{InternalTransactionBatch{*writeOp, std::move(sampleId)}},
+                        std::move(opsWithErrors)};
+            }
+            // If the first WriteOp is kMultiShard, then add the op to a SimpleBatch and then break
+            // and return the batch.
+            if (analysis.type == kMultiShard) {
+                builder.addOp(*writeOp, analysis);
+                break;
+            }
+            // If the op is kSingleShard, then add the op to a SimpleBatch and keep looping to see
+            // if more ops can be added to the batch.
+            builder.addOp(*writeOp, analysis);
         }
     }
 
-    // Return the batch we've built.
-    return simpleBatch ? WriteBatch{std::move(*simpleBatch)} : WriteBatch{};
+    // Return the batch we've built so far.
+    return {builder.done(), std::move(opsWithErrors)};
 }
 
-StatusWith<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
-                                                             RoutingContext& routingCtx,
-                                                             const ErrorHandlerFn& eh) {
+WriteOpBatcher::Result UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
+                                                             RoutingContext& routingCtx) {
+    const bool inTransaction = opCtx && TransactionRouter::get(opCtx);
+
     // When this method returns (or when an exception is thrown), mark the ops in 'opsToReprocess'
     // for re-processing.
     std::vector<WriteOp> opsToReprocess;
     ON_BLOCK_EXIT([&] { markOpReprocess(opsToReprocess); });
 
-    boost::optional<SimpleWriteBatch> simpleBatch;
+    std::vector<std::pair<WriteOp, Status>> opsWithErrors;
+    UnorderedSimpleBatchBuilder builder(*this);
 
     // This outer loop searches for ops to add to the current batch.
     for (;;) {
         boost::optional<std::pair<WriteOp, Analysis>> analyzedOp;
+
         // This inner loop that repeatedly peeks at the next op from the producer until either:
         // (i) we successfully analyze an op, or (ii) we exhaust the producer, or (iii) we encounter
         // an error that requires returning to the caller.
@@ -271,29 +345,40 @@ StatusWith<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
                 analyzedOp.emplace(std::move(*writeOp), std::move(swAnalysis.getValue()));
                 break;
             }
-            // If a target error occurred, call 'action = eh()'. If 'action' is kReturnError, then
-            // return the error to the caller.
-            const bool errorIsOutOfOrder = false;
-            auto action =
-                eh ? eh(*writeOp, swAnalysis.getStatus(), errorIsOutOfOrder) : kReturnError;
-            if (action == kReturnError) {
-                if (simpleBatch) {
-                    markBatchReprocess(WriteBatch{std::move(*simpleBatch)});
-                    simpleBatch = boost::none;
-                }
-                return std::move(swAnalysis.getStatus());
-            }
-            // If 'action' is kConsumeErrorAndReturnEmptyBatch, consume the error and return an
-            // empty batch to the caller.
-            if (action == kConsumeErrorAndReturnEmptyBatch) {
+            // If the write command is running in a transaction, then discard the current batch,
+            // consume the op, record the error, and return an empty batch.
+            if (inTransaction) {
+                opsWithErrors.emplace_back(std::move(*writeOp), swAnalysis.getStatus());
                 _producer.advance();
-                if (simpleBatch) {
-                    markBatchReprocess(WriteBatch{std::move(*simpleBatch)});
-                    simpleBatch = boost::none;
-                }
-                return WriteBatch{};
+
+                LOGV2_DEBUG(10896517,
+                            2,
+                            "Aborting write command due to error in transaction",
+                            "error"_attr = redact(swAnalysis.getStatus()));
+
+                return {WriteBatch{}, std::move(opsWithErrors)};
             }
-            // Otherwise, consume the error and then continue going around the inner loop.
+            // If the write command is not in a transaction and '_retryOnTargetError' is true, then
+            // discard the current batch, refresh the catalog cache, set '_retryOnTargetError' to
+            // false, and return an empty batch. For this case, we intentionally do not consume the
+            // op or record the error.
+            if (_retryOnTargetError) {
+                LOGV2_DEBUG(10896518,
+                            2,
+                            "Encountered a targeter error, will refresh RoutingContext",
+                            "error"_attr = redact(swAnalysis.getStatus()));
+
+                for (const auto& nss : routingCtx.getNssList()) {
+                    routingCtx.onStaleShardVersionError(nss, boost::none /*wantedVersion*/);
+                }
+
+                _retryOnTargetError = false;
+                return {WriteBatch{}, std::move(opsWithErrors)};
+            }
+            // If the write command is not in a transaction and '_retryOnTargetError' is false,
+            // then we consume the op, record the error, and continue looking for more ops to add
+            // to the batch we're building.
+            opsWithErrors.emplace_back(std::move(*writeOp), swAnalysis.getStatus());
             _producer.advance();
         }
 
@@ -303,44 +388,47 @@ StatusWith<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
         }
 
         auto& [writeOp, analysis] = *analyzedOp;
-        if (!simpleBatch) {
-            // If the first WriteOp is kNonTargetedWrite, then consume the op and put it in a
-            // NonTargetedWriteBatch by itself and return the batch.
-            if (analysis.type == kNonTargetedWrite) {
-                _producer.advance();
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return WriteBatch{NonTargetedWriteBatch{writeOp, std::move(sampleId)}};
-            }
-            if (analysis.type == kInternalTransaction) {
-                _producer.advance();
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return WriteBatch{InternalTransactionBatch{writeOp, std::move(sampleId)}};
-            }
-            // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep
-            // looping to see if more ops can be added to the batch.
-            simpleBatch.emplace();
-            addWriteOpToBatch(*simpleBatch, writeOp, analysis);
-        } else {
+
+        if (builder) {
+            // Consume 'writeOp'.
+            _producer.advance();
             // Check if 'writeOp' is compatible with the current batch.
-            if (isCompatibleWithBatch(
-                    *simpleBatch, writeOp.getNss(), analysis.type, analysis.shardsAffected)) {
+            if (builder.isCompatibleWithBatch(writeOp.getNss(), analysis)) {
                 // Add 'writeOp' to the current batch.
-                addWriteOpToBatch(*simpleBatch, writeOp, analysis);
+                builder.addOp(writeOp, analysis);
             } else {
                 // If 'writeOp' cannot be added to the current batch, then we add 'writeOp' to
                 // the 'opsToReprocess' vector.
                 opsToReprocess.emplace_back(writeOp);
             }
+            // Continue looping looking for more ops to add to the batch.
+        } else {
+            // Consume 'writeOp'.
+            _producer.advance();
+            // If the first WriteOp is kNonTargetedWrite, then consume the op and put it in a
+            // NonTargetedWriteBatch by itself and return the batch.
+            if (analysis.type == kNonTargetedWrite) {
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return {WriteBatch{NonTargetedWriteBatch{writeOp, std::move(sampleId)}},
+                        std::move(opsWithErrors)};
+            }
+            // If the first WriteOp is kInternalTransaction, then consume the op and put it in a
+            // InternalTransactionBatch by itself and return the batch.
+            if (analysis.type == kInternalTransaction) {
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return {WriteBatch{InternalTransactionBatch{writeOp, std::move(sampleId)}},
+                        std::move(opsWithErrors)};
+            }
+            // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep
+            // looping to see if more ops can be added to the batch.
+            builder.addOp(writeOp, analysis);
         }
-
-        // Consume 'writeOp' and continue looking for more ops to add to the batch.
-        _producer.advance();
     }
 
-    // Return the batch we've built.
-    return simpleBatch ? WriteBatch{std::move(*simpleBatch)} : WriteBatch{};
+    // Return the batch we've built so far.
+    return {builder.done(), std::move(opsWithErrors)};
 }
 
 }  // namespace unified_write_executor

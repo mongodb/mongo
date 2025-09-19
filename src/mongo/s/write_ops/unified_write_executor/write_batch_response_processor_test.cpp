@@ -262,8 +262,8 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
                                                                                rcr1,
                                                                                {op1, op2},
                                                                            }}});
-    // No unrecoverable error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    // No errors.
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     // One incomplete returned (op2).
     ASSERT_EQ(result.opsToRetry.size(), 1);
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss2);
@@ -299,7 +299,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
 
     result = processor.onWriteBatchResponse(
         opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr2, {op2}}}});
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     ASSERT(result.opsToRetry.empty());
     ASSERT(result.collsToCreate.empty());
     clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
@@ -341,8 +341,8 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
                                                                                rcr1,
                                                                                {op1, op2, op3},
                                                                            }}});
-    // No unrecoverable error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    // No errors.
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     // Assert all ops were returned for retry even though there was only one item in the reply.
     ASSERT_EQ(result.opsToRetry.size(), 3);
     ASSERT_EQ(result.opsToRetry[0].getId(), 0);
@@ -420,8 +420,8 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
                                                                                rcr2,
                                                                                {op4, op5, op6},
                                                                            }}});
-    // No unrecoverable error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    // No errors.
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     // Assert all the errors were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 4);
     ASSERT_EQ(result.opsToRetry[0].getId(), 1);
@@ -500,8 +500,8 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
                                                           {op6, op1, op2},
                                                       }},
                                                  });
-    // Unrecoverable error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kUnrecoverable);
+    // An error should have occurred.
+    ASSERT_TRUE(processor.getNumErrorsRecorded() > 0);
 
     // Assert all the errors were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 1);
@@ -562,13 +562,8 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
     WriteCommandRef cmdRef(request);
     Stats stats;
     WriteBatchResponseProcessor processor(cmdRef, stats);
-    auto result = processor.onWriteBatchResponse(opCtx,
-                                                 routingCtx,
-                                                 SimpleWriteBatchResponse{{shard1Name,
-                                                                           Response{
-                                                                               rcr1,
-                                                                               {op1, op2},
-                                                                           }}});
+    auto result = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1, op2}}}});
 
     ASSERT_EQ(routingCtx.errors.at(nss1).code(), ErrorCodes::StaleConfig);
     ASSERT_EQ(routingCtx.errors.at(nss2).code(), ErrorCodes::StaleDbVersion);
@@ -679,8 +674,8 @@ TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldEr
                                                                                {op1, op2},
                                                                            }}});
 
-    // Assert there is no error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    // No errors.
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
 
     // Assert the only op1 was returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 1);
@@ -741,7 +736,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
                                                                                rcr2,
                                                                                {op1},
                                                                            }}});
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
@@ -810,7 +805,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
                                                           {op1},
                                                       }},
                                                  });
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
@@ -871,7 +866,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
                                                                                {op1},
                                                                            }}});
 
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
@@ -905,7 +900,6 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
     auto result = processor.onWriteBatchResponse(
         opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}}});
 
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
 
@@ -990,6 +984,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
         {NamespaceInfoEntry(nss1)});
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     auto reply = makeReply();
@@ -1009,8 +1004,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, OKReplies) {
         SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}},
                                  {shard2Name, Response{rcr2, {WriteOp(request, 1)}}}});
 
-    // No error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    // No errors.
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
 
     // Confirm the generated bulk reply and batched command response are both correct.
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
@@ -1030,6 +1025,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInARSAsserts
     WriteOp op1(request, 0);
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     // Shard response with a transient transaction error label from the ARS
@@ -1057,6 +1053,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
     WriteOp op2(request, 1);
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     // Shard response with a transient transaction error label from the ARS
@@ -1091,6 +1088,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
                                            {NamespaceInfoEntry(nss1)});
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     auto reply = makeReply();
@@ -1124,8 +1122,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInARSHalt
                                  {shard2Name, Response{rcr3, {WriteOp(request, 2)}}}});
 
 
-    // Error to indicate to stop processing.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kStopProcessing);
+    // An error should have occurred.
+    ASSERT_TRUE(processor.getNumErrorsRecorded() > 0);
 
     // Confirm the generated bulk reply and batched command response are both correct.
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
@@ -1157,6 +1155,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, TransientTransactionErrorInShardRespo
     WriteOp op1(request, 0);
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     // Shard response with a transient transaction error label.
@@ -1190,6 +1189,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
                                            {NamespaceInfoEntry(nss1)});
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     auto reply = makeReply();
@@ -1228,8 +1228,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest,
                                  {shard2Name, Response{rcr2, {WriteOp(request, 1)}}},
                                  {shard2Name, Response{rcr3, {WriteOp(request, 2)}}}});
 
-    // Error to indicate to stop processing.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kStopProcessing);
+    // An error should have occurred.
+    ASSERT_TRUE(processor.getNumErrorsRecorded() > 0);
 
     // Confirm the generated bulk reply and batched command response are both correct.
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
@@ -1262,6 +1262,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
                                            {NamespaceInfoEntry(nss1)});
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     auto reply = makeReply();
@@ -1289,8 +1290,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, NonTransientTransactionErrorInReplyIt
             {shard1Name,
              Response{rcr1, {WriteOp(request, 0), WriteOp(request, 1), WriteOp(request, 2)}}}});
 
-    // Error to indicate to stop processing.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kStopProcessing);
+    // An error should have occurred.
+    ASSERT_TRUE(processor.getNumErrorsRecorded() > 0);
 
     // Confirm the generated bulk reply and batched command response are both correct.
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
@@ -1322,6 +1323,7 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
         {NamespaceInfoEntry(nss1)});
 
     // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    opCtx->setInMultiDocumentTransaction();
     RouterOperationContextSession rocs(opCtx);
 
     auto reply1 = makeReply();
@@ -1352,8 +1354,8 @@ TEST_F(WriteBatchResponseProcessorTxnTest, ProcessorSetsRetriedStmtIdsInClientRe
         SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}},
                                  {shard2Name, Response{rcr2, {WriteOp(request, 1)}}}});
 
-    // No error.
-    ASSERT_EQ(result.errorType, WriteBatchResponseProcessor::ErrorType::kNone);
+    // No errors.
+    ASSERT_FALSE(processor.getNumErrorsRecorded() > 0);
 
     // Confirm the generated bulk reply and batched command response are both correct.
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);

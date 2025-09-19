@@ -55,37 +55,39 @@ Result WriteBatchResponseProcessor::onWriteBatchResponse(OperationContext* opCtx
         response);
 }
 
+Result WriteBatchResponseProcessor::_onWriteBatchResponse(OperationContext* opCtx,
+                                                          RoutingContext& routingCtx,
+                                                          const EmptyBatchResponse& response) {
+    return Result{};
+}
+
 Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx, RoutingContext& routingCtx, const SimpleWriteBatchResponse& response) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     Result result;
+
     for (const auto& [shardId, shardResponse] : response) {
         auto shardResult = onShardResponse(opCtx, routingCtx, shardId, shardResponse);
+
         result.opsToRetry.insert(result.opsToRetry.end(),
                                  std::make_move_iterator(shardResult.opsToRetry.begin()),
                                  std::make_move_iterator(shardResult.opsToRetry.end()));
+
         for (auto& [nss, info] : shardResult.collsToCreate) {
             if (auto it = result.collsToCreate.find(nss); it == result.collsToCreate.cend()) {
                 result.collsToCreate.emplace(nss, std::move(info));
             }
         }
 
-        if (shardResult.errorType != ErrorType::kNone) {
-            result.errorType = shardResult.errorType;
-
-            // If 'errorType' is kStopProcessing, stop processing immediately and return a Result
-            // for what we've processed so far.
-            if (shardResult.errorType == ErrorType::kStopProcessing) {
-                break;
-            }
+        // If this command is running in a transaction and an error occurrs, stop processing
+        // immediately and return a Result for what we've processed so far.
+        if (_nErrors > 0 && inTransaction) {
+            break;
         }
     }
-    return result;
-}
 
-Result WriteBatchResponseProcessor::_onWriteBatchResponse(OperationContext* opCtx,
-                                                          RoutingContext& routingCtx,
-                                                          const EmptyBatchResponse& response) {
-    return Result{};
+    return result;
 }
 
 Result WriteBatchResponseProcessor::_onWriteBatchResponse(
@@ -97,8 +99,33 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     // TODO SERVER-105762 Add support for errorsOnly: true.
     const auto& swRes = response.swResponse;
     const auto& op = response.op;
-    if (!swRes.getStatus().isOK()) {
-        return handleLocalError(opCtx, swRes.getStatus(), op, boost::none /* shardId */);
+
+    if (!swRes.isOK()) {
+        // TODO SERVER-105303 Handle interruption/shutdown.
+        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
+        LOGV2_DEBUG(10896500,
+                    4,
+                    "Unable to receive cluster write results from shard",
+                    "error"_attr = redact(swRes.getStatus()));
+
+        // Process the local or top-level error for the batch.
+        processErrorForBatch(opCtx, std::vector{op}, swRes.getStatus());
+
+        // If the write command is running in a transaction and there was a transient transaction
+        // error, uassert so that the error is returned directly as a top level error, to allow the
+        // client to retry.
+        if (auto transientTxnError = getTransientTxnError(opCtx, swRes.getStatus())) {
+            uassertStatusOK(*transientTxnError);
+        }
+
+        if (TransactionRouter::get(opCtx)) {
+            LOGV2_DEBUG(10413100,
+                        4,
+                        "Aborting write command due to error in a transaction",
+                        "error"_attr = redact(swRes.getStatus()));
+        }
+
+        return Result{};
     }
 
     // Extract the reply item from the ClusterWriteWithoutShardKeyResponse if possible, otherwise
@@ -142,12 +169,17 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
         return replyItem;
     }();
 
-    if (!replyItem.getStatus().isOK()) {
-        _nErrors++;
-    }
+    auto status = replyItem.getStatus();
 
-    auto [it, _] = _results.emplace(op.getId(), std::move(replyItem));
-    it->second.setIdx(op.getId());
+    // Process the reply item.
+    processReplyItem(op, std::move(replyItem));
+
+    // If the write command is running in a transaction and there was a transient transaction error,
+    // uassert so that the error is returned directly as a top level error, to allow the client to
+    // retry.
+    if (auto transientTxnError = getTransientTxnError(opCtx, status)) {
+        uassertStatusOK(*transientTxnError);
+    }
 
     // NonTargetedWriteBatches are only used for update and delete, so we never need to implicitly
     // create collections for a TwoPhaseWrite op.
@@ -155,44 +187,7 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     // Also, the write_without_shard_key::runTwoPhaseWriteProtocol() API handles StaleConfig
     // responses internally, so the UnifiedWriteExecutor doesn't need to have retry logic for
     // TwoPhaseWrite operations.
-    return {};
-}
-
-
-void WriteBatchResponseProcessor::noteErrorResponseOnAbort(int opId, const Status& status) {
-    tassert(10413102, "Unexpectedly got an OK status", !status.isOK());
-    _results.emplace(opId, BulkWriteReplyItem(opId, status));
-    _nErrors++;
-}
-
-Result WriteBatchResponseProcessor::handleLocalError(OperationContext* opCtx,
-                                                     Status status,
-                                                     WriteOp op,
-                                                     boost::optional<const ShardId&> shardId) {
-    // TODO SERVER-105303 Handle interruption/shutdown.
-    // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
-    // If we are in a transaction, we stop processing and return the first error.
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-    if (inTransaction) {
-        auto newStatus = status.withContext(
-            str::stream() << "Encountered error from " << (shardId ? shardId->toString() : "shards")
-                          << " during a transaction");
-        // Transient transaction errors should be returned directly as top level errors to allow
-        // the client to retry.
-        if (isTransientTransactionError(
-                status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false)) {
-            uassertStatusOK(newStatus);
-        }
-        // TODO SERVER-105762 Figure out what opId to use here in case we don't return any.
-        LOGV2_DEBUG(10413100,
-                    4,
-                    "Aborting batch due to error in transaction",
-                    "error"_attr = redact(newStatus));
-        noteErrorResponseOnAbort(op.getId(), status);
-        return {ErrorType::kStopProcessing, {}, {}};
-    }
-    noteErrorResponseOnAbort(op.getId(), status);
-    return {ErrorType::kUnrecoverable};
+    return Result{};
 }
 
 Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
@@ -201,8 +196,40 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
                                                     const ShardResponse& response) {
     const Status& status = response.swResponse.getStatus();
     const auto& ops = response.ops;
+    const boost::optional<HostAndPort>& hostAndPort = response.shardHostAndPort;
+    const bool ordered = _cmdRef.getOrdered();
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
     if (!status.isOK()) {
-        return handleLocalError(opCtx, status, ops.front(), shardId);
+        // TODO SERVER-105303 Handle interruption/shutdown.
+        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
+        LOGV2_DEBUG(10896501,
+                    4,
+                    "Unable to receive cluster write results from shard",
+                    "error"_attr = redact(status),
+                    "shardId"_attr = shardId.toString(),
+                    "host"_attr = (hostAndPort ? hostAndPort->toString() : std::string("(none)")));
+
+        // Process the local error for the batch.
+        processErrorForBatch(opCtx, ops, status);
+
+        // If the write command is running in a transaction and there was a transient transaction
+        // error, uassert so that the error is returned directly as a top level error, to allow the
+        // client to retry.
+        if (auto transientTxnError = getTransientTxnError(opCtx, status)) {
+            uassertStatusOK(*transientTxnError);
+        }
+
+        if (inTransaction) {
+            LOGV2_DEBUG(10896502,
+                        4,
+                        "Aborting write command due to error in a transaction",
+                        "error"_attr = redact(status),
+                        "host"_attr =
+                            (hostAndPort ? hostAndPort->toString() : std::string("(none)")));
+        }
+
+        return Result{};
     }
 
     auto shardResponse = response.swResponse.getValue();
@@ -218,43 +245,36 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         auto status = shardResponseStatus.withContext(
             str::stream() << "cluster write results unavailable from " << shardResponse.target);
 
-        // Processing stale error returned as a top-level error.
         if (status == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(status)) {
+            // Inform the RoutingContext that a stale error occurred.
             routingCtx.onStaleError(status);
         }
 
-        // If we are in a transaction, we stop processing and return the first error.
-        const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-        if (inTransaction) {
-            auto errorReply = ErrorReply::parse(shardResponse.data, IDLParserContext("ErrorReply"));
-            // Transient transaction errors should be returned directly as top level errors to allow
-            // the client to retry.
-            if (hasTransientTransactionErrorLabel(errorReply)) {
-                uassertStatusOK(status.withContext(str::stream() << "Encountered error from "
-                                                                 << shardResponse.target
-                                                                 << " during a transaction"));
-            }
-            // TODO SERVER-105762 Figure out what opId to use here in case we don't return any.
-            LOGV2_DEBUG(10413101,
-                        4,
-                        "Aborting batch due to error in a transaction",
-                        "error"_attr = redact(status),
-                        "host"_attr = shardResponse.target);
-            noteErrorResponseOnAbort(ops.front().getId(), status);
-            return {ErrorType::kStopProcessing, {}, {}};
-        }
-
-        for (const auto& op : ops) {
-            auto [it, _] = _results.emplace(op.getId(), BulkWriteReplyItem(op.getId(), status));
-            it->second.setIdx(op.getId());
-        }
         LOGV2_DEBUG(10347001,
                     4,
-                    "Unable to receive cluster write results from shard",
+                    "Remote error reported from shard when receiving cluster write results",
+                    "error"_attr = redact(status),
                     "host"_attr = shardResponse.target);
 
-        _nErrors += ops.size();
-        return {};
+        // Process the top-level error for the batch.
+        processErrorForBatch(opCtx, ops, status);
+
+        // If the write command is running in a transaction and there was a transient transaction
+        // error, uassert so that the error is returned directly as a top level error, to allow the
+        // client to retry.
+        if (auto transientTxnError = getTransientTxnError(opCtx, shardResponse, status)) {
+            uassertStatusOK(*transientTxnError);
+        }
+
+        if (inTransaction) {
+            LOGV2_DEBUG(10413101,
+                        4,
+                        "Aborting write command due to error in a transaction",
+                        "error"_attr = redact(status),
+                        "host"_attr = shardResponse.target);
+        }
+
+        return Result{};
     }
 
     // Parse and handle inner ok and error responses.
@@ -284,11 +304,57 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
     // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     const auto& replyItems = parsedReply.getCursor().getFirstBatch();
     auto result = processOpsInReplyItems(opCtx, routingCtx, ops, replyItems);
-    if (result.errorType == ErrorType::kNone) {
+
+    if (_nErrors == 0 || (!ordered && !inTransaction)) {
         result.opsToRetry =
             processOpsNotInReplyItems(ops, replyItems, std::move(result.opsToRetry));
     }
+
     return result;
+}
+
+void WriteBatchResponseProcessor::processReplyItem(const WriteOp& op, BulkWriteReplyItem item) {
+    const bool isOK = item.getStatus().isOK();
+
+    // Set the "idx" field to the ID of 'op'.
+    item.setIdx(op.getId());
+
+    // If this is an update op, ensure the "nModified" field is set.
+    if (op.getType() == WriteType::kUpdate && !item.getNModified()) {
+        item.setNModified(0);
+    }
+
+    _results.emplace(op.getId(), std::move(item));
+
+    if (isOK) {
+        _numOkResponses++;
+    } else {
+        _nErrors++;
+    }
+}
+
+void WriteBatchResponseProcessor::processError(const WriteOp& op, const Status& status) {
+    tassert(10896503, "Unexpectedly got an OK status", !status.isOK());
+    processReplyItem(op, BulkWriteReplyItem(0, status));
+}
+
+void WriteBatchResponseProcessor::processErrorForBatch(OperationContext* opCtx,
+                                                       const std::vector<WriteOp>& ops,
+                                                       const Status& status) {
+    if (_cmdRef.getOrdered() || TransactionRouter::get(opCtx)) {
+        // If the write command is ordered or running in a transaction -AND- if no errors have been
+        // recorded yet, then record an error for the op with the lowest ID only.
+        if (_nErrors == 0 && !ops.empty()) {
+            const auto& firstOp = *std::min_element(ops.begin(), ops.end());
+            processError(firstOp, status);
+        }
+    } else {
+        // If the write command is unordered and not in a transaciton, record an error for each
+        // op in 'ops'.
+        for (const auto& op : ops) {
+            processError(op, status);
+        }
+    }
 }
 
 Result WriteBatchResponseProcessor::processOpsInReplyItems(
@@ -296,9 +362,10 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
     RoutingContext& routingCtx,
     const std::vector<WriteOp>& ops,
     const std::vector<BulkWriteReplyItem>& replyItems) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     std::vector<WriteOp> toRetry;
     CollectionsToCreate collectionsToCreate;
-    ErrorType errorType = ErrorType::kNone;
+
     for (const auto& item : replyItems) {
         // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes. if in transaction, return
         // an insert+delete to retry. if not in a transaction, return update to retry in
@@ -330,6 +397,8 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
                 LOGV2_DEBUG(
                     10346900, 4, "Noting stale config response", "status"_attr = item.getStatus());
             }
+
+            // Inform the RoutingContext that a stale error occurred.
             routingCtx.onStaleError(item.getStatus(), op.getNss());
             toRetry.push_back(op);
         } else if (itemCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
@@ -339,53 +408,114 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
                         "status"_attr = item.getStatus());
             toRetry.push_back(op);
         } else {
-            auto [it, _] = _results.emplace(op.getId(), item);
-            it->second.setIdx(op.getId());
+            processReplyItem(op, item);
 
+            // Attempts to populate the actualCollection field of a CollectionUUIDMismatch>
+            // if not already present.
             auto status = item.getStatus();
-            if (!status.isOK()) {
-                // Attempts to populate the actualCollection field of a CollectionUUIDMismatch error
-                // if not already present.
-                if (status.code() == ErrorCodes::CollectionUUIDMismatch) {
-                    status = populateCollectionUUIDMismatch(opCtx, status);
-                }
+            if (status.code() == ErrorCodes::CollectionUUIDMismatch) {
+                status = populateCollectionUUIDMismatch(opCtx, status);
+            }
 
-                _nErrors++;
-                // If we are in a transaction, we stop processing and return the first error.
-                if (static_cast<bool>(TransactionRouter::get(opCtx))) {
-                    LOGV2_DEBUG(10413103,
-                                4,
-                                "Aborting batch due to error in a transaction",
-                                "error"_attr = redact(status));
-                    errorType = ErrorType::kStopProcessing;
-                    break;
-                }
-                if (op.getCommand().getOrdered()) {
-                    errorType = ErrorType::kUnrecoverable;
-                }
+            // If an error occurred and we are in a transaction, we stop processing and return the
+            // first error.
+            if (_nErrors > 0 && inTransaction) {
+                LOGV2_DEBUG(10413103,
+                            4,
+                            "Aborting write command due to error in a transaction",
+                            "error"_attr = redact(status));
+                break;
             }
         }
     }
-    return {errorType, std::move(toRetry), collectionsToCreate};
+
+    return Result{std::move(toRetry), std::move(collectionsToCreate)};
 }
 
 std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
     const std::vector<WriteOp>& requestedOps,
     const std::vector<BulkWriteReplyItem>& replyItems,
     std::vector<WriteOp>&& toRetry) {
-    if (requestedOps.size() != replyItems.size()) {
+    if (requestedOps.size() > replyItems.size()) {
         // TODO SERVER-105762 Add support for errorsOnly: true.
         // If we are here it means we got a response from an ordered: true command and it stopped on
         // the first error.
+        const bool logOps = shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4));
+        std::stringstream opsStream;
+        size_t numOpsInStream = 0;
+
         for (size_t i = replyItems.size(); i < requestedOps.size(); i++) {
-            LOGV2_DEBUG(10411404,
-                        4,
-                        "renenqueuing op not completed by shard",
-                        "op"_attr = requestedOps[i].getId());
+            // Re-enqueue every op that didn't execute in the request.
             toRetry.push_back(requestedOps[i]);
+            // If we are logging the ops being re-enqueued, update 'opsStream'.
+            if (logOps) {
+                opsStream << (numOpsInStream++ > 0 ? ", " : "") << requestedOps[i].getId();
+            }
+        }
+
+        LOGV2_DEBUG(
+            10411404, 4, "re-enqueuing ops not completed by shard", "ops"_attr = opsStream.str());
+    }
+
+    return toRetry;
+}
+
+void WriteBatchResponseProcessor::recordTargetError(OperationContext* opCtx,
+                                                    const WriteOp& op,
+                                                    const Status& status) {
+    if (_nErrors == 0 || (!_cmdRef.getOrdered() && !TransactionRouter::get(opCtx))) {
+        processError(op, status);
+    }
+
+    // If the write command is running in a transaction and there was a transient transaction
+    // error, uassert so that the error is returned directly as a top level error, to allow the
+    // client to retry.
+    if (auto transientTxnError = getTransientTxnError(opCtx, status)) {
+        uassertStatusOK(*transientTxnError);
+    }
+}
+
+void WriteBatchResponseProcessor::recordErrorForRemainingOps(OperationContext* opCtx,
+                                                             const Status& status) {
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const size_t numOps = _cmdRef.getNumOps();
+
+    for (size_t i = 0; i < numOps; ++i) {
+        if (_nErrors > 0 && (_cmdRef.getOrdered() || inTransaction)) {
+            break;
+        }
+
+        WriteOp op{WriteOpRef{_cmdRef, static_cast<int>(i)}};
+        processError(op, status);
+    }
+}
+
+boost::optional<Status> WriteBatchResponseProcessor::getTransientTxnError(OperationContext* opCtx,
+                                                                          const Status& status) {
+    if (!status.isOK() && TransactionRouter::get(opCtx) &&
+        isTransientTransactionError(
+            status.code(), false /*hasWriteConcernError*/, false /*isCommitOrAbort*/)) {
+        return status;
+    }
+
+    return boost::none;
+}
+
+boost::optional<Status> WriteBatchResponseProcessor::getTransientTxnError(
+    OperationContext* opCtx,
+    const executor::RemoteCommandResponse& shardResponse,
+    const Status& status) {
+    if (!status.isOK() && TransactionRouter::get(opCtx)) {
+        auto errorReply = ErrorReply::parse(shardResponse.data, IDLParserContext("ErrorReply"));
+
+        if (hasTransientTransactionErrorLabel(errorReply)) {
+            return status.withContext(str::stream()
+                                      << "Encountered error from " << shardResponse.target
+                                      << " during a transaction");
         }
     }
-    return toRetry;
+
+    return boost::none;
 }
 
 WriteCommandResponse WriteBatchResponseProcessor::generateClientResponse(OperationContext* opCtx) {

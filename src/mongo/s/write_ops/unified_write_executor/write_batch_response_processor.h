@@ -62,24 +62,11 @@ public:
                             std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
 
     /**
-     * An enum that represents the type of error encountered.
-     */
-    enum class ErrorType {
-        // No error occurred, continue with next batch.
-        kNone,
-        // Finish processing the current responses but ignore subsequent batches.
-        kUnrecoverable,
-        // Halt further processing and return immediately.
-        kStopProcessing,
-    };
-
-    /**
      * A struct representing data to be returned to the higher level of control flow.
      */
     struct Result {
-        ErrorType errorType{ErrorType::kNone};  // Type of error encountered if any.
-        std::vector<WriteOp> opsToRetry{};      // Ops to be retried due to recoverable errors
-        CollectionsToCreate collsToCreate{};    // Collections to be explicitly created
+        std::vector<WriteOp> opsToRetry;    // Ops to be retried due to recoverable errors
+        CollectionsToCreate collsToCreate;  // Collections to be explicitly created
     };
 
     explicit WriteBatchResponseProcessor(WriteCommandRef cmdRef,
@@ -100,6 +87,9 @@ public:
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
      * array containing ops that did not complete successfully that need to be resent.
+     *
+     * If 'response' is a type that can stale errors (such as SimpleWriteBatchResponse), then
+     * 'routingCtx' must be an initialized RoutingContext.
      */
     Result onWriteBatchResponse(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
@@ -120,6 +110,34 @@ public:
      */
     static BulkWriteCommandReply generateClientResponseForBulkWriteCommand(
         bulk_write_exec::BulkWriteReplyInfo replyInfo);
+
+    /**
+     * This method is called by the scheduler to record a target error that occurred during batch
+     * creation.
+     */
+    void recordTargetError(OperationContext* opCtx, const WriteOp& op, const Status& status);
+
+    /**
+     * This method is called by the scheduler to record errors for the remaining ops that don't have
+     * results yet. If the write command is ordered or running in a transaction, this method will
+     * only record one error (for the remaining op with the lowest ID). Otherwise, this method will
+     * record errors for all remaining ops.
+     */
+    void recordErrorForRemainingOps(OperationContext* opCtx, const Status& status);
+
+    /**
+     * Returns the number of errors recorded so far.
+     */
+    size_t getNumErrorsRecorded() const {
+        return _nErrors;
+    }
+
+    /**
+     * Returns the number of OK responses that have been processed so far.
+     */
+    size_t getNumOkResponsesProcessed() const {
+        return _numOkResponses;
+    }
 
 private:
     Result _onWriteBatchResponse(OperationContext* opCtx,
@@ -148,6 +166,7 @@ private:
                                   RoutingContext& routingCtx,
                                   const std::vector<WriteOp>& ops,
                                   const std::vector<BulkWriteReplyItem>&);
+
     /**
      * If an op was not in the ReplyItems, this function processes it and decides if a retry is
      * needed.
@@ -156,20 +175,40 @@ private:
                                                    const std::vector<BulkWriteReplyItem>&,
                                                    std::vector<WriteOp>&& toRetry);
 
+    /**
+     * Process a single ReplyItem attributed to 'op', adding it to _results and updating
+     * _numOkResponses and _nErrors.
+     */
+    void processReplyItem(const WriteOp& op, BulkWriteReplyItem item);
 
     /**
-     * Handle errors when we do not have responses from the remote shards.
+     * Process an error attributed to 'op', adding it to _results and updating _nErrors.
      */
-    Result handleLocalError(OperationContext* opCtx,
-                            Status status,
-                            WriteOp op,
-                            boost::optional<const ShardId&> shardId);
+    void processError(const WriteOp& op, const Status& status);
 
     /**
-     * Adds a BulkReplyItem with the opId and status to '_results' and increments '_nErrors'. Used
-     * when we need to abort the whole batch due to an error when we're in a transaction.
+     * Process a local or top-level error attributed to an entire batch of WriteOps ('ops'),
+     * updating _results and _nErrors appropriately.
      */
-    void noteErrorResponseOnAbort(int opId, const Status& status);
+    void processErrorForBatch(OperationContext* opCtx,
+                              const std::vector<WriteOp>& ops,
+                              const Status& status);
+
+    /**
+     * If the write command is running in a transaction and 'status' is a transient transaction
+     * error, then this method returns 'status'. Otherwise this method returns boost::none.
+     */
+    boost::optional<Status> getTransientTxnError(OperationContext* opCtx, const Status& status);
+
+    /**
+     * If the write command is running in a transaction and 'status' is a transient transaction
+     * error, then this method returns 'status' with some additional context added. Otherwise this
+     * method returns boost::none.
+     */
+    boost::optional<Status> getTransientTxnError(
+        OperationContext* opCtx,
+        const executor::RemoteCommandResponse& shardResponse,
+        const Status& status);
 
     /**
      * Returns the retriedStmtIds to set them in the client response.
@@ -188,6 +227,7 @@ private:
     size_t _nModified{0};
     size_t _nUpserted{0};
     size_t _nDeleted{0};
+    size_t _numOkResponses{0};
     std::map<WriteOpId, BulkWriteReplyItem> _results;
     std::vector<ShardWCError> _wcErrors;
     stdx::unordered_set<StmtId> _retriedStmtIds;

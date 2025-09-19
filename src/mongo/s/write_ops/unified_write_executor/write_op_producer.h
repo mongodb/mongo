@@ -86,7 +86,7 @@ protected:
     }
 
     const WriteCommandRef _cmdRef;
-    absl::btree_set<size_t> _activeIndices;
+    absl::btree_set<WriteOpId> _activeIndices;
     bool _stopProducingOps{false};
 };
 

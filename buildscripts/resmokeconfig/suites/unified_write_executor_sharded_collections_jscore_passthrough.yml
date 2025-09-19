@@ -52,12 +52,6 @@ selector:
     # Disabled because some features covered in these tests are not yet supported in the UWE.
     # TODO SERVER-104139: Add timeseries support.
     - jstests/core/timeseries/**/*.js
-    # TODO SERVER-108965: Enable once targeter is equipped to handle errors.
-    # Targeter fails to parse 'delete' queries.
-    - jstests/core/query/expr/expr.js
-    - jstests/core/query/batch_write/batch_write_command_delete.js
-    - jstests/core/query/delete/remove_undefined.js
-    - jstests/core/write/bulk/bulk_write_non_transaction.js
     # TODO: SERVER-104535 support cursor with bulk write.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
   exclude_with_any_tags:

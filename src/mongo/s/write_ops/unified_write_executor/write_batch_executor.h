@@ -45,6 +45,8 @@ struct ShardResponse {
     // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] shound return
     // the corresponding WriteOp from the original command from the client.
     std::vector<WriteOp> ops;
+    // For debugging purposes.
+    boost::optional<HostAndPort> shardHostAndPort;
 };
 
 struct EmptyBatchResponse {};
@@ -63,6 +65,13 @@ using WriteBatchResponse =
 
 class WriteBatchExecutor {
 public:
+    /**
+     * Returns true if the scheduler must provide a RoutingContext when executing the specified
+     * batch, otherwise returns false.
+     *
+     * The scheduler uses this method to determine if it needs to provide a RoutingContext when
+     * it calls execute().
+     */
     WriteBatchExecutor(WriteCommandRef cmdRef) : _cmdRef(cmdRef) {}
 
     WriteBatchExecutor(const BatchedCommandRequest& request)
@@ -71,6 +80,11 @@ public:
     WriteBatchExecutor(const BulkWriteCommandRequest& request)
         : WriteBatchExecutor(WriteCommandRef{request}) {}
 
+    bool usesProvidedRoutingContext(const WriteBatch& batch) const;
+
+    /**
+     * This method executes the specified 'batch' and returns the responses for the batch.
+     */
     WriteBatchResponse execute(OperationContext* opCtx,
                                RoutingContext& routingCtx,
                                const WriteBatch& batch);
@@ -87,6 +101,7 @@ private:
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
                                 const NonTargetedWriteBatch& batch);
+
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
                                 const InternalTransactionBatch& batch);

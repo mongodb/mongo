@@ -38,14 +38,71 @@ namespace unified_write_executor {
 
 class WriteBatchScheduler {
 public:
-    WriteBatchScheduler(WriteOpBatcher& batcher,
+    using CollectionsToCreate = WriteBatchResponseProcessor::CollectionsToCreate;
+
+    static constexpr size_t kMaxRoundsWithoutProgress = 10;
+
+    WriteBatchScheduler(WriteCommandRef cmdRef,
+                        WriteOpBatcher& batcher,
                         WriteBatchExecutor& executor,
                         WriteBatchResponseProcessor& processor)
-        : _batcher(batcher), _executor(executor), _processor(processor) {}
+        : _cmdRef(std::move(cmdRef)),
+          _nssSet(_cmdRef.getNssSet()),
+          _batcher(batcher),
+          _executor(executor),
+          _processor(processor) {}
 
-    void run(OperationContext* opCtx, const std::set<NamespaceString>& nssSet);
+    void run(OperationContext* opCtx);
 
 protected:
+    /**
+     * Helper method for executing a batch and processing the responses. Returns a boolean that
+     * indicates if any progress was made.
+     *
+     * This method takes care of marking ops for re-processing as needed, it will create collections
+     * as needed if there were any CannotImplicitlyCreateCollection errors, and it will also inform
+     * the batcher to stop making batches if an unrecoverable error has occurred.
+     */
+    bool executeRound(OperationContext* opCtx);
+
+    /**
+     * Helper method for creating a RoutingContext.
+     */
+    StatusWith<std::unique_ptr<RoutingContext>> initRoutingContext(
+        OperationContext* opCtx, const std::vector<NamespaceString>& nssList);
+
+    /**
+     * Helper method for handling the case where RoutingContext creation failed.
+     */
+    void handleInitRoutingContextError(OperationContext* opCtx, const Status& status);
+
+    /**
+     * Helper method that calls getNextBatch(), handles target errors that occurred during batch
+     * creation (if any), and then returns the next batch.
+     */
+    WriteBatch getNextBatchAndHandleTargetErrors(OperationContext* opCtx,
+                                                 RoutingContext& routingCtx);
+
+    /**
+     * This method calls release() on 'routingCtx' for the appropriate namespaces in preparation
+     * for executing the specified 'batch'.
+     */
+    void prepareRoutingContext(RoutingContext& routingCtx,
+                               const std::vector<NamespaceString>& nssList,
+                               const WriteBatch& batch);
+
+    /**
+     * Helper method for creating a collection.
+     */
+    bool createCollection(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Helper method for creating multiple collections.
+     */
+    bool createCollections(OperationContext* opCtx, const CollectionsToCreate& collsToCreate);
+
+    const WriteCommandRef _cmdRef;
+    const std::set<NamespaceString> _nssSet;
     WriteOpBatcher& _batcher;
     WriteBatchExecutor& _executor;
     WriteBatchResponseProcessor& _processor;

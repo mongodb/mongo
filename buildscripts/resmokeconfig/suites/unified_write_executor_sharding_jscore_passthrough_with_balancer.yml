@@ -54,6 +54,7 @@ selector:
     # Disabled because some features covered in these tests are not yet supported in the UWE.
     # TODO SERVER-104139: Add timeseries support.
     - jstests/core/**/*timeseries*.js
+    - jstests/core/timeseries/**/*.js
     - jstests/core_sharding/resharding/reshard_collection_timeseries.js
     - jstests/core_sharding/global_catalog/sharded_data_distribution.js
     # TODO: SERVER-104535 support cursor with bulk write.

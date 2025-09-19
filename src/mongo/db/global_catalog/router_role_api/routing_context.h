@@ -86,9 +86,14 @@ public:
     const CollectionRoutingInfo& getCollectionRoutingInfo(const NamespaceString& nss) const;
 
     /**
-     * Returns if the RoutingContext contains the specified NamespaceString.
+     * Returns true if the RoutingContext contains the specified NamespaceString.
      */
     bool hasNss(const NamespaceString& nss) const;
+
+    /**
+     * Returns a vector of all the NamespaceStrings contained within this RoutingContext.
+     */
+    std::vector<NamespaceString> getNssList() const;
 
     /**
      * Record that a versioned request for a namespace was sent to a shard. The namespace is
@@ -102,6 +107,14 @@ public:
      */
     virtual void onStaleError(const Status& status,
                               boost::optional<const NamespaceString&> nss = boost::none);
+
+    /**
+     * Informs the RoutingContext of a StaleConfig error (similar to onStaleError()), but does not
+     * require a StaleConfig Status to be passed in. Where possible, using onStaleError() should be
+     * preferred over using this method.
+     */
+    virtual void onStaleShardVersionError(const NamespaceString& nss,
+                                          const boost::optional<ShardVersion>& wantedVersion);
 
     /**
      * By default, the RoutingContext should be validated by running validateOnContextEnd() at the

@@ -70,7 +70,6 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRe
     WriteOpProducer producer(cmdRef);
     WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);
 
-    std::set<NamespaceString> nssSet = cmdRef.getNssSet();
     const bool ordered = cmdRef.getOrdered();
 
     std::unique_ptr<WriteOpBatcher> batcher{nullptr};
@@ -82,9 +81,9 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRe
 
     WriteBatchExecutor executor(cmdRef);
     WriteBatchResponseProcessor processor(cmdRef, stats, isNonVerbose);
-    WriteBatchScheduler scheduler(*batcher, executor, processor);
+    WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor);
 
-    scheduler.run(opCtx, nssSet);
+    scheduler.run(opCtx);
     stats.updateMetrics(opCtx);
     return processor.generateClientResponse(opCtx);
 }

@@ -45,10 +45,6 @@ struct EmptyBatch {
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return std::set<NamespaceString>{};
     }
-
-    bool executorUsesSeparateRoutingContext() const {
-        return false;
-    }
 };
 
 struct SimpleWriteBatch {
@@ -108,13 +104,14 @@ struct InternalTransactionBatch {
     WriteOp op;
     boost::optional<UUID> sampleId;
 
-    std::set<NamespaceString> getInvolvedNamespaces() const {
-        return {op.getNss()};
-    }
     std::vector<WriteOp> getWriteOps() const {
         std::vector<WriteOp> result;
         result.emplace_back(op);
         return result;
+    }
+
+    std::set<NamespaceString> getInvolvedNamespaces() const {
+        return {op.getNss()};
     }
 };
 
@@ -143,34 +140,29 @@ struct WriteBatch {
     }
 };
 
-
 /**
  * Based on the analysis of the write ops, this class bundles multiple write ops into batches to be
  * sent to shards.
  */
 class WriteOpBatcher {
 public:
-    enum ErrorHandlerAction : uint8_t {
-        kReturnError = 0,
-        kConsumeErrorAndResume,
-        kConsumeErrorAndReturnEmptyBatch,
+    struct Result {
+        WriteBatch batch;
+        std::vector<std::pair<WriteOp, Status>> opsWithErrors;
     };
-
-    using ErrorHandlerFn = std::function<ErrorHandlerAction(const WriteOp&, const Status&, bool)>;
 
     WriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : _producer(producer), _analyzer(analyzer) {}
 
     virtual ~WriteOpBatcher() = default;
 
+    // XXX Update comment
     /**
-     * Get the next batch from the list of write ops returned by the producer. Based on the analysis
-     * results, the batches may be of different write types. If there are no more write ops to be
-     * batched up, this function returns none.
+     * This method makes a new batch using ops taken from the producer and returns it. Depending on
+     * the results from analyzing the ops from the producer, the batch returned may have different
+     * types. If the producer has no more ops, this function returns an EmptyBatch.
      */
-    virtual StatusWith<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                                RoutingContext& routingCtx,
-                                                const ErrorHandlerFn& eh = nullptr) = 0;
+    virtual Result getNextBatch(OperationContext* opCtx, RoutingContext& routingCtx) = 0;
 
     /**
      * Mark a write op to be reprocessed, which will in turn be reanalyzed and rebatched.
@@ -189,9 +181,8 @@ public:
     }
 
     /**
-     * Takes a 'batch' that needs to be reprocessed. This method will do whatever is needed to
-     * cancel the batch, and it will mark the batch's ops to be reprocessed (so they can later
-     * be reanalyzed and rebatched).
+     * Marks all of the write ops in 'batch' to be reprocessed. These ops in turn will be reanalyzed
+     * and rebatched.
      */
     void markBatchReprocess(WriteBatch batch);
 
@@ -203,14 +194,27 @@ public:
     }
 
     /**
-     * Mark an unrecoverable error has occurred, for ordered batcher this means no further batches
-     * should be produced.
+     * Instructs the batcher to not make any more batches. After this method is called, isDone()
+     * will always return true and getNextBatch() will always return an EmptyBatch.
      */
-    virtual void markUnrecoverableError() = 0;
+    void stopMakingBatches() {
+        _producer.stopProducingOps();
+    }
+
+    bool getRetryOnTargetError() const {
+        return _retryOnTargetError;
+    }
+
+    void setRetryOnTargetError(bool b) {
+        _retryOnTargetError = b;
+    }
 
 protected:
     WriteOpProducer& _producer;
     WriteOpAnalyzer& _analyzer;
+
+    // Boolean flag that controls how target errors are handled.
+    bool _retryOnTargetError = true;
 };
 
 class OrderedWriteOpBatcher : public WriteOpBatcher {
@@ -218,11 +222,7 @@ public:
     OrderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : WriteOpBatcher(producer, analyzer) {}
 
-    StatusWith<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                        RoutingContext& routingCtx,
-                                        const ErrorHandlerFn& eh = nullptr) override;
-
-    void markUnrecoverableError() override;
+    Result getNextBatch(OperationContext* opCtx, RoutingContext& routingCtx) override;
 };
 
 class UnorderedWriteOpBatcher : public WriteOpBatcher {
@@ -230,11 +230,7 @@ public:
     UnorderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : WriteOpBatcher(producer, analyzer) {}
 
-    StatusWith<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                        RoutingContext& routingCtx,
-                                        const ErrorHandlerFn& eh = nullptr) override;
-
-    void markUnrecoverableError() override {}
+    Result getNextBatch(OperationContext* opCtx, RoutingContext& routingCtx) override;
 };
 
 }  // namespace unified_write_executor

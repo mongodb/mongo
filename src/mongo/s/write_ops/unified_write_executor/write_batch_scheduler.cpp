@@ -30,58 +30,249 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
 
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace unified_write_executor {
 
-void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceString>& nssSet) {
+void WriteBatchScheduler::run(OperationContext* opCtx) {
+    // The loop below uses an expontential backoff scheme that kicks in when there are one or more
+    // consecutive rounds that don't make progress. If there are too many consecutive rounds without
+    // progress, this function will eventually give up and fail with an error. These variables are
+    // used to implement this mechanism.
+    size_t rounds = 0;
+    size_t numRoundsWithoutProgress = 0;
+    Backoff backoff(Seconds(1), Seconds(2));
+
+    // Keep executing rounds until the batcher says it can't make any more batches or until an
+    // unrecoverable error or exception occurs.
     while (!_batcher.isDone()) {
+        // If there have been too many consecutive rounds without progress, fail the remaining ops
+        // and break out of the loop.
+        if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
+            Status status{ErrorCodes::NoProgressMade,
+                          str::stream() << "No progress was made executing write ops in after "
+                                        << kMaxRoundsWithoutProgress << " rounds (" << rounds
+                                        << " rounds total)"};
 
-        bool shouldAbort = false;
-        // Destroy the routing context after retrieving the next batch, as later processing
-        // may generate separate routing operations (e.g. implicitly creating collections)
-        // but at most one routing context should exist in one thread at any given time.
-        auto collsToCreate = routing_context_utils::withValidatedRoutingContextForTxnCmd(
-            opCtx,
-            std::vector<NamespaceString>{nssSet.begin(), nssSet.end()},
-            [&,
-             this](RoutingContext& routingCtx) -> WriteBatchResponseProcessor::CollectionsToCreate {
-                // TODO SERVER-108965 Handle targeting errors in the UWE.
-
-                // Call getNextBatch(). If a target error occurs, throw an exception.
-                auto batchOfRequests = uassertStatusOK(_batcher.getNextBatch(opCtx, routingCtx));
-
-                // Dismiss validation for any namespaces that don't have write ops in this
-                // round.
-                auto involvedNamespaces = batchOfRequests.getInvolvedNamespaces();
-                for (const auto& nss : nssSet) {
-                    if (!involvedNamespaces.contains(nss)) {
-                        routingCtx.release(nss);
-                    }
-                }
-
-                auto batchOfResponses = _executor.execute(opCtx, routingCtx, batchOfRequests);
-                auto result = _processor.onWriteBatchResponse(opCtx, routingCtx, batchOfResponses);
-                if (result.errorType == WriteBatchResponseProcessor::ErrorType::kStopProcessing) {
-                    shouldAbort = true;
-                } else if (result.errorType ==
-                           WriteBatchResponseProcessor::ErrorType::kUnrecoverable) {
-                    _batcher.markUnrecoverableError();
-                }
-                if (!result.opsToRetry.empty()) {
-                    _batcher.markOpReprocess(result.opsToRetry);
-                }
-                return result.collsToCreate;
-            });
-        if (shouldAbort) {
+            _processor.recordErrorForRemainingOps(opCtx, status);
+            _batcher.stopMakingBatches();
             break;
         }
-        if (!collsToCreate.empty()) {
-            for (auto& [nss, _] : collsToCreate) {
-                cluster::createCollectionWithRouterLoop(opCtx, nss);
+
+        // If no progress was made during the previous round, do expontential backoff before
+        // starting this round.
+        if (numRoundsWithoutProgress > 0) {
+            sleepFor(backoff.nextSleep());
+        }
+
+        // Execute a round.
+        bool madeProgress = executeRound(opCtx);
+
+        // Increment 'rounds', update 'numRoundsWithoutProgress', and print a message to the log.
+        ++rounds;
+        numRoundsWithoutProgress = !madeProgress ? numRoundsWithoutProgress + 1 : 0;
+        LOGV2_DEBUG(10896504, 4, "Completed round", "rounds completed"_attr = rounds);
+    }
+}
+
+bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
+    const bool ordered = _cmdRef.getOrdered();
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const auto nssList = std::vector<NamespaceString>{_nssSet.begin(), _nssSet.end()};
+
+    // Create a RoutingContext. If creating the RoutingContext fails, handle the failure and
+    // return an empty vector.
+    auto swRoutingCtx = initRoutingContext(opCtx, nssList);
+    if (!swRoutingCtx.isOK()) {
+        handleInitRoutingContextError(opCtx, swRoutingCtx.getStatus());
+        return false;
+    }
+
+    // Capture how many OK responses there have been at the start of the round so we can compare
+    // against it when the round has finished.
+    const size_t previousNumOkResponses = _processor.getNumOkResponsesProcessed();
+
+    auto result = routing_context_utils::runAndValidate(
+        *swRoutingCtx.getValue(),
+        [&](RoutingContext& routingCtx) -> WriteBatchResponseProcessor::Result {
+            // Call getNextBatch() and handle any target errors that occurred.
+            auto batch = getNextBatchAndHandleTargetErrors(opCtx, routingCtx);
+
+            // Prepare the RoutingContext for executing the batch.
+            prepareRoutingContext(routingCtx, nssList, batch);
+
+            // Execute the batch.
+            auto batchResponse = _executor.execute(opCtx, routingCtx, batch);
+
+            // Process the responses.
+            return _processor.onWriteBatchResponse(opCtx, routingCtx, batchResponse);
+        });
+
+    // Check if any progress was made during this round.
+    bool madeProgress = _processor.getNumOkResponsesProcessed() > previousNumOkResponses;
+
+    // If a write error occurred -AND- if the write command is ordered or running in a transaction,
+    // call stopMakingBatches() to stop any further execution of this command and then return.
+    if ((ordered || inTransaction) && _processor.getNumErrorsRecorded() > 0) {
+        _batcher.stopMakingBatches();
+        return madeProgress;
+    }
+
+    // Mark each op in 'opsToRetry' for re-processing.
+    if (!result.opsToRetry.empty()) {
+        _batcher.markOpReprocess(result.opsToRetry);
+    }
+
+    // Create a collection for each namespace in 'collsToCreate', and set 'madeProgress' to true
+    // if the call to createCollections() successfully created one or more collections.
+    madeProgress |= createCollections(opCtx, result.collsToCreate);
+
+    return madeProgress;
+}
+
+StatusWith<std::unique_ptr<RoutingContext>> WriteBatchScheduler::initRoutingContext(
+    OperationContext* opCtx, const std::vector<NamespaceString>& nssList) {
+    constexpr size_t kMaxAttempts = 3u;
+
+    // Check to make sure isCollectionlessAggregateNS() is false for all names in 'nssList'.
+    for (const auto& nss : nssList) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Must use real namespaces with WriteBatchScheduler, got "
+                              << nss.toStringForErrorMsg(),
+                !nss.isCollectionlessAggregateNS());
+    }
+
+    size_t attempts = 0;
+
+    for (;;) {
+        ++attempts;
+
+        try {
+            // Ensure all the relevant databases exist.
+            std::set<DatabaseName> dbSet;
+            for (const auto& nss : nssList) {
+                if (auto [it, inserted] = dbSet.insert(nss.dbName()); inserted) {
+                    const auto& dbName = *it;
+                    cluster::createDatabase(opCtx, dbName);
+                }
             }
+
+            // Create a RoutingContext and return it. If the RoutingContext constructor fails, an
+            // exception will be thrown.
+            const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
+                shard_role_details::getLocker(opCtx)->isLocked();
+
+            return std::make_unique<RoutingContext>(opCtx, std::move(nssList), allowLocks);
+        } catch (const DBException& ex) {
+            // For NamespaceNotFound errors, we will retry a couple of times before returning
+            // the error to the caller. For all other types of errors, we return the error to
+            // the caller immediately.
+            if (dynamic_cast<const ExceptionFor<ErrorCodes::NamespaceNotFound>*>(&ex)) {
+                LOGV2_INFO(10896505,
+                           "RoutingContext initialization failed due to a NamespaceNotFound error",
+                           "reason"_attr = ex.reason(),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxAttempts);
+
+                // If the maximum number of attempts has not been reached, continue and try
+                // again.
+                if (attempts < kMaxAttempts) {
+                    continue;
+                }
+            } else if (dynamic_cast<const ExceptionFor<ErrorCodes::StaleEpoch>*>(&ex)) {
+                LOGV2_DEBUG(10896506,
+                            2,
+                            "Failed to refresh RoutingContext in WriteBatchScheduler because "
+                            "collection was dropped",
+                            "error"_attr = redact(ex));
+            } else {
+                LOGV2_WARNING(10896507,
+                              "Failed to refresh RoutingContext in WriteBatchScheduler",
+                              "error"_attr = redact(ex));
+            }
+            // Return the error.
+            return ex.toStatus("Failed to refresh RoutingContext in WriteBatchScheduler");
         }
     }
+}
+
+void WriteBatchScheduler::handleInitRoutingContextError(OperationContext* opCtx,
+                                                        const Status& status) {
+    tassert(10896508, "Unexpectedly got an OK status", !status.isOK());
+
+    // If creating the RoutingContext failed and nothing has been processed yet, throw the error
+    // as an exception.
+    if (!_processor.getNumOkResponsesProcessed() && !_processor.getNumErrorsRecorded()) {
+        uassertStatusOK(status);
+    }
+
+    // Get the non-OK Status from 'routingCtx' and record an error for all remaining ops, and
+    // then call stopMakingBatches() to stop any further execution of this command.
+    _processor.recordErrorForRemainingOps(opCtx, status);
+    _batcher.stopMakingBatches();
+}
+
+WriteBatch WriteBatchScheduler::getNextBatchAndHandleTargetErrors(OperationContext* opCtx,
+                                                                  RoutingContext& routingCtx) {
+    auto result = _batcher.getNextBatch(opCtx, routingCtx);
+
+    if (!result.opsWithErrors.empty()) {
+        // Record any target errors that occurred with the response processor.
+        for (const auto& [op, status] : result.opsWithErrors) {
+            _processor.recordTargetError(opCtx, op, status);
+        }
+        // If an unrecoverable error occurred, discard the batch, call stopMakingBatches() to
+        // stop any further execution of this command, and then return an empty batch.
+        if (_cmdRef.getOrdered() || TransactionRouter::get(opCtx)) {
+            _batcher.markBatchReprocess(std::move(result.batch));
+            _batcher.stopMakingBatches();
+            return WriteBatch{};
+        }
+    }
+
+    // Return the batch.
+    return std::move(result.batch);
+}
+
+void WriteBatchScheduler::prepareRoutingContext(RoutingContext& routingCtx,
+                                                const std::vector<NamespaceString>& nssList,
+                                                const WriteBatch& batch) {
+    auto involvedNssSet = batch.getInvolvedNamespaces();
+    bool executorUsesProvidedRoutingCtx = _executor.usesProvidedRoutingContext(batch);
+    for (const auto& nss : nssList) {
+        // If 'nss' is not involve with 'batch', or if the executor is not going to use 'routingCtx'
+        // when executing 'batch', release 'nss' from 'routingCtx'.
+        if (!executorUsesProvidedRoutingCtx || !involvedNssSet.count(nss)) {
+            routingCtx.release(nss);
+        }
+    }
+}
+
+bool WriteBatchScheduler::createCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        cluster::createCollectionWithRouterLoop(opCtx, nss);
+        LOGV2_DEBUG(10896509, 3, "Successfully created collection", "nss"_attr = nss);
+    } catch (const DBException& ex) {
+        LOGV2(10896510, "Could not create collection", "error"_attr = redact(ex.toStatus()));
+        return false;
+    }
+
+    return true;
+}
+
+bool WriteBatchScheduler::createCollections(OperationContext* opCtx,
+                                            const CollectionsToCreate& collsToCreate) {
+    bool createdCollections = false;
+    if (!collsToCreate.empty()) {
+        for (auto& [nss, _] : collsToCreate) {
+            createdCollections |= createCollection(opCtx, nss);
+        }
+    }
+
+    return createdCollections;
 }
 
 }  // namespace unified_write_executor
