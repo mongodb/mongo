@@ -12,8 +12,8 @@ selector:
 
     # Sharding tests.
     - jstests/sharding/query/bulk_write_basic.js
-    # - jstests/sharding/analyze_shard_key/list_sampled_queries.js
-    # - jstests/sharding/analyze_shard_key/sample_rates_bulk_write_multi_namespaces.js
+    - jstests/sharding/analyze_shard_key/list_sampled_queries.js
+    - jstests/sharding/analyze_shard_key/sample_rates_bulk_write_multi_namespaces.js
     # - jstests/sharding/applyOps_multiple_namespaces.js
     - jstests/sharding/chunk_migration_with_bulk_write.js
     # - jstests/sharding/database_versioning_all_commands.js

@@ -52,10 +52,6 @@ selector:
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
 
-    # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-107644 enable when sample id is supported.
-    - jstests/concurrency/fsm_workloads/analyze_shard_key.js
-
   exclude_with_any_tags:
     - requires_standalone
     - assumes_balancer_off

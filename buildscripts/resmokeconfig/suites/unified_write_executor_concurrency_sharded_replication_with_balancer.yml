@@ -47,8 +47,6 @@ selector:
     # TODO SERVER-104139: Add timeseries support.
     - jstests/concurrency/fsm_workloads/timeseries/*.js
     - jstests/concurrency/fsm_workloads/**/*timeseries*.js
-    # TODO SERVER-107644: Support attaching sampleId.
-    - jstests/concurrency/fsm_workloads/analyze_shard_key.js
 
   exclude_with_any_tags:
     - requires_standalone

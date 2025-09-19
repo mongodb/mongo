@@ -83,9 +83,11 @@ bool isCompatibleWithBatch(SimpleWriteBatch& writeBatch,
     return true;
 }
 
-void addSingleShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
-                                  WriteOp& writeOp,
-                                  std::vector<ShardEndpoint>& shardsAffected) {
+void addSingleShardWriteOpToBatch(
+    SimpleWriteBatch& writeBatch,
+    WriteOp& writeOp,
+    std::vector<ShardEndpoint>& shardsAffected,
+    boost::optional<analyze_shard_key::TargetedSampleId>& targetedSampleId) {
     tassert(10387000,
             "Single shard write type should only target a single shard",
             shardsAffected.size() == 1);
@@ -113,24 +115,33 @@ void addSingleShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
                                                {writeOp.getNss(), shardsAffected.front()}},
                                            std::vector<WriteOp>{writeOp}});
     }
+
+    if (targetedSampleId && targetedSampleId->isFor(shardName)) {
+        auto& request = writeBatch.requestByShardId[shardName];
+        request.sampleIds.emplace(writeOp.getId(), targetedSampleId->getId());
+    }
 }
 
-void addMultiShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
-                                 WriteOp& writeOp,
-                                 std::vector<ShardEndpoint>& shardsAffected) {
+void addMultiShardWriteOpToBatch(
+    SimpleWriteBatch& writeBatch,
+    WriteOp& writeOp,
+    std::vector<ShardEndpoint>& shardsAffected,
+    boost::optional<analyze_shard_key::TargetedSampleId>& targetedSampleId) {
     for (const auto& shardEndpoint : shardsAffected) {
         std::vector<ShardEndpoint> shardEndpoints{shardEndpoint};
-        addSingleShardWriteOpToBatch(writeBatch, writeOp, shardEndpoints);
+        addSingleShardWriteOpToBatch(writeBatch, writeOp, shardEndpoints, targetedSampleId);
     }
 }
 
 void addWriteOpToBatch(SimpleWriteBatch& writeBatch, WriteOp& writeOp, Analysis& analysis) {
     switch (analysis.type) {
         case kSingleShard:
-            addSingleShardWriteOpToBatch(writeBatch, writeOp, analysis.shardsAffected);
+            addSingleShardWriteOpToBatch(
+                writeBatch, writeOp, analysis.shardsAffected, analysis.targetedSampleId);
             break;
         case kMultiShard:
-            addMultiShardWriteOpToBatch(writeBatch, writeOp, analysis.shardsAffected);
+            addMultiShardWriteOpToBatch(
+                writeBatch, writeOp, analysis.shardsAffected, analysis.targetedSampleId);
             break;
         default:
             MONGO_UNREACHABLE;
@@ -195,7 +206,8 @@ StatusWith<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
             }
             // Consume 'writeOp' and add it to the current batch and keep looping to see if more ops
             // can be added to the batch.
-            addSingleShardWriteOpToBatch(*simpleBatch, *writeOp, analysis.shardsAffected);
+            addSingleShardWriteOpToBatch(
+                *simpleBatch, *writeOp, analysis.shardsAffected, analysis.targetedSampleId);
             _producer.advance();
             continue;
         }
@@ -208,20 +220,24 @@ StatusWith<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
             // a SimpleBatch and keep looping to see if more ops can be added to the batch.
             simpleBatch.emplace();
             shardId = analysis.shardsAffected.front().shardName;
-            addSingleShardWriteOpToBatch(*simpleBatch, *writeOp, analysis.shardsAffected);
+            addSingleShardWriteOpToBatch(
+                *simpleBatch, *writeOp, analysis.shardsAffected, analysis.targetedSampleId);
         } else if (analysis.type == kMultiShard) {
             // If this is the first op and it's kMultiShard, then consume the op and put it in a
             // SimpleWriteBatch by itself and return the batch.
             SimpleWriteBatch batch;
-            addMultiShardWriteOpToBatch(batch, *writeOp, analysis.shardsAffected);
+            addMultiShardWriteOpToBatch(
+                batch, *writeOp, analysis.shardsAffected, analysis.targetedSampleId);
             return WriteBatch{std::move(batch)};
         } else if (analysis.type == kNonTargetedWrite) {
             // If this is the first op and it's kNonTargetedWrite, then consume the op and put it in
             // a NonTargetedWriteBatch by itself and return the batch.
-            return WriteBatch{NonTargetedWriteBatch{*writeOp}};
+            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+            return WriteBatch{NonTargetedWriteBatch{*writeOp, std::move(sampleId)}};
         } else if (analysis.type == kInternalTransaction) {
             // For ops needing an internal transaction they are placed in their own batch.
-            return WriteBatch{InternalTransactionBatch{*writeOp}};
+            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+            return WriteBatch{InternalTransactionBatch{*writeOp, std::move(sampleId)}};
         } else {
             MONGO_UNREACHABLE_TASSERT(10346701);
         }
@@ -292,11 +308,15 @@ StatusWith<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
             // NonTargetedWriteBatch by itself and return the batch.
             if (analysis.type == kNonTargetedWrite) {
                 _producer.advance();
-                return WriteBatch{NonTargetedWriteBatch{writeOp}};
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return WriteBatch{NonTargetedWriteBatch{writeOp, std::move(sampleId)}};
             }
             if (analysis.type == kInternalTransaction) {
                 _producer.advance();
-                return WriteBatch{InternalTransactionBatch{writeOp}};
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return WriteBatch{InternalTransactionBatch{writeOp, std::move(sampleId)}};
             }
             // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep
             // looping to see if more ops can be added to the batch.

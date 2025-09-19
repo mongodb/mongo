@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/router_role_api/routing_context.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
@@ -51,6 +52,7 @@ enum BatchType {
 struct Analysis {
     BatchType type;
     std::vector<ShardEndpoint> shardsAffected;
+    boost::optional<analyze_shard_key::TargetedSampleId> targetedSampleId;
 };
 
 class WriteOpAnalyzer {

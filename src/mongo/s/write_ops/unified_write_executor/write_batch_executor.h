@@ -95,12 +95,14 @@ private:
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) const;
 
     BSONObj buildBulkWriteRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const std::map<WriteOpId, UUID>& sampleIds,
         bool shouldAppendLsidAndTxnNumber,
         bool shouldAppendWriteConcern,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) const;

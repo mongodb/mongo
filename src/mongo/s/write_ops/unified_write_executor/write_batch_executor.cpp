@@ -53,6 +53,7 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
     std::vector<BulkWriteOpVariant> bulkOps;
     std::vector<NamespaceInfoEntry> nsInfos;
@@ -93,6 +94,16 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
                 *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
         }
 
+        auto sampleIdIt = sampleIds.find(op.getId());
+        if (sampleIdIt != sampleIds.end()) {
+            visit(OverloadedVisitor{
+                      [&](mongo::BulkWriteInsertOp& op) { return; },
+                      [&](mongo::BulkWriteUpdateOp& op) { op.setSampleId(sampleIdIt->second); },
+                      [&](mongo::BulkWriteDeleteOp& op) { op.setSampleId(sampleIdIt->second); },
+                  },
+                  bulkOp);
+        }
+
         bulkOps.emplace_back(bulkOp);
 
         if (isRetryableWrite) {
@@ -121,11 +132,12 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::map<WriteOpId, UUID>& sampleIds,
     bool shouldAppendLsidAndTxnNumber,
     bool shouldAppendWriteConcern,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
     auto bulkRequest = buildBulkWriteRequestWithoutTxnInfo(
-        opCtx, ops, versionByNss, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+        opCtx, ops, versionByNss, sampleIds, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     BSONObjBuilder builder;
     bulkRequest.serialize(&builder);
@@ -159,6 +171,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         auto bulkRequestObj = buildBulkWriteRequest(opCtx,
                                                     shardRequest.ops,
                                                     shardRequest.versionByNss,
+                                                    shardRequest.sampleIds,
                                                     true /* shouldAppendLsidAndTxnNumber */,
                                                     true /* shouldAppendWriteConcern */);
         LOGV2_DEBUG(10605503,
@@ -209,11 +222,16 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
         opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+    std::map<WriteOpId, UUID> sampleIds;
+    if (batch.sampleId) {
+        sampleIds.emplace(writeOp.getId(), *batch.sampleId);
+    }
     auto cmdObj = buildBulkWriteRequest(opCtx,
                                         {writeOp},
-                                        {},    /* versionByNss*/
-                                        false, /* shouldAppendLsidAndTxnNumber */
-                                        false, /* shouldAppendWriteConcern */
+                                        {},        /* versionByNss*/
+                                        sampleIds, /* sampleIds */
+                                        false,     /* shouldAppendLsidAndTxnNumber */
+                                        false,     /* shouldAppendWriteConcern */
                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     boost::optional<WriteConcernErrorDetail> wce;
@@ -237,13 +255,19 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 const InternalTransactionBatch& batch) {
     // TODO SERVER-108144 maybe we shouldn't call release here or maybe we should acknowledge a
     // write based on the swRes.
+    const WriteOp& writeOp = batch.op;
     routingCtx.release(batch.op.getNss());
     bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
         opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+    std::map<WriteOpId, UUID> sampleIds;
+    if (batch.sampleId) {
+        sampleIds.emplace(writeOp.getId(), *batch.sampleId);
+    }
     auto singleUpdateRequest =
         buildBulkWriteRequestWithoutTxnInfo(opCtx,
                                             {batch.op},
                                             {}, /* versionByNss*/
+                                            sampleIds,
                                             allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();

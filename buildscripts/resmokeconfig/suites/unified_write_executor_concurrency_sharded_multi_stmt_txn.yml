@@ -52,9 +52,6 @@ selector:
     - jstests/concurrency/fsm_workloads/query/update/update_rename.js
     - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js
 
-    # TODO: SERVER-107644 enable when sample id is supported.
-    - jstests/concurrency/fsm_workloads/analyze_shard_key.js
-
   exclude_with_any_tags:
     - requires_standalone
     - assumes_against_mongod_not_mongos

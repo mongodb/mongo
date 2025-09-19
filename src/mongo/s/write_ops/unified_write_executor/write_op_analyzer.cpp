@@ -83,8 +83,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isTimeseriesRetryableUpdateOp =
         isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
 
+    const auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
+        opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
+
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
-        return Analysis{BatchType::kNonTargetedWrite, std::move(tr.endpoints)};
+        return Analysis{
+            BatchType::kNonTargetedWrite, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else if (isTimeseriesRetryableUpdateOp) {
         // Special case for time series since an update could affect two documents in the underlying
         // buckets collection.
@@ -95,11 +99,14 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         tassert(10413902,
                 "Writes without shard key must go through non-targeted path",
                 !(tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId));
-        return Analysis{BatchType::kInternalTransaction, std::move(tr.endpoints)};
+        return Analysis{
+            BatchType::kInternalTransaction, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else if (tr.endpoints.size() == 1) {
-        return Analysis{BatchType::kSingleShard, std::move(tr.endpoints)};
+        return Analysis{
+            BatchType::kSingleShard, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else {
-        return Analysis{BatchType::kMultiShard, std::move(tr.endpoints)};
+        return Analysis{
+            BatchType::kMultiShard, std::move(tr.endpoints), std::move(targetedSampleId)};
     }
 } catch (const DBException& ex) {
     auto status = ex.toStatus();

@@ -58,6 +58,7 @@ struct SimpleWriteBatch {
     struct ShardRequest {
         std::map<NamespaceString, ShardEndpoint> versionByNss;
         std::vector<WriteOp> ops;
+        std::map<WriteOpId, UUID> sampleIds;
     };
 
     std::map<ShardId, ShardRequest> requestByShardId;
@@ -90,6 +91,7 @@ struct SimpleWriteBatch {
 
 struct NonTargetedWriteBatch {
     WriteOp op;
+    boost::optional<UUID> sampleId;
 
     std::vector<WriteOp> getWriteOps() const {
         std::vector<WriteOp> result;
@@ -104,6 +106,8 @@ struct NonTargetedWriteBatch {
 
 struct InternalTransactionBatch {
     WriteOp op;
+    boost::optional<UUID> sampleId;
+
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return {op.getNss()};
     }

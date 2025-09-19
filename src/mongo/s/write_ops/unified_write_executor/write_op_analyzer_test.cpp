@@ -35,8 +35,10 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
+#include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -44,6 +46,17 @@ namespace mongo {
 namespace unified_write_executor {
 namespace {
 struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
+    WriteOpAnalyzerTestImpl()
+        : ShardingTestFixture(
+              false /* withMockCatalogCache */,
+              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+
+    void setUp() override {
+        ShardingTestFixture::setUp();
+        configTargeter()->setFindHostReturnValue(HostAndPort("config", 12345));
+    }
+
     Stats stats;
     WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);
     const ShardId kShard1Name = ShardId("shard1");
@@ -652,6 +665,55 @@ TEST_F(WriteOpAnalyzerTestImpl, TimeSeriesRetryable) {
     WriteOp op1(request, 0);
     auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(BatchType::kInternalTransaction, analysis.type);
+
+    rtx->onRequestSentForNss(nss);
+}
+
+TEST_F(WriteOpAnalyzerTestImpl, AnalysisContainsSampleIdWhenQuerySamplerConfigured) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    // Set up query sampler.
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
+    operationContext()->setQuerySamplingOptions(OperationContext::QuerySamplingOptions::kOptIn);
+    auto& sampler = analyze_shard_key::QueryAnalysisSampler::get(operationContext());
+    sampler.refreshQueryStatsForTest();
+    auto future = launchAsync([&]() { sampler.refreshConfigurationsForTest(operationContext()); });
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        auto now = getServiceContext()->getFastClockSource()->now();
+        analyze_shard_key::CollectionQueryAnalyzerConfiguration configuration{nss, uuid, 1, now};
+
+        RefreshQueryAnalyzerConfigurationResponse response;
+        response.setConfigurations({configuration});
+        return response.toBSON();
+    });
+    future.default_timed_get();
+    // Advance time to make sure we will sample queries.
+    dynamic_cast<TickSourceMock<Nanoseconds>*>(getServiceContext()->getTickSource())
+        ->advance(Milliseconds(10000));
+
+    BulkWriteCommandRequest request(
+        {
+            [&]() {
+                auto op = BulkWriteUpdateOp(
+                    0,
+                    BSON("x" << BSON("$gt" << -1) << "_id" << BSON("$gt" << -1)),
+                    write_ops::UpdateModification(BSON("$set" << BSON("a" << 1))));
+                op.setMulti(true);
+                return op;
+            }(),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op));
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+
+    ASSERT(analysis.targetedSampleId.has_value());
+    ASSERT(analysis.targetedSampleId->isFor(kShard1Name) !=
+           analysis.targetedSampleId->isFor(kShard2Name));
 
     rtx->onRequestSentForNss(nss);
 }
