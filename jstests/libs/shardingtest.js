@@ -300,12 +300,6 @@ export class ShardingTest {
         });
     }
 
-    restartAllMongos(opts) {
-        for (let i = 0; i < this._mongos.length; i++) {
-            this.restartMongos(i, opts);
-        }
-    }
-
     forEachConnection(fn) {
         this._connections.forEach(function(conn) {
             fn(conn);
@@ -701,8 +695,9 @@ export class ShardingTest {
             mongos = this["s" + n];
         }
 
-        opts = opts || mongos;
-        opts.port = opts.port || mongos.port;
+        // Make a copy of the start options to prevent changing the original start options
+        let startOpts = Object.extend({}, opts || mongos, true);
+        startOpts.port = startOpts.port || mongos.port;
 
         this.stopMongos(n, stopOpts);
 
@@ -710,24 +705,24 @@ export class ShardingTest {
             const hostName =
                 this._otherParams.host === undefined ? getHostName() : this._otherParams.host;
             let bridgeOptions =
-                opts !== mongos ? opts.bridgeOptions : mongos.fullOptions.bridgeOptions;
+                startOpts !== mongos ? startOpts.bridgeOptions : mongos.fullOptions.bridgeOptions;
             bridgeOptions = Object.merge(this._otherParams.bridgeOptions, bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: this._otherParams.useHostname ? hostName : "localhost",
                 port: this._mongos[n].port,
                 // The mongos processes identify themselves to mongobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
-                dest: hostName + ":" + opts.port,
+                dest: hostName + ":" + startOpts.port,
             });
 
             this._mongos[n] = new MongoBridge(bridgeOptions);
         }
 
-        if (opts.restart) {
-            opts = Object.merge(mongos.fullOptions, opts);
+        if (startOpts.restart) {
+            startOpts = Object.merge(mongos.fullOptions, startOpts);
         }
 
-        let newConn = MongoRunner.runMongos(opts);
+        let newConn = MongoRunner.runMongos(startOpts);
         if (!newConn) {
             throw new Error("Failed to restart mongos " + n);
         }
