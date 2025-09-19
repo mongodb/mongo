@@ -32,6 +32,7 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/scopeguard.h"
 
 #include <cstdint>
 #include <ctime>
@@ -228,18 +229,20 @@ public:
 private:
     using AtomicAcquisitionStats = observable_mutex_details::AcquisitionStats<Atomic<uint64_t>>;
 
+    template <typename LockerFunc>
     MONGO_COMPILER_NOINLINE void _onContendedAcquisition(AtomicAcquisitionStats& stats,
-                                                         const std::function<void()>& lock) {
+                                                         LockerFunc locker) {
         // TODO SERVER-106769: Replace `Timer` with the new low-overhead timer.
         observable_mutex_details::Timer timer;
         stats.contentions.fetchAndAddRelaxed(1);
         const auto t1 = timer.getTime();
-        try {
-            lock();
-        } catch (...) {
-            stats.contentions.fetchAndSubtractRelaxed(1);
-            throw;
-        }
+
+        // This callback is only run when the call to locker() throws. This is the preferred way to
+        // handle exceptions since it can help produce better code when locker() can't throw.
+        ScopeGuard cleanupGuard([&]() { stats.contentions.fetchAndSubtractRelaxed(1); });
+        locker();
+        cleanupGuard.dismiss();
+
         const auto t2 = timer.getTime();
         stats.waitCycles.fetchAndAddRelaxed(t2 - t1);
     }
