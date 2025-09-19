@@ -97,6 +97,7 @@ def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_li
         lib_to_upload = []
         for pattern in [
             "*.so",
+            "*.so.debug",
             "*.dylib",
         ]:
             lib_to_upload.extend(bazel_bin_dir.rglob(pattern))
