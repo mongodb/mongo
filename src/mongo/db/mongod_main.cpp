@@ -543,6 +543,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
               "host"_attr = getHostNameCached());
     }
 
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::createLockFile,
+                                       &startupTimeElapsedBuilder);
+        StorageEngineLockFile::create(serviceContext, storageGlobalParams.dbpath);
+        auto& lockFile = StorageEngineLockFile::get(serviceContext);
+        if (lockFile) {
+            uassertStatusOK(lockFile->writePid());
+        }
+    }
+
     if (kDebugBuild)
         LOGV2(20533, "DEBUG build (which is slower)");
 
@@ -1944,7 +1955,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         shutdownTTLMonitor(serviceContext);
     }
 
-    PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext)->stop();
+    auto& checker = PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext);
+    if (checker) {
+        checker->stop();
+    }
 
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
@@ -2013,6 +2027,17 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2(20565, "Now exiting");
 
     audit::logShutdown(client);
+
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::closeLockFile,
+                                       &shutdownTimeElapsedBuilder);
+        auto& lockFile = StorageEngineLockFile::get(serviceContext);
+        if (lockFile) {
+            lockFile->clearPidAndUnlock();
+            lockFile = boost::none;
+        }
+    }
 
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     // SessionKiller relies on the network stack being cleanly shutdown which only occurs under

@@ -59,6 +59,9 @@ auto PeriodicReplicaSetConfigShardMaintenanceModeChecker::operator->() const -> 
     return _anchor.get();
 }
 
+PeriodicReplicaSetConfigShardMaintenanceModeChecker::operator bool() const {
+    return _anchor.get();
+}
 
 void PeriodicReplicaSetConfigShardMaintenanceModeChecker::_init(ServiceContext* serviceContext) {
     stdx::lock_guard lk(_mutex);
@@ -67,7 +70,10 @@ void PeriodicReplicaSetConfigShardMaintenanceModeChecker::_init(ServiceContext* 
     }
 
     auto periodicRunner = serviceContext->getPeriodicRunner();
-    invariant(periodicRunner);
+    if (!periodicRunner) {
+        // This can happen if we exit very early during startup.
+        return;
+    }
 
     PeriodicRunner::PeriodicJob job(
         "PeriodicReplicaSetConfigShardMaintenanceModeChecker",

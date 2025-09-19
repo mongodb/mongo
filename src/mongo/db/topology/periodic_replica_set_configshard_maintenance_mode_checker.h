@@ -40,6 +40,7 @@ public:
 
     PeriodicJobAnchor& operator*() const;
     PeriodicJobAnchor* operator->() const;
+    operator bool() const;
 
 private:
     void _init(ServiceContext* serviceContext);

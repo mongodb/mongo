@@ -66,14 +66,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-namespace {
-/**
- * Creates the lock file used to prevent concurrent processes from accessing the data files,
- * as appropriate.
- */
-void createLockFile(ServiceContext* service);
-}  // namespace
-
 StorageEngine::LastShutdownState initializeStorageEngine(
     OperationContext* opCtx,
     const StorageEngineInitFlags initFlags,
@@ -86,13 +78,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(
     // This should be set once.
     if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{})
         invariant(!service->getStorageEngine());
-
-    if ((initFlags & StorageEngineInitFlags::kAllowNoLockFile) == StorageEngineInitFlags{}) {
-        SectionScopedTimer scopedTimer(service->getFastClockSource(),
-                                       TimedSectionId::createLockFile,
-                                       startupTimeElapsedBuilder);
-        createLockFile(service);
-    }
 
     const std::string dbpath = storageGlobalParams.dbpath;
 
@@ -170,13 +155,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(
     if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
     }
 
-    ScopeGuard guard([&] {
-        auto& lockFile = StorageEngineLockFile::get(service);
-        if (lockFile) {
-            lockFile->close();
-        }
-    });
-
     auto& lockFile = StorageEngineLockFile::get(service);
     {
         SectionScopedTimer scopedTimer(service->getFastClockSource(),
@@ -206,12 +184,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(
         }
     }
 
-    if (lockFile) {
-        SectionScopedTimer scopedTimer(
-            service->getFastClockSource(), TimedSectionId::writePID, startupTimeElapsedBuilder);
-        uassertStatusOK(lockFile->writePid());
-    }
-
     // Write a new metadata file if it is not present.
     if (!metadata.get() &&
         (initFlags & StorageEngineInitFlags::kSkipMetadataFile) == StorageEngineInitFlags{}) {
@@ -224,8 +196,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(
         uassertStatusOK(metadata->write());
     }
 
-    guard.dismiss();
-
     if (lockFile && lockFile->createdByUncleanShutdown()) {
         return StorageEngine::LastShutdownState::kUnclean;
     } else {
@@ -237,11 +207,6 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service, bool memLeakAll
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
     storageEngine->cleanShutdown(service, memLeakAllowed);
-    auto& lockFile = StorageEngineLockFile::get(service);
-    if (lockFile) {
-        lockFile->clearPidAndUnlock();
-        lockFile = boost::none;
-    }
 }
 
 StorageEngine::LastShutdownState reinitializeStorageEngine(
@@ -270,31 +235,6 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
 }
 
 namespace {
-
-void createLockFile(ServiceContext* service) {
-    auto& lockFile = StorageEngineLockFile::get(service);
-    try {
-        lockFile.emplace(storageGlobalParams.dbpath);
-    } catch (const std::exception& ex) {
-        uassert(28596,
-                str::stream() << "Unable to determine status of lock file in the data directory "
-                              << storageGlobalParams.dbpath << ": " << ex.what(),
-                false);
-    }
-    const bool wasUnclean = lockFile->createdByUncleanShutdown();
-    const auto openStatus = lockFile->open();
-    if (openStatus == ErrorCodes::IllegalOperation) {
-        lockFile = boost::none;
-    } else {
-        uassertStatusOK(openStatus);
-    }
-
-    if (wasUnclean) {
-        LOGV2_WARNING(22271,
-                      "Detected unclean shutdown - Lock file is not empty",
-                      "lockFile"_attr = lockFile->getFilespec());
-    }
-}
 
 using FactoryMap = std::map<std::string, std::unique_ptr<StorageEngine::Factory>>;
 

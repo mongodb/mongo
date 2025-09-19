@@ -128,7 +128,7 @@ public:
     int _fd;
 };
 
-StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath, StringData fileName)
+StorageEngineLockFile::StorageEngineLockFile(StringData dbpath, StringData fileName)
     : _dbpath(dbpath),
       _filespec((boost::filesystem::path(_dbpath) / std::string{fileName}).string()),
       _uncleanShutdown(boost::filesystem::exists(_filespec) &&

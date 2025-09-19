@@ -51,12 +51,18 @@ public:
     static boost::optional<StorageEngineLockFile>& get(ServiceContext* service);
 
     /**
+     * Creates the lock file used to prevent concurrent processes from accessing the data files,
+     * as appropriate.
+     */
+    static void create(ServiceContext* service, StringData dbpath);
+
+    /**
      * Checks existing lock file, if present, to see if it contains data from a previous
      * unclean shutdown. A clean shutdown should have produced a zero length lock file.
      * Uses open() to read existing lock file or create new file.
      * Uses boost::filesystem to check lock file so may throw boost::exception.
      */
-    StorageEngineLockFile(const std::string& dbpath, StringData fileName = kLockFileBasename);
+    StorageEngineLockFile(StringData dbpath, StringData fileName = kLockFileBasename);
 
     virtual ~StorageEngineLockFile();
 

@@ -92,7 +92,6 @@ private:
     X(getStorageEngineMetadata)                 \
     X(validateMetadata)                         \
     X(createStorageEngine)                      \
-    X(writePID)                                 \
     X(writeNewMetadata)                         \
     X(createSystemUsersIndex)                   \
     X(createSystemRolesIndex)                   \
@@ -159,6 +158,7 @@ private:
     X(joinLogicalSessionCache)                  \
     X(shutDownCursorManager)                    \
     X(shutDownStateRequiredForStorageAccess)    \
+    X(closeLockFile)                            \
     /* For magic restore: */                    \
     X(magicRestoreToolTotal)                    \
     X(readMagicRestoreConfig)                   \

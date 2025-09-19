@@ -69,7 +69,10 @@ void OCSPManager::start(ServiceContext* service) {
 }
 
 void OCSPManager::shutdown(ServiceContext* service) {
-    get(service)->_pool->shutdown();
+    auto* ocspManager = get(service);
+    if (ocspManager) {
+        ocspManager->_pool->shutdown();
+    }
 }
 
 OCSPManager::OCSPManager() {

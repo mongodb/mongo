@@ -68,4 +68,28 @@ std::string StorageEngineLockFile::_getNonExistentPathMessage() const {
                             "'storage.dbPath' option in the configuration file.";
 }
 
+void StorageEngineLockFile::create(ServiceContext* service, StringData dbpath) {
+    auto& lockFile = StorageEngineLockFile::get(service);
+    try {
+        lockFile.emplace(dbpath);
+    } catch (const std::exception& ex) {
+        uasserted(28596,
+                  str::stream() << "Unable to determine status of lock file in the data directory "
+                                << dbpath << ": " << ex.what());
+    }
+    const bool wasUnclean = lockFile->createdByUncleanShutdown();
+    const auto openStatus = lockFile->open();
+    if (openStatus == ErrorCodes::IllegalOperation) {
+        lockFile = boost::none;
+    } else {
+        uassertStatusOK(openStatus);
+    }
+
+    if (wasUnclean) {
+        LOGV2_WARNING(22271,
+                      "Detected unclean shutdown - Lock file is not empty",
+                      "lockFile"_attr = lockFile->getFilespec());
+    }
+}
+
 }  // namespace mongo
