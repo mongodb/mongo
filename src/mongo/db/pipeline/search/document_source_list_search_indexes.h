@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

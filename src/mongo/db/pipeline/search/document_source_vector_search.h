@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

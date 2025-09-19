@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

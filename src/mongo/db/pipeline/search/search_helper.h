@@ -41,6 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>

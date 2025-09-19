@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::search_helpers {
 /**

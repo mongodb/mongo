@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

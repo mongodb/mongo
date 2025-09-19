@@ -31,6 +31,7 @@ imports:
     - "mongo/db/query/query_feature_flags.idl"
 
 global:
+    mod_visibility: private
     cpp_namespace: mongo
     cpp_includes:
         - "mongo/db/query/query_feature_flags_gen.h"

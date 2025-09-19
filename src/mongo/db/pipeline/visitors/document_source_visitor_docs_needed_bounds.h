@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 using DocsNeededConstraint = docs_needed_bounds::DocsNeededConstraint;
@@ -45,7 +46,7 @@ using DocsNeededConstraint = docs_needed_bounds::DocsNeededConstraint;
  * NOTE: Any blocking stages (like $sort, $group) should use only applyBlockingStage(), since the
  * result cardinality of a stage doesn't matter if it requires all documents as input.
  */
-struct DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
+struct MONGO_MOD_PUB DocsNeededBoundsContext : public DocumentSourceVisitorContextBase {
     DocsNeededBoundsContext(DocsNeededConstraint startingMinBounds = docs_needed_bounds::Unknown(),
                             DocsNeededConstraint startingMaxBounds = docs_needed_bounds::Unknown())
         : minBounds(startingMinBounds), maxBounds(startingMaxBounds) {}
