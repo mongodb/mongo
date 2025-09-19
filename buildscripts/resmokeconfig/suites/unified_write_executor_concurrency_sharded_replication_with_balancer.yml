@@ -40,9 +40,6 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
-    # TODO SERVER-104120: Support write without shard key
-    - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/*.js
-
     # Disabled because some features covered in these tests are not yet supported in the UWE.
     # TODO SERVER-104139: Add timeseries support.
     - jstests/concurrency/fsm_workloads/timeseries/*.js
