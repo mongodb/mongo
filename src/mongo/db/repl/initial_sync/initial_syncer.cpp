@@ -596,6 +596,19 @@ void InitialSyncer::_tearDown(WithLock lk,
         invariant(currentLastAppliedOpTime == lastAppliedOpTime);
     }
 
+    // Set stable timestamp before transitioning to steady state replication. This is specifically
+    // for the case where initial sync only went through the data clone phase and not the oplog
+    // application phase. allDurable timestamp advances when we apply oplog entries and when
+    // reserving opTimes. If there are no oplogs to apply during initial sync, allDurable will stay
+    // at kTimestampOne since initial sync sets oldestTimestamp and allDurable to kTimestampOne in
+    // the beginning (_startInitialSyncAttemptCallback). If the initial sync node steps up to become
+    // a primary right after initial sync, the allDurable will still be at kTimestampOne and we will
+    // hit an invariant when refreshing oplogTruncateAfterPoint while stepping up. So we will
+    // advance stable timestamp here to make sure allDurable is advanced before we exit initial
+    // sync. This call will also trigger the first stable checkpoint.
+    _storage->setStableTimestamp(
+        opCtx->getServiceContext(), initialDataTimestamp, true /* force */);
+
     LOGV2(21163,
           "Initial sync done",
           "duration"_attr =
