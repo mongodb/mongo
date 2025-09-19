@@ -200,15 +200,21 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                     // The transaction may have implicitly been aborted by the server or killed by
                     // the kill_session helper and will therefore return a
                     // NoSuchTransaction/Interrupted error code.
-                    assert.commandWorkedOrFailedWithCode(session.abortTransaction_forTesting(), [
-                        ErrorCodes.NoSuchTransaction,
-                        ErrorCodes.Interrupted,
-                        // Ignore sessions killed due to cache pressure. See SERVER-100367.
-                        ErrorCodes.TemporarilyUnavailable,
-                        // Ignore errors that can occur when shards are removed in the background
-                        ErrorCodes.HostUnreachable,
-                        ErrorCodes.ShardNotFound,
-                    ]);
+                    assert.commandWorkedOrFailedWithCode(
+                        session.abortTransaction_forTesting(),
+                        [
+                            ErrorCodes.NoSuchTransaction,
+                            ErrorCodes.Interrupted,
+                            // Ignore sessions killed due to cache pressure. See SERVER-100367.
+                            ErrorCodes.TemporarilyUnavailable,
+                            // Ignore errors that can occur when shards are removed in the background
+                            ErrorCodes.HostUnreachable,
+                            ErrorCodes.ShardNotFound,
+                            // Ignore errors that can occur when there is a resharding operation.
+                            ErrorCodes.InterruptedDueToReshardingCriticalSection,
+                        ],
+                        `Failed to abort transaction after transaction operations failed with error: ${tojson(e)}`,
+                    );
                 }
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {
