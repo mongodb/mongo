@@ -19,7 +19,7 @@ filters:
       - 10gen/query-integration-observability
   - "densify_stage*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "internal_all_collection_stats_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
@@ -31,7 +31,7 @@ filters:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "internal_set_window_fields_stage*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "list_catalog_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

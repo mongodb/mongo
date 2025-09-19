@@ -18,7 +18,7 @@
   - Query Execution
 10gen/query-integration:
   - Query Integration
-10gen/query-integration-extensions:
+10gen/query-integration-features:
   - Query Integration
 10gen/query-integration-observability:
   - Query Integration

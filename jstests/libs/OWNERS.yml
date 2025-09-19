@@ -86,7 +86,7 @@ filters:
       - 10gen/server-collection-write-path
   - "json_utils.js":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "replicated_ident_utils.js":
     approvers:
       - 10gen/server-storage-engine-integration

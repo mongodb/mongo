@@ -164,7 +164,7 @@ filters:
   - "fle*":
     approvers:
       - 10gen/server-security
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "/keyfile_option*":
     approvers:
       - 10gen/server-security

@@ -15,13 +15,13 @@ filters:
       - 10gen/query-execution
   - "internal_js*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "median*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "percentile*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "sigmoid.js":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features

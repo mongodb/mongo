@@ -26,28 +26,28 @@ filters:
       - 10gen/query-execution-classic
   - "accumulator_covariance.cpp":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_exp_moving_avg.cpp":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_for_window_functions.h":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_integral.cpp":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_js_*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_locf.cpp":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_percentile*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "accumulator_test.cpp":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
       - 10gen/query-execution-classic
   - "accumulator_internal_construct_stats.cpp":
     approvers:
@@ -87,13 +87,13 @@ filters:
       - 10gen/query-integration-observability
   - "document_source_densify*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "document_source_fill*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "document_source*geo*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "document_source_hybrid_scoring*":
     approvers:
       - 10gen/query-integration-search
@@ -123,7 +123,7 @@ filters:
       - 10gen/query-integration-search
   - "document_source_set_window_fields*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "document_source_merge_spec*":
     approvers:
       - 10gen/query-optimization
@@ -150,10 +150,10 @@ filters:
       - 10gen/query-execution-classic
   - "expression_from_accumulator_quantile.h":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "expression_function*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "expression_hasher*":
     approvers:
       - 10gen/query-optimization
@@ -162,10 +162,10 @@ filters:
       - 10gen/query-optimization
   - "expression_javascript*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "expression_js*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "expression_visitor*":
     approvers:
       - 10gen/query-optimization
@@ -180,7 +180,7 @@ filters:
       - 10gen/query-execution-classic
   - "javascript_execution*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "initialize_auto_get_helper.h":
     approvers:
       - 10gen/query-execution-classic
@@ -198,7 +198,7 @@ filters:
       - 10gen/streams-engine
   - "make_js_function*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "*_processor*":
     approvers:
       - 10gen/query-execution-classic
@@ -210,7 +210,7 @@ filters:
       - 10gen/query-optimization
   - "partition_key_comparator*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "pipeline_d*":
     approvers:
       - 10gen/query-optimization
@@ -263,10 +263,10 @@ filters:
   # QI.
   - "percentile_algo*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "pipeline_metadata_tree*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "plan_explainer*":
     approvers:
       - 10gen/query-optimization

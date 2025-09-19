@@ -10,4 +10,4 @@ filters:
       - 10gen/query-integration-staff-leads
   - "encrypt_schema*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features

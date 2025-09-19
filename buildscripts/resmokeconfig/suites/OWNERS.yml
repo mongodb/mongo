@@ -56,10 +56,10 @@ filters:
       - 10gen/query-execution-write-exec
   - "extensions*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "fle*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "json_schema.yml":
     approvers:
       - 10gen/query-execution

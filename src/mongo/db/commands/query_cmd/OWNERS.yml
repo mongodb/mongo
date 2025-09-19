@@ -26,7 +26,7 @@ filters:
       - 10gen/query-integration-search
   - "external_data_source_commands*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "getmore_cmd.cpp":
     approvers:
       - 10gen/query-execution
@@ -38,10 +38,10 @@ filters:
       - 10gen/query-execution
   - "map_reduce*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "mr_*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "release_memory_cmd.*":
     approvers:
       - 10gen/query-execution

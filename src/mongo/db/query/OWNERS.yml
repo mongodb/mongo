@@ -104,7 +104,7 @@ filters:
       - 10gen/query-optimization
   - "map_reduce_output_format*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "multiple_collection_accessor*":
     approvers:
       - 10gen/query-optimization
@@ -205,7 +205,7 @@ filters:
       - 10gen/query-execution-sbe
   - "*geo*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "plan_explainer*":
     approvers:
       - 10gen/query-optimization

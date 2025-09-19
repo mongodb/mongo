@@ -10,16 +10,16 @@ filters:
       - 10gen/query-integration-staff-leads
   - "accumulator_js*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "internal_js*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "percentiles*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "median*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
   - "percentiles_syntax.js":
     approvers:
       - 10gen/query-optimization

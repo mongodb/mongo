@@ -40,4 +40,4 @@ filters:
       - 10gen/query-execution
   - "external_data_source_scope_guard*":
     approvers:
-      - 10gen/query-integration-extensions
+      - 10gen/query-integration-features
