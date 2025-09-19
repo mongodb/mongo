@@ -509,6 +509,7 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023-latest-large
+      - name: aggregation
       - name: streams_gen
       - name: streams_kafka_gen
       - name: streams_kafka_gwproxy
@@ -516,7 +517,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: aggregation
+      - name: streams_kinesis
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
 
@@ -555,6 +556,7 @@ buildvariants:
       - name: streams_kafka_gen
       # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
       # - name: streams_kafka_gwproxy
+      - name: streams_kinesis
       - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
@@ -596,6 +598,7 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2-latest-large
+      - name: aggregation
       - name: streams_gen
       - name: streams_kafka_gen
       - name: streams_kafka_gwproxy
@@ -603,7 +606,7 @@ buildvariants:
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: aggregation
+      - name: streams_kinesis
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
 
@@ -642,11 +645,12 @@ buildvariants:
       - name: streams_kafka_gen
       # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
       # - name: streams_kafka_gwproxy
+      - name: aggregation
       - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
       - name: streams_s3
-      - name: aggregation
+      - name: streams_kinesis
       - name: streams_aspio_gen
       - name: streams_build_and_publish_gen
       # Only needed once to generate the streams manifest for both x86 and arm
