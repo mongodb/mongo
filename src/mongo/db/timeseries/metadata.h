@@ -47,5 +47,11 @@ template <class Allocator>
 void normalize(const BSONElement& elem,
                allocator_aware::BSONObjBuilder<Allocator>& builder,
                boost::optional<StringData> as = boost::none);
+/**
+ * Returns whether two BSONElement metadata values are equal to each other, ignoring field order.
+ * Field names will be ignored when comparing two BSONArrays. This is for compatibility with current
+ * normalize() behavior.
+ */
+bool areMetadataEqual(const BSONElement& elem1, const BSONElement& elem2);
 
 }  // namespace mongo::timeseries::metadata

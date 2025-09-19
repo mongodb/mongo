@@ -36,6 +36,7 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/write_ops/measurement.h"
@@ -113,7 +114,7 @@ doc_diff::VerifierFunc makeVerifierFunction(std::shared_ptr<bucket_catalog::Writ
 
         auto actualMeta = docToWrite.getField(kBucketMetaFieldName);
         auto expectedMeta = batch->bucketKey.metadata.element();
-        if (!actualMeta.binaryEqualValues(expectedMeta)) {
+        if (!timeseries::metadata::areMetadataEqual(actualMeta, expectedMeta)) {
             failed(
                 "mismatched metaField value",
                 [](logv2::DynamicAttributes&) {},
