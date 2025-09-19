@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Starts a periodic background job to remove expired documents from change collections. The job
@@ -45,4 +46,4 @@ void startChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext
  */
 void shutdownChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

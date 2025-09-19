@@ -43,6 +43,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -53,12 +54,12 @@
 #include <absl/container/flat_hash_set.h>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Metadata associated with a particular change collection that is used by the purging job.
  */
-struct ChangeCollectionPurgingJobMetadata {
+struct MONGO_MOD_PRIVATE ChangeCollectionPurgingJobMetadata {
     // The wall time in milliseconds of the first document of the change collection.
     long long firstDocWallTimeMillis;
 
@@ -238,4 +239,4 @@ private:
     // Change collections purging job stats.
     PurgingJobStats _purgingJobStats;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

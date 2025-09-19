@@ -36,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -43,7 +44,7 @@ namespace mongo {
  * Manages fetching and storing of the change streams options. The class manages the complete read
  * and write path for the change-streams options.
  */
-class ChangeStreamOptionsManager {
+class MONGO_MOD_NEEDS_REPLACEMENT ChangeStreamOptionsManager {
 public:
     explicit ChangeStreamOptionsManager(ServiceContext* service) {}
 

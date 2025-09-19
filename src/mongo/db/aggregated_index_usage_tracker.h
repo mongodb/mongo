@@ -31,12 +31,13 @@
 
 #include "mongo/db/index_names.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <map>
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 class IndexDescriptor;
 class ServiceContext;
 
@@ -68,14 +69,14 @@ struct IndexFeatures {
  * IndexFeatureStats holds statistics about a specific index feature. Its data members are mutable
  * atomics to allow itself to be used in a const map safely.
  */
-struct IndexFeatureStats {
+struct MONGO_MOD_PRIVATE IndexFeatureStats {
     // Number of indexes that have this feature.
     mutable AtomicWord<long long> count{0};
     // Number of operations that have used indexes with this feature.
     mutable AtomicWord<long long> accesses{0};
 };
 
-enum class FeatureStatType {
+enum class MONGO_MOD_PRIVATE FeatureStatType {
     kCollation,
     kCompound,
     kId,
@@ -143,4 +144,4 @@ private:
     // Total number of indexes being tracked.
     mutable AtomicWord<long long> _count;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
