@@ -14,7 +14,7 @@ if [ -d "$venv_dir" ]; then
 fi
 
 # We create a venv for poetry
-# We cannot install poetry into the same virtual enviorment as the rest of our tools
+# We cannot install poetry into the same virtual environment as the rest of our tools
 # If there is a conflict between poetry and our other deps windows fails to upgrade the package
 # See issue SERVER-80781
 POETRY_VENV="${workdir}/poetry_venv"

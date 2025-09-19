@@ -7,7 +7,7 @@
 
 
 [jsTest] ----
-[jsTest] Found python 3.10 by default. Likely this is because we are using a virtual enviorment.
+[jsTest] Found python 3.10 by default. Likely this is because we are using a virtual environment.
 [jsTest] ----
 
 {">>>pipelines":[

@@ -44,11 +44,16 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
         new Mongo(uri);
         assert(false, "Client was unable to connect to the load balancer port");
     } catch (err) {
+        let actualCount;
+        const compareCounts = (actual, expected) => {
+            // Capture the actual number of times a matching log entry was found in the mongod log.
+            // This way we can mention it if the assertion fails below.
+            actualCount = actual;
+            return actual === expected;
+        };
         assert(
-            checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
-            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${tojson(
-                count,
-            )} times in the log -- failed with this error: ${tojson(err)}`,
+            checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true, compareCounts),
+            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} in the log the expected number of times. Expected to see it ${count} times but saw it ${actualCount} times. This assertion failed while handling an expected error. The error was: ${tojson(err)}`,
         );
     }
 }
