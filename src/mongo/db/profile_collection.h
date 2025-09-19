@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -45,7 +46,7 @@ namespace profile_collection {
 /**
  * Invoked when database profile is enabled.
  */
-void profile(OperationContext* opCtx, NetworkOp op);
+MONGO_MOD_PUB void profile(OperationContext* opCtx, NetworkOp op);
 
 /**
  * Pre-creates the profile collection for the specified database.

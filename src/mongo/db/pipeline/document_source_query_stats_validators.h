@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <vector>

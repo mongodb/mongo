@@ -53,12 +53,12 @@
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 class CurOp;
 
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
-class OpDebug {
+class MONGO_MOD_PUB OpDebug {
 public:
     /**
      * Holds counters for execution statistics that can be accumulated by one or more operations.
@@ -231,7 +231,7 @@ public:
         boost::optional<Milliseconds> overdueInterruptApproxMax;
     };
 
-    OpDebug() = default;
+    MONGO_MOD_PRIVATE OpDebug() = default;
 
     /**
      * Adds information about the current operation to "pAttrs". Since this information will end up
@@ -259,59 +259,61 @@ public:
      * Generally, the metrics/fields reported here should be a superset of what is reported in
      * report(). The profiler is meant to be more verbose than the slow query log.
      */
-    void append(OperationContext* opCtx,
-                const SingleThreadedLockStats& lockStats,
-                FlowControlTicketholder::CurOp flowControlStats,
-                const SingleThreadedStorageMetrics& storageMetrics,
-                long long prepareReadConflicts,
-                bool omitCommand,
-                BSONObjBuilder& builder) const;
+    MONGO_MOD_PRIVATE void append(OperationContext* opCtx,
+                                  const SingleThreadedLockStats& lockStats,
+                                  FlowControlTicketholder::CurOp flowControlStats,
+                                  const SingleThreadedStorageMetrics& storageMetrics,
+                                  long long prepareReadConflicts,
+                                  bool omitCommand,
+                                  BSONObjBuilder& builder) const;
 
-    static std::function<BSONObj(ProfileFilter::Args args)> appendStaged(OperationContext* opCtx,
-                                                                         StringSet requestedFields,
-                                                                         bool needWholeDocument);
-    static void appendUserInfo(const CurOp&, BSONObjBuilder&, AuthorizationSession*);
+    MONGO_MOD_PRIVATE static std::function<BSONObj(ProfileFilter::Args args)> appendStaged(
+        OperationContext* opCtx, StringSet requestedFields, bool needWholeDocument);
+    MONGO_MOD_PRIVATE static void appendUserInfo(const CurOp&,
+                                                 BSONObjBuilder&,
+                                                 AuthorizationSession*);
 
-    static void appendDelinquentInfo(OperationContext* opCtx,
-                                     BSONObjBuilder&,
-                                     bool reportAcquisitions = true);
+    MONGO_MOD_PRIVATE static void appendDelinquentInfo(OperationContext* opCtx,
+                                                       BSONObjBuilder&,
+                                                       bool reportAcquisitions = true);
 
     /**
      * Moves relevant plan summary metrics to this OpDebug instance.
      */
-    void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
+    MONGO_MOD_PRIVATE void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
 
     /**
      * The resulting object has zeros omitted. As is typical in this file.
      */
-    static BSONObj makeFlowControlObject(FlowControlTicketholder::CurOp flowControlStats);
+    MONGO_MOD_PRIVATE static BSONObj makeFlowControlObject(
+        FlowControlTicketholder::CurOp flowControlStats);
 
     /**
      * Make object from $search stats with non-populated values omitted.
      */
-    BSONObj makeMongotDebugStatsObject() const;
+    MONGO_MOD_PRIVATE BSONObj makeMongotDebugStatsObject() const;
 
     /**
      * Gets the type of the namespace on which the current operation operates.
      */
-    std::string getCollectionType(const NamespaceString& nss) const;
+    MONGO_MOD_PRIVATE std::string getCollectionType(const NamespaceString& nss) const;
 
     /**
      * Accumulate resolved views.
      */
-    void addResolvedViews(const std::vector<NamespaceString>& namespaces,
-                          const std::vector<BSONObj>& pipeline);
+    MONGO_MOD_PRIVATE void addResolvedViews(const std::vector<NamespaceString>& namespaces,
+                                            const std::vector<BSONObj>& pipeline);
 
     /**
      * Get or append the array with resolved views' info.
      */
-    BSONArray getResolvedViewsInfo() const;
-    void appendResolvedViewsInfo(BSONObjBuilder& builder) const;
+    MONGO_MOD_PRIVATE BSONArray getResolvedViewsInfo() const;
+    MONGO_MOD_PRIVATE void appendResolvedViewsInfo(BSONObjBuilder& builder) const;
 
     /**
      * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
      */
-    CursorMetrics getCursorMetrics() const;
+    MONGO_MOD_PRIVATE CursorMetrics getCursorMetrics() const;
 
     /**
      * Convenience method that computes QueryShapeHash if '_queryShapeHash' has not been previously
@@ -320,8 +322,8 @@ public:
      * QueryShapeHash is recorded in CurOp::OpDebug.
      */
     template <typename Fn>
-    boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(OperationContext* opCtx,
-                                                                      Fn&& queryShapeHashFn) {
+    MONGO_MOD_PRIVATE boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(
+        OperationContext* opCtx, Fn&& queryShapeHashFn) {
         // QueryShapeHash may be accessed by other thread running $currentOp and therefore needs to
         // be synchronized.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -338,14 +340,14 @@ public:
     /**
      * Returns '_queryShapeHash' value without acquiring the lock.
      */
-    boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
+    MONGO_MOD_PRIVATE boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
 
     /**
      * Sets '_queryShapeHash' value to the new  'hash'. Acquires Client lock prior to setting the
      * hash.
      */
-    void setQueryShapeHash(OperationContext* opCtx,
-                           const boost::optional<query_shape::QueryShapeHash>& hash);
+    MONGO_MOD_PRIVATE void setQueryShapeHash(
+        OperationContext* opCtx, const boost::optional<query_shape::QueryShapeHash>& hash);
 
     // -------------------
 
@@ -429,7 +431,7 @@ public:
      *      - It seemed odd to have ClientCursor and ClusterClientCursorImpl using the struct but
      *        never needing other fields.
      */
-    struct QueryStatsInfo {
+    struct MONGO_MOD_PRIVATE QueryStatsInfo {
         // Uniquely identifies one query stats entry.
         // `key` may be a nullptr during a subquery execution, but will
         // be non-null at the highest-level operation as long as query stats are
@@ -450,7 +452,7 @@ public:
         bool metricsRequested = false;
     };
 
-    QueryStatsInfo queryStatsInfo;
+    MONGO_MOD_PRIVATE QueryStatsInfo queryStatsInfo;
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
@@ -564,4 +566,4 @@ private:
     // Flag indicates if query_shape::QueryShapeHash has already been computed.
     bool _didComputeQueryShapeHash{false};
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

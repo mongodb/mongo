@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

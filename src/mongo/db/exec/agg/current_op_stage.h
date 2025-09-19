@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

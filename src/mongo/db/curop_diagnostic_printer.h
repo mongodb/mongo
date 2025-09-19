@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 
@@ -58,7 +59,7 @@ constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"_sd;
  */
 boost::optional<StringData> isIneligibleForDiagnosticPrinting(OperationContext* opCtx);
 
-class CurOpPrinter {
+class MONGO_MOD_PUB CurOpPrinter {
 public:
     explicit CurOpPrinter(OperationContext* opCtx) : _opCtx{opCtx} {}
 

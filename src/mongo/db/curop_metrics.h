@@ -29,7 +29,9 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 
@@ -41,4 +43,4 @@ void recordCurOpMetrics(OperationContext* opCtx);
 // metrics during oplog application.
 void recordCurOpMetricsOplogApplication(OperationContext* opCtx);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

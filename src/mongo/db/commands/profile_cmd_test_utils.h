@@ -32,6 +32,7 @@
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

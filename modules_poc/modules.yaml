@@ -186,6 +186,7 @@ query:
     - src/mongo/db/memory_tracking/
     - src/mongo/db/multi_key_path_tracker*
     - src/mongo/db/modules/enterprise/src/fle/query_analysis
+    - src/mongo/db/op_debug*
     - src/mongo/db/pipeline/
     - src/mongo/db/profile_*
     - src/mongo/db/query/
@@ -1050,7 +1051,6 @@ replication.oplog:
     - src/mongo/db/repl/*bgsync*
     - src/mongo/db/repl/*sync_source*
     - src/mongo/s/commands/cluster_oplog_note_cmd.cpp
-    - src/mongo/db/op_debug*
     - src/mongo/s/commands/cluster_repl_set_get_status_cmd.cpp
     - src/mongo/db/repl/*insert_group*
     - src/mongo/db/repl/*apply_ops*

@@ -29,6 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes: "mongo/db/commands/profile_common.h"
+    mod_visibility: pub
 
 imports:
     - "mongo/db/basic_types.idl"

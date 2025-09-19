@@ -62,6 +62,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/string_map.h"
@@ -112,7 +113,7 @@ struct PlanSummaryStats;
  * from the thread executing an operation, and as a result its fields may be accessed without
  * any synchronization.
  */
-class CurOp {
+class MONGO_MOD_PUB CurOp {
     CurOp(const CurOp&) = delete;
     CurOp& operator=(const CurOp&) = delete;
 
@@ -126,10 +127,11 @@ public:
      * report, since this may be called in either a mongoD or mongoS context and the latter does not
      * supply lock stats. The client must be locked before calling this method.
      */
-    static void reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Client* client,
-                                         bool truncateOps,
-                                         BSONObjBuilder* infoBuilder);
+    MONGO_MOD_NEEDS_REPLACEMENT static void reportCurrentOpForClient(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Client* client,
+        bool truncateOps,
+        BSONObjBuilder* infoBuilder);
 
     static bool currentOpBelongsToTenant(Client* client, TenantId tenantId);
 
@@ -142,24 +144,24 @@ public:
                                                      boost::optional<size_t> maxQuerySize);
 
     // Convenience helpers for testing metrics that are tracked here.
-    static Counter64& totalInterruptChecks_forTest();
-    static Counter64& opsWithOverdueInterruptCheck_forTest();
+    MONGO_MOD_PRIVATE static Counter64& totalInterruptChecks_forTest();
+    MONGO_MOD_PRIVATE static Counter64& opsWithOverdueInterruptCheck_forTest();
 
     /**
      * Pushes this CurOp to the top of the given "opCtx"'s CurOp stack.
      */
     void push(OperationContext* opCtx);
 
-    CurOp() = default;
+    MONGO_MOD_PRIVATE CurOp() = default;
 
     /**
      * This allows the caller to set the command on the CurOp without using setCommand and
      * having to acquire the Client lock or having to leave a comment indicating why the
      * client lock isn't necessary.
      */
-    explicit CurOp(const Command* command) : _command{command} {}
+    MONGO_MOD_PRIVATE explicit CurOp(const Command* command) : _command{command} {}
 
-    ~CurOp();
+    MONGO_MOD_PRIVATE ~CurOp();
 
     /**
      * Fills out CurOp and OpDebug with basic info common to all commands. We require the NetworkOp
@@ -549,9 +551,9 @@ public:
      * If called from a thread other than the one executing the operation associated with this
      * CurOp, it is necessary to lock the associated Client object before executing this method.
      */
-    void reportState(BSONObjBuilder* builder,
-                     const SerializationContext& serializationContext,
-                     bool truncateOps = false);
+    MONGO_MOD_PRIVATE void reportState(BSONObjBuilder* builder,
+                                       const SerializationContext& serializationContext,
+                                       bool truncateOps = false);
 
     /**
      * Sets the message for FailPoints used.
@@ -677,7 +679,7 @@ public:
         return _resourceStatsBase->lockStats;
     }
 
-    void setTickSource_forTest(TickSource* tickSource) {
+    MONGO_MOD_PRIVATE void setTickSource_forTest(TickSource* tickSource) {
         _tickSource = tickSource;
     }
 
