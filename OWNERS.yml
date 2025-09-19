@@ -21,9 +21,6 @@ filters:
   - "**/.clang-tidy":
     approvers:
       - 10gen/server-programmability
-  - ".dockerignore":
-    approvers:
-      - 10gen/devprod-correctness
   - "/.editorconfig":
     approvers:
       - 10gen/devprod-build
