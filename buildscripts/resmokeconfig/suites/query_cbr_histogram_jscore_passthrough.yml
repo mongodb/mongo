@@ -45,6 +45,7 @@ selector:
     - jstests/core/query/regex/regex5.js
     - jstests/core/query/sort/sort_dotted_paths.js
     - jstests/core/query/sort/sort_dotted_paths_collation.js
+    - jstests/core/index/not_index_tagging.js
     - jstests/core/index/wildcard/wildcard_and_with_not.js
     - jstests/core/query/and/and3.js
     - jstests/core/query/not/not2.js

@@ -1195,6 +1195,28 @@ TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseMultiKeyIndex) {
         "{a: {$_internalExprEq: 1}}", "", kSimpleCollator, indices, "a", expectedIndices);
 }
 
+TEST(QueryPlannerIXSelectTest, InternalExprEqUnderNotCannotUseMultiKeyIndex) {
+    auto entry = makeIndexEntry(BSON("a" << 1), {{0U}});
+    std::vector<IndexEntry> indices;
+    indices.push_back(entry.first);
+    std::set<size_t> expectedIndices;
+    testRateIndices(
+        "{a: {$not: {$_internalExprEq: 1}}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, InternalEqHashedKeyUnderRequiresHashedIndex) {
+    auto entry = makeIndexEntry(BSON("a" << 1), {{0U}});
+    std::vector<IndexEntry> indices;
+    indices.push_back(entry.first);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$not: {$_internalEqHash: NumberLong(2)}}}",
+                    "",
+                    kSimpleCollator,
+                    indices,
+                    "a",
+                    expectedIndices);
+}
+
 TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseNonMultikeyFieldOfMultikeyIndex) {
     auto entry = makeIndexEntry(BSON("a" << 1 << "b" << 1), {{0U}, {}});
     std::vector<IndexEntry> indices;

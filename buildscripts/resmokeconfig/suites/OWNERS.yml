@@ -174,3 +174,6 @@ filters:
   - "streams*":
     approvers:
       - 10gen/streams-engine
+  - "*cbr*":
+    approvers:
+      - 10gen/query-optimization

@@ -468,12 +468,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             // The type being INDEX_WILDCARD implies that the index is sparse.
             invariant(index.sparse || index.type != INDEX_WILDCARD);
 
-            const auto* child = node->getChild(0);
-
-            // Exclude nodes that cannot use index under negation.
-            if (Indexability::nodeCannotUseIndexUnderNot(child)) {
-                return false;
-            }
+            auto* child = node->getChild(0);
 
             // $gt and $lt to MinKey/MaxKey must build inexact bounds if the index is multikey and
             // therefore cannot be inverted safely in a $not.
@@ -514,6 +509,18 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             // within a $not has many complex special cases. We avoid indexing these queries, even
             // though it is sometimes possible to build useful bounds.
             if (isComparisonWithArrayPred(child)) {
+                return false;
+            }
+
+            // If the child is not-equals null, there's no need to recurse.
+            if (!isNotEqualsNull &&
+                !_compatible(keyPatternElt,
+                             index,
+                             keyPatternIdx,
+                             child,
+                             fullPathToNode,
+                             queryContext,
+                             true /* nodeisNotChild */)) {
                 return false;
             }
         }
