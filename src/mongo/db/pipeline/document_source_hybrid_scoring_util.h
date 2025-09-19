@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::hybrid_scoring_util {
 

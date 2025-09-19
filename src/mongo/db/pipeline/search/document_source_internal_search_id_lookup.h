@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

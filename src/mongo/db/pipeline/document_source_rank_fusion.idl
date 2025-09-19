@@ -26,6 +26,7 @@
 # it in the license file.
 #
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 imports:
     - "mongo/db/pipeline/document_source_rank_fusion_inputs.idl"
