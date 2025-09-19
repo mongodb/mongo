@@ -187,6 +187,15 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         resultObj->append("all", _collectionHash.value());
     }
 
+    if (_partialHashes.has_value()) {
+        BSONObjBuilder bob;
+        for (const auto& pair : *_partialHashes) {
+            bob.append(pair.first,
+                       BSON("hash" << pair.second.first << "count" << pair.second.second));
+        }
+        resultObj->append("partial", bob.done());
+    }
+
     // Need to convert RecordId to a printable type.
     BSONArrayBuilder builder;
     for (const RecordId& corruptRecord : getCorruptRecords()) {

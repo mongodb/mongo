@@ -81,6 +81,12 @@ public:
                              ValidationVersion validationVersion);
 
     /**
+     * For a given set of hash prefixes, outputs an order independent hash of all the documents
+     * whose _id hashes to each hash prefix.
+     **/
+    void hashDrillDown(OperationContext* opCtx, ValidateResults* results);
+
+    /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
      * for index consistency.
      */

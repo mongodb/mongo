@@ -576,6 +576,13 @@ Status validate(OperationContext* opCtx,
                   shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
                       validateState.nss(), MODE_X));
 
+        if (validateState.isHashDrillDown()) {
+            validateState.initializeCursors(opCtx);
+            ValidateAdaptor recordStoreValidator(opCtx, &validateState);
+            recordStoreValidator.hashDrillDown(opCtx, results);
+            return Status::OK();
+        }
+
         // Record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
         validateState.getCollection()->getRecordStore()->validate(

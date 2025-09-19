@@ -102,7 +102,7 @@ public:
                       bool logDiagnostics,
                       ValidationVersion validationVersion = currentValidationVersion,
                       boost::optional<std::string> verifyConfigurationOverride = boost::none,
-                      boost::optional<std::vector<BSONElement>> hashPrefixes = boost::none,
+                      boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
                       boost::optional<std::vector<BSONElement>> unhash = boost::none);
 
     virtual ~ValidationOptions() = default;
@@ -153,6 +153,10 @@ public:
         return _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
     }
 
+    const boost::optional<std::vector<std::string>>& getHashPrefixes() const {
+        return _hashPrefixes;
+    }
+
     RepairMode getRepairMode() const {
         return _repairMode;
     }
@@ -192,7 +196,7 @@ private:
 
     const boost::optional<std::string> _verifyConfigurationOverride;
 
-    const boost::optional<std::vector<BSONElement>> _hashPrefixes;
+    const boost::optional<std::vector<std::string>> _hashPrefixes;
     const boost::optional<std::vector<BSONElement>> _unhash;
 };
 

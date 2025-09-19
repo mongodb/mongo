@@ -5,9 +5,8 @@ let count = 10;
 
 function testValidate(options) {
     const output = t.validate(options);
-
-    assert.eq(output.nrecords, count, "validate returned an invalid count");
-    assert.eq(output.nIndexes, 3, "validate returned an invalid number of indexes");
+    jsTest.log.info("Testing validate with options: " + tojson(options));
+    jsTest.log.info("Validate output: " + tojson(output));
 
     let indexNames = output.keysPerIndex;
 
@@ -18,6 +17,12 @@ function testValidate(options) {
 
     if (options.collHash && !options.hashPrefixes) {
         assert(output.all, output);
+    }
+    if (!options.hashPrefixes) {
+        assert.eq(output.nrecords, count, "validate returned an invalid count");
+        assert.eq(output.nIndexes, 3, "validate returned an invalid number of indexes");
+    } else {
+        assert(output.partial, output);
     }
 }
 

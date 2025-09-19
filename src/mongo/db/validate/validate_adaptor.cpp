@@ -772,6 +772,72 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     return Status::OK();
 }
 
+void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* results) {
+    // TODO (SERVER-110844): Implement progress meter
+    if (_validateState->getFirstRecordId().isNull()) {
+        // The record store is empty if the first RecordId isn't initialized.
+        return;
+    }
+
+    const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
+        _validateState->getTraverseRecordStoreCursor();
+
+    // Searches through the list of hash prefixes for a prefix of the provided 'hash', which
+    // is the hash of the _id field. If a matching prefix has been found, returns
+    // <prefix> + N more characters. For example, given an _id hash "abcd", if a prefix
+    // "ab" is found, and N=1, will return "abc".
+    auto getPartialHashBucketKey = [&](const std::string& hash) -> boost::optional<std::string> {
+        // TODO (SERVER-109944): Currently we're iterating through the passed hashPrefixes
+        // for each record we look at, which may be inefficient.
+        for (const auto& prefix : _validateState->getHashPrefixes().get()) {
+            if (hash.starts_with(prefix)) {
+                // If the hash is the same size as the prefix, then we just return the hash
+                // itself. Otherwise return hash[:prefixLen + 1].
+                if (hash.length() == prefix.length()) {
+                    return hash;
+                }
+                return hash.substr(0, prefix.length() + 1);
+            }
+        }
+        return boost::none;
+    };
+
+    // A map from an idHash prefix to the running hash of all documents in that bucket, plus the
+    // number of documents.
+    stdx::unordered_map<std::string, std::pair<SHA256Block, int>> idHashToDocHash;
+
+    for (auto record =
+             traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
+         record;
+         record = traverseRecordStoreCursor->next(opCtx)) {
+        BSONObj recordBson = record->data.toBson();
+        auto idField = recordBson["_id"];
+
+        auto idBlock =
+            SHA256Block::computeHash({ConstDataRange(idField.value(), idField.valuesize())});
+        auto deeperHash = getPartialHashBucketKey(idBlock.toHexString());
+        if (deeperHash) {
+            auto docHash = SHA256Block::computeHash(
+                {ConstDataRange(record->data.data(), record->data.size())});
+            if (!idHashToDocHash.count(*deeperHash)) {
+                idHashToDocHash.emplace(*deeperHash, std::make_pair(docHash, 1));
+            } else {
+                idHashToDocHash.at(*deeperHash).first.xorInline(docHash);
+                idHashToDocHash.at(*deeperHash).second++;
+            }
+        }
+    }
+
+    // Dump the map into results and convert the SHA256 doc hashes to strings.
+    stdx::unordered_map<std::string, std::pair<std::string, int>> partial;
+    for (const auto& pair : idHashToDocHash) {
+        partial.emplace(pair.first,
+                        std::make_pair(pair.second.first.toHexString(), pair.second.second));
+    }
+
+    results->addPartialHashes(std::move(partial));
+}
+
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
                                           ValidationVersion validationVersion) {

@@ -65,6 +65,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -373,11 +374,18 @@ public:
         // collHash parameter.
         const bool collHash = cmdObj["collHash"].trueValue();
 
+        // TODO (SERVER-110841): Sanitize the parameters passed as hashPrefixes.
         // hashPrefixes parameter.
         const auto rawHashPrefixes = cmdObj["hashPrefixes"];
-        boost::optional<std::vector<BSONElement>> hashPrefixes = boost::none;
+        boost::optional<std::vector<std::string>> hashPrefixes = boost::none;
         if (rawHashPrefixes) {
-            hashPrefixes = rawHashPrefixes.Array();
+            hashPrefixes = std::vector<std::string>();
+            for (const auto& e : rawHashPrefixes.Array()) {
+                hashPrefixes->push_back(e.String());
+            }
+            if (!hashPrefixes->size()) {
+                hashPrefixes->push_back(std::string(""));
+            }
         }
         if (rawHashPrefixes && replCoord->getSettings().isReplSet()) {
             uasserted(ErrorCodes::InvalidOptions,
