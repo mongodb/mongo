@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

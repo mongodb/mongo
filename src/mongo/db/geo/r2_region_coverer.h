@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/geo/hash.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <queue>

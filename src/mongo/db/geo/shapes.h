@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/big_polygon.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cmath>

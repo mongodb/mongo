@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::parsers::matcher {
 Status parseGeoExpressionFromBSON(const BSONObj& obj, GeoExpression& expr);

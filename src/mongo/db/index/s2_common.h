@@ -33,6 +33,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>

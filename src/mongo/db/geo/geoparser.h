@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
