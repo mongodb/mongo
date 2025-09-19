@@ -1565,7 +1565,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     request.setNamespaceString(ns);
     request.setLegacyRuntimeConstants(std::move(runtimeConstants));
     if (letParams) {
-        request.setLetParameters(std::move(letParams));
+        request.setLetParameters(letParams);
     }
     request.setBypassEmptyTsReplacement(bypassEmptyTsReplacement);
     request.setStmtIds(stmtIds);
