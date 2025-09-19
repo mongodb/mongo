@@ -1,17 +1,21 @@
 /**
  * Verifies that $rankFusion behaves correctly in FCV upgrade/downgrade scenarios.
  */
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     testPerformUpgradeDowngradeReplSet
 } from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {
     testPerformUpgradeDowngradeSharded
 } from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
-
-const collName = jsTestName();
-const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
-const docs = [{_id: 0, foo: "xyz"}, {_id: 1, foo: "bar"}, {_id: 2, foo: "mongodb"}];
+import {
+    assertRankFusionAggregateAccepted,
+    collName,
+    getDB,
+    rankFusionPipeline,
+    rankFusionPipelineWithScoreDetails,
+    setupCollection,
+} from
+    "jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
 
 const viewName = "rank_fusion_view";
 
@@ -19,22 +23,8 @@ const viewName = "rank_fusion_view";
 const viewPipeline = [{$match: {_id: {$gt: 0}}}];
 
 // TODO SERVER-108470 Add tests for $rankFusion with multiple input pipelines.
-const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}}}];
-const rankFusionPipelineWithScoreDetails = [
-    {$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}, scoreDetails: true}},
-    {$project: {scoreDetails: {$meta: "scoreDetails"}, score: {$meta: "score"}}}
-];
 
 const kUnrecognizedPipelineStageErrorCode = 40324;
-function setupCollection(primaryConn, shardingTest = null) {
-    const coll = assertDropAndRecreateCollection(getDB(primaryConn), collName);
-
-    if (shardingTest) {
-        shardingTest.shardColl(coll, {_id: 1});
-    }
-
-    assert.commandWorked(coll.insertMany(docs));
-}
 
 function assertRankFusionCompletelyRejected(primaryConn) {
     const db = getDB(primaryConn);
@@ -78,13 +68,7 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
     const db = getDB(primaryConn);
     db[viewName].drop();
 
-    // $rankFusion succeeds in an aggregation command.
-    assert.commandWorked(
-        db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
-
-    // $rankFusion with scoreDetails succeeds in an aggregation command.
-    assert.commandWorked(db.runCommand(
-        {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
+    assertRankFusionAggregateAccepted(db, collName);
 
     // View creation is rejected when view pipeline has $rankFusion.
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline), [

@@ -1742,6 +1742,15 @@ server_parameters:
         default: false
         redact: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+    # TODO SERVER-85426 Remove this knob.
+    bypassRankFusionFCVGate:
+        description: "If enabled, bypasses FCV-gating for featureFlagRankFusionBasic and featureFlagRankFusionFull."
+        set_at: [startup]
+        cpp_varname: bypassRankFusionFCVGate
+        cpp_vartype: bool
+        default: false
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

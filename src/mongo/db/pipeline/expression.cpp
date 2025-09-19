@@ -72,6 +72,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
@@ -2051,9 +2052,8 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
     static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore,
                                                                      MetaType::kScoreDetails};
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
-    const bool hybridScoringFeatureFlagEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
-        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool hybridScoringFeatureFlagEnabled =
+        expCtx->shouldParserIgnoreFeatureFlagCheck() || isRankFusionFullEnabled();
     uassert(ErrorCodes::FailedToParse,
             "'featureFlagRankFusionFull' must be enabled to use "
             "'score' or 'scoreDetails' meta field",
@@ -3140,6 +3140,8 @@ intrusive_ptr<Expression> ExpressionSigmoid::parseExpressionSigmoid(
     return make_intrusive<ExpressionDivide>(expCtx, std::move(divideChildren));
 }
 
+// Note: we do not bypass FCV-gating with 'bypassRankFusionFCVGate' here because this expression was
+// not backported to 8.0.
 REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
                                       ExpressionSigmoid::parseExpressionSigmoid,
                                       AllowedWithApiStrict::kNeverInVersion1,

@@ -23,8 +23,13 @@ import {
 
     // Pipeline to run $rankFusion should fail without feature flag turned on.
     assert.commandFailedWithCode(
-        testDB.runCommand({aggregate: 1, pipeline: [{$rankFusion: {}}], cursor: {}}),
-        ErrorCodes.QueryFeatureNotAllowed);
+        testDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}}}],
+            cursor: {},
+        }),
+        ErrorCodes.QueryFeatureNotAllowed,
+    );
 
     // Pipeline to run $scoreFusion should fail without feature flag turned on. Specified value of 1
     // for aggregate indicates a collection agnostic command. Specified cursor of default batch

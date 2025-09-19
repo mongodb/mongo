@@ -34,6 +34,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/util/string_map.h"
 
 #include <ostream>
@@ -244,26 +246,21 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
 }
 
 void DocumentMetadataFields::setScore(double score, bool featureFlagAlreadyValidated) {
-    if (featureFlagAlreadyValidated ||
-        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (featureFlagAlreadyValidated || isRankFusionFullEnabled()) {
         _setCommon(MetaType::kScore);
         _holder->score = score;
     }
 }
 
 void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated) {
-    if (featureFlagAlreadyValidated ||
-        feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (featureFlagAlreadyValidated || isRankFusionFullEnabled()) {
         _setCommon(MetaType::kScoreDetails);
         _holder->scoreDetails = scoreDetails;
     }
 }
 
 void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
-    if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (isRankFusionFullEnabled()) {
         auto score = scoreDetails.getDocument().getField(StringData{scoreDetailsScoreField});
         tassert(9679300,
                 str::stream() << "scoreDetails must provide a numeric 'value' field with which to "

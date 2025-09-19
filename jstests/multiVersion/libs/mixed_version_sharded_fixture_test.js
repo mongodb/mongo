@@ -3,6 +3,8 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export function testPerformUpgradeDowngradeSharded({
+    startingNodeOptions = {},
+    upgradeNodeOptions = {},
     setupFn,
     whenFullyDowngraded,
     whenOnlyConfigIsLatestBinary,
@@ -17,9 +19,9 @@ export function testPerformUpgradeDowngradeSharded({
         mongos: 1,
         config: 1,
         other: {
-            mongosOptions: {binVersion: "last-lts"},
-            configOptions: {binVersion: "last-lts"},
-            rsOptions: {binVersion: "last-lts"}
+            mongosOptions: {binVersion: "last-lts", ...startingNodeOptions},
+            configOptions: {binVersion: "last-lts", ...startingNodeOptions},
+            rsOptions: {binVersion: "last-lts", ...startingNodeOptions}
         },
     });
     st.configRS.awaitReplication();
@@ -32,22 +34,23 @@ export function testPerformUpgradeDowngradeSharded({
         {upgradeShards: false, upgradeMongos: false, upgradeConfigs: false, waitUntilStable: true};
 
     // Upgrade the configs.
-    st.upgradeCluster('latest', {...justWaitForStable, upgradeConfigs: true});
+    st.upgradeCluster('latest', {...justWaitForStable, upgradeConfigs: true}, upgradeNodeOptions);
 
     whenOnlyConfigIsLatestBinary(st.s);
 
     // Upgrade the secondary shard.
-    st.upgradeCluster('latest', {...justWaitForStable, upgradeOneShard: st.rs1});
+    st.upgradeCluster(
+        'latest', {...justWaitForStable, upgradeOneShard: st.rs1}, upgradeNodeOptions);
 
     whenSecondariesAndConfigAreLatestBinary(st.s);
 
     // Upgrade the rest of the cluster.
-    st.upgradeCluster('latest', {...justWaitForStable, upgradeShards: true});
+    st.upgradeCluster('latest', {...justWaitForStable, upgradeShards: true}, upgradeNodeOptions);
 
     whenMongosBinaryIsLastLTS(st.s);
 
     // Upgrade mongos.
-    st.upgradeCluster('latest', {...justWaitForStable, upgradeMongos: true});
+    st.upgradeCluster('latest', {...justWaitForStable, upgradeMongos: true}, upgradeNodeOptions);
 
     whenBinariesAreLatestAndFCVIsLastLTS(st.s);
 

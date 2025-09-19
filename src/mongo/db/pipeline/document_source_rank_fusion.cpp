@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -70,11 +71,10 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
-                                           DocumentSourceRankFusion::LiteParsed::parse,
-                                           DocumentSourceRankFusion::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           &feature_flags::gFeatureFlagRankFusionBasic);
+REGISTER_DOCUMENT_SOURCE(rankFusion,
+                         DocumentSourceRankFusion::LiteParsed::parse,
+                         DocumentSourceRankFusion::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 namespace {
 
@@ -521,8 +521,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
                 restoreUserDocs};
     }
     // TODO SERVER-85426: Remove this check once all feature flags have been removed.
-    if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (isRankFusionFullEnabled()) {
         auto setScore = calculateFinalScoreMetadata(expCtx, pipelineNames);
         return {group, addFields, overrideRanksOfZero, setScore, sort, restoreUserDocs};
     }
@@ -585,6 +584,10 @@ parseAndValidateRankedSelectionPipelines(const RankFusionSpec& spec,
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "'featureFlagRankFusionBasic' must be enabled to use rankFusion",
+            pExpCtx->isBasicRankFusionEnabled());
+
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
@@ -617,12 +620,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     const bool includeScoreDetails = spec.getScoreDetails();
     // TODO SERVER-85426: Remove this check once all feature flags have been removed.
     if (includeScoreDetails) {
-        auto isRankFusionFullEnabled =
-            feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         uassert(ErrorCodes::QueryFeatureNotAllowed,
                 "'featureFlagRankFusionFull' must be enabled to use scoreDetails",
-                isRankFusionFullEnabled);
+                isRankFusionFullEnabled());
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
