@@ -41,6 +41,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
