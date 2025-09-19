@@ -33,6 +33,9 @@
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/expression_context.h"
 
+#include <iosfwd>
+#include <string>
+
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -81,6 +84,11 @@ public:
     boost::optional<NamespaceString> getNamespace() const;
 
     /**
+     * Return a string representation of the ChangeStream object.
+     */
+    std::string toString() const;
+
+    /**
      * Extract the change stream type from the given nss.
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
@@ -96,5 +104,7 @@ private:
     const ChangeStreamType _type;
     const boost::optional<NamespaceString> _nss;
 };
+
+std::ostream& operator<<(std::ostream& os, const ChangeStream& changeStream);
 
 }  // namespace mongo

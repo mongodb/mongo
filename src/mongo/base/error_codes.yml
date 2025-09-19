@@ -31,7 +31,7 @@ error_categories:
   - RetriableError
   # isCloseConnectionError() includes all codes that indicate that it is no longer safe or
   # desirable to maintain a connection with the client. The server will close the connection to
-  # get the client to through server selection again.
+  # get the client to go through server selection again.
   - CloseConnectionError
   - VersionedAPIError
   - ValidationError
@@ -940,6 +940,11 @@ error_codes:
       code: 463,
       name: StreamProcessorKinesisRetryableError,
       categories: [StreamProcessorRetryableError],
+    }
+  - {
+      code: 464,
+      name: ShardRemovedError,
+      categories: [NonResumableChangeStreamError],
     }
 
   # Error codes 4000-8999 are reserved.

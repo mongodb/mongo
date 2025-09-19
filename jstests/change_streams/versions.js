@@ -12,7 +12,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const dbName = jsTestName();
 const collName = jsTestName();
 
-// TODO SERVER-106575 / SERVER-107442: reenable testing of "v2" reader version here.
+// TODO SERVER-107442: reenable testing of "v2" reader version here.
 const validVersions = ["v1", undefined];
 const isPreciseShardTargetingEnabled = FeatureFlagUtil.isEnabled(db, "ChangeStreamPreciseShardTargeting");
 

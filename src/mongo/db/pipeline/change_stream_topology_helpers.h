@@ -29,44 +29,39 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/s/query/exec/async_results_merger_params_gen.h"
-#include "mongo/s/query/exec/merge_cursors_stage.h"
 
-#include <vector>
-
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo::exec::agg {
+namespace mongo::change_stream::topology_helpers {
+
 /**
- * This class handles the execution part of the change stream handle topology change aggregation
- * stage and is part of the execution pipeline. Its construction is based on
- * DocumentSourceChangeStreamHandleTopologyChange, which handles the optimization part.
+ * Given the 'originalAggregateCommand' and a resume token, returns a new BSON object with the same
+ * command except with the addition of a resumeAfter option containing the resume token. If there
+ * was a previous resumeAfter option, it will be removed.
+ * The change stream version can be optionally specified to inject a specific change stream reader
+ * version into the pipeline command.
  */
-class ChangeStreamHandleTopologyChangeStage final : public Stage {
-public:
-    ChangeStreamHandleTopologyChangeStage(StringData stageName,
-                                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+BSONObj replaceResumeTokenAndVersionInCommand(
+    Document resumeToken,
+    const BSONObj& originalAggregateCommand,
+    const boost::optional<ChangeStreamReaderVersionEnum>& changeStreamVersion);
 
-private:
-    GetNextResult doGetNext() final;
+/**
+ * Updates the $changeStream stage in the 'originalAggregateCommand' to reflect the start time for
+ * the newly-added shard(s), then generates the final command object to be run on those shards.
+ * The change stream version can be optionally specified to force a specific change stream reader
+ * version on the shard.
+ */
+BSONObj createUpdatedCommandForNewShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Timestamp atClusterTime,
+    const BSONObj& originalAggregateCommand,
+    const boost::optional<ChangeStreamReaderVersionEnum>& changeStreamVersion);
 
-    /**
-     * Establish the new cursors and tell the RouterStageMerge about them.
-     */
-    void addNewShardCursors(const Document& newShardDetectedObj);
-
-    /**
-     * Open the cursors on the new shards.
-     */
-    std::vector<RemoteCursor> establishShardCursorsOnNewShards(const Document& newShardDetectedObj);
-
-    boost::intrusive_ptr<MergeCursorsStage> _mergeCursors;
-    BSONObj _originalAggregateCommand;
-};
-}  // namespace mongo::exec::agg
+}  // namespace mongo::change_stream::topology_helpers

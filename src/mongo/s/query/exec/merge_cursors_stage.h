@@ -70,10 +70,23 @@ public:
         return _stats.planSummaryStats;
     }
 
+    /**
+     * Adds the specified, already opened cursors for remote shards or the config server.
+     */
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                             const ShardTag& tag = ShardTag::kDefault);
 
+    /**
+     * Close the set of specified open cursors on remote shards and/or the config server.
+     * This is used by v2 change stream readers.
+     */
     void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds, const ShardTag& tag);
+
+    /**
+     * Make the underlying results merger recognize change stream control events.
+     * This is used by v2 change stream readers.
+     */
+    void recognizeControlEvents();
 
     void setInitialHighWaterMark(const BSONObj& highWaterMark);
 

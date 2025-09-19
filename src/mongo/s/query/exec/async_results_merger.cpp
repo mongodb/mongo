@@ -145,7 +145,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         // later via a call to `setNextHighWaterMarkDeterminingStrategy()'.
         _nextHighWaterMarkDeterminingStrategy =
             NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-                _params, false /* recognizeControlEvents */);
+                _params.getCompareWholeSortKey(), false /* recognizeControlEvents */);
     } else {
         // In all other modes than tailable, awaitData, we should never call the function to
         // determine the next high water mark. The following strategy object will ensure that.
@@ -379,6 +379,11 @@ void AsyncResultsMerger::setNextHighWaterMarkDeterminingStrategy(
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _nextHighWaterMarkDeterminingStrategy = std::move(nextHighWaterMarkDeterminingStrategy);
 }
+
+bool AsyncResultsMerger::getCompareWholeSortKey() const {
+    return _params.getCompareWholeSortKey();
+}
+
 
 bool AsyncResultsMerger::partialResultsReturned() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -686,6 +691,13 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
         smallestRemote->eligibleForHighWaterMark) {
         BSONObj nextHighWaterMark = (*_nextHighWaterMarkDeterminingStrategy)(front, _highWaterMark);
+
+        LOGV2_DEBUG(10657528,
+                    5,
+                    "Checking monotonicity of high water mark tokens",
+                    "current"_attr = _highWaterMark,
+                    "next"_attr = nextHighWaterMark,
+                    "sort"_attr = *_params.getSort());
 
         // The following check is potentially very costly on large resume tokens, so we only
         // execute it in debug mode.

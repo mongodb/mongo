@@ -322,6 +322,12 @@ public:
         NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminingStrategy);
 
     /**
+     * Returns if this 'AsyncResultsMerger' compares the whole sort key, based on the initial setup
+     * parameters.
+     */
+    bool getCompareWholeSortKey() const;
+
+    /**
      * Starts shutting down this ARM by canceling all pending requests and scheduling killCursors
      * on all of the unexhausted remotes. Returns a 'future' that is signaled when this ARM is safe
      * to destroy.

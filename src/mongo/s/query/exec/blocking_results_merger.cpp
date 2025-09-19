@@ -31,17 +31,12 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/logv2/log.h"
+#include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
-
-#include <future>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -62,6 +57,12 @@ const AsyncResultsMergerParams& BlockingResultsMerger::asyncResultsMergerParams(
 
 void BlockingResultsMerger::setInitialHighWaterMark(const BSONObj& highWaterMark) {
     _arm->setInitialHighWaterMark(highWaterMark);
+}
+
+void BlockingResultsMerger::recognizeControlEvents() {
+    _arm->setNextHighWaterMarkDeterminingStrategy(
+        NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
+            _arm->getCompareWholeSortKey(), true /* recognizeControlEvents */));
 }
 
 StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(

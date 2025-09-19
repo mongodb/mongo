@@ -56,6 +56,17 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+namespace {
+void appendCommonTransactionFilter(BSONObjBuilder& applyOpsBuilder) {
+    applyOpsBuilder.append("op", "c");
+
+    // "o.applyOps" stores the list of operations, so it must be an array.
+    applyOpsBuilder.append("o.applyOps", BSON("$type" << "array"));
+    applyOpsBuilder.append("o.prepare", BSON("$ne" << true));
+    applyOpsBuilder.append("o.partialTxn", BSON("$ne" << true));
+}
+}  // namespace
+
 namespace change_stream_filter {
 
 std::unique_ptr<MatchExpression> buildTsFilter(
@@ -373,6 +384,34 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     }
 
     return transactionFilter;
+}
+
+std::unique_ptr<MatchExpression> buildTransactionFilterForConfigServer(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& controlEventsFilter,
+    std::vector<BSONObj>& backingBsonObjs) {
+    BSONObjBuilder applyOpsBuilder;
+    appendCommonTransactionFilter(applyOpsBuilder);
+
+    {
+        // Include this 'applyOps' if it has an operation with a matching namespace _or_ if it has a
+        // 'prevOpTime' link to another 'applyOps' command, indicating a multi-entry transaction.
+        BSONArrayBuilder orBuilder(applyOpsBuilder.subarrayStart("$or"));
+
+        // Match relevant command events inside the 'applyOps'.
+        orBuilder.append(BSON("o.applyOps" << BSON("$elemMatch" << controlEventsFilter)));
+
+        // The default repl::OpTime is the value used to indicate a null "prevOpTime" link.
+        orBuilder.append(BSON(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName
+                              << BSON("$ne" << repl::OpTime().toBSON())));
+    }
+
+    auto applyOpsFilter = applyOpsBuilder.obj();
+    auto commitTransactionFilter = BSON("op" << "c"
+                                             << "o.commitTransaction" << 1);
+
+    return MatchExpressionParser::parseAndNormalize(
+        backingBsonObjs.emplace_back(BSON(OR(applyOpsFilter, commitTransactionFilter))), expCtx);
 }
 
 BSONObj buildControlEventsFilterForDataShard(

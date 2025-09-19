@@ -143,9 +143,7 @@ DocumentSourceChangeStreamInjectControlEvents::DocumentSourceChangeStreamInjectC
 
 intrusive_ptr<DocumentSourceChangeStreamInjectControlEvents>
 DocumentSourceChangeStreamInjectControlEvents::create(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec& spec,
-    const BSONObj& actions) {
+    const intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& actions) {
     return new DocumentSourceChangeStreamInjectControlEvents(expCtx,
                                                              ActionsHelper::parseFromBSON(actions));
 }

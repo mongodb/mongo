@@ -29,44 +29,43 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/agg/stage.h"
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream.h"
+#include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/s/query/exec/async_results_merger_params_gen.h"
-#include "mongo/s/query/exec/merge_cursors_stage.h"
+#include "mongo/db/pipeline/resume_token.h"
 
+#include <list>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo::exec::agg {
+namespace mongo::change_stream::pipeline_helpers {
+
 /**
- * This class handles the execution part of the change stream handle topology change aggregation
- * stage and is part of the execution pipeline. Its construction is based on
- * DocumentSourceChangeStreamHandleTopologyChange, which handles the optimization part.
+ * Build a change stream pipeline for the config server, used by v2 change streams.
  */
-class ChangeStreamHandleTopologyChangeStage final : public Stage {
-public:
-    ChangeStreamHandleTopologyChangeStage(StringData stageName,
-                                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+std::vector<BSONObj> buildPipelineForConfigServerV2(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OperationContext* opCtx,
+    Timestamp atClusterTime,
+    const NamespaceString& nss,
+    const ChangeStream& changeStream,
+    ChangeStreamReaderBuilder* readerBuilder);
 
-private:
-    GetNextResult doGetNext() final;
+/**
+ * Build a change stream pipeline for the router or a data shard, depending on the settings in the
+ * ExpressionContext. Calling this function can modify change stream-specific settings in the
+ * ExpressionContext.
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec& spec,
+    const ResumeTokenData& resumeToken);
 
-    /**
-     * Establish the new cursors and tell the RouterStageMerge about them.
-     */
-    void addNewShardCursors(const Document& newShardDetectedObj);
-
-    /**
-     * Open the cursors on the new shards.
-     */
-    std::vector<RemoteCursor> establishShardCursorsOnNewShards(const Document& newShardDetectedObj);
-
-    boost::intrusive_ptr<MergeCursorsStage> _mergeCursors;
-    BSONObj _originalAggregateCommand;
-};
-}  // namespace mongo::exec::agg
+}  // namespace mongo::change_stream::pipeline_helpers

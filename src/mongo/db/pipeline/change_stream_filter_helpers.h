@@ -53,7 +53,7 @@ std::unique_ptr<MatchExpression> buildTsFilter(
 
 /**
  * Produce a filter that rejects any operations marked with the "fromMigrate" flag. These operations
- * occurs as part of chunk migration and should not be visible to user change streams, because they
+ * occur as part of chunk migration and should not be visible to user change streams, because they
  * don't reflect user operations to the database.
  * Also populates the 'backingBsonObjs' vector to store BSONObjs referenced in the returned
  * MatchExpression.
@@ -130,6 +130,16 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
 std::unique_ptr<MatchExpression> buildTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
+    std::vector<BSONObj>& backingBsonObjs);
+
+/**
+ * Build an oplog match expression for control events on a config server. This matches control
+ * events which are part of 'applyOps' entries. The logic is somewhat similar to
+ * 'buildTransactionFilter()', but no user-defined filter is supported.
+ */
+std::unique_ptr<MatchExpression> buildTransactionFilterForConfigServer(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& controlEventsFilter,
     std::vector<BSONObj>& backingBsonObjs);
 
 /**

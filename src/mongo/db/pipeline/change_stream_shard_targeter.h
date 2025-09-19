@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
+#include "mongo/util/assert_util.h"
 
 #include <utility>
 
@@ -49,6 +51,16 @@ enum class ShardTargeterDecision {
     // The change stream reader should switch to V1 of the change stream reader.
     kSwitchToV1,
 };
+
+inline StringData toString(ShardTargeterDecision decision) {
+    switch (decision) {
+        case ShardTargeterDecision::kContinue:
+            return "continue"_sd;
+        case ShardTargeterDecision::kSwitchToV1:
+            return "switchToV1"_sd;
+    }
+    MONGO_UNREACHABLE_TASSERT(10657560);
+}
 
 class ChangeStreamShardTargeter {
 public:

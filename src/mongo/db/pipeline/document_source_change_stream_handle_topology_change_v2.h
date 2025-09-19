@@ -30,13 +30,10 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -50,13 +47,12 @@
 namespace mongo {
 
 /**
- * An internal stage used as part of the V2 change streams infrastructure, to listen for events that
- * describe topology changes to the cluster. This stage is responsible for opening and closing
- * remote cursors on these shards as needed.
+ * An internal DocumentSource used as part of the V2 change streams infrastructure, to listen for
+ * events that describe topology changes to the cluster. This stage is responsible for opening and
+ * closing remote cursors on these shards as needed.
  */
 class DocumentSourceChangeStreamHandleTopologyChangeV2 final
-    : public DocumentSourceInternalChangeStreamStage,
-      public exec::agg::Stage {
+    : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName =
         change_stream_constants::stage_names::kHandleTopologyChangeV2;
@@ -65,12 +61,12 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Creates a new stage for V2 change stream readers which will establish a new cursor and add it
-     * to the cursors being merged by 'mergeCursorsStage' whenever a new shard is detected by a
-     * change stream.
+     * Creates a new stage for V2 change stream readers.
+     * The stage parametrization will happen according to the change stream-related configuration in
+     * the provided 'ExpressionContext' and server parameters.
      */
     static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChangeV2> create(
-        const boost::intrusive_ptr<ExpressionContext>&);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     const char* getSourceName() const final {
         return kStageName.data();
@@ -99,12 +95,7 @@ public:
 
 private:
     DocumentSourceChangeStreamHandleTopologyChangeV2(
-        const boost::intrusive_ptr<ExpressionContext>&);
-
-    /**
-     * This method currently returns all input documents as they are. The actual handling of
-     * topology changes will be implemented in follow-up tickets.
-     */
-    GetNextResult doGetNext() final;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 };
+
 }  // namespace mongo

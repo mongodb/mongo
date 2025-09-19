@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/change_streams/all_databases_change_stream_shard_targeter_impl.h"
@@ -97,7 +97,7 @@ BSONObj ChangeStreamReaderBuilderImpl::buildControlEventFilterForDataShard(
         case ChangeStreamType::kDatabase: {
             auto dbName = DatabaseNameUtil::serialize(nss->dbName(),
                                                       SerializationContext::stateCommandRequest());
-            auto escapedDbName = DocumentSourceChangeStream::regexEscapeNsForChangeStream(dbName);
+            auto escapedDbName = change_stream::regexEscapeNsForChangeStream(dbName);
             predicateForMoveChunk =
                 BSON("o2.moveChunk" << BSONRegEx(fmt::format("^{}\\.", escapedDbName)));
             predicateForMovePrimary = BSON("o2.movePrimary" << dbName);

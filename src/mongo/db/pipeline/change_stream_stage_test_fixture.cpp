@@ -40,7 +40,6 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -53,7 +52,11 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -96,7 +99,12 @@ ChangeStreamStageTestNoSetup::ChangeStreamStageTestNoSetup()
     : ChangeStreamStageTestNoSetup(change_stream_test_helper::nss) {}
 
 ChangeStreamStageTestNoSetup::ChangeStreamStageTestNoSetup(NamespaceString nsString)
-    : AggregationContextFixture(std::move(nsString)) {
+    : AggregationContextFixture(
+          std::move(nsString),
+          std::make_unique<ScopedGlobalServiceContextForTest>(
+              ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                   std::make_unique<ClockSourceMock>(),
+                                   std::make_unique<TickSourceMock<Microseconds>>()))) {
     getExpCtx()->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
 }
 

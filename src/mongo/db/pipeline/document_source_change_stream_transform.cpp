@@ -71,8 +71,8 @@ DocumentSourceChangeStreamTransform::createFromBson(
         DocumentSourceChangeStreamSpec::parse(rawSpec.Obj(), IDLParserContext("$changeStream"));
 
     uassert(10498501,
-            "Expecting 'supportedEvents' to be set only on a shard mongod, not on router or "
-            "replica set member",
+            "Expecting 'supportedEvents' to be set only on a shard mongod, not on a router or "
+            "non-shard replica set member",
             !spec.getSupportedEvents() || !change_stream::isRouterOrNonShardedReplicaSet(expCtx));
 
     // Set the change stream spec on the expression context.

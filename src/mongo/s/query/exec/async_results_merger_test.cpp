@@ -109,7 +109,8 @@ bool isMonotonicallyIncreasing(Timestamp timestampT0, Timestamp timestampT1) {
 NextHighWaterMarkDeterminingStrategyPtr buildNextHighWaterMarkDeterminingStrategy(
     bool recognizeControlEvents) {
     return NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-        AsyncResultsMergerTest::buildARMParamsForChangeStream(), recognizeControlEvents);
+        AsyncResultsMergerTest::buildARMParamsForChangeStream().getCompareWholeSortKey(),
+        recognizeControlEvents);
 }
 
 TEST_F(AsyncResultsMergerTest, ResponseReceivedWhileDetachedFromOperationContext) {

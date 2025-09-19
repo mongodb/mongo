@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/s/query/exec/async_results_merger_params_gen.h"
 
 #include <memory>
 
@@ -81,7 +80,7 @@ struct NextHighWaterMarkDeterminingStrategyFactory {
      * watermark. The correct functor will be created based on the function arguments.
      */
     static NextHighWaterMarkDeterminingStrategyPtr createForChangeStream(
-        const AsyncResultsMergerParams& params, bool recognizeControlEvents);
+        bool compareWholeSortKey, bool recognizeControlEvents);
 };
 
 }  // namespace mongo

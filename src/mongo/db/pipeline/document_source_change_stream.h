@@ -306,7 +306,6 @@ public:
     /**
      * Helpers for determining which regex to match a change stream against.
      */
-    static std::string regexEscapeNsForChangeStream(StringData source);
     static StringData resolveAllCollectionsRegex(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -401,13 +400,6 @@ private:
         Timestamp atClusterTime,
         const DocumentSourceChangeStreamSpec& spec,
         const ChangeStream& changeStream);
-
-    // Constructs and returns a series of stages representing the full change stream pipeline.
-    static std::list<boost::intrusive_ptr<DocumentSource>> _buildPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const DocumentSourceChangeStreamSpec& spec,
-        const ResumeTokenData& resumeToken,
-        bool useV2ChangeStreamReader);
 
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is

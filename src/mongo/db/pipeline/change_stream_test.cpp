@@ -58,6 +58,9 @@ TEST(ChangeStreamTest, CollectionLevelChangeStream) {
     ASSERT_TRUE(actualNss.has_value());
     ASSERT_EQ(*nss, *actualNss);
     ASSERT_FALSE(actualNss->isDbOnly());
+
+    ASSERT_EQ("ChangeStream (type: collection, mode: strict, nss: 'testDB.testCollection')",
+              changeStream.toString());
 }
 
 DEATH_TEST_REGEX(ChangeStreamTest,
@@ -92,13 +95,17 @@ TEST(ChangeStreamTest, DatabaseLevelChangeStream) {
     ASSERT_TRUE(actualNss.has_value());
     ASSERT_EQ(*nss, *actualNss);
     ASSERT_TRUE(actualNss->isDbOnly());
+
+    ASSERT_EQ("ChangeStream (type: database, mode: strict, nss: 'testDB')",
+              changeStream.toString());
 }
 
 TEST(ChangeStreamTest, DatabaseLevelChangeStreamOnCollectionLessAggregateNS) {
     boost::optional<NamespaceString> nss =
         NamespaceString::createNamespaceString_forTest("testDB.$cmd.aggregate");
 
-    ChangeStream changeStream(ChangeStreamReadMode::kStrict, ChangeStreamType::kDatabase, nss);
+    ChangeStream changeStream(
+        ChangeStreamReadMode::kIgnoreRemovedShards, ChangeStreamType::kDatabase, nss);
 
     ASSERT_EQ(ChangeStreamType::kDatabase, changeStream.getChangeStreamType());
 
@@ -106,6 +113,9 @@ TEST(ChangeStreamTest, DatabaseLevelChangeStreamOnCollectionLessAggregateNS) {
     ASSERT_TRUE(actualNss.has_value());
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest("testDB"), *actualNss);
     ASSERT_TRUE(actualNss->isDbOnly());
+
+    ASSERT_EQ("ChangeStream (type: database, mode: ignoreRemovedShards, nss: 'testDB')",
+              changeStream.toString());
 }
 
 DEATH_TEST_REGEX(ChangeStreamTest,
@@ -132,11 +142,14 @@ DEATH_TEST_REGEX(ChangeStreamTest,
 TEST(ChangeStreamTest, AllDatabasesChangeStream) {
     boost::optional<NamespaceString> nss;
 
-    ChangeStream changeStream(ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, nss);
+    ChangeStream changeStream(
+        ChangeStreamReadMode::kIgnoreRemovedShards, ChangeStreamType::kAllDatabases, nss);
 
     ASSERT_EQ(ChangeStreamType::kAllDatabases, changeStream.getChangeStreamType());
 
     ASSERT_FALSE(changeStream.getNamespace().has_value());
+    ASSERT_EQ("ChangeStream (type: all-databases, mode: ignoreRemovedShards)",
+              changeStream.toString());
 }
 
 TEST(ChangeStreamTest, AllDatabasesChangeStreamOnAdminDB) {
@@ -147,6 +160,7 @@ TEST(ChangeStreamTest, AllDatabasesChangeStreamOnAdminDB) {
     ASSERT_EQ(ChangeStreamType::kAllDatabases, changeStream.getChangeStreamType());
 
     ASSERT_FALSE(changeStream.getNamespace().has_value());
+    ASSERT_EQ("ChangeStream (type: all-databases, mode: strict)", changeStream.toString());
 }
 
 DEATH_TEST_REGEX(ChangeStreamTest,

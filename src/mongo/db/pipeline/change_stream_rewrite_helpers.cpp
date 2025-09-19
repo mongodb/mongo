@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -884,13 +885,13 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                     if (fieldName == "db") {
                         return fmt::format(
                             "^{}\\.{}",
-                            DocumentSourceChangeStream::regexEscapeNsForChangeStream(
+                            mongo::change_stream::regexEscapeNsForChangeStream(
                                 nsElem.valueStringDataSafe()),
                             DocumentSourceChangeStream::resolveAllCollectionsRegex(expCtx));
                     }
                     return fmt::format("{}\\.{}$",
                                        DocumentSourceChangeStream::kRegexAllDBs,
-                                       DocumentSourceChangeStream::regexEscapeNsForChangeStream(
+                                       mongo::change_stream::regexEscapeNsForChangeStream(
                                            nsElem.valueStringDataSafe()));
                 }();
 

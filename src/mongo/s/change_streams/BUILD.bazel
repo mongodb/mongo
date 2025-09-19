@@ -41,7 +41,9 @@ mongo_cc_library(
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/pipeline:change_stream_pipeline",
+        "//src/mongo/db/pipeline:change_stream_helpers",
+        "//src/mongo/db/pipeline:change_stream_interfaces",
+        "//src/mongo/s:grid",
     ],
 )
 
@@ -76,6 +78,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":change_streams",
+        ":change_streams_control_events",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_test_fixture",

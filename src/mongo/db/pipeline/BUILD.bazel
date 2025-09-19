@@ -196,8 +196,25 @@ mongo_cc_library(
     ],
     deps = [
         "document_sources_idl",
+        "//src/mongo/db:query_expressions",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_stream_topology_helpers",
+    srcs = [
+        "change_stream_topology_helpers.cpp",
+    ],
+    hdrs = [
+        "change_stream_topology_helpers.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
     ],
 )
 
@@ -1211,17 +1228,40 @@ mongo_cc_library(
     ],
 )
 
+# These interfaces can be used by both mongod and mongos code.
+mongo_cc_library(
+    name = "change_stream_interfaces",
+    srcs = [
+        "change_stream.cpp",
+        "change_stream_reader_builder.cpp",
+        "data_to_shards_allocation_query_service.cpp",
+    ],
+    hdrs = [
+        "change_stream.h",
+        "change_stream_read_mode.h",
+        "change_stream_reader_builder.h",
+        "change_stream_reader_context.h",
+        "change_stream_shard_targeter.h",
+        "data_to_shards_allocation_query_service.h",
+        "historical_placement_fetcher.h",
+    ],
+    deps = [
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/global_catalog:sharding_catalog_client",
+    ],
+)
+
 mongo_cc_library(
     name = "change_stream_pipeline",
     srcs = [
-        "change_stream.cpp",
         "change_stream_document_diff_parser.cpp",
         "change_stream_event_transform.cpp",
         "change_stream_filter_helpers.cpp",
-        "change_stream_reader_builder.cpp",
+        "change_stream_pipeline_helpers.cpp",
         "change_stream_rewrite_helpers.cpp",
         "change_stream_split_event_helpers.cpp",
-        "data_to_shards_allocation_query_service.cpp",
         "document_source_change_stream.cpp",
         "document_source_change_stream_add_post_image.cpp",
         "document_source_change_stream_add_pre_image.cpp",
@@ -1243,6 +1283,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:change_stream_check_topology_change_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_ensure_resume_token_present_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_handle_topology_change_stage.cpp",
+        "//src/mongo/db/exec/agg:change_stream_handle_topology_change_v2_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_inject_control_events_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_split_large_event_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_transform_stage.cpp",
@@ -1251,16 +1292,12 @@ mongo_cc_library(
         "//src/mongo/db/transaction:transaction_history_iterator.h",
     ],
     hdrs = [
-        "change_stream.h",
         "change_stream_document_diff_parser.h",
         "change_stream_event_transform.h",
         "change_stream_filter_helpers.h",
-        "change_stream_reader_builder.h",
-        "change_stream_reader_context.h",
+        "change_stream_pipeline_helpers.h",
         "change_stream_rewrite_helpers.h",
-        "change_stream_shard_targeter.h",
         "change_stream_split_event_helpers.h",
-        "data_to_shards_allocation_query_service.h",
         "document_source_change_stream.h",
         "document_source_change_stream_add_post_image.h",
         "document_source_change_stream_add_pre_image.h",
@@ -1275,7 +1312,6 @@ mongo_cc_library(
         "document_source_change_stream_split_large_event.h",
         "document_source_change_stream_transform.h",
         "document_source_change_stream_unwind_transaction.h",
-        "historical_placement_fetcher.h",
         "//src/mongo/db/exec/agg:change_stream_add_post_image_stage.h",
         "//src/mongo/db/exec/agg:change_stream_add_pre_image_stage.h",
         "//src/mongo/db/exec/agg:change_stream_check_invalidate_stage.h",
@@ -1283,6 +1319,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:change_stream_check_topology_change_stage.h",
         "//src/mongo/db/exec/agg:change_stream_ensure_resume_token_present_stage.h",
         "//src/mongo/db/exec/agg:change_stream_handle_topology_change_stage.h",
+        "//src/mongo/db/exec/agg:change_stream_handle_topology_change_v2_stage.h",
         "//src/mongo/db/exec/agg:change_stream_inject_control_events_stage.h",
         "//src/mongo/db/exec/agg:change_stream_split_large_event_stage.h",
         "//src/mongo/db/exec/agg:change_stream_transform_stage.h",
@@ -1290,7 +1327,9 @@ mongo_cc_library(
     ],
     deps = [
         ":change_stream_helpers",
+        ":change_stream_interfaces",
         ":change_stream_preimage",
+        ":change_stream_topology_helpers",
         "//src/mongo/db:change_stream_serverless_helpers",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_feature_flags",
@@ -1298,7 +1337,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/update:update_driver",
-        "//src/mongo/s/change_streams:change_streams_control_events",
+        "//src/mongo/s/change_streams",
         "//src/mongo/s/query/exec:router_exec_stage",
     ],
 )
@@ -1443,6 +1482,7 @@ mongo_cc_unit_test(
         "change_stream_event_transform_test.cpp",
         "change_stream_reader_builder_mock.h",
         "change_stream_reader_builder_test.cpp",
+        "change_stream_reader_context_mock.h",
         "change_stream_rewrites_test.cpp",
         "change_stream_shard_targeter_mock.h",
         "change_stream_shard_targeter_test.cpp",

@@ -31,6 +31,11 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+
+#include <iostream>
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -81,6 +86,30 @@ boost::optional<NamespaceString> ChangeStream::getNamespace() const {
     return _nss;
 }
 
+std::string ChangeStream::toString() const {
+    StringData mode = _mode == ChangeStreamReadMode::kStrict ? "strict" : "ignoreRemovedShards";
+    StringData type = [&]() -> StringData {
+        switch (_type) {
+            case ChangeStreamType::kAllDatabases:
+                return "all-databases"_sd;
+            case ChangeStreamType::kDatabase:
+                return "database"_sd;
+            case ChangeStreamType::kCollection:
+                return "collection"_sd;
+        }
+        MONGO_UNREACHABLE_TASSERT(10657559);
+    }();
+
+    if (_type == ChangeStreamType::kAllDatabases) {
+        return fmt::format("ChangeStream (type: {}, mode: {})", type, mode);
+    } else {
+        return fmt::format("ChangeStream (type: {}, mode: {}, nss: '{}')",
+                           type,
+                           mode,
+                           NamespaceStringUtil::serialize(*_nss, SerializationContext{}));
+    }
+}
+
 ChangeStreamType ChangeStream::getChangeStreamType(const NamespaceString& nss) {
     // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
     return (nss.isAdminDB() ? ChangeStreamType::kAllDatabases
@@ -101,5 +130,10 @@ ChangeStream ChangeStream::buildFromExpressionContext(
                         getChangeStreamType(nss),
                         nss);
 }
+
+std::ostream& operator<<(std::ostream& os, const ChangeStream& changeStream) {
+    os << changeStream.toString();
+    return os;
+};
 
 }  // namespace mongo

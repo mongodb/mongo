@@ -29,15 +29,24 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
 
+#include <string>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::change_stream {
+/**
+ * Escape a string name component for usage inside a BSONRegEx object that can be used in a change
+ * streams match expression.
+ * TDOO SERVER-111150: replace with pcre_util::quoteMeta.
+ */
+std::string regexEscapeNsForChangeStream(StringData source);
 
 /**
  * Tests if we are currently running on a router or in a non-sharded replica set context.

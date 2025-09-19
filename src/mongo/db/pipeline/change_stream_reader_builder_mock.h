@@ -80,7 +80,12 @@ public:
      */
     std::unique_ptr<ChangeStreamShardTargeter> buildShardTargeter(
         OperationContext* opCtx, const ChangeStream& changeStream) override {
-        return _buildShardTargeter(opCtx, changeStream);
+        auto shardTargeter = _buildShardTargeter(opCtx, changeStream);
+
+        // Keep a pointer to the constructed shard targeter, so it can be retrieved via
+        // 'getShardTargeter()' later.
+        _shardTargeter = shardTargeter.get();
+        return shardTargeter;
     }
 
     /**
@@ -115,12 +120,21 @@ public:
         return _controlEventTypesOnConfigServer(opCtx, changeStream);
     }
 
+    /**
+     * Returns a pointer to the constructed shard targeter, if any. May return a nullptr.
+     */
+    ChangeStreamShardTargeter* getShardTargeter() const {
+        return _shardTargeter;
+    }
+
 private:
     BuildShardTargeterFunction _buildShardTargeter;
     BuildControlEventFunction _controlEventFilterForDataShard;
     GetControlEventTypesFunction _controlEventTypesOnDataShard;
     BuildControlEventFunction _controlEventFilterForConfigServer;
     GetControlEventTypesFunction _controlEventTypesOnConfigServer;
+
+    ChangeStreamShardTargeter* _shardTargeter = nullptr;
 };
 
 }  // namespace mongo

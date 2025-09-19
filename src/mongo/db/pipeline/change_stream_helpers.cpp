@@ -39,6 +39,21 @@
 
 namespace mongo::change_stream {
 
+std::string regexEscapeNsForChangeStream(StringData source) {
+    std::string result;
+    // Output string must be at least as long as the input string.
+    result.reserve(source.size());
+
+    constexpr StringData escapes = "*+|()^?[]./\\$";
+    for (char c : source) {
+        if (escapes.find(c) != std::string::npos) {
+            result.push_back('\\');
+        }
+        result.push_back(c);
+    }
+    return result;
+}
+
 bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (expCtx->getInRouter()) {
         return true;

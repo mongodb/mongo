@@ -110,6 +110,12 @@ public:
     }
 
     /**
+     * Make the underlying 'AsyncResultsMerger' recognize change stream control events. This is used
+     * for v2 change stream readers.
+     */
+    void recognizeControlEvents();
+
+    /**
      * Set the initial high watermark to return when no cursors are tracked.
      * */
     void setInitialHighWaterMark(const BSONObj& highWaterMark);
@@ -131,7 +137,7 @@ public:
     }
 
     /**
-     * Set the stategy to determine the next high water mark.
+     * Set the strategy to determine the next high water mark.
      * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
      */
     void setNextHighWaterMarkDeterminingStrategy(

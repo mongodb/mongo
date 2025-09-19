@@ -139,6 +139,10 @@ void MergeCursorsStage::closeShardCursors(const stdx::unordered_set<ShardId>& sh
     _blockingResultsMerger->closeShardCursors(shardIds, tag);
 }
 
+void MergeCursorsStage::recognizeControlEvents() {
+    _blockingResultsMerger->recognizeControlEvents();
+}
+
 void MergeCursorsStage::setInitialHighWaterMark(const BSONObj& highWaterMark) {
     _blockingResultsMerger->setInitialHighWaterMark(highWaterMark);
 }

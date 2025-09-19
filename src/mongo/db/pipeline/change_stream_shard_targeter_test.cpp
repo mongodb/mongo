@@ -31,6 +31,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
+#include "mongo/db/pipeline/change_stream_reader_context_mock.h"
 #include "mongo/db/pipeline/change_stream_shard_targeter_mock.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -54,35 +55,6 @@ DocumentSourceChangeStreamSpec buildChangeStreamSpec(Timestamp ts) {
     spec.setResumeAfter(ResumeToken::makeHighWaterMarkToken(ts, 1 /* version */));
     return spec;
 }
-
-// TODO: remove when there is a proper mock elsewhere.
-class ChangeStreamReaderContextMock : public ChangeStreamReaderContext {
-public:
-    explicit ChangeStreamReaderContextMock(const ChangeStream& changeStream)
-        : _changeStream(changeStream) {}
-    void openCursorsOnDataShards(Timestamp atClusterTime,
-                                 const stdx::unordered_set<ShardId>& shardSet) override {}
-
-    void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardSet) override {}
-
-    void openCursorOnConfigServer(Timestamp atClusterTime) override {}
-    void closeCursorOnConfigServer() override {}
-
-    const stdx::unordered_set<ShardId>& getCurrentlyTargetedDataShards() const override {
-        return _currentlyTargetedShards;
-    }
-
-    const ChangeStream& getChangeStream() const override {
-        return _changeStream;
-    }
-    bool inDegradedMode() const override {
-        return false;
-    }
-
-private:
-    const ChangeStream _changeStream;
-    stdx::unordered_set<ShardId> _currentlyTargetedShards;
-};
 
 class ChangeStreamShardTargeterTest : public ServiceContextTest {
 public:

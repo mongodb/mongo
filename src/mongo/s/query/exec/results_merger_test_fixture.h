@@ -123,7 +123,7 @@ protected:
             TailableModeEnum::kTailableAndAwaitData) {
             nextHighWaterMarkDeterminingStrategy =
                 NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-                    params, recognizeControlEvents);
+                    params.getCompareWholeSortKey(), recognizeControlEvents);
         }
 
         auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));

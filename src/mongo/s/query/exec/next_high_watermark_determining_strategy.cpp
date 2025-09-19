@@ -67,9 +67,8 @@ public:
 class NextHighWaterMarkDeterminingStrategyChangeStreamV1 final
     : public NextHighWaterMarkDeterminingStrategy {
 public:
-    explicit NextHighWaterMarkDeterminingStrategyChangeStreamV1(
-        const AsyncResultsMergerParams& params)
-        : _compareWholeSortKey(params.getCompareWholeSortKey()) {}
+    explicit NextHighWaterMarkDeterminingStrategyChangeStreamV1(bool compareWholeSortKey)
+        : _compareWholeSortKey(compareWholeSortKey) {}
 
     BSONObj operator()(const BSONObj& nextEvent, const BSONObj& currentHighWaterMark) override {
         return AsyncResultsMerger::extractSortKey(nextEvent, _compareWholeSortKey).getOwned();
@@ -89,9 +88,8 @@ private:
 class NextHighWaterMarkDeterminingStrategyRecognizeControlEvents final
     : public NextHighWaterMarkDeterminingStrategy {
 public:
-    explicit NextHighWaterMarkDeterminingStrategyRecognizeControlEvents(
-        const AsyncResultsMergerParams& params)
-        : _compareWholeSortKey(params.getCompareWholeSortKey()) {}
+    explicit NextHighWaterMarkDeterminingStrategyRecognizeControlEvents(bool compareWholeSortKey)
+        : _compareWholeSortKey(compareWholeSortKey) {}
 
     BSONObj operator()(const BSONObj& nextEvent, const BSONObj& currentHighWaterMark) override {
         tassert(10359109,
@@ -143,14 +141,16 @@ NextHighWaterMarkDeterminingStrategyFactory::createInvalidHighWaterMarkDetermini
 }
 
 NextHighWaterMarkDeterminingStrategyPtr
-NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-    const AsyncResultsMergerParams& params, bool recognizeControlEvents) {
+NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(bool compareWholeSortKey,
+                                                                   bool recognizeControlEvents) {
     if (recognizeControlEvents) {
-        return std::make_unique<NextHighWaterMarkDeterminingStrategyRecognizeControlEvents>(params);
+        return std::make_unique<NextHighWaterMarkDeterminingStrategyRecognizeControlEvents>(
+            compareWholeSortKey);
     }
 
     // Handler for v1 change streams.
-    return std::make_unique<NextHighWaterMarkDeterminingStrategyChangeStreamV1>(params);
+    return std::make_unique<NextHighWaterMarkDeterminingStrategyChangeStreamV1>(
+        compareWholeSortKey);
 }
 
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/db/local_catalog/collection_mock.h"
 #include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
 #include "mongo/db/pipeline/change_stream_reader_builder_mock.h"
@@ -63,6 +64,8 @@
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -396,14 +399,13 @@ TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
 }
 
 TEST_F(ChangeStreamStageTest, ChangeStreamRegexEscape) {
-    ASSERT_EQ(""_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream(""));
-    ASSERT_EQ(" "_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream(" "));
-    ASSERT_EQ("foo bar"_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream("foo bar"));
-    ASSERT_EQ("qux-QUX "_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream("qux-QUX "));
-    ASSERT_EQ("\\^foo\\*bar\\$"_sd,
-              DocumentSourceChangeStream::regexEscapeNsForChangeStream("^foo*bar$"));
+    ASSERT_EQ(""_sd, change_stream::regexEscapeNsForChangeStream(""));
+    ASSERT_EQ(" "_sd, change_stream::regexEscapeNsForChangeStream(" "));
+    ASSERT_EQ("foo bar"_sd, change_stream::regexEscapeNsForChangeStream("foo bar"));
+    ASSERT_EQ("qux-QUX "_sd, change_stream::regexEscapeNsForChangeStream("qux-QUX "));
+    ASSERT_EQ("\\^foo\\*bar\\$"_sd, change_stream::regexEscapeNsForChangeStream("^foo*bar$"));
     ASSERT_EQ("\\*\\+\\|\\(\\)\\^\\?\\[\\]\\.\\/\\\\\\$"_sd,
-              DocumentSourceChangeStream::regexEscapeNsForChangeStream("*+|()^?[]./\\$"));
+              change_stream::regexEscapeNsForChangeStream("*+|()^?[]./\\$"));
 }
 
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
@@ -3903,7 +3905,65 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
     ASSERT_TRUE(next.isEOF());
 }
 
-// Test the control events for a v2 change stream reader.
+// Test that a change stream control event is returned unmodified by a $match stage.
+TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByMatchStageUnmodified) {
+    auto expCtx = getExpCtx();
+
+    // Create a control event that does not the $match expression.
+    BSONObj bson = BSON("some" << "value");
+    MutableDocument doc(Document{bson});
+    doc.metadata().setChangeStreamControlEvent();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        exec::agg::GetNextResult::makeAdvancedControlDocument(doc.freeze()),
+    };
+
+    auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+
+    auto match = DocumentSourceMatch::create(BSON("foo" << "bar"), expCtx);
+    auto matchStage = exec::agg::buildStage(match);
+    matchStage->setSource(stage.get());
+
+    auto result = matchStage->getNext();
+    ASSERT_TRUE(result.isAdvancedControlDocument());
+    ASSERT_BSONOBJ_EQ(bson, result.getDocument().toBson());
+
+    result = matchStage->getNext();
+    ASSERT_TRUE(result.isEOF());
+}
+
+// Test that a change stream control event is returned unmodified by a $project stage.
+TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) {
+    auto expCtx = getExpCtx();
+
+    // Create a control event that does not the $match expression.
+    BSONObj bson = BSON("some" << "value");
+    MutableDocument doc(Document{bson});
+    doc.metadata().setChangeStreamControlEvent();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        exec::agg::GetNextResult::makeAdvancedControlDocument(doc.freeze()),
+    };
+
+    // Test exclusion and inclusion projections.
+    for (int projectType : {0, 1}) {
+        auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+
+        auto project =
+            DocumentSourceProject::create(BSON("foo" << projectType), expCtx, "$project"_sd);
+        auto projectStage = exec::agg::buildStage(project);
+        projectStage->setSource(stage.get());
+
+        auto result = projectStage->getNext();
+        ASSERT_TRUE(result.isAdvancedControlDocument());
+        ASSERT_BSONOBJ_EQ(bson, result.getDocument().toBson());
+
+        result = projectStage->getNext();
+        ASSERT_TRUE(result.isEOF());
+    }
+}
+
+// Test the control events mapping for a v2 change stream reader.
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
     RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
@@ -5088,7 +5148,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
-
 
 //
 // Tests that multiple '$match' gets merged and promoted before the

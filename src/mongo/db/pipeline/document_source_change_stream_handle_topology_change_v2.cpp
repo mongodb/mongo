@@ -29,14 +29,14 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -50,7 +50,7 @@ DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(
     uassert(10612600,
             str::stream() << "the '" << kStageName << "' spec must be an empty object",
             elem.type() == BSONType::object && elem.Obj().isEmpty());
-    return new DocumentSourceChangeStreamHandleTopologyChangeV2(expCtx);
+    return create(expCtx);
 }
 
 boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChangeV2>
@@ -61,8 +61,7 @@ DocumentSourceChangeStreamHandleTopologyChangeV2::create(
 
 DocumentSourceChangeStreamHandleTopologyChangeV2::DocumentSourceChangeStreamHandleTopologyChangeV2(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx) {}
+    : DocumentSourceInternalChangeStreamStage(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceChangeStreamHandleTopologyChangeV2::constraints(
     PipelineSplitState pipeState) const {
@@ -86,12 +85,14 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChangeV2::constraints(
     return constraints;
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamHandleTopologyChangeV2::doGetNext() {
-    return pSource->getNext();
-}
-
 Value DocumentSourceChangeStreamHandleTopologyChangeV2::doSerialize(
     const SerializationOptions& opts) const {
+    if (opts.isSerializingForQueryStats()) {
+        // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
+        // query stats. For query stats we will serialize only the user specified $changeStream
+        // stage.
+        return Value();
+    }
     if (opts.isSerializingForExplain()) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage" << "internalHandleTopologyChangeV2"_sd)));

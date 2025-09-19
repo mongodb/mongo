@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"

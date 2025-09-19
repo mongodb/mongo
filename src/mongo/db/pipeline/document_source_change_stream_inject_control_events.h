@@ -126,9 +126,7 @@ public:
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamInjectControlEvents> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const DocumentSourceChangeStreamSpec& spec,
-        const BSONObj& actions = {});
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& actions = {});
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamInjectControlEvents> createForDataShard(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
