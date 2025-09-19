@@ -31,6 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_helper.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
 

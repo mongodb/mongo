@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/host_adapter/aggregation_stage.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

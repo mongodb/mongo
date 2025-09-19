@@ -31,6 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

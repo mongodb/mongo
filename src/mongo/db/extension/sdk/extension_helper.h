@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::sdk {
 /**

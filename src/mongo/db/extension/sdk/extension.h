@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/util/modules.h"
 
 /**
  * This is the top-level header file for any MongoDB extension implementation. Each extension must

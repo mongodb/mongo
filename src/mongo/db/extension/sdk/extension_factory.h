@@ -34,6 +34,7 @@
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

@@ -32,6 +32,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/platform/shared_library.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -54,7 +55,7 @@ static const ::MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPO
  * Load all extensions in the provided array. Returns true if loading is successful, otherwise
  * false.
  */
-bool loadExtensions(const std::vector<std::string>& extensionNames);
+MONGO_MOD_PUB bool loadExtensions(const std::vector<std::string>& extensionNames);
 
 class ExtensionLoader {
 public:

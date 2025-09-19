@@ -34,6 +34,7 @@
 #include "mongo/db/extension/host_adapter/handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/util/modules.h"
 
 #include <absl/base/nullability.h>
 

@@ -33,6 +33,7 @@
 #include "mongo/db/extension/host_adapter/extension_status.h"
 #include "mongo/db/extension/host_adapter/handle.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_adapter {
 

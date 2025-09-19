@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_adapter {
 /**

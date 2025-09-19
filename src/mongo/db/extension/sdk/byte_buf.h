@@ -30,6 +30,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
 #include "mongo/db/extension/sdk/handle.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string_view>

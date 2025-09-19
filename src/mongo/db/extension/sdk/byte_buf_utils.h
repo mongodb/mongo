@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string_view>
 

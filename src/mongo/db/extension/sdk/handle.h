@@ -28,6 +28,7 @@
  */
 #pragma once
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

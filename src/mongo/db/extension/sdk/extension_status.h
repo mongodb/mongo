@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
 #include "mongo/db/extension/sdk/handle.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <exception>

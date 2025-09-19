@@ -32,9 +32,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::exec::agg {
-
+namespace mongo {
+namespace exec {
+namespace MONGO_MOD_FILE_PRIVATE agg {
 /**
  * A Stage implementation for an extension aggregation stage. ExtensionStage is a facade around
  * handles to extension API objects.
@@ -46,5 +48,6 @@ public:
 private:
     GetNextResult doGetNext() final;
 };
-
-}  // namespace mongo::exec::agg
+}  // namespace MONGO_MOD_FILE_PRIVATE agg
+}  // namespace exec
+}  // namespace mongo

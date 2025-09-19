@@ -31,6 +31,7 @@
 #include "mongo/db/extension/host/handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/util/modules.h"
 
 
 namespace mongo::extension::host_adapter {
