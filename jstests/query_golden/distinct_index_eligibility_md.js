@@ -43,6 +43,29 @@ coll.insert({a: 1, b: [1, 2, 3]});
 coll.createIndex({a: 1, b: 1});
 outputDistinctPlanAndResults(coll, "a", {a: {$gt: 3}});
 
+subSection("strict && sparse index => no DISTINCT_SCAN");
+coll.drop();
+coll.insert({b: 5});
+coll.createIndex({a: 1}, {sparse: true});
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a"}}]);
+
+subSection("strict (with accum) && sparse index => no DISTINCT_SCAN");
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$last: "$b"}}}]);
+
+subSection("strict (with sort) && sparse index => no DISTINCT_SCAN");
+outputAggregationPlanAndResults(coll, [{$sort: {a: 1}}, {$group: {_id: "$a"}}]);
+
+subSection("strict (with sort and accum) && sparse index => no DISTINCT_SCAN");
+coll.dropIndex({a: 1});
+coll.createIndex({a: 1, b: 1}, {sparse: true});
+outputAggregationPlanAndResults(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
+
+subSection("!strict && sparse index => DISTINCT_SCAN");
+coll.drop();
+coll.insert({b: 5});
+coll.createIndex({a: 1}, {sparse: true});
+outputDistinctPlanAndResults(coll, "a");
+
 section("Distinct Field not part of the Index Key Pattern");
 
 subSection("wildcard && covered projection => DISTINCT_SCAN");

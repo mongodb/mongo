@@ -165,6 +165,9 @@ bool indexCoversProjection(const IndexEntry& index, const OrderedPathSet& projFi
  * If there is a projection and at least one index that covers all its fields, the smallest such
  * index is selected. Otherwise, select the index with the fewest total fields.
  *
+ * Sparse indexes are not suitable when strictDistinctOnly is true, since in that case we want to
+ * treat missing fields as null rather than ignore them.
+ *
  * Multikey indices are not suitable for DistinctNode when the projection is on an array
  * element. Arrays are flattened in a multikey index which makes it impossible for the distinct
  * scan stage (plan stage generated from DistinctNode) to select the requested element by array
