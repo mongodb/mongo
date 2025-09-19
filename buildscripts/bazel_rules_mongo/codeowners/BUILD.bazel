@@ -36,6 +36,11 @@ py_binary(
             "CODEOWNERS_DEFAULT_OWNER": "$(codeowners_default_owner)",
         },
         "//conditions:default": {},
+    }) | select({
+        ":have_banned_codeowners": {
+            "BANNED_CODEOWNERS_FILE_PATH": "$(codeowners_banned_codeowners_file_path)",
+        },
+        "//conditions:default": {},
     }),
     main = "codeowners_generate.py",
     visibility = ["//visibility:public"],
@@ -74,5 +79,12 @@ config_setting(
     name = "have_default_owner",
     define_values = {
         "codeowners_have_default_owner": "True",
+    },
+)
+
+config_setting(
+    name = "have_banned_codeowners",
+    define_values = {
+        "codeowners_have_banned_codeowners": "True",
     },
 )

@@ -1214,7 +1214,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/oplog/OWNERS.yml
 /jstests/noPassthrough/oplog/**/* @10gen/server-oplog @svc-auto-approve-bot
-/jstests/noPassthrough/oplog/**/check_for_oplog_cap_maintainer_thread.js @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/noPassthrough/oplog/**/check_for_oplog_cap_maintainer_thread.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/profile/OWNERS.yml
 /jstests/noPassthrough/profile/**/* @10gen/query-integration-observability @svc-auto-approve-bot
@@ -3123,7 +3123,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/gperftools @10gen/server-workload-resilience @svc-auto-approve-bot
 /src/third_party/**/grpc @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/icu4c* @10gen/query-execution @svc-auto-approve-bot
-/src/third_party/**/immer @10gen/server-storage-execution @svc-auto-approve-bot
+/src/third_party/**/immer @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/third_party/**/IntelRDFPMathLib* @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/JSON-Schema-Test-Suite @10gen/query-optimization @svc-auto-approve-bot
 /src/third_party/**/libbson @10gen/server-security @svc-auto-approve-bot
@@ -3133,7 +3133,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/libstemmer_c @10gen/query-integration @svc-auto-approve-bot
 /src/third_party/**/mock_ocsp_responder @10gen/server-security @svc-auto-approve-bot
 /src/third_party/**/mozjs @10gen/query-integration-features @10gen/server-security @svc-auto-approve-bot
-/src/third_party/**/murmurhash3 @10gen/server-storage-execution @svc-auto-approve-bot
+/src/third_party/**/murmurhash3 @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/nlohmann-json @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/node @10gen/server-workload-resilience @svc-auto-approve-bot
 /src/third_party/**/opentelemetry-cpp @10gen/server-networking-and-observability @svc-auto-approve-bot

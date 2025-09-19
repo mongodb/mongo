@@ -260,7 +260,62 @@ def post_generation_checks(
             codeowners_binary_path, expansions_file, branch, codeowners_file_path
         )
 
+    status |= check_banned_codeowners(codeowners_file_path)
     return status
+
+
+def get_banned_codeowners_file_path() -> Optional[str]:
+    return os.environ.get("BANNED_CODEOWNERS_FILE_PATH", None)
+
+
+# Check that there are no banned codeowners in the codeowners file
+def check_banned_codeowners(codeowners_file_path: str) -> int:
+    banned_codeowners_file_path = get_banned_codeowners_file_path()
+    if not banned_codeowners_file_path:
+        return 0
+
+    if not os.path.isfile(banned_codeowners_file_path):
+        print(f"{banned_codeowners_file_path} file not found.")
+        return 1
+
+    banned_owners: set[str] = set()
+    with open(banned_codeowners_file_path, "r", encoding="utf8") as file:
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+
+            if line.startswith("@"):
+                line = line[1:]
+
+            if not line.startswith("#"):
+                banned_owners.add(line)
+
+    print(f"Banned codeowners loaded: {banned_owners}")
+
+    offending_lines = []
+    with open(codeowners_file_path, "r", encoding="utf8") as file:
+        for i, line in enumerate(file.readlines()):
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            owners = parts[1:]
+            for owner in owners:
+                if owner.startswith("@"):
+                    owner = owner[1:]
+
+                if owner in banned_owners:
+                    offending_lines.append((i + 1, line.strip(), owner))
+
+    if not offending_lines:
+        return 0
+
+    print("The following lines in the CODEOWNERS file contain banned owners:")
+    for line_num, line, owner in offending_lines:
+        print(f" line {line_num}: {line} (banned owner: {owner})")
+
+    print("Please remove the banned owners from the CODEOWNERS file.")
+    return 1
 
 
 def get_allowed_unowned_files_path() -> Optional[str]:

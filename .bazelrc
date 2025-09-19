@@ -437,6 +437,8 @@ coverage --legacy_external_runfiles
 common --define codeowners_add_auto_approve_user=True
 common --define codeowners_have_allowed_unowned_files=True
 common --define codeowners_allowed_unowned_files_path=.github/ALLOWED_UNOWNED_FILES.yml
+common --define codeowners_have_banned_codeowners=True
+common --define codeowners_banned_codeowners_file_path=.github/BANNED_CODEOWNERS.txt
 common --define codeowners_have_default_owner=True
 common --define codeowners_default_owner=@10gen/mongo-default-approvers
 

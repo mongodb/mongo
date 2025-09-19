@@ -47,7 +47,7 @@ filters:
       - 10gen/query-execution
   - "immer":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-catalog-and-routing
   - "IntelRDFPMathLib*":
     approvers:
       - 10gen/server-programmability
@@ -78,7 +78,7 @@ filters:
       - 10gen/server-security
   - "murmurhash3":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-programmability
   - "nlohmann-json":
     approvers:
       - 10gen/server-networking-and-observability

@@ -1,0 +1,7 @@
+#
+# Code owners in this file are not allowed to be assigned to any files in the repo.
+# This is a new-line separated list. Lines starting with '#' are comments and ignored.
+#
+
+# Only assign ownership to sub-teams of Storage Execution.
+10gen/server-storage-execution

@@ -5,4 +5,4 @@ filters:
       - 10gen/server-oplog
   - "check_for_oplog_cap_maintainer_thread.js":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-storage-engine-integration
