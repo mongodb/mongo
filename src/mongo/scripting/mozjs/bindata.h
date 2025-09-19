@@ -31,6 +31,7 @@
 
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <js/CallArgs.h>
 #include <js/Class.h>
@@ -45,7 +46,7 @@ namespace mozjs {
  *
  * It offers some simple methods and a handful of specialized constructors
  */
-struct BinDataInfo : public BaseInfo {
+struct MONGO_MOD_PUB BinDataInfo : public BaseInfo {
     enum Slots { BinDataStringSlot, BinDataSlotCount };
 
     static void construct(JSContext* cx, JS::CallArgs args);

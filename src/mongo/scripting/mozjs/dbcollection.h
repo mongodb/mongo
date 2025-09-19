@@ -31,6 +31,7 @@
 
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <js/CallArgs.h>
 #include <js/TypeDecls.h>
@@ -47,7 +48,7 @@ namespace mozjs {
  * Its major magic is in its getProperty() callback, which threads through to
  * a getCollection method installed in js
  */
-struct DBCollectionInfo : public BaseInfo {
+struct MONGO_MOD_PUB DBCollectionInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
 

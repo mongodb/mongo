@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -48,7 +49,7 @@ namespace mongo {
  * This class wraps an existing error and serializes it in a lossless way, so any other metadata
  * about the JavaScript exception is also preserved.
  */
-class JSExceptionInfo final : public ErrorExtraInfo {
+class MONGO_MOD_PUB JSExceptionInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::JSInterpreterFailureWithStack;
 

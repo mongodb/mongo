@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

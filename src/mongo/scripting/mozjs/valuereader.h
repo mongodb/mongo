@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <string>
@@ -48,7 +49,7 @@ namespace mozjs {
 /**
  * Reads into a JS Value from some Mongo C++ primitive
  */
-class ValueReader {
+class MONGO_MOD_PUB ValueReader {
 public:
     /**
      * Depth is used when readers are invoked from ObjectWrappers to avoid

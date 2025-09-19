@@ -31,6 +31,7 @@
 
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

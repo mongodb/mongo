@@ -45,6 +45,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <string>

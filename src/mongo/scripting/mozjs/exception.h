@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

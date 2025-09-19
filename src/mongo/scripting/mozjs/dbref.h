@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <js/CallArgs.h>
 #include <js/Class.h>
@@ -50,7 +51,7 @@ namespace mozjs {
  *     $db : String(),
  * }
  */
-struct DBRefInfo : public BaseInfo {
+struct MONGO_MOD_PUB DBRefInfo : public BaseInfo {
     enum Slots { BSONHolderSlot, DBRefInfoSlotCount };
 
     static void construct(JSContext* cx, JS::CallArgs args);

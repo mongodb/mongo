@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <string>

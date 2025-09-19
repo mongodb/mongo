@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

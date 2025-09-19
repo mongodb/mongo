@@ -32,6 +32,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
@@ -41,7 +42,7 @@ namespace mongo {
 class OperationContext;
 class ServiceContext;
 
-class DBDirectClientFactory {
+class MONGO_MOD_PUB DBDirectClientFactory {
 public:
     using Result = std::unique_ptr<DBClientBase>;
     using Impl = std::function<Result(OperationContext*)>;

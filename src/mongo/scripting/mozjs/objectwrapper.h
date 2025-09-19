@@ -43,6 +43,7 @@
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/lifetimestack.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -79,7 +80,7 @@ class ValueWriter;
  * This wraps a RootedObject, so should only be allocated on the stack and is
  * not movable or copyable
  */
-class ObjectWrapper {
+class MONGO_MOD_PUB ObjectWrapper {
     friend class ValueWriter;
 
 public:

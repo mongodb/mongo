@@ -39,6 +39,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <functional>
@@ -58,7 +59,7 @@ namespace mozjs {
  * originalBSON is a hack to keep integer types in their original type when
  * they're read out, manipulated in js and saved back.
  */
-class ValueWriter {
+class MONGO_MOD_PUB ValueWriter {
 public:
     ValueWriter(JSContext* cx, JS::HandleValue value);
 

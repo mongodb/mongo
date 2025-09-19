@@ -33,6 +33,7 @@
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <type_traits>
@@ -232,7 +233,7 @@ void trace(JSTracer* trc, JSObject* obj) {
 }  // namespace smUtils
 
 template <typename T>
-class WrapType : public T {
+class MONGO_MOD_PUB WrapType : public T {
 public:
     WrapType(JSContext* context)
         : _context(context),

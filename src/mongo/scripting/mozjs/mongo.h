@@ -33,6 +33,7 @@
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -56,9 +57,10 @@ using EncryptedDBClientFromExistingCallback = std::shared_ptr<DBClientBase>(
 
 using GetNestedConnectionCallback = DBClientBase*(DBClientBase*);
 
-void setEncryptedDBClientCallbacks(EncryptedDBClientCallback* encCallback,
-                                   EncryptedDBClientFromExistingCallback* encFromExistingCallback,
-                                   GetNestedConnectionCallback* getCallback);
+MONGO_MOD_PUB void setEncryptedDBClientCallbacks(
+    EncryptedDBClientCallback* encCallback,
+    EncryptedDBClientFromExistingCallback* encFromExistingCallback,
+    GetNestedConnectionCallback* getCallback);
 
 /**
  * Shared code for the "Mongo" javascript object.
@@ -132,7 +134,7 @@ struct MongoExternalInfo : public MongoBase {
     static const JSFunctionSpec freeFunctions[4];
 };
 
-class EncryptionCallbacks {
+class MONGO_MOD_OPEN EncryptionCallbacks {
 public:
     virtual void generateDataKey(JSContext* cx, JS::CallArgs args) = 0;
     virtual void getDataKeyCollection(JSContext* cx, JS::CallArgs args) = 0;

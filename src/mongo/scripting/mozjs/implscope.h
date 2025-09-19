@@ -79,6 +79,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/string_map.h"
 
@@ -129,7 +130,7 @@ const StringData kUnknownError = "Unknown Failure from JSInterpreter";
  *
  * For more information about overriden fields, see mongo::Scope
  */
-class MozJSImplScope final : public Scope {
+class MONGO_MOD_PUB MozJSImplScope final : public Scope {
     MozJSImplScope(const MozJSImplScope&) = delete;
     MozJSImplScope& operator=(const MozJSImplScope&) = delete;
 
@@ -581,7 +582,7 @@ private:
     WrapType<URIInfo> _uriProto;
 };
 
-inline MozJSImplScope* getScope(JSContext* cx) {
+MONGO_MOD_PUB inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(JS_GetContextPrivate(cx));
 }
 

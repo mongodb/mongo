@@ -31,6 +31,7 @@
 
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 #include <js/CallArgs.h>
 #include <js/PropertySpec.h>
@@ -46,7 +47,7 @@ namespace mozjs {
  * whenever you call the constructor to make a new one you just get the
  * "singleton" MaxKey from the prototype. See the postInstall for details.
  */
-struct MaxKeyInfo : public BaseInfo {
+struct MONGO_MOD_PUB MaxKeyInfo : public BaseInfo {
     static void call(JSContext* cx, JS::CallArgs args);
     static void construct(JSContext* cx, JS::CallArgs args);
     struct Functions {

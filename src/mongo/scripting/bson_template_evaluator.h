@@ -48,6 +48,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -77,7 +78,7 @@ namespace mongo {
  * method.
  *
  */
-class BsonTemplateEvaluator {
+class MONGO_MOD_NEEDS_REPLACEMENT BsonTemplateEvaluator {
     BsonTemplateEvaluator(const BsonTemplateEvaluator&) = delete;
     BsonTemplateEvaluator& operator=(const BsonTemplateEvaluator&) = delete;
 
