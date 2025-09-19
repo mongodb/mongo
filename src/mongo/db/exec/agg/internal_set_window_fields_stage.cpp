@@ -188,8 +188,9 @@ Document InternalSetWindowFieldsStage::getExplainOutput(const SerializationOptio
 
     out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
 
-    // TODO SERVER-88298 Remove maxTotalMemoryUsageBytes when we enable feature flag as
-    // peakTrackedMemBytes reports the same value.
+    // TODO SERVER-111011 'maxTotalMemoryUsageBytes' is redundant with 'peakTrackedMemBytes', added
+    // below. We should avoid the duplication and decide the field name here based on the value of
+    // the QueryMemoryTracking feature flag.
     out["maxTotalMemoryUsageBytes"] =
         opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
     out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());

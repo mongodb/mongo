@@ -209,7 +209,7 @@ feature_flags:
             "Feature flag to enable current and high watermark memory usage tracking for
             queries' blocking stages."
         cpp_varname: gFeatureFlagQueryMemoryTracking
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagMongotIndexedViews:

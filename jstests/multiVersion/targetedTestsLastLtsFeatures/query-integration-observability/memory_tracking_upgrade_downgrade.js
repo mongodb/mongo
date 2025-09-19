@@ -2,8 +2,7 @@
  * Verifies that memory tracking behaves correctly in FCV upgrade/downgrade scenarios.  We do not
  * test the profiler output here because the profiler can only be run on a standalone.
  *
- * TODO SERVER-88298 Remove when feature flag is enabled by default.
- * @tags: [featureFlagQueryMemoryTracking]
+ * @tags: [requires_fcv_83]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
