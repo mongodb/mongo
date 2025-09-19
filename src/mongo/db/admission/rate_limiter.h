@@ -152,7 +152,7 @@ public:
     int64_t queued() const;
 
 private:
-    struct RateLimiterPrivate;
+    class RateLimiterPrivate;
     std::unique_ptr<RateLimiterPrivate> _impl;
 };
 }  // namespace mongo::admission
