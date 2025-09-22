@@ -12,7 +12,6 @@ exports_files(
 mongo_cc_unit_test(
     name = "db_query_timeseries_test",
     srcs = [
-        "timeseries_prepend_unpack_stage_test.cpp",
         "timeseries_translation_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],

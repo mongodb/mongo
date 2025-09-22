@@ -30,6 +30,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

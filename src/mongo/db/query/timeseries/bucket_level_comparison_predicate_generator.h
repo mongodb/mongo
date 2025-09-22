@@ -33,13 +33,12 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
-namespace timeseries {
-
+namespace mongo::timeseries {
 
 /**
  * An abstract class responsible for building a comparison predicate from a time-series query.
@@ -83,7 +82,7 @@ protected:
  * The predicate generator class to be used for creating loose predicates for match expressions with
  * buckets that do not use extended range nor are fixed.
  */
-class DefaultBucketLevelComparisonPredicateGenerator final
+class MONGO_MOD_FILE_PRIVATE DefaultBucketLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     DefaultBucketLevelComparisonPredicateGenerator(Params params)
@@ -102,7 +101,7 @@ public:
  * The predicate generator class to be used to be used for creating loose predicates for match
  * expressions for fixed buckets.
  */
-class FixedBucketsLevelComparisonPredicateGenerator final
+class MONGO_MOD_FILE_PRIVATE FixedBucketsLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     FixedBucketsLevelComparisonPredicateGenerator(Params params)
@@ -144,6 +143,4 @@ template <typename T, typename V>
 static auto makeCmpMatchExpr(StringData path, V val) {
     return std::make_unique<T>(path, val);
 }
-}  // namespace timeseries
-
-}  // namespace mongo
+}  // namespace mongo::timeseries

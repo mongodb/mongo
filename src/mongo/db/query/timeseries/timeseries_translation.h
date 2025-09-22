@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -50,7 +51,7 @@ namespace timeseries {
 
 // TODO SERVER-101169 remove this once 'assumeNoMixedSchemaData' and 'areTimeseriesBucketsFixed' are
 // in 'TimeseriesOptions'.
-struct TimeseriesTranslationParams {
+struct MONGO_MOD_FILE_PRIVATE TimeseriesTranslationParams {
     const TimeseriesOptions& tsOptions;
     bool assumeNoMixedSchemaData = true;
     bool areTimeseriesBucketsFixed = false;
@@ -88,9 +89,10 @@ void translateIndexHintIfRequired(const boost::intrusive_ptr<ExpressionContext>&
                                   const CollectionRoutingInfo& cri,
                                   AggregateCommandRequest& request);
 
-void prependUnpackStageToPipeline_forTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          Pipeline& pipeline,
-                                          const TimeseriesTranslationParams& params);
+MONGO_MOD_FILE_PRIVATE void prependUnpackStageToPipeline_forTest(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline& pipeline,
+    const TimeseriesTranslationParams& params);
 
 
 };  // namespace timeseries

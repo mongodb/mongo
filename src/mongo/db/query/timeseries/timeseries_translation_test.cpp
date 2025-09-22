@@ -41,6 +41,13 @@
 
 namespace mongo {
 namespace {
+struct DefaultTranslationParams {
+    const StringData timeField = "time"_sd;
+    const boost::optional<StringData> metaField = boost::none;
+    const boost::optional<std::int32_t> bucketMaxSpanSeconds = 3600;
+    const bool assumeNoMixedSchemaData = {false};
+    const bool timeseriesBucketsAreFixed = {false};
+};
 
 class TimeseriesRewritesTest : public timeseries::TimeseriesTestFixture {
 protected:
@@ -75,6 +82,38 @@ protected:
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.timeseries_translator");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx;
+
+    // Helper function to call the factory function and ensure some basic expected truths.
+    std::tuple<std::vector<BSONObj>, BSONObj> prependUnpackStageHelper(
+        const DefaultTranslationParams& args = {},
+        const std::vector<BSONObj>& originalPipeline = std::vector{
+            BSON("$match" << BSON("a" << 1))}) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto pipeline = Pipeline::parse(originalPipeline, expCtx);
+        const size_t originalPipelineSize = pipeline->getSources().size();
+
+        auto options = TimeseriesOptions{};
+        options.setTimeField(args.timeField);
+        options.setMetaField(args.metaField);
+        options.setBucketMaxSpanSeconds(args.bucketMaxSpanSeconds);
+
+        timeseries::prependUnpackStageToPipeline_forTest(
+            expCtx,
+            *pipeline,
+            {options, args.assumeNoMixedSchemaData, args.timeseriesBucketsAreFixed});
+
+        const auto sources = pipeline->getSources();
+        ASSERT_EQ(sources.size(),
+                  originalPipelineSize + 1);  // One stage should be added.
+
+        // The first stage should be the generated $_internalUnpackBucket stage.
+        const auto firstStage = sources.front();
+        ASSERT_EQ(firstStage->getSourceName(),
+                  DocumentSourceInternalUnpackBucket::kStageNameInternal);
+
+        return {pipeline->serializeToBson(),
+                firstStage->serializeToBSONForDebug().firstElement().Obj().getOwned()};
+    }
 };
 
 TEST_F(TimeseriesRewritesTest, EmptyPipelineRewriteTest) {
@@ -176,6 +215,156 @@ TEST_F(TimeseriesRewritesTest, TranslateIndexHint) {
         BSON(timeseries::kControlMinFieldNamePrefix + std::string{_timeField}
              << 1 << timeseries::kControlMaxFieldNamePrefix + std::string{_timeField} << 1);
     ASSERT_BSONOBJ_EQ(request.getHint().get(), rewrittenIndex);
+}
+
+// The following tests just validate the the 'prependUnpackStage' function.
+TEST_F(TimeseriesRewritesTest, EnsureStageIsGeneratedInReturnedPipeline) {
+    const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
+    const auto [alteredPipeline, _] = prependUnpackStageHelper({}, originalPipeline);
+
+    // The rest of the stages should be unchanged.
+    for (auto oitr = originalPipeline.begin(), aitr = alteredPipeline.begin() + 1;
+         oitr != originalPipeline.end() && aitr != alteredPipeline.end();
+         ++oitr, ++aitr) {
+        ASSERT_BSONOBJ_EQ(*aitr, *oitr);
+    }
+}
+
+TEST_F(TimeseriesRewritesTest, ValidateFieldCombinations) {
+    const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+        .metaField = "foo"_sd,
+        .bucketMaxSpanSeconds = 42,
+        .assumeNoMixedSchemaData = true,
+        .timeseriesBucketsAreFixed = true,
+    });
+    ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                           << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                           << timeseries::kMetaFieldName << "foo"_sd
+                           << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 42
+                           << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData << true
+                           << DocumentSourceInternalUnpackBucket::kFixedBuckets << true),
+                      firstStage);
+}
+
+TEST_F(TimeseriesRewritesTest, ValidateTimeField) {
+    // Default value for timeField.
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper();
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+    // Non-default value for timeField.
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+            .timeField = "readingTimestamp"_sd,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "readingTimestamp"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+    // Empty string value for timeField.
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+            .timeField = ""_sd,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << ""_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+}
+
+TEST_F(TimeseriesRewritesTest, ValidateMetaField) {
+    // Meta field should be omitted if not present.
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper();
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+    // Meta field should be included if present.
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+            .metaField = "foo"_sd,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << timeseries::kMetaFieldName << "foo"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+    // Empty string.
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+            .metaField = ""_sd,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << timeseries::kMetaFieldName << ""_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+}
+
+TEST_F(TimeseriesRewritesTest, ValidateAssumeNoMixedSchemaDataField) {
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+            .assumeNoMixedSchemaData = true,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600
+                               << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                               << true),
+                          firstStage);
+    }
+}
+
+TEST_F(TimeseriesRewritesTest, ValidateBucketMaxSpanSecondsField) {
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({});
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds
+                               << 3600),
+                          firstStage);
+    }
+    {
+        const auto [alteredPipeline, firstStage] = prependUnpackStageHelper({
+            .bucketMaxSpanSeconds = 43,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(DocumentSourceInternalUnpackBucket::kExclude
+                               << BSONArray() << timeseries::kTimeFieldName << "time"_sd
+                               << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 43),
+                          firstStage);
+    }
+}
+
+TEST_F(TimeseriesRewritesTest, BucketsFixedTest) {
+    {
+        const auto [_, internalUnpackBucketStage] =
+            prependUnpackStageHelper({.timeseriesBucketsAreFixed = false});
+        // The 'fixedBuckets' field is not serialized if buckets are not fixed.
+        ASSERT_TRUE(
+            internalUnpackBucketStage[DocumentSourceInternalUnpackBucket::kFixedBuckets].eoo());
+    }
+
+    {
+        const auto [_, internalUnpackBucketStage] =
+            prependUnpackStageHelper({.timeseriesBucketsAreFixed = true});
+        ASSERT_TRUE(
+            internalUnpackBucketStage[DocumentSourceInternalUnpackBucket::kFixedBuckets].Bool());
+    }
 }
 
 }  // namespace
