@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range_common.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

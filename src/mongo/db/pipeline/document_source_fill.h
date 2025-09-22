@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_fill_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 

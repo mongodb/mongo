@@ -45,6 +45,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 

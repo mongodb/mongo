@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

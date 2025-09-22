@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstddef>

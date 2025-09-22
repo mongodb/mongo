@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

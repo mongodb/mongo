@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max_scaler_util.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

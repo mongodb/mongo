@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/percentile_algo_continuous.h"
 #include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/util/modules.h"
 
 #include <boost/container/flat_set.hpp>
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

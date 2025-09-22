@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 /**
  * Common utilities used across different implementations

@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/memory_token_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>

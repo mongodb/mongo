@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

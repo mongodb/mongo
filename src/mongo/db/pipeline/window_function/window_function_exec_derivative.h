@@ -40,6 +40,7 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+#include "mongo/util/modules.h"
 
 #include <benchmark/benchmark.h>
 

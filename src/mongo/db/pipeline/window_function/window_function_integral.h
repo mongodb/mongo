@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <memory>

@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace window_function_n_traits {
