@@ -109,7 +109,7 @@ protected:
      * Accessor for the skipped records tracker table from the IndexBuildInterceptor.
      * To access the interceptor's skipped records tracker table, we have to mark the table as
      * permanent and then destroy the interceptor.
-     * TODO(SERVER-109460): Remove this comment when the skipped records tracker table is
+     * TODO(SERVER-111080): Remove this comment when the skipped records tracker table is
      * initialized proactively.
      * Requires that there is a skipped records tracker table instantiated for the index build.
      */
@@ -117,7 +117,7 @@ protected:
         std::unique_ptr<IndexBuildInterceptor> interceptor) {
         interceptor->keepTemporaryTables();
         auto skippedRecordsIdent = interceptor->getSkippedRecordTracker()->getTableIdent();
-        // TODO(SERVER-109460): Remove this invariant when the skipped records tracker table is
+        // TODO(SERVER-111080): Remove this invariant when the skipped records tracker table is
         // initialized proactively.
         invariant(skippedRecordsIdent);
         return getTable(std::move(interceptor), *skippedRecordsIdent);

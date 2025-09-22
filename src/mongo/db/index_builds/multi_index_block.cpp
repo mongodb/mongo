@@ -1381,7 +1381,7 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
         if (!indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent()) {
             // IndexBuildInterceptor requires the the skipped records tracker table ident to
             // be present in the resume case, so create the table if it hasn't been created yet.
-            // TODO(SERVER-109460): Remove the code to create the skipped records tracker table
+            // TODO(SERVER-111080): Remove the code to create the skipped records tracker table
             // here.
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto tempTable = storageEngine->makeTemporaryRecordStore(

@@ -80,6 +80,20 @@ SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
                                            bool tableExists)
     : _ident(std::string{ident}) {
     if (!tableExists) {
+        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot);
+        if (isPrimaryDrivenIndexBuild) {
+            // Proactively create the table in case of primary driven index builds so that the table
+            // gets created at the same timestamp on all replicas.
+            // TODO(SERVER-111080): We should ideally do this for hybrid index builds as well to
+            // keep things simple.
+            _skippedRecordsTable =
+                opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+                    opCtx, _ident, KeyFormat::Long);
+        }
         return;
     }
 
