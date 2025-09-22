@@ -159,16 +159,44 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesIncompatibleIndexes) {
     createIndex(BSON("key" << BSON("x" << 1) << "name"
                            << "collation"
                            << "collation" << BSON("locale" << "fr") << "v" << kIndexVersion));
+    createIndex(BSON("key" << BSON("x" << 1 << "a.$**" << 1) << "name"
+                           << "wildcard" << "v" << kIndexVersion));
+    createIndex(BSON("key" << BSON("y" << 1) << "name" << "y" << "v" << kIndexVersion));
+    createIndex(
+        BSON("key" << BSON("y" << 1 << "x" << 1) << "name" << "y_x" << "v" << kIndexVersion));
+
+    {
+        const auto index =
+            findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+
+        ASSERT_FALSE(index);
+    }
+
     createIndex(BSON("key" << BSON("x" << 1) << "name"
                            << "x"
                            << "v" << kIndexVersion));
 
+    {
+        const auto index =
+            findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+
+        ASSERT_TRUE(index);
+        ASSERT_EQ("x", index->descriptor()->indexName());
+    }
+}
+
+TEST_F(ShardKeyIndexUtilTest, MultiKeyIndexIsAnIncompatibleShardKey) {
+    createIndex(BSON("key" << BSON("x" << 1) << "name"
+                           << "x"
+                           << "v" << kIndexVersion));
+
+    DBDirectClient client(opCtx());
+    client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
     const auto index =
         findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
 
-    ASSERT_TRUE(index);
-    ASSERT_EQ("x", index->descriptor()->indexName());
+    ASSERT_FALSE(index);
 }
 
 TEST_F(ShardKeyIndexUtilTest, ExcludesMultiKeyIfRequiresSingleKey) {
