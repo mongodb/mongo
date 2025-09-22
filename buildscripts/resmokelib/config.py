@@ -210,8 +210,8 @@ DEFAULTS = {
     "pause_after_populate": None,
     # Regex to filter mocha-style tests to run.
     "mocha_grep": None,
-    # Extensions to load into the server upon startup.
-    "extensions": None
+    # Loads all test extensions into the server.
+    "load_all_extensions": False,
 }
 
 _SuiteOptions = collections.namedtuple(
@@ -842,5 +842,5 @@ VALIDATE_SELECTOR_PATHS = True
 # flag to pause after populating their initial datasets.
 PAUSE_AFTER_POPULATE = None
 
-# If set, then any specified extension will load into the server upon startup.
-EXTENSIONS = None
+# Loads all test extensions into the server.
+LOAD_ALL_EXTENSIONS = False

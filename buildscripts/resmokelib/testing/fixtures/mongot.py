@@ -71,7 +71,7 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.debug("Mongot not running when gathering mongot fixture pid.")
         return out
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             self.logger.info(
                 "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."

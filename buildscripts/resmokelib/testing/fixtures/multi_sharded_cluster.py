@@ -109,7 +109,7 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
                 return False
         return True
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         """Shut down the sharded clusters."""
         self.logger.info("Stopping all sharded clusters...")
 

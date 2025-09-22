@@ -61,7 +61,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.fixturelib.default_if_none(mongod_options, {})
         )
 
-        self.load_all_extensions = load_all_extensions
+        self.load_all_extensions = load_all_extensions or self.config.LOAD_ALL_EXTENSIONS
         if self.load_all_extensions:
             self.loaded_extensions = find_and_generate_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
@@ -173,7 +173,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger,
             self.job_num,
             executable=self.mongod_executable,
-            mongod_options = mongod_options,
+            mongod_options=mongod_options,
         )
 
         try:
@@ -276,8 +276,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
-    def _do_teardown(self, mode=None):
-        if self.load_all_extensions and self.loaded_extensions:
+    def _do_teardown(self, finished=False, mode=None):
+        if finished and self.load_all_extensions and self.loaded_extensions:
             delete_extension_configs(self.loaded_extensions, self.logger)
 
         if self.config.NOOP_MONGO_D_S_PROCESSES:

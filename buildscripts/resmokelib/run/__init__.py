@@ -1064,9 +1064,13 @@ class TestRunner(Subcommand):
                         config.EVERGREEN_REVISION,
                         config.EVERGREEN_TASK_ID,
                     )
-                    archive_strategy = utils.archival.ArchiveToS3(config.ARCHIVE_BUCKET, base_path, get_s3_client(), self._exec_logger)
+                    archive_strategy = utils.archival.ArchiveToS3(
+                        config.ARCHIVE_BUCKET, base_path, get_s3_client(), self._exec_logger
+                    )
                 case "directory":
-                    archive_strategy = utils.archival.ArchiveToDirectory(config.ARCHIVE_DIRECTORY, self._exec_logger)
+                    archive_strategy = utils.archival.ArchiveToDirectory(
+                        config.ARCHIVE_DIRECTORY, self._exec_logger
+                    )
                 case "test_archival":
                     archive_strategy = utils.archival.TestArchival()
             self._archive = utils.archival.Archival(
@@ -2095,10 +2099,10 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
-            "--loadExtensions",
-            dest="extensions",
-            metavar="EXTENSION1,EXTENSION2",
-            help="Comma-separated list of extension names to load into the server upon startup.",
+            "--loadAllExtensions",
+            dest="load_all_extensions",
+            action="store_true",
+            help="Loads all available test extensions in the server upon startup.",
         )
 
         internal_options = parser.add_argument_group(
@@ -2232,8 +2236,10 @@ class RunPlugin(PluginInterface):
             dest="archive_mode",
             choices=("s3", "directory", "test_archival"),
             metavar="MODE",
-            help=("Where to store archived data files on failures - uploaded to s3 during execution, "
-                  "to a directory, or write the names of the files to archive for testing archival behavior."),
+            help=(
+                "Where to store archived data files on failures - uploaded to s3 during execution, "
+                "to a directory, or write the names of the files to archive for testing archival behavior."
+            ),
         )
 
         evergreen_options.add_argument(

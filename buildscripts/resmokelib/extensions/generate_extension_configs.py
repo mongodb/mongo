@@ -14,7 +14,7 @@ from buildscripts.resmokelib.extensions.constants import (
 
 
 def generate_extension_configs(
-    so_files: list[str], logger: logging.Logger, with_suffix: str
+    so_files: list[str], with_suffix: str, logger: logging.Logger
 ) -> list[str]:
     """Generate a .conf file for each extension .so file specified."""
     try:
@@ -94,7 +94,7 @@ def main():
 
     try:
         extension_names = generate_extension_configs(
-            so_files=so_files_list, logger=logger, with_suffix=args.with_suffix
+            so_files=so_files_list, with_suffix=args.with_suffix, logger=logger
         )
         logger.info(f"Successfully generated configuration for extensions: {extension_names}")
     except RuntimeError as e:

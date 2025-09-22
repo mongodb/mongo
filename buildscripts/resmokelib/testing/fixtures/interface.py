@@ -139,7 +139,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
         """
 
         try:
-            self._do_teardown(mode=mode)
+            self._do_teardown(finished=finished, mode=mode)
         finally:
             if finished:
                 for handler in self.logger.handlers:
@@ -147,7 +147,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
                     # want the logs to eventually get flushed.
                     self.fixturelib.close_loggers(handler)
 
-    def _do_teardown(self, mode=None):  # noqa
+    def _do_teardown(self, finished=False, mode=None):  # noqa
         """Destroy the fixture.
 
         This method must be implemented by subclasses.

@@ -236,7 +236,6 @@ tasks:
         vars:
           extraction_change_dir: bazel-bin/install/
           decompress: tar --strip-components=1 -zxvf
-          skip_extensions: true
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1

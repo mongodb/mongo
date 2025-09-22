@@ -73,7 +73,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.fixturelib.default_if_none(mongod_options, {})
         )
 
-        self.load_all_extensions = load_all_extensions
+        self.load_all_extensions = load_all_extensions or self.config.LOAD_ALL_EXTENSIONS
         if self.load_all_extensions:
             self.loaded_extensions = find_and_generate_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
@@ -391,11 +391,11 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 if str(node.port) in ports:
                     return shard
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
-        if self.load_all_extensions and self.loaded_extensions:
+        if finished and self.load_all_extensions and self.loaded_extensions:
             delete_extension_configs(self.loaded_extensions, self.logger)
 
         running_at_start = self.is_running()
@@ -708,7 +708,7 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
         """Use ExternalFixture method."""
         return external.ExternalFixture.await_ready(self)
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         """Use ExternalFixture method."""
         return external.ExternalFixture._do_teardown(self)
 
@@ -857,7 +857,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
 
         self.logger.info("Successfully contacted the mongos on port %d.", self.port)
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             self.logger.info(
                 "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."

@@ -91,7 +91,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.fixturelib.default_if_none(mongod_options, {})
         )
 
-        self.load_all_extensions = load_all_extensions
+        self.load_all_extensions = load_all_extensions or self.config.LOAD_ALL_EXTENSIONS
         if self.load_all_extensions:
             self.loaded_extensions = find_and_generate_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
@@ -686,10 +686,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         sync_node_conn = initial_sync_node.mongo_client()
         sync_node_conn.admin.command(failpoint_off_cmd)
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         self.logger.info("Stopping all members of the replica set '%s'...", self.replset_name)
 
-        if self.load_all_extensions and self.loaded_extensions:
+        if finished and self.load_all_extensions and self.loaded_extensions:
             delete_extension_configs(self.loaded_extensions, self.logger)
 
         running_at_start = self.is_running()
@@ -1002,7 +1002,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         original_preserve_dbpath = chosen.preserve_dbpath
         chosen.preserve_dbpath = True
         try:
-            chosen.setup(temporary_flags = temporary_flags)
+            chosen.setup(temporary_flags=temporary_flags)
             self.logger.info(interface.create_fixture_table(self))
             chosen.await_ready()
         finally:

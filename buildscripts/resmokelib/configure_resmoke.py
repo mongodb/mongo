@@ -63,10 +63,12 @@ def process_feature_flag_file(path: str) -> list[str]:
     with open(path) as fd:
         return fd.read().split()
 
+
 @cache
 def _get_module_configs() -> dict:
     with open(_config.MODULES_CONFIG_PATH, "r") as file:
         return yaml.safe_load(file)
+
 
 def _set_up_modules():
     module_configs = _get_module_configs()
@@ -74,7 +76,7 @@ def _set_up_modules():
     for module in _config.MODULES:
         if module not in module_configs:
             raise RuntimeError(f"Could not find configuration for module {module}")
-    
+
     # loop through all modules, we need to act on both enabled and disabled modules
     for module in module_configs.keys():
         module_config = module_configs[module]
@@ -82,20 +84,23 @@ def _set_up_modules():
         for key in ("fixture_dirs", "hook_dirs", "suite_dirs", "jstest_dirs"):
             if key not in module_config:
                 continue
-            assert type(module_config[key]) == list, f"{key} in {module} did not have the expected type of list"
+            assert (
+                type(module_config[key]) == list
+            ), f"{key} in {module} did not have the expected type of list"
             for module_dir in module_config[key]:
                 if not os.path.exists(module_dir):
                     all_paths_present = False
                     break
 
-
         if module in _config.MODULES and all_paths_present:
             # both the fixures and the hooks just need to be loaded once for resmoke to recognize them
-            for resource_dir in module_config.get("fixture_dirs", []) + module_config.get("hook_dirs", []):
+            for resource_dir in module_config.get("fixture_dirs", []) + module_config.get(
+                "hook_dirs", []
+            ):
                 norm_path = os.path.normpath(resource_dir)
                 package = resource_dir.replace("/", ".")
                 autoloader.load_all_modules(package, [norm_path])
-                
+
             for suite_dir in module_config.get("suite_dirs", []):
                 _config.MODULE_SUITE_DIRS.append(suite_dir)
         else:
@@ -183,7 +188,10 @@ def _validate_options(parser: argparse.ArgumentParser, args: dict):
         parser.error("Cannot specify --shardCount and --shardIndex in combination with --jobs.")
 
     if (args["archive_mode"] != "directory") ^ (args["archive_directory"] is None):
-        parser.error("--archiveMode=directory must be used in combination with --archiveDirectory=DIR")
+        parser.error(
+            "--archiveMode=directory must be used in combination with --archiveDirectory=DIR"
+        )
+
 
 def _validate_config(parser: argparse.ArgumentParser):
     from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
@@ -226,9 +234,9 @@ def _validate_config(parser: argparse.ArgumentParser):
         if _config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             parser.error("--shellTlsCertificateKeyFile requires --shellTls")
 
-    if not sys.platform.startswith("linux") and _config.EXTENSIONS:
-        parser.error("--loadExtensions is only supported on Linux")
-        
+    if not sys.platform.startswith("linux") and _config.LOAD_ALL_EXTENSIONS:
+        parser.error("--loadAllExtensions is only supported on Linux")
+
     # Ranges through param specs and checks that they are valid parameter declarations.
     for param_type in config_fuzzer_params:
         _validate_params_spec(parser, config_fuzzer_params[param_type])
@@ -767,9 +775,7 @@ flags in common: {common_set}
     _config.LOG_LEVEL = config.pop("log_level")
     _config.SANITY_CHECK = config.pop("sanity_check")
     _config.PAUSE_AFTER_POPULATE = config.pop("pause_after_populate")
-    _config.EXTENSIONS = config.pop("extensions")
-    if _config.EXTENSIONS is not None:
-        _config.extensions = _config.EXTENSIONS.split(",")
+    _config.LOAD_ALL_EXTENSIONS = config.pop("load_all_extensions")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")

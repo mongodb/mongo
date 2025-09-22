@@ -36,7 +36,7 @@ class YesFixture(interface.Fixture):
         )
         return self.fixturelib.generic_program(logger, ["yes", self.__message])
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         running_at_start = self.is_running()
         success = True  # Still a success even if nothing is running.
 

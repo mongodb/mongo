@@ -593,21 +593,21 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,incompatible_with_extensions
-        --loadExtensions=${extension_names}
+        --loadAllExtensions
     tasks:
-      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.extensions
-      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.extensions
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-large
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.extensions
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.extensions
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-large
-      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.extensions
-      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.extensions
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-large
-      - name: .fuzzer_deterministic !.multiversion !.extensions
+      - name: .fuzzer_deterministic !.multiversion
 
   # TODO SERVER-94401: Reenable testing this variant.
   # # Run all-feature-flags along with recordIdsReplicated:true on all collections.

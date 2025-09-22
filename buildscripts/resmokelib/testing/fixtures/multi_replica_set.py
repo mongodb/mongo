@@ -105,7 +105,7 @@ class MultiReplicaSetFixture(interface.MultiClusterFixture):
             ]
             primary_coll.insert_many(docs)
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         """Shut down the replica sets."""
         self.logger.info("Stopping all replica sets...")
 

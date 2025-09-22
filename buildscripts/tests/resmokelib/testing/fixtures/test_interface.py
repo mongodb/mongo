@@ -52,6 +52,6 @@ class UnitTestFixture(interface.Fixture):
         interface.Fixture.__init__(self, logger, 99, fixturelib)
         self._should_raise = should_raise
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         if self._should_raise:
             raise errors.ServerFailure(self.ERROR_MESSAGE)
