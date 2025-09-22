@@ -106,7 +106,9 @@ PlanState VirtualScanStage::getNext() {
     _index++;
 
     // Depends on whether the last call was to getNext() or open()/doSaveState().
-    invariant(_releaseIndex == _index - 1 || _releaseIndex == _index - 2);
+    tassert(11093511,
+            "Unexpected value of releaseIndex",
+            _releaseIndex == _index - 1 || _releaseIndex == _index - 2);
 
     // We don't want to release at _index-1, since this is the data we're in the process of
     // returning, but data at any prior index is allowed to be freed.

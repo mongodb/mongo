@@ -45,7 +45,7 @@ namespace mongo::sbe {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void LookupHashTableIter::initSearchArray() {
-    invariant(_outerKeyIsArray);
+    tassert(11093505, "Outer key is not an array", _outerKeyIsArray);
     HashTableType::const_iterator hashTableMatchIter;
 
     value::ArrayEnumerator enumerator(_outerKeyTag, _outerKeyVal);
@@ -74,7 +74,7 @@ void LookupHashTableIter::initSearchArray() {
 }  // LookupHashTableIter::initSearchArray
 
 void LookupHashTableIter::initSearchScalar() {
-    invariant(!_outerKeyIsArray);
+    tassert(11093506, "Outer key is not a scalar", !_outerKeyIsArray);
     HashTableType::const_iterator hashTableMatchIter;
 
     _iterProbeKey.reset(0, false, _outerKeyTag, _outerKeyVal);

@@ -301,7 +301,7 @@ void WindowStage::freeRows() {
 }
 
 void WindowStage::readSpilledRow(size_t id, value::MaterializedRow& row) {
-    invariant(_recordStore);
+    tassert(11093512, "Spilled record storage must be created", _recordStore);
     auto recordId = RecordId(id);
     RecordData record;
     auto result = _recordStore->findRecord(_opCtx, recordId, &record);
@@ -319,7 +319,7 @@ void WindowStage::setAccessors(size_t id,
                                const std::vector<std::unique_ptr<value::SwitchAccessor>>& accessors,
                                size_t& bufferedRowIdx,
                                value::MaterializedRow& spilledRow) {
-    invariant(id >= _firstRowId && id <= _lastRowId);
+    tassert(11093513, "Index out of bounds", id >= _firstRowId && id <= _lastRowId);
     auto lastSpilledRowId = getLastSpilledRowId();
     if (id > lastSpilledRowId) {
         for (auto&& accessor : accessors) {
@@ -600,7 +600,7 @@ PlanState WindowStage::getNext() {
             return trackPlanState(PlanState::IS_EOF);
         }
     }
-    invariant(_currId <= getLastRowId());
+    tassert(11093514, "Index out of bounds", _currId <= getLastRowId());
 
     // Partition boundary check.
     if (_currId == _nextPartitionId) {

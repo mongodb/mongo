@@ -1009,7 +1009,7 @@ void ParallelScanStage::open(bool reOpen) {
 }
 
 boost::optional<Record> ParallelScanStage::nextRange() {
-    invariant(_cursor);
+    tassert(11093507, "Cursor must be created", _cursor);
     _currentRange = _state->currentRange.fetchAndAdd(1);
     if (_currentRange < _state->ranges.size()) {
         _range = _state->ranges[_currentRange];

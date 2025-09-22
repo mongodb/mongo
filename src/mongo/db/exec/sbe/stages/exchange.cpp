@@ -295,7 +295,9 @@ void ExchangeConsumer::open(bool reOpen) {
             }
 
             // Start n producers.
-            invariant(_state->producerCompileCtxs().size() == _state->numOfProducers());
+            tassert(11093503,
+                    "Number of producer contexts doesn't match the number of producers",
+                    _state->producerCompileCtxs().size() == _state->numOfProducers());
             for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
                 auto pf = makePromiseFuture<void>();
                 s_globalThreadPool->schedule(

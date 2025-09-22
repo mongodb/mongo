@@ -823,7 +823,9 @@ PlanState BlockHashAggStage::getNextSpilled() {
         // If we have a key, add the value to our result. If not, break because we won't get anymore
         // values from the record store.
         if (hasNextKey) {
-            invariant(_outKeyRowRecordStore.size() == _outIdBlocks.size());
+            tassert(11093500,
+                    "Size of '_outKeyRowRecordStore' doesn't match the size of '_outIdBlocks'",
+                    _outKeyRowRecordStore.size() == _outIdBlocks.size());
             for (size_t i = 0; i < _outKeyRowRecordStore.size(); i++) {
                 auto [keyComponentTag, keyComponentVal] = _outKeyRowRecordStore.getViewOfValue(i);
                 _outIdBlocks[i].push_back(value::copyValue(keyComponentTag, keyComponentVal));
@@ -892,8 +894,13 @@ PlanState BlockHashAggStage::getNext() {
             }
         }
 
-        invariant(_outAggBlocks.size() == _outAggBlockAccessors.size());
-        invariant(_outAggBlocks.size() == _rowAggAccessors.size());
+        tassert(
+            11093501,
+            "Number of aggregated blocks doesn't match the number of aggregated block accessors",
+            _outAggBlocks.size() == _outAggBlockAccessors.size());
+        tassert(11093502,
+                "Number of aggregated blocks doesn't match the number of aggregated accessors",
+                _outAggBlocks.size() == _rowAggAccessors.size());
 
         // Copy the key from the current element in the HT into the out blocks.
         idx = 0;

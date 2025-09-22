@@ -456,8 +456,9 @@ public:
      * execution has started.
      */
     void markShouldCollectTimingInfo() {
-        invariant(durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) ==
-                  0);
+        tassert(11093508,
+                "Execution should not have started",
+                durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) == 0);
 
         if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;

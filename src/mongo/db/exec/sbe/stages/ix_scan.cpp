@@ -417,7 +417,7 @@ void IndexScanStageBase::debugPrintImpl(std::vector<DebugPrinter::Block>& blocks
         if (varIndex) {
             blocks.emplace_back(DebugPrinter::Block("`,"));
         }
-        invariant(varIndex < _vars.size());
+        tassert(11093504, "Index out of bounds", varIndex < _vars.size());
         DebugPrinter::addIdentifier(blocks, _vars[varIndex++]);
         blocks.emplace_back("=");
         blocks.emplace_back(std::to_string(keyIndex));

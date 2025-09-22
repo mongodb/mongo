@@ -238,7 +238,7 @@ void TsBucketToCellBlockStage::doSaveState() {
 
 void TsBucketToCellBlockStage::initCellBlocks() {
     auto [bucketTag, bucketVal] = _bucketAccessor->getViewOfValue();
-    invariant(bucketTag == value::TypeTags::bsonObject);
+    tassert(11093509, "Expected bsonObject tag type", bucketTag == value::TypeTags::bsonObject);
 
     BSONObj bucketObj(value::getRawPointerView(bucketVal));
     if (_metaOutSlotId) {
@@ -249,7 +249,9 @@ void TsBucketToCellBlockStage::initCellBlocks() {
 
     auto [nMeasurements, tsBlocks, cellBlocks] = _pathExtractor.extractCellBlocks(bucketObj);
     _tsBlockStorage = std::move(tsBlocks);
-    invariant(cellBlocks.size() == _blocksOutAccessor.size());
+    tassert(11093510,
+            "Number of cell blocks doesn't match the number of accessors",
+            cellBlocks.size() == _blocksOutAccessor.size());
     for (size_t i = 0; i < cellBlocks.size(); ++i) {
         _blocksOutAccessor[i].reset(true,
                                     value::TypeTags::cellBlock,
