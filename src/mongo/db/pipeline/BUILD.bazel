@@ -1749,6 +1749,19 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_benchmark(
+    name = "pipeline_optimization_bm",
+    srcs = [
+        "pipeline_optimization_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":expression_context_for_test",
+        ":pipeline",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "document_source_group_bm",
     srcs = [
         "document_source_group_bm.cpp",
