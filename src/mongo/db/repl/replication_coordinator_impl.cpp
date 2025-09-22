@@ -5336,10 +5336,10 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const GenericArguments& gen
     }
 
     // Avoid retrieving Rollback ID if we do not need it for _prepareOplogQueryMetadata().
-    int rbid = -1;
+    int rbid = ReplicationProcess::kUninitializedRollbackId;
     if (hasOplogQueryMetadata) {
         rbid = _replicationProcess->getRollbackID();
-        invariant(-1 != rbid);
+        invariant(ReplicationProcess::kUninitializedRollbackId != rbid);
     }
 
     boost::optional<rpc::ReplSetMetadata> replSetMetadata;

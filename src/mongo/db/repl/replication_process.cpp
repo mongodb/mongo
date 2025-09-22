@@ -110,7 +110,7 @@ int ReplicationProcess::getRollbackID() const {
     if (kUninitializedRollbackId == _rbid) {
         // This may happen when serverStatus is called by an internal client before we have a chance
         // to read the rollback ID from storage.
-        LOGV2_WARNING(21533, "Rollback ID is not initialized yet");
+        LOGV2_DEBUG(21533, 3, "Rollback ID is not initialized yet");
     }
     return _rbid;
 }
