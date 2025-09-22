@@ -21,6 +21,10 @@ tasks:
           binary: "${workdir}/src/evergreen/write_sast_report_env_file.sh"
           env:
             WORK_DIR: ${workdir}
+            JIRA_OAUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+            JIRA_OAUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+            JIRA_OAUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+            JIRA_OAUTH_KEY_CERT: ${jira_auth_key_cert}
             SAST_REPORT_COVERITY_USERNAME: ${SAST_REPORT_COVERITY_USERNAME}
             SAST_REPORT_COVERITY_PASSWORD: ${SAST_REPORT_COVERITY_PASSWORD}
             SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID}
