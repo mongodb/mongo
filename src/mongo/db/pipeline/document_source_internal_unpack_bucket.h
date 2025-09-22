@@ -47,6 +47,7 @@
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/mixed_schema_buckets_state.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -59,9 +60,9 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
-struct InternalUnpackBucketSharedState {
+struct MONGO_MOD_PRIVATE InternalUnpackBucketSharedState {
     // It's beneficial to do as much filtering at the bucket level as possible to avoid unpacking
     // buckets that wouldn't contribute to the results anyway. There is a generic mechanism that
     // allows to swap $match stages with this one (see 'getModifiedPaths()'). It lets us split out
@@ -76,7 +77,7 @@ struct InternalUnpackBucketSharedState {
     timeseries::BucketUnpacker _bucketUnpacker;
 };
 
-class DocumentSourceInternalUnpackBucket : public DocumentSource {
+class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceInternalUnpackBucket : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalUnpackBucket"_sd;
     static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
@@ -435,4 +436,4 @@ private:
     boost::optional<bool> _isSbeCompatible = boost::none;
     boost::optional<SbeCompatibility> _isEventFilterSbeCompatible = boost::none;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

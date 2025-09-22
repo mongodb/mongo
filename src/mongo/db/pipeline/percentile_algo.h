@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/modules.h"
 
 #include <cmath>
 #include <memory>

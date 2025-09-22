@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/timeseries_index_conversion_options.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 

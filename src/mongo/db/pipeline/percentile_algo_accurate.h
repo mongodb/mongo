@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/percentile_algo_accurate.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
