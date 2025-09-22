@@ -99,13 +99,18 @@ void DatabaseShardingMetadataAccessor::setDbMetadata(OperationContext* opCtx,
 void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) {
     LOGV2(10371105, "Clearing this node's cached database metadata", logAttrs(_dbName));
 
-    if (!OperationDatabaseMetadata::get(opCtx).getBypassWriteDbMetadataAccess()) {
-        tassert(10371106,
-                fmt::format("Expected write access to clear metadata for database: {}",
-                            _dbName.toStringForErrorMsg()),
-                _accessType == AccessType::kWriteAccess);
-    }
+    /*
+       Temporarily disable this check: movePrimary may have to clear non-authoritative filtering
+       metadata when aborted before reaching the commit phase of the critical section.
+       TODO SERVER-98118 Re-enable this check once once 9.0 becomes last LTS.
 
+        if (!OperationDatabaseMetadata::get(opCtx).getBypassWriteDbMetadataAccess()) {
+            tassert(10371106,
+                    fmt::format("Expected write access to clear metadata for database: {}",
+                                _dbName.toStringForErrorMsg()),
+                    _accessType == AccessType::kWriteAccess);
+        }
+    */
     _dbPrimaryShard = boost::none;
     _dbVersion = boost::none;
 }

@@ -857,7 +857,7 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 }
 
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
-    const bool clearDbMetadata = _doc.getPhase() >= Phase::kCommit &&
+    const bool clearDbMetadata =
         _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
