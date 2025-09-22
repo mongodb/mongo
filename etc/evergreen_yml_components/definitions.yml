@@ -1720,6 +1720,8 @@ functions:
         author_email: ${author_email}
         github_pr_head_branch: ${github_pr_head_branch}
         github_pr_base_branch: ${github_pr_base_branch}
+        otel_parent_id: ${otel_parent_id}
+        otel_trace_id: ${otel_trace_id}
       args:
         - "src/evergreen/bazel_run.sh"
 

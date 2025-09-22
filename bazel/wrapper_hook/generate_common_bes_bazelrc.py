@@ -95,6 +95,14 @@ common --bes_keywords=rawCommandLineBase64={b64_cmd_line}
 common --bes_keywords=base_branch={base_branch}
 """
 
+    otel_parent_id = os.environ.get("otel_parent_id")
+    otel_trace_id = os.environ.get("otel_trace_id")
+
+    if otel_parent_id:
+        bazelrc_contents += f"common --bes_keywords=otel_parent_id={otel_parent_id}\n"
+    if otel_trace_id:
+        bazelrc_contents += f"common --bes_keywords=otel_trace_id={otel_trace_id}\n"
+
     if developer_build:
         bazelrc_contents += f"common --bes_keywords=workstation={hostname}{os.linesep}"
 
