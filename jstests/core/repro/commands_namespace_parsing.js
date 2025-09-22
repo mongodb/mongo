@@ -283,9 +283,10 @@ if (runningOnMongos) {
     assertFailsWithInvalidNamespacesForField("split", {split: "", find: {}}, isFullyQualified, isAdminCommand);
 
     // Test moveChunk fails with an invalid collection name.
+    const shardName = db.adminCommand({listShards: 1}).shards[0]._id;
     assertFailsWithInvalidNamespacesForField(
         "moveChunk",
-        {moveChunk: "", find: {}, to: "commands_namespace_parsing_out"},
+        {moveChunk: "", find: {}, to: shardName},
         isNotFullyQualified,
         isAdminCommand,
     );

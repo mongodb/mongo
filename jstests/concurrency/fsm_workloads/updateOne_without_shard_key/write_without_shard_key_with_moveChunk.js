@@ -96,6 +96,9 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
             errorMsg.includes("Location51008") ||
             errorMsg.includes("Location6718402") ||
             errorMsg.includes("Location16977") ||
+            // This error can occur when a different migration commits and splits the chunk
+            // being moved by the current migration.
+            errorMsg.includes("Location11089203") ||
             // When running with the balancer, manual chunk migrations might conflict with the
             // balancer issued splits.
             (TestData.runningWithBalancer && err.code == 656452)

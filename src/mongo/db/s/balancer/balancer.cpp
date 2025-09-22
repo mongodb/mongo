@@ -782,6 +782,20 @@ void Balancer::moveRange(OperationContext* opCtx,
                                   << cm.getShardKeyPattern().toBSON(),
                     !maxBound.has_value() || cm.getShardKeyPattern().isShardKey(*maxBound));
 
+            // If both min and max are provided, check that the given range is covered by a single
+            // chunk.
+            if (minBound && maxBound) {
+                const auto chunkRange =
+                    ChunkRange(cm.getShardKeyPattern().normalizeShardKey(*minBound),
+                               cm.getShardKeyPattern().normalizeShardKey(*maxBound));
+                const auto& chunkWithMin = cm.findIntersectingChunkWithSimpleCollation(*minBound);
+
+                uassert(11089203,
+                        str::stream() << "Range with bounds " << chunkRange.toString()
+                                      << " is not contained within a single chunk.",
+                        chunkWithMin.getRange().covers(chunkRange));
+            }
+
             // Get the donor shard.
             const auto fromShardId = [&]() {
                 if (minBound.has_value()) {

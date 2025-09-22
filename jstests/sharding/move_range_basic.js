@@ -89,21 +89,26 @@ function testMoveRangeWithBigChunk(mongos, ns, skPattern, minBound) {
     );
 }
 
-function test(collName, skPattern) {
+function test(collName, skPattern, splitpoint) {
     const ns = kDbName + "." + collName;
 
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: skPattern}));
 
     let aChunk = findChunksUtil.findOneChunkByNs(mongos.getDB("config"), ns, {shard: shard0});
     assert(aChunk);
+
     jsTest.log("Testing invalid commands");
     // Fail if one of the bounds is not a valid shard key
-    assert.commandFailed(
+    assert.commandFailedWithCode(
         mongos.adminCommand({moveRange: ns, min: aChunk.min, max: {invalidShardKey: 10}, toShard: shard1}),
+        ErrorCodes.InvalidOptions,
     );
 
     // Fail if the `to` shard does not exists
-    assert.commandFailed(mongos.adminCommand({moveRange: ns, min: aChunk.min, max: aChunk.max, toShard: "WrongShard"}));
+    assert.commandFailedWithCode(
+        mongos.adminCommand({moveRange: ns, min: aChunk.min, max: aChunk.max, toShard: "WrongShard"}),
+        ErrorCodes.ShardNotFound,
+    );
 
     // Test that `moveRange` with min & max bounds works
     jsTest.log("Testing moveRange with both bounds");
@@ -148,15 +153,37 @@ function test(collName, skPattern) {
 }
 
 // Test running running moveRange on an unsplittable collection will fail
-const collName = "unsplittable_collection";
-const ns = kDbName + "." + collName;
+{
+    const collName = "unsplittable_collection";
+    const ns = kDbName + "." + collName;
 
-jsTest.log("Testing on unsplittable namespace");
-assert.commandWorked(mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}));
-assert.commandFailedWithCode(
-    mongos.adminCommand({moveRange: ns, min: {_id: 0}, toShard: shard0}),
-    ErrorCodes.NamespaceNotSharded,
-);
+    jsTest.log("Testing on unsplittable namespace");
+    assert.commandWorked(mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}));
+    assert.commandFailedWithCode(
+        mongos.adminCommand({moveRange: ns, min: {_id: 0}, toShard: shard0}),
+        ErrorCodes.NamespaceNotSharded,
+    );
+}
+
+// Test that moveRange should fail if both min and max are provided and they are not covered by a
+// single chunk.
+// TODO (SERVER-97588): Remove version check from tests when 9.0 becomes last LTS.
+if (MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "8.3") >= 0) {
+    assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + ".collA", key: {a: 1}}));
+    assert.commandWorked(mongos.adminCommand({split: kDbName + ".collA", middle: {a: 0}}));
+
+    assert.commandFailedWithCode(
+        mongos.adminCommand({
+            moveRange: kDbName + ".collA",
+            min: {a: MinKey()},
+            max: {a: MaxKey()},
+            toShard: shard1,
+        }),
+        11089203,
+    );
+
+    mongos.getCollection(kDbName + ".collA").drop();
+}
 
 test("nonHashedShardKey", {a: 1});
 

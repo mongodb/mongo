@@ -553,11 +553,13 @@ let viewsCommandTests = {
     },
     modifySearchIndex: {skip: "present in v6.3 but renamed to updateSearchIndex in v7.0"},
     moveChunk: {
-        command: {moveChunk: "test.view", find: {}, to: "a"},
+        command: function (conn) {
+            const shardName = conn.adminCommand({listShards: 1}).shards[0]._id;
+            const cmd = {moveChunk: "test.view", find: {}, to: shardName};
+            assert.commandFailedWithCode(conn.adminCommand(cmd), ErrorCodes.NamespaceNotSharded);
+        },
         skipStandalone: true,
         isAdminCommand: true,
-        expectFailure: true,
-        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     moveCollection: {
         command: {moveCollection: "test.view", toShard: "move_collection-rs"},

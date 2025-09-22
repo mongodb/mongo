@@ -53,6 +53,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/cluster_commands_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
@@ -128,13 +129,6 @@ public:
 
             Timer t;
 
-            const auto chunkManager =
-                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns())
-                    .getChunkManager();
-            uassert(ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "Can't execute " << Request::kCommandName
-                                  << " on unsharded collection " << ns().toStringForErrorMsg(),
-                    chunkManager.isSharded());
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",
@@ -163,86 +157,122 @@ public:
 
             const auto to = toStatus.getValue();
 
-            auto find = request().getFind();
-            auto bounds = request().getBounds();
+            const auto find = request().getFind();
+            const auto bounds = request().getBounds();
+
+            auto runMoveRange = [&](const Chunk& chunk) {
+                MoveRangeRequestBase moveRangeReq;
+                moveRangeReq.setToShard(to->getId());
+                moveRangeReq.setMin(chunk.getMin());
+                moveRangeReq.setMax(chunk.getMax());
+                moveRangeReq.setWaitForDelete(request().getWaitForDelete().value_or(false) ||
+                                              request().get_waitForDelete().value_or(false));
 
 
-            boost::optional<Chunk> chunk;
+                ConfigsvrMoveRange configsvrRequest(ns());
+                configsvrRequest.setDbName(DatabaseName::kAdmin);
+                configsvrRequest.setMoveRangeRequestBase(moveRangeReq);
+
+                const auto secondaryThrottle = uassertStatusOK(
+                    MigrationSecondaryThrottleOptions::createFromCommand(request().toBSON()));
+
+                configsvrRequest.setSecondaryThrottle(secondaryThrottle);
+
+                configsvrRequest.setForceJumbo(request().getForceJumbo() ? ForceJumbo::kForceManual
+                                                                         : ForceJumbo::kDoNotForce);
+                generic_argument_util::setMajorityWriteConcern(configsvrRequest);
+
+                auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+                auto commandResponse = configShard->runCommandWithIndefiniteRetries(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    DatabaseName::kAdmin,
+                    configsvrRequest.toBSON(),
+                    Shard::RetryPolicy::kIdempotent);
+                uassertStatusOK(
+                    Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
+
+                Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);
+
+                BSONObjBuilder resultbson;
+                resultbson.append("millis", t.millis());
+                result->getBodyBuilder().appendElements(resultbson.obj());
+            };
 
             if (find) {
                 // find
-                BSONObj shardKey = uassertStatusOK(extractShardKeyFromBasicQuery(
-                    opCtx, ns(), chunkManager.getShardKeyPattern(), *find));
+                const auto maxNumAttempts = gMaxNumStaleVersionRetries.load();
+                auto numAttempts = 0;
+                while (numAttempts < maxNumAttempts) {
+                    const auto chunkManager =
+                        getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns())
+                            .getChunkManager();
+                    uassert(ErrorCodes::NamespaceNotSharded,
+                            str::stream()
+                                << "Can't execute " << Request::kCommandName
+                                << " on unsharded collection " << ns().toStringForErrorMsg(),
+                            chunkManager.isSharded());
 
-                uassert(656450,
-                        str::stream() << "no shard key found in chunk query " << *find,
-                        !shardKey.isEmpty());
+                    BSONObj shardKey = uassertStatusOK(extractShardKeyFromBasicQuery(
+                        opCtx, ns(), chunkManager.getShardKeyPattern(), *find));
 
-                if (find && chunkManager.getShardKeyPattern().isHashedPattern()) {
-                    LOGV2_WARNING(7065400,
-                                  "bounds should be used instead of query for hashed shard keys");
+                    uassert(656450,
+                            str::stream() << "no shard key found in chunk query " << *find,
+                            !shardKey.isEmpty());
+
+                    if (find && chunkManager.getShardKeyPattern().isHashedPattern()) {
+                        LOGV2_WARNING(
+                            7065400,
+                            "bounds should be used instead of query for hashed shard keys");
+                    }
+
+                    const auto chunk =
+                        chunkManager.findIntersectingChunkWithSimpleCollation(shardKey);
+
+                    try {
+                        runMoveRange(chunk);
+                    } catch (const DBException& e) {
+                        if (e.code() == 11089203) {
+                            // We should retry the operation if the computed min and max don't match
+                            // a specific chunk.
+                            numAttempts++;
+                            continue;
+                        }
+                        throw;
+                    }
+                    break;
                 }
-
-                chunk.emplace(chunkManager.findIntersectingChunkWithSimpleCollation(shardKey));
-            } else {
-
-                auto minBound = bounds->front();
-                auto maxBound = bounds->back();
-                uassert(656451,
-                        str::stream() << "shard key bounds "
-                                      << "[" << minBound << "," << maxBound << ")"
-                                      << " are not valid for shard key pattern "
-                                      << chunkManager.getShardKeyPattern().toBSON(),
-                        chunkManager.getShardKeyPattern().isShardKey(minBound) &&
-                            chunkManager.getShardKeyPattern().isShardKey(maxBound));
-
-                BSONObj minKey = chunkManager.getShardKeyPattern().normalizeShardKey(minBound);
-                BSONObj maxKey = chunkManager.getShardKeyPattern().normalizeShardKey(maxBound);
-
-                chunk.emplace(chunkManager.findIntersectingChunkWithSimpleCollation(minKey));
-                uassert(656452,
-                        str::stream() << "no chunk found with the shard key bounds "
-                                      << "[" << minKey << "," << maxKey << ")",
-                        chunk->getMin().woCompare(minKey) == 0 &&
-                            chunk->getMax().woCompare(maxKey) == 0);
+                return;
             }
 
+            const auto chunkManager =
+                getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(opCtx, ns())
+                    .getChunkManager();
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Can't execute " << Request::kCommandName
+                                  << " on unsharded collection " << ns().toStringForErrorMsg(),
+                    chunkManager.isSharded());
 
-            MoveRangeRequestBase moveRangeReq;
-            moveRangeReq.setToShard(to->getId());
-            moveRangeReq.setMin(chunk->getMin());
-            moveRangeReq.setMax(chunk->getMax());
-            moveRangeReq.setWaitForDelete(request().getWaitForDelete().value_or(false) ||
-                                          request().get_waitForDelete().value_or(false));
+            auto minBound = bounds->front();
+            auto maxBound = bounds->back();
+            uassert(656451,
+                    str::stream() << "shard key bounds "
+                                  << "[" << minBound << "," << maxBound << ")"
+                                  << " are not valid for shard key pattern "
+                                  << chunkManager.getShardKeyPattern().toBSON(),
+                    chunkManager.getShardKeyPattern().isShardKey(minBound) &&
+                        chunkManager.getShardKeyPattern().isShardKey(maxBound));
 
+            BSONObj minKey = chunkManager.getShardKeyPattern().normalizeShardKey(minBound);
+            BSONObj maxKey = chunkManager.getShardKeyPattern().normalizeShardKey(maxBound);
 
-            ConfigsvrMoveRange configsvrRequest(ns());
-            configsvrRequest.setDbName(DatabaseName::kAdmin);
-            configsvrRequest.setMoveRangeRequestBase(moveRangeReq);
+            const auto chunk = chunkManager.findIntersectingChunkWithSimpleCollation(minKey);
+            uassert(656452,
+                    str::stream() << "no chunk found with the shard key bounds "
+                                  << "[" << minKey << "," << maxKey << ")",
+                    chunk.getMin().woCompare(minKey) == 0 && chunk.getMax().woCompare(maxKey) == 0);
 
-            const auto secondaryThrottle = uassertStatusOK(
-                MigrationSecondaryThrottleOptions::createFromCommand(request().toBSON()));
-
-            configsvrRequest.setSecondaryThrottle(secondaryThrottle);
-
-            configsvrRequest.setForceJumbo(request().getForceJumbo() ? ForceJumbo::kForceManual
-                                                                     : ForceJumbo::kDoNotForce);
-            generic_argument_util::setMajorityWriteConcern(configsvrRequest);
-
-            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto commandResponse = configShard->runCommandWithIndefiniteRetries(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                configsvrRequest.toBSON(),
-                Shard::RetryPolicy::kIdempotent);
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
-
-            Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);
-
-            BSONObjBuilder resultbson;
-            resultbson.append("millis", t.millis());
-            result->getBodyBuilder().appendElements(resultbson.obj());
+            runMoveRange(chunk);
         }
     };
 };
