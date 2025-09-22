@@ -147,8 +147,8 @@ public:
      * Returns the severity the direct shard operation warnings should be logged at. This is
      * determined by the amount of time that has passed since the last warning was logged.
      */
-    logv2::LogSeverity directConnectionLogSeverity() {
-        return _directConnectionLogSuppressor();
+    logv2::LogSeverity directConnectionLogSeverity(bool forDirectDDLs) {
+        return forDirectDDLs ? _directShardDDLLogSuppressor() : _directConnectionLogSuppressor();
     }
 
 private:
@@ -163,6 +163,8 @@ private:
 
     // Log severity suppressor for direct connection checks
     logv2::SeveritySuppressor _directConnectionLogSuppressor{
+        Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+    logv2::SeveritySuppressor _directShardDDLLogSuppressor{
         Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
 };
 

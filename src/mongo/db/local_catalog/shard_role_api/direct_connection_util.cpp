@@ -63,11 +63,6 @@ bool shouldSkipDirectShardOpChecks(OperationContext* opCtx, const NamespaceStrin
     if (OperationShardingState::get(opCtx).shouldSkipDirectConnectionChecks()) {
         return true;
     }
-    // Skip direct shard connections checks when the corresponding server parameter is set. This
-    // parameter should be active in rare cases, like restoring a sharded cluster as a replica set.
-    if (disableDirectShardDDLOperations.load()) {
-        return true;
-    }
     // Skip direct shard connection checks when the sharding state is disabled, this prevents
     // blocking direct operations on replica sets.
     if (!ShardingState::get(opCtx)->enabled()) {
@@ -90,6 +85,18 @@ bool isAuthorizedForDirectShardOperation(OperationContext* opCtx, const Namespac
 
 void checkDirectShardDDLAllowed(OperationContext* opCtx, const NamespaceString& nss) {
     if (shouldSkipDirectShardOpChecks(opCtx, nss)) {
+        return;
+    }
+
+    // Skip direct shard connections checks when the corresponding server parameter is set. This
+    // parameter should be active in rare cases, like restoring a sharded cluster as a replica set.
+    if (enableDirectShardDDLOperations.load()) {
+        const auto severity =
+            ShardingState::get(opCtx)->directConnectionLogSeverity(true /* forDirectDDLs */);
+        LOGV2_DEBUG(11108701,
+                    severity.toInt(),
+                    "Skipping checking authorization for direct shard ddl operations because "
+                    "'enableDirectShardDDLOperations' is set to true");
         return;
     }
 
@@ -129,7 +136,8 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                 // Atlas log ingestion requires a strict upper bound on the number of logs
                 // per hour. To abide by this, we only log this message once per hour and
                 // rely on the user assertion log (debug 1) otherwise.
-                const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity();
+                const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity(
+                    false /* forDirectDDLs */);
                 if (severity == logv2::LogSeverity::Warning()) {
                     LOGV2_DEBUG(8679600,
                                 logv2::LogSeverity::Error().toInt(),
@@ -145,7 +153,8 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                 // Atlas log ingestion requires a strict upper bound on the number of logs
                 // per hour. To abide by this, we log the lower verbosity messages with a
                 // different log ID to prevent log ingestion from picking them up.
-                const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity();
+                const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity(
+                    false /* forDirectDDLs */);
                 LOGV2_DEBUG(severity == logv2::LogSeverity::Warning() ? 7553700 : 8993900,
                             severity.toInt(),
                             errorMsg,

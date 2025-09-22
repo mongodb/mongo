@@ -53,14 +53,14 @@ server_parameters:
         default: true
         redact: false
 
-    disableDirectShardDDLOperations:
+    enableDirectShardDDLOperations:
         description: >-
-            Disables the checks that prevent direct shard connections from executing DDL 
-            operations. This should only be used in extreme cases, e.g., restore a sharded cluster 
-            backup to a replica set.
+            Enables the user to run direct shard DDL operations on a sharded cluster, bypassing the
+            direct shard DDL checks. This should only be used in extreme cases, e.g., restore a
+            sharded cluster backup to a replica set.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: disableDirectShardDDLOperations
+        cpp_varname: enableDirectShardDDLOperations
         default: false
         redact: false
 

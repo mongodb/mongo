@@ -148,6 +148,18 @@ TEST_F(DirectConnectionDDLHookTest, RegisterOpSessionsCollection) {
     ASSERT_TRUE(hook.getOngoingOperations().empty());
 }
 
+TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecks) {
+    makeUnauthorizedForDirectOps(operationContext()->getClient());
+
+    RAIIServerParameterControllerForTest multitenancyController("enableDirectShardDDLOperations",
+                                                                true);
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    stdx::unordered_map<OperationId, int> expectedMap{{operationContext()->getOpID(), 1}};
+    ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
+}
+
 TEST_F(DirectConnectionDDLHookTest, RegisterMultiple) {
     makeAuthorizedForDirectOps(operationContext()->getClient());
 
