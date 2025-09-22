@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

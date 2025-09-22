@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

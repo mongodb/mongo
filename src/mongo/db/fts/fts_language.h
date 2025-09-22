@@ -35,6 +35,7 @@
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_unicode_phrase_matcher.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

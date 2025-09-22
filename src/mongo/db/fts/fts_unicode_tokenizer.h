@@ -37,6 +37,7 @@
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/db/fts/unicode/codepoints.h"
 #include "mongo/db/fts/unicode/string.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 

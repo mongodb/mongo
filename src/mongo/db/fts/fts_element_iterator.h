@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <map>

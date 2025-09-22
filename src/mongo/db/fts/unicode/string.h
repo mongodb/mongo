@@ -33,6 +33,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/fts/unicode/codepoints.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -46,8 +47,11 @@ namespace unicode {
  * A string class that support basic Unicode functionality such as removing diacritic marks, and
  * lowercasing. The String is constructed with UTF-8 source data, and is converted under the hood to
  * a u32string (UTF-32) so operations can be easily done with individual Unicode code points.
+ *
+ * Need for replacement: It's being used in fle_crud_test.cpp in a single unit test, and the only
+ * member being called are the constructor, .size() and .substrToBuf().
  */
-class String {
+class MONGO_MOD_NEEDS_REPLACEMENT String {
 public:
     String() = default;
 

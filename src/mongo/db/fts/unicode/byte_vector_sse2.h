@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/bits.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 

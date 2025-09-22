@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
