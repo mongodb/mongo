@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

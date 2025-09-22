@@ -32,6 +32,7 @@
 #include "mongo/db/exec/matcher/match_details.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
