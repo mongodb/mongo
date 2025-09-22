@@ -16,6 +16,7 @@
 //
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 // Creating the collection.
@@ -43,6 +44,13 @@ let stages = [
 // Query stats may be disabled by the config fuzzer.
 if (!TestData.fuzzMongodConfigs) {
     stages.push(["$queryStats", adminDB, 1]);
+}
+
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+// TODO(SERVER-106932): $listExtensions can always be included when feature flag is removed.
+if (FeatureFlagUtil.isPresentAndEnabled(adminDB.getMongo(), "ExtensionsAPI") && !isMultiversion) {
+    stages.push(["$listExtensions", adminDB, 1]);
 }
 
 // The following stages cannot be tested here:

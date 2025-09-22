@@ -10,7 +10,10 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const testDb = db.getSiblingDB(jsTestName());
+const adminDb = db.getSiblingDB("admin");
 const collName = "api_version_pipeline_stages";
 const coll = testDb[collName];
 coll.drop();
@@ -164,3 +167,24 @@ const cmdResult = assert.commandWorked(
 assert.eq(cmdResult.cursor.id, 0, cmdResult);
 assert.eq(cmdResult.cursor.firstBatch.length, 1, cmdResult);
 assert.eq(cmdResult.cursor.firstBatch[0].count, 1, cmdResult);
+
+// TODO(SERVER-106932): $listExtensions can always be included when feature flag is removed.
+if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), "ExtensionsAPI")) {
+    // $listExtensions must be run on the adminDB with aggregate: 1, so the
+    // command is tested separately from the unstablePipelines array.
+    assert.commandFailedWithCode(
+        adminDb.runCommand({
+            aggregate: 1,
+            pipeline: [{$listExtensions: {}}],
+            cursor: {},
+            apiStrict: true,
+            apiVersion: "1",
+        }),
+        [
+            ErrorCodes.APIStrictError,
+            kUnrecognizedPipelineStageErrorCode,
+            ErrorCodes.QueryFeatureNotAllowed,
+            ErrorCodes.FailedToParse,
+        ],
+    );
+}
