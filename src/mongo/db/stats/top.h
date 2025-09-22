@@ -41,6 +41,7 @@
 #include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstdint>
@@ -53,7 +54,7 @@ namespace mongo {
 /**
  * Tracks cumulative latency statistics for a Service (shard-role or router-role).
  */
-class ServiceLatencyTracker {
+class MONGO_MOD_PUB ServiceLatencyTracker {
 public:
     static ServiceLatencyTracker& getDecoration(Service* service);
 
@@ -93,7 +94,7 @@ private:
 /**
  * Tracks shard-role usage by collection.
  */
-class Top {
+class MONGO_MOD_PUB Top {
 public:
     struct UsageData {
         long long time{0};

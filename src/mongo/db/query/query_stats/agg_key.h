@@ -42,6 +42,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <utility>

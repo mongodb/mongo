@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

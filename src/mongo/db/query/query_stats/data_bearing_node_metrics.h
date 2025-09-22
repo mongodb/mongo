@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -40,7 +41,7 @@ namespace mongo::query_stats {
  * are optionally rolled up from the data-bearing nodes to routers, and are aggregated into cursors
  * and OpDebug. This structure represents those metrics and can be used to store and aggregate them.
  */
-struct DataBearingNodeMetrics {
+struct MONGO_MOD_PUB DataBearingNodeMetrics {
     uint64_t keysExamined = 0;
     uint64_t docsExamined = 0;
     uint64_t bytesRead = 0;

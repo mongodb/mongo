@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::query_stats {
 

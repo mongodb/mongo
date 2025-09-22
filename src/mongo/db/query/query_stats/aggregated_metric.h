@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/summation.h"
 
 #include <algorithm>

@@ -33,6 +33,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -41,7 +42,7 @@ namespace mongo {
 
 class ServiceContext;
 
-struct ProfileSettings {
+struct MONGO_MOD_PUB ProfileSettings {
     int level;
     std::shared_ptr<const ProfileFilter> filter;  // nullable
 
@@ -67,7 +68,7 @@ struct ProfileSettings {
  * All functions that modify the profile settings are assumed to be called very infrequently, and
  * thus enable performance optimizations for calls to read-only functions.
  */
-class DatabaseProfileSettings {
+class MONGO_MOD_PUB DatabaseProfileSettings {
 public:
     static DatabaseProfileSettings& get(ServiceContext* svcCtx);
 

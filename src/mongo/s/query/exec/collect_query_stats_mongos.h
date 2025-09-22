@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

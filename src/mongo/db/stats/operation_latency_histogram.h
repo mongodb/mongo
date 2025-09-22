@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstdint>

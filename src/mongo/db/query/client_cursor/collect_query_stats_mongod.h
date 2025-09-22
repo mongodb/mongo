@@ -32,6 +32,7 @@
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

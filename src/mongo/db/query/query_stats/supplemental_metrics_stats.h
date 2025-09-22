@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/op_debug.h"
 #include "mongo/db/query/util/named_enum.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

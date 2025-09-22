@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

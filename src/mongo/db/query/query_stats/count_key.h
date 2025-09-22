@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/query_shape/count_cmd_shape.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::query_stats {
 
