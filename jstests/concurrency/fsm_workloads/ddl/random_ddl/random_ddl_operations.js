@@ -101,10 +101,16 @@ export const $config = (function () {
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
+            // SERVER-111231 Remove early exit when untrackUnshardedCollection is re-enabled.
+            if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns || TestData.killShards) {
+                jsTestLog("Skipping untrackUnshardedCollection as stepdowns are enabled");
+                return;
+            }
+
             // Note this command will behave as no-op in case the collection is not tracked.
             db = data.getRandomDb(db);
-            collName = data.getRandomCollection(db);
-            const namespace = `${db}.${collName}`;
+            const coll = data.getRandomCollection(db);
+            const namespace = coll.getFullName();
             jsTestLog(`Started to untrack collection ${namespace}`);
             // Attempt to unshard the collection first
             jsTestLog(`1. Attempting to unshard collection ${namespace}`);
@@ -114,6 +120,11 @@ export const $config = (function () {
                 // Handles the case where another resharding operation is in progress
                 ErrorCodes.ConflictingOperationInProgress,
                 ErrorCodes.ReshardCollectionInProgress,
+                // The command is sent while a FCV transition is in progress
+                ErrorCodes.CommandNotSupported,
+                ErrorCodes.ReshardCollectionAborted,
+                // The command is sent while a node is undergoing initial sync
+                ErrorCodes.SnapshotTooOld,
             ]);
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
@@ -140,7 +151,14 @@ export const $config = (function () {
 
     let teardown = function (db, collName, cluster) {
         const configDB = db.getSiblingDB("config");
-        assert(configDB.collections.countDocuments({allowMigrations: {$exists: true}}) == 0);
+        // All the DDLs executed within the context of this workload should have completed, unblocking migrations on each targeted namespace.
+        // Allow some grace time for operations issued by background hooks (or the balancer) that might still be inflight.
+        assert.soon(
+            () => {
+                return configDB.collections.countDocuments({allowMigrations: {$exists: true}}) === 0;
+            },
+            `Found unexpected "allowMigration" field on one or more tracked collections ${tojson(configDB.collections.findOne({allowMigrations: {$exists: true}}))}`,
+        );
     };
 
     return {

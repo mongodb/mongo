@@ -20,6 +20,9 @@ import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/s
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    // TODO SERVER-111230 Re-enable state execution.
+    delete $config.states.untrackUnshardedCollection;
+
     $config.states.setFCV = function (db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];
