@@ -221,7 +221,7 @@ TEST_F(LoadExtensionsTest, InitializationFunctionPopulatesParserMap) {
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
         "hostVersionSucceeds",
-        makeEmptyExtensionConfig("libhostVersionSucceeds_mongo_extension.so")));
+        makeEmptyExtensionConfig("libhost_version_succeeds_mongo_extension.so")));
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
@@ -232,7 +232,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
         10615503);
 }
 
-TEST_F(LoadExtensionsTest, LoadExtensioninitialize_version_fails) {
+TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
     ASSERT_THROWS_CODE(ExtensionLoader::load("initialize_version_fails_bad_extension",
                                              makeEmptyExtensionConfig(
                                                  "libinitialize_version_fails_bad_extension.so")),
@@ -240,14 +240,14 @@ TEST_F(LoadExtensionsTest, LoadExtensioninitialize_version_fails) {
                        10726600);
 }
 
-DEATH_TEST_F(LoadExtensionsTest, LoadExtensionnull_stage_descriptor, "10596400") {
+DEATH_TEST_F(LoadExtensionsTest, LoadExtensionNullStageDescriptor, "10596400") {
     ExtensionLoader::load("null_stage_descriptor_bad_extension",
                           makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));
 }
 
 TEST(LoadExtensionTest, LoadExtensionTwoStagesSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
-        "loadTwoStages", makeEmptyExtensionConfig("libloadTwoStages_mongo_extension.so")));
+        "loadTwoStages", makeEmptyExtensionConfig("libload_two_stages_mongo_extension.so")));
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     std::vector<BSONObj> pipeline = {BSON("$foo" << BSONObj()), BSON("$bar" << BSONObj())};
@@ -274,7 +274,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionInvokeHostServicesAsapSucceeds) {
 TEST(LoadExtensionTest, LoadHighestCompatibleVersionSucceeds) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(
         "loadHighestCompatibleVersion",
-        makeEmptyExtensionConfig("libloadHighestCompatibleVersion_mongo_extension.so")));
+        makeEmptyExtensionConfig("libload_highest_compatible_version_mongo_extension.so")));
     auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     std::vector<BSONObj> pipeline = {BSON("$extensionV3" << BSONObj())};

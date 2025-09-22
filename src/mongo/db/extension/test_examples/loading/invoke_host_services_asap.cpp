@@ -61,7 +61,7 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         // We test that the host services are accessible as soon as the initialization function is
         // invoked. This is the first entrypoint where extensions are allowed to call into the host
-        // servies.
+        // services.
         uassert(11097601,
                 "Dummy assertion to test usage of the host services",
                 sdk::HostServicesHandle::getHostServices()->alwaysTrue_TEMPORARY());

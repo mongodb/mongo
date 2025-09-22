@@ -2,6 +2,11 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library", "mongo_
 
 package(default_visibility = ["//visibility:public"])
 
+############################## EXTENSIONS FOR PASSTHROUGH TESTS ##############################
+### Any extension name suffix'ed with "_mongo_extension" with be automatically picked up by
+### the extension passthroughs and loaded on all nodes, if it is also added to
+### "dist_test_extensions" in mongo/BUILD.bazel.
+
 # Extensions under test_examples/
 [
     mongo_cc_extension_shared_library(
@@ -16,22 +21,6 @@ package(default_visibility = ["//visibility:public"])
         "buzz",
     ]
 ]
-
-# "foo_v2" is used for testing upgrade scenarios as the upgrade of "foo" from above. We cannot use
-# the "mongo_extension" suffix since loading this extension in passthroughs with "foo" V1 should
-# cause duplicate stage errors.
-mongo_cc_extension_shared_library(
-    name = "foo_extension_v2",
-    srcs = ["foo_v2.cpp"],
-)
-
-# "vector_search" is used to test that we can override the existing $vectorSearch implementation.
-# It must not have the _mongo_extension suffix so that it doesn't get loaded in the
-# Extensions-enabled variant since that would break real $vectorSearch tests.
-mongo_cc_extension_shared_library(
-    name = "vector_search_extension",
-    srcs = ["vector_search.cpp"],
-)
 
 # Extensions under test_examples/extension_options/
 [
@@ -52,12 +41,18 @@ mongo_cc_extension_shared_library(
         srcs = ["loading/" + extension_name + ".cpp"],
     )
     for extension_name in [
-        "hostVersionSucceeds",
+        "host_version_succeeds",
         "invoke_host_services_asap",
-        "loadTwoStages",
-        "loadHighestCompatibleVersion",
+        "load_highest_compatible_version",
+        "load_two_stages",
     ]
 ]
+
+######################### EXTENSIONS FOR NO PASSTHROUGH OR UNIT TESTS #########################
+### To be manually loaded in a no-passthrough e2e test, the extension must also be added to
+### "dist_test_extensions" in mongo/BUILD.bazel.
+### To be manually loaded in a unit test, the extension must also be added to the list of "data"
+### for that test's Bazel target.
 
 # Extensions under test_examples/fail_to_load/
 # Each of these should fail startup.
@@ -82,3 +77,19 @@ mongo_cc_extension_shared_library(
         "no_compatible_version",
     ]
 ]
+
+# "foo_v2" is used for testing upgrade scenarios as the upgrade of "foo" from above. We cannot use
+# the "mongo_extension" suffix since loading this extension in passthroughs with "foo" V1 should
+# cause duplicate stage errors.
+mongo_cc_extension_shared_library(
+    name = "foo_extension_v2",
+    srcs = ["foo_v2.cpp"],
+)
+
+# "vector_search" is used to test that we can override the existing $vectorSearch implementation.
+# It must not have the _mongo_extension suffix so that it doesn't get loaded in the
+# Extensions-enabled variant since that would break real $vectorSearch tests.
+mongo_cc_extension_shared_library(
+    name = "vector_search_extension",
+    srcs = ["vector_search.cpp"],
+)
