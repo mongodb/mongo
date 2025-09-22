@@ -41,6 +41,7 @@
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

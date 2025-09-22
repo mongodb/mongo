@@ -42,6 +42,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -60,7 +61,7 @@ namespace mongo {
  * Helper functions which add new operations into an existing BulkWriteCommandRequest.
  * Only used from tests.
  */
-class BulkWriteCommandModifier {
+class MONGO_MOD_FILE_PRIVATE BulkWriteCommandModifier {
 public:
     BulkWriteCommandModifier(BulkWriteCommandRequest* request, size_t capacity = 0)
         : _request(request), _ops(request->getOps()), _nsInfos(request->getNsInfo()) {

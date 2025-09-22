@@ -34,6 +34,7 @@
 #include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/wc_error.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::unified_write_executor {
 using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;

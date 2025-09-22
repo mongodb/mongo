@@ -32,6 +32,7 @@
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/s/write_ops/bulk_write_reply_info.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

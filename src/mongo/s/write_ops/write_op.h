@@ -35,6 +35,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -291,7 +292,7 @@ public:
 
     bool hasPendingChildOps() const;
 
-    const std::vector<ChildWriteOp>& getChildWriteOps_forTest() const;
+    MONGO_MOD_PRIVATE const std::vector<ChildWriteOp>& getChildWriteOps_forTest() const;
 
 private:
     /**

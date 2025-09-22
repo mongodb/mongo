@@ -47,6 +47,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>

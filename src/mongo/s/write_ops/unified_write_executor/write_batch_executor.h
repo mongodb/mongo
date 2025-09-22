@@ -32,6 +32,7 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

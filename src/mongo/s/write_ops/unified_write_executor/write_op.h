@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/s/write_ops/write_command_ref.h"
+#include "mongo/util/modules.h"
 
 #include <variant>
 

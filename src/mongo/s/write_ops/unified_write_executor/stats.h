@@ -34,6 +34,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
 #include "mongo/s/write_ops/write_command_ref.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace unified_write_executor {

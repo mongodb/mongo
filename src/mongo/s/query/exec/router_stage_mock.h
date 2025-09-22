@@ -34,6 +34,7 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <queue>
 

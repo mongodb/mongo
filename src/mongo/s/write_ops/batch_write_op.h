@@ -46,6 +46,7 @@
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <map>

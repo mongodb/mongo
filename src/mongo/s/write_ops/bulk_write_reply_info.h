@@ -32,6 +32,7 @@
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

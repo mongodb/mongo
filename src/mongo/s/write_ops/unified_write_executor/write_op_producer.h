@@ -31,6 +31,7 @@
 
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
+#include "mongo/util/modules.h"
 
 #include <absl/container/btree_set.h>
 #include <boost/optional.hpp>

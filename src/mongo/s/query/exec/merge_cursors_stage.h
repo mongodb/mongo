@@ -33,6 +33,7 @@
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

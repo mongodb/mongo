@@ -39,6 +39,7 @@
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

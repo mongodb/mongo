@@ -32,6 +32,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace unified_write_executor {

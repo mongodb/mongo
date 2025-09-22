@@ -35,6 +35,7 @@
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>

@@ -45,6 +45,7 @@
 #include "mongo/s/query/exec/cluster_client_cursor.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>

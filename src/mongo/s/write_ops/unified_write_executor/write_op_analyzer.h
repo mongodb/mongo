@@ -36,6 +36,7 @@
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

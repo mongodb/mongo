@@ -48,6 +48,7 @@
 #include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>

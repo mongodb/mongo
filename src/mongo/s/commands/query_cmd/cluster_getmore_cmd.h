@@ -38,6 +38,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/planner/cluster_find.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

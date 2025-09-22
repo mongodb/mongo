@@ -34,6 +34,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
