@@ -607,8 +607,8 @@ StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
     const bool scalingValid = params.scaling > 0;
     if (!scalingValid || std::isinf(params.scaling)) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << "range [" << params.min << ", " << params.max << "] is too small.");
+                      str::stream() << "range [" << params.min << ", " << params.max
+                                    << "] is either extremely small or large.");
     }
 
     return createFromParams(params);
@@ -617,21 +617,11 @@ StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
 StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromParams(
     const Parameters& params) {
     std::unique_ptr<GeoHashConverter> converter(new GeoHashConverter(params));
-
-    const bool errorValid = params.max - params.min >= converter->_error / 2;
-    if (!errorValid) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "invalid computed error: " << converter->_error
-                                    << " on range [" << params.min << ", " << params.max << "].");
-    }
-
     return {std::move(converter)};
 }
 
 GeoHashConverter::GeoHashConverter(const Parameters& params) : _params(params) {
     init();
-    uassert(
-        4799400, "Invalid GeoHashConverter parameters", _params.max - _params.min >= _error / 2);
 }
 
 void GeoHashConverter::init() {
@@ -646,6 +636,16 @@ void GeoHashConverter::init() {
     // TODO:  Can we actually find error bounds for the sqrt function?
     double epsilon = 0.001 / _params.scaling;
     _error = distanceBetweenHashes(a, b) + epsilon;
+
+    // Ensure that the error factor is not too large for the given range.
+    const bool errorValid = !std::isinf(_error) && _params.max - _params.min >= _error / 2;
+    uassert(4799400,
+            str::stream() << "invalid computed geohash error factor: " << _error << " on range ["
+                          << _params.min << ", " << _params.max << "]"
+                          << " with bit precision: " << _params.bits << "."
+                          << " Try increasing the range between min and max field and/or "
+                             "increasing the bit precision field.",
+            errorValid);
 
     // Error in radians
     _errorSphere = deg2rad(_error);
@@ -662,7 +662,7 @@ double GeoHashConverter::distanceBetweenHashes(const GeoHash& a, const GeoHash& 
     double dx = bx - ax;
     double dy = by - ay;
 
-    return sqrt((dx * dx) + (dy * dy));
+    return std::hypot(dx, dy);
 }
 
 /**
