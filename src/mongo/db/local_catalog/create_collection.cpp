@@ -504,14 +504,11 @@ Status _createLegacyTimeseries(
         Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
 
-        // Check if there already exists a Collection on the specified namespace. For legacy
-        // time-series collections, this is the namespace of the view that we will create on top of
-        // a buckets collection. For viewless time-series collection, this is just the name of the
-        // collection.
-        // For legacy time-series collections, we're not holding a Collection lock for this
-        // namespace so we may only check if the pointer is null or not. The answer may also change
-        // at any point after this call which is fine as we properly handle an orphaned bucket
-        // collection. This check is just here to prevent it from being created in the common case.
+        // Check if there already exist a Collection on the namespace we will later create a
+        // view on. We're not holding a Collection lock for this Collection so we may only check
+        // if the pointer is null or not. The answer may also change at any point after this
+        // call which is fine as we properly handle an orphaned bucket collection. This check is
+        // just here to prevent it from being created in the common case.
         Status status = catalog::checkIfNamespaceExists(opCtx, ns);
         if (!status.isOK()) {
             return status;
@@ -527,6 +524,19 @@ Status _createLegacyTimeseries(
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
             ->checkShardVersionOrThrow(opCtx);
+        if (!ns.isTimeseriesBucketsCollection()) {
+            Lock::CollectionLock viewLock(opCtx, ns, MODE_IS);
+            // Check the shard version of the view namespace here to prevent failing due to needing
+            // to refresh the metadata after creating the buckets collection.
+            // When creating an untracked legacy timeseries collection on a sharded cluster,
+            // throwing StaleConfig to refresh while creating the view releases the DDL lock
+            // while only the bucket collection exists. Since the buckets and view are committed
+            // in different WUOWs, checkMetadataConsistency can report a transient
+            // MalformedTimeseriesBucketsCollection inconsistency. See SERVER-110952 for details.
+            // This is a best effort check; this inconsistency can still be caused by stepdowns.
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)
+                ->checkShardVersionOrThrow(opCtx);
+        }
 
         WriteUnitOfWork wuow(opCtx);
         AutoStatsTracker bucketsStatsTracker(
