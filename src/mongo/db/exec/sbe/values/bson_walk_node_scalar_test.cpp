@@ -50,17 +50,73 @@ struct PathTestCase {
 void dummyCallBack(value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder>* node,
                    value::TypeTags eltTag,
                    value::Value eltVal,
-                   const char* bson) {
+                   const char*) {
     if (auto rec = node->projRecorder) {
         rec->recordValue(eltTag, eltVal);
     }
 }
 
+
+value::Object convertToObject(value::TypeTags inputTag, value::Value inputVal);
+
+value::Array convertToArray(value::TypeTags inputTag, value::Value inputVal) {
+    ASSERT_TRUE(inputTag == value::TypeTags::bsonArray);
+    value::Array ret;
+    auto callback = [&](value::TypeTags inTag, value::Value inVal, const char* /*bsonPtr*/) {
+        value::TypeTags outTag;
+        value::Value outVal;
+        switch (inTag) {
+            case value::TypeTags::bsonObject: {
+                std::tie(outTag, outVal) = makeCopyObject(convertToObject(inTag, inVal));
+                break;
+            }
+            case value::TypeTags::bsonArray: {
+                std::tie(outTag, outVal) = makeCopyArray(convertToArray(inTag, inVal));
+                break;
+            }
+            default: {
+                outTag = inTag;
+                outVal = inVal;
+            }
+        }
+        ret.push_back(outTag, outVal);
+    };
+    arrayForEach(inputTag, inputVal, callback);
+    return ret;
+}
+
+value::Object convertToObject(value::TypeTags inputTag, value::Value inputVal) {
+    value::Object ret;
+    auto callback = [&](StringData fieldName,
+                        value::TypeTags inTag,
+                        value::Value inVal,
+                        const char* cur) -> bool {
+        value::TypeTags outTag;
+        value::Value outVal;
+        switch (inTag) {
+            case value::TypeTags::bsonObject: {
+                std::tie(outTag, outVal) = makeCopyObject(convertToObject(inTag, inVal));
+                break;
+            }
+            case value::TypeTags::bsonArray: {
+                std::tie(outTag, outVal) = makeCopyArray(convertToArray(inTag, inVal));
+                break;
+            }
+            default: {
+                outTag = inTag;
+                outVal = inVal;
+            }
+        }
+        ret.push_back(fieldName, outTag, outVal);
+        return false;
+    };
+    objectForEach(inputTag, inputVal, callback);
+    return ret;
+}
+
 class BsonWalkNodeScalarTest : public mongo::unittest::Test {
 public:
-    void testPaths(const std::vector<PathTestCase>& testCases,
-                   const BSONObj& data,
-                   bool mayHaveArrayValue = true) {
+    void testPaths(const std::vector<PathTestCase>& testCases, const BSONObj& data) {
         value::BsonWalkNode<value::ScalarProjectionPositionInfoRecorder> root;
         // Construct extractor.
         std::vector<value::ScalarProjectionPositionInfoRecorder> recorders;
@@ -70,25 +126,41 @@ public:
             root.add(tc.path, nullptr, &recorders.back());
         }
         auto [inputTag, inputVal] = stage_builder::makeValue(data);
-        value::ValueGuard vg{inputTag, inputVal};  // Free input value's memory on exit.
+        // Convert to Object.
+        auto [convertedTag, convertedVal] = makeCopyObject(convertToObject(inputTag, inputVal));
+        BSONObjBuilder b;
+        bson::convertToBsonObj(b, value::getObjectView(convertedVal));
+        auto obj = b.obj();
+        ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(obj == data))
+            << "Conversion did not preserve input data. Original data: " << data
+            << ", converted value: " << obj << ".";
 
-        // Extract paths from input data in a single pass.
-        value::walkField<value::ScalarProjectionPositionInfoRecorder>(
-            &root, inputTag, inputVal, nullptr /* bsonPtr */, dummyCallBack);
+        // Free value memory on exit.
+        value::ValueGuard inputGuard{inputTag, inputVal};
+        value::ValueGuard convertedGuard{convertedTag, convertedVal};
 
-        // Verify the extracted values are correct.
-        size_t idx = 0;
-        for (auto& tc : testCases) {
-            value::MoveableValueGuard value = recorders[idx].extractValue();
-            auto [resultsTag, resultsVal] = value.get();
-            BSONObjBuilder tmp;
-            bson::appendValueToBsonObj(tmp, "result", resultsTag, resultsVal);
-            BSONObj resultObj = tmp.obj();  // Frees memory in tmp.
-            ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(resultObj == tc.projectValue))
-                << "Incorrect projection for path " << tc.path << " on input " << data
-                << ". Expected " << tc.projectValue << ", got " << resultObj << ".";
-            ++idx;
-        }
+        auto verifyWalk = [&](value::TypeTags t, value::Value v) {
+            // Extract paths from input data in a single pass.
+            value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+                &root, t, v, nullptr /* bsonPtr */, dummyCallBack);
+
+            // Verify the extracted values are correct.
+            size_t idx = 0;
+            for (auto& tc : testCases) {
+                value::MoveableValueGuard value = recorders[idx].extractValue();
+                auto [resultsTag, resultsVal] = value.get();
+                BSONObjBuilder tmp;
+                bson::appendValueToBsonObj(tmp, "result", resultsTag, resultsVal);
+                BSONObj resultObj = tmp.obj();  // Frees memory in tmp.
+                ASSERT_TRUE(
+                    SimpleBSONObjComparator::kInstance.evaluate(resultObj == tc.projectValue))
+                    << "Incorrect projection for path " << tc.path << " on input " << data
+                    << ". Expected " << tc.projectValue << ", got " << resultObj << ".";
+                ++idx;
+            }
+        };
+        verifyWalk(inputTag, inputVal);
+        verifyWalk(convertedTag, convertedVal);
     }
 };
 
@@ -336,21 +408,21 @@ TEST_F(BsonWalkNodeScalarTest, DuplicateFields) {
         // Duplicate toplevel field names
         BSONObj inputObj = BSON("a" << 1 << "a" << 2);
         std::vector<PathTestCase> tests{
-            PathTestCase{.path = {Get{"a"}, Id{}}, .projectValue = fromjson("{result: 2}")}};
+            PathTestCase{.path = {Get{"a"}, Id{}}, .projectValue = fromjson("{result: 1}")}};
         testPaths(tests, inputObj);
     }
     {
         // Duplicate toplevel field names, values in the opposite order
         BSONObj inputObj = BSON("a" << 2 << "a" << 1);
         std::vector<PathTestCase> tests{
-            PathTestCase{.path = {Get{"a"}, Id{}}, .projectValue = fromjson("{result: 1}")}};
+            PathTestCase{.path = {Get{"a"}, Id{}}, .projectValue = fromjson("{result: 2}")}};
         testPaths(tests, inputObj);
     }
     {
         // Duplicate nested field names
         BSONObj inputObj = BSON("a" << BSON("a" << 1 << "a" << 2));
         std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
-                                                     .projectValue = fromjson("{result: 2}")}};
+                                                     .projectValue = fromjson("{result: 1}")}};
         testPaths(tests, inputObj);
     }
     {
@@ -358,33 +430,31 @@ TEST_F(BsonWalkNodeScalarTest, DuplicateFields) {
         BSONObj inputObj =
             BSON("a" << BSON("a" << 1 << "a" << 2) << "a" << BSON("a" << 3 << "a" << 4));
         std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
-                                                     .projectValue = fromjson("{result: 4}")}};
+                                                     .projectValue = fromjson("{result: 1}")}};
         testPaths(tests, inputObj);
     }
     {
-        // We accumulate all duplicate field values for documents in arrays.
+        // Record first of duplicate field values for documents in arrays.
         BSONObj inputObj =
             BSON("a" << BSON_ARRAY(BSON("a" << 1 << "a" << 2) << BSON("a" << 3 << "a" << 4)));
-        std::vector<PathTestCase> tests{
-            PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
-                         .projectValue = fromjson("{result: [1, 2, 3, 4]}")}};
+        std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
+                                                     .projectValue = fromjson("{result: [1, 3]}")}};
         testPaths(tests, inputObj);
     }
     {
-        // We accumulate all duplicate field values for documents in arrays.
+        // Record first of duplicate field values for documents in arrays.
         BSONObj inputObj = BSON("a" << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 3 << "a" << 4)));
-        std::vector<PathTestCase> tests{
-            PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
-                         .projectValue = fromjson("{result: [1, 3, 4]}")}};
+        std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
+                                                     .projectValue = fromjson("{result: [1, 3]}")}};
         testPaths(tests, inputObj);
     }
     {
-        // We accumulate all duplicate field values for documents in arrays.
+        // Record first of duplicate field values for documents in arrays.
         BSONObj inputObj =
             BSON("a" << BSON_ARRAY(BSON("a" << 1) << BSON("a" << BSON("a" << 3) << "a" << 4)));
         std::vector<PathTestCase> tests{
             PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
-                         .projectValue = fromjson("{result: [1, {a: 3}, 4]}")}};
+                         .projectValue = fromjson("{result: [1, {a: 3}]}")}};
         testPaths(tests, inputObj);
     }
     {
@@ -396,7 +466,7 @@ TEST_F(BsonWalkNodeScalarTest, DuplicateFields) {
                                    << BSON("a" << BSON_ARRAY(BSON("a" << 3)) << "a" << 4)));
         std::vector<PathTestCase> tests{
             PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"a"}, Id{}},
-                         .projectValue = fromjson("{result: [1, [{a: 3}], 4]}")}};
+                         .projectValue = fromjson("{result: [1, [{a: 3}]]}")}};
         testPaths(tests, inputObj);
     }
 }

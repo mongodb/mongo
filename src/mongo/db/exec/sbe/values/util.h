@@ -40,6 +40,7 @@ namespace value {
  * Similar to std::any_of, for SBE arrays.
  */
 template <class Cb>
+requires std::invocable<Cb&, TypeTags, Value>
 bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
     if (tag == TypeTags::bsonArray) {
         auto bson = getRawPointerView(val);
@@ -85,11 +86,28 @@ bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
     return false;
 }
 
+/**
+ * Allows the caller to invoke either of the two function signatures.
+ */
+template <class Cb>
+requires std::invocable<Cb&, TypeTags, Value> || std::invocable<Cb&, TypeTags, Value, const char*>
+MONGO_COMPILER_ALWAYS_INLINE inline void invokeCb(const Cb& cb,
+                                                  TypeTags elemTag,
+                                                  Value elemVal,
+                                                  const char* rawBson) {
+    if constexpr (std::is_invocable_v<Cb, TypeTags, Value, const char*>) {
+        cb(elemTag, elemVal, rawBson);
+    } else {
+        cb(elemTag, elemVal);
+    }
+}
+
 /*
  * Invokes callback on each element of the given array.
  */
-template <bool MoveOrCopy = false, typename Cb>
-void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
+template <bool MoveOrCopy = false, class Cb>
+requires std::invocable<Cb&, TypeTags, Value> || std::invocable<Cb&, TypeTags, Value, const char*>
+inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
     if (tag == TypeTags::bsonArray) {
         auto bson = getRawPointerView(val);
         const auto* cur = bson + 4;
@@ -103,8 +121,7 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             if constexpr (MoveOrCopy) {
                 std::tie(elemTag, elemVal) = value::copyValue(elemTag, elemVal);
             }
-
-            cb(elemTag, elemVal);
+            invokeCb(cb, elemTag, elemVal, cur);
             cur = bson::advance(cur, keySize);
         }
     } else if (tag == TypeTags::Array) {
@@ -115,7 +132,7 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
                 tv.first = value::TypeTags::Nothing;
                 tv.second = 0;
             }
-            cb(t, v);
+            invokeCb(cb, t, v, nullptr /*rawBson*/);
         }
         if constexpr (MoveOrCopy) {
             array->values().clear();
@@ -129,7 +146,7 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             } else {
                 ++it;
             }
-            cb(t, v);
+            invokeCb(cb, t, v, nullptr /*rawBson*/);
         }
     } else if (tag == TypeTags::ArrayMultiSet) {
         auto arrayMultiSet = getArrayMultiSetView(val);
@@ -140,10 +157,40 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             } else {
                 ++it;
             }
-            cb(t, v);
+            invokeCb(cb, t, v, nullptr /*rawBson*/);
         }
     } else {
         MONGO_UNREACHABLE;
+    }
+}
+
+/**
+ * Invokes callback on each field's value of the given Object. Exits early if the callback returns
+ * true.
+ */
+template <class Cb>
+requires std::predicate<Cb&, StringData, TypeTags, Value, const char*>
+inline void objectForEach(TypeTags tag, Value val, const Cb& cb) {
+    if (tag == TypeTags::bsonObject) {
+        auto bson = getRawPointerView(val);
+        const auto end = bson::bsonEnd(bson);
+        // Skip document length.
+        const char* cur = bson + 4;
+        bool done = false;
+        while (!done && (cur != end - 1)) {
+            StringData currFieldName = bson::fieldNameAndLength(cur);
+            auto [eltTag, eltVal] = bson::convertFrom<true>(cur, end, currFieldName.size());
+            done = cb(currFieldName, eltTag, eltVal, cur);
+            cur = bson::advance(cur, currFieldName.size());
+        }
+    } else {
+        tassert(10751104, "expected tag to be Object", tag == TypeTags::Object);
+        auto obj = getObjectView(val);
+        bool done = false;
+        for (size_t i = 0; !done && (i < obj->size()); i++) {
+            auto [eltTag, eltVal] = obj->getAt(i);
+            done = cb(obj->field(i), eltTag, eltVal, nullptr);
+        }
     }
 }
 
