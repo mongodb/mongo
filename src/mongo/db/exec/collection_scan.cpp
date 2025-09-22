@@ -314,7 +314,9 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     // error if the recordId is null.
                     //
                     // Note that we want to return the record *after* this one since we have already
-                    // returned this one prior to the resume.
+                    // returned this one prior to the resume *unless* we are resuming from a deleted
+                    // record id in which case the cursor is already positioned on the next record
+                    // id.
                     auto& resumeScanPoint = *_params.resumeScanPoint;
                     auto& recordIdToSeek = resumeScanPoint.recordId;
                     if (recordIdToSeek.isNull()) {
@@ -323,12 +325,18 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                             "Failed to resume collection scan: cannot resume from null recordId");
                     }
 
-                    if (resumeScanPoint.tolerateKeyNotFound) {
-                        auto record = _cursor->seek(recordIdToSeek,
-                                                    SeekableRecordCursor::BoundInclusion::kInclude);
-                    } else {
-                        auto record = _cursor->seekExact(recordIdToSeek);
-                        if (!record) {
+                    // Attempt to seek to the exact recordId. If it doesn't exist and we're using
+                    // '$_startAt' (tolerateKeyNotFound = true), we'll use seek() instead to find
+                    // the next highest recordId and return. In this case the cursor is already
+                    // positioned on the recordId we want to return so we don't need to advance it
+                    // again below. If tolerateKeyNotFound = false, we throw.
+                    auto testRecord = _cursor->seekExact(recordIdToSeek);
+                    if (!testRecord) {
+                        if (resumeScanPoint.tolerateKeyNotFound) {
+                            record = _cursor->seek(recordIdToSeek,
+                                                   SeekableRecordCursor::BoundInclusion::kInclude);
+                            return PlanStage::ADVANCED;
+                        } else {
                             uasserted(
                                 ErrorCodes::KeyNotFound,
                                 str::stream()

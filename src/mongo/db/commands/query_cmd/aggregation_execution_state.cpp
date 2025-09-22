@@ -810,7 +810,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
 }
 
 void AggCatalogState::validate() const {
-    if (_aggExState.getRequest().getResumeAfter()) {
+    if (_aggExState.getRequest().getResumeAfter() || _aggExState.getRequest().getStartAt()) {
         const auto& collectionOrView = getMainCollectionOrView();
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on view",
