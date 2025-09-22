@@ -15,3 +15,9 @@ filters:
   - "validate_compile_commands.py":
     approvers:
       - 10gen/devprod-build
+  - "generate_sast_report.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "write_sast_report_env_file.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
