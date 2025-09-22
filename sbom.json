@@ -540,11 +540,11 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/dcleblanc/safeint@3.0.26",
+      "bom-ref": "pkg:github/dcleblanc/safeint@3.0.28a",
       "author": "David LeBlanc",
       "group": "dcleblanc",
       "name": "SafeInt",
-      "version": "3.0.26",
+      "version": "3.0.28a",
       "description": "SafeInt is a class library for C++ that manages integer overflows.",
       "licenses": [
         {
@@ -554,7 +554,7 @@
         }
       ],
       "copyright": "Copyright David LeBlanc - dcl@dleblanc.net",
-      "purl": "pkg:github/dcleblanc/safeint@3.0.26",
+      "purl": "pkg:github/dcleblanc/safeint@3.0.28a",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -570,7 +570,7 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/scripts/safeint_get_sources.sh"
+          "value": "src/third_party/SafeInt/scripts/import.sh"
         }
       ],
       "evidence": {
