@@ -27,6 +27,7 @@
 #
 global:
     cpp_namespace: "mongo"
+    mod_visibility: private
     cpp_includes:
         - "mongo/db/pipeline/accumulator_percentile.h"
         - "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
