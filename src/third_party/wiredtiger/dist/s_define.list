@@ -1,6 +1,7 @@
 # List of WiredTiger #defines that are "unused", but it's OK.
 API_CALL
 API_CALL_NOCONF
+API_CALL_NOCONF_NOERRCLEAR
 API_END
 API_END_STAT
 API_SESSION_INIT
@@ -62,9 +63,10 @@ WT_EXT_FOREACH_OFF
 WT_ERR_MSG_BUF_LEN
 WT_FIELD_ELEMENTS
 WT_FILE_HANDLE_WILLNEED
-WT_HS_CONFIG_COMMON
 WT_INLINE
+WT_HAVE_ERROR_LOG
 WT_HS_COMPRESSOR
+WT_HS_CONFIG_COMMON
 WT_LIKELY
 WT_LIVE_RESTORE_INIT
 WTI_LOG_SLOT_ACTIVE
@@ -145,6 +147,8 @@ __wt_atomic_store_generic
 __wt_bswap16
 __wt_checksum_with_seed
 __wt_conf_gets
+__wt_error_log_add_helper
+__wt_error_log_clear_helper
 __wt_verbose_error
 __wt_verbose_level
 __wt_verbose_level_id

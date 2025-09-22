@@ -13,6 +13,10 @@
 #define WT_DEBUG_POINT ((void *)(uintptr_t)0xdeadbeef)
 #define WT_DEBUG_BYTE (0xab)
 
+#ifdef HAVE_DIAGNOSTIC
+#define WT_HAVE_ERROR_LOG
+#endif
+
 /* In DIAGNOSTIC mode, yield in places where we want to encourage races (except for with
  * antithesis). */
 #if defined HAVE_DIAGNOSTIC && defined NON_BARRIER_DIAGNOSTIC_YIELDS && !defined ENABLE_ANTITHESIS
@@ -41,15 +45,43 @@
 #define __wt_set_return(session, error) \
     __wt_set_return_func(session, __PRETTY_FUNCTION__, __LINE__, error, #error)
 
+#ifdef WT_HAVE_ERROR_LOG
+#define __wt_error_log_add_helper(expr, error, suberror) \
+    WT_IGNORE_RET(                                       \
+      __wt_error_log_add(__FILE__, __PRETTY_FUNCTION__, __LINE__, expr, error, suberror))
+#define __wt_error_log_clear_helper() __wt_error_log_clear()
+
+/*
+ * WT_ERROR_LOG_ADD --
+ *     Add an entry to the error log. This is useful in places where we assign an error code
+ * directly to "ret" and return it, instead of using the WT_ERR() macro. It is also useful in places
+ * where we want to log an error but not return it.
+ */
+#define WT_ERROR_LOG_ADD(expr) \
+    __wt_error_log_add(__FILE__, __PRETTY_FUNCTION__, __LINE__, #expr, expr, WT_NONE)
+
+#else
+#define __wt_error_log_add_helper(expr, error, suberror) \
+    {                                                    \
+    }
+#define __wt_error_log_clear_helper() \
+    {                                 \
+    }
+#define WT_ERROR_LOG_ADD(expr) (expr)
+#endif /* WT_HAVE_ERROR_LOG */
+
 /* Set "ret" and branch-to-err-label tests. */
-#define WT_ERR(a)             \
-    do {                      \
-        if ((ret = (a)) != 0) \
-            goto err;         \
+#define WT_ERR(a)                                        \
+    do {                                                 \
+        if ((ret = (a)) != 0) {                          \
+            __wt_error_log_add_helper(#a, ret, WT_NONE); \
+            goto err;                                    \
+        }                                                \
     } while (0)
 #define WT_ERR_MSG(session, v, ...)                                    \
     do {                                                               \
         ret = (v);                                                     \
+        __wt_error_log_add_helper(#v, ret, WT_NONE);                   \
         __wt_err(session, ret, __VA_ARGS__);                           \
         __wt_session_set_last_error(session, v, WT_NONE, __VA_ARGS__); \
         goto err;                                                      \
@@ -57,22 +89,24 @@
 #define WT_ERR_SUB(session, v, sub_v, ...)                           \
     do {                                                             \
         ret = (v);                                                   \
+        __wt_error_log_add_helper(#v, ret, sub_v);                   \
         __wt_session_set_last_error(session, v, sub_v, __VA_ARGS__); \
         goto err;                                                    \
+    } while (0)
+#define WT_ERR_TEST(a, v, keep)                          \
+    do {                                                 \
+        if (a) {                                         \
+            ret = (v);                                   \
+            __wt_error_log_add_helper(#v, ret, WT_NONE); \
+            goto err;                                    \
+        } else if (!(keep))                              \
+            ret = 0;                                     \
     } while (0)
 #define WT_ERR_MSG_CHK(session, v, ...)            \
     do {                                           \
         ret = (v);                                 \
         if (ret != 0)                              \
             WT_ERR_MSG(session, ret, __VA_ARGS__); \
-    } while (0)
-#define WT_ERR_TEST(a, v, keep) \
-    do {                        \
-        if (a) {                \
-            ret = (v);          \
-            goto err;           \
-        } else if (!(keep))     \
-            ret = 0;            \
     } while (0)
 #define WT_ERR_ERROR_OK(a, e, keep) WT_ERR_TEST((ret = (a)) != 0 && ret != (e), ret, keep)
 #define WT_ERR_NOTFOUND_OK(a, keep) WT_ERR_ERROR_OK(a, WT_NOTFOUND, keep)
@@ -81,23 +115,33 @@
 #define WT_ERR_PANIC(session, v, ...) WT_ERR(__wt_panic(session, v, __VA_ARGS__))
 
 /* Return tests. */
-#define WT_RET(a)               \
+#define WT_RET(a)                                          \
+    do {                                                   \
+        int __ret;                                         \
+        if ((__ret = (a)) != 0) {                          \
+            __wt_error_log_add_helper(#a, __ret, WT_NONE); \
+            return (__ret);                                \
+        }                                                  \
+    } while (0)
+#define WT_RET_NOLOG(a)         \
     do {                        \
         int __ret;              \
         if ((__ret = (a)) != 0) \
             return (__ret);     \
     } while (0)
-#define WT_RET_TRACK(a)               \
-    do {                              \
-        int __ret;                    \
-        if ((__ret = (a)) != 0) {     \
-            WT_TRACK_OP_END(session); \
-            return (__ret);           \
-        }                             \
+#define WT_RET_TRACK(a)                                    \
+    do {                                                   \
+        int __ret;                                         \
+        if ((__ret = (a)) != 0) {                          \
+            __wt_error_log_add_helper(#a, __ret, WT_NONE); \
+            WT_TRACK_OP_END(session);                      \
+            return (__ret);                                \
+        }                                                  \
     } while (0)
 #define WT_RET_MSG(session, v, ...)                                    \
     do {                                                               \
         int __ret = (v);                                               \
+        __wt_error_log_add_helper(#v, __ret, WT_NONE);                 \
         __wt_err(session, __ret, __VA_ARGS__);                         \
         __wt_session_set_last_error(session, v, WT_NONE, __VA_ARGS__); \
         return (__ret);                                                \
@@ -105,13 +149,16 @@
 #define WT_RET_SUB(session, v, sub_v, ...)                           \
     do {                                                             \
         int __ret = (v);                                             \
+        __wt_error_log_add_helper(#v, __ret, sub_v);                 \
         __wt_session_set_last_error(session, v, sub_v, __VA_ARGS__); \
         return (__ret);                                              \
     } while (0)
-#define WT_RET_TEST(a, v) \
-    do {                  \
-        if (a)            \
-            return (v);   \
+#define WT_RET_TEST(a, v)                              \
+    do {                                               \
+        if (a) {                                       \
+            __wt_error_log_add_helper(#a, v, WT_NONE); \
+            return (v);                                \
+        }                                              \
     } while (0)
 #define WT_RET_ERROR_OK(a, e)                           \
     do {                                                \
@@ -157,21 +204,25 @@ __wt_tret_error_ok(int *pret, int a, int e)
 #define WT_TRET_ERROR_OK(a, e) __wt_tret_error_ok(&ret, a, e)
 #else
 /* Set "ret" if not already set. */
-#define WT_TRET(a)                                                                           \
-    do {                                                                                     \
-        int __ret;                                                                           \
-        if ((__ret = (a)) != 0 &&                                                            \
-          (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
-            ret == WT_RESTART))                                                              \
-            ret = __ret;                                                                     \
+#define WT_TRET(a)                                                                                \
+    do {                                                                                          \
+        int __ret;                                                                                \
+        if ((__ret = (a)) != 0) {                                                                 \
+            __wt_error_log_add_helper(#a, __ret, WT_NONE);                                        \
+            if (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
+              ret == WT_RESTART)                                                                  \
+                ret = __ret;                                                                      \
+        }                                                                                         \
     } while (0)
-#define WT_TRET_ERROR_OK(a, e)                                                               \
-    do {                                                                                     \
-        int __ret;                                                                           \
-        if ((__ret = (a)) != 0 && __ret != (e) &&                                            \
-          (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
-            ret == WT_RESTART))                                                              \
-            ret = __ret;                                                                     \
+#define WT_TRET_ERROR_OK(a, e)                                                                    \
+    do {                                                                                          \
+        int __ret;                                                                                \
+        if ((__ret = (a)) != 0 && __ret != (e)) {                                                 \
+            __wt_error_log_add_helper(#a, __ret, WT_NONE);                                        \
+            if (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
+              ret == WT_RESTART)                                                                  \
+                ret = __ret;                                                                      \
+        }                                                                                         \
     } while (0)
 #endif /* INLINE_FUNCTIONS_INSTEAD_OF_MACROS */
 

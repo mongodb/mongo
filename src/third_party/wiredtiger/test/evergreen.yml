@@ -861,7 +861,7 @@ functions:
         # do_run will contain a list of files we want to run.
         no_run=$(mktemp)
         do_run=$(mktemp)
-        sed -e 's/ *#.*//' -e '/^$/d' < ${unit_test_parallel_ignore} > $no_run
+        sed -e 's/ *#.*//' -e '/^$/d' ${unit_test_parallel_ignore} > $no_run
         (cd ./test/suite; ls test_*.py) | fgrep -vf $no_run > $do_run
         cd cmake_build
         threads_command="-j ${nproc}"
@@ -870,12 +870,7 @@ functions:
         fi
         py=${python_binary|python3}
         echo "Using $threads_command for 'unit test parallel'"
-        if [[ $TESTUTIL_TSAN -eq 1 ]]; then
-            export TSAN_OPTIONS="$TSAN_OPTIONS:log_path=$(git rev-parse --show-toplevel)/tsan_logs:exitcode=0"
-            ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1 || echo "Ignoring failed test as we are checking test coverage"
-        else
-            ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1
-        fi
+        ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1
 
   "tsan warning metric":
     command: shell.exec
@@ -886,8 +881,7 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_PATH}
-        # Track warnings only after time 2025-08-06 06:07:50.655735+00:00
-        python3 test/evergreen/tsan_warnings_analysis.py --timestamp 1754460496
+        python3 test/evergreen/tsan_warnings_analysis.py --timestamp ${timestamp}
 
   "code coverage analysis":
     command: shell.exec
@@ -2312,11 +2306,41 @@ tasks:
           upload_source_dir: "wiredtiger"
           upload_filename: unit-test-tsan.tgz
 
-  # A large number of unit tests are run with the disagg hook. Break them into buckets to prevent
-  # the individual jobs from taking too long.
+  - name: unit-test-disagg-leader-tsan
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test parallel"
+        vars:
+          # Run the set of tests that are not in the fail list.
+          unit_test_parallel_ignore: test/suite/tsan.fail test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_parallel_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)"
+      - func: "upload artifact"
+        vars:
+          upload_source_dir: "wiredtiger"
+          upload_filename: unit-test-disagg-leader-tsan.tgz
 
-  - name: unit-test-hook-disagg-leader-bucket00
-    tags: ["pull_request", "python"]
+  - name: unit-test-disagg-follower-tsan
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As follower, run a minimal functionality test
+          unit_test_args: -v 2 --timeout 60 --hook "disagg=(role=follower)" base01
+      - func: "upload artifact"
+        vars:
+          upload_source_dir: "wiredtiger"
+          upload_filename: unit-test-disagg-follower-tsan.tgz
+
+  - name: unit-test-hook-disagg-leader
+    tags: ["python"]
     depends_on:
     - name: compile
     commands:
@@ -4737,6 +4761,29 @@ tasks:
           dependent_task: unit-test-tsan
           destination: wiredtiger/unit-test-tsan
       - func: "tsan warning metric"
+        vars:
+          # Track warnings only after time 2025-08-06 06:07:50.655735+00:00
+          timestamp: 1754460496
+
+  - name: generate-tsan-metric-disagg
+    tags: ["pull_request_code_statistics"]
+    depends_on:
+      - name: "unit-test-disagg-leader-tsan"
+      - name: "unit-test-disagg-follower-tsan"
+    commands:
+      - func: "get project"
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: unit-test-disagg-leader-tsan
+          destination: wiredtiger/unit-test-disagg-leader-tsan
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: unit-test-disagg-follower-tsan
+          destination: wiredtiger/unit-test-disagg-follower-tsan
+      - func: "tsan warning metric"
+        vars:
+          # Track warnings right before disagg merge 2025-08-02.
+          timestamp: 1746576000
 
     ###############################
     # Performance Tests for btree #
@@ -6306,8 +6353,13 @@ buildvariants:
     - name: examples-c-test
     - name: unit-test-tsan
       distros: ubuntu2004-large
+    - name: unit-test-disagg-leader-tsan
+      distros: ubuntu2004-large
+    - name: unit-test-disagg-follower-tsan
+      distros: ubuntu2004-large
     - name: generate-tsan-metric
     - name: tsan-playground-test
+    - name: generate-tsan-metric-disagg
 
 # FIXME-WT-13256
 # This variant runs all possible tasks under TSan but instructs TSan to not report any issues it

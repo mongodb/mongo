@@ -294,5 +294,22 @@ class test_layered31(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
             self.close_cursors(cursors)
 
+        #
+        # Part 7: Check errors
+        #
+
+        # Make sure that the follower is a follower again.
+        conn_follow.reconfigure('disaggregated=(role="follower")')
+
+        # Pick up a non-existent checkpoint
+        l = lambda: conn_follow.reconfigure('disaggregated=(checkpoint_meta="test")')
+        self.assertRaisesException(wiredtiger.WiredTigerError, l, '/WT_NOTFOUND/')
+        if wiredtiger.diagnostic_build():
+            with self.expectedStderrPattern('WT_VERB_ERROR_RETURNS'):
+                conn_follow.dump_error_log()
+
+        #
+        # Cleanup
+        #
         session_follow.close()
         conn_follow.close()

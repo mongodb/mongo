@@ -2946,6 +2946,28 @@ err:
 }
 
 /*
+ * __conn_dump_error_log --
+ *     Dump any logged error messages into the event handler. This works only if this level of
+ *     diagnostics is enabled.
+ */
+static int
+__conn_dump_error_log(WT_CONNECTION *wt_conn)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+    CONNECTION_API_CALL_NOCONF_NOERRCLEAR(conn, session, dump_error_log);
+
+    __wt_error_log_to_handler(session);
+
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * wiredtiger_open --
  *     Main library entry point: open a new connection to a WiredTiger database.
  */
@@ -2959,7 +2981,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
       __conn_load_extension, __conn_add_data_source, __conn_add_collator, __conn_add_compressor,
       __conn_add_encryptor, __conn_set_file_system, __conn_add_page_log, __conn_add_storage_source,
       __conn_get_page_log, __conn_get_storage_source, __conn_set_context_uint,
-      __conn_get_extension_api};
+      __conn_dump_error_log, __conn_get_extension_api};
     static const WT_NAME_FLAG file_types[] = {
       {"data", WT_FILE_TYPE_DATA}, {"log", WT_FILE_TYPE_LOG}, {NULL, 0}};
 
@@ -3506,7 +3528,7 @@ err:
          * detected the corruption above, set it here after closing.
          */
         if (try_salvage)
-            ret = WT_TRY_SALVAGE;
+            ret = WT_ERROR_LOG_ADD(WT_TRY_SALVAGE);
     }
 
     return (ret);

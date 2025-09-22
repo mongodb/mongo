@@ -71,7 +71,7 @@ class test_prepare36(test_prepare_preserve_prepare_base):
         # Setup: Initialize timestamps with stable < prepare timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        if 'disagg' in self.hook_names:
+        if self.runningHook('disagg'):
             self.skipTest("Skip test until cell packing/unpacking is supported for page delta and tier storage")
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)

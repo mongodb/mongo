@@ -93,16 +93,23 @@
         __wt_session_reset_last_error((s));                                              \
     __wt_verbose((s), WT_VERB_API, "%s", "CALL: " #struct_name ":" #func_name)
 
-#define API_CALL_NOCONF(s, struct_name, func_name, dh) \
-    do {                                               \
-        bool __set_err = true;                         \
+#define API_CALL_NOCONF_NOERRCLEAR(s, struct_name, func_name, dh) \
+    do {                                                          \
+        bool __set_err = true;                                    \
     API_SESSION_INIT(s, struct_name, func_name, dh)
+
+#define API_CALL_NOCONF(s, struct_name, func_name, dh)                  \
+    API_CALL_NOCONF_NOERRCLEAR(s, struct_name, func_name, dh);          \
+    if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) \
+        __wt_error_log_clear_helper();
 
 #define API_CALL(s, struct_name, func_name, dh, config, cfg)                                \
     do {                                                                                    \
         bool __set_err = true;                                                              \
         const char *(cfg)[] = {WT_CONFIG_BASE(s, struct_name##_##func_name), config, NULL}; \
         API_SESSION_INIT(s, struct_name, func_name, dh);                                    \
+        if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL))                 \
+            __wt_error_log_clear_helper();                                                  \
         /*                                                                                  \
          * Optimize configuration checking. If the configuration string                     \
          * passed into the API is empty, use NULL instead, it saves a                       \
@@ -255,6 +262,10 @@
 #define CONNECTION_API_CALL_NOCONF(conn, s, func_name) \
     s = (conn)->default_session;                       \
     API_CALL_NOCONF(s, WT_CONNECTION, func_name, NULL)
+
+#define CONNECTION_API_CALL_NOCONF_NOERRCLEAR(conn, s, func_name) \
+    s = (conn)->default_session;                                  \
+    API_CALL_NOCONF_NOERRCLEAR(s, WT_CONNECTION, func_name, NULL)
 
 #define SESSION_API_CALL_PREPARE_ALLOWED(s, func_name, config, cfg) \
     API_CALL(s, WT_SESSION, func_name, NULL, config, cfg)

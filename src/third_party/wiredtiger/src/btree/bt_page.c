@@ -888,6 +888,8 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
     upd = NULL;
     total_size = 0;
 
+    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_READONLY));
+
     /* We don't handle in-memory prepare resolution here. */
     WT_ASSERT(
       session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !F_ISSET(btree, WT_BTREE_IN_MEMORY));

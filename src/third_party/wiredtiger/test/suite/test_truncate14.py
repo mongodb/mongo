@@ -34,7 +34,8 @@ from wtscenario import make_scenarios
 
 # test_truncate14.py
 # Generate very large namespace gaps with truncate.
-
+# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
+@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate14(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false)'

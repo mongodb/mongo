@@ -78,32 +78,57 @@ class CapturedFd(object):
         self.file.close()
         self.file = None
 
-    def hasUnexpectedOutput(self, testcase):
+    def skipLinesWithPattern(self, pat):
+        """
+        Ignore lines with the given pattern.
+        """
+        if type(pat) == str:
+            pat = re.compile(pat)
+        with open(self.filename, 'r') as f:
+            f.seek(self.expectpos)
+            while True:
+                line = f.readline()
+                if not line:
+                    self.expectpos = f.tell()
+                    break
+                elif pat.search(line) is not None:
+                    self.expectpos = f.tell()
+                else:
+                    break
+
+    def hasUnexpectedOutput(self, testcase=None, ignore_pat=None):
         """
         Check to see that there is no unexpected output in the captured output
-        file.
+        file. Ignore lines with the given pattern.
         """
         if AbstractWiredTigerTestCase._ignoreStdout:
-            return
+            return False
         if self.file != None:
             self.file.flush()
         new_size = os.path.getsize(self.filename)
-        if self.ignore_regex is None:
+
+        ignore = []
+        if self.ignore_regex is not None:
+            ignore.append(self.ignore_regex)
+        if ignore_pat is not None:
+            ignore.append(re.compile(ignore_pat))
+        if len(ignore) == 0:
             return self.expectpos < new_size
 
         gotstr = self.readFileFrom(self.filename, self.expectpos, new_size - self.expectpos)
         for line in list(filter(None, gotstr.split('\n'))):
-            if self.ignore_regex.search(line) is None:
+            if all(r.search(line) is None for r in ignore):
                 return True
         return False
 
-    def check(self, testcase):
+    def check(self, testcase=None, ignore_pat=None):
         """
         Check to see that there is no unexpected output in the captured output
         file.  If there is, raise it as a test failure.
         This is generally called after 'release' is called.
+        Ignore lines with the given pattern.
         """
-        if self.hasUnexpectedOutput(testcase):
+        if self.hasUnexpectedOutput(testcase, ignore_pat=ignore_pat):
             contents = self.readFileFrom(self.filename, self.expectpos, 10000)
             AbstractWiredTigerTestCase.prout('ERROR: ' + self.filename +
                                              ' unexpected ' + self.desc +
@@ -120,28 +145,34 @@ class CapturedFd(object):
             self.file.flush()
         self.expectpos = os.path.getsize(self.filename)
 
-    def checkAdditional(self, testcase, expect):
+    def checkAdditional(self, testcase, expect, ignore_pat=None):
         """
         Check to see that an additional string has been added to the
         output file.  If it has not, raise it as a test failure.
         In any case, reset the expected pos to account for the new output.
+        If ignore_pat is set, ignore any lines that match it.
         """
         if self.file != None:
             self.file.flush()
+        if ignore_pat is not None:
+            self.skipLinesWithPattern(ignore_pat)
         gotstr = self.readFileFrom(self.filename, self.expectpos, 1000)
         testcase.assertEqual(gotstr, expect, 'in ' + self.desc +
                              ', expected "' + expect + '", but got "' +
                              gotstr + '"')
         self.expectpos = os.path.getsize(self.filename)
 
-    def checkAdditionalPattern(self, testcase, pat, re_flags = 0, maxchars = 1500):
+    def checkAdditionalPattern(self, testcase, pat, re_flags=0, maxchars=1500, ignore_pat=None):
         """
         Check to see that an additional string has been added to the
         output file.  If it has not, raise it as a test failure.
         In any case, reset the expected pos to account for the new output.
+        If ignore_pat is set, ignore any lines that match it.
         """
         if self.file != None:
             self.file.flush()
+        if ignore_pat is not None:
+            self.skipLinesWithPattern(ignore_pat)
         gotstr = self.readFileFrom(self.filename, self.expectpos, maxchars)
         if re.search(pat, gotstr, re_flags) == None:
             testcase.fail('in ' + self.desc +

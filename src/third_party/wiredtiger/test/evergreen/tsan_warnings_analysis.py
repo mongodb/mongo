@@ -52,6 +52,12 @@ def get_line_last_modified_times(file_path, line_number):
         # Extract the UNIX timestamp
         if line.startswith("author-time"):
             timestamp = int(line.split()[1])
+
+    # Check that requested line number and file has a timestamp.
+    if (timestamp is None):
+        print("Error: Requested line and file path doesn't have a timestamp")
+        exit(1)
+
     return timestamp
 
 def get_tsan_warnings():
@@ -59,7 +65,7 @@ def get_tsan_warnings():
     Get the TSAN warnings from the log files.
     :return: Set of unique TSAN warnings.
     """
-    tsan_warnings_set = set()
+    tsan_warnings_dict = dict()
     current_dir = os.getcwd()
 
     # Loop through WT root directory and search for tsan logs.
@@ -69,19 +75,28 @@ def get_tsan_warnings():
             if file_name.startswith("tsan_logs"):
                 file_path = os.path.join(root, file_name)  # Get the full path to the file
                 with open(file_path, "r") as file:
+                    start_record = False
+                    warning_lines = []
                     for line in file:
-                        if (not line.startswith("SUMMARY:")):
+                        if ("WARNING:" in line.strip()):
+                            start_record = True
                             continue
-                        # Strip away the unnecessary information
-                        pattern_to_remove = r"/.*/wiredtiger/"
-                        cleaned_text = re.sub(pattern_to_remove, "", line).strip()
+                        if start_record:
+                            warning_lines.append(line.strip())
+                            if (line.startswith("SUMMARY:")):
+                                # Strip away the path
+                                pattern_to_remove = r"/.*/wiredtiger/"
+                                cleaned_text = re.sub(pattern_to_remove, "", line).strip()
 
-                        # Strip away the column line information.
-                        pattern_to_remove = r':(\d+):\d+'
-                        cleaned_text = re.sub(pattern_to_remove, r':\1', cleaned_text).strip()
+                                # Strip away the column line information.
+                                pattern_to_remove = r':(\d+):\d+'
+                                cleaned_text = re.sub(pattern_to_remove, r':\1', cleaned_text).strip()
+                                tsan_warnings_dict[cleaned_text] = (file_name, warning_lines.copy())
 
-                        tsan_warnings_set.add(cleaned_text)
-    return tsan_warnings_set
+                                # Restart the warning recording.
+                                warning_lines = []
+                                start_record = False
+    return tsan_warnings_dict
 
 
 def main():
@@ -90,26 +105,37 @@ def main():
 
     args = parser.parse_args()
 
-    tsan_warnings_set = get_tsan_warnings()
-    filter_tsan_warnings = set()
+    tsan_warnings_dict = get_tsan_warnings()
+    filter_tsan_warnings = dict()
 
     if (args.timestamp):
-        for tsan_warning in tsan_warnings_set:
-            pattern_to_capture = r"data race (/wiredtiger/.*):(\d+)"
+        for tsan_warning, tsan_tuple in tsan_warnings_dict.items():
+            pattern_to_capture = r"data race (.*):(\d+)"
             capture = re.search(pattern_to_capture, tsan_warning)
-            if (capture):
-                timestamp = get_line_last_modified_times(capture.group(1), capture.group(2))
-                timestamp_filter = int(args.timestamp)
-                if (timestamp_filter and timestamp_filter <= timestamp):
-                    filter_tsan_warnings.add(tsan_warning)
-        tsan_warnings_set = filter_tsan_warnings
+            # It is possible for TSAN warnings to not have line number information.
+            # In such case, add the TSAN warning to the filtered tsan warnings.
+            if (not capture):
+                print(f"Error: Unable to parse the tsan warning: {tsan_warning}")
+                filter_tsan_warnings[tsan_warning] = tsan_tuple
+                continue
+            file_path = capture.group(1)
+            line_number = int(capture.group(2))
+            timestamp = get_line_last_modified_times(file_path, line_number)
+            timestamp_filter = int(args.timestamp)
+            if (timestamp_filter <= timestamp):
+                filter_tsan_warnings[tsan_warning] = tsan_tuple
+        tsan_warnings_dict = filter_tsan_warnings
 
-    if len(tsan_warnings_set) == 0:
+    if len(tsan_warnings_dict) == 0:
         print("No TSAN warnings to fix!")
     else:
         print("Total warnings:")
-        print("\n".join(tsan_warnings_set))
-        print(f"Overall TSAN Warnings: {len(tsan_warnings_set)}")
+        for _, (tsan_log, warning_lines) in tsan_warnings_dict.items():
+            print("=" * 150)
+            print("TSAN log: " + tsan_log)
+            print("\n".join(warning_lines))
+            print("=" * 150)
+        print(f"Overall TSAN Warnings: {len(tsan_warnings_dict)}")
 
 if __name__ == '__main__':
     main()

@@ -144,7 +144,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_DECL_RET;
     WT_ITEM *deltas;
     WT_ITEM *tmp;
-    WT_PAGE *notused;
+    WT_PAGE *page;
     WT_PAGE_BLOCK_META block_meta;
     WT_REF_STATE previous_state;
     size_t count, i;
@@ -155,6 +155,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     tmp = NULL;
     count = 0;
     disk_image_freed = false;
+    page = NULL;
 
     /* Lock the WT_REF. */
     switch (previous_state = WT_REF_GET_STATE(ref)) {
@@ -256,12 +257,13 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         FLD_SET(page_flags, WT_PAGE_PREFETCH);
     if (deltas != NULL)
         FLD_SET(page_flags, WT_PAGE_WITH_DELTAS);
-    WT_ERR(__wti_page_inmem(session, ref, tmp[0].data, page_flags, &notused, &instantiate_upd));
+    WT_ERR(__wti_page_inmem(session, ref, tmp[0].data, page_flags, &page, &instantiate_upd));
+    WT_ASSERT(session, ref->page == page);
     tmp[0].mem = NULL;
-    if (ref->page->disagg_info != NULL) {
-        ref->page->disagg_info->block_meta = block_meta;
-        ref->page->disagg_info->old_rec_lsn_max = block_meta.disagg_lsn;
-        ref->page->disagg_info->rec_lsn_max = block_meta.disagg_lsn;
+    if (page->disagg_info != NULL) {
+        page->disagg_info->block_meta = block_meta;
+        page->disagg_info->old_rec_lsn_max = block_meta.disagg_lsn;
+        page->disagg_info->rec_lsn_max = block_meta.disagg_lsn;
     }
 
     /* Reconstruct deltas*/
@@ -296,14 +298,17 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
     if (previous_state == WT_REF_DELETED) {
         if (F_ISSET(S2BT(session), WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
-            WT_ERR(__wt_page_modify_init(session, ref->page));
+            WT_ERR(__wt_page_modify_init(session, page));
             ref->page->modify->instantiated = true;
         } else
             WT_ERR(__wti_delete_page_instantiate(session, ref));
     }
 
     /* Track page reads for debugging purposes. */
-    WT_ERR(__wt_conn_page_history_track_read(session, ref->page));
+    WT_ERR(__wt_conn_page_history_track_read(session, page));
+
+    /* Read only page must be clean. */
+    WT_ASSERT(session, !F_ISSET(S2BT(session), WT_BTREE_READONLY) || !__wt_page_is_modified(page));
 
 skip_read:
     F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);
@@ -317,9 +322,9 @@ err:
      * If the function building an in-memory version of the page failed, it discarded the page, but
      * not the disk image. Discard the page and separately discard the disk image in all cases.
      */
-    if (ref->page != NULL) {
-        disk_image_freed = ref->page->dsk != NULL;
-        __wt_page_modify_clear(session, ref->page);
+    if (page != NULL) {
+        disk_image_freed = page->dsk != NULL;
+        __wt_page_modify_clear(session, page);
         __wt_ref_out(session, ref);
     }
 

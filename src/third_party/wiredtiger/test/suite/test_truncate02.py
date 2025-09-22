@@ -39,6 +39,8 @@ import wttest
 #       When deleting leaf pages that aren't in memory, we set transactional
 # information in the page's WT_REF structure, which results in interesting
 # issues.
+# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
+@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate_fast_delete(test_truncate_base):
     name = 'test_truncate'
     nentries = 10000
@@ -48,7 +50,7 @@ class test_truncate_fast_delete(test_truncate_base):
     types = [
         ('file', dict(type='file:', config=\
             'allocation_size=512,leaf_page_max=512')),
-        # FIXME-WT-14998 Re-enable the layered table scenario once disaggregated storage works with truncate tests.
+        # FIXME-WT-15430 Re-enable the layered table scenario once disaggregated storage works with fast truncate tests.
         # Consider whether we need this scenario here if the scenario is already defined in the test truncate base test.
         # ('layered', dict(type='layered:', config=\
         #     'allocation_size=512,leaf_page_max=512'))
@@ -90,7 +92,7 @@ class test_truncate_fast_delete(test_truncate_base):
         ('txn2', dict(commit=False)),
         ]
 
-    scenarios = make_scenarios(test_truncate_base.disagg_storages, types, keyfmt, overflow, reads, writes, txn,
+    scenarios = make_scenarios(types, keyfmt, overflow, reads, writes, txn,
                                prune=20, prunelong=1000)
 
     # Return the number of records visible to the cursor; test both forward

@@ -28,6 +28,7 @@ __thread_run(void *arg)
         if (!F_ISSET(thread, WT_THREAD_ACTIVE))
             __wt_cond_wait(
               session, thread->pause_cond, WT_THREAD_PAUSE * WT_MILLION, thread->chk_func);
+        __wt_error_log_clear();
         WT_ERR(thread->run_func(session, thread));
     }
 
@@ -35,6 +36,10 @@ __thread_run(void *arg)
  * If a thread is stopping it may have subsystem cleanup to do.
  */
 err:
+    /* If the thread function resulted in an error, print extra information about the error. */
+    if (ret != 0)
+        __wt_error_log_to_handler(session);
+
     if (thread->stop_func != NULL)
         WT_TRET(thread->stop_func(session, thread));
 

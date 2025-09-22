@@ -25,6 +25,7 @@ __sweep_file_dhandle_check_and_reset_tod(WT_SESSION_IMPL *session, WT_DATA_HANDL
     WT_TABLE *table;
 
     ret = WT_NOTFOUND;
+
     /*
      * The sweep server's algorithm is altered to prevent unnecessary table dhandle closures. This
      * is done by checking for associated file dhandles before marking table dhandles for sweeping.
@@ -42,11 +43,11 @@ __sweep_file_dhandle_check_and_reset_tod(WT_SESSION_IMPL *session, WT_DATA_HANDL
         if (ret == 0) {
             dhandle->timeofdeath = 0;
             session->dhandle = NULL;
-            return (ret);
+            return (WT_ERROR_LOG_ADD(ret));
         }
     }
 
-    return (ret);
+    return (WT_ERROR_LOG_ADD(ret));
 }
 
 /*

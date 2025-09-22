@@ -28,6 +28,7 @@ __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_ATTRIBUTE((noreturn))
 #else
     __wt_errx(session, "aborting WiredTiger library");
 #endif
+    __wt_error_log_to_handler(session);
     abort();
     /* NOTREACHED */
 }

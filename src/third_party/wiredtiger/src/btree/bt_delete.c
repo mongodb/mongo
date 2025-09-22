@@ -585,6 +585,12 @@ __instantiate_col_var(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *pa
     /* We just read the page and it's still locked. The append list should be empty. */
     WT_ASSERT(session, WT_COL_APPEND(page) == NULL);
 
+    /*
+     * The modify code marks the page dirty. Mark it back to clean as instantiated deleted page
+     * should be clean.
+     */
+    __wt_page_modify_clear(session, page);
+
 err:
     __wt_free(session, upd);
 
@@ -699,8 +705,9 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
      * We do not need to mark the page dirty here. (It used to be necessary because evicting a clean
      * instantiated page would lose the delete information; but that is no longer the case.) Note
      * though that because VLCS instantiation goes through col_modify it will mark the page dirty
-     * regardless, except in read-only trees where attempts to mark things dirty are ignored. (Row-
-     * store instantiation adds the tombstones by hand and so does not need to mark the page dirty.)
+     * regardless, except in read-only trees where attempts to mark things dirty are ignored.
+     * Therefore, we explicitly mark it as clean. (Row- store instantiation adds the tombstones by
+     * hand and so does not need to mark the page dirty.)
      *
      * Note that partially visible truncates that may need instantiation can appear in read-only
      * trees (whether a read-only open of the live database or via a checkpoint cursor) if they were
@@ -709,14 +716,15 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_RET(__wt_page_modify_init(session, page));
 
     /*
-     * If the truncate operation is not yet resolved, count how many updates we're going to need and
-     * allocate an array for them. This allows linking them in the page-deleted structure so they
-     * can be found when the transaction is resolved, even if they have moved to other pages. If the
-     * page-deleted structure is NULL, that means the truncate is globally visible, and therefore
-     * committed. Use an extra slot to mark the end with NULL so we don't need to also store the
-     * length.
+     * If the truncate operation is not yet resolved and the btree is not read-only, count how many
+     * updates we're going to need and allocate an array for them. This allows linking them in the
+     * page-deleted structure so they can be found when the transaction is resolved, even if they
+     * have moved to other pages. If the page-deleted structure is NULL, that means the truncate is
+     * globally visible, and therefore committed. Use an extra slot to mark the end with NULL so we
+     * don't need to also store the length. No need to do this for read-only btrees as we will never
+     * resolve the updates.
      */
-    if (page_del != NULL && !page_del->committed) {
+    if (!F_ISSET(S2BT(session), WT_BTREE_READONLY) && page_del != NULL && !page_del->committed) {
         count = 0;
         switch (page->type) {
         case WT_PAGE_COL_VAR:
@@ -750,6 +758,9 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 
     page->modify->instantiated = true;
     page->modify->inst_updates = update_list;
+
+    /* The instantiated deleted page should be clean. */
+    WT_ASSERT(session, !__wt_page_is_modified(page));
 
     /*
      * We will leave the WT_PAGE_DELETED structure in the ref; all of its information has been

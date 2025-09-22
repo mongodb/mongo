@@ -4,6 +4,7 @@
 test_alter01.py
 test_alter02.py
 test_backup14.py
+test_backup15.py
 test_cc06.py
 test_cc09.py
 test_checkpoint02.py
@@ -18,6 +19,7 @@ test_compact02.py
 test_compact03.py
 test_compact04.py
 test_compact09.py
+test_compact10.py
 test_compact11.py
 test_compact16.py
 test_compat03.py
@@ -28,12 +30,14 @@ test_cursor13.py
 test_cursor18.py
 test_cursor_bound09.py
 test_cursor_bound14.py
+test_cursor_random.py
 test_encrypt01.py
 test_encrypt04.py
 test_eviction02.py
 test_hs11.py
 test_hs32.py
 test_import09.py
+test_layered14.py
 test_layered39.py
 test_log03.py
 test_overwrite.py

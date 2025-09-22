@@ -569,6 +569,7 @@ typedef uint64_t wt_timestamp_t;
 #include "timestamp.h"    /* required by reconcile.h */
 #include "thread_group.h" /* required by rollback_to_stable.h */
 #include "verbose.h"      /* required by rollback_to_stable.h */
+#include "error.h"        /* required by api.h */
 
 #include "api.h"
 #include "bitstring.h"
@@ -589,7 +590,6 @@ typedef uint64_t wt_timestamp_t;
 #include "conf.h"
 #include "config.h"
 #include "dlh.h"
-#include "error.h"
 #include "futex.h"
 #include "generation.h"
 #include "hash_map.h"

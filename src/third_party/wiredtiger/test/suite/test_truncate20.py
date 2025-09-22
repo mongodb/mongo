@@ -35,6 +35,8 @@ from wtscenario import make_scenarios
 #
 # Test to mimic oplog workload in MongoDB. Ensure the deleted pages are
 # cleaned up on disk and we are not using excessive disk space.
+# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
+@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
 class test_truncate20(test_cc_base):
     conn_config = 'statistics=(all),log=(enabled=true)'
 

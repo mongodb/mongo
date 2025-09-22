@@ -728,6 +728,9 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_ASSERT_ALWAYS(session, !F_ISSET(page->modify, WT_PAGE_MODIFY_EXCLUSIVE),
       "Illegal attempt to modify a page that is being exclusively reconciled");
 
+    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+        return;
+
     last_running = 0;
     if (__wt_atomic_load32(&page->modify->page_state) == WT_PAGE_CLEAN)
         last_running = __wt_atomic_loadv64(&S2C(session)->txn_global.last_running);
@@ -774,6 +777,9 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_tree_modify_set(WT_SESSION_IMPL *session)
 {
+    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+        return;
+
     /*
      * Test before setting the dirty flag, it's a hot cache line.
      *
@@ -897,6 +903,9 @@ static WT_INLINE int
 __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_only)
 {
     WT_PAGE *parent;
+
+    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+        return (0);
 
     /*
      * This function exists as a place to stash this comment. There are a few places where we need

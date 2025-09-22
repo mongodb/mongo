@@ -13,6 +13,7 @@ test_bug027.py
 test_bug033.py
 test_bulk01.py
 test_bulk02.py
+test_checkpoint06.py # FIXME: WT-15507
 test_config02.py
 test_config09.py
 test_config10.py
@@ -57,18 +58,6 @@ test_hs24.py
 test_hs30.py
 test_hs32.py
 test_hs_evict_race01.py
-test_import01.py
-test_import02.py
-test_import03.py
-test_import04.py
-test_import05.py
-test_import06.py
-test_import07.py
-test_import08.py
-test_import09.py
-test_import10.py
-test_import11.py
-test_import12.py
 test_log03.py
 test_metadata_cursor01.py
 test_metadata_cursor02.py
@@ -101,6 +90,9 @@ test_stat_log01.py
 test_stat_log02.py
 test_sweep03.py  # FIXME: WT-15417
 test_timestamp20.py
+test_truncate01.py # FIXME: WT-15474
+test_truncate21.py # FIXME: WT-15472
+test_truncate24.py # FIXME: WT-15473
 test_txn02.py
 test_txn04.py
 test_txn06.py

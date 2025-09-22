@@ -192,7 +192,7 @@ class test_prepare34(test_prepare_preserve_prepare_base):
 
         # Write prepare update to disk when prepare ts is stable but durable timestamp is not stable
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(80))
-        if 'disagg' in self.hook_names:
+        if self.runningHook('disagg'):
             # We should write an empty delta as we still write prepared.
             self.checkpoint_and_verify_stats({
                 wiredtiger.stat.dsrc.rec_page_delta_leaf: False,

@@ -113,11 +113,16 @@ label_output() {
 }
 
 # run individual Python tests scripts in the background - it's faster than using run.py -j
-rm -rf WT_TEST
+rm -rf WT_TEST.*
+# Save TSAN options for TSAN runs.
+saved_tsan_options=$TSAN_OPTIONS
 for pyfile in "$@"; do
     # Run the test script in the background - modify output so we know what test it is coming from.
-    echo running "$python ../test/suite/run.py $run_py_options $pyfile"
-    label_output "$pyfile" "$python" ../test/suite/run.py $run_py_options $pyfile &
+    echo running "$python ../test/suite/run.py -D WT_TEST.$pyfile $run_py_options $pyfile"
+    if [[ $TESTUTIL_TSAN == 1 ]]; then
+        export TSAN_OPTIONS="$saved_tsan_options:log_path=$(git rev-parse --show-toplevel)/tsan_logs_$pyfile:exitcode=0"
+    fi
+    label_output "$pyfile" "$python" ../test/suite/run.py -D WT_TEST.$pyfile $run_py_options $pyfile &
     procs["$!"]="$pyfile"
 
     # Wait if we're up to the limit of processes allowed.
@@ -125,6 +130,9 @@ for pyfile in "$@"; do
         waitone
     fi
 done
+
+# Reset TSAN options.
+TSAN_OPTIONS=$saved_tsan_options
 
 # Wait for last running processes
 while [ $(jobs -p | wc -l) -gt 0 ]; do

@@ -2928,6 +2928,15 @@ struct __wt_connection {
      */
     int __F(set_context_uint)(WT_CONNECTION *connection, WT_CONTEXT_TYPE which,
         uint64_t value);
+
+    /*!
+     * Dump any logged error messages into the event handler. This works only if this level of
+     * diagnostics is enabled.
+     *
+     * @param connection the connection handle
+     * @errors
+     */
+    int __F(dump_error_log)(WT_CONNECTION *connection);
 #endif
 
     /*!

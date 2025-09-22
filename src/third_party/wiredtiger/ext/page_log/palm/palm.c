@@ -762,6 +762,9 @@ palm_handle_verify_page(
 #endif
 
         /* Validate base LSN. */
+        /*
+         * FIXME-WT-15524: fix false positive verification failure caused by failed reconciliation.
+         */
         if (count == 1) {
             PALM_VERIFY_EQUAL(matches.base_lsn, last_lsn);
         } else if (count > 1) {
