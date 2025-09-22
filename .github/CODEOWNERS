@@ -35,6 +35,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./.github/OWNERS.yml
 /.github/ @10gen/server-root-ownership @svc-auto-approve-bot
 /.github/ALLOWED_UNOWNED_FILES.yml @svc-auto-approve-bot alex.neben@mongodb.com
+/.github/workflows @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./bazel/OWNERS.yml
 /bazel/**/* @10gen/devprod-build @svc-auto-approve-bot

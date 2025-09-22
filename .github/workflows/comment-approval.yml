@@ -1,0 +1,20 @@
+---
+name: Comment Approval Override
+on:
+  issue_comment:
+    types: [created] # Triggers only when a comment is created
+
+jobs:
+  comment_approval:
+    if: contains(github.event.comment.body, 'I approve of a break-glass override') && github.event.issue.pull_request
+    runs-on: codebuild-10gen-mongo-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Comment Approval
+        uses: 10gen/comment-approval-action@72554eb5dec3faddbf1c1d5fb32187eb1f5d36e5
+        env:
+          GITHUB_TOKEN: ${{ secrets.AUTO_APPROVE_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_COMMENT_ID: ${{ github.event.comment.id }}
+          GITHUB_PR_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_BYPASS_TEAM: mongo-break-glass
+          REQUIRED_COMMENT_TEXT: "I approve of a break-glass override"
