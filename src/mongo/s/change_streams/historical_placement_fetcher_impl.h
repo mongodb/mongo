@@ -41,7 +41,8 @@ public:
      */
     HistoricalPlacement fetch(OperationContext* opCtx,
                               const boost::optional<NamespaceString>& nss,
-                              Timestamp atClusterTime) override;
+                              Timestamp atClusterTime,
+                              bool checkIfPointInTimeIsInFuture) override;
 };
 
 }  // namespace mongo

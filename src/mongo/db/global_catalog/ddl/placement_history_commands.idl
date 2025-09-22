@@ -82,3 +82,9 @@ commands:
                     "When true, the command retrieves placement information concerning
                     the whole cluster (ignoring the namespace parameter)"
                 default: false
+            checkIfPointInTimeIsInFuture:
+                type: bool
+                description:
+                    "When true, verifies that the supplied 'at' cluster time is not in
+                    the future relative to the current config time"
+                default: true

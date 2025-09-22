@@ -338,15 +338,17 @@ void setInitializationTimeOnPlacementHistory(
 HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     OperationContext* opCtx,
     const boost::optional<NamespaceString>& nss,
-    const Timestamp& atClusterTime) {
+    const Timestamp& atClusterTime,
+    bool checkIfPointInTimeIsInFuture) {
 
     uassert(ErrorCodes::InvalidOptions,
             "unsupported namespace for historical placement query",
             !nss || (!nss->dbName().isEmpty() && !nss->isOnInternalDb()));
+
     // If 'atClusterTime' is greater than current config time, then we can not return correct
     // placement history and early exit with HistoricalPlacementStatus::FutureClusterTime.
     const auto vcTime = VectorClock::get(opCtx)->getTime();
-    if (atClusterTime > vcTime.configTime().asTimestamp()) {
+    if (checkIfPointInTimeIsInFuture && atClusterTime > vcTime.configTime().asTimestamp()) {
         return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
     }
 

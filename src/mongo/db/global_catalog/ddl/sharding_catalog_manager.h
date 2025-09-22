@@ -702,7 +702,8 @@ public:
      */
     HistoricalPlacement getHistoricalPlacement(OperationContext* opCtx,
                                                const boost::optional<NamespaceString>& nss,
-                                               const Timestamp& atClusterTime);
+                                               const Timestamp& atClusterTime,
+                                               bool checkIfPointInTimeIsInFuture = true);
 
 
     /**

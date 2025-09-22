@@ -1158,9 +1158,8 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
     assertSameHistoricalPlacement(historicalPlacement_cleanup_coll1, {"shard1", "shard2"});
 }
 
-TEST_F(
-    GetHistoricalPlacementTestFixture,
-    Given_CurrentClusterTime_When_PlacementhHistoryRequestedInTheFuture_Then_ReturnPlacementHistoryStatusFutureClusterTime) {
+TEST_F(GetHistoricalPlacementTestFixture,
+       Given_CurrentClusterTime_When_PlacementhHistoryRequested_Then_ReturnPlacementHistory) {
     auto opCtx = operationContext();
 
     // Set up config shard and placement history information.
@@ -1174,44 +1173,104 @@ TEST_F(
     Timestamp currentConfigTime = vcTime.configTime().asTimestamp();
 
     // Ensure that fetching placement history returns a set of active shards when requesting
-    // placement history from the 'currentConfigTime'.
+    // placement history from the 'currentConfigTime' regardless of the
+    // 'checkIfPointInTimeIsInFuture' value.
     {
         ASSERT_GREATER_THAN_OR_EQUALS(currentConfigTime, placementHistoryTs);
 
         auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
         auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
         assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(opCtx, collNss, currentConfigTime),
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, collNss, currentConfigTime, true /* checkIfPointInTimeIsInFuture */),
             {"shard1", "shard2"});
         assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(opCtx, dbOnlyNss, currentConfigTime),
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, collNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
+            {"shard1", "shard2"});
+
+        assertSameHistoricalPlacement(
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, dbOnlyNss, currentConfigTime, true /* checkIfPointInTimeIsInFuture */),
             {"shard1", "shard2"});
         assertSameHistoricalPlacement(
-            shardingCatalogManager().getHistoricalPlacement(opCtx, boost::none, currentConfigTime),
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, dbOnlyNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
+            {"shard1", "shard2"});
+
+        assertSameHistoricalPlacement(
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, boost::none, currentConfigTime, true /* checkIfPointInTimeIsInFuture */),
+            {"shard1", "shard2"});
+        assertSameHistoricalPlacement(
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, boost::none, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
             {"shard1", "shard2"});
     }
+}
+
+TEST_F(
+    GetHistoricalPlacementTestFixture,
+    Given_CurrentClusterTime_When_PlacementhHistoryRequestedInTheFuture_Then_ReturnPlacementHistoryStatusDependingOnTheCheckIfPointInTimeIsInFutureFlag) {
+    auto opCtx = operationContext();
+
+    // Set up config shard and placement history information.
+    Timestamp placementHistoryTs(10, 0);
+    setupConfigPlacementHistory(opCtx,
+                                {{placementHistoryTs, "db", {"shard1"}},
+                                 {placementHistoryTs, "db.collection1", {"shard1", "shard2"}}});
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    const auto& vcTime = VectorClock::get(opCtx)->getTime();
+    Timestamp currentConfigTime = vcTime.configTime().asTimestamp();
+
+    // Ensure 'tsInTheFuture' is greater than 'currentConfigTime'.
+    Timestamp timeInTheFuture = currentConfigTime + 1;
+    ASSERT_GREATER_THAN(timeInTheFuture, currentConfigTime);
 
     // Ensure that fetching placement history returns HistoricalPlacementStatus::FutureClusterTime,
-    // when requesting placement history from the future config time.
+    // when requesting placement history from the future config time if
+    // 'checkIfPointInTimeIsInFuture' is set to true.
     {
-        // Ensure 'tsInTheFuture' is greater than 'currentConfigTime'.
-        Timestamp timeInTheFuture = currentConfigTime + 1;
-        ASSERT_GREATER_THAN(timeInTheFuture, currentConfigTime);
-
         auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
         auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
         ASSERT_EQ(shardingCatalogManager()
-                      .getHistoricalPlacement(opCtx, collNss, timeInTheFuture)
+                      .getHistoricalPlacement(
+                          opCtx, collNss, timeInTheFuture, true /* checkIfPointInTimeIsInFuture */)
                       .getStatus(),
                   HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(shardingCatalogManager()
-                      .getHistoricalPlacement(opCtx, dbOnlyNss, timeInTheFuture)
-                      .getStatus(),
-                  HistoricalPlacementStatus::FutureClusterTime);
-        ASSERT_EQ(shardingCatalogManager()
-                      .getHistoricalPlacement(opCtx, boost::none, timeInTheFuture)
-                      .getStatus(),
-                  HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(
+            shardingCatalogManager()
+                .getHistoricalPlacement(
+                    opCtx, dbOnlyNss, timeInTheFuture, true /* checkIfPointInTimeIsInFuture */)
+                .getStatus(),
+            HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(
+            shardingCatalogManager()
+                .getHistoricalPlacement(
+                    opCtx, boost::none, timeInTheFuture, true /* checkIfPointInTimeIsInFuture */)
+                .getStatus(),
+            HistoricalPlacementStatus::FutureClusterTime);
+    }
+
+    // Ensure that fetching placement history does not return
+    // HistoricalPlacementStatus::FutureClusterTime, when requesting placement history from the
+    // future config time if 'checkIfPointInTimeIsInFuture' is set to false.
+    {
+        auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
+        auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
+        assertSameHistoricalPlacement(
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, collNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
+            {"shard1", "shard2"});
+        assertSameHistoricalPlacement(
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, dbOnlyNss, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
+            {"shard1", "shard2"});
+        assertSameHistoricalPlacement(
+            shardingCatalogManager().getHistoricalPlacement(
+                opCtx, boost::none, currentConfigTime, false /* checkIfPointInTimeIsInFuture */),
+            {"shard1", "shard2"});
     }
 }
 

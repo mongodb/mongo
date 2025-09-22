@@ -62,7 +62,8 @@ public:
      */
     HistoricalPlacement fetch(OperationContext* opCtx,
                               const boost::optional<NamespaceString>& nss,
-                              Timestamp atClusterTime) override {
+                              Timestamp atClusterTime,
+                              bool checkIfPointInTimeIsInFuture = false) override {
         auto response = popResponse(nss, atClusterTime);
         return response.second;
     }

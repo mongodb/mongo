@@ -43,11 +43,15 @@ public:
 
     /**
      * Fetches HistoricalPlacement information for the given namespace 'nss' at time
-     * 'atClusterTime'.
+     * 'atClusterTime'. 'checkIfPointInTimeIsInFuture' is passed as false by default as
+     * HistoricalPlacementFetcher is used primarily by ChangeStreamShardTargeters that handle events
+     * for already running change streams that can not return change events with the cluster time in
+     * the future.
      */
     virtual HistoricalPlacement fetch(OperationContext* opCtx,
                                       const boost::optional<NamespaceString>& nss,
-                                      Timestamp atClusterTime) = 0;
+                                      Timestamp atClusterTime,
+                                      bool checkIfPointInTimeIsInFuture = false) = 0;
 };
 
 }  // namespace mongo
