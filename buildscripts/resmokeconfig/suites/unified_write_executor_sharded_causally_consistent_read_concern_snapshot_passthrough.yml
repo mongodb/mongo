@@ -38,8 +38,7 @@ selector:
 
     # Exclusions because of unimplemented functionalities in the unified write executor.
 
-    # TODO: SERVER-104535 support cursor with bulk write.
-    - jstests/core/txns/bulk_write_getMore.js
+    # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
 
     # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.

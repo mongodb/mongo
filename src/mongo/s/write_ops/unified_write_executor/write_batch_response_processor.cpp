@@ -33,6 +33,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/router_role_api/collection_uuid_mismatch.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
@@ -94,7 +95,6 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx,
     RoutingContext& routingCtx,
     const NoRetryWriteBatchResponse& response) {
-    // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
     // TODO SERVER-105762 Add support for errorsOnly: true.
     const auto& swRes = response.swResponse;
@@ -301,7 +301,6 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         }
     }
 
-    // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     const auto& replyItems = parsedReply.getCursor().getFirstBatch();
     auto result = processOpsInReplyItems(opCtx, routingCtx, ops, replyItems);
 
@@ -552,46 +551,19 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulk
         _stats.incrementOpCounters(opCtx, _cmdRef.getOp(id));
     }
 
-    // Construct a BulkWriteCommandReply object. We always store the values of the top-level
-    // counters for the command (nInserted, nMatched, etc) into the BulkWriteCommandReply object,
-    // regardless of whether '_isNonVerbose' is true or false.
-    auto reply = BulkWriteCommandReply(
-        // TODO SERVER-104535 cursor support for UnifiedWriteExec.
-        BulkWriteCommandResponseCursor(
-            0, std::move(results), NamespaceString::makeBulkWriteNSS(boost::none)),
-        _nErrors,
-        _nInserted,
-        _nMatched,
-        _nModified,
-        _nUpserted,
-        _nDeleted);
-    reply.setRetriedStmtIds(getRetriedStmtIds());
+    bulk_write_exec::SummaryFields fields(
+        _nErrors, _nInserted, _nMatched, _nModified, _nUpserted, _nDeleted);
+    bulk_write_exec::BulkWriteReplyInfo info(
+        std::move(results), std::move(fields), boost::none, getRetriedStmtIds());
 
     // Aggregate all the write concern errors from the shards.
     if (auto totalWcError = mergeWriteConcernErrors(_wcErrors); totalWcError) {
-        reply.setWriteConcernError(BulkWriteWriteConcernError{totalWcError->toStatus().code(),
-                                                              totalWcError->toStatus().reason()});
+        info.wcErrors = BulkWriteWriteConcernError{totalWcError->toStatus().code(),
+                                                   totalWcError->toStatus().reason()};
     }
 
-    return reply;
-}
-
-BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(
-    bulk_write_exec::BulkWriteReplyInfo replyInfo) {
-    // TODO SERVER-104535 cursor support for UnifiedWriteExec. Is it needed given this function is
-    // only used for FLE case?
-    auto reply = BulkWriteCommandReply(
-        BulkWriteCommandResponseCursor(
-            0, std::move(replyInfo.replyItems), NamespaceString::makeBulkWriteNSS(boost::none)),
-        replyInfo.summaryFields.nErrors,
-        replyInfo.summaryFields.nInserted,
-        replyInfo.summaryFields.nMatched,
-        replyInfo.summaryFields.nModified,
-        replyInfo.summaryFields.nUpserted,
-        replyInfo.summaryFields.nDeleted);
-    reply.setWriteConcernError(std::move(replyInfo.wcErrors));
-    reply.setRetriedStmtIds(std::move(replyInfo.retriedStmtIds));
-    return reply;
+    return populateCursorReply(
+        opCtx, _cmdRef.getBulkWriteCommandRequest(), _originalCommand, std::move(info));
 }
 
 BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBatchedCommand() {
@@ -636,7 +608,12 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
 
     const int nValue = _nInserted + _nUpserted + _nMatched + _nDeleted;
     resp.setN(nValue);
-    resp.setNModified(_nModified);
+    if (_cmdRef.isBatchWriteCommand() &&
+        _cmdRef.getBatchedCommandRequest().getBatchType() ==
+            BatchedCommandRequest::BatchType_Update &&
+        _nModified >= 0) {
+        resp.setNModified(_nModified);
+    }
     resp.setRetriedStmtIds(getRetriedStmtIds());
 
     // Aggregate all the write concern errors from the shards.

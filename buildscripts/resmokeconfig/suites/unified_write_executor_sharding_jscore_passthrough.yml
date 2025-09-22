@@ -37,7 +37,7 @@ selector:
     - jstests/core_sharding/zones/zone_timeseries_basic.js
     - jstests/core_sharding/chunk_migration/move_range_timeseries.js
     - jstests/core_sharding/global_catalog/sharded_data_distribution.js
-    # TODO: SERVER-104535 support cursor with bulk write.
+    # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
   exclude_with_any_tags:
     - assumes_standalone_mongod

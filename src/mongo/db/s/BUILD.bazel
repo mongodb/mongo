@@ -1217,6 +1217,7 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_find_cmd.h",
         "//src/mongo/s/commands/query_cmd:cluster_getmore_cmd.h",
         "//src/mongo/s/commands/query_cmd:cluster_pipeline_cmd.h",
+        "//src/mongo/s/commands/query_cmd:populate_cursor.h",
     ],
     deps = [
         ":analyze_shard_key_util",
@@ -1271,6 +1272,7 @@ mongo_cc_library(
         "//src/mongo/s:startup_initialization",
         "//src/mongo/s/commands:cluster_commands_common",
         "//src/mongo/s/commands:sharded_cluster_sharding_commands",
+        "//src/mongo/s/commands/query_cmd:populate_cursor",
     ],
 )
 

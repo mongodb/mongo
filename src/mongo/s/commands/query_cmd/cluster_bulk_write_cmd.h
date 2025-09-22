@@ -63,6 +63,7 @@
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/commands/query_cmd/cluster_write_cmd.h"
+#include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor_guard.h"
 #include "mongo/s/query/exec/cluster_client_cursor_impl.h"
@@ -229,120 +230,6 @@ public:
             return static_cast<const ClusterBulkWriteCmd*>(definition());
         }
 
-        BulkWriteCommandReply _populateCursorReply(
-            OperationContext* opCtx,
-            BulkWriteCommandRequest& bulkRequest,
-            const OpMsgRequest& unparsedRequest,
-            bulk_write_exec::BulkWriteReplyInfo replyInfo) const {
-            const auto& req = bulkRequest;
-            auto reqObj = unparsedRequest.body;
-            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds] = replyInfo;
-            const NamespaceString cursorNss =
-                NamespaceString::makeBulkWriteNSS(req.getDbName().tenantId());
-
-            if (bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
-                // Skip cursor creation and return the simplest reply.
-                return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                                                 0 /* cursorId */, {} /* firstBatch */, cursorNss),
-                                             summaryFields.nErrors,
-                                             summaryFields.nInserted,
-                                             summaryFields.nMatched,
-                                             summaryFields.nModified,
-                                             summaryFields.nUpserted,
-                                             summaryFields.nDeleted);
-            }
-
-            ClusterClientCursorParams params(
-                cursorNss,
-                APIParameters::get(opCtx),
-                ReadPreferenceSetting::get(opCtx),
-                repl::ReadConcernArgs::get(opCtx),
-                [&] {
-                    if (!opCtx->getLogicalSessionId())
-                        return OperationSessionInfoFromClient();
-                    // TODO (SERVER-80525): This code path does not
-                    // clear the setAutocommit field on the presence of
-                    // TransactionRouter::get
-                    return OperationSessionInfoFromClient(
-                        *opCtx->getLogicalSessionId(),
-                        // Retryable writes will have a txnNumber we do not want to associate with
-                        // the cursor. We only want to set this field for transactions.
-                        opCtx->inMultiDocumentTransaction() ? opCtx->getTxnNumber() : boost::none);
-                }());
-
-            long long batchSize = std::numeric_limits<long long>::max();
-            if (req.getCursor() && req.getCursor()->getBatchSize()) {
-                params.batchSize = req.getCursor()->getBatchSize();
-                batchSize = *req.getCursor()->getBatchSize();
-            }
-            params.originatingCommandObj = reqObj.getOwned();
-            params.originatingPrivileges = bulk_write_common::getPrivileges(req);
-
-            auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
-            BulkWriteCommandReply reply;
-            reply.setNErrors(summaryFields.nErrors);
-            reply.setNInserted(summaryFields.nInserted);
-            reply.setNDeleted(summaryFields.nDeleted);
-            reply.setNMatched(summaryFields.nMatched);
-            reply.setNModified(summaryFields.nModified);
-            reply.setNUpserted(summaryFields.nUpserted);
-            reply.setWriteConcernError(wcErrors);
-            reply.setRetriedStmtIds(retriedStmtIds);
-
-            for (auto& replyItem : replyItems) {
-                queuedDataStage->queueResult(replyItem.toBSON());
-            }
-
-            auto ccc =
-                ClusterClientCursorImpl::make(opCtx, std::move(queuedDataStage), std::move(params));
-
-            size_t numRepliesInFirstBatch = 0;
-            FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
-            for (long long objCount = 0; objCount < batchSize; objCount++) {
-                auto next = uassertStatusOK(ccc->next());
-
-                if (next.isEOF()) {
-                    break;
-                }
-
-                auto nextObj = *next.getResult();
-                if (!responseSizeTracker.haveSpaceForNext(nextObj)) {
-                    ccc->queueResult(nextObj);
-                    break;
-                }
-
-                numRepliesInFirstBatch++;
-                responseSizeTracker.add(nextObj);
-            }
-            if (numRepliesInFirstBatch == replyItems.size()) {
-                replyItems.resize(numRepliesInFirstBatch);
-                reply.setCursor(BulkWriteCommandResponseCursor(
-                    0, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));
-                return reply;
-            }
-
-            ccc->detachFromOperationContext();
-            ccc->incNBatches();
-
-            auto authUser =
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
-            auto cursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
-                opCtx,
-                ccc.releaseCursor(),
-                cursorNss,
-                ClusterCursorManager::CursorType::QueuedData,
-                ClusterCursorManager::CursorLifetime::Mortal,
-                authUser));
-
-            // Record the cursorID in CurOp.
-            CurOp::get(opCtx)->debug().cursorid = cursorId;
-
-            replyItems.resize(numRepliesInFirstBatch);
-            reply.setCursor(BulkWriteCommandResponseCursor(
-                cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));
-            return reply;
-        }
-
         bool runImpl(OperationContext* opCtx,
                      const OpMsgRequest& request,
                      BulkWriteCommandRequest& bulkRequest,
@@ -396,7 +283,7 @@ public:
                 // - To ensure that possible writeErrors are properly managed, a "fire and forget"
                 //   request needs to be temporarily upgraded to 'w:1'(unless the request belongs to
                 //   a transaction, where per-operation WC settings are not supported);
-                // - Once done, The original WC is re-established to allow _populateCursorReply
+                // - Once done, The original WC is re-established to allow populateCursorReply
                 //   evaluating whether a reply needs to be returned to the external client.
                 bulk_write_exec::BulkWriteExecStats execStats;
                 auto bulkWriteReply = [&] {
@@ -417,8 +304,8 @@ public:
                 // updates that modify a document’s owning shard.
                 execStats.updateMetrics(opCtx, targeters, updatedShardKey);
 
-                response =
-                    _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));
+                response = populateCursorReply(
+                    opCtx, bulkRequest, request.body, std::move(bulkWriteReply));
             }
             result.appendElements(response.toBSON());
             return true;

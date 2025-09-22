@@ -72,18 +72,26 @@ public:
 
     explicit WriteBatchResponseProcessor(WriteCommandRef cmdRef,
                                          Stats& stats,
-                                         bool isNonVerbose = false)
-        : _cmdRef(cmdRef), _stats(stats), _isNonVerbose(isNonVerbose) {}
+                                         bool isNonVerbose = false,
+                                         BSONObj originalCommand = BSONObj())
+        : _cmdRef(cmdRef),
+          _stats(stats),
+          _isNonVerbose(isNonVerbose),
+          _originalCommand(originalCommand) {}
 
     explicit WriteBatchResponseProcessor(const BatchedCommandRequest& request,
                                          Stats& stats,
-                                         bool isNonVerbose = false)
-        : WriteBatchResponseProcessor(WriteCommandRef{request}, stats, isNonVerbose) {}
+                                         bool isNonVerbose = false,
+                                         BSONObj originalCommand = BSONObj())
+        : WriteBatchResponseProcessor(
+              WriteCommandRef{request}, stats, isNonVerbose, originalCommand) {}
 
     explicit WriteBatchResponseProcessor(const BulkWriteCommandRequest& request,
                                          Stats& stats,
-                                         bool isNonVerbose = false)
-        : WriteBatchResponseProcessor(WriteCommandRef{request}, stats, isNonVerbose) {}
+                                         bool isNonVerbose = false,
+                                         BSONObj originalCommand = BSONObj())
+        : WriteBatchResponseProcessor(
+              WriteCommandRef{request}, stats, isNonVerbose, originalCommand) {}
 
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
@@ -105,12 +113,6 @@ public:
     BatchedCommandResponse generateClientResponseForBatchedCommand();
 
     BulkWriteCommandReply generateClientResponseForBulkWriteCommand(OperationContext* opCtx);
-
-    /**
-     * Generate bulkWrite client response from BulkWriteReplyInfo object.
-     */
-    static BulkWriteCommandReply generateClientResponseForBulkWriteCommand(
-        bulk_write_exec::BulkWriteReplyInfo replyInfo);
 
     /**
      * This method is called by the scheduler to record a target error that occurred during batch
@@ -222,6 +224,7 @@ private:
     WriteCommandRef _cmdRef;
     Stats& _stats;
     const bool _isNonVerbose;
+    BSONObj _originalCommand;
     size_t _nErrors{0};
     size_t _nInserted{0};
     size_t _nMatched{0};

@@ -37,6 +37,7 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:parsed_update",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s:sharding_write_without_shard_key_api",
+        "//src/mongo/s/commands/query_cmd:populate_cursor",
         "//src/mongo/s/write_ops:batch_write_types",
         "//src/mongo/s/write_ops:fle",
         "//src/mongo/s/write_ops:wc_error",

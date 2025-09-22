@@ -30,42 +30,18 @@
 #pragma once
 
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/unified_write_executor/write_op.h"
-#include "mongo/s/write_ops/write_command_ref.h"
+#include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
-namespace unified_write_executor {
-
-using WriteCommandResponse = std::variant<BatchedCommandResponse, BulkWriteCommandReply>;
 
 /**
- * This function will execute the specified write command and return a response.
+ * Constructs a BulkWriteCommandReply for the given 'replyInfo'. This function will also create a
+ * cursor if needed.
  */
-WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
-                                         WriteCommandRef cmdRef,
-                                         BSONObj originalCommand = BSONObj());
+BulkWriteCommandReply populateCursorReply(OperationContext* opCtx,
+                                          const BulkWriteCommandRequest& req,
+                                          const BSONObj& reqObj,
+                                          bulk_write_exec::BulkWriteReplyInfo replyInfo);
 
-/**
- * Helper function for executing insert/update/delete commands.
- */
-BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandRequest& request);
-
-/**
- * Helper function for executing bulk commands.
- */
-BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
-                                const BulkWriteCommandRequest& request,
-                                BSONObj originalCommand = BSONObj());
-
-/**
- * Unified write executor feature flag check. Also ensures we only have viewless timeseries
- * collections.
- */
-bool isEnabled(OperationContext* opCtx);
-
-}  // namespace unified_write_executor
 }  // namespace mongo

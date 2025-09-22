@@ -118,10 +118,11 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     ASSERT_EQ(clientReply.getNModified(), 6);
 
     // Generating a 'BatchedCommandResponse' should output the same statistics, save for 'n', which
-    // is the combination of 'nInserted' and 'nMatched'.
+    // is the combination of 'nInserted' and 'nMatched', and 'nModified', which is only set on
+    // updates.
     auto batchedCommandReply = processor.generateClientResponseForBatchedCommand();
     ASSERT_EQ(batchedCommandReply.getN(), 8);
-    ASSERT_EQ(batchedCommandReply.getNModified(), 6);
+    ASSERT_EQ(batchedCommandReply.getNModified(), 0);
 }
 
 TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {

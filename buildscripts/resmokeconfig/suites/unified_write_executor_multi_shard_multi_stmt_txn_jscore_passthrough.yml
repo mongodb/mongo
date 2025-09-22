@@ -235,12 +235,8 @@ selector:
     - jstests/core/**/query/function_prototype_bson_type.js
 
     # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-104535 support cursor with bulk write.
-    - jstests/core/query/bulk/bulk_write_update_cursor.js
-    - jstests/core/query/bulk/bulk_write_delete_cursor.js
-    - jstests/core/query/bulk/bulk_write_non_retryable_cursor.js
+    # TODO SERVER-105762: add support for errorsOnly to UWE.
     - jstests/core/write/bulk/bulk_write_insert_cursor.js
-    - jstests/core/query/bulk/bulk_write.js
 
   exclude_with_any_tags:
     # "Cowardly refusing to override read concern of command: ..."

@@ -23,10 +23,6 @@ selector:
     # attached to statements in a transaction beyond the first one.
     - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
 
-    # Exclusions because of unimplemented functionalities in the unified write executor.
-    # TODO: SERVER-104535 support cursor with bulk write.
-    - jstests/core/txns/bulk_write_getMore.js
-
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - does_not_support_causal_consistency

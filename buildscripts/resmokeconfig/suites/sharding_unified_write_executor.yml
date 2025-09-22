@@ -66,8 +66,6 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
 
   exclude_files:
-    # TODO: SERVER-104535 support cursor with bulk write.
-    - jstests/sharding/internal_txns/transaction_api_distributed_from_shard.js
     # TODO SERVER-110635: enable
     - jstests/sharding/timeseries/timeseries_retry_delete_and_update_unsharded.js
 

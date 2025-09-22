@@ -31,6 +31,7 @@
 
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
@@ -63,7 +64,9 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
 }
 }  // namespace
 
-WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
+WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
+                                         WriteCommandRef cmdRef,
+                                         BSONObj originalCommand) {
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
 
     Stats stats;
@@ -80,7 +83,7 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx, WriteCommandRe
     }
 
     WriteBatchExecutor executor(cmdRef);
-    WriteBatchResponseProcessor processor(cmdRef, stats, isNonVerbose);
+    WriteBatchResponseProcessor processor(cmdRef, stats, isNonVerbose, originalCommand);
     WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor);
 
     scheduler.run(opCtx);
@@ -102,18 +105,20 @@ BatchedCommandResponse write(OperationContext* opCtx, const BatchedCommandReques
     return std::get<BatchedCommandResponse>(executeWriteCommand(opCtx, WriteCommandRef{request}));
 }
 
-BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request) {
+BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
+                                const BulkWriteCommandRequest& request,
+                                BSONObj originalCommand) {
     if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
         auto [result, replyInfo] = attemptExecuteFLE(opCtx, request);
         if (result == FLEBatchResult::kProcessed) {
-            return WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(
-                std::move(replyInfo));
+            return populateCursorReply(opCtx, request, originalCommand, std::move(replyInfo));
         }
         // When FLE logic determines there is no need of processing, we fall through to the normal
         // case.
     }
 
-    return std::get<BulkWriteCommandReply>(executeWriteCommand(opCtx, WriteCommandRef{request}));
+    return std::get<BulkWriteCommandReply>(
+        executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
 }
 
 bool isEnabled(OperationContext* opCtx) {
