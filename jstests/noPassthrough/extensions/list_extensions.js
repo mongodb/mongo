@@ -141,13 +141,10 @@ describe("$listExtensions with no extensions loaded", function () {
 });
 
 describe("$listExtensions with some extensions loaded", function () {
-    const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-    const pathToExtensionBar = MongoRunner.getExtensionPath("libbar_mongo_extension.so");
-    const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
     const extensionNames = generateExtensionConfigs([
-        pathToExtensionFoo,
-        pathToExtensionBar,
-        pathToExtensionVectorSearch,
+        "libfoo_mongo_extension.so",
+        "libbar_mongo_extension.so",
+        "libvector_search_extension.so",
     ]);
     const extOpts = {
         loadExtensions: extensionNames,

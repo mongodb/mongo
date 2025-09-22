@@ -17,10 +17,7 @@ if (!isLinux()) {
     quit();
 }
 
-const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-const pathToExtensionBar = MongoRunner.getExtensionPath("libbar_mongo_extension.so");
-
-const extensionNames = generateExtensionConfigs([pathToExtensionFoo, pathToExtensionBar]);
+const extensionNames = generateExtensionConfigs(["libfoo_mongo_extension.so", "libbar_mongo_extension.so"]);
 
 try {
     // Test loading a single extension in mongod and mongos.

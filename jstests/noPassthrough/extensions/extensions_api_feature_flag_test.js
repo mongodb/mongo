@@ -5,8 +5,7 @@
  */
 import {deleteExtensionConfigs, generateExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-const extensions = generateExtensionConfigs([pathToExtensionFoo]);
+const extensions = generateExtensionConfigs("libfoo_mongo_extension.so");
 
 try {
     // The 'loadExtensions' startup parameter should fail when featureFlagExtensionsAPI is off.

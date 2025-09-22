@@ -4,13 +4,15 @@
 import {getPython3Binary} from "jstests/libs/python.js";
 
 /**
- * @param {string|string[]} paths A path string or a list of path strings to .so files to
- *    generate .conf files for.
+ * @param {string|string[]} soFileNames A shared object file name or a list of shared object file names
+ *      to generate .conf files for.
  */
-export function generateExtensionConfigs(paths) {
-    if (!Array.isArray(paths)) {
-        paths = [paths];
+export function generateExtensionConfigs(soFileNames) {
+    if (!Array.isArray(soFileNames)) {
+        soFileNames = [soFileNames];
     }
+
+    const paths = soFileNames.map((name) => MongoRunner.getExtensionPath(name));
 
     // A hash is appended to the end of the configuration file name to avoid collisions
     // across concurrent tests using the same extension.

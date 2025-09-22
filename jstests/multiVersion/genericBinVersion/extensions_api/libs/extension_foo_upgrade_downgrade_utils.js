@@ -8,9 +8,6 @@ import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-const pathToExtensionFooV2 = MongoRunner.getExtensionPath("libfoo_extension_v2.so");
-
 const collName = jsTestName();
 const viewName = "foo_view";
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
@@ -23,7 +20,7 @@ const data = [
 const fooParseErrorCodes = [10624200, 10624201];
 
 export function generateMultiversionExtensionConfigs() {
-    return generateExtensionConfigs([pathToExtensionFoo, pathToExtensionFooV2]);
+    return generateExtensionConfigs(["libfoo_mongo_extension.so", "libfoo_extension_v2.so"]);
 }
 
 export function deleteMultiversionExtensionConfigs(extensionNames) {

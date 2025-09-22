@@ -17,9 +17,7 @@ if (!isLinux()) {
     quit();
 }
 
-const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-
-const extensionNames = generateExtensionConfigs(pathToExtensionFoo);
+const extensionNames = generateExtensionConfigs("libfoo_mongo_extension.so");
 
 const extOpts = {
     loadExtensions: extensionNames[0],

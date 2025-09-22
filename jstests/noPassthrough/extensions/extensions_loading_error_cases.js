@@ -12,14 +12,10 @@ import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {deleteExtensionConfigs, generateExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
-const pathToMissingSymbolExtension = MongoRunner.getExtensionPath("libno_symbol_bad_extension.so");
-const pathToDuplicateStageExtension = MongoRunner.getExtensionPath("libduplicate_stage_descriptor_bad_extension.so");
-
 const extensionNames = generateExtensionConfigs([
-    pathToExtensionFoo,
-    pathToMissingSymbolExtension,
-    pathToDuplicateStageExtension,
+    "libfoo_mongo_extension.so",
+    "libno_symbol_bad_extension.so",
+    "libduplicate_stage_descriptor_bad_extension.so",
 ]);
 
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't

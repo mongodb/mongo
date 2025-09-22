@@ -14,9 +14,7 @@ if (!isLinux()) {
     quit();
 }
 
-const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
-
-const extensionNames = generateExtensionConfigs(pathToExtensionVectorSearch);
+const extensionNames = generateExtensionConfigs("libvector_search_extension.so");
 
 const options = {
     loadExtensions: extensionNames[0],
