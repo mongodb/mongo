@@ -1,6 +1,32 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "join_ordering",
+    srcs = [
+        "join_graph.cpp",
+    ],
+    hdrs = [
+        "join_graph.h",
+        "logical_defs.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:canonical_query_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "join_ordering_test",
+    srcs = [
+        "join_graph_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":join_ordering",
+    ],
+)
 
 mongo_cc_library(
     name = "join_predicate",
