@@ -1252,73 +1252,6 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
     initialize_server_global_state::forkServerOrDie();
 }
 
-#ifdef __linux__
-/**
- * Read the pid file from the dbpath for the process ID used by this instance of the server.
- * Use that process number to kill the running server.
- *
- * Equivalent to: `kill -SIGTERM $(cat $DBPATH/mongod.lock)`
- *
- * Performs additional checks to make sure the PID as read is reasonable (>= 1)
- * and can be found in the /proc filesystem.
- */
-Status shutdownProcessByDBPathPidFile(const std::string& dbpath) {
-    auto pidfile = (boost::filesystem::path(dbpath) / std::string{kLockFileBasename}).string();
-    if (!boost::filesystem::exists(pidfile)) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "There doesn't seem to be a server running with dbpath: "
-                              << dbpath};
-    }
-
-    pid_t pid;
-    try {
-        std::ifstream f(pidfile.c_str());
-        f >> pid;
-    } catch (const std::exception& ex) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Error reading pid from lock file [" << pidfile
-                              << "]: " << ex.what()};
-    }
-
-    if (pid <= 0) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Invalid process ID '" << pid
-                              << "' read from pidfile: " << pidfile};
-    }
-
-    std::string procPath = str::stream() << "/proc/" << pid;
-    if (!boost::filesystem::exists(procPath)) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Process ID '" << pid << "' read from pidfile '" << pidfile
-                              << "' does not appear to be running"};
-    }
-
-    std::cout << "Killing process with pid: " << pid << std::endl;
-    int ret = kill(pid, SIGTERM);
-    if (ret) {
-        auto ec = lastSystemError();
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Failed to kill process: " << errorMessage(ec)};
-    }
-
-    // Wait for process to terminate.
-    for (;;) {
-        std::uintmax_t pidsize = boost::filesystem::file_size(pidfile);
-        if (pidsize == 0) {
-            // File empty.
-            break;
-        }
-        if (pidsize == static_cast<decltype(pidsize)>(-1)) {
-            // File does not exist.
-            break;
-        }
-        sleepsecs(1);
-    }
-
-    return Status::OK();
-}
-#endif  // __linux__
-
 /*
  * This function should contain the startup "actions" that we take based on the startup config.
  * It is intended to separate the actions from "storage" and "validation" of our startup
@@ -1356,19 +1289,6 @@ void startupConfigActions(const std::vector<std::string>& args) {
                                 std::vector<std::string>(),
                                 args);
 #endif  // _WIN32
-
-#ifdef __linux__
-    if (moe::startupOptionsParsed.count("shutdown") &&
-        moe::startupOptionsParsed["shutdown"].as<bool>() == true) {
-        auto status = shutdownProcessByDBPathPidFile(storageGlobalParams.dbpath);
-        if (!status.isOK()) {
-            std::cerr << status.reason() << std::endl;
-            quickExit(ExitCode::fail);
-        }
-
-        quickExit(ExitCode::clean);
-    }
-#endif
 }
 
 void setUpCatalog(ServiceContext* serviceContext) {

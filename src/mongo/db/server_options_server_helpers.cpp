@@ -131,10 +131,6 @@ bool shouldFork(const moe::Environment& params) {
         return envVal && std::string{envVal} == "1";
     };
 
-    if (paramYes(params, "shutdown")) {
-        return false;
-    }
-
     if (envVarYes("MONGODB_CONFIG_OVERRIDE_NOFORK")) {
         LOGV2(7484500,
               "Environment variable MONGODB_CONFIG_OVERRIDE_NOFORK == 1, "
