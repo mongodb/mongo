@@ -217,7 +217,7 @@ public:
         return _indexName;
     }
 
-    virtual bool isIdIndex() const {
+    bool isIdIndex() const override {
         return false;
     }
 
@@ -230,7 +230,6 @@ public:
                        WT_CURSOR* c,
                        WiredTigerSession* session,
                        const key_string::View& keyString) = 0;
-    virtual bool unique() const = 0;
     virtual bool isTimestampSafeUniqueIdx() const = 0;
 
     bool hasOldFormatVersion() const {

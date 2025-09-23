@@ -348,6 +348,14 @@ public:
 
     ~DevNullSortedDataInterface() override {}
 
+    bool isIdIndex() const override {
+        return false;
+    }
+
+    bool unique() const override {
+        return false;
+    }
+
     std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
                                                                 RecoveryUnit& ru) override {
         return {};

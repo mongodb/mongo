@@ -113,6 +113,16 @@ public:
 
     virtual ~SortedDataInterface() {}
 
+    /**
+     * Returns true if this is an _id index.
+     */
+    virtual bool isIdIndex() const = 0;
+
+    /**
+     * Returns true if this is a unique index.
+     */
+    virtual bool unique() const = 0;
+
     //
     // Data changes
     //
