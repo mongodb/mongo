@@ -46,7 +46,6 @@ public:
      */
     long long getOplogSizeBytes() const;
     std::string getReplSetString() const;
-    bool isServerless() const;
     bool shouldAutoInitiate() const;
 
     /**
@@ -64,13 +63,10 @@ public:
      */
     void setOplogSizeBytes(long long oplogSizeBytes);
     void setReplSetString(std::string replSetString);
-    void setServerlessMode();
     void setShouldAutoInitiate();
 
 private:
     long long _oplogSizeBytes = 0;  // --oplogSize
-
-    bool _isServerless = false;
     bool _shouldAutoInitiate = false;
     std::string _replSetString;  // --replSet[/<seedlist>]
 };

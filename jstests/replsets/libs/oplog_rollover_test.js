@@ -114,7 +114,7 @@ export function rollOver1MBOplog(replSet) {
     assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
 }
 
-export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
+export function oplogRolloverTest(storageEngine, initialSyncMethod) {
     jsTestLog("Testing with storageEngine: " + storageEngine);
     if (initialSyncMethod) {
         jsTestLog("  and initial sync method: " + initialSyncMethod);
@@ -141,8 +141,6 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
         },
         nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
     };
-
-    if (serverless) replSetOptions = Object.merge(replSetOptions, {serverless: true});
 
     const replSet = new ReplSetTest(replSetOptions);
     // Set max oplog size to 1MB.

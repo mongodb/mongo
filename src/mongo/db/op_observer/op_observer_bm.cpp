@@ -81,8 +81,7 @@ ServiceContext* setupServiceContext() {
 
 void setUpObservers(ServiceContext* serviceContext,
                     OpObserverRegistry* opObserverRegistry,
-                    ClusterRole clusterRole,
-                    bool isServerless) {
+                    ClusterRole clusterRole) {
     if (clusterRole.has(ClusterRole::ShardServer)) {
         opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerTransactionProxy>(
@@ -157,7 +156,7 @@ void BM_OnUpdate(benchmark::State& state, const char* nss) {
     auto client = serviceContext->getService()->makeClient("BM_OnUpdate_Client");
     auto opCtx = client->makeOperationContext();
     repl::UnreplicatedWritesBlock uwb(opCtx.get());
-    setUpObservers(serviceContext, &registry, ClusterRole::None, false /* not serverless */);
+    setUpObservers(serviceContext, &registry, ClusterRole::None);
     for (auto _ : state) {
         registry.onUpdate(opCtx.get(), args);
     }
@@ -201,7 +200,7 @@ void BM_OnInserts(benchmark::State& state, const char* nss) {
     auto client = serviceContext->getService()->makeClient("BM_OnInserts_Client");
     auto opCtx = client->makeOperationContext();
     repl::UnreplicatedWritesBlock uwb(opCtx.get());
-    setUpObservers(serviceContext, &registry, ClusterRole::None, false /* not serverless */);
+    setUpObservers(serviceContext, &registry, ClusterRole::None);
     for (auto _ : state) {
         registry.onInserts(opCtx.get(),
                            collptr,
@@ -251,7 +250,7 @@ void BM_onDelete(benchmark::State& state, const char* nss) {
     auto opCtx = client->makeOperationContext();
     repl::UnreplicatedWritesBlock uwb(opCtx.get());
 
-    setUpObservers(serviceContext, &registry, ClusterRole::None, false /* not serverless */);
+    setUpObservers(serviceContext, &registry, ClusterRole::None);
     for (auto _ : state) {
         registry.onDelete(
             opCtx.get(), collptr, kUninitializedStmtId, doc, documentKey, deleteArgs, nullptr);

@@ -221,7 +221,6 @@ void ReplCoordTest::start() {
     // Skip recovering user writes critical sections for the same reason as the above.
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
-    // Skip recovering of serverless mutual exclusion locks for the same reason as the above.
     invariant(!_callShutdown);
     // if we haven't initialized yet, do that first.
     if (!_repl) {

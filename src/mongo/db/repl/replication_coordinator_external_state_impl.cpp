@@ -694,6 +694,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
             VersionContext::getDecoration(opCtx))) {
+        // TODO(SERVER-111008): The change collection feature is deprecated.
+        // We should remove this code.
+
         // Create the pre-images collection if it doesn't exist yet. Pre-images are not supported in
         // serverless environments.
         ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);

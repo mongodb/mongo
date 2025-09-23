@@ -471,48 +471,6 @@ tasks:
         vars:
           suite: libunwind
 
-  - <<: *gen_task_template
-    name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "experimental",
-        "incompatible_debug_mode",
-        "serverless",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: multitenancy_with_mongoq_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "experimental",
-        "incompatible_debug_mode",
-        "serverless",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "experimental",
-        "incompatible_debug_mode",
-        "serverless",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
   - <<: *task_template
     name: search_no_pinned_connections_auth
     tags:
@@ -610,21 +568,6 @@ tasks:
         vars:
           suite: server_selection_json_test
           install_dir: bazel-bin/install/bin
-
-  - <<: *task_template
-    name: serverless
-    tags:
-      [
-        "assigned_to_jira_team_server_programmability",
-        "experimental",
-        "incompatible_debug_mode",
-        "requires_large_host_debug_mode",
-        "requires_large_host_tsan",
-        "serverless",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
 
   - <<: *task_template
     name: session_jscore_passthrough

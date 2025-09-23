@@ -149,7 +149,7 @@ void BM_refreshOplogTruncateAFterPointIfPrimary(benchmark::State& state) {
 
 BENCHMARK(BM_refreshOplogTruncateAFterPointIfPrimary)->MinTime(10.0);
 
-void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole, bool isServerless) {
+void setUpObservers(ServiceContext* serviceContext, ClusterRole clusterRole) {
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     if (clusterRole.has(ClusterRole::ShardServer)) {
         opObserverRegistry->addObserver(
@@ -211,7 +211,7 @@ void BM_setOplogTruncateAfterPoint(benchmark::State& state) {
     auto opCtx = bmTest.getOperationContext();
     auto serviceContext = bmTest.getServiceContext();
 
-    setUpObservers(serviceContext, ClusterRole::None, false /* not serverless */);
+    setUpObservers(serviceContext, ClusterRole::None);
 
     auto status = consistencyMarkers.createInternalCollections(opCtx);
     for (auto _ : state) {

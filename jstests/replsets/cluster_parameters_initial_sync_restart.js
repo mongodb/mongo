@@ -7,7 +7,6 @@
  *   requires_persistence,
  *   requires_replication,
  *   requires_fcv_62,
- *   serverless
  *  ]
  */
 import {
@@ -17,53 +16,36 @@ import {
 } from "jstests/libs/cluster_server_parameter_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const tenantId = ObjectId();
-
-let intParameter1 = {
+let intParameter = {
     _id: "testIntClusterParameter",
 };
-let strParameter1 = {
-    _id: "testStrClusterParameter",
-};
-let intParameter2 = {
-    _id: "testIntClusterParameter",
-};
-let strParameter2 = {
+let strParameter = {
     _id: "testStrClusterParameter",
 };
 
 function setParamsAndValidateCluster(rst) {
-    runSetClusterParameter(rst.getPrimary(), intParameter1);
-    runSetClusterParameter(rst.getPrimary(), strParameter1);
-    runSetClusterParameter(rst.getPrimary(), intParameter2, tenantId);
-    runSetClusterParameter(rst.getPrimary(), strParameter2, tenantId);
+    runSetClusterParameter(rst.getPrimary(), intParameter);
+    runSetClusterParameter(rst.getPrimary(), strParameter);
 
     // Check that the new values are visible on the majority of the nodes.
     runGetClusterParameterReplicaSet(
         rst,
         ["testIntClusterParameter", "testStrClusterParameter"],
-        [intParameter1, strParameter1],
-    );
-    runGetClusterParameterReplicaSet(
-        rst,
-        ["testIntClusterParameter", "testStrClusterParameter"],
-        [intParameter2, strParameter2],
-        tenantId,
+        [intParameter, strParameter],
     );
 }
 // Checks that up-to-date cluster parameters are transferred over to newly-added replica set nodes
 // as part of initial sync.
 function checkClusterParameterInitialSync(rst, newNodeOptions) {
     // Update some parameter values.
-    intParameter1.intData = 5;
-    strParameter1.strData = "state 1";
-    intParameter2.intData = 6;
-    strParameter2.strData = "state 2";
+    intParameter.intData = 5;
+    strParameter.strData = "state 1";
     setParamsAndValidateCluster(rst);
 
     // Add a new node to the replica set, reinitiate the set, and wait for it to become a secondary
     // with all data fully replicated to it.
     const newNode = rst.add(newNodeOptions);
+    rst.waitForAllNewlyAddedRemovals();
     rst.reInitiate();
     rst.awaitSecondaryNodes(null, [newNode]);
     rst.awaitReplication();
@@ -73,23 +55,13 @@ function checkClusterParameterInitialSync(rst, newNodeOptions) {
         runGetClusterParameterNode(
             newNode,
             ["testIntClusterParameter", "testStrClusterParameter"],
-            [intParameter1, strParameter1],
-        ),
-    );
-    assert(
-        runGetClusterParameterNode(
-            newNode,
-            ["testIntClusterParameter", "testStrClusterParameter"],
-            [intParameter2, strParameter2],
-            tenantId,
+            [intParameter, strParameter],
         ),
     );
 
     // Check that setClusterParameter properly works with the reconfigured replica set.
-    intParameter1.intData = 30;
-    strParameter1.strData = "sleep";
-    intParameter2.intData = 31;
-    strParameter2.strData = "wake";
+    intParameter.intData = 30;
+    strParameter.strData = "sleep";
     setParamsAndValidateCluster(rst);
 }
 
@@ -97,10 +69,8 @@ function checkClusterParameterInitialSync(rst, newNodeOptions) {
 // values.
 function checkClusterParameterRestart(rst) {
     // Update some parameter values.
-    intParameter1.intData = 7;
-    strParameter1.strData = "state 3";
-    intParameter2.intData = 8;
-    strParameter2.strData = "state 4";
+    intParameter.intData = 7;
+    strParameter.strData = "state 2";
     setParamsAndValidateCluster(rst);
 
     // Bounce restart all of the nodes.
@@ -112,23 +82,16 @@ function checkClusterParameterRestart(rst) {
     runGetClusterParameterReplicaSet(
         rst,
         ["testIntClusterParameter", "testStrClusterParameter"],
-        [intParameter1, strParameter1],
-    );
-    runGetClusterParameterReplicaSet(
-        rst,
-        ["testIntClusterParameter", "testStrClusterParameter"],
-        [intParameter2, strParameter2],
-        tenantId,
+        [intParameter, strParameter],
     );
 }
 
 const baseOptions = {
-    setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true},
+    setParameter: {},
 };
 
 const rst = new ReplSetTest({
     nodes: 3,
-    serverless: true,
 });
 rst.startSet(baseOptions);
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});

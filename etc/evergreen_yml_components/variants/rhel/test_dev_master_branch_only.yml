@@ -690,7 +690,7 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
     tasks:
       - name: .aggfuzzer
-      - name: .change_stream_fuzzer !.serverless
+      - name: .change_stream_fuzzer
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz
@@ -710,7 +710,7 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
     tasks:
       - name: .aggfuzzer
-      - name: .change_stream_fuzzer !.serverless
+      - name: .change_stream_fuzzer
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz

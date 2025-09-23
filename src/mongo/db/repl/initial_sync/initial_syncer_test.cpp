@@ -388,7 +388,7 @@ protected:
 
         auto* service = getGlobalServiceContext();
 
-        auto replSettings = createServerlessReplSettings();
+        repl::ReplSettings replSettings;
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings);
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
 

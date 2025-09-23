@@ -731,9 +731,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 
     // ourSetName can be empty if user didn't pass in --replSet. In that case, just use the local
     // config.
-    if (!_settings.isServerless() && !_settings.shouldAutoInitiate() &&
-        localConfig.getReplSetName() != _settings.ourSetName()) {
-
+    if (!_settings.shouldAutoInitiate() && localConfig.getReplSetName() != _settings.ourSetName()) {
         LOGV2_WARNING(21406,
                       "Local replica set configuration document set name differs from command line "
                       "set name; waiting for reconfig or remote heartbeat",
@@ -4245,9 +4243,7 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
         auto overrideConfig = newConfig.getMutable();
         overrideConfig.setReplSetName(UUID::gen().toString());
         newConfig = ReplSetConfig(std::move(overrideConfig));
-    }
-    // The setname is not provided as a command line argument in serverless mode.
-    else if (!_settings.isServerless() && newConfig.getReplSetName() != _settings.ourSetName()) {
+    } else if (newConfig.getReplSetName() != _settings.ourSetName()) {
         static constexpr char errmsg[] =
             "Rejecting initiate with a set name that differs from command line set name";
         LOGV2_ERROR(21424,
@@ -5397,16 +5393,8 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
             uassert(
                 8001600, "Auto bootstrapped replica set not yet initialized", rsc.isInitialized());
             return std::string{rsc.getReplSetName()};
-        } else if (!_settings.isServerless()) {
-            return _settings.ourSetName();
         } else {
-            if (rsc.isInitialized()) {
-                return std::string{rsc.getReplSetName()};
-            }
-
-            // In serverless mode before having an initialized config, simply use the replica set
-            // name provided in the hearbeat request.
-            return args.getSetName();
+            return _settings.ourSetName();
         }
     }();
 

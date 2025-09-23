@@ -310,22 +310,6 @@ void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord, BSONObj config, St
     *status = replCoord->runReplSetInitiate_forTest(config, &garbage);
 }
 
-TEST_F(ReplCoordTest, NodeInitiateInServerlessMode) {
-    ReplSettings settings;
-    settings.setServerlessMode();
-
-    ReplCoordTest::init(settings);
-    start(HostAndPort("node1", 12345));
-
-    Status status(ErrorCodes::InternalError, "Not set");
-    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
-    ASSERT_OK(status);
-
-    ASSERT(getReplCoord()->getSettings().isReplSet());
-    auto config = getReplCoord()->getConfig();
-    ASSERT_EQUALS("mySet", config.getReplSetName());
-}
-
 TEST_F(ReplCoordTest, NodeInitiateDifferentSetNames) {
     ReplCoordTest::init("cliSetName");
     start(HostAndPort("node1", 12345));

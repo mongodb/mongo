@@ -293,7 +293,7 @@ buildvariants:
           - rhel8.8-medium
       - name: .auth
       - name: .causally_consistent !.sharding
-      - name: .change_stream_fuzzer !.serverless
+      - name: .change_stream_fuzzer
       - name: .change_streams
       - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
       - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded

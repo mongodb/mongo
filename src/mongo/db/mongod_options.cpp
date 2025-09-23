@@ -148,14 +148,7 @@ void appendSysInfo(BSONObjBuilder* obj) {
 StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& params) {
     repl::ReplSettings replSettings;
 
-    if (params.count("replication.serverless")) {
-        if (params.count("replication.replSet") || params.count("replication.replSetName")) {
-            return Status(ErrorCodes::BadValue,
-                          "serverless cannot be used with replSet or replSetName options");
-        }
-        // Starting a node in "serverless" mode implies it uses a replSet.
-        replSettings.setServerlessMode();
-    } else if (params.count("replication.replSet")) {
+    if (params.count("replication.replSet")) {
         /* seed list of hosts for the repl set */
         replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
     } else if (params.count("replication.replSetName")) {

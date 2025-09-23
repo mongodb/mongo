@@ -2796,10 +2796,8 @@ export class ReplSetTest {
             } else {
                 defaults.replSet = this.name;
             }
-        } else if (this.serverless == null) {
-            defaults.replSet = this.useSeedList ? this.getURL() : this.name;
         } else {
-            defaults.serverless = true;
+            defaults.replSet = this.useSeedList ? this.getURL() : this.name;
         }
 
         const nodeOptions = this.nodeOptions["n" + n];
@@ -3501,7 +3499,6 @@ function _constructStartNewInstances(rst, opts) {
     rst.name = opts.name || jsTest.name();
     jsTest.log.info("Starting new replica set " + rst.name);
 
-    rst.serverless = opts.serverless;
     rst.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
     rst.host = rst.useHostName ? opts.host || getHostName() : "localhost";
     rst.oplogSize = opts.oplogSize || 40;
@@ -3664,22 +3661,11 @@ function _constructFromExistingSeedNode(rst, seedNode) {
  */
 function _constructFromExistingNodes(
     rst,
-    {
-        name,
-        serverless,
-        nodeHosts,
-        nodeOptions,
-        keyFile,
-        host,
-        waitForKeys,
-        useAutoBootstrapProcedure,
-        pidValue = undefined,
-    },
+    {name, nodeHosts, nodeOptions, keyFile, host, waitForKeys, useAutoBootstrapProcedure, pidValue = undefined},
 ) {
     jsTest.log.info("Recreating replica set from existing nodes", {nodeHosts});
 
     rst.name = name;
-    rst.serverless = serverless;
     rst.ports = nodeHosts.map((node) => node.split(":")[1]);
 
     let i = 0;

@@ -250,52 +250,6 @@ TEST_F(ReplCoordHBV1Test,
     ASSERT_TRUE(getExternalState()->threadsStarted());
 }
 
-TEST_F(ReplCoordHBV1Test,
-       ServerlessNodeJoinsExistingReplSetWhenReceivingAConfigContainingTheNodeViaHeartbeat) {
-    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
-                                                              logv2::LogSeverity::Debug(3)};
-    ReplSetConfig rsConfig =
-        assertMakeRSConfig(BSON("_id" << "mySet"
-                                      << "version" << 3 << "members"
-                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                               << "h1:1")
-                                                    << BSON("_id" << 2 << "host"
-                                                                  << "h2:1")
-                                                    << BSON("_id" << 3 << "host"
-                                                                  << "h3:1"))
-                                      << "protocolVersion" << 1));
-
-    ReplSettings settings;
-    settings.setServerlessMode();
-    init(settings);
-    addSelf(HostAndPort("h2", 1));
-    start();
-    enterNetwork();
-    assertMemberState(MemberState::RS_STARTUP);
-    NetworkInterfaceMock* net = getNet();
-    ASSERT_FALSE(net->hasReadyRequests());
-    exitNetwork();
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
-
-    enterNetwork();
-
-    processResponseFromPrimary(rsConfig);
-
-    performSyncToFinishReconfigHeartbeat();
-
-    assertMemberState(MemberState::RS_STARTUP2);
-    auto opCtx{makeOperationContext()};
-    auto storedConfig = ReplSetConfig::parse(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(opCtx.get())));
-    ASSERT_OK(storedConfig.validate());
-    ASSERT_EQUALS(3, storedConfig.getConfigVersion());
-    ASSERT_EQUALS(3, storedConfig.getNumMembers());
-    ASSERT_EQUALS("mySet", storedConfig.getReplSetName());
-    exitNetwork();
-
-    ASSERT_TRUE(getExternalState()->threadsStarted());
-}
-
 TEST_F(ReplCoordHBV1Test, RestartingHeartbeatsShouldOnlyCancelScheduledHeartbeats) {
     auto replAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(3)};
@@ -491,11 +445,11 @@ class ReplCoordHBV1SplitConfigTest : public ReplCoordHBV1Test {
 public:
     void startUp(const std::string& hostAndPort) {
         ReplSettings settings;
-        settings.setServerlessMode();
+        settings.setReplSetString(_replSetName);
         init(settings);
 
         BSONObj configBson =
-            BSON("_id" << _donorSetName << "version" << _configVersion << "term" << _configTerm
+            BSON("_id" << _replSetName << "version" << _configVersion << "term" << _configTerm
                        << "members" << _members << "protocolVersion" << 1);
         ReplSetConfig rsConfig = assertMakeRSConfig(configBson);
         assertStartSuccess(configBson, HostAndPort(hostAndPort));
@@ -579,15 +533,12 @@ public:
                       << "votes" << 0 << "priority" << 0 << "tags" << BSON("recip" << "tag2")));
 
 protected:
-    const std::string _donorSetName{"mySet"};
-    const std::string _recipientSetName{"newSet"};
-    const std::string _recipientTag{"recip"};
-    const std::string _donorSecondaryNode{"h2:1"};
-    const std::string _recipientSecondaryNode{"h4:1"};
+    const std::string _replSetName{"mySet"};
 };
 
 TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse) {
-    startUp(_recipientSecondaryNode);
+    const std::string otherNode{"h4:1"};
+    startUp(otherNode);
 
     // Receive a heartbeat request that tells us about a config with a newer version
     ReplSetConfig rsConfig =
@@ -599,7 +550,7 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse)
 
         // The received heartbeat has a greater (term, version), so verify that the next request
         // targets that host to retrieve the new config.
-        auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
+        auto noi = validateNextRequest("h1", _replSetName, _configVersion, _configTerm);
 
         // Schedule a heartbeat response which reports the higher (term, version) but wrong setName
         auto response = [&]() {

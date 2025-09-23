@@ -76,7 +76,7 @@ configs:
             callback: validateReplicaSetNameSetting
     "replication.serverless":
         section: "Serverless mode"
-        description: "Serverless mode implies replication is enabled, cannot be used with replSet or replSetName."
+        description: DEPRECATED
         arg_vartype: Bool
         short_name: serverless
         source: [yaml, cli]

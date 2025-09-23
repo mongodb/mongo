@@ -338,11 +338,6 @@ public:
                       "This node was not started with replication enabled.");
         }
 
-        if (settings.isServerless() && configObj.isEmpty()) {
-            uasserted(ErrorCodes::InvalidReplicaSetConfig,
-                      "A config must be provided when started in serverless mode.");
-        }
-
         if (configObj.isEmpty()) {
             std::string replSetString = settings.getReplSetString();
 

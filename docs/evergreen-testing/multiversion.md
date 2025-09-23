@@ -232,8 +232,8 @@ suites to pick up the test `multiversion_incompatible` tag can be added to the t
 ```
 
 There is additional `requires_fcv_XX` set of tags that can be used to disable tests from running in
-multiversion where `XX` is the version number, e.g. `requires_fcv_61` stands for version `6.1` in
-[jstests/serverless/change_collection_expired_document_remover.js](https://github.com/mongodb/mongo/blob/d870dda33fb75983f628636ff8f849c7f1c90b09/jstests/serverless/change_collection_expired_document_remover.js#L4).
+multiversion where `XX` is the version number, e.g. `requires_fcv_70` stands for version `7.0` in
+[jstests/auth/user_roles_empty.js](https://github.com/mongodb/mongo/blob/4170a47e6af669e411c9809e676f46171d0a633f/jstests/auth/user_roles_empty.js#L3).
 
 ```js
 // @tags: [requires_fcv_61]

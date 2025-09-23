@@ -5872,13 +5872,5 @@ TEST_F(OpObserverTransactionTest, OnContainerDelete) {
         opObserver.onContainerDelete(opCtx(), nss, uuid, ident, key2), DBException, 10942702);
 }
 
-class OpObserverServerlessTest : public OpObserverTest {
-private:
-    // Need to set serverless.
-    repl::ReplSettings createReplSettings() override {
-        return repl::createServerlessReplSettings();
-    }
-};
-
 }  // namespace
 }  // namespace mongo

@@ -100,12 +100,11 @@ bool canInitializeServices() {
 }
 
 bool isServerlessEnvironment() {
+    // TODO(SERVER-111008): Serverless is now deprecated. We should remove this function.
     // A change stream services are enabled only in the multitenant serverless settings. For the
     // sharded cluster, 'internalChangeStreamUseTenantIdForTesting' maybe provided for the testing
     // purposes until the support is available.
-    const auto isMultiTenantServerless =
-        getGlobalReplSettings().isServerless() && gMultitenancySupport;
-    return isMultiTenantServerless || internalChangeStreamUseTenantIdForTesting.load();
+    return internalChangeStreamUseTenantIdForTesting.load();
 }
 
 const TenantId& getTenantIdForTesting() {
