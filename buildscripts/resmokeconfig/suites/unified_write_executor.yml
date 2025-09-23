@@ -31,6 +31,7 @@ selector:
     - jstests/core/timeseries/write/timeseries_update_concurrent.js
     - jstests/core/timeseries/write/timeseries_update_hint.js
     - jstests/core/timeseries/write/timeseries_delete_with_meta_concurrent.js
+    - jstests/core/timeseries/write/timeseries_update_concurrent_arbitrary_updates_not_enabled.js
 
 executor:
   archive:
