@@ -505,6 +505,10 @@ const internalCommandsMap = {
         testname: "_shardsvrCommitDropDatabaseMetadata",
         command: {_shardsvrCommitDropDatabaseMetadata: 1},
     },
+    _shardsvrDrainOngoingDDLOperations: {
+        testname: "_shardsvrDrainOngoingDDLOperations",
+        command: {_shardsvrDrainOngoingDDLOperations: 1},
+    },
     _shardsvrDropCollection: {
         testname: "_shardsvrDropCollection",
         command: {

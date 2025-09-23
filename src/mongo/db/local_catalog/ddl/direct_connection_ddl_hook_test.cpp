@@ -304,5 +304,30 @@ TEST_F(DirectConnectionDDLHookTest, WaitForDrainedAllowedOpUnregistered) {
     ASSERT_EQ(hook.getOngoingOperations(), expectedMap);
 }
 
+TEST_F(DirectConnectionDDLHookTest, WaitForDrainedFutureAcrossClients) {
+    makeAuthorizedForDirectOps(operationContext()->getClient());
+
+    DirectConnectionDDLHook hook;
+    hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
+
+    auto future0 = hook.getWaitForDrainedFuture(operationContext());
+    ASSERT_FALSE(future0.isReady());
+
+    auto secondClient = makeClient();
+    auto secondOpCtx = secondClient->makeOperationContext();
+
+    auto future1 = hook.getWaitForDrainedFuture(secondOpCtx.get());
+    ASSERT_FALSE(future1.isReady());
+
+    hook.onEndDDL(operationContext(), std::vector<NamespaceString>{kNss});
+    ASSERT_TRUE(future1.isReady());
+
+    auto thirdClient = makeClient();
+    auto thirdOpCtx = thirdClient->makeOperationContext();
+
+    auto future2 = hook.getWaitForDrainedFuture(thirdOpCtx.get());
+    ASSERT_TRUE(future2.isReady());
+}
+
 }  // namespace
 }  // namespace mongo

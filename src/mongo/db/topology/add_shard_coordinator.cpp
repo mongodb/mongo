@@ -31,6 +31,7 @@
 
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/local_catalog/ddl/list_collections_gen.h"
 #include "mongo/db/local_catalog/shard_role_catalog/participant_block_gen.h"
@@ -63,6 +64,8 @@ static constexpr auto kBlockFCVDocumentId = "block_fcv_changes";
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangAfterLockingNewShard);
+MONGO_FAIL_POINT_DEFINE(hangAfterShardingInitialization);
+MONGO_FAIL_POINT_DEFINE(hangAfterDrainingDDLOperations);
 
 AddShardCoordinator::AddShardCoordinator(ShardingDDLCoordinatorService* service,
                                          const BSONObj& initialState)
@@ -189,27 +192,42 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     throw;
                 }
             }))
-        .then(_buildPhaseHandler(Phase::kPrepareNewShard,
-                                 [this, _ = shared_from_this()](auto* opCtx) {
-                                     auto& targeter = _getTargeter(opCtx);
+        .then(_buildPhaseHandler(
+            Phase::kPrepareNewShard,
+            [this, _ = shared_from_this()](auto* opCtx) {
+                auto& targeter = _getTargeter(opCtx);
 
-                                     _dropSessionsCollection(opCtx);
+                _dropSessionsCollection(opCtx);
 
-                                     _doc.setPreExistingDatabasesOnPromotion(
-                                         topology_change_helpers::getDBNamesListFromReplicaSet(
-                                             opCtx, targeter, _executorWithoutGossip));
+                _installShardIdentity(opCtx, _executorWithoutGossip);
+                hangAfterShardingInitialization.pauseWhileSet(opCtx);
 
-                                     _installShardIdentity(opCtx, _executorWithoutGossip);
+                const auto fcvSnapshot =
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                tassert(10951700,
+                        "Expected the FCV to be initialized during addShard",
+                        fcvSnapshot.isVersionInitialized());
 
-                                     if (_doc.getIsConfigShard()) {
-                                         return;
-                                     }
+                if (feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    _drainOngoingDDLOperations(opCtx);
+                    hangAfterDrainingDDLOperations.pauseWhileSet(opCtx);
+                }
 
-                                     topology_change_helpers::getClusterTimeKeysFromReplicaSet(
-                                         opCtx, targeter, _executorWithoutGossip);
+                _doc.setPreExistingDatabasesOnPromotion(
+                    topology_change_helpers::getDBNamesListFromReplicaSet(
+                        opCtx, targeter, _executorWithoutGossip));
 
-                                     _standardizeClusterParameters(opCtx);
-                                 }))
+                if (_doc.getIsConfigShard()) {
+                    return;
+                }
+
+                topology_change_helpers::getClusterTimeKeysFromReplicaSet(
+                    opCtx, targeter, _executorWithoutGossip);
+
+                _standardizeClusterParameters(opCtx);
+            }))
         .then(_buildPhaseHandler(
             Phase::kEnterCriticalSection,
             [this, _ = shared_from_this()](auto* opCtx) {
@@ -923,6 +941,14 @@ void AddShardCoordinator::_dropSessionsCollection(OperationContext* opCtx) {
                         builder.done(),
                         _executorWithoutGossip)
                         .commandStatus);
+}
+
+void AddShardCoordinator::_drainOngoingDDLOperations(OperationContext* opCtx) {
+    ShardsvrDrainOngoingDDLOperations cmd;
+    cmd.setDbName(DatabaseName::kAdmin);
+    auto res = topology_change_helpers::runCommandForAddShard(
+        opCtx, _getTargeter(opCtx), DatabaseName::kAdmin, cmd.toBSON(), _executorWithoutGossip);
+    uassertStatusOK(res.commandStatus);
 }
 
 }  // namespace mongo

@@ -134,6 +134,7 @@ const allCommands = {
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrResolveView: {skip: isAnInternalCommand},
     _shardsvrRunSearchIndexCommand: {skip: isAnInternalCommand},
+    _shardsvrDrainOngoingDDLOperations: {skip: isAnInternalCommand},
     _shardsvrDropDatabase: {skip: isAnInternalCommand},
     _shardsvrDropDatabaseParticipant: {skip: isAnInternalCommand},
     _shardsvrReshardCollection: {skip: isAnInternalCommand},

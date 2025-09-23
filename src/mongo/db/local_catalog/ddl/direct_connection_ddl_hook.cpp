@@ -106,12 +106,6 @@ void DirectConnectionDDLHook::onEndDDL(OperationContext* opCtx,
 
 SharedSemiFuture<void> DirectConnectionDDLHook::getWaitForDrainedFuture(OperationContext* opCtx) {
     stdx::lock_guard lk(_mutex);
-    tassert(10920801,
-            "Cannot drain direct DDL operations when "
-            "featureFlagPreventDirectShardDDLsDuringPromotion is disabled",
-            feature_flags::gFeatureFlagPreventDirectShardDDLsDuringPromotion.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // If there are no ongoing ops, then return immediately a ready future.
     if (_ongoingOps.empty()) {

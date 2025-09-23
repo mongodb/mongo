@@ -88,6 +88,9 @@ filters:
   - "direct_shard_connection_ddls_on_replicaset.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "direct_shard_connection_ddls_during_promotion_to_*.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "incompatible_shard_key_indexes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

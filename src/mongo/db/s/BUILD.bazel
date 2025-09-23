@@ -1084,6 +1084,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:shardsvr_convert_to_capped_participant_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_create_collection_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_create_collection_participant_command.cpp",
+        "//src/mongo/db/global_catalog/ddl:shardsvr_drain_ongoing_ddl_operations_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_drop_collection_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_drop_collection_if_uuid_not_matching_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_drop_collection_participant_command.cpp",

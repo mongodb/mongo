@@ -165,6 +165,7 @@ let testCases = {
     _shardsvrCoordinateMultiUpdate: {skip: "internal command"},
     _shardsvrCreateCollection: {skip: "internal command"},
     _shardsvrCreateCollectionParticipant: {skip: "internal command"},
+    _shardsvrDrainOngoingDDLOperations: {skip: "internal command"},
     _shardsvrDropCollection: {skip: "internal command"},
     _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: "internal command"},
     _shardsvrDropCollectionParticipant: {skip: "internal command"},

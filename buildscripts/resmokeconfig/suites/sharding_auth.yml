@@ -21,6 +21,8 @@ selector:
     - jstests/sharding/kill_sessions.js
     - jstests/sharding/replica_set_promotion_demotion.js
     - jstests/sharding/direct_shard_connection_ddls_on_replicaset.js
+    - jstests/sharding/direct_shard_connection_ddls_during_promotion_to_embedded.js
+    - jstests/sharding/direct_shard_connection_ddls_during_promotion_to_dedicated.js
     # Skip these additional tests when running with auth enabled.
     - jstests/sharding/parallel.js
     # Skip the testcases that do not have auth bypass when running ops in parallel.

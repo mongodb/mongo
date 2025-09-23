@@ -125,6 +125,8 @@ private:
 
     void _dropSessionsCollection(OperationContext* opCtx);
 
+    void _drainOngoingDDLOperations(OperationContext* opCtx);
+
     void _installShardIdentity(OperationContext* opCtx,
                                std::shared_ptr<executor::TaskExecutor> executor);
 

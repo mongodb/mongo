@@ -937,3 +937,11 @@ commands:
         type: namespacestring
         strict: false
         reply_type: OkReply
+
+    _shardsvrDrainOngoingDDLOperations:
+        command_name: _shardsvrDrainOngoingDDLOperations
+        cpp_name: ShardsvrDrainOngoingDDLOperations
+        description: "Internal command invoked by the config server to drain any ongoing DDL operation executed by the shard before initializing sharding during promotion to sharded cluster."
+        strict: false
+        namespace: ignored
+        api_version: ""

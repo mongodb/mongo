@@ -177,6 +177,7 @@ let viewsCommandTests = {
     _shardsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCreateCollection: {skip: isAnInternalCommand},
     _shardsvrCreateCollectionParticipant: {skip: isAnInternalCommand},
+    _shardsvrDrainOngoingDDLOperations: {skip: isAnInternalCommand},
     _shardsvrDropDatabase: {skip: isAnInternalCommand},
     _shardsvrDropDatabaseParticipant: {skip: isAnInternalCommand},
     _shardsvrGetStatsForBalancing: {skip: isAnInternalCommand},

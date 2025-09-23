@@ -47,6 +47,7 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrCloneAuthoritativeMetadata",
     "_shardsvrCommitCreateDatabaseMetadata",
     "_shardsvrCommitDropDatabaseMetadata",
+    "_shardsvrDrainOngoingDDLOperations",
     "_shardsvrFetchCollMetadata",
     "_shardsvrRenameIndexMetadata",
     "getTrafficRecordingStatus",

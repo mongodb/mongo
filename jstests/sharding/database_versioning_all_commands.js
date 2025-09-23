@@ -969,6 +969,7 @@ const allTestCases = {
         _shardsvrCoordinateMultiUpdate: {skip: "TODO"},
         _shardsvrCreateCollection: {skip: "TODO"},
         _shardsvrCreateCollectionParticipant: {skip: "TODO"},
+        _shardsvrDrainOngoingDDLOperations: {skip: "TODO"},
         _shardsvrDropCollection: {skip: "TODO"},
         _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: "TODO"},
         _shardsvrDropCollectionParticipant: {skip: "TODO"},
