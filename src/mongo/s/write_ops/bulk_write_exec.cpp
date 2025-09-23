@@ -65,6 +65,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -1053,73 +1054,6 @@ void BulkWriteOp::noteErrorForRemainingWrites(const Status& status) {
     dassert(isFinished());
 }
 
-std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
-    OperationContext* opCtx,
-    const TargetedWriteBatch& targetedBatch,
-    const BulkWriteCommandReply& commandReply) {
-    // No cursor, just return the first batch from the existing reply.
-    if (commandReply.getCursor().getId() == 0) {
-        return commandReply.getCursor().getFirstBatch();
-    }
-
-    std::vector<BulkWriteReplyItem> result = commandReply.getCursor().getFirstBatch();
-    auto id = commandReply.getCursor().getId();
-    auto collection = commandReply.getCursor().getNs().coll();
-
-    // When cursorId = 0 we do not require a getMore.
-    while (id != 0) {
-        BSONObjBuilder bob;
-        bob.append("getMore", id);
-        bob.append("collection", collection);
-
-        if (opCtx->inMultiDocumentTransaction()) {
-            logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &bob);
-        } else {
-            // Only want to append logical session id for retryable writes and not txnNumber.
-            // txnNumber cannot be sent to a getMore command since it is not retryable.
-            logical_session_id_helpers::serializeLsid(opCtx, &bob);
-        }
-
-        std::vector<AsyncRequestsSender::Request> requests;
-        requests.emplace_back(targetedBatch.getShardId(), bob.obj());
-
-        MultiStatementTransactionRequestsSender ars(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            DatabaseName::kAdmin,
-            requests,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kNoRetry /* getMore is never retryable */);
-
-        while (!ars.done()) {
-            // Block until a response is available.
-            auto response = ars.next();
-
-            // When the responseStatus is not OK, this means that mongos was unable to receive a
-            // response from the shard the write batch was sent to, or mongos faced some other local
-            // error (for example, mongos was shutting down). In this case we need to indicate that
-            // the getMore failed.
-            if (!response.swResponse.getStatus().isOK()) {
-                result.emplace_back(0, response.swResponse.getStatus());
-                id = 0;
-            } else {
-                auto getMoreReply =
-                    CursorGetMoreReply::parse(response.swResponse.getValue().data,
-                                              IDLParserContext("BulkWriteCommandGetMoreReply"));
-
-                id = getMoreReply.getCursor().getCursorId();
-                collection = getMoreReply.getCursor().getNs().coll();
-
-                for (auto& obj : getMoreReply.getCursor().getNextBatch()) {
-                    result.emplace_back(BulkWriteReplyItem::parse(obj));
-                }
-            }
-        }
-    }
-
-    return result;
-}
-
 void BulkWriteOp::processChildBatchResponseFromRemote(
     const TargetedWriteBatch& writeBatch,
     const AsyncRequestsSender::Response& response,
@@ -1209,7 +1143,8 @@ void BulkWriteOp::noteChildBatchResponse(
     bool shouldDeferWriteWithoutShardKeyReponse =
         isWithoutShardKeyWithIdWrite && targetedBatch.getNumOps() > 1;
 
-    const auto& replyItems = exhaustCursorForReplyItems(_opCtx, targetedBatch, commandReply);
+    const auto replyItems =
+        exhaustCursorForReplyItems(_opCtx, targetedBatch.getShardId(), commandReply);
 
     _nInserted += commandReply.getNInserted();
     _nDeleted += commandReply.getNDeleted();

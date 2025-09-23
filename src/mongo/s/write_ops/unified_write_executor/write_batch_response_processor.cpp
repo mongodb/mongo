@@ -301,7 +301,8 @@ Result WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
         }
     }
 
-    const auto& replyItems = parsedReply.getCursor().getFirstBatch();
+    const auto replyItems = exhaustCursorForReplyItems(opCtx, shardId, parsedReply);
+
     auto result = processOpsInReplyItems(opCtx, routingCtx, ops, replyItems);
 
     if (_nErrors == 0 || (!ordered && !inTransaction)) {

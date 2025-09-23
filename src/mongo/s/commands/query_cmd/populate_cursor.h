@@ -44,4 +44,7 @@ BulkWriteCommandReply populateCursorReply(OperationContext* opCtx,
                                           const BSONObj& reqObj,
                                           bulk_write_exec::BulkWriteReplyInfo replyInfo);
 
+std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
+    OperationContext* opCtx, const ShardId& shardId, const BulkWriteCommandReply& commandReply);
+
 }  // namespace mongo

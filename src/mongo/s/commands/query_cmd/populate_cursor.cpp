@@ -32,6 +32,7 @@
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor_guard.h"
 #include "mongo/s/query/exec/cluster_client_cursor_impl.h"
@@ -153,4 +154,70 @@ BulkWriteCommandReply populateCursorReply(OperationContext* opCtx,
         cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));
     return reply;
 }
+
+std::vector<BulkWriteReplyItem> exhaustCursorForReplyItems(
+    OperationContext* opCtx, const ShardId& shardId, const BulkWriteCommandReply& commandReply) {
+    // No cursor, just return the first batch from the existing reply.
+    if (commandReply.getCursor().getId() == 0) {
+        return commandReply.getCursor().getFirstBatch();
+    }
+
+    std::vector<BulkWriteReplyItem> result = commandReply.getCursor().getFirstBatch();
+    auto id = commandReply.getCursor().getId();
+    auto collection = commandReply.getCursor().getNs().coll();
+
+    // When cursorId = 0 we do not require a getMore.
+    while (id != 0) {
+        BSONObjBuilder bob;
+        bob.append("getMore", id);
+        bob.append("collection", collection);
+
+        if (opCtx->inMultiDocumentTransaction()) {
+            logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &bob);
+        } else {
+            // Only want to append logical session id for retryable writes and not txnNumber.
+            // txnNumber cannot be sent to a getMore command since it is not retryable.
+            logical_session_id_helpers::serializeLsid(opCtx, &bob);
+        }
+
+        std::vector<AsyncRequestsSender::Request> requests;
+        requests.emplace_back(shardId, bob.obj());
+
+        MultiStatementTransactionRequestsSender ars(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            DatabaseName::kAdmin,
+            requests,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kNoRetry /* getMore is never retryable */);
+
+        while (!ars.done()) {
+            // Block until a response is available.
+            auto response = ars.next();
+
+            // When the responseStatus is not OK, this means that mongos was unable to receive a
+            // response from the shard the write batch was sent to, or mongos faced some other local
+            // error (for example, mongos was shutting down). In this case we need to indicate that
+            // the getMore failed.
+            if (!response.swResponse.getStatus().isOK()) {
+                result.emplace_back(0, response.swResponse.getStatus());
+                id = 0;
+            } else {
+                auto getMoreReply =
+                    CursorGetMoreReply::parse(response.swResponse.getValue().data,
+                                              IDLParserContext("BulkWriteCommandGetMoreReply"));
+
+                id = getMoreReply.getCursor().getCursorId();
+                collection = getMoreReply.getCursor().getNs().coll();
+
+                for (auto& obj : getMoreReply.getCursor().getNextBatch()) {
+                    result.emplace_back(BulkWriteReplyItem::parse(obj));
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
 }  // namespace mongo
