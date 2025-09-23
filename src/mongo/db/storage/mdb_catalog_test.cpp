@@ -126,8 +126,8 @@ TEST_F(MDBCatalogTest, BuildCatalogEntryObjAndNsEquivalence) {
     auto expectedNs = NamespaceStringUtil::serializeForCatalog(expectedNss);
     durable_catalog::CatalogEntryMetaData md =
         durable_catalog::internal::createMetaDataForNewCollection(expectedNss, optionsWithUUID);
-    auto expected =
-        durable_catalog::internal::buildRawMDBCatalogEntry("test-Ident", BSONObj(), md, expectedNs);
+    auto expected = durable_catalog::internal::buildRawMDBCatalogEntry(
+        "test-Ident", BSONObj(), md, expectedNss);
 
     // Build with MDBCatalog function and compare
     NamespaceString nss;

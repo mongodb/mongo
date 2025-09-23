@@ -34,7 +34,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -168,11 +167,7 @@ std::vector<std::string> MDBCatalog::getAllIdents(OperationContext* opCtx) const
         BSONElement e = obj["idxIdent"];
         if (!e.isABSONObj())
             continue;
-        BSONObj idxIdent = e.Obj();
-
-        BSONObjIterator sub(idxIdent);
-        while (sub.more()) {
-            BSONElement e = sub.next();
+        for (auto&& e : e.Obj()) {
             v.push_back(e.String());
         }
     }
@@ -201,6 +196,32 @@ std::vector<std::string> MDBCatalog::getIndexIdents(OperationContext* opCtx,
     return _getIndexIdents(obj);
 }
 
+bool MDBCatalog::hasCollectionIdent(OperationContext* opCtx, StringData ident) const {
+    auto cursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+        if (obj["ident"].valueStringDataSafe() == ident) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool MDBCatalog::hasIndexIdent(OperationContext* opCtx, StringData ident) const {
+    auto cursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+        BSONElement e = obj["idxIdent"];
+        if (!e.isABSONObj())
+            continue;
+        for (auto&& e : e.Obj()) {
+            if (e.valueStringDataSafe() == ident)
+                return true;
+        }
+    }
+    return false;
+}
+
 std::unique_ptr<SeekableRecordCursor> MDBCatalog::getCursor(OperationContext* opCtx,
                                                             bool forward) const {
     if (!_rs) {
@@ -222,6 +243,7 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::addEntry(OperationContext* o
                                                  Timestamp());
     if (!res.isOK())
         return res.getStatus();
+    invariant(res.getValue() == catalogId);
 
     stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
@@ -236,29 +258,6 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::addEntry(OperationContext* o
                 "res_getValue"_attr = res.getValue());
 
     return {{res.getValue(), ident, nss}};
-}
-
-StatusWith<std::unique_ptr<RecordStore>> MDBCatalog::createRecordStoreForEntry(
-    OperationContext* opCtx,
-    const MDBCatalog::EntryIdentifier& entry,
-    const boost::optional<UUID>& uuid,
-    const RecordStore::Options& recordStoreOptions) {
-    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    Status status =
-        _engine->createRecordStore(provider, entry.nss, entry.ident, recordStoreOptions);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-    ru.onRollback([&ru, catalog = this, ident = entry.ident](OperationContext*) {
-        // Intentionally ignoring failure
-        catalog->_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
-    });
-
-    auto rs = _engine->getRecordStore(opCtx, entry.nss, entry.ident, recordStoreOptions, uuid);
-    invariant(rs);
-    return rs;
 }
 
 StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::importCatalogEntry(

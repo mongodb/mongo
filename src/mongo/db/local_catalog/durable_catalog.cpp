@@ -82,88 +82,6 @@ std::shared_ptr<CatalogEntryMetaData> parseMetaData(const BSONElement& mdElement
     }
     return md;
 }
-
-// Ensures that only one catalog entry has the same ident as 'expectedCatalogEntry'.  This check is
-// potentially expensive, as it iterates over all catalog entries, and should only be used after an
-// 'ObjectAlreadyExists' error occurs after the first attempt to persist a new collection in
-// storage. Such cases are expected to be rare.
-Status validateNoIdentConflictInCatalog(OperationContext* opCtx,
-                                        const MDBCatalog::EntryIdentifier& expectedCatalogEntry,
-                                        MDBCatalog* mdbCatalog) {
-    std::vector<MDBCatalog::EntryIdentifier> entriesWithIdent;
-    auto cursor = mdbCatalog->getCursor(opCtx);
-    while (auto record = cursor->next()) {
-        BSONObj obj = record->data.releaseToBson();
-
-        if (feature_document_util::isFeatureDocument(obj)) {
-            // Skip over the version document because it doesn't correspond to a collection.
-            continue;
-        }
-
-        auto entryIdent = obj["ident"].String();
-        if (entryIdent == expectedCatalogEntry.ident &&
-            expectedCatalogEntry.catalogId != record->id) {
-            return Status(
-                ErrorCodes::ObjectAlreadyExists,
-                fmt::format("Could not create collection {} with ident {} because the ident was "
-                            "already in use by another table recorded in the catalog",
-                            expectedCatalogEntry.nss.toStringForErrorMsg(),
-                            expectedCatalogEntry.ident));
-        }
-    }
-    return Status::OK();
-}
-
-// Retries creating new collection's table on disk after the first attempt returns
-// 'ObjectAlreadyExists'. This can happen if idents are replicated, the initial create attempt was
-// rolled back, and the same operation gets applied again. In which case, the ident may correspond
-// to a table still on disk.
-StatusWith<std::unique_ptr<RecordStore>> retryCreateCollectionIfObjectAlreadyExists(
-    OperationContext* opCtx,
-    const MDBCatalog::EntryIdentifier& catalogEntry,
-    const boost::optional<UUID>& uuid,
-    const RecordStore::Options& recordStoreOptions,
-    const Status& originalFailure,
-    MDBCatalog* mdbCatalog) {
-    // First, validate the ident doesn't appear in multiple catalog entries. This should never
-    // happen unless there is manual oplog work or applyOps intervention which has caused
-    // corruption.
-    Status validateStatus = validateNoIdentConflictInCatalog(opCtx, catalogEntry, mdbCatalog);
-    if (!validateStatus.isOK()) {
-        return validateStatus;
-    }
-
-    // Rollback only guarantees the first state of two-phase table drop. If the initial create for
-    // the table was rolled back, it can still exist in the storage engine. The ident is likely in
-    // the drop-pending reaper, so we must remove it before trying to create the same collection
-    // again.
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    const auto& ident = catalogEntry.ident;
-    auto dropStatus = storageEngine->immediatelyCompletePendingDrop(opCtx, ident);
-    if (!dropStatus.isOK()) {
-        LOGV2(10526201,
-              "Attempted to drop and recreate a collection ident which already existed, but failed "
-              "the drop",
-              "ident"_attr = ident,
-              "uuid"_attr = uuid,
-              "nss"_attr = catalogEntry.nss.toStringForErrorMsg(),
-              "dropResult"_attr = dropStatus,
-              "originalCreateFailure"_attr = originalFailure);
-        return originalFailure;
-    }
-
-    auto createResult =
-        mdbCatalog->createRecordStoreForEntry(opCtx, catalogEntry, uuid, recordStoreOptions);
-    LOGV2(10526200,
-          "Attempted to drop and recreate a collection ident which already existed",
-          "ident"_attr = ident,
-          "uuid"_attr = uuid,
-          "nss"_attr = catalogEntry.nss.toStringForErrorMsg(),
-          "dropResult"_attr = dropStatus,
-          "createResult"_attr = createResult.getStatus());
-    return createResult;
-}
-
 }  // namespace
 
 namespace internal {
@@ -185,12 +103,12 @@ CatalogEntryMetaData createMetaDataForNewCollection(const NamespaceString& nss,
 BSONObj buildRawMDBCatalogEntry(const std::string& ident,
                                 const BSONObj& idxIdent,
                                 const CatalogEntryMetaData& md,
-                                const std::string& ns) {
+                                const NamespaceString& nss) {
     BSONObjBuilder b;
     b.append("ident", ident);
     b.append("idxIdent", idxIdent);
     b.append("md", md.toBSON());
-    b.append("ns", ns);
+    b.append("ns", NamespaceStringUtil::serializeForCatalog(nss));
     return b.obj();
 }
 }  // namespace internal
@@ -286,6 +204,77 @@ void putMetaData(OperationContext* opCtx,
     mdbCatalog->putUpdatedEntry(opCtx, catalogId, b.obj());
 }
 
+namespace {
+/**
+ * Creates the underlying storage for a collection or index, handling cases where the ident is
+ * transiently in use but can be safely dropped. The actual creation is performed by the `create`
+ * callback argument, which should attempt to create the record store or SDI and return whatever
+ * error that produces. The `identExists` callback should scan the catalog for the ident and check
+ * if it's already present. This callback is only invoked after an ident conflict has been detected,
+ * so it can perform checks which are too expensive for the happy path.
+ */
+Status createStorage(OperationContext* opCtx,
+                     StringData ident,
+                     function_ref<Status()> create,
+                     function_ref<bool()> identExists) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+    // Rolling back table creation performs a two-phase drop, so this ident may be pending drop. If
+    // it is we'll need to complete the drop before we can proceed. If it isn't, this is a no-op.
+    if (auto status = storageEngine->immediatelyCompletePendingDrop(opCtx, ident); !status.isOK()) {
+        LOGV2(11093000,
+              "Ident being created was drop-pending and could not be dropped immediately",
+              "ident"_attr = ident,
+              "error"_attr = status);
+        return status;
+    }
+
+    Status status = create();
+    if (status == ErrorCodes::ObjectAlreadyExists) {
+        // The ident is already in use (and wasn't drop pending). Check if the ident is already
+        // found in the catalog, which would mean that we've either hit a bug or an admin user did
+        // something invalid with oplog editing or applyOps. This is an expensive check, so we do it
+        // only after optimistically trying the creation the first time.
+        if (identExists()) {
+            LOGV2(11093001,
+                  "Ident being created is already in the catalog and so cannot be dropped",
+                  "ident"_attr = ident);
+            return status;
+        }
+
+        // The ident isn't in the catalog and isn't drop-pending, so we can safely drop it, which is
+        // also what would happen if we were to reload the catalog. This can happen if a table is
+        // created while a checkpoint is in progress, as DDL operations being non-transactional
+        // means that the table *might* be included in the checkpoint despite not existing at the
+        // checkpoint's timestamp.
+        auto dropStatus = storageEngine->getEngine()->dropIdent(ru, ident, true);
+        if (!dropStatus.isOK()) {
+            LOGV2(11093002,
+                  "Ident being created is known to the storage engine but not in the catalog, but "
+                  "could not be dropped",
+                  "ident"_attr = ident,
+                  "error"_attr = dropStatus);
+            return dropStatus;
+        }
+
+        // Try again after dropping the existing table. This is expected to always work.
+        status = create();
+    }
+
+    if (!status.isOK()) {
+        return status;
+    }
+
+    ru.onRollback([ident = std::string(ident)](OperationContext* opCtx) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        storageEngine->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
+    });
+
+    return status;
+}
+}  // namespace
+
 StatusWith<std::unique_ptr<RecordStore>> createCollection(
     OperationContext* opCtx,
     const RecordId& catalogId,
@@ -297,30 +286,33 @@ StatusWith<std::unique_ptr<RecordStore>> createCollection(
     invariant(nss.coll().size() > 0);
 
     auto recordStoreOptions = getRecordStoreOptions(nss, collectionOptions);
-
     durable_catalog::CatalogEntryMetaData md =
         internal::createMetaDataForNewCollection(nss, collectionOptions);
-    const auto ns = NamespaceStringUtil::serializeForCatalog(nss);
-    auto mdbCatalogEntryObj =
-        internal::buildRawMDBCatalogEntry(ident, BSONObj() /* idxIdent */, md, ns);
-    auto swCatalogEntry = mdbCatalog->addEntry(opCtx, ident, nss, mdbCatalogEntryObj, catalogId);
-    if (!swCatalogEntry.isOK()) {
-        return swCatalogEntry.getStatus();
-    }
-    const auto& catalogEntry = swCatalogEntry.getValue();
-    invariant(catalogEntry.catalogId == catalogId);
 
-    auto createResult = mdbCatalog->createRecordStoreForEntry(
-        opCtx, catalogEntry, md.options.uuid, recordStoreOptions);
-    if (createResult.getStatus() == ErrorCodes::ObjectAlreadyExists) {
-        createResult = retryCreateCollectionIfObjectAlreadyExists(opCtx,
-                                                                  catalogEntry,
-                                                                  md.options.uuid,
-                                                                  recordStoreOptions,
-                                                                  createResult.getStatus(),
-                                                                  mdbCatalog);
+    auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    auto status = createStorage(
+        opCtx,
+        ident,
+        [&] { return engine->createRecordStore(provider, nss, ident, recordStoreOptions); },
+        [&] { return mdbCatalog->hasCollectionIdent(opCtx, ident); });
+    if (!status.isOK()) {
+        return status;
     }
-    return createResult;
+
+    // Update the catalog only after successfully creating the record store. In between attempts at
+    // creating the record store we check if the catalog already contains the ident we're trying to
+    // create, and that's easier to do if we haven't already added our entry containing the ident.
+    auto mdbCatalogEntryObj =
+        internal::buildRawMDBCatalogEntry(ident, BSONObj() /* idxIdent */, md, nss);
+    status = mdbCatalog->addEntry(opCtx, ident, nss, mdbCatalogEntryObj, catalogId).getStatus();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto rs = engine->getRecordStore(opCtx, nss, ident, recordStoreOptions, collectionOptions.uuid);
+    invariant(rs);
+    return rs;
 }
 
 Status createIndex(OperationContext* opCtx,
@@ -329,51 +321,27 @@ Status createIndex(OperationContext* opCtx,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
                    StringData ident) {
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto kvEngine = storageEngine->getEngine();
-    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-
     invariant(collectionOptions.uuid);
 
-    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifiers(
-        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider());
-    if (replicateLocalCatalogIdentifiers) {
-        // If a previous attempt at creating this index was rolled back, the ident may still be drop
-        // pending. Complete that drop before creating the index if so.
-        if (Status status = storageEngine->immediatelyCompletePendingDrop(opCtx, ident);
-            !status.isOK()) {
-            LOGV2(10526400,
-                  "Index ident was drop pending and required completing the drop",
-                  "ident"_attr = ident,
-                  "error"_attr = status);
-            return status;
-        }
-    }
+    auto mdbCatalog = MDBCatalog::get(opCtx);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
 
-    Status status = kvEngine->createSortedDataInterface(
-        provider,
-        ru,
-        nss,
-        *collectionOptions.uuid,
+    return createStorage(
+        opCtx,
         ident,
-        indexConfig,
-        collectionOptions.indexOptionDefaults.getStorageEngine());
-
-    if (status.isOK()) {
-        if (replicateLocalCatalogIdentifiers) {
-            ru.onRollback([storageEngine, ident = std::string(ident), &ru](OperationContext*) {
-                storageEngine->addDropPendingIdent(Timestamp::min(),
-                                                   std::make_shared<Ident>(ident));
-            });
-        } else {
-            ru.onRollback([kvEngine, ident = std::string(ident), &ru](OperationContext*) {
-                // Intentionally ignoring failure.
-                kvEngine->dropIdent(ru, ident, false).ignore();
-            });
-        }
-    }
-    return status;
+        [&] {
+            return engine->createSortedDataInterface(
+                provider,
+                ru,
+                nss,
+                *collectionOptions.uuid,
+                ident,
+                indexConfig,
+                collectionOptions.indexOptionDefaults.getStorageEngine());
+        },
+        [&] { return mdbCatalog->hasIndexIdent(opCtx, ident); });
 }
 
 StatusWith<ImportResult> importCollection(OperationContext* opCtx,

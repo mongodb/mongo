@@ -202,6 +202,12 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     ss << ",key_format=u";
     ss << ",value_format=u";
 
+    // By default, WiredTiger silently ignores a create table command if the specified ident already
+    // exists - even if the existing table has a different configuration.
+    //
+    // Enable the 'exclusive' flag so WiredTiger table creation fails if an ident already exists.
+    ss << ",exclusive=true";
+
     // Index metadata
     ss << generateAppMetadataString(config);
     if (isLogged) {

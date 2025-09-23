@@ -141,7 +141,7 @@ protected:
         const auto ident = ident::generateNewCollectionIdent(nss.dbName(), false, false);
         auto md = durable_catalog::internal::createMetaDataForNewCollection(nss, collectionOptions);
         auto rawMDBCatalogEntry = durable_catalog::internal::buildRawMDBCatalogEntry(
-            ident, BSONObj() /* idxIdent */, md, NamespaceStringUtil::serializeForCatalog(nss));
+            ident, BSONObj() /* idxIdent */, md, nss);
 
         // An 'orphaned' entry is one without a RecordStore explicitly created to back it.
         auto swEntry = mdbCatalog->addEntry(

@@ -196,7 +196,7 @@ durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
 BSONObj buildRawMDBCatalogEntry(const std::string& ident,
                                 const BSONObj& idxIdent,
                                 const durable_catalog::CatalogEntryMetaData& md,
-                                const std::string& ns);
+                                const NamespaceString& nss);
 
 }  // namespace internal
 

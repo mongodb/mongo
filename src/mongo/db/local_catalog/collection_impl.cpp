@@ -1588,41 +1588,32 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
               "spec"_attr = spec->infoObj());
     }
 
-    // Add this index to the metadata. This requires building a new idxIdent mapping which includes
-    // the new index ident. This must be done before createIndex() as that validates that the index
-    // is in the metadata.
-    {
-
-        BSONObjBuilder indexIdents;
-        indexIdents.append(imd.nameStringData(), ident);
-
-        auto ii = _indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
-        while (ii->more()) {
-            auto entry = ii->next();
-            if (entry->getIdent() == ident) {
-                return Status(
-                    ErrorCodes::ObjectAlreadyExists,
-                    fmt::format(
-                        "Attempting to create index '{}' with ident '{}' that is already in use",
-                        spec->indexName(),
-                        ident));
-            }
-            indexIdents.append(entry->descriptor()->indexName(), entry->getIdent());
-        }
-
-        auto metadata = _copyMetadataForWrite(opCtx);
-        metadata->insertIndex(std::move(imd));
-        durable_catalog::putMetaData(
-            opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx), indexIdents.obj());
-        _metadata = std::move(metadata);
-    }
-
     auto status = durable_catalog::createIndex(
         opCtx, getCatalogId(), ns(), getCollectionOptions(), spec->toIndexConfig(), ident);
-    if (status.isOK()) {
-        _indexCatalog->createIndexEntry(
-            opCtx, this, IndexDescriptor{*spec}, CreateIndexEntryFlags::kNone);
+    if (!status.isOK()) {
+        return status;
     }
+
+    // Add this index to the metadata. This requires building a new idxIdent mapping which includes
+    // the new index ident. This must be done before createIndexEntry() as that validates that the
+    // index is in the metadata, but after createIndex() as that function validates that the ident
+    // is not already present.
+    BSONObjBuilder indexIdents;
+    indexIdents.append(imd.nameStringData(), ident);
+    auto ii = _indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
+    while (ii->more()) {
+        auto entry = ii->next();
+        indexIdents.append(entry->descriptor()->indexName(), entry->getIdent());
+    }
+
+    auto metadata = _copyMetadataForWrite(opCtx);
+    metadata->insertIndex(std::move(imd));
+    durable_catalog::putMetaData(
+        opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx), indexIdents.obj());
+    _metadata = std::move(metadata);
+
+    _indexCatalog->createIndexEntry(
+        opCtx, this, IndexDescriptor{*spec}, CreateIndexEntryFlags::kNone);
 
     return status;
 }

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -129,6 +130,16 @@ public:
 
     std::vector<std::string> getIndexIdents(OperationContext* opCtx, const RecordId& catalogId);
 
+    /**
+     * Checks if any collection tracked in the catalog is using the given ident.
+     */
+    bool hasCollectionIdent(OperationContext* opCtx, StringData ident) const;
+
+    /**
+     * Checks if any index tracked in the catalog is using the given ident.
+     */
+    bool hasIndexIdent(OperationContext* opCtx, StringData ident) const;
+
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward = true) const;
 
@@ -141,14 +152,6 @@ public:
                                                      const NamespaceString& nss,
                                                      const BSONObj& catalogEntryObj,
                                                      const RecordId& catalogId);
-    /**
-     * Creates a new record store to back the catalog entry.
-     */
-    StatusWith<std::unique_ptr<RecordStore>> createRecordStoreForEntry(
-        OperationContext* opCtx,
-        const MDBCatalog::EntryIdentifier& entry,
-        const boost::optional<UUID>& uuid,
-        const RecordStore::Options& recordStoreOptions);
 
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> importCatalogEntry(
         OperationContext* opCtx,

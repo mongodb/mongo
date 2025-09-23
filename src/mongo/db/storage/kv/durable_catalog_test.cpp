@@ -118,25 +118,35 @@ public:
         CatalogTestFixture::setUp();
 
         _nss = NamespaceString::createNamespaceString_forTest("unittests.durable_catalog");
-        _collectionUUID = createCollection(_nss, CollectionOptions()).uuid;
+        _collection = createCollection(_nss, CollectionOptions());
     }
 
     NamespaceString ns() {
         return _nss;
     }
 
+    UUID uuid() const {
+        return _collection->uuid;
+    }
+
+    RecordId catalogId() const {
+        return _collection->catalogId;
+    }
+
+    StorageEngine* storageEngine() {
+        return operationContext()->getServiceContext()->getStorageEngine();
+    }
+
     MDBCatalog* getMDBCatalog() {
-        return operationContext()->getServiceContext()->getStorageEngine()->getMDBCatalog();
+        return storageEngine()->getMDBCatalog();
     }
 
     std::string generateNewCollectionIdent(const NamespaceString& nss) {
-        auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
-        return storageEngine->generateNewCollectionIdent(nss.dbName());
+        return storageEngine()->generateNewCollectionIdent(nss.dbName());
     }
 
     std::string generateNewIndexIdent(const NamespaceString& nss) {
-        auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
-        return storageEngine->generateNewIndexIdent(nss.dbName());
+        return storageEngine()->generateNewIndexIdent(nss.dbName());
     }
 
     CollectionPtr getCollection() {
@@ -144,11 +154,11 @@ public:
         // it's controlled by the test. The initialization is therefore safe.
         return CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(operationContext())
-                ->lookupCollectionByUUID(operationContext(), *_collectionUUID));
+                ->lookupCollectionByUUID(operationContext(), uuid()));
     }
 
     CollectionWriter getCollectionWriter() {
-        return CollectionWriter(operationContext(), *_collectionUUID);
+        return CollectionWriter(operationContext(), uuid());
     }
 
     struct CollectionCatalogIdAndUUID {
@@ -189,13 +199,9 @@ public:
         return CollectionCatalogIdAndUUID{catalogId, *options.uuid};
     }
 
-    IndexCatalogEntry* createIndex(BSONObj keyPattern,
-                                   std::string indexType = IndexNames::BTREE,
-                                   bool twoPhase = false) {
-        Lock::DBLock dbLk(operationContext(), _nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLk(operationContext(), _nss, MODE_X);
-
-        std::string indexName = "idx" + std::to_string(_numIndexesCreated);
+    IndexDescriptor indexDescriptor(BSONObj keyPattern,
+                                    const std::string& indexType = IndexNames::BTREE) {
+        std::string indexName = fmt::format("idx_{}", _numIndexesCreated++);
         // Make sure we have a valid IndexSpec for the type requested
         IndexSpec spec;
         spec.version(1).name(indexName).addKeys(keyPattern);
@@ -205,7 +211,16 @@ public:
             spec.textDefaultLanguage("swedish");
         }
 
-        auto desc = IndexDescriptor(indexType, spec.toBSON());
+        return IndexDescriptor(indexType, spec.toBSON());
+    }
+
+    IndexCatalogEntry* createIndex(BSONObj keyPattern,
+                                   std::string indexType = IndexNames::BTREE,
+                                   bool twoPhase = false) {
+        Lock::DBLock dbLk(operationContext(), _nss.dbName(), MODE_IX);
+        Lock::CollectionLock collLk(operationContext(), _nss, MODE_X);
+
+        auto desc = indexDescriptor(keyPattern, indexType);
 
         IndexCatalogEntry* entry = nullptr;
         auto collWriter = getCollectionWriter();
@@ -217,13 +232,13 @@ public:
                               operationContext(), &desc, generateNewIndexIdent(_nss), buildUUID));
             entry = collWriter.getWritableCollection(operationContext())
                         ->getIndexCatalog()
-                        ->getWritableEntryByName(
-                            operationContext(), indexName, IndexCatalog::InclusionPolicy::kAll);
+                        ->getWritableEntryByName(operationContext(),
+                                                 desc.indexName(),
+                                                 IndexCatalog::InclusionPolicy::kAll);
             ASSERT(entry);
             wuow.commit();
         }
 
-        ++_numIndexesCreated;
         return entry;
     }
 
@@ -257,7 +272,7 @@ private:
 
     size_t _numIndexesCreated = 0;
 
-    boost::optional<UUID> _collectionUUID;
+    boost::optional<CollectionCatalogIdAndUUID> _collection;
 };
 
 class ImportCollectionTest : public DurableCatalogTest {
@@ -310,7 +325,7 @@ protected:
 
         wuow.commit();
 
-        auto engine = operationContext()->getServiceContext()->getStorageEngine()->getEngine();
+        auto engine = storageEngine()->getEngine();
         engine->checkpoint();
 
         storageMetadata =
@@ -1017,7 +1032,7 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT(catalogEntryDoesNotExist == boost::none);
 }
 
-TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithExistingIdent) {
+TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithDropPendingIdent) {
     auto opCtx = operationContext();
     auto mdbCatalog = getMDBCatalog();
     const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
@@ -1056,6 +1071,41 @@ TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithExistingIdent) {
         wuow.commit();
     }
     parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
+}
+
+TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithIdentNotInCatalog) {
+    auto opCtx = operationContext();
+    auto mdbCatalog = getMDBCatalog();
+    const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto ident = storageEngine->generateNewCollectionIdent(nss.dbName());
+
+    // Create the collection but remove the catalog entry for it. This simulates the case where the
+    // table is present in a checkpoint at a timestamp before when the collection was created.
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        ASSERT_OK(mdbCatalog->removeEntry(opCtx, catalogId));
+        wuow.commit();
+    }
+    ASSERT_FALSE(mdbCatalog->getEntry_forTest(catalogId));
+
+    // Creating the collection again should drop and recreate the table
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto recordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+
+    auto parsedEntry = mdbCatalog->getEntry(catalogId);
     ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
     ASSERT_EQUALS(nss, parsedEntry.nss);
     ASSERT_EQUALS(ident, parsedEntry.ident);
@@ -1200,6 +1250,93 @@ TEST_F(DurableCatalogTest, CreateCollectionWithCatalogIdentifierSucceedsAfterRol
     ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
     ASSERT_EQUALS(nss, parsedEntry.nss);
     ASSERT_EQUALS(ident, parsedEntry.ident);
+}
+
+TEST_F(DurableCatalogTest, RollingBackCreateIndexAddsIdentToReaper) {
+    const auto ident = generateNewIndexIdent(ns());
+
+    ASSERT_EQUALS(0U, storageEngine()->getNumDropPendingIdents());
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(durable_catalog::createIndex(operationContext(),
+                                               catalogId(),
+                                               ns(),
+                                               {.uuid = uuid()},
+                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                               ident));
+    }
+
+    ASSERT_EQUALS(1U, storageEngine()->getNumDropPendingIdents());
+}
+
+TEST_F(DurableCatalogTest, CreateIndexRemovesIdentFromDropPending) {
+    const auto ident = generateNewIndexIdent(ns());
+
+    ASSERT_EQUALS(0U, storageEngine()->getNumDropPendingIdents());
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(durable_catalog::createIndex(operationContext(),
+                                               catalogId(),
+                                               ns(),
+                                               {.uuid = uuid()},
+                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                               ident));
+    }
+
+    ASSERT_EQUALS(1U, storageEngine()->getNumDropPendingIdents());
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(durable_catalog::createIndex(operationContext(),
+                                               catalogId(),
+                                               ns(),
+                                               {.uuid = uuid()},
+                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                               ident));
+        wuow.commit();
+    }
+
+    ASSERT_EQUALS(0U, storageEngine()->getNumDropPendingIdents());
+}
+
+TEST_F(DurableCatalogTest, CreateIndexSucceedsIfIdentExistsButIsNotInCatalog) {
+    const auto ident = generateNewIndexIdent(ns());
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(durable_catalog::createIndex(operationContext(),
+                                               catalogId(),
+                                               ns(),
+                                               {.uuid = uuid()},
+                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                               ident));
+        wuow.commit();
+    }
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(durable_catalog::createIndex(operationContext(),
+                                               catalogId(),
+                                               ns(),
+                                               {.uuid = uuid()},
+                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                               ident));
+        wuow.commit();
+    }
+}
+
+TEST_F(DurableCatalogTest, CreateIndexFailsIfIdentExistsAndIsInCatalog) {
+    auto entry = createIndex(BSON("a" << 1));
+
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_EQUALS(ErrorCodes::ObjectAlreadyExists,
+                  durable_catalog::createIndex(operationContext(),
+                                               catalogId(),
+                                               ns(),
+                                               {.uuid = uuid()},
+                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                               entry->getIdent()));
 }
 
 }  // namespace
