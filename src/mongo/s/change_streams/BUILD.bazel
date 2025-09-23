@@ -44,6 +44,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:change_stream_helpers",
         "//src/mongo/db/pipeline:change_stream_interfaces",
         "//src/mongo/s:grid",
+        "//src/mongo/util:pcre_util",
     ],
 )
 

@@ -41,12 +41,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::change_stream {
-/**
- * Escape a string name component for usage inside a BSONRegEx object that can be used in a change
- * streams match expression.
- * TDOO SERVER-111150: replace with pcre_util::quoteMeta.
- */
-std::string regexEscapeNsForChangeStream(StringData source);
 
 /**
  * Tests if we are currently running on a router or in a non-sharded replica set context.

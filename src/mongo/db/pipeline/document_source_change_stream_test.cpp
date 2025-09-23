@@ -398,16 +398,6 @@ TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
         DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
 }
 
-TEST_F(ChangeStreamStageTest, ChangeStreamRegexEscape) {
-    ASSERT_EQ(""_sd, change_stream::regexEscapeNsForChangeStream(""));
-    ASSERT_EQ(" "_sd, change_stream::regexEscapeNsForChangeStream(" "));
-    ASSERT_EQ("foo bar"_sd, change_stream::regexEscapeNsForChangeStream("foo bar"));
-    ASSERT_EQ("qux-QUX "_sd, change_stream::regexEscapeNsForChangeStream("qux-QUX "));
-    ASSERT_EQ("\\^foo\\*bar\\$"_sd, change_stream::regexEscapeNsForChangeStream("^foo*bar$"));
-    ASSERT_EQ("\\*\\+\\|\\(\\)\\^\\?\\[\\]\\.\\/\\\\\\$"_sd,
-              change_stream::regexEscapeNsForChangeStream("*+|()^?[]./\\$"));
-}
-
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
     auto expCtx = getExpCtx();
 

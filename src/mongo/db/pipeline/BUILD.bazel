@@ -183,6 +183,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/idl:idl_parser",
         "//src/mongo/s:common_s",
+        "//src/mongo/util:pcre_util",
     ],
 )
 
@@ -1339,6 +1340,7 @@ mongo_cc_library(
         "//src/mongo/db/update:update_driver",
         "//src/mongo/s/change_streams",
         "//src/mongo/s/query/exec:router_exec_stage",
+        "//src/mongo/util:pcre_util",
     ],
 )
 
