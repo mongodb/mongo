@@ -34,7 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/stats/max_diff.h"
-#include "mongo/db/query/compiler/stats/rand_utils_new.h"
+#include "mongo/db/query/compiler/stats/rand_utils.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/platform/decimal128.h"
@@ -255,7 +255,7 @@ TEST(CEHistograms, MixedTypedHistrogram) {
         dateFromISOString("2015-10-21T07:28:00+0000").getValue()));
     td.push_back(std::make_unique<DoubleDistribution>(uniform, 0.2, 100, -100, 100));
     td.push_back(std::make_unique<ObjectIdDistribution>(uniform, 0.2, 100));
-    DatasetDescriptorNew desc{std::move(td), seed};
+    DatasetDescriptor desc{std::move(td), seed};
     const std::vector<SBEValue> values = desc.genRandomDataset(10'000);
     ASSERT_EQ(10'000, values.size());
     auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
@@ -267,7 +267,7 @@ TEST(CEHistograms, LargeNumberOfScalarValuesBucketRanges) {
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
     TypeDistrVector td;
     td.push_back(std::make_unique<IntDistribution>(uniform, 0.5, 1'000'000, 0, 1'000'000));
-    DatasetDescriptorNew desc{std::move(td), seed};
+    DatasetDescriptor desc{std::move(td), seed};
     const std::vector<SBEValue> values = desc.genRandomDataset(1'000'000);
     ASSERT_EQ(1'000'000, values.size());
     auto ceHist = createCEHistogram(values, ScalarHistogram::kMaxBuckets);
@@ -285,12 +285,12 @@ TEST(CEHistograms, LargeArraysHistogram) {
 
     TypeDistrVector arrayData;
     arrayData.push_back(std::make_unique<IntDistribution>(uniform, 1.0, 1'000'000, 0, 1'000'000));
-    auto arrayDataDesc = std::make_unique<DatasetDescriptorNew>(std::move(arrayData), seed);
+    auto arrayDataDesc = std::make_unique<DatasetDescriptor>(std::move(arrayData), seed);
 
     TypeDistrVector arrayDataset;
     arrayDataset.push_back(std::make_unique<ArrDistribution>(
         uniform, 1.0, 100, 80'000, 100'000, std::move(arrayDataDesc)));
-    DatasetDescriptorNew arrayDatasetDesc{std::move(arrayDataset), seed};
+    DatasetDescriptor arrayDatasetDesc{std::move(arrayDataset), seed};
 
     // Build 10 values where each value is an array of length 80-100k.
     const auto values = arrayDatasetDesc.genRandomDataset(10);
@@ -310,12 +310,12 @@ TEST(CEHistograms, LargeNumberOfArraysHistogram) {
 
     TypeDistrVector arrayData;
     arrayData.push_back(std::make_unique<IntDistribution>(uniform, 1.0, 1'000'000, 0, 1'000'000));
-    auto arrayDataDesc = std::make_unique<DatasetDescriptorNew>(std::move(arrayData), seed);
+    auto arrayDataDesc = std::make_unique<DatasetDescriptor>(std::move(arrayData), seed);
 
     TypeDistrVector arrayDataset;
     arrayDataset.push_back(
         std::make_unique<ArrDistribution>(uniform, 1.0, 100, 5, 10, std::move(arrayDataDesc)));
-    DatasetDescriptorNew arrayDatasetDesc{std::move(arrayDataset), seed};
+    DatasetDescriptor arrayDatasetDesc{std::move(arrayDataset), seed};
 
     // Build 100k values where each value is an array of length 5-10.
     const auto values = arrayDatasetDesc.genRandomDataset(100'000);

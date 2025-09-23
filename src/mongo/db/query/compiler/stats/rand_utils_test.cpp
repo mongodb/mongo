@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/compiler/stats/rand_utils_new.h"
+#include "mongo/db/query/compiler/stats/rand_utils.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
@@ -57,7 +57,7 @@ TEST(RandUtilsNewTest, ObjectIdAllPartsCanBeNonzero) {
     MixedDistributionDescriptor uniform{{DistrType::kUniform, 1.0}};
     TypeDistrVector td;
     td.push_back(std::make_unique<ObjectIdDistribution>(uniform, 0.2, 100));
-    DatasetDescriptorNew desc{std::move(td), seed};
+    DatasetDescriptor desc{std::move(td), seed};
     const std::vector<SBEValue> randValues = desc.genRandomDataset(10);
     ASSERT(std::find_if(randValues.begin(), randValues.end(), all_components_non_zero) !=
            randValues.end());

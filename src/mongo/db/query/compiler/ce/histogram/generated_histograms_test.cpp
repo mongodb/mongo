@@ -42,7 +42,7 @@ constexpr double kErrorBound = 0.1;
 TEST(EstimatorTest, UniformIntStrEstimate) {
     /* The code in this comment generates a dataset and creates the histogram used in this test. To
     recreate the data set and the histogram, place this code in a unit test which uses the utilities
-    from rand_utils_new.cpp.
+    from rand_utils.cpp.
 
     constexpr int minLen = 3, maxLen = 5;
     constexpr int minVal = 0, maxVal = 1000;
@@ -55,7 +55,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     td.emplace_back(std::make_unique<StrDistribution>(dd, 0.5, 250, minLen, maxLen));
 
     std::mt19937_64 gen(0);
-    DatasetDescriptorNew desc{std::move(td), gen};
+    DatasetDescriptor desc{std::move(td), gen};
 
     std::vector<SBEValue> dataset;
     dataset = desc.genRandomDataset(dataSize);
@@ -152,7 +152,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
 TEST(EstimatorTest, IntStrArrayEstimate) {
     /* The code in this comment generates a dataset of 1000 integers, strings and arrays of integers
        and strings and creates the histogram used in this test. To recreate the data set and the
-       histogram, place this code in a unit test which uses the utilities from rand_utils_new.cpp.
+       histogram, place this code in a unit test which uses the utilities from rand_utils.cpp.
 
        constexpr int minLen = 2, maxLen = 5;
        constexpr int minVal = 0, maxVal = 1000;
@@ -165,7 +165,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
        td1.emplace_back(std::make_unique<StrDistribution>(dd, 0.3, 100, minLen, maxLen));
 
        std::mt19937_64 gen(5);
-       auto desc1 = std::make_unique<DatasetDescriptorNew>(std::move(td1), gen);
+       auto desc1 = std::make_unique<DatasetDescriptor>(std::move(td1), gen);
 
        TypeDistrVector td2;
        td2.emplace_back(std::make_unique<IntDistribution>(dd, 0.4, 200, minVal, maxVal));
@@ -173,7 +173,7 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
        td2.emplace_back(std::make_unique<ArrDistribution>(dd, 0.3, 200, 2, 6, std::move(desc1),
        0.0));
 
-       DatasetDescriptorNew desc{std::move(td2), gen};
+       DatasetDescriptor desc{std::move(td2), gen};
        std::vector<SBEValue> dataset;
        dataset = desc.genRandomDataset(dataSize);
 

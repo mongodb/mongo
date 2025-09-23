@@ -31,120 +31,480 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
+#include <cmath>
 #include <cstddef>
-#include <map>
 #include <memory>
 #include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
+#include <absl/random/zipf_distribution.h>
 
 namespace mongo::stats {
-// A simple histogram describing the distribution of values of each data type.
-using DataTypeDistribution = std::map<sbe::value::TypeTags, double>;
+
+class DatasetDescriptor;
 
 /**
-    Describes the distribution of a dataset according to type and weight. Other ctor parameters
-    are used to describe the various data types which can be emitted and correspond to the fields
-    named similarly
+ * A base class for wrappers of STL random distributions that produce size_t values within a range.
+ * This class enables polymorphic usage of random distributions, for instance to implement a mix of
+ * distributions.
  */
-class DatasetDescriptor {
+class RandomDistribution {
 public:
-    DatasetDescriptor(const DataTypeDistribution& dataTypeDistribution,
-                      size_t intNDV,
-                      int minInt,
-                      int maxInt,
-                      size_t strNDV,
-                      size_t minStrLen,
-                      size_t maxStrLen,
-                      std::shared_ptr<DatasetDescriptor> nestedDataDescriptor = nullptr,
-                      double reuseScalarsRatio = 0,
-                      size_t arrNDV = 0,
-                      size_t minArrLen = 0,
-                      size_t maxArrLen = 0);
+    RandomDistribution() = default;
+    RandomDistribution(const RandomDistribution&) = default;
+    RandomDistribution(RandomDistribution&&) = default;
+    RandomDistribution& operator=(const RandomDistribution&) = default;
+    RandomDistribution& operator=(RandomDistribution&&) = default;
+    virtual ~RandomDistribution() = default;
 
-    // Generate a random dataset of 'nElems' according to the data distribution characteristics in
-    // this object.
-    std::vector<SBEValue> genRandomDataset(size_t nElems, DatasetDescriptor* parentDesc = nullptr);
+    virtual size_t operator()(std::mt19937_64& gen) = 0;
+};
 
-private:
-    // Select a random value data type.
-    sbe::value::TypeTags getRandDataType() {
-        double key = _uniformRandProbability(_gen);
-        return (*_dataTypeDistribution.upper_bound(key)).second;
+/**
+    A uniform random distribution of size_t within a range
+ */
+class UniformDistr : public RandomDistribution {
+public:
+    UniformDistr(size_t min, size_t max) : _distr{min, max}, _min(min), _max(max) {}
+
+    size_t operator()(std::mt19937_64& gen) override {
+        size_t result = _distr(gen);
+        uassert(6660540, "Random index out of range", result >= _min && result <= _max);
+        return result;
     }
 
-    // Generate a random string with size 'len'.
-    std::string genRandomString(size_t len);
+private:
+    std::uniform_int_distribution<size_t> _distr;
+    size_t _min;
+    size_t _max;
+};
 
-    // Generate a random array with length determined uniformly between minArrLen and maxArrLen
-    std::vector<SBEValue> genRandomArray();
+/**
+ * Wrapper of normal distribution that is guaranteed to produces size_t values within a certain
+ * range. The STL class normal_distribution takes a median and standard deviation. This class
+ * computes a suitable median and standard deviation from the required [min,max] boundaries.
+ */
+class NormalDistr : public RandomDistribution {
+public:
+    NormalDistr(size_t min, size_t max)
+        : _distr{(double)(min + max) / 2.0, (double)(max - min) / 4.0},
+          _backup{min, max},
+          _min((double)min),
+          _max((double)max) {}
 
-    // Generate a set of random arrays that are chosen from when generating array data.
-    void fillRandomArraySet();
+    size_t operator()(std::mt19937_64& gen) override {
+        double randNum = _distr(gen);
+        size_t trials = 0;
+        // If the result is outside the range (an event with low probability), try 10 more times to
+        // get a number in the range.
+        while (!(randNum >= _min && randNum <= _max) && trials < 10) {
+            randNum = _distr(gen);
+            if (randNum < _min) {
+                randNum = std::ceil(randNum);
+            } else if (randNum > _max) {
+                randNum = std::floor(randNum);
+            } else {
+                randNum = std::round(randNum);
+            }
+            ++trials;
+        }
+        if (randNum < _min || randNum > _max) {
+            // We couldn't generate a number in [min,max] within 10 attempts. Generate a uniform
+            // number.
+            randNum = _backup(gen);
+        }
+        size_t result = std::round(randNum);
+        uassert(6660541, "Random index out of range", result >= _min && result <= _max);
+        return result;
+    }
 
 private:
-    using InternalDataTypeDistribution = std::map<double, sbe::value::TypeTags>;
-    /*
-     * General distribution charecteristics.
+    std::normal_distribution<double> _distr;
+    std::uniform_int_distribution<size_t> _backup;
+    double _min;
+    double _max;
+};
+
+/**
+ * Wrapper of zipfian distribution that is guaranteed to produces size_t values within a certain
+ * range. The absl::zipf_distribution class requires as input the max value expected in the
+ * distribution.
+ */
+class ZipfianDistr : public RandomDistribution {
+public:
+    ZipfianDistr(size_t min, size_t max)
+        : _distr{max}, _backup{min, max}, _min((double)min), _max((double)max) {}
+
+    size_t operator()(std::mt19937_64& gen) override {
+        double randNum = _distr(gen);
+        size_t trials = 0;
+        // If the result is outside the range (an event with low probability), try 10 more times to
+        // get a number in the range.
+        while (!(randNum >= _min && randNum <= _max) && trials < 10) {
+            randNum = _distr(gen);
+            if (randNum < _min) {
+                randNum = std::ceil(randNum);
+            } else if (randNum > _max) {
+                randNum = std::floor(randNum);
+            } else {
+                randNum = std::round(randNum);
+            }
+            ++trials;
+        }
+        if (randNum < _min || randNum > _max) {
+            // We couldn't generate a number in [min,max] within 10 attempts. Generate a uniform
+            // number.
+            randNum = _backup(gen);
+        }
+        size_t result = std::round(randNum);
+        uassert(8871801, "Random index out of range", result >= _min && result <= _max);
+        return result;
+    }
+
+private:
+    absl::zipf_distribution<size_t> _distr;
+    std::uniform_int_distribution<size_t> _backup;
+    double _min;
+    double _max;
+};
+
+enum class DistrType { kUniform, kNormal, kZipfian };
+
+using MixedDistributionDescriptor = std::vector<std::pair<DistrType, double /*weight*/>>;
+
+/**
+ * Generator for mixed distribution, where mixing is on the type of distribution, in the
+ * probabilities specified in distrProbabilites
+ */
+class MixedDistribution {
+public:
+    MixedDistribution(std::vector<std::unique_ptr<RandomDistribution>> distrMix,
+                      std::vector<double>& distrProbabilities)
+        : _distrMix(std::move(distrMix)) {
+        _distDist.param(std::discrete_distribution<size_t>::param_type(distrProbabilities.begin(),
+                                                                       distrProbabilities.end()));
+    }
+
+    static std::unique_ptr<MixedDistribution> make(MixedDistributionDescriptor& descriptor,
+                                                   size_t min,
+                                                   size_t max) {
+        std::vector<double> distrProbabilities;
+        std::vector<std::unique_ptr<RandomDistribution>> distrMix;
+
+        for (const auto& [distrType, weight] : descriptor) {
+            distrProbabilities.push_back(weight);
+            switch (distrType) {
+                case DistrType::kUniform:
+                    distrMix.emplace_back(std::make_unique<UniformDistr>(min, max));
+                    break;
+                case DistrType::kNormal:
+                    distrMix.emplace_back(std::make_unique<NormalDistr>(min, max));
+                    break;
+                case DistrType::kZipfian:
+                    distrMix.emplace_back(std::make_unique<ZipfianDistr>(min, max));
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+
+        return std::make_unique<MixedDistribution>(std::move(distrMix), distrProbabilities);
+    }
+
+    size_t operator()(std::mt19937_64& gen) {
+        size_t distIdx = _distDist(gen);
+        size_t result = (*_distrMix.at(distIdx))(gen);
+        return result;
+    }
+
+private:
+    // Mix of different distributions. There can be instances of the same type of distribution,
+    // because they can still be defined differently.
+    std::vector<std::unique_ptr<RandomDistribution>> _distrMix;
+    // Distribution of distributions - select the current distribution with a certain probability.
+    std::discrete_distribution<size_t> _distDist;
+};
+
+/**
+ * Descriptor of a typed data distribution
+ */
+class DataTypeDistr {
+public:
+    DataTypeDistr(MixedDistributionDescriptor distrDescriptor,
+                  sbe::value::TypeTags tag,
+                  double weight,
+                  size_t ndv,
+                  double nullsRatio = 0.0,
+                  double nanRatio = 0.0)
+        : _mixedDistrDescriptor(distrDescriptor),
+          _tag(tag),
+          _weight(weight),
+          _ndv(ndv),
+          _nullsRatio(nullsRatio),
+          _nanRatio(nanRatio) {
+        uassert(6660542, "NDV must be > 0.", ndv > 0);
+        uassert(6660543, "nullsRatio must be in [0, 1].", nullsRatio >= 0 && nullsRatio <= 1);
+        uassert(9497300, "NaN Ratio must be in [0, 1].", nanRatio >= 0 && nanRatio <= 1);
+        uassert(9497301,
+                "The sum of NaN Ratio and nullsRatio must be in [0, 1].",
+                (nullsRatio + nanRatio) >= 0 && (nullsRatio + nanRatio) <= 1);
+    }
+
+    virtual ~DataTypeDistr() = default;
+
+    /**
+     * Generate all unique values that generation chooses from, and store them in '_valSet'.
+     * Different data types provide different implementations.
+     * @todo: The 'parentDesc' parameter is used only by array generation. Consider a different way
+     * of passing it only to that type.
      */
+    virtual void init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) = 0;
 
-    // Pseudo-random generator.
-    std::mt19937_64 _gen;
-    // Random probabilities. Used to:
-    // - Select Value data types as random indexes in '_dataTypeDistribution'.
-    // - Select the source of values - either existing scalars or new.
-    std::uniform_real_distribution<double> _uniformRandProbability{0.0, 1.0};
-    // Distribution of different SBE data types. There will be %percent values of each type.
-    InternalDataTypeDistribution _dataTypeDistribution;
-    double _reuseScalarsRatio;
+    /**
+     * Generate a single random value, and store it in 'randValues' vector.
+     */
+    void generate(std::vector<SBEValue>& randValues, std::mt19937_64& gen);
+
+    /**
+     * Generate a single random value, and store it in 'randValueArray' array.
+     */
+    void generate(sbe::value::Array* randValueArray, std::mt19937_64& gen);
+
+    /**
+     * Custom equality comparison for storage in sets. There can be only datatype in a set.
+     */
+    bool operator==(const DataTypeDistr& d) const {
+        return this->_tag == d._tag;
+    }
+
+    sbe::value::TypeTags tag() const {
+        return _tag;
+    }
+
+    double weight() const {
+        return _weight;
+    }
+
+protected:
+    MixedDistributionDescriptor _mixedDistrDescriptor;
+    sbe::value::TypeTags _tag;
+    // Weight that determines the probability of a value of this type.
+    const double _weight;
+    const size_t _ndv;
+    // A set of (randomly generated) values to choose from when generating random datasets.
+    std::vector<SBEValue> _valSet;
+    // Generator of random indexes into a set of values.
+    // std::uniform_int_distribution<size_t> _idxDist;
+    std::unique_ptr<MixedDistribution> _idxDist;
+    // Percent of null values in the dataset.
+    double _nullsRatio;
+    // Percent of NaN values in the dataset.
+    double _nanRatio;
+    // Random generator to decide between null/NaN/some number vaule.
+    std::uniform_real_distribution<double> _selector{0, 1};
+
+    friend class DatasetDescriptor;
+};
+
+using TypeDistrVector = std::vector<std::unique_ptr<DataTypeDistr>>;
+
+/**
+ * Null data distribution.
+ */
+class NullDistribution : public DataTypeDistr {
+public:
+    NullDistribution(MixedDistributionDescriptor distrDescriptor, double weight, size_t ndv);
 
     /*
-     * Integer data parameters.
+     * Generate a set of null values, and store them in _valSet.
      */
+    void init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) override;
+};
 
-    // Number of distinct integer values.
-    const size_t _intNDV;
-    // A set of integers to choose from while generating random integers.
-    std::vector<int> _intSet;
-    // Generator of random integers with uniform distribution.
-    std::uniform_int_distribution<int> _uniformIntDist;
-    // Generator of random indexes into the set of integers '_intSet'.
-    std::uniform_int_distribution<size_t> _uniformIntIdxDist;
+/**
+ * Boolean data distribution.
+ */
+class BooleanDistribution : public DataTypeDistr {
+public:
+    BooleanDistribution(MixedDistributionDescriptor distrDescriptor,
+                        double weight,
+                        size_t ndv,
+                        bool includeFalse,
+                        bool includeTrue,
+                        double nullsRatio = 0);
 
     /*
-     * String data parameters.
+     * Generate a set of random booleans, and store them in _valSet.
      */
+    void init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) override;
 
+protected:
+    // _includeFalse and _includeTrue define which of true/false values will appear in the dataset.
+    // if _includeFalse is true, then 'false' values will be generated, otherwise not.
+    // Similarly for _includeTrue.
+    bool _includeFalse;
+    bool _includeTrue;
+};
+
+/**
+ * Integer data distribution.
+ */
+class IntDistribution : public DataTypeDistr {
+public:
+    IntDistribution(MixedDistributionDescriptor distrDescriptor,
+                    double weight,
+                    size_t ndv,
+                    int minInt,
+                    int maxInt,
+                    double nullsRatio = 0,
+                    double nanRatio = 0);
+
+    /*
+     * Generate a set of random integers, and store them in _valSet.
+     */
+    void init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) override;
+
+protected:
+    int _minInt;
+    int _maxInt;
+};
+
+/**
+ * String data distribution.
+ */
+class StrDistribution : public DataTypeDistr {
+public:
+    StrDistribution(MixedDistributionDescriptor distrDescriptor,
+                    double weight,
+                    size_t ndv,
+                    size_t minStrLen,
+                    size_t maxStrLen,
+                    double nullsRatio = 0);
+
+    /*
+     * Generate a set of random strings, and store them in _valSet.
+     */
+    void init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) override;
+
+protected:
+    std::string genRandomString(size_t len, std::mt19937_64& gen);
+
+    size_t _minStrLen;
+    size_t _maxStrLen;
     // All strings draw characters from this alphabet.
     static const std::string _alphabet;
-    // A set of random strings to choose from. In theory there can be duplicates, but this is very
-    // unlikely. We don't care much if there are a few duplicates anyway.
-    std::vector<std::string> _stringSet;
     // Generator of random indexes into the set of characters '_alphabet'.
     std::uniform_int_distribution<size_t> _uniformCharIdxDist{0, _alphabet.size() - 1};
-    // Generator of random indexes into the set of strings '_stringSet'.
-    std::uniform_int_distribution<size_t> _uniformStrIdxDist;
+};
 
-    /*
-     * Array data parameters.
-     */
+/**
+ * Date data distribution.
+ */
+class DateDistribution : public DataTypeDistr {
+public:
+    DateDistribution(MixedDistributionDescriptor distrDescriptor,
+                     double weight,
+                     size_t ndv,
+                     Date_t minDate,
+                     Date_t maxDate,
+                     double nullsRatio = 0);
 
-    // Number of distinct arrays.
-    // TODO: currently not used. The idea is to use it in the same way as arrays - pre-generate
-    // '_arrNDV' arrays, then select randomly from this initial set.
-    size_t _arrNDV;
-    // Set of arrays to pick from when generating random data.
-    std::vector<std::vector<SBEValue>> _arraySet;
+    void init(DatasetDescriptor*, std::mt19937_64& gen) override;
+
+protected:
+    Date_t _minDate;
+    Date_t _maxDate;
+};
+
+/**
+ * Double data distribution.
+ */
+class DoubleDistribution : public DataTypeDistr {
+public:
+    DoubleDistribution(MixedDistributionDescriptor distrDescriptor,
+                       double weight,
+                       size_t ndv,
+                       double min,
+                       double max,
+                       double nullsRatio = 0,
+                       double nanRatio = 0);
+
+    void init(DatasetDescriptor*, std::mt19937_64& gen) override;
+
+protected:
+    double _min;
+    double _max;
+};
+
+/**
+ * ObjectId data distribution.
+ */
+class ObjectIdDistribution : public DataTypeDistr {
+public:
+    ObjectIdDistribution(MixedDistributionDescriptor distrDescriptor,
+                         double weight,
+                         size_t ndv,
+                         double nullsRatio = 0);
+
+    void init(DatasetDescriptor*, std::mt19937_64& gen) override;
+};
+
+/**
+ * SBE array data distribution.
+ */
+class ArrDistribution : public DataTypeDistr {
+public:
+    ArrDistribution(MixedDistributionDescriptor distrDescriptor,
+                    double weight,
+                    size_t ndv,
+                    size_t minArrLen,
+                    size_t maxArrLen,
+                    std::unique_ptr<DatasetDescriptor> arrayDataDescriptor,
+                    double reuseScalarsRatio = 0,
+                    double nullsRatio = 0);
+
+private:
+    void init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) override;
+
     // Generator of random array sizes.
     std::uniform_int_distribution<size_t> _uniformArrSizeDist;
     // Descriptor of the dataset within each array.
-    std::shared_ptr<DatasetDescriptor> _nestedDataDescriptor;
-    // Generator of random indexes into the set of arrays '_arraySet'.
-    std::uniform_int_distribution<size_t> _uniformArrIdxDist;
+    std::unique_ptr<DatasetDescriptor> _arrayDataDescriptor;
+    // Randomly select a parent or a child distribution when generating random
+    std::uniform_real_distribution<double> _uniformRandProbability{0.0, 1.0};
+    double _reuseScalarsRatio;
+};
+
+/**
+    Given a list of tyoed data distibutions, this class is used to generate a vector of values
+    according to the distribution weights.
+*/
+class DatasetDescriptor {
+public:
+    DatasetDescriptor(TypeDistrVector dataTypeDistributions, std::mt19937_64& gen);
+
+    // Generate a random dataset of 'nElems' according to the data distribution characteristics in
+    // this object.
+    std::vector<SBEValue> genRandomDataset(size_t nElems);
+
+private:
+    // Select a random value data type.
+    DataTypeDistr* getRandDataTypeDist();
+
+    // Distribution of different SBE data types. There will be %percent values of each type.
+    // TODO: is it a better idea to store shared_ptr or raw pointers to enable reuse?
+    TypeDistrVector _dataTypeDistributions;
+    // Pseudo-random generator.
+    std::mt19937_64& _gen;
+    // Select a random data type distribution.
+    std::discrete_distribution<size_t> _dataTypeSelector;
+
+    friend class ArrDistribution;
 };
 
 /**

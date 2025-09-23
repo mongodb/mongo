@@ -30,178 +30,162 @@
 #include "mongo/db/query/compiler/stats/rand_utils.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
-#include <cmath>
+#include <cstdint>
 #include <cstdlib>
-#include <cstring>
-#include <iterator>
+#include <limits>
+#include <set>
 #include <string>
-#include <tuple>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::stats {
 namespace value = sbe::value;
-
-const std::string DatasetDescriptor::_alphabet =
+const std::string StrDistribution::_alphabet =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-DatasetDescriptor::DatasetDescriptor(const DataTypeDistribution& dataTypeDistribution,
-                                     size_t intNDV,
-                                     int minInt,
-                                     int maxInt,
-                                     size_t strNDV,
-                                     size_t minStrLen,
-                                     size_t maxStrLen,
-                                     std::shared_ptr<DatasetDescriptor> nestedDataDescriptor,
-                                     double reuseScalarsRatio,
-                                     size_t arrNDV,
-                                     size_t minArrLen,
-                                     size_t maxArrLen)
-    : _gen{42},
-      _reuseScalarsRatio(reuseScalarsRatio),
-      _intNDV(std::min(intNDV, static_cast<size_t>(std::abs(maxInt - minInt)))),
-      _uniformIntDist{minInt, maxInt},
-      _arrNDV(arrNDV),
-      _uniformArrSizeDist{minArrLen, maxArrLen},
-      _nestedDataDescriptor(std::move(nestedDataDescriptor)) {
-    uassert(6660520, "Maximum integer number must be >= the minimum one.", (maxInt >= minInt));
-    uassert(6660521, "Maximum string size must be >= the minimum one.", (maxStrLen >= minStrLen));
-    uassert(6660522,
-            "Array specs must be 0 if there is no array data descriptor.",
-            _nestedDataDescriptor || (arrNDV == 0 && minArrLen == 0 && maxArrLen == 0));
-    uassert(6660523,
-            "Nested arrays requires sensible array lengths",
-            !_nestedDataDescriptor || maxArrLen >= minArrLen);
-    uassert(6660524, "Recursive descriptors are not allowed.", _nestedDataDescriptor.get() != this);
-    uassert(6660525,
-            "reuseScalarsRatio is a probability, must be in [0, 1].",
-            reuseScalarsRatio >= 0 && reuseScalarsRatio <= 1.0);
-
-    // Compute absolute ranges given relative weights of each value type.
-    double sumWeights = 0;
-    for (const auto& weightedType : dataTypeDistribution) {
-        sumWeights += weightedType.second;
+void DataTypeDistr::generate(std::vector<SBEValue>& randValues, std::mt19937_64& gen) {
+    auto rand = _selector(gen);
+    if (_nullsRatio > 0 && rand >= 0 && rand < _nullsRatio) {
+        auto [tag, val] = makeNullValue();
+        randValues.emplace_back(tag, val);
+    } else if (_nanRatio > 0 && rand >= _nullsRatio && rand < _nullsRatio + _nanRatio) {
+        auto [tag, val] = stats::makeNaNValue();
+        randValues.emplace_back(tag, val);
+    } else {
+        size_t idx = (*_idxDist)(gen);
+        const auto val = _valSet.at(idx);
+        auto [copyTag, copyVal] = copyValue(val.getTag(), val.getValue());
+        randValues.emplace_back(copyTag, copyVal);
     }
-    double sumRelativeWeights = 0;
-    auto lastKey = dataTypeDistribution.crbegin()->first;
-    for (auto it = dataTypeDistribution.cbegin(); it != dataTypeDistribution.cend(); ++it) {
-        const auto weightedType = *it;
-        if (weightedType.first != lastKey) {
-            sumRelativeWeights += weightedType.second / sumWeights;
-            uassert(6660526, "The sum of weights can't be >= 1", sumRelativeWeights < 1);
-        } else {
-            // Due to rounding errors the last relative weight may not be exactly 1.0. Set it
-            // to 1.0.
-            sumRelativeWeights = 1.0;
-        }
-        _dataTypeDistribution.emplace(sumRelativeWeights, weightedType.first);
+}
+
+void DataTypeDistr::generate(value::Array* randValueArray, std::mt19937_64& gen) {
+    auto rand = _selector(gen);
+    if (_nullsRatio > 0 && rand < _nullsRatio) {
+        auto [tag, val] = makeNullValue();
+        randValueArray->push_back(tag, val);
+    } else {
+        size_t idx = (*_idxDist)(gen);
+        const auto val = _valSet.at(idx);
+        auto [copyTag, copyVal] = copyValue(val.getTag(), val.getValue());
+        randValueArray->push_back(copyTag, copyVal);
+    }
+}
+
+NullDistribution::NullDistribution(MixedDistributionDescriptor distrDescriptor,
+                                   double weight,
+                                   size_t ndv)
+    : DataTypeDistr(distrDescriptor, value::TypeTags::Null, weight, ndv, 1) {}
+
+void NullDistribution::init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) {}
+
+BooleanDistribution::BooleanDistribution(MixedDistributionDescriptor distrDescriptor,
+                                         double weight,
+                                         size_t ndv,
+                                         bool includeFalse,
+                                         bool includeTrue,
+                                         double nullsRatio)
+    : DataTypeDistr(distrDescriptor, value::TypeTags::NumberInt64, weight, ndv, nullsRatio),
+      _includeFalse(includeFalse),
+      _includeTrue(includeTrue) {
+    uassert(9163901, "At least one of the values needs to be true.", (includeFalse || includeTrue));
+}
+
+void BooleanDistribution::init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) {
+    _valSet.reserve(2);
+
+    if (_includeFalse) {
+        const auto [tagFalse, valFalse] = makeBooleanValue(0);
+        _valSet.emplace_back(tagFalse, valFalse);
     }
 
-    // Generate a set of random integers.
-    mongo::stdx::unordered_set<int> tmpIntSet;
-    tmpIntSet.reserve(_intNDV);
-    if (_intNDV == intNDV) {
-        for (int i = minInt; i <= maxInt; ++i) {
-            tmpIntSet.insert(i);  // This is a dense set of all ints the range.
+    if (_includeTrue) {
+        const auto [tagTrue, valTrue] = makeBooleanValue(1);
+        _valSet.emplace_back(tagTrue, valTrue);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+IntDistribution::IntDistribution(MixedDistributionDescriptor distrDescriptor,
+                                 double weight,
+                                 size_t ndv,
+                                 int minInt,
+                                 int maxInt,
+                                 double nullsRatio,
+                                 double nanRatio)
+    : DataTypeDistr(distrDescriptor,
+                    value::TypeTags::NumberInt64,
+                    weight,
+                    std::min(ndv, static_cast<size_t>(std::abs(maxInt - minInt))),
+                    nullsRatio,
+                    nanRatio),
+      _minInt(minInt),
+      _maxInt(maxInt) {
+    uassert(6660507, "Maximum integer number must be >= the minimum one.", (maxInt >= minInt));
+}
+
+void IntDistribution::init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) {
+    std::set<int> tmpIntSet;
+    std::uniform_int_distribution<int> uniformIntDist{_minInt, _maxInt};
+
+    if (_ndv == static_cast<size_t>(std::abs(_maxInt - _minInt))) {
+        // This is a dense set of all ints in the range.
+        for (int i = _minInt; i <= _maxInt; ++i) {
+            tmpIntSet.insert(i);
         }
     } else {
         size_t randCount = 0;
-        while (tmpIntSet.size() < _intNDV && randCount < 10 * _intNDV) {
-            int randInt = _uniformIntDist(_gen);
+        while (tmpIntSet.size() < _ndv && randCount < 10 * _ndv) {
+            int randInt = uniformIntDist(gen);
             ++randCount;
             tmpIntSet.insert(randInt);
         }
     }
-    uassert(
-        6660527, "Too few integers generated.", (double)tmpIntSet.size() / (double)_intNDV > 0.99);
-    _intSet.reserve(tmpIntSet.size());
-    _intSet.insert(_intSet.end(), tmpIntSet.begin(), tmpIntSet.end());
-    _uniformIntIdxDist.param(
-        std::uniform_int_distribution<size_t>::param_type(0, _intSet.size() - 1));
-
-    // Generate a set of random strings with random sizes so that each string can be chosen
-    // multiple times in the test data set.
-    _stringSet.reserve(strNDV);
-    std::uniform_int_distribution<size_t> uniformStrSizeDistr{minStrLen, maxStrLen};
-    for (size_t i = 0; i < strNDV; ++i) {
-        size_t len = uniformStrSizeDistr(_gen);
-        const auto randStr = genRandomString(len);
-        _stringSet.push_back(randStr);
+    uassert(6660508, "Too few integers generated.", (double)tmpIntSet.size() / (double)_ndv > 0.99);
+    _valSet.reserve(tmpIntSet.size());
+    for (const auto randInt : tmpIntSet) {
+        const auto [tag, val] = makeInt64Value(randInt);
+        _valSet.emplace_back(tag, val);
     }
-    _uniformStrIdxDist.param(
-        std::uniform_int_distribution<size_t>::param_type(0, _stringSet.size() - 1));
 
-    // Generate a set of random arrays that are chosen from when generating array data.
-    fillRandomArraySet();
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
 }
 
-std::vector<SBEValue> DatasetDescriptor::genRandomDataset(size_t nElems,
-                                                          DatasetDescriptor* parentDesc) {
-    std::vector<SBEValue> randValues;
-    randValues.reserve(nElems);
-    DatasetDescriptor* curDesc = this;
-
-    if (parentDesc) {
-        double reuseProb = _uniformRandProbability(_gen);
-        if (reuseProb < parentDesc->_reuseScalarsRatio) {
-            curDesc = parentDesc;
-        }
-    }
-
-    for (size_t i = 0; i < nElems; ++i) {
-        // Get the data type of the current value to be generated.
-        value::TypeTags genTag = this->getRandDataType();
-        // Generate a random value of the corresponding type.
-        switch (genTag) {
-            case value::TypeTags::NumberInt64: {
-                size_t idx = curDesc->_uniformIntIdxDist(_gen);
-                auto randInt = curDesc->_intSet.at(idx);
-                const auto [tag, val] = makeInt64Value(randInt);
-                randValues.emplace_back(tag, val);
-                break;
-            }
-            case value::TypeTags::StringBig:
-            case value::TypeTags::StringSmall: {
-                size_t idx = curDesc->_uniformStrIdxDist(_gen);
-                const auto randStr = curDesc->_stringSet.at(idx);
-                const auto [tag, val] = value::makeNewString(randStr);
-                const auto [copyTag, copyVal] = value::copyValue(tag, val);
-                randValues.emplace_back(copyTag, copyVal);
-                break;
-            }
-            case value::TypeTags::Array: {
-                if (_nestedDataDescriptor) {
-                    const auto randArray = genRandomArray();
-                    auto [arrayTag, arrayVal] = value::makeNewArray();
-                    value::Array* arr = value::getArrayView(arrayVal);
-                    for (const auto& elem : randArray) {
-                        const auto [copyTag, copyVal] =
-                            value::copyValue(elem.getTag(), elem.getValue());
-                        arr->push_back(copyTag, copyVal);
-                    }
-                    randValues.emplace_back(arrayTag, arrayVal);
-                }
-                break;
-            }
-            default:
-                uasserted(6660528, "Unsupported data type");
-        }
-    }
-
-    return randValues;
+StrDistribution::StrDistribution(MixedDistributionDescriptor distrDescriptor,
+                                 double weight,
+                                 size_t ndv,
+                                 size_t minStrLen,
+                                 size_t maxStrLen,
+                                 double nullsRatio)
+    : DataTypeDistr(distrDescriptor, value::TypeTags::StringBig, weight, ndv, nullsRatio),
+      _minStrLen(minStrLen),
+      _maxStrLen(maxStrLen) {
+    uassert(6660509, "Maximum string size must be >= the minimum one.", (maxStrLen >= minStrLen));
 }
 
-std::string DatasetDescriptor::genRandomString(size_t len) {
+void StrDistribution::init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) {
+    // Generate a set of random strings with random sizes between _minStrLen and _maxStrLen.
+    _valSet.reserve(_ndv);
+    std::uniform_int_distribution<size_t> uniformStrSizeDistr{_minStrLen, _maxStrLen};
+    for (size_t i = 0; i < _ndv; ++i) {
+        size_t len = uniformStrSizeDistr(gen);
+        const auto randStr = genRandomString(len, gen);
+        const auto [tag, val] = value::makeNewString(randStr);
+        _valSet.emplace_back(tag, val);
+    }
+
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+std::string StrDistribution::genRandomString(size_t len, std::mt19937_64& gen) {
     std::string randStr;
     randStr.reserve(len);
     for (size_t i = 0; i < len; ++i) {
-        size_t idx = _uniformCharIdxDist(_gen);
+        size_t idx = _uniformCharIdxDist(gen);
         const char ch = _alphabet[idx];
         randStr += ch;
     }
@@ -209,30 +193,209 @@ std::string DatasetDescriptor::genRandomString(size_t len) {
     return randStr;
 }
 
-std::vector<SBEValue> DatasetDescriptor::genRandomArray() {
-    uassert(6660529,
-            "There must be a nested data descriptor for random array generation.",
-            _nestedDataDescriptor);
-    if (_arrNDV == 0) {
-        size_t randArraySize = _uniformArrSizeDist(_gen);
-        return _nestedDataDescriptor->genRandomDataset(randArraySize, this);
-    } else {
-        size_t idx = _uniformArrIdxDist(_gen);
-        return _arraySet.at(idx);
-    }
+DateDistribution::DateDistribution(MixedDistributionDescriptor distrDescriptor,
+                                   double weight,
+                                   size_t ndv,
+                                   Date_t minDate,
+                                   Date_t maxDate,
+                                   double nullsRatio)
+    : DataTypeDistr(distrDescriptor, value::TypeTags::Date, weight, ndv, nullsRatio),
+      _minDate(minDate),
+      _maxDate(maxDate) {
+    uassert(7169301,
+            fmt::format(
+                "minDate: {} must be before maxDate: {}", _minDate.toString(), _maxDate.toString()),
+            _minDate <= _maxDate);
 }
 
-void DatasetDescriptor::fillRandomArraySet() {
-    for (size_t i = 0; i < _arrNDV; ++i) {
-        size_t randArraySize = _uniformArrSizeDist(_gen);
-        const auto randArray = _nestedDataDescriptor->genRandomDataset(randArraySize, this);
-        _arraySet.push_back(randArray);
+void DateDistribution::init(DatasetDescriptor*, std::mt19937_64& gen) {
+    const auto min = _minDate.toMillisSinceEpoch();
+    const auto max = _maxDate.toMillisSinceEpoch();
+    std::set<long long> tmpRandSet;
+    std::uniform_int_distribution<long long> uniformIntDist{min, max};
+    while (tmpRandSet.size() < _ndv) {
+        long long rand = uniformIntDist(gen);
+        tmpRandSet.insert(rand);
+    }
+    _valSet.reserve(tmpRandSet.size());
+    for (const auto rand : tmpRandSet) {
+        const auto [tag, val] = makeDateValue(Date_t::fromMillisSinceEpoch(rand));
+        _valSet.emplace_back(tag, val);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+DoubleDistribution::DoubleDistribution(MixedDistributionDescriptor distrDescriptor,
+                                       double weight,
+                                       size_t ndv,
+                                       double min,
+                                       double max,
+                                       double nullsRatio,
+                                       double nanRatio)
+    : DataTypeDistr(
+          distrDescriptor, value::TypeTags::NumberDouble, weight, ndv, nullsRatio, nanRatio),
+      _min(min),
+      _max(max) {
+    uassert(7169302,
+            fmt::format("min double: {} must be less than max double: {}", _min, _max),
+            _min <= _max);
+}
+
+void DoubleDistribution::init(DatasetDescriptor*, std::mt19937_64& gen) {
+    std::set<double> tmpRandSet;
+    std::uniform_real_distribution<double> uniformDist{_min, _max};
+    while (tmpRandSet.size() < _ndv) {
+        tmpRandSet.insert(uniformDist(gen));
+    }
+    _valSet.reserve(tmpRandSet.size());
+    for (const auto rand : tmpRandSet) {
+        const auto [tag, val] = makeDoubleValue(rand);
+        _valSet.emplace_back(tag, val);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+ObjectIdDistribution::ObjectIdDistribution(MixedDistributionDescriptor distrDescriptor,
+                                           double weight,
+                                           size_t ndv,
+                                           double nullsRatio)
+    : DataTypeDistr(distrDescriptor, value::TypeTags::ObjectId, weight, ndv, nullsRatio) {}
+
+/**
+ * Helper to construct a 12-byte ObjectId from three 4-byte integers.
+ */
+sbe::value::ObjectIdType createObjectId(uint32_t a, uint32_t b, uint32_t c) {
+    return {
+        static_cast<uint8_t>((a >> 24) & 0xff),
+        static_cast<uint8_t>((a >> 16) & 0xff),
+        static_cast<uint8_t>((a >> 8) & 0xff),
+        static_cast<uint8_t>(a & 0xff),
+        static_cast<uint8_t>((b >> 24) & 0xff),
+        static_cast<uint8_t>((b >> 16) & 0xff),
+        static_cast<uint8_t>((b >> 8) & 0xff),
+        static_cast<uint8_t>(b & 0xff),
+        static_cast<uint8_t>((c >> 24) & 0xff),
+        static_cast<uint8_t>((c >> 16) & 0xff),
+        static_cast<uint8_t>((c >> 8) & 0xff),
+        static_cast<uint8_t>(c & 0xff),
+    };
+}
+
+void ObjectIdDistribution::init(DatasetDescriptor*, std::mt19937_64& gen) {
+    // An ObjectId is an array of 12 one byte integers.
+    // To generate N random ObjectIds, we generate 3*N random four byte integers and use every 3 of
+    // those integers to create N ObjectIds.
+    std::vector<uint32_t> tmpRandSet;
+    std::uniform_int_distribution<uint32_t> uniformDist{0, std::numeric_limits<uint32_t>::max()};
+    tmpRandSet.reserve(_ndv * 3);
+    for (size_t i = 0; i < _ndv * 3; ++i) {
+        tmpRandSet.push_back(uniformDist(gen));
+    }
+    _valSet.reserve(tmpRandSet.size() / 3);
+    for (size_t i = 0; i < tmpRandSet.size(); i += 3) {
+        const auto [tag, val] = sbe::value::makeCopyObjectId(
+            createObjectId(tmpRandSet[i], tmpRandSet[i + 1], tmpRandSet[i + 2]));
+        _valSet.emplace_back(tag, val);
+    }
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+ArrDistribution::ArrDistribution(MixedDistributionDescriptor distrDescriptor,
+                                 double weight,
+                                 size_t ndv,
+                                 size_t minArrLen,
+                                 size_t maxArrLen,
+                                 std::unique_ptr<DatasetDescriptor> arrayDataDescriptor,
+                                 double reuseScalarsRatio,
+                                 double nullsRatio)
+    : DataTypeDistr(distrDescriptor, value::TypeTags::Array, weight, ndv, nullsRatio),
+      _uniformArrSizeDist{minArrLen, maxArrLen},
+      _arrayDataDescriptor(std::move(arrayDataDescriptor)),
+      _reuseScalarsRatio(reuseScalarsRatio) {
+    uassert(6660510,
+            "Array specs must be 0 if there is no array data descriptor.",
+            _arrayDataDescriptor || (ndv == 0 && minArrLen == 0 && maxArrLen == 0));
+    uassert(6660511,
+            "Nested arrays requires sensible array lengths.",
+            !_arrayDataDescriptor || maxArrLen >= minArrLen);
+    uassert(6660512,
+            "reuseScalarsRatio must be in [0, 1].",
+            reuseScalarsRatio >= 0 && reuseScalarsRatio <= 1.0);
+}
+
+void ArrDistribution::init(DatasetDescriptor* parentDesc, std::mt19937_64& gen) {
+    uassert(6660513, "There must always be a parent data descriptor.", parentDesc);
+
+    // Extract the per-type probabilities from the parent descriptor, only if we need them.
+    std::vector<double> parentProbabilities;
+    std::discrete_distribution<size_t> parentDataTypeSelector;
+    if (_reuseScalarsRatio > 0.0) {
+        for (const auto& dtd : parentDesc->_dataTypeDistributions) {
+            // Set the array probability to 0 to avoid self-recursion.
+            double prob = (dtd->tag() == value::TypeTags::Array) ? 0 : dtd->weight();
+            parentProbabilities.push_back(prob);
+        }
+        parentDataTypeSelector.param(std::discrete_distribution<size_t>::param_type(
+            parentProbabilities.begin(), parentProbabilities.end()));
     }
 
-    if (_arrNDV > 0) {
-        _uniformArrIdxDist.param(
-            std::uniform_int_distribution<size_t>::param_type(0, _arraySet.size() - 1));
+    // Generate _ndv distinct arrays, and store them in _valSet.
+    for (size_t i = 0; i < _ndv; ++i) {
+        auto [arrayTag, arrayVal] = value::makeNewArray();
+        value::Array* arr = value::getArrayView(arrayVal);
+        size_t randArraySize = _uniformArrSizeDist(gen);
+        arr->reserve(randArraySize);
+        // Generate the data for one random array.
+        for (size_t j = 0; j < randArraySize; ++j) {
+            DataTypeDistr* dtd = nullptr;
+            size_t idx;
+            double reuseParentProb = _uniformRandProbability(gen);
+            if (reuseParentProb < _reuseScalarsRatio) {
+                // Pick a random data type descriptor from the parent.
+                idx = parentDataTypeSelector(gen);
+                dtd = parentDesc->_dataTypeDistributions.at(idx).get();
+            } else {
+                idx = _arrayDataDescriptor->_dataTypeSelector(gen);
+                dtd = _arrayDataDescriptor->_dataTypeDistributions.at(idx).get();
+            }
+            dtd->generate(arr, gen);
+        }
+        _valSet.emplace_back(arrayTag, arrayVal);
     }
+
+    _idxDist = MixedDistribution::make(_mixedDistrDescriptor, 0, _valSet.size() - 1);
+}
+
+DatasetDescriptor::DatasetDescriptor(TypeDistrVector dataTypeDistributions, std::mt19937_64& gen)
+    : _dataTypeDistributions(std::move(dataTypeDistributions)), _gen{gen} {
+
+    // The probability of each type to be chosen. Extracted into a vector in order to setup a
+    // discrete_distribution.
+    std::vector<double> probabilities;
+    probabilities.reserve(_dataTypeDistributions.size());
+    for (auto& dtd : _dataTypeDistributions) {
+        dtd->init(this, gen);
+        probabilities.push_back(dtd->weight());
+    }
+    _dataTypeSelector.param(
+        std::discrete_distribution<size_t>::param_type(probabilities.begin(), probabilities.end()));
+}
+
+DataTypeDistr* DatasetDescriptor::getRandDataTypeDist() {
+    size_t idx = _dataTypeSelector(_gen);
+    return _dataTypeDistributions[idx].get();
+}
+
+std::vector<SBEValue> DatasetDescriptor::genRandomDataset(size_t nElems) {
+    std::vector<SBEValue> randValues;
+    randValues.reserve(nElems);
+
+    for (size_t i = 0; i < nElems; ++i) {
+        DataTypeDistr* dtd = getRandDataTypeDist();
+        dtd->generate(randValues, _gen);
+    }
+
+    return randValues;
 }
 
 /**

@@ -134,11 +134,9 @@ mongo_cc_library(
     name = "stats_test_utils",
     srcs = [
         "rand_utils.cpp",
-        "rand_utils_new.cpp",
     ],
     hdrs = [
         "rand_utils.h",
-        "rand_utils_new.h",
     ],
     deps = [
         ":stats_histograms",
@@ -265,11 +263,11 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
-    name = "rand_utils_new_test",
+    name = "rand_utils_test",
     srcs = [
-        "rand_utils_new_test.cpp",
+        "rand_utils_test.cpp",
     ],
-    tags = ["mongo_unittest_fifth_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":stats_test_utils",
     ],

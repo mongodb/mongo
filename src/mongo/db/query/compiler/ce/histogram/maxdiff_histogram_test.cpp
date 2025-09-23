@@ -31,7 +31,6 @@
 #include "mongo/db/query/compiler/stats/max_diff.h"
 #include "mongo/db/query/compiler/stats/maxdiff_test_utils.h"
 #include "mongo/db/query/compiler/stats/rand_utils.h"
-#include "mongo/db/query/compiler/stats/rand_utils_new.h"
 #include "mongo/db/service_context_test_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -192,7 +191,7 @@ TEST_F(HistogramTest, MaxDiffTestIntMixedDistribution) {
                                              {stats::DistrType::kNormal, 0.8}};
     stats::TypeDistrVector td;
     td.push_back(std::make_unique<stats::IntDistribution>(mixed, 1.0, 2000, 0, 10'000));
-    stats::DatasetDescriptorNew desc{std::move(td), seed};
+    stats::DatasetDescriptor desc{std::move(td), seed};
     std::vector<stats::SBEValue> data = desc.genRandomDataset(nElems);
 
     auto opCtx = makeOperationContext();

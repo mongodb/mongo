@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/query/compiler/stats/rand_utils_new.h"
+#include "mongo/db/query/compiler/stats/rand_utils.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -379,7 +379,7 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                 arrayData.push_back(std::make_unique<stats::IntDistribution>(
                     mdd, type.typeProbability, ndv, interval.first, interval.second));
                 auto arrayDataDesc =
-                    std::make_unique<stats::DatasetDescriptorNew>(std::move(arrayData), seedArray);
+                    std::make_unique<stats::DatasetDescriptor>(std::move(arrayData), seedArray);
                 td.push_back(std::make_unique<stats::ArrDistribution>(mdd,
                                                                       1.0 /*weight*/,
                                                                       10 /*ndv*/,
@@ -436,7 +436,7 @@ void generateDataOneField(size_t ndv,
     populateTypeDistrVectorAccordingToInputConfig(
         td, dataInterval, typeCombinationData, ndv, seedArray, distr, arrayTypeLength);
 
-    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
+    stats::DatasetDescriptor desc{std::move(td), seedDataset};
     data = desc.genRandomDataset(size);
 }
 
