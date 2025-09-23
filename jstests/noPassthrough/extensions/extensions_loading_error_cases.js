@@ -10,7 +10,11 @@
  */
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {deleteExtensionConfigs, generateExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    generateExtensionConfigs,
+    deleteExtensionConfigs,
+    checkExtensionFailsToLoad,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 const extensionNames = generateExtensionConfigs([
     "libfoo_mongo_extension.so",
@@ -23,48 +27,31 @@ const extensionNames = generateExtensionConfigs([
 // environment. This also reduces the amount of times we have to start a whole sharded cluster in
 // the test.
 const st = new ShardingTest({shards: 1, mongos: 1});
-
-function runTest({options, validateExitCode = true}) {
-    function tryStartup(startupFn) {
-        try {
-            startupFn();
-            assert(false, "Expected startup to fail but it succeeded");
-        } catch (e) {
-            assert(e instanceof MongoRunner.StopError, e);
-            if (validateExitCode) {
-                assert.eq(e.returnCode, MongoRunner.EXIT_BADOPTIONS, e);
-            }
-        }
-    }
-    // Test mongod.
-    tryStartup(() => {
-        const conn = MongoRunner.runMongod(options);
-        MongoRunner.stopMongod(conn);
-    });
-    // Test mongos.
-    tryStartup(() => {
-        const conn = MongoRunner.runMongos(Object.assign({configdb: st.configRS.getURL()}, options));
-        MongoRunner.stopMongos(conn);
-    });
-}
-
 try {
     if (isLinux()) {
-        // Empty filename (equivalent to no argument being provided to the parameter, so failure
-        // happens at a higher level when parsing parameters).
-        runTest({options: {loadExtensions: ""}, validateExitCode: false});
+        // Empty filename (equivalent to no argument being provided to the parameter, so failure happens
+        // at a higher level when parsing parameters).
+        checkExtensionFailsToLoad({options: {loadExtensions: ""}, st: st, validateExitCode: false});
+        // Extensions parameter is not allowed when the feature flag is disabled.
+        checkExtensionFailsToLoad({
+            options: {loadExtensions: extensionNames[0], setParameter: {featureFlagExtensionsAPI: false}},
+            st: st,
+        });
         // Extensions is a scalar, non-string.
-        runTest({options: {loadExtensions: 12345}});
-        // Path to extension does not exist.
-        runTest({options: {loadExtensions: "path/does/not/exist.so"}});
-        // Path to extension with an .so that is missing the get_mongodb_extension symbol.
-        runTest({options: {loadExtensions: extensionNames[1]}});
-        // Path to extension that attempts to register duplicate stage descriptors.
-        runTest({options: {loadExtensions: extensionNames[2]}});
+        checkExtensionFailsToLoad({options: {loadExtensions: 12345}, st: st});
+        // Extension does not exist.
+        checkExtensionFailsToLoad({options: {loadExtensions: "extension_does_not_exist"}, st: st});
+        // Attempts to load a filepath.
+        checkExtensionFailsToLoad({options: {loadExtensions: "etc/mongo/extensions/extension.conf"}, st: st});
+        checkExtensionFailsToLoad({options: {loadExtensions: "path/to/extension_does_not_exist.so"}, st: st});
+        // Extension with an .so that is missing the get_mongodb_extension symbol.
+        checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[1]}, st: st});
+        // Extension that attempts to register duplicate stage descriptors.
+        checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[2]}, st: st});
     } else {
-        // Startup should fail because we are attempting to load an extension on a platform that is
-        // not linux.
-        runTest({options: {loadExtensions: extensionNames[0]}});
+        // Startup should fail because we are attempting to load an extension on a platform that is not
+        // linux.
+        checkExtensionFailsToLoad({options: {loadExtensions: extensionNames[0]}, st: st});
     }
 } finally {
     st.stop();

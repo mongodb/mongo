@@ -14,17 +14,37 @@ from buildscripts.resmokelib.extensions.constants import (
 
 
 def generate_extension_configs(
-    so_files: list[str], with_suffix: str, logger: logging.Logger
+    so_files: list[str],
+    with_suffix: str,
+    logger: logging.Logger,
+    manual_options: str | None = None,
 ) -> list[str]:
     """Generate a .conf file for each extension .so file specified."""
-    try:
-        with open(CONF_IN_PATH, "r") as fstream:
-            yml = yaml.safe_load(fstream)
-            logger.info("Loaded test extensions' configuration file %s", CONF_IN_PATH)
-    except FileNotFoundError as e:
-        raise RuntimeError(f"Cannot find test extensions' configuration file {CONF_IN_PATH}") from e
+    extensions = {}
+    parsed_manual_options = None
 
-    extensions = yml.get("extensions") or {}
+    if manual_options:
+        if len(so_files) > 1:
+            raise RuntimeError(
+                "When using --manual-options, only one .so file can be specified via --so-files"
+            )
+        try:
+            parsed_manual_options = yaml.safe_load(manual_options)
+            logger.info("Using manual extension options supplied via --manual-options")
+        except yaml.YAMLError as e:
+            raise RuntimeError(f"Failed to parse manual options as YAML: {manual_options}") from e
+    else:
+        # Load configurations.yml if manual options were not provided.
+        try:
+            with open(CONF_IN_PATH, "r") as fstream:
+                yml = yaml.safe_load(fstream)
+                logger.info("Loaded test extensions' configuration file %s", CONF_IN_PATH)
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                f"Cannot find test extensions' configuration file {CONF_IN_PATH}"
+            ) from e
+        extensions = (yml or {}).get("extensions") or {}
+
     extension_names = []
 
     # Create a clean output directory.
@@ -49,8 +69,11 @@ def generate_extension_configs(
                 # All extension .conf files will have a sharedLibraryPath.
                 conf_file.write(f"sharedLibraryPath: {so_file}\n")
 
-                # Copy over extensionOptions if they exist.
-                if ext_config := extensions.get(extension_name):
+                if parsed_manual_options is not None:
+                    # Write manual options as extensionOptions.
+                    yaml.dump({"extensionOptions": parsed_manual_options}, conf_file)
+                # Fallback to extensionOptions from configurations.yml for this extension.
+                elif ext_config := extensions.get(extension_name):
                     yaml.dump(ext_config, conf_file)
 
                 logger.info(
@@ -85,6 +108,12 @@ def main():
         required=True,
         help="A string to add to the end of every generated .conf file.",
     )
+    parser.add_argument(
+        "--manual-options",
+        dest="manual_options",
+        type=str,
+        help="Manual extensionOptions to include instead of from configurations.yml (YAML or JSON string).",
+    )
 
     args = parser.parse_args()
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -94,7 +123,10 @@ def main():
 
     try:
         extension_names = generate_extension_configs(
-            so_files=so_files_list, with_suffix=args.with_suffix, logger=logger
+            so_files=so_files_list,
+            with_suffix=args.with_suffix,
+            logger=logger,
+            manual_options=(args.manual_options or None),
         )
         logger.info(f"Successfully generated configuration for extensions: {extension_names}")
     except RuntimeError as e:
