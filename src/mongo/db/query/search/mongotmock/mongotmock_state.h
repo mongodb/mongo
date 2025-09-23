@@ -34,6 +34,7 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <map>

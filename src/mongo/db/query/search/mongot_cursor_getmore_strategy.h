@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor_options.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace executor {

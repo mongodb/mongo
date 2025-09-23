@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/search/search_index_process_interface.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

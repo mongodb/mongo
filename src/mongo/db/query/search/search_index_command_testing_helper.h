@@ -46,6 +46,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/stacktrace.h"
 
 #include <boost/optional/optional.hpp>

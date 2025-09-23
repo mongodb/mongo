@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -42,7 +43,7 @@ namespace mongo {
 /**
  * Mongot (search) configuration options
  */
-struct MongotParams {
+struct MONGO_MOD_PUB MongotParams {
     static Status onSetHost(const std::string&);
     static Status onValidateHost(StringData str, const boost::optional<TenantId>&);
 
@@ -58,6 +59,6 @@ struct MongotParams {
     transport::ConnectSSLMode sslMode;
 };
 
-extern MongotParams globalMongotParams;
+MONGO_MOD_PUB extern MongotParams globalMongotParams;
 
 }  // namespace mongo

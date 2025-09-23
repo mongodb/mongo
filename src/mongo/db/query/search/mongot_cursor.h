@@ -32,8 +32,10 @@
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::mongot_cursor {
+namespace mongo {
+namespace MONGO_MOD_PUB mongot_cursor {
 inline auto makeRetryOnNetworkErrorPolicy() {
     return [retried = false](const Status& st) mutable {
         return std::exchange(retried, true) ? false : ErrorCodes::isNetworkError(st);
@@ -185,4 +187,5 @@ void throwIfNotRunningWithMongotHostConfigured(
  * in TaskExecutorCursor.
  */
 bool shouldPinConnection();
-}  // namespace mongo::mongot_cursor
+}  // namespace MONGO_MOD_PUB mongot_cursor
+}  // namespace mongo
