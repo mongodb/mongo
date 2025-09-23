@@ -11,6 +11,11 @@
  *     # available retries or otherwise fail because of a long-running operation.
  *     tsan_incompatible,
  *     multiversion_incompatible,
+ *
+ *     # Creates memory pressure on secondaries in some passthroughs (esp. secondary_reads_passthrough)
+ *     # under burn-in configuration.
+ *     # TODO(SERVER-111328): Remove this tag after investigating memory resource issues.
+ *     assumes_read_preference_unchanged,
  *  ]
  */
 
