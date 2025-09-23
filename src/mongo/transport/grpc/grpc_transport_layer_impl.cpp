@@ -63,8 +63,12 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
         BSONObjBuilder section;
-        auto tl = opCtx->getServiceContext()->getTransportLayerManager()->getTransportLayer(
-            TransportProtocol::GRPC);
+        auto tlm = opCtx->getServiceContext()->getTransportLayerManager();
+        if (MONGO_unlikely(!tlm)) {
+            return section.obj();
+        }
+
+        auto tl = tlm->getTransportLayer(TransportProtocol::GRPC);
 
         if (!tl) {
             return section.obj();

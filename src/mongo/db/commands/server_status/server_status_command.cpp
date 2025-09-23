@@ -95,6 +95,10 @@ public:
         return false;
     }
 
+    bool enableDiagnosticPrintingOnFailure() const final {
+        return true;
+    }
+
     std::string help() const final {
         return "returns lots of administrative server statistics. Optionally set {..., all: 1} to "
                "retrieve all server status sections.";

@@ -27,12 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/db_command_test_fixture.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 
@@ -109,6 +111,34 @@ DEATH_TEST(ServerStatusSectionRegistryTest,
            CannotRegisterRouterSectionWithSameNameAsShardAndRouterSection,
            "Duplicate ServerStatusSection") {
     trySections({bothRoles, ClusterRole::RouterServer});
+}
+
+
+class FailingSection : public ServerStatusSection {
+    using ServerStatusSection::ServerStatusSection;
+    bool includeByDefault() const override {
+        return false;
+    }
+    BSONObj generateSection(OperationContext*, const BSONElement&) const final {
+        invariant(false);
+        return BSONObj();
+    }
+};
+
+auto& fatalSection =
+    *ServerStatusSectionBuilder<FailingSection>("failingSection").forShard().forRouter();
+
+class ServerStatusCmdTest : public DBCommandTestFixture {};
+
+/**
+ * Ensure that the enableDiagnosticPrintingOnFailure feature emits the correct diagnostic
+ * information on an invariant.
+ */
+DEATH_TEST_REGEX_F(
+    ServerStatusCmdTest,
+    CommandLogsDiagnosticsOnFailure,
+    R"#(ScopedDebugInfo.*\'opDescription\': \{ serverStatus: 1, failingSection: 1.*)#") {
+    runCommand(BSON("serverStatus" << 1 << "failingSection" << 1));
 }
 
 }  // namespace
