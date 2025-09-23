@@ -240,6 +240,14 @@ def create_coll_scan_collection_template(
                 distribution=distributions["string_mixed"],
                 indexed=False,
             ),
+            config.FieldTemplate(
+                name="int_uniform",
+                data_type=config.DataType.INTEGER,
+                distribution=RandomDistribution.uniform(
+                    RangeGenerator(DataType.INTEGER, 0, 100_000)
+                ),
+                indexed=True,
+            ),
         ],
         compound_indexes=[],
         cardinalities=cardinalities,

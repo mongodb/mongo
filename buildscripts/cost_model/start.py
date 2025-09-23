@@ -306,6 +306,25 @@ async def execute_ors(database: DatabaseInstance, collections: Sequence[Collecti
     )
 
 
+async def execute_fetches(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collection = [c for c in collections if c.name.startswith("coll_scan")][0]
+
+    requests = []
+
+    cards = [10, 50, 100, 500, 1000, 5000, 10000]
+    for card in cards:
+        requests.append(
+            Query(
+                {"filter": {"int_uniform": {"$lt": card}}},
+                note="FETCH",
+            )
+        )
+
+    await workload_execution.execute(
+        database, main_config.workload_execution, [collection], requests
+    )
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -328,6 +347,7 @@ async def main():
             execute_sorts,
             execute_merge_sorts,
             execute_ors,
+            execute_fetches,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
