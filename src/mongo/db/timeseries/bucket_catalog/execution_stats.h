@@ -141,7 +141,7 @@ public:
 
 private:
     tracking::shared_ptr<ExecutionStats> _collectionStats;
-    ExecutionStats* _globalStats;
+    ExecutionStats* _globalStats = nullptr;
 };
 
 void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder);
