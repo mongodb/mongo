@@ -713,17 +713,21 @@ err:
 }
 
 #define PALM_VERIFY_EQUAL(a, b)                                                                   \
-    {                                                                                             \
+    do {                                                                                          \
         if ((a) != (b)) {                                                                         \
             ret = palm_kv_err(palm, session, EINVAL,                                              \
               "%s:%d: Delta chain validation failed at position %" PRIu32                         \
               ": %s != %s. Page details: table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64 \
-              ", flags=%" PRIx32 ", %s=%" PRIu64 ", %s=%" PRIu64,                                 \
+              ", flags=0x%" PRIx32 ", %s=%" PRIu64 ", %s=%" PRIu64,                               \
               __func__, __LINE__, count, #a, #b, palm_handle->table_id, page_id, matches.lsn,     \
               matches.flags, #a, (a), #b, (b));                                                   \
             goto err;                                                                             \
         }                                                                                         \
-    }
+    } while (0)
+
+#ifndef WT_DELTA_LIMIT
+#define WT_DELTA_LIMIT 32
+#endif
 
 static int
 palm_handle_verify_page(
@@ -734,13 +738,17 @@ palm_handle_verify_page(
     PALM_HANDLE *palm_handle;
     PALM_KV_PAGE_MATCHES matches;
     uint32_t count;
-    uint64_t last_base_lsn, last_lsn;
-    bool last_tombstone;
+#if 0 /* FIXME-WT-15041: Enable once PALM can handle abandoned checkpoints. */
+    bool seen_tombstone = false;
+#endif
     int ret;
+    struct {
+        uint64_t lsn;
+        uint64_t backlink_lsn;
+        uint64_t base_lsn;
+        uint32_t flags;
+    } matched_pages[WT_DELTA_LIMIT + 1]; /* +1 for a tombstone */
 
-    count = 0;
-    last_base_lsn = last_lsn = 0;
-    last_tombstone = false;
     palm_handle = (PALM_HANDLE *)plh;
     palm = palm_handle->palm;
 
@@ -748,34 +756,59 @@ palm_handle_verify_page(
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     PALM_KV_ERR(palm, session,
       palm_kv_get_page_matches(&context, palm_handle->table_id, page_id, lsn, true, &matches));
-    while (palm_kv_next_page_match(&matches)) {
+    for (count = 0; palm_kv_next_page_match(&matches); count++) {
+        assert(count < sizeof(matched_pages) / sizeof(*matched_pages));
+        matched_pages[count].lsn = matches.lsn;
+        matched_pages[count].backlink_lsn = matches.backlink_lsn;
+        matched_pages[count].base_lsn = matches.base_lsn;
+        matched_pages[count].flags = matches.flags;
 
-        /* FIXME-WT-15041: Enable the following once PALM can handle abandoned checkpoints. */
-        (void)last_tombstone;
-#if 0
+        if (count == 0) {
+            /* For the base page, just check flags. */
+            PALM_VERIFY_EQUAL(matches.flags & (WT_PALM_KV_TOMBSTONE | WT_PAGE_LOG_DELTA), 0);
+            continue;
+        }
+
+        /* All subsequent pages are deltas. */
+        PALM_VERIFY_EQUAL(matches.flags & WT_PAGE_LOG_DELTA, WT_PAGE_LOG_DELTA);
+
+#if 0 /* FIXME-WT-15041: Enable once PALM can handle abandoned checkpoints. */
         /* Only the last page in the chain can be a tombstone. */
-        PALM_VERIFY_EQUAL(last_tombstone, false);
-
-        /* Validate backlink LSN. */
-        if (count > 0)
-            PALM_VERIFY_EQUAL(matches.backlink_lsn, last_lsn);
+        PALM_VERIFY_EQUAL(seen_tombstone, false);
+        if ((matches.flags & WT_PALM_KV_TOMBSTONE) != 0)
+            seen_tombstone = true;
 #endif
 
         /* Validate base LSN. */
-        /*
-         * FIXME-WT-15524: fix false positive verification failure caused by failed reconciliation.
-         */
-        if (count == 1) {
-            PALM_VERIFY_EQUAL(matches.base_lsn, last_lsn);
-        } else if (count > 1) {
-            PALM_VERIFY_EQUAL(matches.base_lsn, last_base_lsn);
-        }
+        PALM_VERIFY_EQUAL(matches.base_lsn, matched_pages[0].lsn);
 
-        count++;
-        last_base_lsn = matches.base_lsn;
-        last_lsn = matches.lsn;
-        if ((matches.flags & WT_PALM_KV_TOMBSTONE) != 0)
-            last_tombstone = true;
+        /* Validate backlink LSN. */
+        if ((matches.flags & WT_PALM_KV_TOMBSTONE) == 0)
+            PALM_VERIFY_EQUAL(matches.backlink_lsn, matched_pages[count - 1].lsn);
+        else {
+            /* Tombstone can backlink to any page that we've seen in the chain. */
+            for (int i = (int)count - 1; i >= 0; i--)
+                if (matches.backlink_lsn == matched_pages[i].lsn)
+                    goto ok; /* Found it! */
+
+            ret = EINVAL;
+            /* Print a comprehensive error message. */
+            palm_kv_err(palm, session, EINVAL,
+              "%s:%d: Delta chain validation failed at position %" PRIu32
+              ". Page details: table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
+              ", flags=0x%" PRIx32 ", backlink_lsn=%" PRIu64 ". Pages on stack:",
+              __func__, __LINE__, count, palm_handle->table_id, page_id, matches.lsn, matches.flags,
+              matches.backlink_lsn);
+            for (int i = 0; i < (int)count; i++)
+                palm_kv_err(palm, session, 0,
+                  "    [%" PRIu32 "] lsn=%" PRIu64 ", backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
+                  ", flags=0x%" PRIx32,
+                  i, matched_pages[i].lsn, matched_pages[i].backlink_lsn, matched_pages[i].base_lsn,
+                  matched_pages[i].flags);
+            goto err;
+
+ok:;
+        }
     }
     PALM_KV_ERR(palm, session, matches.error);
 
@@ -859,7 +892,7 @@ err_no_rollback:
             ret = palm_kv_err(palm, session, EINVAL,                                           \
               "%s:%d: LSN arguments validation failed"                                         \
               ": %s != %s. Page details: table_id=%" PRIu64 ", page_id=%" PRIu64               \
-              ", flags=%" PRIx64 ", %s=%" PRIu64 ", %s=%" PRIu64,                              \
+              ", flags=0x%" PRIx64 ", %s=%" PRIu64 ", %s=%" PRIu64,                            \
               __func__, __LINE__, #a, #b, palm_handle->table_id, page_id, put_args->flags, #a, \
               (a), #b, (b));                                                                   \
             goto err;                                                                          \
