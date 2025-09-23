@@ -343,7 +343,8 @@ export var ClusteredCappedUtils = class {
             assert.lte(ops[0].o.applyOps.length, 2);
             if (ops[0].o.applyOps.length === 1) {
                 // The batch got split in two separate executions.
-                const pendingId = ops[0].o.applyOps[0].o._id === tenDaysAgo ? earlierTenDaysAgo : tenDaysAgo;
+                const pendingId =
+                    ops[0].o.applyOps[0].o._id.getTime() === tenDaysAgo.getTime() ? earlierTenDaysAgo : tenDaysAgo;
                 assert.eq(1, db.getSiblingDB("local").oplog.rs.find({op: "d", ns: ns, "o._id": pendingId}).itcount());
             }
         } else {
