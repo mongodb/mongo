@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <benchmark/benchmark.h>
@@ -58,7 +59,13 @@ public:
 
     void SetUp(benchmark::State& state) override {
         QueryFCVEnvironmentForTest::setUp();
+        // Keep the same default on debug builds.
+        internalPipelineLengthLimit = 1000;
     };
+
+    void TearDown(benchmark::State& state) override {
+        internalPipelineLengthLimit = defaultInternalPipelineLengthLimit();
+    }
 
     static std::vector<BSONObj> makePipeline(size_t numStages) {
         size_t nextFieldSuffix{0};
