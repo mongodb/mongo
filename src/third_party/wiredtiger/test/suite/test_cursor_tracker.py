@@ -293,10 +293,6 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.assertEqual(expect, cursor.prev())
         self.curremoved = False
 
-    def cur_update(self, cursor, key):
-        # TODO:
-        pass
-
     def bitspos(self, bits):
         list = self.bitlist
         return next(i for i in range(len(list)) if list[i] == bits)

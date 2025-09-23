@@ -26,6 +26,10 @@ typedef enum __wt_cache_op {
  * Change the eviction strategy to scrub eviction when the cache usage is under the target limit.
  */
 struct __wt_cache_eviction_controls {
+
+    wt_shared uint8_t
+      app_eviction_min_cache_fill_ratio; /* Application eviction minimum cache fill ratio */
+
 /* cache eviction controls bit positions */
 #define WT_CACHE_EVICT_INCREMENTAL_APP 0x1u
 #define WT_CACHE_EVICT_SCRUB_UNDER_TARGET 0x2u

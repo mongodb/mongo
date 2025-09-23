@@ -23,7 +23,6 @@ test_cursor02.py  # FIXME: WT-15291
 test_cursor03.py
 test_cursor05.py  # FIXME: WT-15291
 test_cursor06.py  # FIXME: WT-15417
-test_cursor13.py  # FIXME: WT-15369
 test_cursor17.py  # FIXME: WT-15418
 test_cursor21.py  # FIXME: WT-15369
 test_debug_mode08.py
@@ -44,7 +43,6 @@ test_empty.py
 test_encrypt06.py
 test_env01.py
 test_error_info01.py
-test_error_info02.py
 test_error_info03.py
 test_eviction02.py
 test_eviction03.py

@@ -160,6 +160,10 @@ struct __wt_session_impl {
     u_int sweep_warning_5min;        /* Whether the session was without sweep for 5 min. */
     u_int sweep_warning_60min;       /* Whether the session was without sweep for 60 min. */
 
+#ifdef HAVE_DIAGNOSTIC
+    bool cursor_open_timer_running; /* Flag used to track timer across nested calls. */
+#endif
+
     WT_CURSOR_BACKUP *bkp_cursor; /* Hot backup cursor */
 
     WT_COMPACT_STATE *compact; /* Compaction information */

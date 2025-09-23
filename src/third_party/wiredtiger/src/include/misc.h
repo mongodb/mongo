@@ -102,6 +102,9 @@
 #define WT_MAX(a, b) ((a) < (b) ? (b) : (a))
 #define WT_CLAMP(x, low, high) (WT_MIN(WT_MAX((x), (low)), (high)))
 
+/* Check and reset, implicitly reset to 0. */
+#define WT_CHECK_AND_RESET(a, v) ((a) == (v) ? ((a) = 0, true) : false)
+
 /* Ceil for unsigned/positive real numbers. */
 #define WT_CEIL_POS(a) ((a) - (double)(uintmax_t)(a) > 0.0 ? (uintmax_t)(a) + 1 : (uintmax_t)(a))
 

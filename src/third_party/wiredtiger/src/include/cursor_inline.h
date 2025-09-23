@@ -471,7 +471,8 @@ __wt_cursor_free_cached_memory(WT_CURSOR *cursor)
         __wt_buf_free(session, &cursor->value);
 
         /* Discard the underlying WT_CURSOR_BTREE buffers. */
-        __wt_btcur_free_cached_memory((WT_CURSOR_BTREE *)cursor);
+        if (!WT_PREFIX_MATCH(cursor->internal_uri, "layered:"))
+            __wt_btcur_free_cached_memory((WT_CURSOR_BTREE *)cursor);
 
         F_CLR(cursor, WT_CURSTD_CACHED_WITH_MEM);
     }

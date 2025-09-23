@@ -883,6 +883,24 @@ __wt_error_log_clear(void)
 }
 
 /*
+ * __simplify_path --
+ *     Simplify a file path by removing a redundant prefix.
+ */
+static const char *
+__simplify_path(const char *path)
+{
+    const char *p;
+
+    p = strstr(path, "/src/");
+    if (p == NULL)
+        p = path;
+    else
+        p += 1; /* Skip the leading '/'. */
+
+    return (p);
+}
+
+/*
  * __wt_error_log_to_handler --
  *     Print all entries from the error log to the event handler.
  */
@@ -898,8 +916,9 @@ __wt_error_log_to_handler(WT_SESSION_IMPL *session)
               WT_MAX_ERROR_LOG_MAX);
         for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
             entry = &error_log.log[i];
-            fprintf(stderr, "Error at %s:%d: \"%s\" failed with %s (%d)%s%s\n", entry->file,
-              entry->line, entry->expr, __wt_strerror(NULL, entry->error, NULL, 0), entry->error,
+            fprintf(stderr, "Error at %s:%d: \"%s\" failed with %s (%d)%s%s\n",
+              __simplify_path(entry->file), entry->line, entry->expr,
+              __wt_strerror(NULL, entry->error, NULL, 0), entry->error,
               entry->suberror == WT_NONE ? "" : ", ",
               entry->suberror == WT_NONE ? "" : __wt_strerror(NULL, entry->suberror, NULL, 0));
         }
@@ -911,8 +930,8 @@ __wt_error_log_to_handler(WT_SESSION_IMPL *session)
         for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
             entry = &error_log.log[i];
             __wt_err_func(session, entry->error, entry->func, entry->line, WT_VERB_ERROR_RETURNS,
-              "Error at %s:%d: \"%s\" failed%s%s", entry->file, entry->line, entry->expr,
-              entry->suberror == WT_NONE ? "" : " with ",
+              "Error at %s:%d: \"%s\" failed%s%s", __simplify_path(entry->file), entry->line,
+              entry->expr, entry->suberror == WT_NONE ? "" : " with ",
               entry->suberror == WT_NONE ? "" : __wt_strerror(session, entry->suberror, NULL, 0));
         }
     }

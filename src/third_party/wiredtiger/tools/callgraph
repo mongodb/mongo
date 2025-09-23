@@ -38,22 +38,65 @@ no warnings 'uninitialized';    # allow 0+undef
 # Highlight "from" and "to" functions:
 # --after-parse-code 'map {push @{$funcmarks{$_}}, "--fontcolor=darkgreen"} grep { ($pathTo && /$pathTo/) || ($pathFrom && /$pathFrom/) } keys %func2file;'
 
+# Get all error codes used in WiredTiger and their counts:
+# callgraph -retl main --after-parse-code 'my %res; for (keys %funcs) { map {$res{$_}++;} grep {/^[A-Z_0-9]++$/} @{$func2ret{$_}} if $func2ret{$_} && @{$func2ret{$_}}; } for (sort keys %res) { say "$_\t$res{$_}"; } exit;'
+
+# Merge pre-laidout graphs:
+# -mergeflat -dir l --engine "fdp -n2 -s72"
+
 use Getopt::Long;
 use IO::File;
 
-our $VERSION="1.4.4";
+our $VERSION="1.7";
 
 our (@codeInit, @codeParse, @codeAfterParse, @codeFilterNode, @codeFilterEdge, @codeEnd);
-our ($outputFilter, $OUT);
+our ($outputFilter, $OUT, $outPid, $exiting) = (undef, *STDOUT, undef, 0);
+our $server = undef;
+sub server_msg(@) { print "\n<<<<<<<<<< @_ >>>>>>>>>>\n"; flush STDOUT; }
+sub close_out() {
+  if ($outputFilter && $OUT) {
+    close $OUT;
+    $OUT = undef;
+    wait;
+  };
+}
 sub EXIT(@) {
   for my $code (@codeEnd) {
     eval $code;
     if ($@) { say STDERR "Error in custom end code: $@\n$code" }
   }
-  $outputFilter && $OUT and close $OUT;
+  server_msg "Server end: $$:", ($_[0] // 0) if $server;
+  close_out();
+  ++$exiting; # 0: not exiting; 1: exiting - just close output; 2: kill subprocess; 3: kill -9
+  if ($exiting == 2) {
+    kill 'TERM', $outPid if $outPid;
+    wait;
+  } elsif ($exiting >= 3) {
+    kill 'KILL', $outPid if $outPid;
+    wait;
+  }
   exit @_;
 }
 sub fatal(@) { say STDERR @_; EXIT 1; }
+our $dot_fixed = 0;
+sub open_out() {
+  if ($outputFilter) {
+    if ($dot_fixed && $outputFilter =~ /-Tdot/) {
+      # Additional filtering for fixed-dot output.
+      $outputFilter .= q{ |   perl -E '
+        do { local $/=undef; $_=<>; };
+        s/pos="([^" ]++)"/pos="$1!"/g; # Make positions unchangeable
+        s/,\n\s*/, /g;                 # Remove newlines in attributes
+        s/\n\s*\]/\]/g;                # Remove newlines before ]
+        print;
+        '
+      };
+    }
+    # $OUT = IO::File->new("|$outputFilter") or fatal "Can't open output filter program: $outputFilter";
+    $OUT = undef;
+    $outPid = open $OUT, "|-", $outputFilter or fatal "Can't open output filter program: $outputFilter";
+  }
+}
 sub readfile($) { local $/=undef; IO::File->new(shift, "r")->getline(); }
 sub writefile($@) { IO::File->new(shift, "w")->print(@_); }
 sub re_escape($) { $_[0] =~ s{([\\^.\$|\(\)\[\]*+?{}\-\#])}{\\$1}gr }  # use quotemeta?
@@ -117,14 +160,20 @@ sub cd_root() {
 #   return split /\n/, `LC_ALL=C find src build -name '*.[ch]' | LC_ALL=C sort`;
 # }
 
+our $home;
 sub read_all() {
+  my $cd_home = defined($home) ? "cd '$home' || die 'Cant chdir to $home'" : "";
+  my $build = defined($home) ? "$home/build" : "build";
+  $build = -d $build ? "build" : "";
   my $ret = `
     die() { echo "\$@"; exit 1; }
+    $cd_home
     if ! test -d src; then
       ROOT="\$(git rev-parse --show-toplevel)" || die "Can't find the repo top level"
       cd "\$ROOT" || die "Can't chdir to \$ROOT"
     fi
-    for f in \`find src build -name '*.[ch]' | LC_ALL=C sort\`; do
+    test -d src || die "Can't find src directory in \$PWD"
+    for f in \`find src ext $build -name '*.[ch]' | LC_ALL=C sort\`; do
       echo
       echo "#line" \$f
       cat \$f
@@ -154,6 +203,8 @@ Usage:
 --retl               - Print all possible return values for a function and list all sub-calls returning immediate value.
 --retll              - Print all possible return values for a function and list all sub-calls that can return the value, recursively.
 --merge              - Merge multiple DOT files into one.
+--mergeflat          - Merge multiple DOT files into one in flat structure.
+--server             - Start in server mode: read commands from stdin or terminal.
 
   * Options:
 --from, -f                - Source function names or regex.
@@ -166,7 +217,7 @@ Usage:
 --[no-]length, -[no-]l    - Output call path length.
 
   * Tagging functions:
---ntag {TAG:... ...}      - Tag functions by name
+--tagname {TAG:... ...}      - Tag functions by name
 --tag {TAG=WORD}          - Tag functions having this word in its body
 --tag {TAG=/REGEX}        - Tag functions having this regexp in its body
 --tagline {WORD}          - Tag functions having this word in its body, quoting the entire line
@@ -191,6 +242,8 @@ Usage:
 --depth                   - Depth first (also leads to alphabetically sored output).
 --continue                - Continue the search when a target is hit (for more matches).
 --refs                    - Try to make sense of assigned function pointers.
+--strict                  - Only follow direct calls, do not try to follow function pointers.
+--timeout                 - Timeout for graph search operations in seconds.
 
   * Output format:
 --text                    - Plain text (default for text).
@@ -200,16 +253,20 @@ Usage:
     --indentstr           - Indent string (default: "" -> use the call arrow).
     --indents              - Combines --indent and --indentstr "    " (four spaces)
 --dot                     - Graphviz DOT format (default for graph).
---dotdot                  - DOT format with layout information.
+--dotdot                  - DOT format with layout information. --dotfix - fixed coordinates.
 --png                     - PNG format.
 --svg                     - SVG format.
 --svg-html                - HTML format for SVG browsing.
+--engine                  - Graphviz engine to use like 'dot', 'sdf', 'neato', etc (default: dot).
 
   * Graphviz options:
 --dir                     - Graph direction: LR, RL, TB, BT.
---minmaxrank              - Group top and bottom rank nodes at the begginning and end.
+--minmax                  - Group top and bottom rank nodes at the begginning and end.
 
   * Misc options:
+--home               - Set source home directory (default: current).
+--mod                - Use module names instead of file names (default: false).
+--files              - Use files (oppposite of --mod) (default: true).
 --help, -h           - Print this usage help and exit.
 --version, -v        - Print version and exit.
 
@@ -285,14 +342,16 @@ our $ret_arg1 = "WT_ERR|WT_ERR_ERROR_OK|WT_ERR_NOTFOUND_OK|WT_RET|WT_RET_TRACK|W
 our $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|__wt_set_return|__blkcache_read_corrupt|__wt_err_func|__wt_panic|__wt_panic_func|__wt_panic_func";
 our $ret_arg3 = "__config_err";
 our $ret_arg4 = "WT_RET_ASSERT|WT_RET_PANIC_ASSERT";
-our ($pathFrom, $pathTo, $exclude, $prune, $grow, $printBackwards, $maxDepthToScan, $searchPath, $printLen, $rankdir, $minmaxrank, $fmt, $mode, $walkByBreadth, $continue, $refs, $grep, $indentStr, $hlends);
+our ($pathFrom, $pathTo, $exclude, $prune, $grow, $printBackwards, $maxDepthToScan, $searchPath, $printLen, $rankdir, $minmaxrank, $fmt, $mode, $walkByBreadth, $continue, $refs, $strict, $grep, $indentStr, $hlends);
 $refs = $printLen = $walkByBreadth = 1;
 $searchPath = 2; $mode = 2;
+our ($timeout, $use_modules);
 our (@pathFrom, @pathTo, @exclude, @prune, @grow, $grepFrom, @grepFrom, $grepTo, @grepTo, $fileFrom, @fileFrom, $fileTo, @fileTo, @grep);
 our (@tags, @ntags, $ntags, %ntags, %func2ret);
 our (%nodesPrint, @edges);
 our ($reverseSearch, @srcs, @dsts, $start, $src, $dst, $maxdepth, $nPaths, $nFound);
-our $splines = "line"; # none / line / polyline / curved / ortho / spline : https://graphviz.org/docs/attrs/splines/
+our $splines = "spline"; # none / line / polyline / curved / ortho / spline : https://graphviz.org/docs/attrs/splines/
+our $engine = "";
 
 our ($a, $b, $filterMode);
 our $path;
@@ -318,18 +377,25 @@ our %re_patterns = (
   '{BLOCK}' => { subst => "\\{\\s*+(?&TOKEN)*+\\}" },
 );
 
-GetOptions(
+sub is_graphical_output() { $fmt =~ /^(dot|png|svg|svg-html)$/ }
+
+sub parseArgs() {
+  GetOptions(
+  "home=s" => \$home,
+  "mod!" => \$use_modules,
+  "files!" => sub { $use_modules = !$_[0] },
   "help|h" => sub { print STDERR usage(); exit; },
   "version|v" => sub { print STDERR "callgraph version: $VERSION\n"; exit; },
 
-  "graph|g" => sub { $mode = 1; },
-  "path-1|1" => sub { $searchPath = 1; $mode = 2; },
-  "path-all|a" => sub { $searchPath = 2; $mode = 2; },
-  "crosslink-stats" => sub { $mode = 3; },
+  "graph|g" => sub { $mode = 1; $splines = "line"; },
+  "path-1|1" => sub { $searchPath = 1; $mode = 2; $splines = "spline"; },
+  "path-all|a" => sub { $searchPath = 2; $mode = 2; $splines = "spline"; },
+  "crosslink-stats" => sub { $mode = 3; $splines = "spline"; },
   "ret" => sub { $mode = 4; $printLen = 0; },
   "retl" => sub { $mode = 4; $printLen = 1; },
   "retll" => sub { $mode = 4; $printLen = 2; },
-  "merge" => sub { $mode = 5; },
+  "merge" => sub { $mode = 5; $splines = "spline"; },
+  "mergeflat" => sub { $mode = 6; $splines = "spline"; },
 
   "from|f=s" => \@pathFrom,
   "to|t=s" => \@pathTo,
@@ -340,7 +406,7 @@ GetOptions(
   "reverse|r!" => \$printBackwards,
   "length|l!" => \$printLen,
   "grep=s" => \@grep,
-  "ntag=s" => sub {
+  "tagname=s" => sub {
     my @tag = split /:/, $_[1], 2;
     @tag == 2 or fatal "Invalid name tag: '$_[1]' (must be TAG:TEXT or TAG:/REGEXP)";
     my $t = scalar keys %ntags;
@@ -386,8 +452,10 @@ GetOptions(
 
   "breadth" => sub { $walkByBreadth = 1; },
   "depth" => sub { $walkByBreadth = 0; },
-  "continue" => \$continue,
-  "refs" => \$refs,
+  "continue!" => \$continue,
+  "refs!" => \$refs,
+  "strict!" => \$strict,
+  "timeout=i" => \$timeout,
 
   "dir=s" => sub {
     $rankdir =
@@ -406,95 +474,144 @@ GetOptions(
   "indentstr=s" => \$indentStr,
   "indents" => sub { $fmt = "indent"; $indentStr = "    "; $outputFilter = undef; },
   "dot" => sub { $fmt = "dot"; $printLen = 0; $outputFilter = undef; },
-  "dotdot" => sub { $fmt = "dot"; $printLen = 0; $outputFilter = "dot -Tdot /dev/stdin"; },
-  "png" => sub { $fmt = "png"; $printLen = 0; $outputFilter = "dot -Tpng /dev/stdin"; },
-  "svg" => sub { $fmt = "svg"; $printLen = 0; $outputFilter = "dot -Tsvg /dev/stdin"; },
-  "svg-html" => sub { $fmt = "svg-html"; $printLen = 0; $outputFilter = "dot -Tsvg /dev/stdin"; },
-) || exit 1;
+  "dotdot" => sub { $fmt = "dot"; $printLen = 0; $outputFilter = "dot -Tdot /dev/stdin$engine"; },
+  "dotfix" => sub { $fmt = "dot"; $printLen = 0; $outputFilter = "dot -Tdot /dev/stdin$engine"; $dot_fixed = 1; },
+  "png" => sub { $fmt = "png"; $printLen = 0; $outputFilter = "dot -Tpng /dev/stdin$engine"; },
+  "svg" => sub { $fmt = "svg"; $printLen = 0; $outputFilter = "dot -Tsvg /dev/stdin$engine"; },
+  "svg-html" => sub { $fmt = "svg-html"; $printLen = 0; $outputFilter = "dot -Tsvg /dev/stdin$engine"; },
+  "engine=s" => sub {
+    $engine = " -K$_[1]";
+    $outputFilter .= $engine if defined $outputFilter;
+  },
+  "server!" => \$server,
+  );
 
-sub is_graphical_output() { $fmt =~ /^(dot|png|svg|svg-html)$/ }
+  defined $hlends or $hlends = is_graphical_output();
+  $rankdir //= ($mode == 1 ? "LR" : "TB");
+}
 
-defined $hlends or $hlends = is_graphical_output();
+parseArgs() || exit 1;
 
-$rankdir //= ($mode == 1 ? "LR" : "TB");
+sub start_server();
 
-if ($mode == 5) {
+sub graphMerge() {
   # Merge mode
-  $OUT = *STDOUT;
-  if ($outputFilter) {
-    $OUT = IO::File->new("|$outputFilter") or fatal "Can't open output filter program: $outputFilter";
+  # start_server();
+  open_out();
+  $fmt =~ /^(svg-html)$/ and do { print "<!DOCTYPE html><html><head></head><body><div>\n"; flush STDOUT; };
+  say $OUT "strict digraph root { rankdir=$rankdir; splines=$splines;";
+  while (do {local $/=undef; $_=<>;}) {
+    if ($mode == 5) {
+      s/strict digraph/subgraph/g;
+    } else {
+      s/^[^{]*\{//s && s/\}\s*$//s;
+    }
+    say $OUT $_;
   }
-  $fmt =~ /^(svg-html)$/ and do { print "<!DOCTYPE html><html><head></head><body>\n"; flush STDOUT; };
-  say $OUT "strict digraph root { rankdir=$rankdir;";
-  while (do {local $/=undef; $_=<>;}) { say $OUT s/strict digraph/subgraph/gr; }
   say $OUT "}";
   close $OUT; $OUT = undef;
-  $fmt =~ /^(svg-html)$/ and say "<script defer>".pan_js()."</script></body></html>\n";
+  $fmt =~ /^(svg-html)$/ and say "</div><script defer>".pan_js()."</script></body></html>\n";
   EXIT;
 }
 
-our ($filter, $addNodes);
-
-@exclude = grep {$_ ne ""} map {split /[\s,;]+/} @exclude if @exclude;
-
-@ntags and $ntags = join "|", @ntags;
-
-if ($mode == 1) {
-  # Build DOT graph mode
-  $filter = join "|", map {"(?:$_)"} grep !/^[*!]/, @ARGV;
-  $addNodes = make_re map { my $x = $_; $x =~ s/^[*]// ? $x : () } @ARGV;
-  $exclude = make_re @exclude, map { my $x = $_; $x =~ s/^[!]// ? $x : () } @ARGV;
-} elsif ($mode == 2) {
-  # Search path mode
-  @ARGV && !defined $pathFrom and @pathFrom = shift @ARGV;
-  @ARGV && !defined $pathTo and @pathTo = shift @ARGV;
-  @ARGV && !defined $exclude and @exclude = shift @ARGV;
-
-  @pathFrom = map { s{^//}{} ? do { push @grepFrom, $_; () } : s{^[@]}{} ? do { push @fileFrom, $_; () } : $_ } @pathFrom;
-  $pathFrom =
-    (@pathFrom == 0 && @grepFrom == 0) ? undef :
-    (@pathFrom == 1 && @grepFrom == 0) ? re_or_number $pathFrom[0] :
-    make_re @pathFrom;
-  $grepFrom = make_re @grepFrom;
-  $fileFrom = !@fileFrom ? undef : join "|", map {re_escape_word_list $_} @fileFrom;
-
-  @pathTo   = map { s{^//}{} ? do { push   @grepTo, $_; () } : s{^[@]}{} ? do { push   @fileTo, $_; () } : $_ } @pathTo;
-  $pathTo =
-    (@pathTo == 0 && @grepTo == 0) ? undef :
-    (@pathTo == 1 && @grepTo == 0) ? re_or_number $pathTo[0] :
-    make_re @pathTo;
-  $grepTo = make_re @grepTo;
-  $fileTo = !@fileTo ? undef : join "|", map {re_escape_word_list $_} @fileTo;
-
-  $exclude = @exclude == 0 ? undef : make_re @exclude;
-
-  @prune = grep {$_ ne ""} map {split /[\s,;]+/} @prune if @prune;
-  $prune = @prune == 0 ? undef : make_re_tagged @prune;
-
-  @grow = grep {$_ ne ""} map {split /[\s,;]+/} @grow if @grow;
-  $grow = @grow == 0 ? undef : make_re_tagged @grow;
-} elsif ($mode == 3) {
-  # Crosslink stats mode
-} elsif ($mode == 4) {
-  # Returns mode
-  $addNodes = make_re @ARGV;
-  $exclude = make_re @exclude, "/$ret_arg0|$ret_arg1|$ret_arg2|$ret_arg3|$ret_arg4";
-  # Add some POSIX functions
-  %func2ret = (
-    "posix_memalign" => ["0", "EINVAL", "ENOMEM"],
-  );
-} else {
-  print STDERR "Must specify exactly one of: --graph, --path-1, --path-all\n";
-  exit 1;
+sub checkMerge() {
+  if ($mode == 5 || $mode == 6) {
+    # Merge mode
+    graphMerge();
+  }
 }
 
-$grep = @grep == 0 ? undef : make_re @grep;
+checkMerge();
 
-$fmt //= ($mode == 1 ? "dot" : "text");
-is_graphical_output() and $printBackwards = 0;
+our ($filter, $addNodes);
+
+our $pathJoiner;
+our ($pathJoiner2, $pathJoiner3);
+our $inPathJoiner;
+
+our (%funcs, %func2file, %file2func, %func2mod, %mod2func, $func2modfile, $modfile2func, %edges, %calls, %rcalls, %files, %callstats, %rcallstats, %funcmarks);
+our ($f, $callee, $edge, $func);
+our (%grepFuncsFrom, %grepFuncsTo);
+our %fn_refs;
+
+sub postProcessArgs() {
+  @exclude = grep {$_ ne ""} map {split /[\s,;]+/} @exclude if @exclude;
+  $ntags = join "|", @ntags if @ntags;
+  $grep = @grep == 0 ? undef : make_re @grep;
+  $fmt //= ($mode == 1 ? "dot" : "text");
+  $printBackwards = 0 if is_graphical_output();
+  $walkByBreadth = 0 if ($fmt eq "indent");
+  if ($use_modules) {
+    $func2modfile = \%func2mod;
+    $modfile2func = \%mod2func;
+  } else {
+    $func2modfile = \%func2file;
+    $modfile2func = \%file2func;
+  }
+
+  $pathJoiner = $printBackwards ? " <- " : " -> ";
+  $pathJoiner =~ s/ /\t/g if $fmt eq "table";
+  ($pathJoiner2, $pathJoiner3) = ($pathJoiner =~ s/-/--/r, $pathJoiner =~ s/-/---/r);
+  $inPathJoiner = is_graphical_output() ? "\n" : " ";
+
+  if ($mode == 1) {
+    # Build DOT graph mode
+    for ($_ = $#ARGV-1; $_ >= 0; --$_) {  # Merge standalone '*' and '!' arguments with the next one.
+      splice @ARGV, $_, 2, $ARGV[$_].$ARGV[$_+1] if ($ARGV[$_] eq "*" || $ARGV[$_] eq "!");
+    }
+    $filter = join "|", map {"(?:$_)"} grep !/^[*!]/, @ARGV;
+    $addNodes = make_re map { my $x = $_; $x =~ s/^[*]// ? $x : () } @ARGV;
+    $exclude = make_re @exclude, map { my $x = $_; $x =~ s/^[!]// ? $x : () } @ARGV;
+  } elsif ($mode == 2) {
+    # Search path mode
+    @ARGV && !defined $pathFrom and @pathFrom = shift @ARGV;
+    @ARGV && !defined $pathTo and @pathTo = shift @ARGV;
+    @ARGV && !defined $exclude and @exclude = shift @ARGV;
+
+    @pathFrom = map { s{^//}{} ? do { push @grepFrom, $_; () } : s{^[@]}{} ? do { push @fileFrom, $_; () } : $_ } @pathFrom;
+    $pathFrom =
+      (@pathFrom == 0 && @grepFrom == 0) ? undef :
+      (@pathFrom == 1 && @grepFrom == 0) ? re_or_number $pathFrom[0] :
+      make_re @pathFrom;
+    $grepFrom = make_re @grepFrom;
+    $fileFrom = !@fileFrom ? undef : join "|", map {re_escape_word_list $_} @fileFrom;
+
+    @pathTo   = map { s{^//}{} ? do { push   @grepTo, $_; () } : s{^[@]}{} ? do { push   @fileTo, $_; () } : $_ } @pathTo;
+    $pathTo =
+      (@pathTo == 0 && @grepTo == 0) ? undef :
+      (@pathTo == 1 && @grepTo == 0) ? re_or_number $pathTo[0] :
+      make_re @pathTo;
+    $grepTo = make_re @grepTo;
+    $fileTo = !@fileTo ? undef : join "|", map {re_escape_word_list $_} @fileTo;
+
+    $exclude = @exclude == 0 ? undef : make_re @exclude;
+
+    @prune = grep {$_ ne ""} map {split /[\s,;]+/} @prune if @prune;
+    $prune = @prune == 0 ? undef : make_re_tagged @prune;
+
+    @grow = grep {$_ ne ""} map {split /[\s,;]+/} @grow if @grow;
+    $grow = @grow == 0 ? undef : make_re_tagged @grow;
+  } elsif ($mode == 3) {
+    # Crosslink stats mode
+  } elsif ($mode == 4) {
+    # Returns mode
+    $addNodes = make_re @ARGV;
+    $exclude = make_re @exclude, "/$ret_arg0|$ret_arg1|$ret_arg2|$ret_arg3|$ret_arg4";
+    # Add some POSIX functions
+    %func2ret = (
+      "posix_memalign" => ["0", "EINVAL", "ENOMEM"],
+    );
+  } elsif ($mode == 5 || $mode == 6) {
+  } else {
+    print STDERR "Must specify exactly one of: --graph, --path-1, --path-all, --merge\n";
+    exit 1;
+  }
+}
+
+postProcessArgs();
 
 sub status(;$$);
-if (-t STDERR) {
+if (-t STDERR || $server) {
   eval { use Time::HiRes "time"; };  # try do get it but ok to fail
   my $lastStatusUpdate = 0;
   *status = sub (;$$) {
@@ -507,20 +624,98 @@ if (-t STDERR) {
   *status = sub (;$$) {};
 }
 
-$OUT = *STDOUT;
-if ($outputFilter) {
-  $OUT = IO::File->new("|$outputFilter") or fatal "Can't open output filter program: $outputFilter";
-}
-
 status "Reading source...";
 $_ = read_all();
 
 status "Pre-processing...";
 
-our (%funcs, %func2file, %file2func, %edges, %calls, %rcalls, %files, %callstats, %rcallstats, %funcmarks);
-our ($f, $callee, $edge, $func);
-our (%grepFuncsFrom, %grepFuncsTo);
-our %fn_refs;
+our (%modules, %moduleDirs, %moduleAliasesFile, %moduleAliasesSrc);
+
+%modules = (
+  block => {},
+  block_cache => {fileAliases=>["block_chunkcache"], sourceAliases=>["blkcache", "bm"]},
+  block_disagg => {},
+  bloom => {},
+  btree => {fileAliases=>["btmem", "btree_cmp", "dhandle", "modify", "ref", "serial"]},
+  call_log => {},
+  conf => {sourceAliases=>["conf_keys"]},
+  config => {},
+  conn => {fileAliases=>["connection"], sourceAliases=>["connection"]},
+  cursor => {sourceAliases=>["cur", "btcur", "curbackup"]},
+  disagg => {},
+  evict => {fileAliases=>["cache"]},
+  history => {sourceAliases=>["hs"]},
+  log => {},
+  lsm => {sourceAliases=>["clsm"]},
+  meta => {sourceAliases=>["metadata"]},
+  optrack => {},
+  os => {fileAliases=>["os_common", "os_darwin", "os_linux", "os_posix", "os_win", "os_fs", "os_fstream", "os_fhandle"]},
+  packing => {sourceAliases=>["pack"]},
+  reconcile => {sourceAliases=>["rec"]},
+  rollback_to_stable => {sourceAliases=>["rts"]},
+  schema => {},
+  session => {},
+  support => {},
+  tiered => {},
+  txn => {sourceAliases=>["truncate"]},
+  utilities => {},
+  bitstring => {},
+  cell => {},
+  checkpoint => {sourceAliases=>["ckpt"]},
+  column => {sourceAliases=>["col"]},
+  compact => {},
+  generation => {},
+  pack => {fileAliases=>["intpack"]},
+  stat => {},
+);
+our $name_with_module_re = qr/^(?>(__wt_)|(__wti_|WT_))(?>@{[join "|", keys %modules]})/;
+
+for (keys %modules) {
+  my $mod = $modules{$_};
+  $moduleDirs{$mod->{dirname} // $_} = $_;
+  for my $alias (@{$mod->{fileAliases}}) { $moduleAliasesFile{$alias} = $_; }
+  for my $alias (@{$mod->{sourceAliases}}) { $moduleAliasesSrc{$alias} = $_; }
+}
+
+sub _fname_to_module_raw($) {
+  my $prefix = "src/";
+  return "" unless index($_[0], $prefix) == 0;
+
+  # has "src/" prefix
+  my $ret = substr($_[0], length($prefix));
+  if (index($ret, "include/") != 0) {
+    # Not in "include/" directory
+    if ((my $i = index($ret, "/")) >= 0) {
+      # Extract the first part of the path
+      $ret = substr($ret, 0, $i);
+    }
+    return $ret;
+  }
+  # In "include/" directory
+
+  # A header in include/ directory
+  # Extract filename without extension
+  $ret =~ /([^\/\.]++)(?:\..*)?$/ and $ret = $1;
+  if ($ret =~ /_inline$/) { # strip _inline suffix
+    $ret = substr($ret, 0, -7);
+  } elsif ($ret =~ /_private$/) { # strip _private suffix
+    $ret = substr($ret, 0, -8);
+  }
+  return $ret ne "wt_internal" && $ret ne "extern" ? $ret : "";
+}
+
+sub fname_to_module($) {
+  my $ret = _fname_to_module_raw($_[0]);
+  return "" if !$ret;
+  $ret = $moduleAliasesFile{$ret} if exists $moduleAliasesFile{$ret};
+  # return (exists $modules{$ret}) ? $ret : "";
+  return $ret;
+}
+
+sub name_to_module($) {
+  $_[0] =~ /^([^\-]++\-\>)/ ? $1 :
+  $_[0] =~ /$name_with_module_re/ ? $3 : "";
+}
 
 if ($refs) {
   for my $txt (/(WT_CURSOR_STATIC_INIT\([^)]++\);[^\n]++\n)/sg) {
@@ -533,7 +728,10 @@ if ($refs) {
       $edge = dot_escape_node($func) . " -> " . dot_escape_node($callee);
       $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
       $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
-      $func2file{$func} = "";
+      $funcs{$func} = 1;
+      $func2file{$func} = $func2mod{$func} = "cursor->";
+      push @{$file2func{"cursor->"}}, $func;
+      push @{$mod2func{"cursor->"}}, $func;
     }
   }
 }
@@ -542,10 +740,10 @@ if ($refs) {
 s{\/\*([^*]|\*[^/])*\*/}{}msg;
 
 # Join long lines
-s{\\\n\s*}{ }msg;
-s{\(\n\s*}{(}msg;
-s{([,?:|!~%^])\n\s*}{$1 }msg;
-s{(\&\&)\n\s*}{$1 }msg;
+s{[ \t]*+\\\n\s*+}{ }msg;
+s{\([ \t]*+\n\s*+}{(}msg;
+s{([,?:|!~%^])[ \t]*+\n\s*+}{$1 }msg;
+s{(\&\&)[ \t]*+\n\s*}{$1 }msg;
 
 # Collect all function names from func definitions and count them
 our %fn;
@@ -589,17 +787,22 @@ for my $code (@codeInit) {
 status "Parsing...";
 
 if ($refs) {
-  while (/^\s*+((?:\w+(?:->|\.))+\w+)\s*+=\s*+($re_all);/mg) {
-    ($func, $callee) = ($1, $2);
+  while (/^\s*+((\w+(?:->|\.))\w+)\s*+=\s*+($re_all);/mg) {
+    my $mod;
+    ($func, $mod, $callee) = ($1, $2, $3);
     ++$fn_refs{$func};
 # say "(1) $func -> $callee";
     $edge = dot_escape_node($func) . " -> " . dot_escape_node($callee);
     $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
     $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
-    $func2file{$func} = "";
+    $funcs{$func} = 1;
+    $func2file{$func} = $func2mod{$func} = $mod;
+    push @{$file2func{$mod}}, $func;
+    push @{$mod2func{$mod}}, $func;
   }
   $re_all = "\\b(".(join "|", map {re_escape($_)} sort ((keys %fn_all), (keys %fn_refs))).")\\b" if %fn_refs;
 }
+our $re_all_match = $strict ? qr{$re_all\(} : qr{$re_all\s*+([(),:;])};
 
 $func = "";
 sub parse_retvals {
@@ -637,30 +840,35 @@ sub parse_retvals {
     push @{$func2ret{$func}}, $1;
   }
 }
+
 for (split /\n/) {
+  # skip struct initializers
+  # if (/_STATIC_INIT\s*\([\w\s\,]++\);\s*+$/ || /^[\w\s\[\]]++\s*+=\s*+\{[\w\s\,\[\]\{\}=]*?\}[;,]\s*+$/s) { next; }
+  if (/_STATIC_INIT/ || /^[\w\s\[\]]++\s*+=\s*+\{[\w\s\,\[\]\{\}=]*?\}[;,]\s*+$/s) { next; }
   if (/^#define ([_]*wt_\w++)\(/i) {
     local $func = $1;  # make a local one
     $funcs{$func} = 1;
 
     if (@ntags && $ntags && $func =~ /$ntags/) {
-      my @n;
-      @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
+      my @n; @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
     }
 
     if ($func !~ /$re_bad/) {
       $func2file{$func}=$f;
       push @{$file2func{$f}}, $func;
+      my $mod = name_to_module($func) || fname_to_module($f);
+      $func2mod{$func}=$mod;
+      push @{$mod2func{$mod}}, $func;
     }
     parse_retvals($_);
     next;
   }
-  if (/^([a-z_]\w+)\(/) {
+  if (/^([a-z_]\w++)\(/) {
     $func = $1;
     $funcs{$func} = 1;
 
     if (@ntags && $ntags && $func =~ /$ntags/) {
-      my @n;
-      @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
+      my @n; @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
     }
 
 # $f =~ /scratch\.c/ and say "----: $f $func: $_";
@@ -669,6 +877,9 @@ for (split /\n/) {
     }
     $func2file{$func}=$f;
     push @{$file2func{$f}}, $func;
+    my $mod = name_to_module($func) || fname_to_module($f);
+    $func2mod{$func}=$mod;
+    push @{$mod2func{$mod}}, $func;
     $f && (defined $fileFrom) && $f =~ /$fileFrom/ and $grepFuncsFrom{$func} = 1;
     $f && (defined $fileTo  ) && $f =~ /$fileTo/   and $grepFuncsTo{$func}   = 1;
     next;
@@ -682,9 +893,19 @@ for (split /\n/) {
   if (!$func) { next; }
   # Search for function calls
   # while (m{$re_all\(}g) {
-  while (m{$re_all[(,)]}g) {
+  # while (m{$re_all\s*+([(),:;])}g) {
+  while (m{$re_all_match}g) {
+    if ($2 eq ';' && substr($_, $-[0]-3, 3) eq ' = ') { # skip function pointer assignment
+      # my $i = pos();
+      # my $ii = $i;
+      # while ($i > 0 && substr($_, $i, 1) ne "\n") { --$i; }
+      # ++$i;
+      # while ($ii < length($_) && substr($_, $ii, 1) ne "\n") { ++$ii; }
+      # say "<$2> $func -> $1\n".substr($_, $i, $ii-$i);
+      next;
+    }
     $callee = $1;
-    $edge = "$func -> $callee";
+    $edge = dot_escape_node($func) . " -> " . dot_escape_node($callee);
     $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
     $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
   }
@@ -732,27 +953,20 @@ for (split /\n/) {
 #              (*printPath = sub (@) { say $OUT join " <- ", reverse @_; })
 #  );
 
-if ($fmt eq "indent") {
-  $walkByBreadth = 0;
-}
-our $pathJoiner = $printBackwards ? " <- " : " -> ";
-$fmt eq "table" and $pathJoiner =~ s/ /\t/g;
-our ($pathJoiner2, $pathJoiner3) = ($pathJoiner =~ s/-/--/r, $pathJoiner =~ s/-/---/r);
-our $inPathJoiner = is_graphical_output() ? "\n" : " ";
 sub is_same_file($$) { return $func2file{$_[0]} eq $func2file{$_[1]}; }
-sub is_same_directory($$) { return ($func2file{$_[0]} =~ s{/[^/]++$}{}r) eq ($func2file{$_[1]} =~ s{/[^/]++$}{}r); }
+sub is_same_directory($$) { return ($func2modfile->{$_[0]} =~ s{/[^/]++$}{}r) eq ($func2modfile->{$_[1]} =~ s{/[^/]++$}{}r); }
 sub path_joiner($$) {
   is_same_file($_[0], $_[1]) ? $pathJoiner :
   is_same_directory($_[0], $_[1]) ? $pathJoiner2 : $pathJoiner3;
 }
 our @prevPath;
 sub joinPathIndent(@) {
-  if (@_ == 1) { @prevPath = @_; return "$_[0]\t\t($func2file{$_[0]})"; }
+  if (@_ == 1) { @prevPath = @_; return "$_[0]\t\t($func2modfile->{$_[0]})"; }
   my $useIndentStr = defined($indentStr) && $indentStr ne "";
   my $curIndentStr = ""; # "     ·";
   my $ret = "";
   if ($_[0] ne $prevPath[0]) {
-    $ret = "$_[0]\t\t($func2file{$_[0]})";
+    $ret = "$_[0]\t\t($func2modfile->{$_[0]})";
     @prevPath = ();
   }
   for (my $i = 1; $i <= $#_; ++$i) {
@@ -760,7 +974,7 @@ sub joinPathIndent(@) {
     if ($_[$i] ne $prevPath[$i]) {
       $ret .= "".(@prevPath ? "" : "\n") . $curIndentStr .
           ($useIndentStr ? path_joiner($_[$i-1], $_[$i]) : "") .
-          "$_[$i]      ($func2file{$_[$i]})";
+          "$_[$i]      ($func2modfile->{$_[$i]})";
       $printLen and $ret .= " [".($i+1)."]";
       @prevPath = ();
     }
@@ -771,7 +985,7 @@ sub joinPathIndent(@) {
 sub joinPath(@) {
   if (is_graphical_output()) { return join " -> ", @_; }
   if ($fmt eq "indent") { return joinPathIndent @_; }
-  if (@_ == 1) { return "$_[0]      ($func2file{$_[0]})"; }
+  if (@_ == 1) { return "$_[0]      ($func2modfile->{$_[0]})"; }
   my $ret = $_[0];
   for (my $i = 1; $i <= $#_; ++$i) {
     $ret .= path_joiner($_[$i-1], $_[$i]) . $_[$i];
@@ -866,18 +1080,13 @@ sub filterNode(;$) { # uses $_ or arg
   return $ret;
 }
 
-%grepFuncsFrom and
-  $pathFrom = (defined $pathFrom) ? "$pathFrom|(?:".(make_re sort keys %grepFuncsFrom).")" : make_re sort keys %grepFuncsFrom;
-%grepFuncsTo   and
-  $pathTo   = (defined $pathTo)   ?   "$pathTo|(?:".(make_re sort keys %grepFuncsTo).")"   : make_re sort keys %grepFuncsTo  ;
-
 # Add artificial links
 for (keys %funcs) {
   if (/^(.*)_func$/) {
     if (exists $funcs{$1}) {
       $func = $1;
       $callee = "${func}_func";
-      $edge = "$func -> $callee";
+      $edge = dot_escape_node($func) . " -> " . dot_escape_node($callee);
       $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
       $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
       if ($mode == 4) {
@@ -886,6 +1095,7 @@ for (keys %funcs) {
     }
   }
 }
+
 if ($mode == 4) {
   # push @{$func2ret{WT_HANDLE_METHOD_REQ}}, "EINVAL";
   push @{$func2ret{__wt_realloc_def}}, "__wt_realloc(...)";
@@ -895,6 +1105,370 @@ for my $code (@codeAfterParse) {
   eval $code;
   if ($@) { fatal "Error in custom after-parse code: $@\n$code"; }
 }
+
+sub unquote(;$) {
+  $_ = $_[0] if @_;
+  my $c = substr $_, 0, 1;
+  return $_ if $c eq '(' || $c eq '{' || $c eq '[';
+
+  my $in_str = "";
+  for (my $i = 0; $i < length($_); ++$i) {
+    my $c = substr $_, $i, 1;
+    if ($c eq "'" || $c eq '"') {
+      if (!$in_str) {
+        $in_str = $c;
+        substr $_, $i, 1, ""; --$i; next;
+      } elsif ($c eq $in_str) {
+        $in_str = "";
+        substr $_, $i, 1, ""; --$i; next;
+      }
+    }
+    if ($c eq "\\" && $i < length($_) - 1) {
+      substr $_, $i, 1, "";
+      $c = substr $_, $i, 1;
+      if    ($c eq "n") { substr $_, $i, 1, "\n"; }
+      elsif ($c eq "t") { substr $_, $i, 1, "\t"; }
+      elsif ($c eq "r") { substr $_, $i, 1, "\r"; }
+      elsif ($c eq "b") { substr $_, $i, 1, "\b"; }
+      elsif ($c eq "f") { substr $_, $i, 1, "\f"; }
+      elsif ($c eq "v") { substr $_, $i, 1, "\013"; }
+    }
+  }
+  return $_;
+}
+
+our $tmpdir =
+  exists $ENV{TMPDIR} && -d $ENV{TMPDIR} ? $ENV{TMPDIR} :
+  exists $ENV{TEMP}   && -d $ENV{TEMP}   ? $ENV{TEMP}   :
+  exists $ENV{TMP}    && -d $ENV{TMP}    ? $ENV{TMP}    :
+                         -d "/tmp"       ? "/tmp"       :
+  ".";
+our $tmpprefix = "$tmpdir/callgraph-$$-";
+our $tmpidx = 0;
+
+sub tmpname() {
+  # for (my $i = 0; $i < 10000; ++$i) {
+  #   my $tmp = $tmpprefix.int(rand(10000));
+  #   if (!-e $tmp) {
+  #     return $tmp;
+  #   }
+  # }
+  # fatal "Can't create temporary file in $tmpdir";
+  return $tmpprefix.sprintf("%04d", ++$tmpidx);
+}
+
+sub cleanup_tmp() { unlink glob "$tmpprefix*"; }
+
+sub split_args(;$) {
+  $_ = $_[0] if @_;
+  my @ret = map { $_ ne "" && /^[\S]/ ? unquote : () } m{
+      \G
+      (
+        \s++ |
+        [<>\$] |                               # special chars
+        (?>
+          [^\[\](){}<>\$\\'"\s]++ |            # any non-special char
+          \\ . |                             # \-escaped char
+          (?> " (?>[^\\"]|\\.)* " ) |        # Double-quoted string
+          (?> ' (?>[^\\']|\\.)* ' ) |        # Single-quoted string
+          (?> \{ (?&THING)* \} ) |
+          (?> \( (?&THING)* \) ) |
+          (?> \[ (?&THING)* \] )
+        )++
+      )
+
+      (?(DEFINE)(?<THING>
+        \s++ |
+        [<>] |                               # special chars
+        (?>
+          [^\\'" \t\r\n\[\](){}]++ |         # any non-special char
+          \\ . |                             # \-escaped char
+          (?> " (?>[^\\"]|\\.)* " ) |        # Double-quoted string
+          (?> ' (?>[^\\']|\\.)* ' ) |        # Single-quoted string
+          (?> \{ (?&THING)* \} ) |
+          (?> \( (?&THING)* \) ) |
+          (?> \[ (?&THING)* \] ) |
+          (?>(?:[^\[\](){}<>\s\\'"])++)
+        )++
+      ))
+    }sgx;
+  length($_) == $+[0] or fatal "Parse error:\n$_\n".(" " x $-[0])." ^ here";
+  return @ret;
+}
+
+# >WORD  - Output to file.
+# <WORD  - Use file contents as argument.
+# $WORD  - Use environment variable as argument.
+# $(...) - Use command output as argument.
+# <(...) - Put command output into a file and use it as argument.
+# {}, [] - Reserved.
+sub argv_redirect() {
+  for (my $i = 0; $i < @ARGV; ++$i) {
+    if ($ARGV[$i] =~ /^[<>\$]$/) {
+      my $op = splice @ARGV, $i, 1;
+      last if $i >= @ARGV;
+      my $arg = splice @ARGV, $i, 1;
+      my @replacement = ();
+
+      if ($op eq ">") {
+        # Output redirection
+        fatal "Unsupported redirection to/from" if $arg =~ /^[\{\[\(]/;
+        open STDOUT, ">", $arg or fatal "Can't open $arg: $!";
+        status "Output to: $arg";
+        --$i; # no substitution
+      } elsif ($arg =~ /^\(/) {
+        # The argument is a command
+        my $file = $arg;
+        if ($arg = substr $arg, 1, -1) {
+          local $_ = $arg;
+          $file = tmpname();
+          my $ppid = $$;
+          my $pid = fork();
+          if ($pid == 0) {
+            server_msg "Subtask start: $ppid -> $$";
+            @ARGV = split_args($arg);
+            open STDOUT, ">", $file or fatal "Can't open $file: $!";
+            return;
+          } elsif ($pid > 0) {
+            local $SIG{INT} = local $SIG{TERM} = sub { kill $_[0], $pid; };
+            waitpid($pid, 0);
+            server_msg "Subtask end: $$ -> $pid: $?";
+          } else {
+            server_msg "Subtask ($arg): fork failed: $!";
+            fatal "Subtask  ($arg): fork failed: $!";
+          }
+        }
+        if ($op eq '<') {
+          @replacement = ($file);
+        } elsif ($op eq '$') {
+          @replacement = ("".readfile($file));
+        } else {
+          fatal "Invalid redirection: $op$arg";
+        }
+      } elsif ($op eq '<') {
+        # The argument is NOT a command: substitute the arg with file contents
+        fatal "Unsupported redirection to/from" if $arg =~ /^[\[\(]/;
+        if ($arg =~ /^\{/) {
+          $arg = substr $arg, 1, -1;
+          my $file = tmpname();
+          writefile($file, $arg);
+          @replacement = ($file);
+        } else {
+          fatal "Can't read $arg" if !-r $arg;
+          @replacement = ("".readfile($arg));
+        }
+      } elsif ($op eq '$') {
+        # The argument is NOT a command: substitute the arg with environment variable
+        fatal "Unsupported redirection to/from" if $arg =~ /^[\{\[\(]/;
+        @replacement = ("".$ENV{$arg});
+      } else {
+        fatal "Invalid redirection: $op$arg";
+      }
+
+      splice @ARGV, $i, 0, @replacement;
+      $i += $#replacement;
+    } elsif ($ARGV[$i] =~ /^\{/) {
+      # {}-balanced string
+      $ARGV[$i] = substr $ARGV[$i], 1, -1;
+    }
+  }
+}
+
+our $sources = $_;
+
+# The server supports the following:
+#  - Bash-like command line and syntax.
+#  - TTY input supports readline with history.
+#  - Initial command line arguments are parsed upon startup but no further actions are taken.
+#    e.g. can start server with `callgraph -server -timeout 1`
+#  - User input is treated as command line arguments to `callgraph`.
+#  - Internal command line is parsed similarly to bash allowing "" and '' quoting.
+#  - '\' at the end of line is replaced with "\n" and the command input continues to the next line.
+#  - Argument substitution:
+#    - >WORD  - Output to file.
+#    - <WORD  - Use file contents as a single argument (may contain spaces).
+#    - $WORD  - Use environment variable as a single argument (may contain spaces).
+#    - $(...) - Use command output as a single argument (may contain spaces).
+#    - <(...) - Put command output into a file and use it as an argument.
+#    - {}     - Balanced string as immediate argument (e.g. `{foo bar}`).
+#    - <{}    - Balanced string as file content (e.g. `{foo bar}`).
+#    - [] - Reserved.
+#    e.g. `-merge <(/lru -dot) <(/cmp -dot)`
+#  - Ctrl-C:
+#    - If a child process is running, it will be interrupted.
+#    - If no child process is running, press Ctrl-C again to exit.
+#  - SIGTERM - terminate the server and all child processes.
+sub start_server() {
+  return if !$server;
+
+  my $read_user_input;
+  if (-t STDIN) {
+    $read_user_input or eval {
+      # use Term::ReadLine;
+      use Term::ReadLine;
+      my $term = Term::ReadLine->new('callgraph');
+      die "No readline" if $term->ReadLine eq "Term::ReadLine::Stub";  # Not a useful readline
+      $term->tkRunning(0);
+      $term->ornaments(0);
+      $read_user_input = sub {
+        my $ret = $term->readline("callgraph> ");
+        $term->addhistory($ret);
+        return $ret;
+      };
+    };
+    $read_user_input //= sub {
+      my $ret = `
+        bash -c '
+          export HISTFILE="\$HOME/.callgraph_history"
+          history -r
+          read -e -p "callgraph> " -r && echo "\$REPLY" && [[ -n "\$REPLY" ]] && echo "\$REPLY" >> \$HISTFILE
+        '
+      `;
+      return $? ? undef : $ret;
+    }
+  }
+  $read_user_input //= sub { <STDIN> };
+
+  our $interrupt_count = 0;
+  local $SIG{TERM} = local $SIG{INT} = sub {
+    if ($_[0] eq 'INT' && $interrupt_count++ < 2) {
+      server_msg "Server interrupt-protection: Press Ctrl-C more to quit @_ ($interrupt_count)";
+      return;
+    }
+    server_msg "Server interrupt: $$", @_;
+    EXIT $_[0];
+  };
+  server_msg "Server start: $$";
+
+  my $last_line = "";
+  while (1) {
+    $_ = $read_user_input->();
+    if (!defined $_) {
+      next if $interrupt_count;
+      last;
+    }
+
+    $interrupt_count = 0;
+    chomp;
+    if (/\\$/) { $last_line .= $_."\n"; next; }
+    if ($last_line ne "") { $_ = $last_line.$_; $last_line = ""; }
+    # @ARGV = split_args() or next;
+
+    my $pid = fork();
+    if ($pid == 0) {
+      # Child process
+      server_msg "Task start: $$";
+      @ARGV = split_args() or exit;
+# say STDERR join "|", @ARGV;
+      argv_redirect();
+# say STDERR join "|", @ARGV; exit;
+      close STDIN;
+      parseArgs();
+      postProcessArgs();
+      # Fix function lookup by file name
+      if (defined($fileFrom) || defined($fileTo)) {
+        for $f (keys %$modfile2func) {
+          defined($fileFrom) && $f =~ /$fileFrom/ and do { $grepFuncsFrom{$_} = 1 for @{$modfile2func->{$f}} };
+          defined($fileTo  ) && $f =~ /$fileTo/   and do { $grepFuncsTo{$_}   = 1 for @{$modfile2func->{$f}} };
+        }
+      }
+      if (defined($grep) || @ntags || @tags || defined($grepFrom) || defined($grepTo)) {
+        status "Parsing (server)...";
+        for (split /\n/, $sources) {
+          if (/^#define ([_]*wt_\w++)\(/i) {
+            local $func = $1;  # make a local one
+
+            if (@ntags && $ntags && $func =~ /$ntags/) {
+              my @n; @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
+            }
+
+            # <snip>
+
+            next;
+          }
+          if (/^([a-z_]\w++)\(/) {
+            $func = $1;
+            if (@ntags && $ntags && $func =~ /$ntags/) {
+              my @n; @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
+            }
+
+            if ($func =~ /$re_bad/) { $func = ""; next; }
+
+            # <snip>
+
+            next;
+          }
+          if (/^}/) { $func = ""; next; }
+          if (/#line (.*)/) { $f = $1; $func = ""; next; }
+          if (!$func) { next; }
+
+          # <snip>
+
+          (defined $grepFrom) && /$grepFrom/ and $grepFuncsFrom{$func} = 1;
+          (defined $grepTo  ) && /$grepTo/   and $grepFuncsTo{$func}   = 1;
+          defined($grep) && /$grep/ and print "$func: $_\n";
+          for my $tag (@tags) {
+            if ($tag->[0] == 1) {
+              my ($name, $re) = ($tag->[1], $tag->[2]);
+              /$re/ and push @{$funcmarks{$func}}, $name;
+            } elsif ($tag->[0] == 2) {
+              my ($re, $subst) = ($tag->[1], $tag->[2]);
+              while (/($re)/gs) {
+                my @a = @{^CAPTURE};
+                my $str = $subst =~ s/\$(\{)?(\d++)(?(1)\})/$a[$2]/ersg =~ s/(^\s++)|(\s++$)//grs;
+                $str ne "" and push @{$funcmarks{$func}}, $str;
+              }
+            } elsif ($tag->[0] == 3) {
+              my ($re, $subst) = ($tag->[1], $tag->[2]);
+              while (/$re/gs) {
+                my $str = eval "$subst";
+                if (defined $str) {
+                  $str =~ s/(^\s++)|(\s++$)//gs;
+                  $str ne "" and push @{$funcmarks{$func}}, $str;
+                }
+              }
+            }
+          }
+        }
+        status;
+        EXIT if defined $grep;
+      }
+      $server = undef;
+      checkMerge();
+      return;
+    } elsif ($pid > 0) {
+      # Parent process
+      local $SIG{INT} = local $SIG{TERM} = sub { server_msg "Task interrupt: $pid", @_; kill $_[0], $pid; };
+      waitpid($pid, 0);
+      server_msg "Task end: $pid: $?";
+      cleanup_tmp();
+    } else {
+      server_msg "Server error: fork failed: $!";
+    }
+  }
+  EXIT;
+}
+
+start_server();
+$sources = undef;
+open_out();
+
+%grepFuncsFrom and
+  $pathFrom = (defined $pathFrom) ? "$pathFrom|(?:".(make_re sort keys %grepFuncsFrom).")" : make_re sort keys %grepFuncsFrom;
+%grepFuncsTo   and
+  $pathTo   = (defined $pathTo)   ?   "$pathTo|(?:".(make_re sort keys %grepFuncsTo).")"   : make_re sort keys %grepFuncsTo  ;
+
+our $interrupt = 0;
+sub handle_ctrl_c() {
+  $SIG{TERM} = $SIG{INT} = sub {
+    # $SIG{INT} = undef;
+    say STDERR "** Interrupt **";
+    if ($interrupt++ > 1) {
+      EXIT;
+    }
+  };
+}
+handle_ctrl_c() if $outputFilter;
 
 if ($mode == 4) {
   my @funcs = sort grep {/$addNodes/} keys %func2ret;
@@ -988,10 +1562,10 @@ if ($mode == 4) {
 }
 
 if ($mode == 3) {
-  for my $f1 (keys %func2file) {
-    my @path1 = split /\//, $func2file{$f1};
+  for my $f1 (keys %$func2modfile) {
+    my @path1 = split /\//, $func2modfile->{$f1};
     for $func (keys %{$calls{$f1}}) {
-      my $f2 = $func2file{$func};
+      my $f2 = $func2modfile->{$func};
       if ($f2) {
         my @path2 = split /\//, $f2;
         for my $i (0 .. ($#path1 < $#path2 ? $#path1 : $#path2)) {
@@ -1001,7 +1575,7 @@ if ($mode == 3) {
       }
     }
     for $func (keys %{$rcalls{$f1}}) {
-      my $f2 = $func2file{$func};
+      my $f2 = $func2modfile->{$func};
       if ($f2) {
         my @path2 = split /\//, $f2;
         for my $i (0 .. ($#path1 < $#path2 ? $#path1 : $#path2)) {
@@ -1031,7 +1605,7 @@ if ($mode == 3) {
 }
 
 if ($fmt =~ /^(svg-html)$/) {
-  print STDOUT "<!DOCTYPE html><html><head></head><body>\n";
+  print STDOUT "<!DOCTYPE html><html><head></head><body><div>\n";
   flush STDOUT;
 }
 
@@ -1039,7 +1613,7 @@ if ($mode == 2) {
   status "Searching...";
 
   if ($searchPath == 1 || (defined $pathFrom && $pathFrom !~ /^\d+$/)) {
-    @srcs = sort grep { /$pathFrom/ } keys %func2file;
+    @srcs = sort grep { /$pathFrom/ } keys %$func2modfile;
     !@srcs and fatal "No functions match source filter: $pathFrom";
   } elsif (defined $pathFrom && $pathFrom =~ /^\d+$/) {
     !defined $maxDepthToScan and $maxDepthToScan = 0+$pathFrom;
@@ -1049,7 +1623,7 @@ if ($mode == 2) {
   }
 
   if ($searchPath == 1 || (defined $pathTo && $pathTo !~ /^\d+$/)) {
-    @dsts = sort grep { /$pathTo/ } keys %func2file;
+    @dsts = sort grep { /$pathTo/ } keys %$func2modfile;
     !@dsts and fatal "No functions match destination filter: $pathTo";
   } elsif (defined $pathTo && $pathTo =~ /^\d+$/) {
     !defined $maxDepthToScan and $maxDepthToScan = 0+$pathTo;
@@ -1075,7 +1649,7 @@ if ($mode == 2) {
   $exclude and $start = [grep { !/$exclude/ } @$start];
   @$start or fatal "No functions match source filter\n";
 
-  my @exclude = $exclude ? grep { /$exclude/ } keys %func2file : ();
+  my @exclude = $exclude ? grep { /$exclude/ } keys %$func2modfile : ();
 
   my %acalls;
   if (!$reverseSearch) {
@@ -1094,21 +1668,32 @@ if ($mode == 2) {
   }
 
   is_graphical_output() and print $OUT (<< "_E");
-strict digraph calls {
+strict digraph {
 rankdir=$rankdir;
+splines=$splines;
 _E
 
   if ($depthScan && $maxDepthToScan == 1) {
     for (@$start) { printPath $_ if !$exclude || !/$exclude/; }
+    is_graphical_output() and print $OUT "}\n";
+    close_out();
+    if ($fmt =~ /^(svg-html)$/) {
+      print STDOUT "</div><script defer>".pan_js()."</script></body></html>\n";
+      flush STDOUT;
+    }
+    status;
     EXIT;
   }
 
+  handle_ctrl_c();
   if ($searchPath == 1) {
     $maxdepth = 0;
     for (@srcs) {
       my @queue = [$_];
       my %visited = ($_, 1, map { ($_, 1) } @exclude );
+      my $tEnd = $timeout > 0 ? 0+$timeout+time() : undef;
       while (local $path = shift @queue) {
+        last if $interrupt || ($tEnd && 0+time() > $tEnd);
         ++$nPaths;
         $maxdepth = 0+@$path if $maxdepth < @$path;
         status "[$maxdepth] $_", 1;
@@ -1133,7 +1718,9 @@ _E
       my %ignore = ($_, 1, map { ($_, 1) } @exclude);
       my (%node_outs, %node_ins);   # this is for supporting min rank and max rank on graph
       our $curMaxDepth = $maxDepthToScan;
+      my $tEnd = $timeout > 0 ? 0+$timeout+time() : undef;
       while (my $next_item = ($walkByBreadth ? shift @queue : pop @queue)) {
+        last if $interrupt || ($tEnd && 0+time() > $tEnd);
         local ($curMaxDepth, $path) = @$next_item;
 
         ++$nPaths;
@@ -1168,7 +1755,7 @@ _E
         }
 
         $maxdepth = 0+@$path if $maxdepth < @$path;
-        status "[".($maxdepth+1)."] ($nPaths)", 1;
+        status "[".($maxdepth+1)."] ($nPaths) $nFound", 1;
         for $dst (@{$acalls{$src}}) {
           next if $ignore{$dst}; # || in_list @$path, $dst; ### Allow to print a recursive call once
           next if @codeFilterNode && !filterNode($dst);
@@ -1193,10 +1780,9 @@ _E
     #}
   }
   is_graphical_output() and print $OUT "}\n";
-  close $OUT; $OUT = undef;
-  wait;
+  close_out();
   if ($fmt =~ /^(svg-html)$/) {
-    print STDOUT "<script defer>".pan_js()."</script></body></html>\n";
+    print STDOUT "</div><script defer>".pan_js()."</script></body></html>\n";
     flush STDOUT;
   }
   status;
@@ -1209,8 +1795,7 @@ if ($mode == 1) {
 
   # Print graph
   is_graphical_output() and print $OUT (<< "_E");
-strict digraph calls {
-label="Call Graph\\n@{[join "", map {q{\n}.s/(["\\])/\\$1/gr} @ARGV]}";
+strict digraph {
 labelloc=t;
 rankdir=$rankdir;
 splines=$splines;
@@ -1240,7 +1825,7 @@ _E
 
   if (is_graphical_output()) {
     # Print out nodes inside of corresponding files
-    for (keys %nodesPrint) { $files{$func2file{$_}} = 1; }
+    for (keys %nodesPrint) { $files{$func2modfile->{$_}} = 1; }
     my $f0 = "";
     my @f0;
     for $f (sort keys %files) {
@@ -1256,7 +1841,7 @@ _E
         for my $i ($common+1 ... $#f) {
           my $id1 = my $f1 = join "/", @f[0..$i];
           $id1 =~ s{\W}{_}g;
-          say $OUT qq/subgraph "cluster: $f1" { cluster=true; style="filled,dashed"; label="$f1"; labeljust=l; color="#00000040"; fillcolor="#00000008"; fontcolor="#0000FF60";/;
+          say $OUT qq/subgraph "cluster: $f1" { cluster=true; style="filled,dashed"; label="$f1"; labeljust=l; color="#00000040"; fillcolor="#00000010"; fontcolor="#0000FF60";/;
         }
 
         $f0 = $f;
@@ -1265,7 +1850,7 @@ _E
 
       print $OUT sort map {
         exists $nodesPrint{$_} ? formatNodeDot($_)."\n" : ()
-      } @{$file2func{$f}};
+      } @{$modfile2func->{$f}};
     }
     say $OUT "}"x(@f0);
   }
@@ -1286,9 +1871,8 @@ _E
 
   is_graphical_output() and say $OUT "}";
 
-  close $OUT; $OUT = undef;
-  wait;
-  $fmt =~ /^(svg-html)$/ and print STDOUT "<script defer>setTimeout(()=>{".pan_js()."}, 10)</script></body></html>\n";
+  close_out();
+  $fmt =~ /^(svg-html)$/ and print STDOUT "</div><script defer>setTimeout(()=>{".pan_js()."}, 10)</script></body></html>\n";
 
   status;
 
@@ -1382,7 +1966,7 @@ function endSearch() {
 }
 
 document.addEventListener("wheel", ev => {
-    if (!ev.shiftKey || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    if (!ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey) return;
     ev.preventDefault();
     ev.cancelBubble = true;
     let delta = ev.wheelDeltaY ? -ev.wheelDeltaY : ev.wheelDeltaX ? -ev.wheelDeltaX : 0;

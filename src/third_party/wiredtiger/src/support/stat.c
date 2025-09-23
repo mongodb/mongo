@@ -273,6 +273,8 @@ static const char *const __stats_dsrc_desc[] = {
   "cursor: modify value bytes modified",
   "cursor: next calls",
   "cursor: open cursor count",
+  "cursor: open cursor time application (usecs)",
+  "cursor: open cursor time internal (usecs)",
   "cursor: operation restarted",
   "cursor: prev calls",
   "cursor: remove calls",
@@ -691,6 +693,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cursor_modify_bytes_touch = 0;
     stats->cursor_next = 0;
     /* not clearing cursor_open_count */
+    /* not clearing cursor_open_time_user_usecs */
+    /* not clearing cursor_open_time_internal_usecs */
     stats->cursor_restart = 0;
     stats->cursor_prev = 0;
     stats->cursor_remove = 0;
@@ -1108,6 +1112,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cursor_modify_bytes_touch += from->cursor_modify_bytes_touch;
     to->cursor_next += from->cursor_next;
     to->cursor_open_count += from->cursor_open_count;
+    to->cursor_open_time_user_usecs += from->cursor_open_time_user_usecs;
+    to->cursor_open_time_internal_usecs += from->cursor_open_time_internal_usecs;
     to->cursor_restart += from->cursor_restart;
     to->cursor_prev += from->cursor_prev;
     to->cursor_remove += from->cursor_remove;
@@ -1560,6 +1566,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cursor_modify_bytes_touch += WT_STAT_DSRC_READ(from, cursor_modify_bytes_touch);
     to->cursor_next += WT_STAT_DSRC_READ(from, cursor_next);
     to->cursor_open_count += WT_STAT_DSRC_READ(from, cursor_open_count);
+    to->cursor_open_time_user_usecs += WT_STAT_DSRC_READ(from, cursor_open_time_user_usecs);
+    to->cursor_open_time_internal_usecs += WT_STAT_DSRC_READ(from, cursor_open_time_internal_usecs);
     to->cursor_restart += WT_STAT_DSRC_READ(from, cursor_restart);
     to->cursor_prev += WT_STAT_DSRC_READ(from, cursor_prev);
     to->cursor_remove += WT_STAT_DSRC_READ(from, cursor_remove);
@@ -2223,6 +2231,8 @@ static const char *const __stats_connection_desc[] = {
   "cursor: cursor update value size change",
   "cursor: cursors reused from cache",
   "cursor: open cursor count",
+  "cursor: open cursor time application (usecs)",
+  "cursor: open cursor time internal (usecs)",
   "data-handle: Table connection data handles currently active",
   "data-handle: Tiered connection data handles currently active",
   "data-handle: Tiered_Tree connection data handles currently active",
@@ -3181,6 +3191,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_update_bytes_changed = 0;
     stats->cursor_reopen = 0;
     /* not clearing cursor_open_count */
+    /* not clearing cursor_open_time_user_usecs */
+    /* not clearing cursor_open_time_internal_usecs */
     /* not clearing dh_conn_handle_table_count */
     /* not clearing dh_conn_handle_tiered_count */
     /* not clearing dh_conn_handle_tiered_tree_count */
@@ -4217,6 +4229,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_update_bytes_changed += WT_STAT_CONN_READ(from, cursor_update_bytes_changed);
     to->cursor_reopen += WT_STAT_CONN_READ(from, cursor_reopen);
     to->cursor_open_count += WT_STAT_CONN_READ(from, cursor_open_count);
+    to->cursor_open_time_user_usecs += WT_STAT_CONN_READ(from, cursor_open_time_user_usecs);
+    to->cursor_open_time_internal_usecs += WT_STAT_CONN_READ(from, cursor_open_time_internal_usecs);
     to->dh_conn_handle_table_count += WT_STAT_CONN_READ(from, dh_conn_handle_table_count);
     to->dh_conn_handle_tiered_count += WT_STAT_CONN_READ(from, dh_conn_handle_tiered_count);
     to->dh_conn_handle_tiered_tree_count +=

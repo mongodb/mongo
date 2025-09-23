@@ -132,6 +132,20 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
             raise Exception('hook_disagg: bad extensions in config \"%s\"' % conn_config)
         ext_string = conn_config[start: end]
 
+    def should_bump_cache(test) -> (bool):
+        test_class = str(test).strip().split('.', 1)[0]
+        bump_tests = {
+            'test_cache_evict_config02', # Inserts large values
+            'test_error_info02',         # Inserts large values
+        }
+        return str(test_class) in bump_tests
+
+    if should_bump_cache(testcase): # bump for specific tests
+        if not page_log_config:
+            page_log_config = "cache_size_mb=2048"
+        elif "cache_size_mb=" not in page_log_config: # don't override user-specified size
+            page_log_config = f"cache_size_mb=2048,{page_log_config}"
+
     if page_log_config == None:
         ext_lib = '\"%s\"' % extension_libs[0]
     else:
@@ -271,6 +285,12 @@ def session_create_replace(orig_session_create, session_self, uri, config):
     ret = orig_session_create(session_self, uri, config_str)
     return ret
 
+# Called to replace Session.drop
+def session_drop_replace(orig_session_drop, session_self, uri, config):
+    # uri = replace_uri(uri)
+    # return orig_session_drop(session_self, uri, config)
+    skip_test("drop on disagg tables not yet implemented")
+
 # Called to replace Session.open_cursor.  We skip calls that do backup
 # as that is not yet supported in disaggregated storage.
 def session_open_cursor_replace(orig_session_open_cursor, session_self, uri, dupcursor, config):
@@ -367,6 +387,10 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
         orig_session_create = self.Session['create']
         self.Session['create'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_create_replace(orig_session_create, s, uri, config))
+
+        orig_session_drop = self.Session['drop']
+        self.Session['drop'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
+          session_drop_replace(orig_session_drop, s, uri, config))
 
         orig_session_open_cursor = self.Session['open_cursor']
         self.Session['open_cursor'] = (wthooks.HOOK_REPLACE, lambda s, uri, todup=None, config=None:

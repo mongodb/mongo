@@ -1489,6 +1489,7 @@ __wt_cursor_init(
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cdump;
+    WT_DECL_RET;
     WT_SESSION_IMPL *session;
     bool readonly;
 
@@ -1501,13 +1502,13 @@ __wt_cursor_init(
     }
 
     /* WT_CURSTD_OVERWRITE */
-    WT_RET(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
+    WT_ERR(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
     if (cval.val)
         F_SET(cursor, WT_CURSTD_OVERWRITE);
     else
         F_CLR(cursor, WT_CURSTD_OVERWRITE);
 
-    WT_RET(__cursor_reuse_or_init(session, cursor, cfg, &readonly, &owner, &cdump));
+    WT_ERR(__cursor_reuse_or_init(session, cursor, cfg, &readonly, &owner, &cdump));
 
     if (readonly) {
         cursor->insert = __wt_cursor_notsup;
@@ -1547,4 +1548,11 @@ __wt_cursor_init(
 
     *cursorp = (cdump != NULL) ? cdump : cursor;
     return (0);
+
+err:
+    if (ret != 0) {
+        __wt_free(session, cursor->internal_uri);
+        cursor->internal_uri = NULL;
+    }
+    return (ret);
 }

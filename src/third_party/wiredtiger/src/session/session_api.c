@@ -248,7 +248,6 @@ __session_clear(WT_SESSION_IMPL *session)
     __wt_atomic_store32(&session->hazards.inuse, 0);
     session->hazards.num_active = 0;
 }
-
 /*
  * __session_close_cursors --
  *     Close all cursors in a list.
@@ -276,6 +275,8 @@ __session_close_cursors(WT_SESSION_IMPL *session, WT_CURSOR_LIST *cursors)
             WT_TRET(session->event_handler->handle_close(
               session->event_handler, &session->iface, cursor));
 
+        if (WT_PREFIX_MATCH(cursor->internal_uri, "layered:"))
+            F_SET(cursor, WT_CURSTD_CONSTITUENT_DEAD);
         WT_TRET(cursor->close(cursor));
     }
     WT_TAILQ_SAFE_REMOVE_END
@@ -730,11 +731,8 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
     if (*cursorp == NULL)
         return (__wt_bad_object_type(session, uri));
 
-    if (owner != NULL) {
-        /*
-         * We support caching simple cursors that have no children. If this cursor is a child, we're
-         * not going to cache this child or its parent.
-         */
+    /* Support caching simple cursors that have no children or if the owner is a layered cursor. */
+    if (owner != NULL && !WT_PREFIX_MATCH(owner->internal_uri, "layered:")) {
         F_CLR(owner, WT_CURSTD_CACHEABLE);
         F_CLR(*cursorp, WT_CURSTD_CACHEABLE);
     }
@@ -767,6 +765,18 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
     uint64_t hash_value;
 
     hash_value = 0;
+    /* Don't require a NULL input cursor */
+    *cursorp = NULL;
+
+#ifdef HAVE_DIAGNOSTIC
+    struct timespec end_time, start_time;
+    bool cursor_timing = false;
+    if (session->cursor_open_timer_running == false) {
+        session->cursor_open_timer_running = true;
+        cursor_timing = true;
+        __wt_epoch(session, &start_time);
+    }
+#endif
     WT_NOT_READ(txn_global, &S2C(session)->txn_global);
 
     /*
@@ -782,15 +792,37 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
         session->hs_cursor_counter == 0 || F_ISSET(session, WT_SESSION_INTERNAL) ||
         (S2BT_SAFE(session) != NULL && F_ISSET(S2BT(session), WT_BTREE_VERIFY)));
 
-    /* We do not cache any subordinate tables/files cursors. */
-    if (owner == NULL) {
+    if (owner != NULL && !WT_PREFIX_MATCH(owner->internal_uri, "layered:")) {
+        WT_ERR(__session_open_cursor_int(session, uri, owner, NULL, cfg, hash_value, cursorp));
+    } else {
+        /* Try to find the cursor in the cache. */
         __wt_cursor_get_hash(session, uri, NULL, &hash_value);
-        if ((ret = __wt_cursor_cache_get(session, uri, hash_value, NULL, cfg, cursorp)) == 0)
-            return (0);
-        WT_RET_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(
+          __wt_cursor_cache_get(session, uri, hash_value, NULL, cfg, cursorp), false);
+
+        /* Open a new cursor if no cached cursor was found. */
+        if (*cursorp == NULL)
+            WT_ERR(__session_open_cursor_int(session, uri, owner, NULL, cfg, hash_value, cursorp));
     }
 
-    return (__session_open_cursor_int(session, uri, owner, NULL, cfg, hash_value, cursorp));
+err:
+    /* Always close out the timing information regardless of success. */
+#ifdef HAVE_DIAGNOSTIC
+    if (cursor_timing) {
+        session->cursor_open_timer_running = false;
+        __wt_epoch(session, &end_time);
+        uint64_t time_diff_usec = WT_TIMEDIFF_US(end_time, start_time);
+        /*
+         * We may not have a valid dhandle when EBUSY is returned. In that case only increment the
+         * connection statistics
+         */
+        if (ret != EBUSY)
+            WT_STAT_CONN_DSRC_INCRV(session, cursor_open_time_internal_usecs, time_diff_usec);
+        else
+            WT_STAT_CONN_INCRV(session, cursor_open_time_internal_usecs, time_diff_usec);
+    }
+#endif
+    return (ret);
 }
 
 /*
@@ -806,12 +838,26 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
     WT_SESSION_IMPL *session;
     uint64_t hash_value;
     bool dup_backup;
+#ifdef HAVE_DIAGNOSTIC
+    struct timespec end_time, start_time;
+    bool cursor_timing;
 
+    cursor_timing = false;
+#endif
     cursor = *cursorp = NULL;
+
     hash_value = 0;
     dup_backup = false;
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL(session, ret, open_cursor, config, cfg);
+
+#ifdef HAVE_DIAGNOSTIC
+    if (session->cursor_open_timer_running == false) {
+        session->cursor_open_timer_running = true;
+        cursor_timing = true;
+        __wt_epoch(session, &start_time);
+    }
+#endif
 
     /*
      * Check for early usage of a user session to collect statistics. If the connection is not fully
@@ -864,6 +910,30 @@ err:
         if (cursor != NULL)
             WT_TRET(cursor->close(cursor));
     }
+    /* Always close out the timing information regardless of success. */
+#ifdef HAVE_DIAGNOSTIC
+    if (cursor_timing) {
+        session->cursor_open_timer_running = false;
+        __wt_epoch(session, &end_time);
+        uint64_t time_diff_usec = WT_TIMEDIFF_US(end_time, start_time);
+        /*
+         * It's considered a user open if it comes via a top-level API call. This could
+         * alternatively decide the statistic based on whether it's a user or internal session.
+         *
+         * We may not have a valid dhandle when EBUSY is returned. In that case only increment the
+         * connection statistics
+         */
+        if (ret != EBUSY)
+            if (API_USER_ENTRY(session))
+                WT_STAT_CONN_DSRC_INCRV(session, cursor_open_time_user_usecs, time_diff_usec);
+            else
+                WT_STAT_CONN_DSRC_INCRV(session, cursor_open_time_internal_usecs, time_diff_usec);
+        else if (API_USER_ENTRY(session))
+            WT_STAT_CONN_INCRV(session, cursor_open_time_user_usecs, time_diff_usec);
+        else
+            WT_STAT_CONN_INCRV(session, cursor_open_time_internal_usecs, time_diff_usec);
+    }
+#endif
     /*
      * Opening a cursor on a non-existent data source will set ret to either of ENOENT or
      * WT_NOTFOUND at this point. However, applications may reasonably do this inside a transaction

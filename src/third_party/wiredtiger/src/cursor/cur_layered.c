@@ -1097,6 +1097,115 @@ err:
 }
 
 /*
+ * __clayered_cache --
+ *     WT_CURSOR->cache method for the layered cursor type.
+ */
+static int
+__clayered_cache(WT_CURSOR *cursor)
+{
+    WT_CURSOR_LAYERED *clayered;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    clayered = (WT_CURSOR_LAYERED *)cursor;
+    session = CUR2S(cursor);
+
+    WT_TRET(__wti_cursor_cache(cursor, clayered->dhandle));
+    WT_TRET(__wt_session_release_dhandle(session));
+
+    API_RET_STAT(session, ret, cursor_cache);
+}
+
+/*
+ * __clayered_reopen_int --
+ *     Helper for __clayered_reopen, called with the session data handle set.
+ */
+static int
+__clayered_reopen_int(WT_CURSOR *cursor)
+{
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    bool is_dead;
+
+    session = CUR2S(cursor);
+    dhandle = session->dhandle;
+
+    /*
+     * Lock the handle: we're only interested in open handles, any other state disqualifies the
+     * cache.
+     */
+    ret = __wt_session_lock_dhandle(session, 0, &is_dead);
+    if (!is_dead && ret == 0 && !WT_DHANDLE_CAN_REOPEN(dhandle)) {
+        WT_RET(__wt_session_release_dhandle(session));
+        ret = __wt_set_return(session, EBUSY);
+    }
+
+    /*
+     * The data handle may not be available, fail the reopen, and flag the cursor so that the handle
+     * won't be unlocked when subsequently closed.
+     */
+    if (is_dead || ret == EBUSY) {
+        F_SET(cursor, WT_CURSTD_DEAD);
+        ret = WT_NOTFOUND;
+    }
+    __wti_cursor_reopen(cursor, dhandle);
+
+    /*
+     * The layered handle may have been reopened since we last accessed it. Reset fields in the
+     * cursor that point to memory owned by the handle.
+     */
+    if (ret == 0) {
+        WT_LAYERED_TABLE *layered = (WT_LAYERED_TABLE *)session->dhandle;
+        cursor->internal_uri = session->dhandle->name;
+        cursor->key_format = layered->key_format;
+        cursor->value_format = layered->value_format;
+
+        WT_STAT_CONN_DSRC_INCR(session, cursor_reopen);
+    }
+    return (ret);
+}
+
+/*
+ * __clayered_reopen --
+ *     WT_CURSOR->reopen method for the layered cursor type.
+ */
+static int
+__clayered_reopen(WT_CURSOR *cursor, bool sweep_check_only)
+{
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    bool can_sweep;
+
+    session = CUR2S(cursor);
+    dhandle = ((WT_CURSOR_LAYERED *)cursor)->dhandle;
+
+    if (sweep_check_only) {
+        /*
+         * The sweep check returns WT_NOTFOUND if the cursor should be swept. Generally if the
+         * associated data handle cannot be reopened it should be swept. But a handle being operated
+         * on by this thread should not be swept. The situation where a handle cannot be reopened
+         * but also cannot be swept can occur if this thread is in the middle of closing a cursor
+         * for a handle that is marked as dropped. During the close, a few iterations of the session
+         * cursor sweep are run. The sweep calls this function to see if a cursor should be swept,
+         * and it may thus be asking about the very cursor being closed.
+         */
+        can_sweep = !WT_DHANDLE_CAN_REOPEN(dhandle) && dhandle != session->dhandle;
+        return (can_sweep ? WT_NOTFOUND : 0);
+    }
+
+    /*
+     * Temporarily set the session's data handle to the data handle in the cursor. Reopen may be
+     * called either as part of an open API call, or during cursor sweep as part of a different API
+     * call, so we need to restore the original data handle that was in our session after the reopen
+     * completes.
+     */
+    WT_WITH_DHANDLE(session, dhandle, ret = __clayered_reopen_int(cursor));
+    API_RET_STAT(session, ret, cursor_reopen);
+}
+
+/*
  * __clayered_lookup_constituent --
  *     The cursor-agnostic parts of layered table lookups.
  */
@@ -1797,26 +1906,37 @@ __clayered_close_int(WT_CURSOR *cursor)
     WT_CURSOR_LAYERED *clayered;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    bool dead;
 
+    dead = F_ISSET(cursor, WT_CURSTD_DEAD);
     session = CUR2S(cursor);
     WT_ASSERT_ALWAYS(session, session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
       "Valid layered dhandle is required to close a cursor");
     clayered = (WT_CURSOR_LAYERED *)cursor;
 
     /*
-     * If this close is via a connection close the constituent cursors will be closed by a scan of
-     * cursors in the session. It might be better to keep them out of the session cursor list, but I
-     * don't know how to do that? Probably opening a file cursor directly instead of a table cursor?
+     * No need to close the constituent cursors if it has been already done during connection->close
+     * performing a close of all cursors in the session.
      */
-    WT_TRET(__clayered_close_cursors(clayered));
+    if (!F_ISSET(cursor, WT_CURSTD_CONSTITUENT_DEAD))
+        WT_TRET(__clayered_close_cursors(clayered));
 
     /* In case we were somehow left positioned, clear that. */
     __clayered_leave(clayered);
 
     __wt_cursor_close(cursor);
 
-    WT_TRET(__wt_session_release_dhandle(session));
+    if (session->dhandle != NULL) {
+        /* Decrement the data-source's in-use counter. */
+        __wt_cursor_dhandle_decr_use(session);
 
+        /*
+         * If the cursor was marked dead, we got here from reopening a cached cursor, which had a
+         * handle that was dead at that time, so it did not obtain a lock on the handle.
+         */
+        if (!dead)
+            WT_TRET(__wt_session_release_dhandle(session));
+    }
     return (ret);
 }
 
@@ -1838,9 +1958,36 @@ __clayered_close(WT_CURSOR *cursor)
     clayered = (WT_CURSOR_LAYERED *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, clayered->dhandle);
 err:
+    if (ret == 0) {
+        /*
+         * If releasing the cursor fails in any way, it will be left in a state that allows it to be
+         * normally closed.
+         */
+        bool released = false;
+        ret = __wti_cursor_cache_release(session, cursor, &released);
+
+        if (released) {
+            /*
+             * If the cursor has been cached, try to cache the constituent cursors by evoking a
+             * cursor close.
+             *
+             * Note: There no need to close the constituent cursors if it has been already done
+             * during connection->close performing a close of all cursors in the session.
+             */
+            if (!F_ISSET(cursor, WT_CURSTD_CONSTITUENT_DEAD))
+                WT_TRET(__clayered_close_cursors(clayered));
+
+            /* In case we were somehow left positioned, clear that. */
+            __clayered_leave(clayered);
+            goto done;
+        }
+    }
+    /* For cached cursors, free any extra buffers retained now. */
+    __wt_cursor_free_cached_memory(cursor);
+    cursor->internal_uri = NULL;
 
     WT_TRET(__clayered_close_int(cursor));
-
+done:
     API_END_RET(session, ret);
 }
 
@@ -1977,19 +2124,21 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __wti_cursor_reconfigure,                       /* reconfigure */
       __clayered_largest_key,                         /* largest_key */
       __clayered_bound,                               /* bound */
-      __wt_cursor_notsup,                             /* cache */
-      __wt_cursor_reopen_notsup,                      /* reopen */
+      __clayered_cache,                               /* cache */
+      __clayered_reopen,                              /* reopen */
       __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __clayered_close);                              /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_LAYERED *clayered;
     WT_DECL_RET;
     WT_LAYERED_TABLE *layered;
+    bool cacheable;
 
     WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_LAYERED);
 
     clayered = NULL;
     cursor = NULL;
+    cacheable = F_ISSET(session, WT_SESSION_CACHE_CURSORS);
 
     if (!WT_PREFIX_MATCH(uri, "layered:"))
         return (__wt_unexpected_object_type(session, uri, "layered:"));
@@ -2007,6 +2156,12 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     /* Get the layered tree, and hold a reference to it until the cursor is closed. */
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, cfg, 0));
 
+    /*
+     * Increment the data-source's in-use counter; done now because closing the cursor will
+     * decrement it, and all failure paths from here close the cursor.
+     */
+    __wt_cursor_dhandle_incr_use(session);
+
     layered = (WT_LAYERED_TABLE *)session->dhandle;
     WT_ASSERT_ALWAYS(session, layered->ingest_uri != NULL && layered->key_format != NULL,
       "Layered handle not setup");
@@ -2017,10 +2172,9 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     cursor = (WT_CURSOR *)clayered;
     *cursor = iface;
     cursor->session = (WT_SESSION *)session;
+    cursor->internal_uri = session->dhandle->name;
     cursor->key_format = layered->key_format;
     cursor->value_format = layered->value_format;
-
-    WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
     WT_ERR(__wt_config_gets_def(session, cfg, "next_random", 0, &cval));
     if (cval.val != 0) {
@@ -2033,13 +2187,24 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 
         WT_ERR(__wt_config_gets_def(session, cfg, "next_random_sample_size", 0, &cval));
         clayered->next_random_sample_size = (u_int)cval.val;
+        cacheable = false;
     }
+
+    /* Set the cache flag before finding a cursor handle. */
+    if (cacheable)
+        F_SET(cursor, WT_CURSTD_CACHEABLE);
+
+    /* Try to find the cursor in the cache. */
+    WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
     /* Layered cursor is not compatible with cursor_copy config. */
     F_CLR(cursor, WT_CURSTD_DEBUG_COPY_KEY | WT_CURSTD_DEBUG_COPY_VALUE);
 
     if (0) {
 err:
+        /* Our caller expects to release the data handles if we fail. */
+        clayered->dhandle = NULL;
+        __wt_cursor_dhandle_decr_use(session);
         if (clayered != NULL)
             WT_TRET(__clayered_close(cursor));
         WT_TRET(__wt_session_release_dhandle(session));

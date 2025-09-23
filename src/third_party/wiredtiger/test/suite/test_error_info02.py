@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time, wiredtiger
+import time, wiredtiger, wttest
 from error_info_util import error_info_util
 
 # test_error_info02.py
@@ -34,7 +34,8 @@ from error_info_util import error_info_util
 #   occur in the session.
 class test_error_info02(error_info_util):
     uri = "table:test_error_info.wt"
-
+    # FIXME-WT-15058
+    @wttest.skip_for_hook("disagg", "Fails due to incorrect cursor logic.")
     def test_wt_rollback_cache_overflow(self):
         """
         Try to insert a key value pair with an unreasonably low cache max wait time and

@@ -1222,6 +1222,8 @@ conn_dsrc_stats = [
     CursorStat('cursor_next_skip_lt_100', 'cursor next calls that skip greater than 1 and fewer than 100 entries'),
     CursorStat('cursor_next_skip_total', 'Total number of entries skipped by cursor next calls'),
     CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
+    CursorStat('cursor_open_time_internal_usecs', 'open cursor time internal (usecs)', 'no_clear,no_scale'),
+    CursorStat('cursor_open_time_user_usecs', 'open cursor time application (usecs)', 'no_clear,no_scale'),
     CursorStat('cursor_prev_hs_tombstone', 'cursor prev calls that skip due to a globally visible history store tombstone'),
     CursorStat('cursor_prev_skip_ge_100', 'cursor prev calls that skip greater than or equal to 100 entries'),
     CursorStat('cursor_prev_skip_lt_100', 'cursor prev calls that skip less than 100 entries'),

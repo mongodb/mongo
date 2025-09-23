@@ -521,6 +521,20 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
         return (false);
 
     clean_needed = __wt_evict_clean_needed(session, &pct_full);
+
+    /*
+     * We must check if application threads are allowed to participate in eviction based on the
+     * minimum cache fill ratio that is configured. A clean eviction is required only when the
+     * minimum cache fill ratio is set to a value higher than the eviction trigger. This means we
+     * should check for the scenario where a clean eviction is not required.
+     */
+    if (!clean_needed) {
+        uint8_t min_cache_fill_ratio = __wt_atomic_load8(
+          &S2C(session)->cache->cache_eviction_controls.app_eviction_min_cache_fill_ratio);
+        if (min_cache_fill_ratio > 0 && pct_full < min_cache_fill_ratio)
+            return (false);
+    }
+
     if (readonly) {
         dirty_needed = updates_needed = false;
         pct_dirty = pct_updates = 0.0;

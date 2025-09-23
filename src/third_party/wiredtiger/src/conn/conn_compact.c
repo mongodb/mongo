@@ -632,7 +632,7 @@ __background_compact_server(void *arg)
         WT_ERR_NOTFOUND_OK(__background_compact_find_next_uri(session, uri, next_uri), true);
 
         /* All the keys with the specified prefix have been parsed. */
-        if (ret == WT_NOTFOUND) {
+        if (WT_CHECK_AND_RESET(ret, WT_NOTFOUND)) {
             full_iteration = true;
             continue;
         }

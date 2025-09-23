@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import wiredtiger
 import wttest
 
 # For now, this is just making sure the flags are set without errors
@@ -45,10 +46,17 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
 
         # Try different eviction reconfigurations.
         configs = [
-            "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=true]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false]",
-            "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=false]",
-            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=true]",
+            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,app_eviction_min_cache_fill_ratio=0]",
+            "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=true,app_eviction_min_cache_fill_ratio=10]",
+            "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=false,app_eviction_min_cache_fill_ratio=25]",
+            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=true,app_eviction_min_cache_fill_ratio=50]",
+        ]
+
+        # Try different eviction failure reconfigurations.
+        failure_configs = [
+            "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=-1]",
+            "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=60]",
+            "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=110]",
         ]
 
         for cfg in configs:
@@ -65,3 +73,9 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
             count = sum(1 for _ in cursor)
             self.assertGreaterEqual(count, 5)
             cursor.close()
+
+        for cfg in failure_configs:
+             self.assertRaisesException(wiredtiger.WiredTigerError,
+                lambda: self.conn.reconfigure(cfg), 'Invalid argument')
+
+        self.ignoreStderrPatternIfExists('Invalid argument')
