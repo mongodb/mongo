@@ -1362,10 +1362,10 @@ void UnwindNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "UNWIND\n";
     addIndent(ss, indent + 1);
-    *ss << "preserveNullAndEmptyArrays = " << preserveNullAndEmptyArrays << "\n";
-    if (indexPath) {
+    *ss << "preserveNullAndEmptyArrays = " << spec.preserveNullAndEmptyArrays << "\n";
+    if (spec.indexPath) {
         addIndent(ss, indent + 1);
-        *ss << "indexPath = " << indexPath->fullPath() << "\n";
+        *ss << "indexPath = " << spec.indexPath->fullPath() << "\n";
     }
 
     addCommon(ss, indent);
@@ -1375,8 +1375,7 @@ void UnwindNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> UnwindNode::clone() const {
-    return std::make_unique<UnwindNode>(
-        children[0]->clone(), fieldPath, preserveNullAndEmptyArrays, indexPath);
+    return std::make_unique<UnwindNode>(children[0]->clone(), spec);
 }
 
 //
@@ -1930,10 +1929,10 @@ void EqLookupUnwindNode::appendToString(str::stream* ss, int indent) const {
     *ss << "shouldProduceBson = " << shouldProduceBson << "\n";
 
     addIndent(ss, indent + 1);
-    *ss << "preserveNullAndEmptyArrays = " << unwindNode.preserveNullAndEmptyArrays << "\n";
-    if (unwindNode.indexPath) {
+    *ss << "preserveNullAndEmptyArrays = " << unwindSpec.preserveNullAndEmptyArrays << "\n";
+    if (unwindSpec.indexPath) {
         addIndent(ss, indent + 1);
-        *ss << "indexPath = " << unwindNode.indexPath->fullPath() << "\n";
+        *ss << "indexPath = " << unwindSpec.indexPath->fullPath() << "\n";
     }
 
     addIndent(ss, indent + 1);
@@ -1957,8 +1956,8 @@ std::unique_ptr<QuerySolutionNode> EqLookupUnwindNode::clone() const {
                                                 idxEntry,
                                                 shouldProduceBson,
                                                 // $unwind-specific data members.
-                                                unwindNode.preserveNullAndEmptyArrays,
-                                                unwindNode.indexPath,
+                                                unwindSpec.preserveNullAndEmptyArrays,
+                                                unwindSpec.indexPath,
                                                 scanDirection);
 }
 

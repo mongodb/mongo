@@ -2253,10 +2253,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
  * This also builds a child project stage to get the field to be unwound, and ancestor project
  * stage(s) to add the $unwind outputs (value and optionally array index) to the result document.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    const UnwindNode* un = static_cast<const UnwindNode*>(root);
-    const FieldPath& fp = un->fieldPath;
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const QuerySolutionNode* root,
+                                                                      const PlanStageReqs& reqs) {
+    const UnwindNode* unwindNode = static_cast<const UnwindNode*>(root);
+    const FieldPath& fieldPath = unwindNode->spec.fieldPath;
 
     //
     // Build the execution subtree for the child plan subtree.
@@ -2265,10 +2265,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // The child must produce all of the slots required by the parent of this UnwindNode, plus this
     // node needs to produce the result slot.
     PlanStageReqs childReqs = reqs.copyForChild().setResultObj();
-    auto [stage, outputs] = build(un->children[0].get(), childReqs);
+    auto [stage, outputs] = build(unwindNode->children[0].get(), childReqs);
 
     // Clear the root of the original field being unwound so later plan stages do not reference it.
-    outputs.clearField(fp.getSubpath(0));
+    outputs.clearField(fieldPath.getSubpath(0));
     const sbe::value::SlotId childResultSlot = outputs.getResultObj().slotId;
 
     //
@@ -2278,7 +2278,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // only the former supports dotted paths.
     //
     std::vector<std::string> fields;
-    fields.emplace_back(fp.fullPath());
+    fields.emplace_back(fieldPath.fullPath());
     auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
                                                      fields,
                                                      childResultSlot,
@@ -2290,7 +2290,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::value::SlotId getFieldSlot = outSlots[0].getId();
 
     // Continue building the unwind and projection to results.
-    return buildOnlyUnwind(un, reqs, stage, outputs, childResultSlot, getFieldSlot);
+    return buildOnlyUnwind(unwindNode->spec,
+                           reqs,
+                           unwindNode->nodeId(),
+                           stage,
+                           outputs,
+                           childResultSlot,
+                           getFieldSlot);
 }  // buildUnwind
 
 /**
@@ -2301,13 +2307,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
  * materialization is not a performance or memory problem.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
-    const UnwindNode* un,
+    const UnwindNode::UnwindSpec& un,
     const PlanStageReqs& reqs,
+    PlanNodeId nodeId,
     std::unique_ptr<sbe::PlanStage>& stage,
     PlanStageSlots& outputs,
     const sbe::value::SlotId childResultSlot,
     const sbe::value::SlotId getFieldSlot) {
-    const FieldPath& fp = un->fieldPath;
 
     //
     // Build the unwind execution node itself. This will unwind the value in 'getFieldSlot' into
@@ -2319,8 +2325,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                          getFieldSlot /* inField */,
                                          unwindSlot /* outField */,
                                          arrayIndexSlot /* outIndex */,
-                                         un->preserveNullAndEmptyArrays,
-                                         un->nodeId(),
+                                         un.preserveNullAndEmptyArrays,
+                                         nodeId,
                                          nullptr /* yieldPolicy */,
                                          true /* participateInTrialRunTracking */);
 
@@ -2342,13 +2348,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // The projection expression that adds the index and/or unwind values to the result doc.
     std::unique_ptr<sbe::EExpression> finalProjectExpr;
 
-    if (un->indexPath) {
+    bool hasIndexPath = un.indexPath.has_value();
+    if (hasIndexPath) {
         // "includeArrayIndex" option (Cases 1-3). The index is always projected in these.
 
         // If our parent wants the array index field, set our outputs to point it to that slot.
-        if (reqs.has({PlanStageSlots::SlotType::kField, un->indexPath->fullPath()})) {
+        if (reqs.has({PlanStageSlots::SlotType::kField, un.indexPath->fullPath()})) {
             outputs.set(PlanStageSlots::OwnedSlotName{PlanStageSlots::SlotType::kField,
-                                                      un->indexPath->fullPath()},
+                                                      un.indexPath->fullPath()},
                         arrayIndexSlot);
         }
 
@@ -2362,11 +2369,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             projectionNodes.clear();
 
             // Index output
-            fieldPaths.emplace_back(un->indexPath->fullPath());
+            fieldPaths.emplace_back(un.indexPath->fullPath());
             projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
 
             // Unwind output
-            fieldPaths.emplace_back(fp.fullPath());
+            fieldPaths.emplace_back(un.fieldPath.fullPath());
             projectionNodes.emplace_back(SbExpr{unwindSlot});
 
             indexNullUnwindValProjExpr[copy] = generateProjection(
@@ -2382,11 +2389,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         projectionNodes.clear();
 
         // Index output
-        fieldPaths.emplace_back(un->indexPath->fullPath());
+        fieldPaths.emplace_back(un.indexPath->fullPath());
         projectionNodes.emplace_back(SbExpr{arrayIndexSlot});
 
         // Unwind output
-        fieldPaths.emplace_back(fp.fullPath());
+        fieldPaths.emplace_back(un.fieldPath.fullPath());
         projectionNodes.emplace_back(SbExpr{unwindSlot});
 
         SbExpr indexValUnwindValProjExpr = generateProjection(
@@ -2401,7 +2408,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         projectionNodes.clear();
 
         // Index output
-        fieldPaths.emplace_back(un->indexPath->fullPath());
+        fieldPaths.emplace_back(un.indexPath->fullPath());
         projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
 
         SbExpr indexNullProjExpr = generateProjection(
@@ -2447,7 +2454,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         projectionNodes.clear();
 
         // Unwind output
-        fieldPaths.emplace_back(fp.fullPath());
+        fieldPaths.emplace_back(un.fieldPath.fullPath());
         projectionNodes.emplace_back(SbExpr{unwindSlot});
 
         SbExpr unwindValProjExpr = generateProjection(
@@ -2478,7 +2485,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Create the ProjectStage that adds the output(s) to the result doc via 'finalProjectExpr'.
     SbSlot resultSlot = SbSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
     stage = makeProjectStage(std::move(stage),
-                             un->nodeId(),
+                             nodeId,
                              resultSlot.slotId,  // output result document
                              std::move(finalProjectExpr));
 

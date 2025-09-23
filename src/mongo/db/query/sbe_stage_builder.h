@@ -1021,9 +1021,11 @@ private:
      * foreign collection, where the $lookup result array is empty and thus its materialization is
      * not a performance or memory problem.
      */
+
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildOnlyUnwind(
-        const UnwindNode* un,
+        const UnwindNode::UnwindSpec& un,
         const PlanStageReqs& reqs,
+        PlanNodeId nodeId,
         std::unique_ptr<sbe::PlanStage>& stage,
         PlanStageSlots& outputs,
         sbe::value::SlotId childResultSlot,
