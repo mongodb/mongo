@@ -208,16 +208,24 @@ class MongoTidyTests(unittest.TestCase):
         self.run_clang_tidy()
 
     def test_MongoBannedNamesCheck(self):
-        stdx_replacement_str = "Consider using alternatives such as the polyfills from the mongo::stdx:: namespace."
+        stdx_replacement_str = (
+            "Consider using alternatives such as the polyfills from the mongo::stdx:: namespace."
+        )
 
         test_names = [
             ("std::get_terminate()", stdx_replacement_str),
             ("std::future<int> myFuture", "Consider using mongo::Future instead."),
-            ("std::recursive_mutex recursiveMut", "Do not use. A recursive mutex is often an indication of a design problem and is prone to deadlocks because you don't know what code you are calling while holding the lock."),
+            (
+                "std::recursive_mutex recursiveMut",
+                "Do not use. A recursive mutex is often an indication of a design problem and is prone to deadlocks because you don't know what code you are calling while holding the lock.",
+            ),
             ("const std::condition_variable cv", stdx_replacement_str),
             ("static std::unordered_map<int, int> myMap", stdx_replacement_str),
             ("boost::unordered_map<int, int> boostMap", stdx_replacement_str),
-            ("std::regex_search(std::string(\"\"), std::regex(\"\"))", "Consider using mongo::pcre::Regex instead."),
+            (
+                'std::regex_search(std::string(""), std::regex(""))',
+                "Consider using mongo::pcre::Regex instead.",
+            ),
             ("std::atomic<int> atomicVar", "Consider using mongo::Atomic<T> instead."),
             ("std::optional<std::string> strOpt", "Consider using boost::optional instead."),
             ("std::atomic<int> fieldDecl", "Consider using mongo::Atomic<T> instead."),
@@ -227,7 +235,9 @@ class MongoTidyTests(unittest.TestCase):
 
         self.expected_output = [
             "error: Forbidden use of banned name in "
-            + name + ". " + msg
+            + name
+            + ". "
+            + msg
             + " Use '//  NOLINT' if usage is absolutely necessary. Be especially careful doing so outside of test code."
             for (name, msg) in test_names
         ]
@@ -308,7 +318,7 @@ class MongoTidyTests(unittest.TestCase):
         self.run_clang_tidy()
 
     def test_MongoBannedAutoGetUsageCheck(self):
-        self.expected_output = ("AutoGetCollection is not allowed to be used from the query modules. Use ShardRole CollectionAcquisitions instead.")
+        self.expected_output = "AutoGetCollection is not allowed to be used from the query modules. Use ShardRole CollectionAcquisitions instead."
         self.run_clang_tidy()
 
 

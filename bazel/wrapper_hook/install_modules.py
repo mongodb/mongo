@@ -88,10 +88,12 @@ def search_for_modules(deps, deps_installed, lockfile_changed=False):
     wrapper_debug(f"deps_not_found: {deps_not_found}")
     return deps_not_found
 
+
 def skip_cplusplus_toolchain(args):
     if any("no_c++_toolchain" in arg for arg in args):
         return True
     return False
+
 
 def install_modules(bazel, args):
     need_to_install = False

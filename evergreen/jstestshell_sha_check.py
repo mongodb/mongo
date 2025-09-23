@@ -13,8 +13,8 @@ def url_exists(url, timeout=5):
     except requests.RequestException:
         return False
 
+
 if __name__ == "__main__":
-    
     parser = argparse.ArgumentParser(description="Download and verify S3 binary.")
     parser.add_argument("s3_path", help="S3 URL to download from")
     parser.add_argument("local_path", nargs="?", help="Optional output file path")

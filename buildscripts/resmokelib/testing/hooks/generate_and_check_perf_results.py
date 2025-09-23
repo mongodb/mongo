@@ -20,7 +20,9 @@ from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
 THRESHOLD_LOCATION = "etc/performance_thresholds.yml"
 SEP_BENCHMARKS_PROJECT = "mongodb-mongo-master"
 SEP_BENCHMARKS_TASK_NAME = "benchmarks_sep"
-GET_TIMESERIES_URL = "https://performance-monitoring-api.corp.mongodb.com/time_series/?summarized_executions=false"
+GET_TIMESERIES_URL = (
+    "https://performance-monitoring-api.corp.mongodb.com/time_series/?summarized_executions=false"
+)
 MAINLINE_REQUESTERS = frozenset(["git_tag_request", "gitter_request"])
 
 
@@ -115,19 +117,17 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 "No variant information was given to resmoke. Please set the --variantName flag to let resmoke know what thresholds to use when checking."
             )
             return
-        
+
         # For mainline builds, Evergreen does not make the base commit available in the expansions
         # we retrieve it by looking for the previous commit in the Git log
         if _config.EVERGREEN_REQUESTER in MAINLINE_REQUESTERS:
             base_commit_hash = subprocess.check_output(
-                ["git", "log", "-1", "--pretty=format:%H", "HEAD~1"],
-                cwd=".",
-                text=True
+                ["git", "log", "-1", "--pretty=format:%H", "HEAD~1"], cwd=".", text=True
             ).strip()
         # For patch builds the evergreen revision is set to the base commit
         else:
             base_commit_hash = _config.EVERGREEN_REVISION
-        
+
         for test_name in benchmark_reports.keys():
             variant_thresholds = self.performance_thresholds.get(test_name, None)
             if variant_thresholds is None:
@@ -274,10 +274,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
         project: str,
     ) -> int:
         """Retrieve the base commit value for a given timeseries for a specific commit hash."""
-        headers = {
-            "accept": "application/json",
-            "Content-Type": "application/json"
-        }
+        headers = {"accept": "application/json", "Content-Type": "application/json"}
         payload = {
             "infos": [
                 {
@@ -286,7 +283,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
                     "task": task_name,
                     "test": test_name,
                     "measurement": measurement,
-                    "args": args
+                    "args": args,
                 }
             ]
         }
@@ -332,6 +329,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
         raise CedarReportError(
             f"No value found for test {test_name}, measurement {measurement} on variant {variant} in project {project}"
         )
+
 
 class CheckPerfResultTestCase(interface.DynamicTestCase):
     """CheckPerfResultTestCase class."""

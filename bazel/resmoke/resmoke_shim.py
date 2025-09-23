@@ -48,10 +48,11 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--versionId=", "version_id")
     add_volatile_arg(args, "--requester=", "requester")
 
+
 class ResmokeShimContext:
     def __init__(self):
         self.links = []
-        
+
     def __enter__(self):
         # Use the Bazel provided TEST_TMPDIR. Note this must occur after uses of acquire_local_resource
         # which relies on a shared temporary directory among all test shards.
@@ -85,6 +86,7 @@ class ResmokeShimContext:
         pid = os.getpid()
         p = psutil.Process(pid)
         signal_python(new_resmoke_logger(), p.name, pid)
+
 
 if __name__ == "__main__":
     sys.argv[0] = (
@@ -127,7 +129,9 @@ if __name__ == "__main__":
     lock, base_port = acquire_local_resource("port_block")
     resmoke_args.append(f"--basePort={base_port}")
 
-    resmoke_args.append(f"--archiveDirectory={os.path.join(os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'), 'data_archives')}")
+    resmoke_args.append(
+        f"--archiveDirectory={os.path.join(os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'), 'data_archives')}"
+    )
 
     if (
         os.path.isfile("bazel/resmoke/test_runtimes.json")

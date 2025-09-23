@@ -171,6 +171,7 @@ def iter_clang_tidy_files(root: str | Path) -> list[Path]:
             continue
     return results
 
+
 def validate_clang_tidy_configs(generate_report, fix):
     buildozer = download_buildozer()
 
@@ -193,14 +194,16 @@ def validate_clang_tidy_configs(generate_report, fix):
         print(p.stderr)
         raise Exception(f"could not parse tidy config targets from '{p.stdout}'")
 
-    if tidy_targets == ['']:
+    if tidy_targets == [""]:
         tidy_targets = []
 
     all_targets = []
     for tidy_file in tidy_files:
-        tidy_file_target = "//" + os.path.dirname(os.path.join(mongo_dir, tidy_file)) + ":clang_tidy_config"
+        tidy_file_target = (
+            "//" + os.path.dirname(os.path.join(mongo_dir, tidy_file)) + ":clang_tidy_config"
+        )
         all_targets.append(tidy_file_target)
-    
+
     if all_targets != tidy_targets:
         msg = f"Incorrect clang tidy config targets: {all_targets} != {tidy_targets}"
         print(msg)
@@ -210,7 +213,9 @@ def validate_clang_tidy_configs(generate_report, fix):
             put_report(report)
 
     if fix:
-        subprocess.run([buildozer, f"set srcs {' '.join(all_targets)}", "//:clang_tidy_config_files"])
+        subprocess.run(
+            [buildozer, f"set srcs {' '.join(all_targets)}", "//:clang_tidy_config_files"]
+        )
 
 
 def validate_bazel_groups(generate_report, fix):

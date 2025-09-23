@@ -21,6 +21,7 @@ class BinAndSourceIncompatible(Exception):
 class DuplicateSourceNames(Exception):
     pass
 
+
 def get_buildozer_output(autocomplete_query):
     from buildscripts.install_bazel import install_bazel
 

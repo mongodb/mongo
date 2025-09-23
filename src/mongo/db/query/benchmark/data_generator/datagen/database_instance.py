@@ -125,12 +125,16 @@ class DatabaseInstance:
             check=True,
         )
 
-    async def analyze_field(self, collection_name: str, field: str, number_buckets: int = 1000) -> None:
+    async def analyze_field(
+        self, collection_name: str, field: str, number_buckets: int = 1000
+    ) -> None:
         """
         Run 'analyze' on a given field.
         Analyze is currently not persisted across restarts, or when dumping or restoring.
         """
-        await self.database.command({"analyze": collection_name, "key": field, "numberBuckets": number_buckets})
+        await self.database.command(
+            {"analyze": collection_name, "key": field, "numberBuckets": number_buckets}
+        )
 
     async def set_parameter(self, name: str, value: any) -> None:
         """Set MongoDB Parameter."""
@@ -182,7 +186,12 @@ class DatabaseInstance:
         """Drop collection."""
         await self.database[collection_name].drop()
 
-    async def insert_many(self, collection_name: str, docs: Sequence[Mapping[str, any]], context_manager: ContextManager) -> None:
+    async def insert_many(
+        self,
+        collection_name: str,
+        docs: Sequence[Mapping[str, any]],
+        context_manager: ContextManager,
+    ) -> None:
         """Insert documents into the collection with the given name.
         The context_manager can be:
             - `contextlib.nullcontext` to enable maximum concurrency

@@ -318,7 +318,7 @@ class MultiClientsTestCase(interface.TestCase):
     def _raise_if_unsafe_exit(self, return_code: int):
         """Determine if a return code represents and unsafe exit."""
         if self.timed_out.is_set():
-            # If the test timed out, it is assumed a non-zero exit code is 
+            # If the test timed out, it is assumed a non-zero exit code is
             # from the hang-analyzer intentionally killing the process.
             return
         # 252 and 253 may be returned in failed test executions.

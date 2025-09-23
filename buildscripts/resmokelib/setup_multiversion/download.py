@@ -37,7 +37,6 @@ def is_s3_presigned_url(url: str) -> bool:
     return "X-Amz-Signature" in qs
 
 
-
 def download_from_s3(url):
     """Download file from S3 bucket by a given URL."""
 

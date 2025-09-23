@@ -10,13 +10,28 @@ from typing import List
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
-LARGE_FILE_THRESHOLD = 10 * 1024 * 1024 #10MiB
+LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
 
-SUPPORTED_EXTENSIONS = (".cpp", ".c", ".h", ".hpp", ".py", ".js", ".mjs", ".json", ".lock", ".toml", ".defs", ".inl", ".idl")
+SUPPORTED_EXTENSIONS = (
+    ".cpp",
+    ".c",
+    ".h",
+    ".hpp",
+    ".py",
+    ".js",
+    ".mjs",
+    ".json",
+    ".lock",
+    ".toml",
+    ".defs",
+    ".inl",
+    ".idl",
+)
 
 
 class LinterFail(Exception):
     pass
+
 
 def create_build_files_in_new_js_dirs() -> None:
     base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
@@ -55,6 +70,7 @@ def list_files_with_targets(bazel_bin: str) -> List:
             check=False,
         ).stdout.splitlines()
     ]
+
 
 class LintRunner:
     def __init__(self, keep_going: bool, bazel_bin: str):
@@ -205,6 +221,7 @@ def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") ->
 
     return list(file_set)
 
+
 def get_parsed_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -242,11 +259,7 @@ def get_parsed_args(args):
         default="origin/master",
         help="Base branch to compare changes against",
     )
-    parser.add_argument(
-        "--large-files",
-        action="store_true",
-        default=False
-    )
+    parser.add_argument("--large-files", action="store_true", default=False)
     parser.add_argument(
         "--keep-going",
         action="store_true",
@@ -255,11 +268,13 @@ def get_parsed_args(args):
     )
     return parser.parse_known_args(args)
 
+
 def lint_mod(lint_runner: LintRunner):
     lint_runner.run_bazel("//modules_poc:mod_mapping", ["--validate-modules"])
-    #TODO add support for the following steps
-    #subprocess.run([bazel_bin, "run", "//modules_poc:merge_decls"], check=True)
-    #subprocess.run([bazel_bin, "run", "//modules_poc:browse", "--", "merged_decls.json", "--parse-only"], check=True)
+    # TODO add support for the following steps
+    # subprocess.run([bazel_bin, "run", "//modules_poc:merge_decls"], check=True)
+    # subprocess.run([bazel_bin, "run", "//modules_poc:browse", "--", "merged_decls.json", "--parse-only"], check=True)
+
 
 def run_rules_lint(bazel_bin: str, args: List[str]):
     parsed_args, args = get_parsed_args(args)
@@ -276,10 +291,16 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
     files_with_targets = list_files_with_targets(bazel_bin)
     lr.list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"])
     lr.list_files_without_targets(
-        files_with_targets, "javascript", "js", ["src/mongo", "jstests"],
+        files_with_targets,
+        "javascript",
+        "js",
+        ["src/mongo", "jstests"],
     )
     lr.list_files_without_targets(
-        files_with_targets, "python", "py", ["src/mongo", "buildscripts", "evergreen"],
+        files_with_targets,
+        "python",
+        "py",
+        ["src/mongo", "buildscripts", "evergreen"],
     )
     lint_all = parsed_args.all or "..." in args or "//..." in args
     files_to_lint = [arg for arg in args if not arg.startswith("-")]
@@ -309,8 +330,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
         lr.run_bazel("//buildscripts:quickmongolint", ["lint"])
 
     if lint_all or any(
-        file.endswith((".cpp", ".c", ".h", ".py", ".idl"))
-        for file in files_to_lint
+        file.endswith((".cpp", ".c", ".h", ".py", ".idl")) for file in files_to_lint
     ):
         lr.run_bazel("//buildscripts:errorcodes", ["--quiet"])
 
@@ -323,14 +343,18 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
         lr.run_bazel("//buildscripts:poetry_lock_check")
 
     if lint_all or any(file.endswith(".yml") for file in files_to_lint):
-        lr.run_bazel("buildscripts:validate_evg_project_config", [f"--evg-project-name={parsed_args.lint_yaml_project}", "--evg-auth-config=.evergreen.yml"])
+        lr.run_bazel(
+            "buildscripts:validate_evg_project_config",
+            [
+                f"--evg-project-name={parsed_args.lint_yaml_project}",
+                "--evg-auth-config=.evergreen.yml",
+            ],
+        )
 
     if lint_all or parsed_args.large_files:
         lr.run_bazel("buildscripts:large_file_check", ["--exclude", "src/third_party/*"])
     else:
         lr.simple_file_size_check(files_to_lint)
-
-
 
     if lint_all or any(
         file.endswith((".cpp", ".c", ".h", ".hpp", ".idl", ".inl", ".defs"))

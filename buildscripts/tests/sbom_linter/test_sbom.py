@@ -102,7 +102,7 @@ class TestSbom(unittest.TestCase):
         third_party_libs = {"librdkafka"}
         error_manager = sbom_linter.lint_sbom(test_file, test_file, third_party_libs, False)
         self.assert_message_in_errors(error_manager, sbom_linter.VERSION_MISMATCH_ERROR)
-        
+
     def test_pedigree_version_match(self):
         test_file = os.path.join(self.input_dir, "sbom_pedigree_version_match.json")
         third_party_libs = {"kafka"}
@@ -124,7 +124,7 @@ class TestSbom(unittest.TestCase):
         self.assert_message_in_errors(
             error_manager, sbom_linter.MISSING_VERSION_IN_SBOM_COMPONENT_ERROR
         )
-        
+
     def test_missing_license(self):
         test_file = os.path.join(self.input_dir, "sbom_missing_license.json")
         third_party_libs = {"librdkafka"}
@@ -137,10 +137,8 @@ class TestSbom(unittest.TestCase):
         test_file = os.path.join(self.input_dir, "sbom_invalid_license_expression.json")
         third_party_libs = {"librdkafka"}
         error_manager = sbom_linter.lint_sbom(test_file, test_file, third_party_libs, False)
-        #print(error_manager.errors)
-        self.assert_message_in_errors(
-            error_manager, "ExpressionInfo"
-        )
+        # print(error_manager.errors)
+        self.assert_message_in_errors(error_manager, "ExpressionInfo")
 
     def test_named_license(self):
         test_file = os.path.join(self.input_dir, "sbom_named_license.json")

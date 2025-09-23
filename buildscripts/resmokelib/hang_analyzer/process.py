@@ -20,7 +20,8 @@ if _IS_WINDOWS:
     import win32event
 
 PROCS_TIMEOUT_SECS = 60
-TYPICAL_MONGOD_DUMP_SECS = 5 # How long a mongod usually takes to core dump.
+TYPICAL_MONGOD_DUMP_SECS = 5  # How long a mongod usually takes to core dump.
+
 
 def call(args, logger, timeout_seconds=None, pinfo=None, check=True) -> int:
     """Call subprocess on args list."""
@@ -159,7 +160,9 @@ def teardown_processes(logger, processes, dump_pids):
                 else:
                     logger.info("Killing process %s with pid %d", pinfo.name, pid)
                     proc.kill()
-                proc.wait(timeout=TYPICAL_MONGOD_DUMP_SECS) # A zombie or defunct process won't end until it is reaped by its parent.
+                proc.wait(
+                    timeout=TYPICAL_MONGOD_DUMP_SECS
+                )  # A zombie or defunct process won't end until it is reaped by its parent.
             except (psutil.NoSuchProcess, psutil.TimeoutExpired):
                 # Process has already terminated or will need to be reaped by its parent.
                 pass
@@ -170,7 +173,7 @@ def _await_cores(dump_pids, logger):
     start_time = datetime.now()
     for pid in dump_pids:
         while not os.path.exists(dump_pids[pid]):
-            time.sleep(TYPICAL_MONGOD_DUMP_SECS) 
+            time.sleep(TYPICAL_MONGOD_DUMP_SECS)
             if (datetime.now() - start_time).total_seconds() > PROCS_TIMEOUT_SECS:
                 logger.error("Timed out while awaiting process.")
                 return

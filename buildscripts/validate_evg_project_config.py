@@ -74,7 +74,7 @@ def main(
         evg_project_config_map = {
             DEFAULT_EVG_NIGHTLY_PROJECT_NAME: DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG,
         }
-    
+
     if RELEASE_BRANCH:
         for _, project_config in evg_project_config_map.items():
             cmd = [

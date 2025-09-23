@@ -17,7 +17,6 @@ if not gdb:
 
 
 def detect_toolchain(progspace):
-
     readelf_bin = os.environ.get("MONGO_GDB_READELF", "/opt/mongodbtoolchain/v5/bin/llvm-readelf")
     if not os.path.exists(readelf_bin):
         readelf_bin = "readelf"
@@ -76,10 +75,10 @@ STDERR:
 -----------------
 Assuming {toolchain_ver} as a default, this could cause issues with the printers.""")
 
-    base_toolchain_dir = os.environ.get("MONGO_GDB_PP_DIR", f"/opt/mongodbtoolchain/{toolchain_ver}/share")
-    pp = glob.glob(
-        f"{base_toolchain_dir}/gcc-*/python/libstdcxx/v6/printers.py"
+    base_toolchain_dir = os.environ.get(
+        "MONGO_GDB_PP_DIR", f"/opt/mongodbtoolchain/{toolchain_ver}/share"
     )
+    pp = glob.glob(f"{base_toolchain_dir}/gcc-*/python/libstdcxx/v6/printers.py")
     printers = pp[0]
     return os.path.dirname(os.path.dirname(os.path.dirname(printers)))
 

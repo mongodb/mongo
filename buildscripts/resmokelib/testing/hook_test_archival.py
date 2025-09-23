@@ -124,7 +124,9 @@ class HookTestArchival(object):
             test_name, config.EVERGREEN_EXECUTION, self._tests_repeat[test_name]
         )
         logger.info("Archiving data files for test %s from %s", test_name, input_files)
-        status, message = self.archive_instance.archive_files(input_files, archive_name, display_name)
+        status, message = self.archive_instance.archive_files(
+            input_files, archive_name, display_name
+        )
         if status:
             logger.warning("Archive failed for %s: %s", test_name, message)
         else:

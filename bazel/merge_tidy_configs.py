@@ -19,12 +19,13 @@ import yaml
 
 # --------------------------- YAML helpers ---------------------------
 
-def load_yaml(file_path: str | pathlib.Path) -> Dict[str, Any]:  
-    path = pathlib.Path(file_path)  
-    if not path.exists():  
-        raise SystemExit(f"Error: Config file '{file_path}' not found.")  
-    with open(path, "r", encoding="utf-8") as f:  
-        return yaml.safe_load(f) or {} 
+
+def load_yaml(file_path: str | pathlib.Path) -> Dict[str, Any]:
+    path = pathlib.Path(file_path)
+    if not path.exists():
+        raise SystemExit(f"Error: Config file '{file_path}' not found.")
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
 def split_checks_to_list(value: Any) -> List[str]:
@@ -40,8 +41,9 @@ def split_checks_to_list(value: Any) -> List[str]:
     return [s for s in parts if s]
 
 
-def merge_checks_into_config(target_config: Dict[str, Any],
-                             incoming_config: Dict[str, Any]) -> None:
+def merge_checks_into_config(
+    target_config: Dict[str, Any], incoming_config: Dict[str, Any]
+) -> None:
     """Append incoming Checks onto target Checks (string-concatenated)."""
     accumulated = split_checks_to_list(target_config.get("Checks"))
     additions = split_checks_to_list(incoming_config.get("Checks"))
@@ -59,8 +61,9 @@ def check_options_list_to_map(value: Any) -> Dict[str, Any]:
     return out
 
 
-def merge_check_options_into_config(target_config: Dict[str, Any],
-                                    incoming_config: Dict[str, Any]) -> None:
+def merge_check_options_into_config(
+    target_config: Dict[str, Any], incoming_config: Dict[str, Any]
+) -> None:
     """
     Merge CheckOptions so later configs override earlier by 'key'.
     Stores back as list[{key,value}] sorted by key for determinism.
@@ -69,9 +72,7 @@ def merge_check_options_into_config(target_config: Dict[str, Any],
     override = check_options_list_to_map(incoming_config.get("CheckOptions"))
     if override:
         base.update(override)  # later wins
-        target_config["CheckOptions"] = [
-            {"key": k, "value": v} for k, v in sorted(base.items())
-        ]
+        target_config["CheckOptions"] = [{"key": k, "value": v} for k, v in sorted(base.items())]
 
 
 def deep_merge_dicts(base: Any, override: Any) -> Any:
@@ -91,56 +92,57 @@ def deep_merge_dicts(base: Any, override: Any) -> Any:
     return override
 
 
-# --------------------------- path helpers ---------------------------  
-  
-def is_ancestor_directory(ancestor: pathlib.Path, descendant: pathlib.Path) -> bool:  
-    """  
-    True if 'ancestor' is the same as or a parent of 'descendant'.  
-    Resolution ensures symlinks and relative parts are normalized.  
-    """  
-    try:  
-        ancestor = ancestor.resolve()  
-        descendant = descendant.resolve()  
-    except FileNotFoundError:  
-        # If either path doesn't exist yet, still resolve purely lexicaly  
-        ancestor = ancestor.absolute()  
-        descendant = descendant.absolute()  
-    return ancestor == descendant or ancestor in descendant.parents  
-  
-  
-def filter_and_sort_config_paths(  
-    config_paths: list[str | pathlib.Path],  
-    scope_directory: str | None  
-) -> list[pathlib.Path]:  
-    """  
-    Keep only config files whose parent directory is an ancestor  
-    of the provided scope directory.  
-    Sort shallow → deep so deeper configs apply later and override earlier ones.  
-    If scope_directory is None, keep paths in the order given.  
-    """  
-    config_paths = [pathlib.Path(p) for p in config_paths]  
-  
-    if not scope_directory:  
-        return config_paths  
-  
-    workspace_root = pathlib.Path.cwd().resolve()  
-    scope_abs = (workspace_root / scope_directory).resolve()  
-  
-    selected: list[tuple[int, pathlib.Path]] = []  
-  
-    for cfg in config_paths:  
-        parent_dir = cfg.parent  
-        if is_ancestor_directory(parent_dir, scope_abs):  
-            # Depth is number of path components from root  
-            selected.append((len(parent_dir.parts), cfg.resolve()))  
-  
-    # Sort by depth ascending so root-most files merge first  
-    selected.sort(key=lambda t: t[0])  
-  
+# --------------------------- path helpers ---------------------------
+
+
+def is_ancestor_directory(ancestor: pathlib.Path, descendant: pathlib.Path) -> bool:
+    """
+    True if 'ancestor' is the same as or a parent of 'descendant'.
+    Resolution ensures symlinks and relative parts are normalized.
+    """
+    try:
+        ancestor = ancestor.resolve()
+        descendant = descendant.resolve()
+    except FileNotFoundError:
+        # If either path doesn't exist yet, still resolve purely lexicaly
+        ancestor = ancestor.absolute()
+        descendant = descendant.absolute()
+    return ancestor == descendant or ancestor in descendant.parents
+
+
+def filter_and_sort_config_paths(
+    config_paths: list[str | pathlib.Path], scope_directory: str | None
+) -> list[pathlib.Path]:
+    """
+    Keep only config files whose parent directory is an ancestor
+    of the provided scope directory.
+    Sort shallow → deep so deeper configs apply later and override earlier ones.
+    If scope_directory is None, keep paths in the order given.
+    """
+    config_paths = [pathlib.Path(p) for p in config_paths]
+
+    if not scope_directory:
+        return config_paths
+
+    workspace_root = pathlib.Path.cwd().resolve()
+    scope_abs = (workspace_root / scope_directory).resolve()
+
+    selected: list[tuple[int, pathlib.Path]] = []
+
+    for cfg in config_paths:
+        parent_dir = cfg.parent
+        if is_ancestor_directory(parent_dir, scope_abs):
+            # Depth is number of path components from root
+            selected.append((len(parent_dir.parts), cfg.resolve()))
+
+    # Sort by depth ascending so root-most files merge first
+    selected.sort(key=lambda t: t[0])
+
     return [cfg for _, cfg in selected]
 
 
 # --------------------------- main ---------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -175,7 +177,7 @@ def main() -> None:
         # then generic merge:
         merged_config = deep_merge_dicts(merged_config, incoming_config)
 
-    merged_config["Checks"] = ",".join(split_checks_to_list(merged_config.get("Checks"))) 
+    merged_config["Checks"] = ",".join(split_checks_to_list(merged_config.get("Checks")))
     output_path = pathlib.Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:

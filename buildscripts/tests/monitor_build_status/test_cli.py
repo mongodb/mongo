@@ -14,10 +14,7 @@ class TestSummarize(unittest.TestCase):
 
         summary = under_test.MonitorBuildStatusOrchestrator._summarize("scope", scope_percentages)
 
-        expected_summary = (
-            f"`SUMMARY [scope]` "
-            f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}"
-        )
+        expected_summary = f"`SUMMARY [scope]` " f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}"
 
         self.assertEqual(summary, expected_summary)
 
@@ -31,10 +28,7 @@ class TestSummarize(unittest.TestCase):
 
         summary = under_test.MonitorBuildStatusOrchestrator._summarize("scope", scope_percentages)
 
-        expected_summary = (
-            f"`SUMMARY [scope]` "
-            f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}"
-        )
+        expected_summary = f"`SUMMARY [scope]` " f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}"
 
         self.assertEqual(summary, expected_summary)
 

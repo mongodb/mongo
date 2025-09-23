@@ -518,9 +518,7 @@ class TestVariant(unittest.TestCase):
 
     def test_test_flags(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
-        self.assertEqual(
-            "--param=value --ubuntu --modules=none", variant_ubuntu.test_flags
-        )
+        self.assertEqual("--param=value --ubuntu --modules=none", variant_ubuntu.test_flags)
 
         variant_osx = self.conf.get_variant("osx-108")
         self.assertIsNone(variant_osx.test_flags)
@@ -559,9 +557,7 @@ class TestVariant(unittest.TestCase):
         # Check combined_suite_to_resmoke_args_map when the task doesn't have resmoke_args.
         passing_task = variant_ubuntu.get_task("passing_test")
         self.assertEqual(
-            {
-                "passing_test": "--suites=passing_test --param=value --ubuntu --modules=none"
-            },
+            {"passing_test": "--suites=passing_test --param=value --ubuntu --modules=none"},
             passing_task.combined_suite_to_resmoke_args_map,
         )
 

@@ -31,13 +31,7 @@ def lint(paths: List[str]):
     """Lint specified paths (files or directories) using Pyright."""
     if "BUILD_WORKSPACE_DIRECTORY" in os.environ:
         subprocess.run(
-            [
-                "python",
-                "-m",
-                "pyright",
-                "-p",
-                "pyproject.toml"
-            ] + paths,
+            ["python", "-m", "pyright", "-p", "pyproject.toml"] + paths,
             env=os.environ,
             check=True,
             cwd=REPO_ROOT,

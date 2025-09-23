@@ -114,7 +114,7 @@ class Suite(object):
 
     @tests.setter
     def tests(self, tests):
-      self._tests = tests
+        self._tests = tests
 
     @property
     def excluded(self):
@@ -157,7 +157,9 @@ class Suite(object):
             try:
                 evg_api = evergreen_conn.get_evergreen_api()
             except RuntimeError:
-                loggers.ROOT_EXECUTOR_LOGGER.warning("Failed to create Evergreen API client. Evergreen test selection will be skipped even if it was enabled.")
+                loggers.ROOT_EXECUTOR_LOGGER.warning(
+                    "Failed to create Evergreen API client. Evergreen test selection will be skipped even if it was enabled."
+                )
             else:
                 test_selection_strategy = (
                     _config.EVERGREEN_TEST_SELECTION_STRATEGY
@@ -207,9 +209,9 @@ class Suite(object):
                     # ensures that select_tests results is only used if no exceptions or type errors are thrown from it
                     if select_tests_succeeds_flag and use_select_tests:
                         evergreen_filtered_tests = result["tests"]
-                        evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(
-                            set(tests)
-                        )
+                        evergreen_excluded_tests = set(
+                            evergreen_filtered_tests
+                        ).symmetric_difference(set(tests))
                         loggers.ROOT_EXECUTOR_LOGGER.info(
                             f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
                         )

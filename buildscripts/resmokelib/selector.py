@@ -306,7 +306,7 @@ class _TestList(object):
                     break
             if not in_disabled_module:
                 new_filtered.append(test)
-        
+
         self._filtered = new_filtered
 
     def match_tag_expression(self, tag_expression, get_tags):

@@ -11,8 +11,8 @@ class Uncorrelated:
 
     @staticmethod
     def make_field1(fkr: faker.proxy.Faker) -> int:
-        return fkr.random.choice(['a','b'])
+        return fkr.random.choice(["a", "b"])
 
     @staticmethod
     def make_field2(fkr: faker.proxy.Faker) -> int:
-        return fkr.random.choice(['a','b'])
+        return fkr.random.choice(["a", "b"])

@@ -54,7 +54,6 @@ class DBTestCase(interface.ProcessTestCase):
         interface.append_process_tracking_options(process_kwargs, self._id)
         self.dbtest_options["process_kwargs"] = process_kwargs
 
-
     def _execute(self, process):
         interface.ProcessTestCase._execute(self, process)
         self._clear_dbpath()

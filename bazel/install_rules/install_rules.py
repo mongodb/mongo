@@ -86,7 +86,9 @@ def install(src, install_type):
                                     if exc.strerror == "Invalid argument":
                                         print("Encountered OSError: Invalid argument. Retrying...")
                                         time.sleep(1)
-                                        os.link(os.path.join(root, name), os.path.join(dest_dir, name))
+                                        os.link(
+                                            os.path.join(root, name), os.path.join(dest_dir, name)
+                                        )
                     else:
                         try:
                             os.link(src, dst)

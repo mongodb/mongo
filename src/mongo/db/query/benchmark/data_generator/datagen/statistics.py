@@ -90,7 +90,6 @@ class FieldStatistic:
 
 
 class FieldStatisticByScalarType:
-
     def __init__(self):
         self.min = None
         self.max = None
@@ -152,8 +151,7 @@ def serialize_supported(v):
         return v.isoformat()
     elif isinstance(v, (bson.decimal128.Decimal128, decimal.Decimal)):
         return str(v)
-    elif isinstance(v,
-                    (bson.datetime_ms.DatetimeMS, bson.timestamp.Timestamp)):
+    elif isinstance(v, (bson.datetime_ms.DatetimeMS, bson.timestamp.Timestamp)):
         return v.as_datetime().replace(tzinfo=datetime.timezone.utc).timestamp()
     elif issubclass(type(v), Enum):
         # We expect that the Enum will have a __repr__ method that returns

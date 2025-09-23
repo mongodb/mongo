@@ -855,7 +855,7 @@ class ServerParameter(common.SourceLocation):
         self.validator = None  # type: Validator
         self.on_update = None  # type: str
 
-        self.is_deprecated = False # type: bool
+        self.is_deprecated = False  # type: bool
 
         super(ServerParameter, self).__init__(file_name, line, column)
 

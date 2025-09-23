@@ -296,7 +296,7 @@ class _StructTypeInfo(StructTypeInfoBase):
             "parseSharingOwnership",
             [
                 "const BSONObj& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -315,7 +315,7 @@ class _StructTypeInfo(StructTypeInfoBase):
             "parseOwned",
             [
                 "BSONObj&& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -337,7 +337,7 @@ class _StructTypeInfo(StructTypeInfoBase):
             "parse",
             [
                 "const BSONObj& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -353,7 +353,7 @@ class _StructTypeInfo(StructTypeInfoBase):
             "parseProtected",
             [
                 "const BSONObj& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -430,7 +430,7 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
             "parse",
             [
                 "const OpMsgRequest& request",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             class_name,
@@ -445,7 +445,7 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
             "parseProtected",
             [
                 "const OpMsgRequest& request",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -551,7 +551,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
             "parseProtected",
             [
                 "const BSONObj& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -633,7 +633,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
             "parseProtected",
             [
                 "const BSONObj& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",
@@ -641,7 +641,9 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_methods(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line("void setNamespace(NamespaceString nss) { _nss = std::move(nss); }")
+        indented_writer.write_line(
+            "void setNamespace(NamespaceString nss) { _nss = std::move(nss); }"
+        )
         indented_writer.write_line("const NamespaceString& getNamespace() const { return _nss; }")
         if self._struct.non_const_getter:
             indented_writer.write_line("NamespaceString& getNamespace() { return _nss; }")
@@ -739,7 +741,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
             "parseProtected",
             [
                 "const BSONObj& bsonObject",
-                f"const IDLParserContext& ctxt = IDLParserContext(\"{self._struct.name}\")",
+                f'const IDLParserContext& ctxt = IDLParserContext("{self._struct.name}")',
                 "DeserializationContext* dctx = nullptr",
             ],
             "void",

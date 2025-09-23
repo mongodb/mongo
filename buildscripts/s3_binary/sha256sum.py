@@ -12,12 +12,14 @@ def compute_sha256(file_path: str) -> str:
             sha256.update(block)
     return sha256.hexdigest()
 
+
 def write_sha256_file(file_path: str, hash_value: str):
     sha256_path = file_path + ".sha256"
     file_name = os.path.basename(file_path)
     with open(sha256_path, "w") as f:
         f.write(f"{hash_value}  {file_name}\n")
     print(f"Wrote SHA-256 to {sha256_path}")
+
 
 def main():
     if len(sys.argv) != 2:
@@ -31,6 +33,7 @@ def main():
 
     hash_value = compute_sha256(file_path)
     write_sha256_file(file_path, hash_value)
+
 
 if __name__ == "__main__":
     main()

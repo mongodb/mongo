@@ -34,9 +34,7 @@ def _relink_binaries_with_symbols(failed_tests: List[str]):
     bazel_build_flags += " --remote_download_outputs=toplevel"
 
     # Remap //src/mongo/testabc to //src/mongo:testabc
-    failed_test_labels = [
-        ":".join(test.rsplit("/", 1)) for test in failed_tests
-    ]
+    failed_test_labels = [":".join(test.rsplit("/", 1)) for test in failed_tests]
 
     relink_command = [
         arg for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_test_labels] if arg
@@ -53,12 +51,17 @@ def _relink_binaries_with_symbols(failed_tests: List[str]):
         f.write(repro_test_command)
     print(f"Repro command written to .failed_unittest_repro.txt: {repro_test_command}")
 
+
 def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_lib_dir: str) -> bool:
     success = True
     bazel_bin_dir = Path("./bazel-bin/src")
     # Search both in the top level remote exec shellscript wrapper output directory, and in the
     # binary output directory.
-    failed_tests += [failed_test.replace("_remote_exec", "") for failed_test in failed_tests if "_remote_exec" in failed_test]
+    failed_tests += [
+        failed_test.replace("_remote_exec", "")
+        for failed_test in failed_tests
+        if "_remote_exec" in failed_test
+    ]
     for failed_test in failed_tests:
         full_binary_path = bazel_bin_dir / failed_test
         binary_name = failed_test.split(os.sep)[-1]

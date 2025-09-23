@@ -131,7 +131,7 @@ async def upstream(
     collection_name: str,
     source: typing.Generator,
     count: int,
-    context_manager: ContextManager
+    context_manager: ContextManager,
 ):
     """Bulk insert generated objects into a collection."""
     import dataclasses
@@ -150,7 +150,7 @@ async def upstream(
                         datagen.serialize.serialize_doc(dataclasses.asdict(next(source)))
                         for _ in range(num)
                     ],
-                    context_manager
+                    context_manager,
                 )
             )
         )
@@ -184,10 +184,14 @@ async def main():
     )
     parser.add_argument("--drop", action="store_true", help="Drop the collection before inserting.")
     parser.add_argument("--dump", nargs="?", const="", help="Dump the collection after inserting.")
-    parser.add_argument("--analyze", action="store_true", help="""
+    parser.add_argument(
+        "--analyze",
+        action="store_true",
+        help="""
                         Run the 'analyze' command against each field of the collection.
                         Analyze is not preserved across restarts, or when dumping or restoring.
-                        """)
+                        """,
+    )
     parser.add_argument("--indexes", action="append", help="An index set to load.")
     parser.add_argument("--restore-args", type=str, help="Parameters to pass to mongorestore.")
     parser.add_argument(
@@ -215,7 +219,12 @@ async def main():
         help="Number of objects to generate. Set to 0 to skip data generation.",
     )
     parser.add_argument("--seed", type=str, help="The seed to use.")
-    parser.add_argument("--serial-inserts", action='store_true', default=False, help="Force single-threaded insertion")
+    parser.add_argument(
+        "--serial-inserts",
+        action="store_true",
+        default=False,
+        help="Force single-threaded insertion",
+    )
 
     args = parser.parse_args()
     module = importlib.import_module(args.module)
@@ -249,7 +258,9 @@ async def main():
             generator_factory = CorrelatedGeneratorFactory(spec, seed)
             generator = generator_factory.make_generator()
             context_manager = asyncio.Semaphore(1) if args.serial_inserts else nullcontext()
-            await upstream(database_instance, collection_name, generator, args.size, context_manager)
+            await upstream(
+                database_instance, collection_name, generator, args.size, context_manager
+            )
             generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
 
         # 3. Create indexes after documents.
@@ -283,6 +294,7 @@ async def main():
         if args.analyze is not None:
             for field in fields(spec):
                 await field.type.analyze(database_instance, collection_name, field.name)
+
 
 if __name__ == "__main__":
     import asyncio

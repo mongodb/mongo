@@ -17,7 +17,8 @@ class ContinuousMaintenance(interface.Hook):
     """Regularly connect to replica sets and send a replSetMaintenance command."""
 
     DESCRIPTION = (
-        "Continuous maintenance (causes a secondary node to enter maintenance mode at regular" " intervals)"
+        "Continuous maintenance (causes a secondary node to enter maintenance mode at regular"
+        " intervals)"
     )
 
     IS_BACKGROUND = True
@@ -152,8 +153,8 @@ class _MaintenanceThread(threading.Thread):
             self.logger.warning("No replica set on which to run maintenances.")
             return
 
-        try:  
-            while True:  
+        try:
+            while True:
                 permitted = self.__lifecycle.wait_for_action_permitted()
                 if not permitted:
                     break
@@ -177,16 +178,16 @@ class _MaintenanceThread(threading.Thread):
                 )
                 client = fixture_interface.build_client(chosen, self._auth_options)
 
-                self.logger.info("Putting secondary into maintenance mode...")  
-                self._toggle_maintenance_mode(client, enable=True)  
-  
-                self.logger.info(f"Sleeping for {self._maintenance_interval_secs} seconds...")  
-                self.__lifecycle.wait_for_action_interval(self._maintenance_interval_secs)  
-  
-                self.logger.info("Disabling maintenance mode...")  
-                self._toggle_maintenance_mode(client, enable=False)  
-  
-                self.logger.info(f"Sleeping for {self._maintenance_interval_secs} seconds...")  
+                self.logger.info("Putting secondary into maintenance mode...")
+                self._toggle_maintenance_mode(client, enable=True)
+
+                self.logger.info(f"Sleeping for {self._maintenance_interval_secs} seconds...")
+                self.__lifecycle.wait_for_action_interval(self._maintenance_interval_secs)
+
+                self.logger.info("Disabling maintenance mode...")
+                self._toggle_maintenance_mode(client, enable=False)
+
+                self.logger.info(f"Sleeping for {self._maintenance_interval_secs} seconds...")
                 self.__lifecycle.wait_for_action_interval(self._maintenance_interval_secs)
         except Exception as e:
             # Proactively log the exception when it happens so it will be
@@ -214,7 +215,6 @@ class _MaintenanceThread(threading.Thread):
         self._check_thread()
         self._none_maintenance_mode()
 
-
         # Check that fixtures are still running
         for rs_fixture in self._rs_fixtures:
             if not rs_fixture.is_running():
@@ -239,19 +239,19 @@ class _MaintenanceThread(threading.Thread):
             secondaries = rs_fixture.get_secondaries()
             for secondary in secondaries:
                 client = fixture_interface.build_client(secondary, self._auth_options)
-                self._toggle_maintenance_mode(client, enable=False)  
+                self._toggle_maintenance_mode(client, enable=False)
 
-    def _toggle_maintenance_mode(self, client, enable):  
-        """  
-        Toggles a secondary node into and out of maintenance mode.  
-      
-        Args:  
-            client (MongoClient): A PyMongo client connected to the secondary node.  
-            enable (bool): True to enable maintenance mode, False to disable it.  
-        """  
-        try:  
-            result = client.admin.command('replSetMaintenance', enable)  
-            self.logger.info(f"Maintenance mode {'enabled' if enable else 'disabled'}: {result}")  
+    def _toggle_maintenance_mode(self, client, enable):
+        """
+        Toggles a secondary node into and out of maintenance mode.
+
+        Args:
+            client (MongoClient): A PyMongo client connected to the secondary node.
+            enable (bool): True to enable maintenance mode, False to disable it.
+        """
+        try:
+            result = client.admin.command("replSetMaintenance", enable)
+            self.logger.info(f"Maintenance mode {'enabled' if enable else 'disabled'}: {result}")
         except pymongo.errors.OperationFailure as e:
             # Note it is expected to see this log if we are trying to set maintenance mode disabled when we are not in maintenance mode.
             self.logger.info(f"Failed to toggle maintenance mode: {e}")

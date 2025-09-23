@@ -280,10 +280,13 @@ class TestTestTimeout(_ResmokeSelftest):
             report = json.load(f)
         timeout = [test for test in report["results"] if test["status"] == "timeout"]
         passed = [test for test in report["results"] if test["status"] == "pass"]
-        self.assertEqual(len(timeout), 1, f"Expected one timed out test. Got {timeout}")  # one jstest
+        self.assertEqual(
+            len(timeout), 1, f"Expected one timed out test. Got {timeout}"
+        )  # one jstest
         self.assertEqual(
             len(passed), 3, f"Expected 3 passing tests. Got {passed}"
         )  # one jstest, one fixture setup, one fixture teardown
+
 
 class TestTestSelection(_ResmokeSelftest):
     def parse_reports_json(self):
@@ -645,7 +648,7 @@ class TestDiscovery(_ResmokeSelftest):
         )
 
 
-def execute_resmoke(resmoke_args: List[str], subcommand: str="run"):
+def execute_resmoke(resmoke_args: List[str], subcommand: str = "run"):
     return subprocess.run(
         [sys.executable, "buildscripts/resmoke.py", subcommand] + resmoke_args,
         text=True,
@@ -928,10 +931,11 @@ class TestValidateCollections(unittest.TestCase):
         self.assertIn(expected, result.stdout)
         self.assertNotEqual(result.returncode, 0)
 
+
 class TestModules(unittest.TestCase):
     def test_files_included(self):
         # this suite uses a fixture and hook from the module so it will fail if they are not loaded
-        # it also uses a 
+        # it also uses a
         resmoke_args = [
             "--resmokeModulesPath=buildscripts/tests/resmoke_end2end/test_resmoke_modules.yml",
             "--suite=resmoke_test_module_worked",
@@ -939,7 +943,7 @@ class TestModules(unittest.TestCase):
 
         result = execute_resmoke(resmoke_args)
         self.assertEqual(result.returncode, 0)
-        
+
     def test_jstests_excluded(self):
         # this first command should not include any of the tests from the module
         resmoke_args = [
@@ -948,10 +952,10 @@ class TestModules(unittest.TestCase):
             "--suite=buildscripts/tests/resmoke_end2end/suites/resmoke_test_module_jstests.yml",
             "--dryRun=included-tests",
         ]
-        
+
         result_without_module = execute_resmoke(resmoke_args)
         self.assertEqual(result_without_module.returncode, 0)
-        
+
         # this second invocartion should include all of the base jstests and all of the module jstests.
         resmoke_args = [
             "--resmokeModulesPath=buildscripts/tests/resmoke_end2end/test_resmoke_modules.yml",
@@ -959,11 +963,15 @@ class TestModules(unittest.TestCase):
             "--suite=buildscripts/tests/resmoke_end2end/suites/resmoke_test_module_jstests.yml",
             "--dryRun=included-tests",
         ]
-        
+
         result_with_module = execute_resmoke(resmoke_args)
         self.assertEqual(result_with_module.returncode, 0)
-        
+
         # assert the test is in the list of tests when the module is included
-        self.assertIn("buildscripts/tests/resmoke_end2end/testfiles/one.js", result_with_module.stdout)
+        self.assertIn(
+            "buildscripts/tests/resmoke_end2end/testfiles/one.js", result_with_module.stdout
+        )
         # assert the test is not in the list of tests when the module is excluded
-        self.assertNotIn("buildscripts/tests/resmoke_end2end/testfiles/one.js", result_without_module.stdout)
+        self.assertNotIn(
+            "buildscripts/tests/resmoke_end2end/testfiles/one.js", result_without_module.stdout
+        )

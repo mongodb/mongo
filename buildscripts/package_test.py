@@ -533,12 +533,16 @@ def get_edition_alias(edition_name: str) -> str:
         return "org"
     return edition_name
 
+
 def validate_top_level_directory(tar_name: str):
     command = f"tar -tf {tar_name} | head -n 1 | awk -F/ '{{print $1}}'"
     proc = subprocess.run(command, capture_output=True, shell=True, text=True)
     top_level_directory = proc.stdout.strip()
     if all(os_arch not in top_level_directory for os_arch in VALID_TAR_DIRECTORY_ARCHITECTURES):
-        raise Exception(f"Found an unexpected os-arch pairing as the top level directory. Top level directory: {top_level_directory}")
+        raise Exception(
+            f"Found an unexpected os-arch pairing as the top level directory. Top level directory: {top_level_directory}"
+        )
+
 
 def validate_enterprise(sources_text, edition, binfile):
     if edition != "enterprise" and edition != "atlas":
@@ -548,6 +552,7 @@ def validate_enterprise(sources_text, edition, binfile):
         if "src/mongo/db/modules/enterprise" not in sources_text:
             raise Exception(f"Failed to find enterprise code in {edition} binary {binfile}.")
 
+
 def validate_atlas(sources_text, edition, binfile):
     if edition != "atlas":
         if "/modules/atlas/" in sources_text:
@@ -555,6 +560,7 @@ def validate_atlas(sources_text, edition, binfile):
     else:
         if "/modules/enterprise/" not in sources_text:
             raise Exception(f"Failed to find atlas code in {edition} binary {binfile}.")
+
 
 arches: Set[str] = set()
 oses: Set[str] = set()
@@ -743,7 +749,7 @@ if args.command == "branch":
                 )
                 output_text = p.stdout + p.stderr
                 logging.info(output_text)
-                
+
                 validate_enterprise(output_text, args.edition, binfile)
                 validate_atlas(output_text, args.edition, binfile)
 

@@ -45,7 +45,6 @@ def run_pty_command(cmd):
 
 
 def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
-
     # compiledb ignores command line args so just make a version rc file in anycase
     write_mongo_variables_bazelrc([])
     if persistent_compdb:
@@ -214,7 +213,6 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
                 )
         else:
             shutil.copyfile(pathlib.Path("bazel-bin") / ".clang-tidy", clang_tidy_file)
-
 
     if platform.system() == "Linux":
         # TODO: SERVER-110144 optimize this to only generate the extensions source code

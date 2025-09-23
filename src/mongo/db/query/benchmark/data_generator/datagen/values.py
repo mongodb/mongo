@@ -49,9 +49,9 @@ class RangeGenerator(typing.Generic[TVar]):
     ndv: int = -1
 
     def __post_init__(self):
-        assert type(self.interval_begin) == type(self.interval_end), (
-            "Interval ends must of the same type."
-        )
+        assert type(self.interval_begin) == type(
+            self.interval_end
+        ), "Interval ends must of the same type."
         if type(self.interval_begin) == int or type(self.interval_begin) == float:
             self.ndv = round((self.interval_end - self.interval_begin) / self.step)
         elif type(self.interval_begin) == datetime.datetime:

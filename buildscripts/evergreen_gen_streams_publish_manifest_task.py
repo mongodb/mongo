@@ -16,22 +16,28 @@ from buildscripts.util.read_config import read_config_file
 # This file is for generating the task creates a docker manifest for the distro images produced via streams_build_and_publish.
 # The docker manifest is used in order for the different architecture images to be pulled correctly without needing the particular architecture tag.
 
+
 def make_task(compile_variant: str) -> Task:
     commands = [
         BuiltInCommand("manifest.load", {}),
         FunctionCall("git get project and add git tag"),
         FunctionCall("f_expansions_write"),
         FunctionCall("set up venv"),
-        FunctionCall("set up remote credentials", {
-            "aws_key_remote": "${repo_aws_key}",
-            "aws_secret_remote": "${repo_aws_secret}"
-        }),
-        BuiltInCommand("ec2.assume_role", {"role_arn": "arn:aws:iam::664315256653:role/mongo-tf-project"}),
-        BuiltInCommand("subprocess.exec", {
-            "add_expansions_to_env": True,
-            "binary": "bash",
-            "args": ["./src/evergreen/streams_docker_manifest.sh"]
-        }),
+        FunctionCall(
+            "set up remote credentials",
+            {"aws_key_remote": "${repo_aws_key}", "aws_secret_remote": "${repo_aws_secret}"},
+        ),
+        BuiltInCommand(
+            "ec2.assume_role", {"role_arn": "arn:aws:iam::664315256653:role/mongo-tf-project"}
+        ),
+        BuiltInCommand(
+            "subprocess.exec",
+            {
+                "add_expansions_to_env": True,
+                "binary": "bash",
+                "args": ["./src/evergreen/streams_docker_manifest.sh"],
+            },
+        ),
     ]
     dependencies = {
         TaskDependency(f"streams_build_and_publish_{compile_variant.replace('-arm64', '')}"),
@@ -50,7 +56,7 @@ def main(
     current_task_name = expansions.get("task_name", "streams_publish_manifest_gen")
 
     compile_variant_name = expansions.get("compile_variant")
-    if (not compile_variant_name.endswith("-arm64")):
+    if not compile_variant_name.endswith("-arm64"):
         raise RuntimeError("This task should only run on the arm64 compile variant")
 
     build_variant = BuildVariant(name=build_variant_name)

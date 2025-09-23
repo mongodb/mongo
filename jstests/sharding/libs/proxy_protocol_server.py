@@ -26,10 +26,12 @@ from proxyprotocol.server.main import main
 # [1]: https://github.com/python/cpython/blob/5c19c5bac6abf3da97d1d9b80cfa16e003897096/Lib/asyncio/base_events.py#L1429
 original_create_server = BaseEventLoop.create_server
 
+
 async def monkeypatched_create_server(self, protocol_factory, host, port, *args, **kwargs):
     result = await original_create_server(self, protocol_factory, host, port, *args, **kwargs)
-    print(f'Now listening on {host}:{port}')
+    print(f"Now listening on {host}:{port}")
     return result
+
 
 if __name__ == "__main__":
     BaseEventLoop.create_server = monkeypatched_create_server

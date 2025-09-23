@@ -188,7 +188,9 @@ class Specification:
         )
         return f"{self.type.__name__}({', '.join(specs)})"
 
-    async def analyze(self, database_instance: DatabaseInstance, collection_name: str, field_name: str) -> None:
+    async def analyze(
+        self, database_instance: DatabaseInstance, collection_name: str, field_name: str
+    ) -> None:
         """
         Runs 'analyze' on all fields in the Specification.
 

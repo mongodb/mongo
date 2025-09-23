@@ -188,7 +188,6 @@ class HangAnalyzer(Subcommand):
                             str(pinfo.pidv),
                         )
 
-
         # Dump info of all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
             try:
@@ -291,9 +290,7 @@ class HangAnalyzer(Subcommand):
             )
         except (KeyError, OSError):
             # The error from getpass.getuser() when there is no username for a UID.
-            self.root_logger.warning(
-                "No username set for the current UID."
-            )
+            self.root_logger.warning("No username set for the current UID.")
 
     def _check_enough_free_space(self):
         usage_percent = psutil.disk_usage(".").percent

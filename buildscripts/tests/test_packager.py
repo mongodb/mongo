@@ -60,21 +60,9 @@ class TestPackager(TestCase):
             want: str
 
         cases = [
-            Case(
-                name="Old unstable",
-                version="4.3.0",
-                want="-org-unstable"
-            ),
-            Case(
-                name="Old stable 4.2",
-                version="4.2.0",
-                want="-org"
-            ),
-            Case(
-                name="Old stable 4.4",
-                version="4.4.0",
-                want="-org"
-            ),
+            Case(name="Old unstable", version="4.3.0", want="-org-unstable"),
+            Case(name="Old stable 4.2", version="4.2.0", want="-org"),
+            Case(name="Old stable 4.4", version="4.4.0", want="-org"),
             Case(
                 name="New stable standard",
                 version="8.0.0",

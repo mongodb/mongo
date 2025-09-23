@@ -181,7 +181,9 @@ class TestReport(unittest.TestResult):
                 if test.timed_out.is_set():
                     test_info.status = "timeout"
                     test_info.evergreen_status = "timeout"
-                test_status = "no failures detected" if test_info.status == "pass" else test_info.status
+                test_status = (
+                    "no failures detected" if test_info.status == "pass" else test_info.status
+                )
 
             time_taken = test_info.end_time - test_info.start_time
             self.job_logger.info(

@@ -212,7 +212,8 @@ def main() -> int:
 
     return (
         0
-        if run_prettier(prettier_path, args.check, files_to_format) and run_rules_lint(
+        if run_prettier(prettier_path, args.check, files_to_format)
+        and run_rules_lint(
             args.rules_lint_format, args.rules_lint_format_check, args.check, files_to_format
         )
         else 1

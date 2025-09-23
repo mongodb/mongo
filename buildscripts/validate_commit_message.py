@@ -138,7 +138,6 @@ def get_non_merge_queue_squashed_commits(
             # required fields, but faked out - these aren't helpful in user-facing logs
             repo=fake_repo,
             binsha=b"00000000000000000000",
-            
         )
     ]
 

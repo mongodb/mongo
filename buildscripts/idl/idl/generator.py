@@ -1431,7 +1431,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     # Write member variables
                     for field in struct.fields:
-                        if not field.ignore and not field.chained_struct_field and not field.nested_chained_parent:
+                        if (
+                            not field.ignore
+                            and not field.chained_struct_field
+                            and not field.nested_chained_parent
+                        ):
                             if not (field.type and field.type.internal_only):
                                 self.gen_member(field)
 
@@ -2911,7 +2915,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             if field.chained_struct_field:
                 continue
-            
+
             if field.nested_chained_parent:
                 continue
 
@@ -3238,19 +3242,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         for alias_no, alias in enumerate(param.deprecated_name):
             varname = f"scp_{param_no}_deprecated_alias"
             with self.get_initializer_lambda(
-                    f"auto {varname}",
-                    return_type="std::unique_ptr<ServerParameter>",
-                    capture_ref=True,
-                ):
+                f"auto {varname}",
+                return_type="std::unique_ptr<ServerParameter>",
+                capture_ref=True,
+            ):
                 self._writer.write_line(
                     f"""\
 auto {varname} = std::make_unique<IDLServerParameterDeprecatedAlias>({_encaps(alias)}, scp_{param_no}.get());
 {varname}->setIsDeprecated(true);
 return std::move({varname});"""
                 )
-            self._writer.write_line(
-                f"registerServerParameter(std::move({varname}));"
-            )
+            self._writer.write_line(f"registerServerParameter(std::move({varname}));")
 
     def gen_server_parameters(self, params, header_file_name):
         # type: (List[ast.ServerParameter], str) -> None

@@ -48,15 +48,18 @@ class TestEnum(enum.Enum):
     def __repr__(self) -> str:
         return self.name
 
+
 class TestIntEnum(enum.IntEnum):
     A = enum.auto()
 
     def __repr__(self) -> str:
         return str(self.value)
 
+
 @dataclasses.dataclass
 class NestedObject:
     str_field: Specification(str, source=lambda fkr: "A")
+
 
 @dataclasses.dataclass
 class TypesTest:
@@ -64,21 +67,20 @@ class TypesTest:
     int_field: Specification(int, source=lambda fkr: 1)
     str_field: Specification(str, source=lambda fkr: "A")
     bool_field: Specification(bool, source=lambda fkr: True)
-    datetime_datetime_field: Specification(datetime.datetime,
-                                           source=lambda fkr: DATETIME)
+    datetime_datetime_field: Specification(datetime.datetime, source=lambda fkr: DATETIME)
     bson_datetime_ms_field: Specification(
-        datetime, source=lambda fkr: bson.datetime_ms.DatetimeMS(DATETIME))
+        datetime, source=lambda fkr: bson.datetime_ms.DatetimeMS(DATETIME)
+    )
     bson_timestamp_field: Specification(
-        bson.timestamp.Timestamp,
-        source=lambda fkr: bson.timestamp.Timestamp(DATETIME, 123))
+        bson.timestamp.Timestamp, source=lambda fkr: bson.timestamp.Timestamp(DATETIME, 123)
+    )
     bson_decimal128_field: Specification(
-        bson.decimal128.Decimal128,
-        source=lambda fkr: bson.decimal128.Decimal128("1.1"))
+        bson.decimal128.Decimal128, source=lambda fkr: bson.decimal128.Decimal128("1.1")
+    )
     array_field: Specification(list, source=lambda fkr: [1, 2])
     obj_field: Specification(NestedObject)
-    dict_field: Specification(dict, source=lambda fkr: {'a': 1})
+    dict_field: Specification(dict, source=lambda fkr: {"a": 1})
     enum_field: Specification(TestEnum, source=lambda fkr: TestEnum.A)
-    int_enum_field: Specification(TestIntEnum,
-                                  source=lambda fkr: TestIntEnum.A)
+    int_enum_field: Specification(TestIntEnum, source=lambda fkr: TestIntEnum.A)
     null_field: Specification(type(None), source=lambda fkr: None)
     missing_field: Specification(type(None), source=lambda fkr: MISSING)

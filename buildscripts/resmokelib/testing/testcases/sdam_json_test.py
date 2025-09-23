@@ -34,7 +34,6 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
 
         interface.append_process_tracking_options(self.program_options, self._id)
 
-
     def _find_executable(self):
         binary = os.path.join(config.INSTALL_DIR, "sdam_json_test")
         if os.name == "nt":

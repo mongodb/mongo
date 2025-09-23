@@ -116,11 +116,12 @@ def get_script_version(
 def strip_extra_prefixes(string_with_prefix: str) -> str:
     return string_with_prefix.removeprefix("mongo/").removeprefix("v")
 
+
 def validate_license(component: dict, error_manager: ErrorManager) -> None:
     if "licenses" not in component:
         error_manager.append_full_error_message(MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR)
         return
-    
+
     valid_license = False
     for license in component["licenses"]:
         if "expression" in license:
@@ -132,15 +133,15 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
             elif "name" in license["license"]:
                 # If SPDX does not define the license used, the name field may be used to provide the license name
                 valid_license = True
-        
+
         if not valid_license:
-            licensing_validate = get_spdx_licensing().validate( expression, validate=True )
+            licensing_validate = get_spdx_licensing().validate(expression, validate=True)
             # ExpressionInfo(
             #   original_expression='',
             #   normalized_expression='',
             #   errors=[],
             #   invalid_symbols=[]
-            #)
+            # )
             valid_license = not licensing_validate.errors or not licensing_validate.invalid_symbols
             if not valid_license:
                 error_manager.append_full_error_message(licensing_validate)
@@ -179,18 +180,22 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
         return
 
     # Include the .pedigree.descendants[0] version for version matching
-    if "pedigree" in component and "descendants" in component["pedigree"] and "version" in component["pedigree"]["descendants"][0]:
+    if (
+        "pedigree" in component
+        and "descendants" in component["pedigree"]
+        and "version" in component["pedigree"]["descendants"][0]
+    ):
         comp_pedigree_version = component["pedigree"]["descendants"][0]["version"]
     else:
         comp_pedigree_version = ""
-    
 
     # At this point a version is attempted to be read from the import script file
     script_version = get_script_version(script_path, "VERSION", error_manager)
     if script_version == "":
         error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
-    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_version) and \
-        strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_pedigree_version):
+    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(
+        comp_version
+    ) and strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_pedigree_version):
         error_manager.append_full_error_message(
             VERSION_MISMATCH_ERROR
             + f"\nscript version:{script_version}\nsbom component version:{comp_version}\nsbom component pedigree version:{comp_pedigree_version}"
@@ -217,7 +222,7 @@ def validate_location(component: dict, third_party_libs: set, error_manager: Err
             error_manager.append_full_error_message(
                 "'evidence.occurrences' field must include at least one location."
             )
-        
+
         occurrences = component["evidence"]["occurrences"]
         for occurrence in occurrences:
             if "location" in occurrence:
@@ -230,7 +235,7 @@ def validate_location(component: dict, third_party_libs: set, error_manager: Err
                     lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)
                     if lib in third_party_libs:
                         third_party_libs.remove(lib)
-    
+
 
 def lint_sbom(
     input_file: str, output_file: str, third_party_libs: set, should_format: bool

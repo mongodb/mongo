@@ -18,6 +18,7 @@ from buildscripts.util.read_config import read_config_file
 # depends_on is only evaluated on task creation/validation, so all dependencies must exist prior to streams_build_and_publish.
 # Streams currently depends on multiple generated test suite tasks, which is why this task must also be generated.
 
+
 def make_task(compile_variant: str, additional_dependencies: set[str]) -> Task:
     commands = [
         BuiltInCommand("manifest.load", {}),
@@ -26,16 +27,21 @@ def make_task(compile_variant: str, additional_dependencies: set[str]) -> Task:
         FunctionCall("set up venv"),
         FunctionCall("fetch binaries"),
         FunctionCall("extract binaries"),
-        FunctionCall("set up remote credentials", {
-            "aws_key_remote": "${repo_aws_key}",
-            "aws_secret_remote": "${repo_aws_secret}"
-        }),
-        BuiltInCommand("ec2.assume_role", {"role_arn": "arn:aws:iam::664315256653:role/mongo-tf-project"}),
-        BuiltInCommand("subprocess.exec", {
-            "add_expansions_to_env": True,
-            "binary": "bash",
-            "args": ["./src/evergreen/streams_image_push.sh"]
-        }),
+        FunctionCall(
+            "set up remote credentials",
+            {"aws_key_remote": "${repo_aws_key}", "aws_secret_remote": "${repo_aws_secret}"},
+        ),
+        BuiltInCommand(
+            "ec2.assume_role", {"role_arn": "arn:aws:iam::664315256653:role/mongo-tf-project"}
+        ),
+        BuiltInCommand(
+            "subprocess.exec",
+            {
+                "add_expansions_to_env": True,
+                "binary": "bash",
+                "args": ["./src/evergreen/streams_image_push.sh"],
+            },
+        ),
     ]
     dependencies = {
         TaskDependency("archive_dist_test", compile_variant),
@@ -45,6 +51,7 @@ def make_task(compile_variant: str, additional_dependencies: set[str]) -> Task:
     for dep in additional_dependencies:
         dependencies.add(TaskDependency(dep))
     return Task(f"streams_build_and_publish_{compile_variant}", commands, dependencies)
+
 
 def main(
     expansions_file: Annotated[str, typer.Argument()] = "expansions.yml",
@@ -69,14 +76,14 @@ def main(
         else:
             # is not a display task
             task_deps.append(task.display_name)
-        
+
         required_tasks.remove(task.display_name)
-    
+
     print(task_deps)
     if required_tasks:
         print("The following required tasks were not found", required_tasks)
         raise RuntimeError("Could not find all required tasks")
-    
+
     distro = expansions.get("distro_id")
     compile_variant_name = expansions.get("compile_variant")
     current_task_name = expansions.get("task_name", "streams_build_and_publish_gen")

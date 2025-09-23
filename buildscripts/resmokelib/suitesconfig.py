@@ -273,7 +273,9 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
         """Populate the named suites by scanning config_dir/suites."""
         with cls._name_suites_lock:
             if not cls._named_suites:
-                suites_dirs = [os.path.join(_config.CONFIG_DIR, "suites")] + _config.MODULE_SUITE_DIRS
+                suites_dirs = [
+                    os.path.join(_config.CONFIG_DIR, "suites")
+                ] + _config.MODULE_SUITE_DIRS
                 for suites_dir in suites_dirs:
                     root = os.path.abspath(suites_dir)
                     if not os.path.exists(root):

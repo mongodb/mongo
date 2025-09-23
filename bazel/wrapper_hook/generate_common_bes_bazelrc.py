@@ -77,7 +77,7 @@ def write_workstation_bazelrc(args):
 
     filtered_args = args[1:]
     if "--" in filtered_args:
-        filtered_args = filtered_args[:filtered_args.index("--")] + ["--", "(REDACTED)"]
+        filtered_args = filtered_args[: filtered_args.index("--")] + ["--", "(REDACTED)"]
 
     developer_build = os.environ.get("CI") is None
     b64_cmd_line = base64.b64encode(json.dumps(filtered_args).encode()).decode()

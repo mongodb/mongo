@@ -1,6 +1,5 @@
 """Minimum and maximum dictionary declarations for the different randomized parameters (mongod and mongos)."""
 
-
 """
 For context and maintenance, see:
 https://github.com/10gen/mongo/blob/master/buildscripts/resmokelib/generate_fuzz_config/README.md#adding-new-mongo-parameters

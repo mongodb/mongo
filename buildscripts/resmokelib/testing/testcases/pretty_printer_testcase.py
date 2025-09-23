@@ -27,7 +27,6 @@ class PrettyPrinterTestCase(interface.ProcessTestCase):
         self.program_executable = program_executables[0]
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
-
         interface.append_process_tracking_options(self.program_options, self._id)
 
     def _make_process(self):

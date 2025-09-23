@@ -31,8 +31,12 @@ def validate(mdb, logger, acceptable_err_codes):
                 if "code" in res and res["code"] in acceptable_err_codes:
                     # Command not supported on view.
                     pass
-                elif ("code" in res and "errmsg" in res and res["code"] == 26 and
-                      "Timeseries buckets collection does not exist" in res["errmsg"]):
+                elif (
+                    "code" in res
+                    and "errmsg" in res
+                    and res["code"] == 26
+                    and "Timeseries buckets collection does not exist" in res["errmsg"]
+                ):
                     # TODO(SERVER-109819): Remove this workaround once v9.0 is last LTS
                     # Validating a timeseries view without a matching buckets collection fails with
                     # NamespaceNotFound. This can happen with this create+drop interleaving:

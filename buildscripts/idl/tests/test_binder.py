@@ -2896,7 +2896,7 @@ class TestBinder(testcase.IDLTestcase):
                     fcv_gated: true
                     enable_on_transitional_fcv_UNSAFE: true
             """),
-            idl.errors.ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION
+            idl.errors.ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION,
         )
 
         # if fcv_gated is false, fcv_context_unaware is not allowed

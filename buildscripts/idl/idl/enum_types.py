@@ -200,7 +200,7 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
         deserializer = self._get_enum_deserializer_name()
-        return f"{cpp_type} {deserializer}(std::int32_t value, const IDLParserContext& ctxt = IDLParserContext(\"{self.get_cpp_type_name()}\"))"
+        return f'{cpp_type} {deserializer}(std::int32_t value, const IDLParserContext& ctxt = IDLParserContext("{self.get_cpp_type_name()}"))'
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -264,7 +264,7 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
         func = self._get_enum_deserializer_name()
-        return f"{cpp_type} {func}(StringData value, const IDLParserContext& ctxt = IDLParserContext(\"{cpp_type}\"))"
+        return f'{cpp_type} {func}(StringData value, const IDLParserContext& ctxt = IDLParserContext("{cpp_type}"))'
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None

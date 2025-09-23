@@ -33,7 +33,6 @@ class TestMochaRunner(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-    
 
     def test_mocha_runner(self):
         resmoke_args = [

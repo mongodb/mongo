@@ -227,11 +227,7 @@ class ReplSetBuilder(FixtureBuilder):
         if replset.disagg_base_config:
             members = []
             for idx, node in enumerate(replset.nodes):
-                member = {
-                    "_id": idx,
-                    "host": node.get_internal_connection_string(),
-                    "priority": 1
-                }
+                member = {"_id": idx, "host": node.get_internal_connection_string(), "priority": 1}
                 members.append(member)
             disagg_base_config = {
                 **replset.disagg_base_config,
@@ -240,15 +236,17 @@ class ReplSetBuilder(FixtureBuilder):
                     "version": 1,
                     "term": 1,
                     "members": members,
-                }
+                },
             }
             for node in replset.nodes:
                 opts = node.get_mongod_options()
                 opts["set_parameters"]["disaggregatedStorageConfig"] = json.dumps(
-                    disagg_base_config)
+                    disagg_base_config
+                )
                 opts["set_parameters"]["disaggregatedStorageEnabled"] = True
                 opts["set_parameters"]["logComponentVerbosity"] = json.dumps(
-                    {"disaggregatedStorage": 5})
+                    {"disaggregatedStorage": 5}
+                )
                 node.set_mongod_options(opts)
 
         if replset.start_initial_sync_node:

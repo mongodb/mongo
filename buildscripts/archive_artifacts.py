@@ -23,7 +23,7 @@ def create_tarball(output_filename, file_patterns, exclude_patterns):
             else:
                 for f in found_files:
                     if os.path.isfile(f) or os.path.islink(f):
-                         included_files.add(f)
+                        included_files.add(f)
         except Exception as e:
             print(f"Error processing pattern '{pattern}': {e}", file=sys.stderr)
 
@@ -45,14 +45,19 @@ def create_tarball(output_filename, file_patterns, exclude_patterns):
         if shutil.which("pigz"):
             with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as tmp_file:
                 for file in sorted(list(files_to_add)):
-                    tmp_file.write(file + '\n')
+                    tmp_file.write(file + "\n")
                 tmp_file.flush()
-                tar_command = ["tar", "--dereference", "--use-compress-program", "pigz", "-cf", output_filename, "-T", tmp_file.name]
-                subprocess.run(
-                    tar_command,
-                    check=True,
-                    text=True
-                )
+                tar_command = [
+                    "tar",
+                    "--dereference",
+                    "--use-compress-program",
+                    "pigz",
+                    "-cf",
+                    output_filename,
+                    "-T",
+                    tmp_file.name,
+                ]
+                subprocess.run(tar_command, check=True, text=True)
         else:
             print("pigz not found. Using serial compression")
             with tarfile.open(output_filename, "w:gz", dereference=True) as tar:
@@ -74,28 +79,26 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         required=True,
-        help="The name of the output tarball file (e.g., archive.tar.gz)."
+        help="The name of the output tarball file (e.g., archive.tar.gz).",
     )
 
+    parser.add_argument("--base_dir", default=".", help="Directory to run in.")
+
     parser.add_argument(
-        "--base_dir",
-        default=".",
-        help="Directory to run in."
-    )
-    
-    parser.add_argument(
-        "-e", "--exclude",
-        action='append',
+        "-e",
+        "--exclude",
+        action="append",
         default=[],
-        help="A file pattern to exclude (e.g., '**/__pycache__/*'). Can be specified multiple times."
+        help="A file pattern to exclude (e.g., '**/__pycache__/*'). Can be specified multiple times.",
     )
 
     parser.add_argument(
         "patterns",
-        nargs='+',
-        help="One or more file patterns to include. Use quotes around patterns with wildcards."
+        nargs="+",
+        help="One or more file patterns to include. Use quotes around patterns with wildcards.",
     )
 
     args = parser.parse_args()

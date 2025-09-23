@@ -53,9 +53,9 @@ def should_activate_core_analysis_task(task: Task) -> bool:
 
         # Expected format is like dump_mongod.429814.core or dump_mongod-8.2.429814.core, where 429814 is the PID.
         assert len(core_file_parts) >= 3, "Unknown core dump file name format"
-        assert str.isdigit(core_file_parts[-2]), (
-            "PID not in expected location of core dump file name"
-        )
+        assert str.isdigit(
+            core_file_parts[-2]
+        ), "PID not in expected location of core dump file name"
         pid = core_file_parts[-2]
         core_dump_pids.add(pid)
 

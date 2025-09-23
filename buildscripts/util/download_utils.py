@@ -34,6 +34,7 @@ def get_s3_client():
         boto3.setup_default_session(botocore_session=botocore_session)
     return boto3.client("s3")
 
+
 def extract_s3_bucket_key(url: str) -> tuple[str, str]:
     """
     Extracts the S3 bucket name and object key from an HTTP(s) S3 URL.

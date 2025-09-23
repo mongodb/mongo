@@ -40,9 +40,11 @@ from datagen.util import Specification
 class TestGrandchild:
     g: Specification(int)
 
+
 @dataclasses.dataclass
 class TestChild:
     c: Specification(TestGrandchild)
+
 
 @dataclasses.dataclass
 class Test:
@@ -52,6 +54,7 @@ class Test:
     @staticmethod
     def compute_il(fkr: faker.proxy.Faker) -> float:
         return 1
+
 
 def test_index() -> list[pymongo.IndexModel]:
     return [

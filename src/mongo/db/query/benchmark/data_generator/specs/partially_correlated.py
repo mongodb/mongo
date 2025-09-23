@@ -12,13 +12,15 @@ class PartiallyCorrelated:
 
     @staticmethod
     def make_field1(fkr: faker.proxy.Faker) -> int:
-        return fkr.random.choice(['a','b'])
+        return fkr.random.choice(["a", "b"])
 
     @staticmethod
     def make_field2(fkr: faker.proxy.Faker) -> str:
         return fkr.random_element(
-            collections.OrderedDict([
-                (uncorrelated_faker().random.choice(['c','d']), 0.1),
-                (fkr.random.choice(['a','b']), 0.9)
-            ])
+            collections.OrderedDict(
+                [
+                    (uncorrelated_faker().random.choice(["c", "d"]), 0.1),
+                    (fkr.random.choice(["a", "b"]), 0.9),
+                ]
+            )
         )

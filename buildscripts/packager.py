@@ -50,6 +50,7 @@ DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2", "amazon202
 
 unexpected_lts_release_series = ("8.2",)
 
+
 def get_suffix(version, stable_name: str, unstable_name: str) -> str:
     parts = version.split(".")
 
@@ -59,10 +60,11 @@ def get_suffix(version, stable_name: str, unstable_name: str) -> str:
     series = f"{major}.{minor}"
 
     if major >= 5:
-        is_stable_version = (minor == 0 or series in unexpected_lts_release_series)
+        is_stable_version = minor == 0 or series in unexpected_lts_release_series
         return stable_name if is_stable_version else unstable_name
     else:
         return stable_name if minor % 2 == 0 else unstable_name
+
 
 class Spec(object):
     """Spec class."""

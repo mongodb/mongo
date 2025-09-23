@@ -1269,6 +1269,7 @@ def _bind_field(ctxt, parsed_spec, field):
         ctxt.add_must_be_query_shape_component(ast_field, ast_field.type.name, ast_field.name)
     return ast_field
 
+
 def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct, nested_chained_parent=None):
     # type: (errors.ParserContext, syntax.IDLSpec, ast.Struct, syntax.ChainedStruct, ast.Field) -> None
     """Bind the specified chained struct."""
@@ -1291,7 +1292,6 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct, nested_c
             ast_struct, ast_struct.name, chained_struct.name
         )
 
-
     # Configure a field for the chained struct.
     ast_chained_field = ast.Field(ast_struct.file_name, ast_struct.line, ast_struct.column)
     ast_chained_field.name = struct.name
@@ -1302,7 +1302,9 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct, nested_c
 
     if struct.chained_structs:
         for nested_chained_struct in struct.chained_structs or []:
-            _bind_chained_struct(ctxt, parsed_spec, ast_struct, nested_chained_struct, ast_chained_field)
+            _bind_chained_struct(
+                ctxt, parsed_spec, ast_struct, nested_chained_struct, ast_chained_field
+            )
 
     if nested_chained_parent:
         ast_chained_field.nested_chained_parent = nested_chained_parent
@@ -1712,13 +1714,19 @@ def _bind_feature_flags(ctxt, param):
                 ctxt.add_feature_flag_default_true_missing_version(param)
                 return None
 
-            if (param.enable_on_transitional_fcv_UNSAFE and
-                "(Enable on transitional FCV):" not in param.description):
+            if (
+                param.enable_on_transitional_fcv_UNSAFE
+                and "(Enable on transitional FCV):" not in param.description
+            ):
                 ctxt.add_feature_flag_enabled_on_transitional_fcv_missing_safety_explanation(param)
                 return None
         else:
             # Feature flags that should not be FCV gated must not have unsupported options.
-            for option_name in ("version", "enable_on_transitional_fcv_UNSAFE", "fcv_context_unaware"):
+            for option_name in (
+                "version",
+                "enable_on_transitional_fcv_UNSAFE",
+                "fcv_context_unaware",
+            ):
                 if getattr(param, option_name):
                     ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(param, option_name)
                     return None

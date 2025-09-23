@@ -36,6 +36,7 @@ format_multirun(
     html = "//:prettier",
     javascript = "//:prettier",
     markdown = "//:prettier",
+    python = "@aspect_rules_lint//format:ruff",
     shell = "@shfmt//:shfmt",
     sql = "//:prettier",
     starlark = "@buildifier_prebuilt//:buildifier",

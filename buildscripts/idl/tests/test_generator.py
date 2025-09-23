@@ -470,7 +470,9 @@ class TestGenerator(testcase.IDLTestcase):
         """)
         )
 
-        expected = dedent("constexpr inline auto kTestServerParameterName = \"testServerParameter\"_sd;")
+        expected = dedent(
+            'constexpr inline auto kTestServerParameterName = "testServerParameter"_sd;'
+        )
         self.assertIn(expected, header)
 
     def test_command_view_type_generates_anchor(self) -> None:
@@ -1047,18 +1049,25 @@ class TestGenerator(testcase.IDLTestcase):
             """
             )
         )
-        self.assertStringsInFile(header, [
-            "mongo::NestedChainedBase& getNestedChainedBase() { return getNestedChainedBottom().getNestedChainedBase();",
-            "void setNestedChainedBase(mongo::NestedChainedBase value) {\n        getNestedChainedBottom().setNestedChainedBase(std::move(value));",
-            "void setBase_field(std::int32_t value) {\n        getNestedChainedBase().setBase_field(std::move(value));",
-            "mongo::NestedChainedBottom& getNestedChainedBottom() { return getNestedChainedMiddle().getNestedChainedBottom();",
-            "void setNestedChainedBottom(mongo::NestedChainedBottom value) {\n        getNestedChainedMiddle().setNestedChainedBottom(std::move(value));",
-            ])
-        self.assertStringsInFile(source, ["getNestedChainedBase().setBase_field(element._numberInt());",
-            "getNestedChainedBottom().setBottom_field(element._numberInt());",
-            "getNestedChainedMiddle().setMiddle_field(element.str());",
-            "_top_field = element.boolean();",
-            ])
+        self.assertStringsInFile(
+            header,
+            [
+                "mongo::NestedChainedBase& getNestedChainedBase() { return getNestedChainedBottom().getNestedChainedBase();",
+                "void setNestedChainedBase(mongo::NestedChainedBase value) {\n        getNestedChainedBottom().setNestedChainedBase(std::move(value));",
+                "void setBase_field(std::int32_t value) {\n        getNestedChainedBase().setBase_field(std::move(value));",
+                "mongo::NestedChainedBottom& getNestedChainedBottom() { return getNestedChainedMiddle().getNestedChainedBottom();",
+                "void setNestedChainedBottom(mongo::NestedChainedBottom value) {\n        getNestedChainedMiddle().setNestedChainedBottom(std::move(value));",
+            ],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                "getNestedChainedBase().setBase_field(element._numberInt());",
+                "getNestedChainedBottom().setBottom_field(element._numberInt());",
+                "getNestedChainedMiddle().setMiddle_field(element.str());",
+                "_top_field = element.boolean();",
+            ],
+        )
 
         header, source = self.assert_generate_with_basic_types(
             dedent(

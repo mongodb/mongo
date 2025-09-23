@@ -25,6 +25,7 @@ from buildscripts.util.fileops import read_yaml_file
 
 assert sys.version_info >= (3, 7)
 
+
 @dataclass
 class Output:
     name: str
@@ -34,6 +35,7 @@ class Output:
         ts = datetime.fromtimestamp(self.ctime)
         iso_date = ts.strftime("%Y-%m-%d %H:%M:%S")
         return f"{self.name} {iso_date}"
+
 
 class AppError(Exception):
     """Application execution error."""
@@ -206,7 +208,7 @@ class GoldenTestApp(object):
         if not os.path.isdir(self.output_parent_path):
             return []
         return [
-            Output(name = name, ctime = os.path.getctime(self.get_output_path(name)))
+            Output(name=name, ctime=os.path.getctime(self.get_output_path(name)))
             for name in os.listdir(self.output_parent_path)
             if re.match(self.output_name_regex, name)
             and os.path.isdir(os.path.join(self.output_parent_path, name))
@@ -216,12 +218,13 @@ class GoldenTestApp(object):
         """Return the output name wit most recent created timestamp."""
         self.vprint("Searching for output with latest creation time")
         outputs = self.get_outputs()
-        if (len(outputs) == 0):
+        if len(outputs) == 0:
             raise AppError("No outputs found")
         else:
             latest = max(outputs, key=lambda output: output.ctime)
             self.vprint(
-               f"Found output with latest creation time: {latest.name} " + f"created at {latest.ctime}"
+                f"Found output with latest creation time: {latest.name} "
+                + f"created at {latest.ctime}"
             )
             return latest
 

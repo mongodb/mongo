@@ -6,6 +6,7 @@
 external rules-lint-ignored=true
 **/*.tpl.h rules-lint-ignored=true
 **/*.tpl.cpp rules-lint-ignored=true
+rpm/*.spec rules-lint-ignored=true
 src/mongo/bson/column/bson_column_compressed_data.inl rules-lint-ignored=true
 *.idl linguist-language=yaml
 
