@@ -1169,6 +1169,19 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                 //
                 // In addition, we should be sure to remove the 'usesExtendedRange' value from the
                 // unpack stage, since the value on the target shard may be different.
+                //
+                // TODO SERVER-111172: Remove this timeseries specific handling after 9.0 is LTS.
+                //
+                // Note: this logic only needs to run for view-ful timeseries collections
+                // but not viewless. There are two main cases to handle here inside
+                // 'patchPipelineForTimeseriesQuery'; altering the 'bucketMaxSpanSeconds' field
+                // and the altering the 'usesExtendedRange' field on the $_internalUnpackBucket
+                // stage. These fields need to be altered for different reasons, but for both the
+                // possibility for their incorrect value at this point in the retry loop stems from
+                // them being set on the primary shard that is, for one reason or another, not
+                // correct here back in the router. Viewless timeseries avoids this kickback loop
+                // between the router and primary shard, and the possibility for these cases thus
+                // does not arise.
                 if (nsStruct.executionNss.isTimeseriesBucketsCollection()) {
                     const TypeCollectionTimeseriesFields* timeseriesFields =
                         [&]() -> const TypeCollectionTimeseriesFields* {
