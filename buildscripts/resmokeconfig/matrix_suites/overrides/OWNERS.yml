@@ -42,3 +42,6 @@ filters:
   - "primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-index-builds
+  - "replica_sets_kill_secondary.yml":
+    approvers:
+      - 10gen/server-replication

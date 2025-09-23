@@ -74,3 +74,6 @@ filters:
   - "*primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-index-builds
+  - "replica_sets_kill_secondaries_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-replication
