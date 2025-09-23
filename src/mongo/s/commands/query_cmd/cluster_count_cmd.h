@@ -204,19 +204,6 @@ public:
                     auto countRequest =
                         CountCommandRequest::parse(cmdObj, IDLParserContext("count"));
 
-                    {
-                        // This scope is used to end the use of the builder whether or not we
-                        // convert to a view-less timeseries aggregate request.
-                        auto aggResult = BSONObjBuilder{};
-
-                        if (convertAndRunAggregateIfViewlessTimeseries(
-                                opCtx, routingCtx, aggResult, countRequest, nss)) {
-                            ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
-                                &result, boost::none /*tenantId*/);
-                            return true;
-                        }
-                    }
-
                     // Create an RAII object that prints the collection's shard key in the case of a
                     // tassert or crash.
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
@@ -261,6 +248,21 @@ public:
                                 countRequest.getReadConcern(),
                                 countRequest.getMaxTimeMS().has_value());
                         });
+                    }
+
+                    // Note: This must happen after query stats because query stats retain the
+                    // originating command type for timeseries.
+                    {
+                        // This scope is used to end the use of the builder whether or not we
+                        // convert to a view-less timeseries aggregate request.
+                        auto aggResult = BSONObjBuilder{};
+
+                        if (convertAndRunAggregateIfViewlessTimeseries(
+                                opCtx, routingCtx, aggResult, countRequest, nss)) {
+                            ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
+                                &result, boost::none /*tenantId*/);
+                            return true;
+                        }
                     }
 
                     // We only need to factor in the skip value when sending to the shards if we
