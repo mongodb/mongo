@@ -37,7 +37,7 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      ValidationVersion validationVersion,
                                      boost::optional<std::string> verifyConfigurationOverride,
                                      boost::optional<std::vector<std::string>> hashPrefixes,
-                                     boost::optional<std::vector<BSONElement>> unhash)
+                                     boost::optional<std::vector<std::string>> unhash)
     : _validateMode(validateMode),
       _repairMode(repairMode),
       _logDiagnostics(logDiagnostics),

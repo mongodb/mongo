@@ -21,17 +21,6 @@ const differingDocId = Random.randInt(100);
 jsTest.log.info(`Updating doc on second node: {_id: ${differingDocId}}`);
 assert.commandWorked(db2.coll.update({_id: differingDocId}, {$set: {a: "hello"}}));
 
-// TODO (SERVER-109950): Currently we also insert the differing document in its own collection
-// to know what hash bucket belongs to. This is to verify that the document found in hash
-// drill down is indeed the one we modified.
-// After unhash:true has been implemented, we can just run unhash:true instead and fetch the
-// _id of the document.
-assert.commandWorked(db1.verification.insert({_id: differingDocId}));
-jsTest.log.info(
-    "Verification collection partial: " +
-        tojson(assert.commandWorked(db1.verification.validate({collHash: true, hashPrefixes: []})).partial),
-);
-
 // Keeps drilling down until the bucket size is 1, so that we are certain which bucket
 // is differing.
 function hashDrillDown(db1, db2) {
@@ -59,15 +48,10 @@ function hashDrillDown(db1, db2) {
 
     jsTest.log.info("Prefix of differing bucket: " + tojson(prefix));
 
-    // We expect the hash prefix we found via drill down to yield exactly one bucket in the
-    // verification collection. The bucket is also expected to have exactly one document.
-    const verifPartial = assert.commandWorked(
-        db1.verification.validate({collHash: true, hashPrefixes: [prefix]}),
-    ).partial;
-    jsTest.log.info("Partial in verification collection: " + tojson(verifPartial));
-    assert.eq(Object.keys(verifPartial).length, 1);
-    const verifBucket = Object.keys(verifPartial)[0];
-    assert.eq(verifPartial[verifBucket].count, 1);
+    // Unhash with 'prefix' should return 'differingDocId'.
+    const res = assert.commandWorked(db1.coll.validate({collHash: true, unhash: [prefix]}));
+    assert.eq(res.unhashed[prefix].length, 1, res);
+    assert.eq(res.unhashed[prefix][0], {_id: differingDocId}, res);
 }
 
 hashDrillDown(db1, db2);

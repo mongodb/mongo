@@ -830,9 +830,9 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
 
     // Dump the map into results and convert the SHA256 doc hashes to strings.
     stdx::unordered_map<std::string, std::pair<std::string, int>> partial;
-    for (const auto& pair : idHashToDocHash) {
-        partial.emplace(pair.first,
-                        std::make_pair(pair.second.first.toHexString(), pair.second.second));
+    for (const auto& [prefix, hashAndCount] : idHashToDocHash) {
+        partial.emplace(prefix,
+                        std::make_pair(hashAndCount.first.toHexString(), hashAndCount.second));
     }
 
     results->addPartialHashes(std::move(partial));
@@ -890,6 +890,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // zeroed out.
     SHA256Block accumulatedBlock;
     accumulatedBlock.xorInline(accumulatedBlock);
+    bool unhash = _validateState->getUnhash().has_value();
+    stdx::unordered_map<std::string, std::vector<BSONObj>> unhashed;
+    if (unhash) {
+        for (const auto& unhashPrefix : _validateState->getUnhash().get()) {
+            unhashed[unhashPrefix] = {};
+        }
+    }
 
     for (auto record =
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
@@ -916,6 +923,16 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             SHA256Block block = SHA256Block::computeHash(
                 {ConstDataRange(record->data.data(), record->data.size())});
             accumulatedBlock.xorInline(block);
+            if (unhash) {
+                const auto idField = record->data.toBson()["_id"];
+                auto idBlock = SHA256Block::computeHash(
+                    {ConstDataRange(idField.value(), idField.valuesize())});
+                for (const auto& unhashPrefix : _validateState->getUnhash().get()) {
+                    if (idBlock.toHexString().starts_with(unhashPrefix)) {
+                        unhashed[unhashPrefix].push_back(idField.wrap());
+                    }
+                }
+            }
         }
 
         // Log the out-of-order entries as errors.
@@ -1058,6 +1075,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
     if (_validateState->isCollHashValidation()) {
         results->addCollectionHash(accumulatedBlock.toHexString());
+        if (unhash) {
+            results->addUnhashed(std::move(unhashed));
+        }
     }
 
     if (results->getNumRemovedCorruptRecords() > 0) {

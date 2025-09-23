@@ -188,12 +188,18 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     }
 
     if (_partialHashes.has_value()) {
-        BSONObjBuilder bob;
-        for (const auto& pair : *_partialHashes) {
-            bob.append(pair.first,
-                       BSON("hash" << pair.second.first << "count" << pair.second.second));
+        BSONObjBuilder bob(resultObj->subobjStart("partial"));
+        for (const auto& [prefix, hashAndCount] : *_partialHashes) {
+            bob.append(prefix,
+                       BSON("hash" << hashAndCount.first << "count" << hashAndCount.second));
         }
-        resultObj->append("partial", bob.done());
+    }
+
+    if (_unhashed.has_value()) {
+        BSONObjBuilder bob(resultObj->subobjStart("unhashed"));
+        for (const auto& [prefix, ids] : *_unhashed) {
+            bob.append(prefix, ids);
+        }
     }
 
     // Need to convert RecordId to a printable type.

@@ -399,12 +399,10 @@ public:
                                     << " requires {collHash: true}.");
         }
 
+        // TODO (SERVER-110841): Sanitize prefixes in the unhash field.
         // unhash parameter.
         const auto rawUnhash = cmdObj["unhash"];
-        boost::optional<std::vector<BSONElement>> unhash = boost::none;
-        if (rawUnhash) {
-            unhash = rawUnhash.Array();
-        }
+        boost::optional<std::vector<std::string>> unhash = boost::none;
         if (rawUnhash && replCoord->getSettings().isReplSet()) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
@@ -422,11 +420,19 @@ public:
                           << "Running the validate command with { unhash: [] } cannot be done with"
                           << " {hashPrefixes: []}.");
         }
-        if (rawUnhash && unhash.get().empty()) {
-            uasserted(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << "Running the validate command with { unhash: [] } cannot be done with"
-                          << " an empty array provided.");
+        if (rawUnhash) {
+            const auto& rawUnhashArr = rawUnhash.Array();
+            if (rawUnhashArr.empty()) {
+                uasserted(
+                    ErrorCodes::InvalidOptions,
+                    str::stream()
+                        << "Running the validate command with { unhash: [] } cannot be done with"
+                        << " an empty array provided.");
+            }
+            unhash = std::vector<std::string>();
+            for (const auto& e : rawUnhashArr) {
+                unhash->push_back(e.String());
+            }
         }
 
         auto validateMode = [&] {
