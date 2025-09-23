@@ -323,7 +323,7 @@ common:opt --//bazel/config:dbg=False
 common:opt --//bazel/config:dbg_level=2
 common:opt --//bazel/config:debug_symbols=True
 common:opt --//bazel/config:separate_debug=False
-common:opt --//bazel/config:compiler_type=gcc
+common:opt --//bazel/config:compiler_type=clang
 common:opt --//bazel/config:linker=auto
 common:opt --//bazel/config:linkstatic=True
 common:opt --//bazel/config:build_enterprise=True
@@ -345,7 +345,6 @@ common:opt_profiled --//bazel/config:separate_debug=True
 common:opt_profiled --//bazel/config:compiler_type=clang
 common:opt_profiled --//bazel/config:dtlto=True
 common:opt_profiled --//bazel/config:pgo_profile_use=True
-common:opt_profiled --//bazel/config:bolt_profile_use=True
 common:opt_profiled --enable_platform_specific_config=true
 
 --config=evg

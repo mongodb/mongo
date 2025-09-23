@@ -79,6 +79,11 @@ mongo_cc_library(
             "-Wno-deprecated-volatile",
             "-Wno-sign-compare",
         ],
+    }) + select({
+        "//bazel/config:ppc_or_s390x": [
+            "-Wno-unused-but-set-variable",
+        ],
+        "//conditions:default": [],
     }),
     features = select({
         "//bazel/config:compiler_type_gcc": ["no_volatile"],

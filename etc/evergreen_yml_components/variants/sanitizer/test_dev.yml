@@ -91,6 +91,10 @@ variables:
     bazel_compile_flags: >-
       --remote_execution_priority=3
       --dbg=True
+      --compiler_type=gcc
+      --dtlto=False
+      --pgo_profile_use=False
+      --bolt_profile_use=False
       --opt=on
       --build_otel=True
       --build_enterprise=False
@@ -756,6 +760,8 @@ buildvariants:
         --opt=on
         --ubsan=True
         --compiler_type=clang
+        --dtlto=False
+        --pgo_profile_use=False
         --allocator=tcmalloc-gperf
         --separate_debug=False
       compile_variant: *rhel8-debug-ubsan-roll-back-incremental-feature-flags

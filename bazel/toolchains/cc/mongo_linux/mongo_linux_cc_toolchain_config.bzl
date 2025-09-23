@@ -1108,6 +1108,21 @@ def _impl(ctx):
         ],
     )
 
+    clang_toolchain_resource_dir_feature = feature(
+        name = "clang_toolchain_resource_dir",
+        enabled = ctx.attr.compiler == COMPILERS.CLANG,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = ["-resource-dir=" + CLANG_RESOURCE_DIR],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     # Some of the linux versions are missing libatomic.so.1 - this is a hack so mold will use the one contained
     # within the mongo toolchain rather than needing one installed on the machine
     mold_shared_libraries_feature = feature(
@@ -1151,14 +1166,6 @@ def _impl(ctx):
                 flag_groups = [
                     flag_group(
                         flags = [""] if ctx.attr.compiler == COMPILERS.CLANG else ["-Wno-mismatched-new-delete"],
-                    ),
-                ],
-            ),
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = ["-resource-dir=" + CLANG_RESOURCE_DIR] if ctx.attr.compiler == COMPILERS.CLANG else [""],
                     ),
                 ],
             ),
@@ -1424,6 +1431,7 @@ def _impl(ctx):
         debug_types_section_feature,
         no_debug_types_section_feature,
         strip_debug_feature,
+        clang_toolchain_resource_dir_feature,
     ] + get_common_features(ctx)
 
     return [

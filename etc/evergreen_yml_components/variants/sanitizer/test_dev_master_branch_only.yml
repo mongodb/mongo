@@ -405,6 +405,8 @@ buildvariants:
         --opt=on
         --ubsan=True
         --compiler_type=clang
+        --dtlto=False
+        --pgo_profile_use=False
         --allocator=tcmalloc-gperf
         --separate_debug=False
       compile_variant: *rhel8-debug-ubsan-all-feature-flags

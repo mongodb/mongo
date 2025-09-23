@@ -85,9 +85,11 @@ if __name__ == "__main__":
     try:
         gdb.execute("run")
         gdb.execute("frame function main")
-        test_decorable()
+        # TODO(SERVER-110170): Currently bugged in clang
+        # test_decorable()
         test_dbname_nss()
-        test_string_map()
+        # TODO(SERVER-110170): Currently bugged in clang
+        # test_string_map()
         test_boost_optional()
         gdb.write("TEST PASSED\n")
     except Exception as err:

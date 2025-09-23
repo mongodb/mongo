@@ -31,6 +31,8 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2204
         --compiler_type=clang
+        --dtlto=False
+        --pgo_profile_use=False
         --copt=-fsanitize-coverage=trace-pc-guard
         --linkopt=-lvoidstar
 

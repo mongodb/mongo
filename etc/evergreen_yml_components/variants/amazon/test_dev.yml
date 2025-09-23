@@ -153,6 +153,7 @@ buildvariants:
         --jobs=1600
         --build_atlas=True
         --config=opt_profiled
+        --bolt_profile_use=True
       unittest_library_compile_flags: >-
         --config=evg
         --linkstatic=False

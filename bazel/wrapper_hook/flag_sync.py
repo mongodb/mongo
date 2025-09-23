@@ -15,6 +15,9 @@ ALLOW_LINES = [
     "common --config=local",
     "--experimental_throttle_remote_action_building",
     "--noexperimental_throttle_remote_action_building",
+    "--dtlto=False",
+    "--pgo_profile_use=False",
+    "--bolt_profile_use=False",
 ]
 
 

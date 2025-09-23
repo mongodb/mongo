@@ -550,6 +550,10 @@ mongo_cc_library(
         "dist/absl/base/internal/unscaledcycleclock.cc",
     ],
     hdrs = ABSEIL_HEADERS,
+    copts = select({
+        "//bazel/config:ppc_or_s390x": ["-Wno-sign-conversion"],
+        "//conditions:default": [],
+    }),
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
@@ -779,6 +783,10 @@ mongo_cc_library(
         "dist/absl/debugging/stacktrace.cc",
     ],
     hdrs = ABSEIL_HEADERS,
+    copts = select({
+        "//bazel/config:ppc_or_s390x": ["-Wno-shorten-64-to-32"],
+        "//conditions:default": [],
+    }),
     includes = ["dist"],
     skip_global_deps = ABSEIL_SKIP_GLOBAL_DEPS,
     deps = [
@@ -1943,7 +1951,14 @@ mongo_cc_library(
     ],
     hdrs = ABSEIL_HEADERS,
     copts = select({
-        "//bazel/config:gcc_or_clang": ["-Wno-pass-failed"],
+        "//bazel/config:gcc_or_clang": [
+            "-Wno-pass-failed",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ppc_or_s390x": [
+            "-Wno-deprecate-lax-vec-conv-all",
+        ],
         "//conditions:default": [],
     }),
     includes = ["dist"],

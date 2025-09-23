@@ -6,8 +6,10 @@ def _extensions_transition_impl(settings, attr):
     """
     return {
         "//bazel/config:allocator": "system",
+        "//bazel/config:dtlto": False,
         "//bazel/config:shared_archive": True,
         "//bazel/config:linkstatic": True,
+        "//bazel/config:pgo_profile_use": False,
         "//bazel/config:skip_archive": True,
         "//bazel/config:asan": settings.get("//bazel/config:asan", False),
         "//bazel/config:fsan": settings.get("//bazel/config:fsan", False),
@@ -22,8 +24,10 @@ extensions_transition = transition(
     inputs = [],
     outputs = [
         "//bazel/config:allocator",
+        "//bazel/config:dtlto",
         "//bazel/config:shared_archive",
         "//bazel/config:linkstatic",
+        "//bazel/config:pgo_profile_use",
         "//bazel/config:skip_archive",
         "//bazel/config:asan",
         "//bazel/config:fsan",

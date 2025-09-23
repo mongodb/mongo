@@ -98,8 +98,8 @@ PGO_PROFILE_GENERATE_ENABLED = select({
 })
 
 PGO_PROFILE_USE_ENABLED = select({
-    "@//bazel/config:pgo_profile_use_clang_enabled": "@pgo_data//:clang_pgo_files",
-    "@//bazel/config:pgo_profile_use_gcc_enabled": "@pgo_data//:gcc_pgo_files",
+    "@//bazel/config:pgo_profile_use_clang_enabled_linkstatic_enabled": "@pgo_data//:clang_pgo_files",
+    "@//bazel/config:pgo_profile_use_gcc_enabled_linkstatic_enabled": "@pgo_data//:gcc_pgo_files",
     "@//conditions:default": None,
 })
 
@@ -109,9 +109,9 @@ PROPELLER_PROFILE_GENERATE_ENABLED = select({
 })
 
 DTLTO_ENABLED = select({
-    "@//bazel/config:dtlto_linux_clang_enabled_fission_disabled": True,
-    "@//bazel/config:dtlto_disabled": False,
-}, no_match_error = "Distributed Thin LTO is only available for linux clang with fission disabled.")
+    "@//bazel/config:dtlto_linux_clang_enabled_fission_disabled_linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
 
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
@@ -119,8 +119,8 @@ LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 filegroup(
     name = "all_files",
     srcs = glob(["**/*"]) + select({
-        "@//bazel/config:pgo_profile_use_clang_enabled": ["@pgo_data//:clang_pgo_files"],
-        "@//bazel/config:pgo_profile_use_gcc_enabled": ["@pgo_data//:gcc_pgo_files"],
+        "@//bazel/config:pgo_profile_use_clang_enabled_linkstatic_enabled": ["@pgo_data//:clang_pgo_files"],
+        "@//bazel/config:pgo_profile_use_gcc_enabled_linkstatic_enabled": ["@pgo_data//:gcc_pgo_files"],
         "@//conditions:default": [],
     })
 )
