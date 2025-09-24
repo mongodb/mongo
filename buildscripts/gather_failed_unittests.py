@@ -1,19 +1,20 @@
 import os
 import shutil
 import subprocess
-import xml.etree.ElementTree as ET
 from glob import glob
 from pathlib import Path
 from typing import List
 
 import typer
 
+from buildscripts.parse_test_xml import parse_test_xml
+
 
 def _collect_test_results(testlog_dir: str) -> List[str]:
     failed_tests = []
     successful_tests = []
     for test_xml in glob(f"{testlog_dir}/**/test.xml", recursive=True):
-        testsuite = ET.parse(test_xml).getroot().find("testsuite")
+        testsuite = parse_test_xml(test_xml).find("testsuite")
         testcase = testsuite.find("testcase")
         test_file = testcase.attrib["name"]
 

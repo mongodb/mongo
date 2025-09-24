@@ -217,11 +217,25 @@ sh_binary(
     srcs = ["mount_drives.sh"],
 )
 
+py_library(
+    name = "parse_test_xml",
+    srcs = [
+        "parse_test_xml.py",
+    ],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
 py_binary(
     name = "gather_failed_unittests",
     srcs = ["gather_failed_unittests.py"],
     visibility = ["//visibility:public"],
     deps = [
+        ":parse_test_xml",
         "//buildscripts/util",
         dependency(
             "typer",

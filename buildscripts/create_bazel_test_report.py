@@ -1,12 +1,13 @@
 import json
 import time
-import xml.etree.ElementTree as ET
 from glob import glob
 from typing import List
 
 import typer
 from typing_extensions import TypedDict
 from util.expansions import get_expansion
+
+from buildscripts.parse_test_xml import parse_test_xml
 
 
 class Result(TypedDict):
@@ -36,7 +37,7 @@ def main(testlog_dir: str):
 
     report = Report({"results": []})
     for test_xml in glob(f"{testlog_dir}/**/test.xml", recursive=True):
-        testsuite = ET.parse(test_xml).getroot().find("testsuite")
+        testsuite = parse_test_xml(test_xml).find("testsuite")
         testcase = testsuite.find("testcase")
 
         # Replace part of the name added by the remote test wrapper script
