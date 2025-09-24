@@ -67,7 +67,7 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    bool isHybridBuilding() const override {
+    bool sideWritesAllowed() const override {
         MONGO_UNIMPLEMENTED;
     }
 

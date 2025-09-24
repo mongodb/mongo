@@ -238,7 +238,9 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
                                 collWriter,
                                 {std::move(idIndexBuildInfo)},
                                 MultiIndexBlock::kNoopOnInitFn,
-                                MultiIndexBlock::InitMode::SteadyState);
+                                MultiIndexBlock::InitMode::SteadyState,
+                                /*resumeInfo=*/boost::none,
+                                /*generateTableWrites=*/true);
     if (!swSpecs.isOK()) {
         return swSpecs.getStatus();
     }

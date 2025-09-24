@@ -622,10 +622,10 @@ private:
     // Maintains the state of the index build.
     IndexBuildState _indexBuildState;
 
-    // TODO(SERVER-110172): Remove this field.
     // Indicates whether this node should produce any table writes during the index build. When
     // this is false, it means that this node is a secondary and is only applying writes received
     // from the primary via the oplog.
+    // TODO(SERVER-111304): Remove this field.
     bool _generateTableWrites{true};
 
     // Represents the callback handle for scheduled remote command "voteCommitIndexBuild".

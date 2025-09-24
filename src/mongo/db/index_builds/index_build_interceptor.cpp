@@ -92,8 +92,10 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhaseSecond);
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexCatalogEntry* entry,
                                              const IndexBuildInfo& indexBuildInfo,
-                                             bool resume)
-    : _sideWritesTable([&]() {
+                                             bool resume,
+                                             bool generateTableWrites)
+    : _generateTableWrites(generateTableWrites),
+      _sideWritesTable([&]() {
           uassert(10709201, "sideWritesIdent is not provided", indexBuildInfo.sideWritesIdent);
           auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
           if (resume) {

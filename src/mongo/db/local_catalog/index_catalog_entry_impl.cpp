@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/local_catalog/durable_catalog.h"
 #include "mongo/db/local_catalog/index_catalog_entry_helpers.h"
@@ -152,6 +153,10 @@ void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> a
     _shared->_accessMethod = std::move(accessMethod);
     index_catalog_helpers::computeUpdateIndexData(
         this, _shared->_accessMethod.get(), &_shared->_indexedPaths);
+}
+
+bool IndexCatalogEntryImpl::sideWritesAllowed() const {
+    return _indexBuildInterceptor != nullptr && _indexBuildInterceptor->sideWritesAllowed();
 }
 
 bool IndexCatalogEntryImpl::isFrozen() const {
@@ -460,8 +465,8 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(10083545);
     }
 
-    bool isHybridBuilding() const final {
-        return _original->isHybridBuilding();
+    bool sideWritesAllowed() const final {
+        return _original->sideWritesAllowed();
     }
 
     IndexBuildInterceptor* indexBuildInterceptor() const final {
@@ -586,8 +591,8 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(10083552);
     }
 
-    bool isHybridBuilding() const final {
-        return _original->isHybridBuilding();
+    bool sideWritesAllowed() const final {
+        return _original->sideWritesAllowed();
     }
 
     IndexBuildInterceptor* indexBuildInterceptor() const final {

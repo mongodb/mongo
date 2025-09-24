@@ -103,7 +103,8 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       Collection* collection,
                                       const IndexBuildInfo& indexBuildInfo,
-                                      IndexBuildPhaseEnum phase) {
+                                      IndexBuildPhaseEnum phase,
+                                      bool generateTableWrites) {
     _indexBuildInfo = indexBuildInfo;
     auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
@@ -132,7 +133,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     }
 
     _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
-        opCtx, writableEntry, indexBuildInfo, /*resume=*/true);
+        opCtx, writableEntry, indexBuildInfo, /*resume=*/true, generateTableWrites);
     writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
@@ -143,7 +144,8 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
 Status IndexBuildBlock::init(OperationContext* opCtx,
                              Collection* collection,
                              const IndexBuildInfo& indexBuildInfo,
-                             bool forRecovery) {
+                             bool forRecovery,
+                             bool generateTableWrites) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -176,7 +178,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
         _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
-            opCtx, indexCatalogEntry, *_indexBuildInfo, /*resume=*/false);
+            opCtx, indexCatalogEntry, *_indexBuildInfo, /*resume=*/false, generateTableWrites);
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 
@@ -305,8 +307,11 @@ Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
                                         const IndexBuildInfo& indexBuildInfo) {
     IndexBuildBlock indexBuildBlock(
         collection->ns(), indexBuildInfo.spec, IndexBuildMethodEnum::kForeground, boost::none);
-    if (auto status =
-            indexBuildBlock.init(opCtx, collection, indexBuildInfo, /*forRecovery=*/false);
+    if (auto status = indexBuildBlock.init(opCtx,
+                                           collection,
+                                           indexBuildInfo,
+                                           /*forRecovery=*/false,
+                                           /*generateTableWrites=*/true);
         !status.isOK()) {
         return status;
     }

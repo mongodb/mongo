@@ -113,7 +113,9 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
                                                    collWriter,
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
-                                                   MultiIndexBlock::InitMode::SteadyState));
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
@@ -145,7 +147,9 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
                                                    collWriter,
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
-                                                   MultiIndexBlock::InitMode::InitialSync));
+                                                   MultiIndexBlock::InitMode::InitialSync,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
@@ -181,7 +185,9 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
                                                    coll,
                                                    {},
                                                    MultiIndexBlock::kNoopOnInitFn,
-                                                   MultiIndexBlock::InitMode::InitialSync));
+                                                   MultiIndexBlock::InitMode::InitialSync,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
         operationContext(),
@@ -216,7 +222,10 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
                 operationContext(),
                 coll,
                 {indexBuildInfo},
-                [] { throwWriteConflictException("Throw WriteConflictException in 'OnInitFn'."); }),
+                [] { throwWriteConflictException("Throw WriteConflictException in 'OnInitFn'."); },
+                MultiIndexBlock::InitMode::SteadyState,
+                boost::none,
+                /*generateTableWrites=*/true),
             DBException,
             ErrorCodes::WriteConflict);
     }
@@ -224,10 +233,15 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
     {
         WriteUnitOfWork wuow(operationContext());
         indexBuildInfo.indexIdent = "index-1";
-        ASSERT_OK(
-            indexer
-                ->init(operationContext(), coll, {indexBuildInfo}, MultiIndexBlock::kNoopOnInitFn)
-                .getStatus());
+        ASSERT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true)
+                      .getStatus());
         wuow.commit();
     }
 
@@ -264,7 +278,10 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                           ->init(operationContext(),
                                  coll,
                                  {indexBuildInfo1, indexBuildInfo2},
-                                 MultiIndexBlock::kNoopOnInitFn)
+                                 MultiIndexBlock::kNoopOnInitFn,
+                                 MultiIndexBlock::InitMode::SteadyState,
+                                 boost::none,
+                                 /*generateTableWrites=*/true)
                           .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
@@ -275,10 +292,15 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
         WriteUnitOfWork wuow(operationContext());
         indexBuildInfo1.setInternalIdents(*storageEngine,
                                           VersionContext::getDecoration(operationContext()));
-        ASSERT_OK(
-            indexer
-                ->init(operationContext(), coll, {indexBuildInfo1}, MultiIndexBlock::kNoopOnInitFn)
-                .getStatus());
+        ASSERT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo1},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true)
+                      .getStatus());
         wuow.commit();
     }
 
@@ -289,11 +311,16 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
         WriteUnitOfWork wuow(operationContext());
         indexBuildInfo1.setInternalIdents(*storageEngine,
                                           VersionContext::getDecoration(operationContext()));
-        ASSERT_EQ(
-            secondaryIndexer
-                ->init(operationContext(), coll, {indexBuildInfo1}, MultiIndexBlock::kNoopOnInitFn)
-                .getStatus(),
-            ErrorCodes::IndexBuildAlreadyInProgress);
+        ASSERT_EQ(secondaryIndexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo1},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true)
+                      .getStatus(),
+                  ErrorCodes::IndexBuildAlreadyInProgress);
     }
 
     // Trying to start multiple index builds with the same spec fails with
@@ -308,7 +335,10 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                       ->init(operationContext(),
                              coll,
                              {indexBuildInfo1, indexBuildInfo2},
-                             MultiIndexBlock::kNoopOnInitFn)
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true)
                       .getStatus(),
                   ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -331,7 +361,10 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                       ->init(operationContext(),
                              coll,
                              {indexBuildInfo3, indexBuildInfo1},
-                             MultiIndexBlock::kNoopOnInitFn)
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true)
                       .getStatus(),
                   ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -356,10 +389,15 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(
-            indexer
-                ->init(operationContext(), coll, {indexBuildInfo}, MultiIndexBlock::kNoopOnInitFn)
-                .getStatus());
+        ASSERT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true)
+                      .getStatus());
         wuow.commit();
     }
 

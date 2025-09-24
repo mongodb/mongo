@@ -213,7 +213,10 @@ Status createIndexFromSpec(OperationContext* opCtx,
                         uassertStatusOK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
                             clock->tickClusterTime(1).asTimestamp()));
                     }
-                })
+                },
+                MultiIndexBlock::InitMode::SteadyState,
+                boost::none,
+                /*generateTableWrites=*/true)
             .getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
@@ -480,7 +483,10 @@ public:
                 indexer.init(_opCtx,
                              coll,
                              {indexBuildInfo},
-                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll.get()));
+                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll.get()),
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true);
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2081,7 +2087,10 @@ public:
                 indexer.init(_opCtx,
                              coll,
                              {indexBuildInfo},
-                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, *autoColl));
+                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, *autoColl),
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/true);
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2735,7 +2744,10 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
                 _opCtx,
                 collection,
                 {indexBuildInfo},
-                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection.get()));
+                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection.get()),
+                MultiIndexBlock::InitMode::SteadyState,
+                boost::none,
+                /*generateTableWrites=*/true);
             ASSERT_OK(swSpecs.getStatus());
         }
 

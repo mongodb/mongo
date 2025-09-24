@@ -94,6 +94,12 @@ public:
         IndexBuildProtocol protocol = IndexBuildProtocol::kSinglePhase;
         IndexBuildMethodEnum method = IndexBuildMethodEnum::kHybrid;
         bool forRecovery = false;
+        // Indicates whether this node should produce any table writes during the index build. When
+        // this is false, it means that this node is a secondary and is only applying writes
+        // received from the primary via the oplog.
+        // TODO(SERVER-111304): We might be able to remove this field by not creating an instance of
+        // IndexBuildInterceptor on a standby in case of primary driven index builds.
+        bool generateTableWrites{true};
     };
 
     IndexBuildsManager() = default;

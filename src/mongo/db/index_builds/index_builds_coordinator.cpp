@@ -723,6 +723,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         options.protocol = protocol;
         // All indexes are dropped during repair and should be rebuilt normally.
         options.forRecovery = !storageGlobalParams.repair;
+        options.generateTableWrites = replIndexBuildState->getGenerateTableWrites();
         status = _indexBuildsManager.setUpIndexBuild(
             opCtx, collWriter, indexes, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
@@ -853,6 +854,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     IndexBuildsManager::SetupOptions options;
     options.protocol = protocol;
+    options.generateTableWrites = replIndexBuildState->getGenerateTableWrites();
     status = _indexBuildsManager.setUpIndexBuild(
         opCtx, collection, indexes, buildUUID, MultiIndexBlock::kNoopOnInitFn, options, resumeInfo);
     if (!status.isOK()) {
@@ -2635,6 +2637,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         : IndexBuildsManager::IndexConstraints::kEnforce;
     options.protocol = replState->protocol;
     options.method = indexBuildOptions.indexBuildMethod;
+    options.generateTableWrites = replState->getGenerateTableWrites();
 
     try {
         if (replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&

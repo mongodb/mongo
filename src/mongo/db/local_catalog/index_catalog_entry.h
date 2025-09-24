@@ -73,7 +73,7 @@ public:
 
     virtual void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 
-    virtual bool isHybridBuilding() const = 0;
+    virtual bool sideWritesAllowed() const = 0;
 
     virtual IndexBuildInterceptor* indexBuildInterceptor() const = 0;
 

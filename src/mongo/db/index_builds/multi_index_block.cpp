@@ -292,6 +292,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     OnInitFn onInit,
     const InitMode initMode,
     const boost::optional<ResumeIndexInfo>& resumeInfo,
+    bool generateTableWrites,
     const boost::optional<size_t> maxMemoryUsageBytes) {
     invariant(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X),
@@ -422,12 +423,16 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 auto status = index.block->initForResume(opCtx,
                                                          collection.getWritableCollection(opCtx),
                                                          indexes[i],
-                                                         resumeInfo->getPhase());
+                                                         resumeInfo->getPhase(),
+                                                         generateTableWrites);
                 if (!status.isOK())
                     return status;
             } else {
-                auto status = index.block->init(
-                    opCtx, collection.getWritableCollection(opCtx), indexes[i], forRecovery);
+                auto status = index.block->init(opCtx,
+                                                collection.getWritableCollection(opCtx),
+                                                indexes[i],
+                                                forRecovery,
+                                                generateTableWrites);
                 if (!status.isOK())
                     return status;
             }

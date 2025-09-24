@@ -410,8 +410,11 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                                           *storageEngine,
                                           collection->ns().dbName(),
                                           VersionContext::getDecoration(opCtx));
-            ASSERT_OK(
-                indexBuildBlock.init(opCtx, collection, indexBuildInfo, /*forRecovery=*/false));
+            ASSERT_OK(indexBuildBlock.init(opCtx,
+                                           collection,
+                                           indexBuildInfo,
+                                           /*forRecovery=*/false,
+                                           /*generateTableWrites=*/true));
             wuow.commit();
         }
         ON_BLOCK_EXIT([&indexBuildBlock, opCtx, collection] {

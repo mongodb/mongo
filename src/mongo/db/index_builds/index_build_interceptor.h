@@ -94,7 +94,16 @@ public:
     IndexBuildInterceptor(OperationContext* opCtx,
                           const IndexCatalogEntry* entry,
                           const IndexBuildInfo& indexBuildInfo,
-                          bool resume);
+                          bool resume,
+                          bool generateTableWrites);
+
+    /**
+     * Returns true if this node is allowed to perform side writes during the ongoing index build.
+     * Side writes are not permitted on a secondary in case of a primary driven index build.
+     */
+    bool sideWritesAllowed() const {
+        return _generateTableWrites;
+    }
 
     /**
      * Keeps the temporary side writes and duplicate key constraint violations tables.
@@ -228,6 +237,13 @@ private:
     Status _finishSideWrite(OperationContext* opCtx,
                             const IndexCatalogEntry* indexCatalogEntry,
                             const std::vector<BSONObj>& toInsert);
+
+    // Indicates whether this node should produce any table writes during the index build. When
+    // this is false, it means that this node is a secondary and is only applying writes received
+    // from the primary via the oplog.
+    // TODO(SERVER-111304): We might be able to remove this field by not creating an instance of
+    // IndexBuildInterceptor on a standby in case of primary driven index builds.
+    bool _generateTableWrites{true};
 
     // This temporary record store records intercepted keys that will be written into the index by
     // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.

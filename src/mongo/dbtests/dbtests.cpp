@@ -211,7 +211,15 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto indexBuildInfo = IndexBuildInfo(
         spec, *storageEngine, collection->ns().dbName(), VersionContext::getDecoration(opCtx));
-    return indexer.init(opCtx, collection, {indexBuildInfo}, onInit).getStatus();
+    return indexer
+        .init(opCtx,
+              collection,
+              {indexBuildInfo},
+              onInit,
+              MultiIndexBlock::InitMode::SteadyState,
+              boost::none,
+              /*generateTableWrites=*/true)
+        .getStatus();
 }
 
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)

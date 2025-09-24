@@ -75,8 +75,11 @@ protected:
         auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
         IndexBuildInfo indexBuildInfo(
             spec, *storageEngine, _nss.dbName(), VersionContext::getDecoration(operationContext()));
-        return std::make_unique<IndexBuildInterceptor>(
-            operationContext(), createIndex(std::move(spec)), indexBuildInfo, /*resume=*/false);
+        return std::make_unique<IndexBuildInterceptor>(operationContext(),
+                                                       createIndex(std::move(spec)),
+                                                       indexBuildInfo,
+                                                       /*resume=*/false,
+                                                       /*generateTableWrites=*/true);
     }
 
     /**

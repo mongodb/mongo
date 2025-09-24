@@ -79,21 +79,27 @@ public:
      * getEntry(). IndexCatalog will still own the entry.
      *
      * Must be called from within a `WriteUnitOfWork`
+     * TODO(SERVER-111304): We might be able to remove generateTableWrites param by not creating an
+     * instance of IndexBuildInterceptor on a standby in case of primary driven index builds.
      */
     Status init(OperationContext* opCtx,
                 Collection* collection,
                 const IndexBuildInfo& indexBuildInfo,
-                bool forRecovery);
+                bool forRecovery,
+                bool generateTableWrites);
 
     /**
      * Makes sure that an entry for the index was created at startup in the IndexCatalog. Returns
      * an error status if we are resuming from the bulk load phase and the index ident was unable
      * to be dropped or recreated in the storage engine.
+     * TODO(SERVER-111304): We might be able to remove generateTableWrites param by not creating an
+     * instance of IndexBuildInterceptor on a standby in case of primary driven index builds.
      */
     Status initForResume(OperationContext* opCtx,
                          Collection* collection,
                          const IndexBuildInfo& indexBuildInfo,
-                         IndexBuildPhaseEnum phase);
+                         IndexBuildPhaseEnum phase,
+                         bool generateTableWrites);
 
     /**
      * Marks the state of the index as 'ready' and commits the index to disk.

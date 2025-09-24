@@ -89,9 +89,7 @@ public:
 
     void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final;
 
-    bool isHybridBuilding() const final {
-        return _indexBuildInterceptor != nullptr;
-    }
+    bool sideWritesAllowed() const final;
 
     IndexBuildInterceptor* indexBuildInterceptor() const final {
         return _indexBuildInterceptor;

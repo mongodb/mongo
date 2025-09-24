@@ -140,8 +140,9 @@ public:
         CollectionWriter& collection,
         const std::vector<IndexBuildInfo>& indexes,
         OnInitFn onInit,
-        InitMode initMode = InitMode::SteadyState,
-        const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none,
+        InitMode initMode,
+        const boost::optional<ResumeIndexInfo>& resumeInfo,
+        bool generateTableWrites,
         boost::optional<size_t> maxMemoryUsageBytes = boost::none);
     /**
      * Not all index initializations need an OnInitFn, in particular index builds that do not need

@@ -77,7 +77,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool isHybridBuilding() const final {
+    bool sideWritesAllowed() const final {
         MONGO_UNREACHABLE;
     }
 

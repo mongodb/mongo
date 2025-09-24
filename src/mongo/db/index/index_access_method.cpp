@@ -334,7 +334,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket);
 
     auto status = Status::OK();
-    if (entry->isHybridBuilding() || !entry->isReady()) {
+    if (entry->sideWritesAllowed() || !entry->isReady()) {
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll->ns(),
@@ -647,7 +647,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     if (!indexFilter || exec::matcher::matchesBSON(indexFilter, from)) {
         // Override key constraints when generating keys for removal. This only applies to keys
         // that do not apply to a partial filter expression.
-        const auto getKeysMode = entry->isHybridBuilding()
+        const auto getKeysMode = entry->sideWritesAllowed()
             ? InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered
             : options.getKeysMode;
 
@@ -696,7 +696,7 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
                                              const UpdateTicket& ticket,
                                              int64_t* numInserted,
                                              int64_t* numDeleted) {
-    invariant(!entry->isHybridBuilding());
+    invariant(!entry->sideWritesAllowed());
     invariant(ticket.newKeys.size() ==
               ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size());
     invariant(numInserted);
@@ -1617,7 +1617,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     const InsertDeleteOptions& options,
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
-    if (entry->isHybridBuilding()) {
+    if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
         // See SERVER-28975 and SERVER-39705 for details.
@@ -1670,7 +1670,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
 
-    if (entry->isHybridBuilding()) {
+    if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
         // See SERVER-28975 and SERVER-39705 for details.

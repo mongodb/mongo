@@ -2176,7 +2176,7 @@ public:
                                                  VersionContext::getDecoration(&_opCtx));
                 auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2453,7 +2453,7 @@ public:
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2786,7 +2786,7 @@ public:
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2841,7 +2841,7 @@ public:
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -3447,7 +3447,7 @@ public:
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -3502,7 +3502,7 @@ public:
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -4723,7 +4723,7 @@ public:
                 indexBuildInfo.setInternalIdents(*storageEngine,
                                                  VersionContext::getDecoration(&_opCtx));
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false);
+                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
