@@ -361,6 +361,8 @@ buildvariants:
     allowed_requesters: ["commit"]
     activate: true
     # TODO (RNDSEC-1453): Add paths: - "sbom.json" when the  DEVPROD-22112 ticket is fixed
+    paths:
+      - "sbom.json"
     tags: []
     run_on:
       - rhel8.8-small
