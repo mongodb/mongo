@@ -116,7 +116,7 @@ host_adapter::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 }
 }  // namespace
 
-stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> ExtensionLoader::loadedExtensions;
+stdx::unordered_map<std::string, LoadedExtension> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionNames) {
     if (extensionNames.empty()) {
@@ -208,10 +208,10 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
                           << "' failed: " << swExtensionLib.getStatus().reason(),
             swExtensionLib.isOK());
 
-    // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
+    // Add the 'SharedLibrary' pointer to our loaded extensions map to keep it alive for the
     // lifetime of the server.
-    loadedExtensions.emplace(name, std::move(swExtensionLib.getValue()));
-    auto& extensionLib = loadedExtensions[name];
+    loadedExtensions.emplace(name, LoadedExtension{std::move(swExtensionLib.getValue()), config});
+    auto& extensionLib = loadedExtensions[name].library;
 
     host_adapter::ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
     // Validate that the major and minor versions from the extension implementation are compatible
@@ -229,12 +229,15 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
     extHandle.initialize(portal, HostServices::get());
 }
 
-std::vector<std::string> ExtensionLoader::getLoadedExtensions() {
-    std::vector<std::string> result;
-    result.reserve(loadedExtensions.size());
+stdx::unordered_map<std::string, ExtensionConfig> ExtensionLoader::getLoadedExtensions() {
+    stdx::unordered_map<std::string, ExtensionConfig> result;
 
-    for (const auto& [name, _] : loadedExtensions) {
-        result.push_back(name);
+    for (const auto& [name, loadedExtension] : loadedExtensions) {
+        tassert(11048700,
+                str::stream() << "Extension names must be unique, but '" << name
+                              << "' already exists",
+                !result.contains(name));
+        result.insert({name, loadedExtension.config});
     }
 
     return result;

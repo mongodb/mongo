@@ -79,14 +79,17 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListExtensions::createFromBso
             "$listExtensions must be run against the 'admin' database with {aggregate: 1}",
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
-    // Get the loaded extensions and insert them in the queue with the format {"extensionName":
-    // "..."}. The queue won't be populated until the first call to getNext().
+    // Get the loaded extensions and insert them in the queue with the format
+    // {"extensionName": "...", "extensionOptions": {...}}. The queue won't be
+    // populated until the first call to getNext().
     DocumentSourceQueue::DeferredQueue deferredQueue{[]() {
         const auto loadedExtensions = extension::host::ExtensionLoader::getLoadedExtensions();
         std::deque<DocumentSource::GetNextResult> queue;
 
-        for (const auto& extensionName : loadedExtensions) {
-            queue.push_back(Document(BSON("extensionName" << extensionName)));
+        for (const auto& [extensionName, config] : loadedExtensions) {
+            // TODO(SERVER-111166): Convert config.extOptions to a BSON directly, not a string.
+            queue.push_back(Document(BSON("extensionName" << extensionName << "extensionOptions"
+                                                          << YAML::Dump(config.extOptions))));
         }
 
         // Canonicalize output order of results. Sort in ascending order so that

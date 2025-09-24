@@ -8,10 +8,14 @@ import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    generateExtensionConfigs,
+    deleteExtensionConfigs,
+    generateExtensionConfigWithOptions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-// Extensions are only supported on Linux platforms, so skip this test on other operating systems.
 if (!isLinux()) {
+    jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
     quit();
 }
 
@@ -141,13 +145,19 @@ describe("$listExtensions with no extensions loaded", function () {
 });
 
 describe("$listExtensions with some extensions loaded", function () {
-    const extensionNames = generateExtensionConfigs([
-        "libfoo_mongo_extension.so",
-        "libbar_mongo_extension.so",
-        "libvector_search_extension.so",
-    ]);
+    const libParseExtension = generateExtensionConfigWithOptions(
+        "libparse_options_mongo_extension.so",
+        "{checkMax: false, max: 1}",
+    );
+    const libTestOptionsExtension = generateExtensionConfigWithOptions(
+        "libtest_options_mongo_extension.so",
+        "{optionA: true}",
+    );
+    const libFooExtension = generateExtensionConfigs("libfoo_mongo_extension.so")[0];
+    // The order of extensions is intentionally not alphabetical to verify sorting.
+    const extensionsToLoad = [libParseExtension, libFooExtension, libTestOptionsExtension];
     const extOpts = {
-        loadExtensions: extensionNames,
+        loadExtensions: extensionsToLoad,
     };
 
     function checkResultsCorrectAndSorted(conn) {
@@ -155,10 +165,12 @@ describe("$listExtensions with some extensions loaded", function () {
             .getDB("admin")
             .aggregate([{$listExtensions: {}}])
             .toArray();
+        // TODO(SERVER-111166): Update extensionOptions values after converting YAML to BSON
+        // properly.
         const expected = [
-            {"extensionName": extensionNames[1]},
-            {"extensionName": extensionNames[0]},
-            {"extensionName": extensionNames[2]},
+            {"extensionName": libFooExtension, "extensionOptions": "{}"},
+            {"extensionName": libParseExtension, "extensionOptions": "checkMax: false\nmax: 1"},
+            {"extensionName": libTestOptionsExtension, "extensionOptions": "optionA: true"},
         ];
         assert.eq(actual, expected);
     }
@@ -196,6 +208,6 @@ describe("$listExtensions with some extensions loaded", function () {
     });
 
     after(function () {
-        deleteExtensionConfigs(extensionNames);
+        deleteExtensionConfigs(extensionsToLoad);
     });
 });

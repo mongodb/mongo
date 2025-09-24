@@ -45,6 +45,11 @@ struct ExtensionConfig {
     YAML::Node extOptions;
 };
 
+struct LoadedExtension {
+    std::unique_ptr<SharedLibrary> library;
+    ExtensionConfig config;
+};
+
 static ::MongoExtensionAPIVersion supportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
 
 static const ::MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPORTED = {
@@ -73,15 +78,15 @@ public:
 
 
     /**
-     * Returns the names of the currently registered extensions.
+     * Returns the names and configurations of the currently registered extensions.
      */
-    static std::vector<std::string> getLoadedExtensions();
+    static stdx::unordered_map<std::string, ExtensionConfig> getLoadedExtensions();
 
 private:
     // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
     // and track what extensions have been loaded. Initialized during process initialization and
     // const thereafter. These are intentionally "leaked" on shutdown.
-    static stdx::unordered_map<std::string, std::unique_ptr<SharedLibrary>> loadedExtensions;
+    static stdx::unordered_map<std::string, LoadedExtension> loadedExtensions;
 
     // Expected YAML config file field names.
     static inline constexpr char kSharedLibraryPath[] = "sharedLibraryPath";
